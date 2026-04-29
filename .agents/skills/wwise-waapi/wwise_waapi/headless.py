@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterable, Protocol, TextIO
 
+from .platform_paths import build_wwise_console_command  # pyright: ignore[reportMissingImports]
+
 
 MACOS_WWISE_CONSOLE = Path(
     "/Applications/Audiokinetic/Wwise2022.1.19.8584/Wwise.app/Contents/Tools/WwiseConsole.sh"
@@ -280,8 +282,12 @@ class HeadlessLifecycle:
         assert_port_free(self.host, selected_port)
         self.port = selected_port
         self.console_path = resolved_path
-        project_args = [str(self.project_path)] if self.project_path is not None else []
-        self.command = [str(resolved_path), "waapi-server", *project_args, "--wamp-port", str(selected_port), *self.command_extra_args]
+        self.command = build_wwise_console_command(
+            resolved_path,
+            selected_port,
+            project_path=self.project_path,
+            extra_args=self.command_extra_args,
+        )
 
         def start_process() -> Any:
             kwargs: dict[str, Any] = {
