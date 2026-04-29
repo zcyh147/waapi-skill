@@ -1,0 +1,39 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Runtime data and generated artifacts
+data/
+logs/
+artifacts/
+tmp/
+cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Tooling
+.mypy_cache/
+.ruff_cache/
+.tox/
+
+# Local Wwise / browser state
+browser_state/
+auth/
+state.json
+auth_info.json
+library.json
+cookies.json
+session*.json
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*~

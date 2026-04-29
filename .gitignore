@@ -1,0 +1,16 @@
+.agents/
+.sisyphus/
+skills-lock.json
+
+# Python / test artifacts
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+env/

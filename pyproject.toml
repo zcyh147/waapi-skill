@@ -1,0 +1,17 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+  "live: tests that require Wwise and WAAPI access",
+  "destructive: tests that may mutate a fixture Wwise project",
+]
+
+[tool.coverage.run]
+branch = true
+relative_files = true
+source = [".agents/skills/wwise-waapi"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = true
