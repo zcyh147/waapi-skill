@@ -98,10 +98,59 @@ def test_audit_rejects_unknown_deferred_entries() -> None:
 
 
 def test_manifest_shape_errors_fail_before_any_uri_can_be_silently_skipped() -> None:
+    with pytest.raises(ValueError, match="missing required sections: functions, topics"):
+        ApiCoverageAuditor().audit({}, DeferredRegistry())
+    with pytest.raises(ValueError, match="missing required sections: topics"):
+        ApiCoverageAuditor().audit({"functions": []}, DeferredRegistry())
+    with pytest.raises(ValueError, match="at least one reflected"):
+        ApiCoverageAuditor().audit({"functions": [], "topics": []}, DeferredRegistry())
     with pytest.raises(ValueError, match="function section must be a list"):
         ApiCoverageAuditor().audit({"functions": {}, "topics": []}, DeferredRegistry())
     with pytest.raises(ValueError, match="missing uri"):
         ApiCoverageAuditor().audit({"functions": [{"name": "missing"}], "topics": []}, DeferredRegistry())
+
+
+def test_audit_rejects_behavioral_and_deferred_overlap() -> None:
+    manifest = {"functions": [{"uri": "ak.wwise.core.getInfo"}], "topics": []}
+    registry = DeferredRegistry.from_mappings([_valid_deferred_payload("ak.wwise.core.getInfo")])
+    behavior = BehavioralCoverageRecord(
+        uri="ak.wwise.core.getInfo",
+        version="2022.1",
+        category="core",
+        evidence_source="tests/unit/test_api_coverage_audit.py::fixture",
+        test_name="test_get_info_behavior",
+    )
+
+    result = ApiCoverageAuditor().audit(manifest, registry, [behavior], version="2022.1")
+
+    assert result.passed is False
+    assert result.invalid == ("URI ak.wwise.core.getInfo has both behavioral coverage and a deferred entry",)
+
+
+def test_deferred_entry_with_wrong_risk_level_fails_usefully() -> None:
+    manifest = {"functions": [{"uri": "ak.wwise.debug.testCrash"}], "topics": []}
+    payload = _valid_deferred_payload("ak.wwise.debug.testCrash")
+    payload["risk_level"] = "low"
+    registry = DeferredRegistry.from_mappings([payload])
+
+    result = ApiCoverageAuditor().audit(manifest, registry, version="2022.1")
+
+    assert result.passed is False
+    assert result.invalid == ("Deferred entry ak.wwise.debug.testCrash risk_level 'low' != deterministic 'high'",)
+
+
+def test_behavioral_record_reports_non_string_fields_as_missing() -> None:
+    record = BehavioralCoverageRecord(
+        uri="ak.wwise.core.getInfo",
+        version="2022.1",
+        category="core",
+        evidence_source="tests/unit/test_api_coverage_audit.py::fixture",
+        test_name="test_get_info_behavior",
+    )
+    object.__setattr__(record, "test_name", None)
+
+    with pytest.raises(ValueError, match="missing: test_name"):
+        record.validate()
 
 
 def _valid_deferred_payload(uri: str, item_type: str = "function") -> dict[str, str]:
