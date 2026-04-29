@@ -26,8 +26,9 @@ def test_headless_lifecycle_defaults_are_safe_before_launch() -> None:
     lifecycle.shutdown()
 
 
-def test_dispatcher_placeholder_raises() -> None:
-    import pytest  # pyright: ignore[reportMissingImports]
+def test_dispatcher_returns_structured_error_before_live_client_exists() -> None:
+    result = WwiseDispatcher().dispatch("ak.test.command")
 
-    with pytest.raises(NotImplementedError):
-        WwiseDispatcher().dispatch("ak.test.command")
+    assert result["ok"] is False
+    assert result["error_code"] == "API_NOT_FOUND"
+    assert result["api"] == "ak.test.command"

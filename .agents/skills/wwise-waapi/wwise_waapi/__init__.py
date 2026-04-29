@@ -7,7 +7,7 @@ from .api_coverage_audit import (  # pyright: ignore[reportMissingImports]
     BehavioralCoverageRecord,
 )
 from .deferred_registry import DeferredRegistry
-from .dispatcher import WwiseDispatcher
+from .dispatcher import DispatcherRequest, WwiseDispatcher
 from .headless import HeadlessLifecycle
 from .manifest import ManifestAudit, ManifestStore, ReflectionManifestBuilder, WaapiReflectionClient
 from .notebooklm_gate import (  # pyright: ignore[reportMissingImports]
@@ -20,6 +20,7 @@ from .subscriptions import SubscriptionManager
 
 __all__ = [
     "DeferredRegistry",
+    "DispatcherRequest",
     "ApiCoverageAuditor",
     "ApiCoverageAuditResult",
     "BehavioralCoverageRecord",
