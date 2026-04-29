@@ -17,6 +17,15 @@ from .notebooklm_gate import (  # pyright: ignore[reportMissingImports]
     require_docs_generation,
 )
 from .subscriptions import SubscriptionManager
+from .waql import (  # pyright: ignore[reportMissingImports]
+    WAQL_EXAMPLES,
+    WaqlReferenceGate,
+    WaqlReferenceStatus,
+    require_waql_helper_generation,
+    validate_stored_waql_examples,
+    validate_waql_example,
+    waql_api_uris,
+)
 
 __all__ = [
     "DeferredRegistry",
@@ -36,5 +45,12 @@ __all__ = [
     "SubscriptionManager",
     "ReflectionManifestBuilder",
     "WaapiReflectionClient",
+    "WAQL_EXAMPLES",
+    "WaqlReferenceGate",
+    "WaqlReferenceStatus",
+    "require_waql_helper_generation",
+    "validate_stored_waql_examples",
+    "validate_waql_example",
+    "waql_api_uris",
     "WwiseDispatcher",
 ]
