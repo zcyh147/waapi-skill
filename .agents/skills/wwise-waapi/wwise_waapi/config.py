@@ -6,6 +6,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 
+DEFAULT_WWISE_CONSOLE_MACOS = Path(
+    "/Applications/Audiokinetic/Wwise2022.1.19.8584/Wwise.app/Contents/Tools/WwiseConsole.sh"
+)
+WINDOWS_WWISE_CONSOLE_RELATIVE = Path("Authoring") / "x64" / "Release" / "bin" / "WwiseConsole.exe"
+
+
 @dataclass(slots=True, frozen=True)
 class SkillPaths:
     """Resolved paths used by the Wwise WAAPI skill."""
@@ -41,6 +47,11 @@ class SkillConfig:
     )
     wwise_live_env: str = "WWISE_LIVE"
     wwise_destructive_env: str = "WWISE_DESTRUCTIVE"
+    wwise_version_env: str = "WWISE_VERSION"
+    wwise_console_env: str = "WWISE_CONSOLE"
+    wwise_root_env: str = "WWISEROOT"
+    default_wwise_console_macos: Path = DEFAULT_WWISE_CONSOLE_MACOS
+    windows_wwise_console_relative: Path = WINDOWS_WWISE_CONSOLE_RELATIVE
 
     def __post_init__(self) -> None:
         self.paths = SkillPaths(self.skill_root)

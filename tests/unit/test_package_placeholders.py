@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest  # pyright: ignore[reportMissingImports]
-
 from wwise_waapi import DeferredRegistry, HeadlessLifecycle, ManifestStore, SubscriptionManager, WwiseDispatcher  # pyright: ignore[reportMissingImports]
 
 
@@ -21,16 +19,15 @@ def test_placeholder_registry_and_dispatcher_methods() -> None:
     assert subscriptions.active_topics == set()
 
 
-@pytest.mark.parametrize(
-    "method_name",
-    ["launch", "wait_ready", "shutdown"],
-)
-def test_headless_methods_raise_not_implemented(method_name: str) -> None:
+def test_headless_lifecycle_defaults_are_safe_before_launch() -> None:
     lifecycle = HeadlessLifecycle()
-    with pytest.raises(NotImplementedError):
-        getattr(lifecycle, method_name)()
+    assert lifecycle.console_path is None
+    assert lifecycle.port is None
+    lifecycle.shutdown()
 
 
 def test_dispatcher_placeholder_raises() -> None:
+    import pytest  # pyright: ignore[reportMissingImports]
+
     with pytest.raises(NotImplementedError):
         WwiseDispatcher().dispatch("ak.test.command")
