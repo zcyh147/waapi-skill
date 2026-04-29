@@ -4,7 +4,7 @@ from .config import SkillConfig, SkillPaths
 from .deferred_registry import DeferredRegistry
 from .dispatcher import WwiseDispatcher
 from .headless import HeadlessLifecycle
-from .manifest import ManifestStore
+from .manifest import ManifestAudit, ManifestStore, ReflectionManifestBuilder, WaapiReflectionClient
 from .notebooklm_gate import (  # pyright: ignore[reportMissingImports]
     NotebookLMGate,
     NotebookLMGateStatus,
@@ -16,6 +16,7 @@ from .subscriptions import SubscriptionManager
 __all__ = [
     "DeferredRegistry",
     "HeadlessLifecycle",
+    "ManifestAudit",
     "ManifestStore",
     "NotebookLMGate",
     "NotebookLMGateStatus",
@@ -24,5 +25,7 @@ __all__ = [
     "SkillConfig",
     "SkillPaths",
     "SubscriptionManager",
+    "ReflectionManifestBuilder",
+    "WaapiReflectionClient",
     "WwiseDispatcher",
 ]
