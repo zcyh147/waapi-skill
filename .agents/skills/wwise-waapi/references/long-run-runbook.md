@@ -67,3 +67,99 @@ Required evidence paths:
 Final verification is not self-completing. After targeted tests, full pytest, coverage, live-gated evidence review, Windows gate review, and final review agents complete, present the verification results to the user and wait for explicit user okay before marking the final verification wave complete.
 
 The approval stop must be recorded in `.sisyphus/evidence/task-12-approval-stop.md`. The runbook constraint test evidence belongs in `.sisyphus/evidence/task-12-runbook.md`.
+
+## Live sandbox execution modes
+
+Use these commands from the repository root. Default pytest must stay Wwise-free, and live or destructive suites must be opt-in through environment variables.
+
+### Default Wwise-free verification
+
+```bash
+python -m pytest -q
+```
+
+Expected result: unit tests pass without launching Wwise, opening WwiseConsole, requiring SampleProject, or reading live credentials.
+
+### Live smoke prerequisites
+
+```bash
+WWISE_LIVE=1 \
+WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject \
+python -m pytest tests/live/test_live_prerequisites.py -q
+```
+
+Expected result: the prerequisite gate proves that the local Wwise 2022.1 console and immutable SampleProject source are present. If the gate fails, do not run live or destructive suites. Record the exact missing prerequisite instead.
+
+### Live sandbox read-only workflows
+
+```bash
+WWISE_LIVE=1 \
+WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject \
+python -m pytest tests/live/test_waql_live_matrix.py tests/live/test_object_topics_sandbox.py -q
+```
+
+Expected result: read-only live checks use SampleProject as the source fixture and keep generated evidence bounded to the test output and `.sisyphus/evidence/wwise-waapi-live-sandbox-coverage/` when explicitly written by the suite.
+
+### Destructive sandbox workflows
+
+```bash
+WWISE_LIVE=1 \
+WWISE_DESTRUCTIVE=1 \
+WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+python -m pytest tests/destructive/test_project_mutation_sandbox.py tests/destructive/test_soundbank_audio_sandbox.py -q
+```
+
+Destructive tests must only mutate copied sandboxes under `WWISE_SANDBOX_ROOT`. Never point `WWISE_FIXTURE_PROJECT` at a source project, production project, user project, or any `.wproj` outside the active sandbox root.
+
+### Keep-on-failure evidence workflow
+
+```bash
+WWISE_LIVE=1 \
+WWISE_DESTRUCTIVE=1 \
+WWISE_SANDBOX_KEEP_ON_FAILURE=1 \
+WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+python -m pytest tests/destructive/test_project_mutation_sandbox.py -q
+```
+
+When a destructive sandbox fails and `WWISE_SANDBOX_KEEP_ON_FAILURE=1` is set, inspect the preserved sandbox and evidence under `.sisyphus/evidence/wwise-waapi-live-sandbox-coverage/`. Compare copied `.wproj`, `.wwu`, generated bank, audio, and log artifacts there. Do not commit preserved sandboxes, generated banks, generated audio, runtime logs, caches, `.venv`, or auth/session state.
+
+### Prerequisite failure workflow
+
+```bash
+WWISE_LIVE=1 \
+WWISE_SAMPLE_PROJECT_PATH=/missing/or/unavailable/SampleProject \
+python -m pytest tests/live/test_live_prerequisites.py -q
+```
+
+Expected result: with `WWISE_LIVE=1` set, missing Wwise or SampleProject prerequisites must fail fast with a clear prerequisite error before any live or destructive workflow continues. Do not silently skip, fall back to fake routes, or treat the live opt-in failure as substitute coverage. Fix the local prerequisite, then rerun the live smoke command before trying category suites again.
+
+### Windows-pending workflow
+
+```bash
+python -m pytest tests/unit/test_phase2_coverage_summary.py -q
+```
+
+Expected result: the summary keeps `windows_validation` as `pending` unless Windows-host evidence exists. macOS-generated `GeneratedSoundBanks/Windows` artifacts are sandbox output only, not Windows validation.
+
+## Live environment variables
+
+- `WWISE_SAMPLE_PROJECT_PATH`: immutable source-to-copy fixture path. The local example is `/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject`. This source is copied because tests need disposable sandboxes while the installed SampleProject stays unchanged and is not committed or vendored.
+- `WWISE_FIXTURE_PROJECT`: active copied `.wproj` used by a live or destructive test. For destructive runs, it must be under `WWISE_SANDBOX_ROOT`.
+- `WWISE_SANDBOX_ROOT`: root directory for copied sandbox projects. The default project runtime path is `.sisyphus/runtime/wwise-waapi-sandboxes`.
+- `WWISE_SANDBOX_KEEP_ON_FAILURE`: set to `1` to preserve a failing sandbox and evidence for inspection. Leave unset for normal cleanup.
+- `WWISE_LIVE`: set to `1` to opt into live Wwise prerequisite and read-only sandbox suites.
+- `WWISE_DESTRUCTIVE`: set to `1` together with `WWISE_LIVE=1` to opt into copied-sandbox mutation suites. It has no destructive effect without the live gate.
+
+## Rerunning failed category suites
+
+Rerun only the failed category after the prerequisite smoke test passes. Keep the same env contract so evidence remains comparable.
+
+```bash
+WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject python -m pytest tests/live/test_waql_live_matrix.py -q
+WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject python -m pytest tests/live/test_profiler_transport_soundengine.py -q
+WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes python -m pytest tests/destructive/test_soundbank_audio_sandbox.py -q
+```
+
+Accepted WAAPI calls alone are not coverage. Promotion requires bounded readback, topic payload, profiler payload, generated artifact, or cleanup evidence that matches the category contract.

@@ -1,0 +1,69 @@
+# Wwise WAAPI Phase 2 user review packet
+
+Use this packet when asking the user to approve the Phase 2 live sandbox coverage outcome. It summarizes what changed, what remains deferred, and what must not be claimed yet.
+
+## Before and after counts
+
+| Metric | Count |
+| --- | ---: |
+| Reflected Wwise 2022.1 APIs | 144 |
+| Functions | 112 |
+| Topics | 32 |
+| Original deferred before Phase 2 | 117 |
+| Original deferred after Phase 2 | 74 |
+| Original deferred promoted to behavioral coverage | 13 |
+| Original deferred policy-approved as inventory only | 30 |
+| Live behavioral covered count | 13 |
+| Behavioral covered count including fake-route coverage | 38 |
+
+## Final status split
+
+| Status | Count | Review meaning |
+| --- | ---: | --- |
+| `fake-route-tested` | 25 | Non-policy Phase 1 fake-route coverage remains accepted, but it is not live behavior. |
+| `sandbox-mutating-tested` | 13 | Original deferred APIs promoted through copied-sandbox behavior evidence. |
+| `skipped-approved` | 21 | `cli`, `core.remote`, and `debug` are user-approved inventory-only exclusions. |
+| `wrapper-only` | 11 | `ui`, `ui.commands`, and `ui.project` keep wrapper diagnostics only. |
+| `still-deferred-with-evidence` | 74 | Deferred entries have concrete blocker evidence and future review triggers. |
+
+Do not claim that all 117 original deferred APIs are fully behavior-tested. The accepted split is 13 promoted behavioral, 30 policy-approved inventory-only, and 74 still deferred with evidence.
+
+## Promoted APIs and statuses
+
+The promoted Phase 2 live behavior is limited to the 13 original deferred APIs that reached `sandbox-mutating-tested`. These are copied-sandbox object, audio, SoundBank, and undo mutation flows with readback or generated-artifact evidence. They count as live behavioral coverage because they mutate only disposable sandboxes and include cleanup or source-immutability checks.
+
+Read-only WAQL and object checks supply live evidence for their own suites, but they do not turn wrapper-only, skipped-approved, or still-deferred categories into live behavior.
+
+## Still-deferred blockers
+
+- `ak.wwise.core.project.saved` is reflected, but WwiseConsole reports the topic as unavailable. Authoring-instance topic evidence is still required.
+- `ak.wwise.core.undo.redo` is absent locally, and `ak.wwise.core.undo.cancelGroup` did not roll back the sandbox object creation.
+- `ak.wwise.core.switchContainer.*Assignment` remains blocked because the disposable SwitchContainer/Switch Group fixture did not produce a materialized assignment readback pair.
+- `ak.wwise.core.soundbank.processDefinitionFiles` remains blocked because the local definition-file fixture returned no usable SoundBank object readback and logged a file error.
+- Transport, profiler, and soundengine cases remain blocked where no observable side effect was captured.
+
+## Wrapper-only and skipped categories
+
+`wrapper-only` and `skipped-approved` are inventory and route-policy results, not live behavior. Keep UI shortcut categories as wrapper-only until a deterministic UI automation fixture is approved. Keep `cli`, `core.remote`, and `debug` skipped-approved under the current user policy.
+
+## WAQL gaps
+
+Keep WAQL generation fail-closed for escaping beyond normal JSON string escaping, exhaustive object-type property and reference inventories, malformed-WAQL error payload shapes, timeout, memory, recursion, and performance limits, plus mutation semantics. The available WAQL evidence covers bounded read-only object queries only.
+
+## Profiler and soundengine feasibility notes
+
+Profiler, transport, and soundengine coverage must not be promoted from accepted calls alone. Local evidence did not observe a transport state transition, a profiler capture-log payload for `postMsgMonitor`, or profiler game-object payloads for game-object registration. Returned ids, empty mappings, or accepted calls are not enough to count as coverage.
+
+## Windows-pending language
+
+Windows validation remains pending. macOS-generated `GeneratedSoundBanks/Windows` artifacts prove only that the macOS sandbox generated a Windows-named output folder. They are not Windows-host evidence and must not be described as cross-platform validation.
+
+## Approval gate text
+
+Use this exact approval gate before F1-F4 are marked complete:
+
+```text
+Please review the Phase 2 live sandbox coverage packet and confirm whether you approve the remaining 74 still-deferred-with-evidence entries, the 21 skipped-approved entries, the 11 wrapper-only entries, and the Windows-pending status. F1-F4 must not be marked complete until you explicitly approve this packet.
+```
+
+If the user does not explicitly approve, keep F1-F4 open and record the missing approval in `.sisyphus/evidence/task-12-approval-stop.md`.
