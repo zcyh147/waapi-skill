@@ -100,6 +100,29 @@ def test_source_notes_have_no_embedded_gate_success_claims() -> None:
         assert "query_result" not in note
 
 
+def test_source_note_required_field_semantics_match_reflected_behavior() -> None:
+    data = load_resource()
+
+    object_mutation = data["notes"]["object-mutation"]
+    assert "ak.wwise.core.undo.beginGroup: no required fields" in object_mutation["required_fields"]
+    assert "ak.wwise.core.undo.endGroup: displayName" in object_mutation["required_fields"]
+    assert "ak.wwise.core.undo.beginGroup: no required fields" in object_mutation["cited_required_fields"]
+    assert "ak.wwise.core.undo.endGroup: displayName" in object_mutation["cited_required_fields"]
+
+    property_reference = data["notes"]["property-reference"]
+    assert "ak.wwise.core.object.isPropertyEnabled: object, platform, property" in property_reference["required_fields"]
+    assert "ak.wwise.core.object.isPropertyEnabled: object, platform, property" in property_reference["cited_required_fields"]
+
+    import_note = data["notes"]["import"]
+    assert "ak.wwise.core.audio.importTabDelimited: importLanguage, importOperation, importFile" in import_note["required_fields"]
+    assert "importLocation" in import_note["optional_fields"]
+    assert "ak.wwise.core.audio.importTabDelimited: importLanguage, importOperation, importFile" in import_note["cited_required_fields"]
+
+    soundbank = data["notes"]["soundbank"]
+    assert "ak.wwise.core.soundbank.convertExternalSources: sources array; each source entry input, platform" in soundbank["required_fields"]
+    assert "ak.wwise.core.soundbank.convertExternalSources: sources array; each source entry input, platform" in soundbank["cited_required_fields"]
+
+
 def test_missing_source_note_resource_fails_with_typed_code(tmp_path: Path) -> None:
     checker = SemanticSourceNoteChecker(tmp_path / "missing.json")
 

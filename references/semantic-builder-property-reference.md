@@ -39,7 +39,7 @@
 - `getTypes`: no required fields.
 - `getPropertyAndReferenceNames`: `classId`.
 - `getPropertyInfo`: `property` and exactly one of `object` or `classId`.
-- `isPropertyEnabled`: `object`, `property`.
+- `isPropertyEnabled`: `object`, `platform`, `property`.
 - `getAttenuationCurve`: `object`, `curveType`.
 - `setName`: `object`, `value`.
 - `setNotes`: `object`, `value`.
@@ -74,7 +74,7 @@ Object names must use `type:name` or `Global:shortId` when strings are used. `ge
 - `ak.wwise.core.object.getTypes: no required fields`
 - `ak.wwise.core.object.getPropertyAndReferenceNames: classId`
 - `ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId`
-- `ak.wwise.core.object.isPropertyEnabled: object, property`
+- `ak.wwise.core.object.isPropertyEnabled: object, platform, property`
 - `ak.wwise.core.object.getAttenuationCurve: object, curveType`
 - `ak.wwise.core.object.setName: object, value`
 - `ak.wwise.core.object.setNotes: object, value`

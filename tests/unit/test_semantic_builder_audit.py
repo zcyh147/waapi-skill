@@ -78,6 +78,18 @@ def test_source_notes_are_grounded_and_exclude_out_of_scope_families() -> None:
             assert not any(excluded.lower() in uri.lower() for excluded in EXCLUDED_FAMILY_TERMS)
 
 
+def test_source_note_required_field_strings_match_reflected_behavior() -> None:
+    payload = json.loads(SOURCE_NOTES.read_text(encoding="utf-8"))
+    notes = payload["notes"]
+
+    assert "ak.wwise.core.undo.beginGroup: no required fields" in notes["object-mutation"]["required_fields"]
+    assert "ak.wwise.core.undo.endGroup: displayName" in notes["object-mutation"]["required_fields"]
+    assert "ak.wwise.core.object.isPropertyEnabled: object, platform, property" in notes["property-reference"]["required_fields"]
+    assert "ak.wwise.core.audio.importTabDelimited: importLanguage, importOperation, importFile" in notes["import"]["required_fields"]
+    assert "importLocation" in notes["import"]["optional_fields"]
+    assert "ak.wwise.core.soundbank.convertExternalSources: sources array; each source entry input, platform" in notes["soundbank"]["required_fields"]
+
+
 def test_skill_docs_prefer_builders_without_claiming_live_execution() -> None:
     text = SKILL_MD.read_text(encoding="utf-8")
 

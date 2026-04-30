@@ -72,8 +72,8 @@
         "ak.wwise.core.object.move: object, parent",
         "ak.wwise.core.object.diff: object, other",
         "ak.wwise.core.object.pasteProperties: source, target",
-        "ak.wwise.core.undo.beginGroup: displayName",
-        "ak.wwise.core.undo.endGroup: no required fields",
+        "ak.wwise.core.undo.beginGroup: no required fields",
+        "ak.wwise.core.undo.endGroup: displayName",
         "ak.wwise.core.undo.undo: no required fields"
       ],
       "optional_fields": [
@@ -97,8 +97,8 @@
         "ak.wwise.core.object.move: object, parent",
         "ak.wwise.core.object.diff: object, other",
         "ak.wwise.core.object.pasteProperties: source, target",
-        "ak.wwise.core.undo.beginGroup: displayName",
-        "ak.wwise.core.undo.endGroup: no required fields",
+        "ak.wwise.core.undo.beginGroup: no required fields",
+        "ak.wwise.core.undo.endGroup: displayName",
         "ak.wwise.core.undo.undo: no required fields"
       ]
     },
@@ -136,7 +136,7 @@
         "ak.wwise.core.object.getTypes: no required fields",
         "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
         "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
-        "ak.wwise.core.object.isPropertyEnabled: object, property",
+        "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
         "ak.wwise.core.object.getAttenuationCurve: object, curveType",
         "ak.wwise.core.object.setName: object, value",
         "ak.wwise.core.object.setNotes: object, value",
@@ -157,7 +157,7 @@
         "ak.wwise.core.object.getTypes: no required fields",
         "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
         "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
-        "ak.wwise.core.object.isPropertyEnabled: object, property",
+        "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
         "ak.wwise.core.object.getAttenuationCurve: object, curveType",
         "ak.wwise.core.object.setName: object, value",
         "ak.wwise.core.object.setNotes: object, value",
@@ -189,10 +189,11 @@
       "required_fields": [
         "ak.wwise.core.audio.import: imports array",
         "ak.wwise.core.audio.import: each import item objectPath",
-        "ak.wwise.core.audio.importTabDelimited: importLocation, importLanguage, importOperation, importFile",
+        "ak.wwise.core.audio.importTabDelimited: importLanguage, importOperation, importFile",
         "ak.wwise.core.audio.imported: topic payload only"
       ],
       "optional_fields": [
+        "importLocation",
         "importOperation",
         "default",
         "autoAddToSourceControl",
@@ -208,7 +209,7 @@
       "cited_required_fields": [
         "ak.wwise.core.audio.import: imports array",
         "ak.wwise.core.audio.import: each import item objectPath",
-        "ak.wwise.core.audio.importTabDelimited: importLocation, importLanguage, importOperation, importFile",
+        "ak.wwise.core.audio.importTabDelimited: importLanguage, importOperation, importFile",
         "ak.wwise.core.audio.imported: topic payload only"
       ]
     },
@@ -241,7 +242,7 @@
         "ak.wwise.core.soundbank.getInclusions: soundbank",
         "ak.wwise.core.soundbank.setInclusions: soundbank, operation, inclusions",
         "ak.wwise.core.soundbank.generate: no required fields unless soundbanks entries are supplied",
-        "ak.wwise.core.soundbank.convertExternalSources: no required fields",
+        "ak.wwise.core.soundbank.convertExternalSources: sources array; each source entry input, platform",
         "ak.wwise.core.soundbank.processDefinitionFiles: files array",
         "ak.wwise.core.soundbank.generated: topic payload only",
         "ak.wwise.core.soundbank.generationDone: topic payload only"
@@ -264,7 +265,7 @@
         "ak.wwise.core.soundbank.getInclusions: soundbank",
         "ak.wwise.core.soundbank.setInclusions: soundbank, operation, inclusions",
         "ak.wwise.core.soundbank.generate: no required fields unless soundbanks entries are supplied",
-        "ak.wwise.core.soundbank.convertExternalSources: no required fields",
+        "ak.wwise.core.soundbank.convertExternalSources: sources array; each source entry input, platform",
         "ak.wwise.core.soundbank.processDefinitionFiles: files array",
         "ak.wwise.core.soundbank.generated: topic payload only",
         "ak.wwise.core.soundbank.generationDone: topic payload only"

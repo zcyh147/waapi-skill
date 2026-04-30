@@ -39,8 +39,9 @@
 - `object.move`: `object`, `parent`.
 - `object.diff`: `object`, `other`.
 - `object.pasteProperties`: `source`, `target`.
-- `undo.beginGroup`: `displayName`.
-- `undo.endGroup` and `undo.undo`: no required fields.
+- `undo.beginGroup`: no required fields.
+- `undo.endGroup`: `displayName`.
+- `undo.undo`: no required fields.
 
 ## Optional fields
 
@@ -77,6 +78,6 @@ Do not create Query objects or Source, Effect, or Metadata plug-ins here; do not
 - `ak.wwise.core.object.move: object, parent`
 - `ak.wwise.core.object.diff: object, other`
 - `ak.wwise.core.object.pasteProperties: source, target`
-- `ak.wwise.core.undo.beginGroup: displayName`
-- `ak.wwise.core.undo.endGroup: no required fields`
+- `ak.wwise.core.undo.beginGroup: no required fields`
+- `ak.wwise.core.undo.endGroup: displayName`
 - `ak.wwise.core.undo.undo: no required fields`

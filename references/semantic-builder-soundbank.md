@@ -34,7 +34,7 @@
 - `getInclusions`: `soundbank`.
 - `generate`: no required fields unless `soundbanks` entries are supplied.
 - `setInclusions`: `soundbank`, `operation`, `inclusions`.
-- `convertExternalSources`: no required fields.
+- `convertExternalSources`: `sources` array; each source entry `input`, `platform`.
 - `processDefinitionFiles`: `files` array.
 - `generated` and `generationDone`: topic payload only.
 
@@ -71,6 +71,6 @@ Do not include profiler, transport, soundengine, UI, CLI, remote, or debug APIs;
 - `ak.wwise.core.soundbank.generate: no required fields unless soundbanks entries are supplied`
 - `ak.wwise.core.soundbank.setInclusions: soundbank, operation, inclusions`
 - `ak.wwise.core.soundbank.processDefinitionFiles: files array`
-- `ak.wwise.core.soundbank.convertExternalSources: no required fields`
+- `ak.wwise.core.soundbank.convertExternalSources: sources array; each source entry input, platform`
 - `ak.wwise.core.soundbank.generated: topic payload only`
 - `ak.wwise.core.soundbank.generationDone: topic payload only`

@@ -27,12 +27,13 @@
 
 - `audio.import`: `imports` array.
 - `audio.import`: each import item `objectPath`.
-- `audio.importTabDelimited`: `importLocation`, `importLanguage`, `importOperation`, `importFile`.
+- `audio.importTabDelimited`: `importLanguage`, `importOperation`, `importFile`.
 - `audio.imported`: topic payload only.
 
 ## Optional fields
 
 - `importOperation`
+- `importLocation`
 - `default`
 - `autoAddToSourceControl`
 - `options.return`
@@ -60,5 +61,5 @@ Do not use this family for profiler, transport, soundengine, UI, CLI, remote, or
 
 - `ak.wwise.core.audio.import: imports array`
 - `ak.wwise.core.audio.import: each import item objectPath`
-- `ak.wwise.core.audio.importTabDelimited: importLocation, importLanguage, importOperation, importFile`
+- `ak.wwise.core.audio.importTabDelimited: importLanguage, importOperation, importFile`
 - `ak.wwise.core.audio.imported: topic payload only`
