@@ -9,7 +9,7 @@ markers = [
 [tool.coverage.run]
 branch = true
 relative_files = true
-source = [".agents/skills/wwise-waapi"]
+source = ["wwise_waapi", "scripts"]
 
 [tool.coverage.report]
 fail_under = 85

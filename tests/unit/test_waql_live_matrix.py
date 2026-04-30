@@ -10,21 +10,15 @@ from wwise_waapi.waql import WAQL_API_URI, validate_waql_example  # pyright: ign
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MATRIX_PATH = (
     REPO_ROOT
-    / ".agents"
-    / "skills"
-    / "wwise-waapi"
     / "resources"
     / "waql"
     / "2022.1"
     / "object-get-live-matrix.json"
 )
-REFERENCE_PATH = REPO_ROOT / ".agents" / "skills" / "wwise-waapi" / "references" / "waql-2022.1.md"
+REFERENCE_PATH = REPO_ROOT / "references" / "waql-2022.1.md"
 GAP_EVIDENCE_PATH = REPO_ROOT / ".sisyphus" / "evidence" / "task-8-waql-missing.md"
 MANIFEST_PATH = (
     REPO_ROOT
-    / ".agents"
-    / "skills"
-    / "wwise-waapi"
     / "resources"
     / "manifest"
     / "2022.1"
@@ -66,7 +60,7 @@ def test_waql_matrix_resource_is_source_grounded_and_schema_linked() -> None:
     assert REFERENCE_PATH.exists()
     assert GAP_EVIDENCE_PATH.exists()
     assert metadata["uri"] == WAQL_API_URI
-    assert metadata["reference"] == ".agents/skills/wwise-waapi/references/waql-2022.1.md"
+    assert metadata["reference"] == "references/waql-2022.1.md"
     assert metadata["gap_evidence"] == ".sisyphus/evidence/task-8-waql-missing.md"
     assert metadata["sandbox_required"] is True
     assert metadata["source_project_mutation_allowed"] is False

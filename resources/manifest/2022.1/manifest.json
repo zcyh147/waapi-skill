@@ -1,0 +1,26 @@
+{
+  "audit": {
+    "counts_match": true,
+    "manifest_function_count": 112,
+    "manifest_topic_count": 32,
+    "reflected_function_count": 112,
+    "reflected_topic_count": 32,
+    "schema_count": 144,
+    "schema_failure_count": 0
+  },
+  "metadata": {
+    "generator": "wwise_waapi.manifest.ReflectionManifestBuilder",
+    "inventory_source": "live-reflection",
+    "schema_source_uri": "ak.wwise.waapi.getSchema",
+    "schema_source_uris": [
+      "ak.wwise.waapi.getSchema"
+    ],
+    "source_uris": [
+      "ak.wwise.waapi.getFunctions",
+      "ak.wwise.waapi.getTopics",
+      "ak.wwise.waapi.getSchema"
+    ],
+    "wwise_build": "2022.1.19.8584",
+    "wwise_version_target": "2022.1"
+  }
+}

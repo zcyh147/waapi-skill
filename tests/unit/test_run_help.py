@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def test_run_help_exits_zero() -> None:
-    skill_root = Path(__file__).resolve().parents[2] / ".agents" / "skills" / "wwise-waapi"
+    skill_root = Path(__file__).resolve().parents[2]
     result = subprocess.run(
         [sys.executable, str(skill_root / "scripts" / "run.py"), "--help"],
         capture_output=True,

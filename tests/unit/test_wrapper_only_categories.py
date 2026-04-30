@@ -19,7 +19,7 @@ from wwise_waapi.manifest import ManifestStore  # pyright: ignore[reportMissingI
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SKILL_ROOT = REPO_ROOT / ".agents" / "skills" / "wwise-waapi"
+SKILL_ROOT = REPO_ROOT
 COVERAGE_ROOT = SKILL_ROOT / "resources" / "coverage" / "2022.1"
 MATRIX_RESOURCE = COVERAGE_ROOT / "live-coverage-matrix.json"
 API_COVERAGE_RESOURCE = COVERAGE_ROOT / "api-coverage.json"

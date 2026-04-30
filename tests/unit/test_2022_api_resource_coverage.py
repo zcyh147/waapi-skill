@@ -11,7 +11,7 @@ from wwise_waapi.waql import WAQL_API_URI  # pyright: ignore[reportMissingImport
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SKILL_ROOT = REPO_ROOT / ".agents" / "skills" / "wwise-waapi"
+SKILL_ROOT = REPO_ROOT
 MANIFEST_ROOT = SKILL_ROOT / "resources" / "manifest"
 COVERAGE_RESOURCE = SKILL_ROOT / "resources" / "coverage" / "2022.1" / "api-coverage.json"
 EVIDENCE_SUMMARY = REPO_ROOT / ".sisyphus" / "evidence" / "task-7-api-coverage-summary.json"
@@ -86,9 +86,9 @@ def test_waql_coverage_references_source_grounded_reference_and_gate() -> None:
     entry = _coverage_by_uri()[WAQL_API_URI]
 
     assert entry["deferred"]["status"] is False
-    assert entry["usage_guidance"]["waql_reference"] == ".agents/skills/wwise-waapi/references/waql-2022.1.md"
+    assert entry["usage_guidance"]["waql_reference"] == "references/waql-2022.1.md"
     assert entry["usage_guidance"]["waql_gate"] == "wwise_waapi.waql.require_waql_helper_generation"
-    assert entry["behavioral_evidence"]["evidence"] == ".agents/skills/wwise-waapi/references/waql-2022.1.md"
+    assert entry["behavioral_evidence"]["evidence"] == "references/waql-2022.1.md"
 
 
 def test_evidence_summary_counts_match_generated_resource() -> None:

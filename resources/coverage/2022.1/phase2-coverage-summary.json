@@ -727,9 +727,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "inventory_coverage": "reflected-schema-ok",
@@ -757,9 +757,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "inventory_coverage": "reflected-schema-ok",
@@ -787,9 +787,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "inventory_coverage": "reflected-schema-ok",
@@ -817,9 +817,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "inventory_coverage": "reflected-schema-ok",
@@ -847,9 +847,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "inventory_coverage": "reflected-schema-ok",
@@ -877,9 +877,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "inventory_coverage": "reflected-schema-ok",
@@ -907,9 +907,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "inventory_coverage": "reflected-schema-ok",
@@ -937,9 +937,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "inventory_coverage": "reflected-schema-ok",
@@ -967,9 +967,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "inventory_coverage": "reflected-schema-ok",
@@ -997,9 +997,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "inventory_coverage": "reflected-schema-ok",
@@ -1027,9 +1027,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "inventory_coverage": "reflected-schema-ok",
@@ -1057,9 +1057,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "inventory_coverage": "reflected-schema-ok",
@@ -1177,9 +1177,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -1207,9 +1207,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -1237,9 +1237,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -1267,9 +1267,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -1297,9 +1297,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -1327,9 +1327,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.log or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -1357,9 +1357,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -1387,9 +1387,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -1417,9 +1417,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -1447,9 +1447,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -1477,9 +1477,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -1567,9 +1567,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -1627,9 +1627,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -1657,16 +1657,16 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "fake-route-tested-and-waql-reference-gated",
-        "evidence": ".agents/skills/wwise-waapi/references/waql-2022.1.md",
+        "evidence": "references/waql-2022.1.md",
         "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
       },
       "phase1_status": "fake-route-tested",
@@ -1695,9 +1695,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -1732,9 +1732,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -1769,9 +1769,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -1806,9 +1806,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -1843,9 +1843,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -1873,9 +1873,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -1903,9 +1903,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -1933,9 +1933,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -1963,9 +1963,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -1993,9 +1993,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -2023,9 +2023,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -2143,9 +2143,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -2173,9 +2173,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -2203,9 +2203,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -2233,9 +2233,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -2263,9 +2263,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -2293,9 +2293,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.object or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -2477,9 +2477,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -2511,9 +2511,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -2545,9 +2545,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -2579,9 +2579,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -2613,9 +2613,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -2647,9 +2647,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -2681,9 +2681,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -2831,9 +2831,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.project or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -2861,9 +2861,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.project or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -2891,9 +2891,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.project or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -2921,9 +2921,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.project or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -2981,9 +2981,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
       "inventory_coverage": "reflected-schema-ok",
@@ -3011,9 +3011,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
       "inventory_coverage": "reflected-schema-ok",
@@ -3041,9 +3041,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
       "inventory_coverage": "reflected-schema-ok",
@@ -3071,9 +3071,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
       "inventory_coverage": "reflected-schema-ok",
@@ -3101,9 +3101,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.sound or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -3131,9 +3131,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.soundbank or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -3251,9 +3251,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -3378,9 +3378,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.switchContainer or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -3408,9 +3408,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.switchContainer or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -3442,9 +3442,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -3596,9 +3596,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -3630,9 +3630,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -3660,9 +3660,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/deferred/2022.1.json",
+      "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"
+        "resources/deferred/2022.1.json"
       ],
       "future_review_trigger": "When behavioral dispatcher/subscription tests are added for core.transport or the 2022.1 manifest changes.",
       "inventory_coverage": "reflected-schema-ok",
@@ -3841,9 +3841,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
       "inventory_coverage": "reflected-schema-ok",
@@ -3871,9 +3871,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
       "inventory_coverage": "reflected-schema-ok",
@@ -3901,9 +3901,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
       "inventory_coverage": "reflected-schema-ok",
@@ -3931,9 +3931,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
       "inventory_coverage": "reflected-schema-ok",
@@ -3961,9 +3961,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
       "inventory_coverage": "reflected-schema-ok",
@@ -3991,9 +3991,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "inventory_coverage": "reflected-schema-ok",
@@ -4021,9 +4021,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "inventory_coverage": "reflected-schema-ok",
@@ -4051,9 +4051,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "inventory_coverage": "reflected-schema-ok",
@@ -4081,9 +4081,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "inventory_coverage": "reflected-schema-ok",
@@ -4111,9 +4111,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "inventory_coverage": "reflected-schema-ok",
@@ -4141,9 +4141,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "inventory_coverage": "reflected-schema-ok",
@@ -4171,9 +4171,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "inventory_coverage": "reflected-schema-ok",
@@ -4201,9 +4201,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "inventory_coverage": "reflected-schema-ok",
@@ -4231,9 +4231,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "inventory_coverage": "reflected-schema-ok",
@@ -4261,9 +4261,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "inventory_coverage": "reflected-schema-ok",
@@ -4291,9 +4291,9 @@
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
+      "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"
+        "resources/coverage/2022.1/wrapper-only-category-policy.json"
       ],
       "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "inventory_coverage": "reflected-schema-ok",
@@ -4321,9 +4321,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -4351,9 +4351,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",
@@ -4381,9 +4381,9 @@
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
-      "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
+      "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
-        ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"
+        "resources/coverage/2022.1/api-coverage.json"
       ],
       "future_review_trigger": "",
       "inventory_coverage": "reflected-schema-ok",

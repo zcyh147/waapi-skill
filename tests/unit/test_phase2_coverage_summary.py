@@ -14,7 +14,7 @@ from wwise_waapi.phase2_coverage_summary import (  # pyright: ignore[reportMissi
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SKILL_ROOT = REPO_ROOT / ".agents" / "skills" / "wwise-waapi"
+SKILL_ROOT = REPO_ROOT
 MANIFEST_ROOT = SKILL_ROOT / "resources" / "manifest"
 SUMMARY_RESOURCE = SKILL_ROOT / "resources" / "coverage" / "2022.1" / "phase2-coverage-summary.json"
 SKIPPED_APPROVED_CATEGORIES = {"cli", "core.remote", "debug"}

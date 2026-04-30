@@ -8,7 +8,7 @@ from typing import Any, Mapping
 
 EXPECTED_WAQL_NOTEBOOK_ID = "wwise-2022.1-docs"
 WAQL_API_URI = "ak.wwise.core.object.get"
-DEFAULT_WAQL_REFERENCE = Path(".agents/skills/wwise-waapi/references/waql-2022.1.md")
+DEFAULT_WAQL_REFERENCE = Path("references/waql-2022.1.md")
 REQUIRED_REFERENCE_SECTIONS = (
     "## Source map",
     "## Syntax",

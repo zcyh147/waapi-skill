@@ -6,7 +6,7 @@ from typing import Any, Mapping
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SKILL_ROOT = REPO_ROOT / ".agents" / "skills" / "wwise-waapi"
+SKILL_ROOT = REPO_ROOT
 MATRIX_RESOURCE = SKILL_ROOT / "resources" / "coverage" / "2022.1" / "live-coverage-matrix.json"
 API_COVERAGE_RESOURCE = SKILL_ROOT / "resources" / "coverage" / "2022.1" / "api-coverage.json"
 FUNCTIONS_MANIFEST = SKILL_ROOT / "resources" / "manifest" / "2022.1" / "functions.json"

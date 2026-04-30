@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 
-RUNBOOK = Path(__file__).resolve().parents[2] / ".agents" / "skills" / "wwise-waapi" / "references" / "long-run-runbook.md"
+RUNBOOK = Path(__file__).resolve().parents[2] / "references" / "long-run-runbook.md"
 
 
 def runbook_text() -> str:

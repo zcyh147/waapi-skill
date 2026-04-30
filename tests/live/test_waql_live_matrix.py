@@ -32,9 +32,6 @@ from wwise_waapi.waql import WAQL_API_URI  # pyright: ignore[reportMissingImport
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MATRIX_PATH = (
     REPO_ROOT
-    / ".agents"
-    / "skills"
-    / "wwise-waapi"
     / "resources"
     / "waql"
     / "2022.1"

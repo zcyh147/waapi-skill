@@ -3796,7 +3796,7 @@
     {
       "behavioral_evidence": {
         "coverage": "fake-route-tested-and-waql-reference-gated",
-        "evidence": ".agents/skills/wwise-waapi/references/waql-2022.1.md",
+        "evidence": "references/waql-2022.1.md",
         "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
       },
       "category": "core.object",
@@ -3852,7 +3852,7 @@
         "default_path": "Use WwiseDispatcher with injected/fake clients in default tests; require live fixture for real WAAPI execution.",
         "notes": "Do not mutate broad user projects; use fixture projects and evidence paths for live tiers.",
         "waql_gate": "wwise_waapi.waql.require_waql_helper_generation",
-        "waql_reference": ".agents/skills/wwise-waapi/references/waql-2022.1.md"
+        "waql_reference": "references/waql-2022.1.md"
       },
       "version": "2022.1"
     },
@@ -9454,7 +9454,7 @@
     ],
     "sort_key": "uri",
     "version": "2022.1",
-    "waql_reference": ".agents/skills/wwise-waapi/references/waql-2022.1.md"
+    "waql_reference": "references/waql-2022.1.md"
   },
   "summary": {
     "deferred": 117,

@@ -10,7 +10,7 @@ from scripts import setup_environment as setup_script  # pyright: ignore[reportM
 
 
 def test_script_config_exports_expected_paths_and_targets() -> None:
-    assert script_config.SKILL_DIR.name == "wwise-waapi"
+    assert script_config.SKILL_DIR == Path(__file__).resolve().parents[2]
     assert script_config.VENV_DIR == script_config.SKILL_DIR / ".venv"
     assert script_config.COVERAGE_MINIMUM == 85
     assert script_config.CORE_COVERAGE_TARGETS["manifest"] == 95
@@ -68,7 +68,7 @@ def test_run_main_unknown_script_exits(monkeypatch: pytest.MonkeyPatch, tmp_path
 
 def test_setup_environment_ensure_creates_venv_and_installs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(setup_script, "VENV_DIR", tmp_path / ".venv")
-    monkeypatch.setattr(setup_script, "SKILL_DIR", Path("/Users/xiye/Documents/Git/waapi-skills/.agents/skills/wwise-waapi"))
+    monkeypatch.setattr(setup_script, "SKILL_DIR", Path(__file__).resolve().parents[2])
 
     created: list[Path] = []
 

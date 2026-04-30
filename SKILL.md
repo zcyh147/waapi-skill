@@ -1,6 +1,6 @@
 ---
 name: wwise-waapi
-description: Use this skill for Wwise WAAPI automation, dispatcher calls, generated WAAPI manifests, bounded subscriptions, NotebookLM-gated Wwise documentation lookup, headless Wwise lifecycle work, or tests under `.agents/skills/wwise-waapi/`. Always use this skill when the task mentions Wwise, WAAPI, Audiokinetic APIs, generated manifests, topic subscriptions, destructive Wwise guardrails, or this repo's Wwise skill package; it provides the generic dispatcher contract and safety rules instead of one skill per API.
+description: Use this skill for Wwise WAAPI automation, dispatcher calls, generated WAAPI manifests, bounded subscriptions, NotebookLM-gated Wwise documentation lookup, headless Wwise lifecycle work, or tests in this root-level skill repository. Always use this skill when the task mentions Wwise, WAAPI, Audiokinetic APIs, generated manifests, topic subscriptions, destructive Wwise guardrails, or this repo's Wwise skill package; it provides the generic dispatcher contract and safety rules instead of one skill per API.
 ---
 
 # Wwise WAAPI Skill
@@ -12,8 +12,8 @@ This skill provides one generic, manifest-backed WAAPI dispatcher for Wwise 2022
 Use the skill-local wrapper for scripts so the local environment and dependencies are managed consistently:
 
 ```bash
-python .agents/skills/wwise-waapi/scripts/run.py --help
-python .agents/skills/wwise-waapi/scripts/run.py setup_environment.py
+python scripts/run.py --help
+python scripts/run.py setup_environment.py
 ```
 
 Python callers should use the dispatcher shape below:

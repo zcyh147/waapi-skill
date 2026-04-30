@@ -1601,12 +1601,12 @@
       "fixture_prerequisites": [
         "sandbox fixture project",
         "read-only WAQL query examples",
-        ".agents/skills/wwise-waapi/references/waql-2022.1.md"
+        "references/waql-2022.1.md"
       ],
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "fake-route-tested-and-waql-reference-gated",
-        "evidence": ".agents/skills/wwise-waapi/references/waql-2022.1.md",
+        "evidence": "references/waql-2022.1.md",
         "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
       },
       "phase1_inventory_status": "reflected-schema-ok",

@@ -297,8 +297,8 @@ class Phase2CoverageSummaryBuilder:
             entry.update(
                 {
                     "evidence_command": UNIT_ROUTE_COMMAND,
-                    "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json",
-                    "evidence_paths": [".agents/skills/wwise-waapi/resources/coverage/2022.1/api-coverage.json"],
+                    "evidence_path": "resources/coverage/2022.1/api-coverage.json",
+                    "evidence_paths": ["resources/coverage/2022.1/api-coverage.json"],
                 }
             )
             self._add_attempted_live_context(entry, uri)
@@ -321,8 +321,8 @@ class Phase2CoverageSummaryBuilder:
             entry.update(
                 {
                     "evidence_command": UNIT_WRAPPER_POLICY_COMMAND,
-                    "evidence_path": ".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json",
-                    "evidence_paths": [".agents/skills/wwise-waapi/resources/coverage/2022.1/wrapper-only-category-policy.json"],
+                    "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
+                    "evidence_paths": ["resources/coverage/2022.1/wrapper-only-category-policy.json"],
                     "future_review_trigger": policy.future_review_trigger,
                     "review_trigger": policy.future_review_trigger,
                     "user_approved_rationale": policy.user_approved_rationale,
@@ -349,7 +349,7 @@ class Phase2CoverageSummaryBuilder:
             {
                 "blocking_condition": blocking_condition,
                 "evidence_command": blocker.get("evidence_command", UNIT_NO_SILENT_SKIP_COMMAND),
-                "evidence_path": blocker.get("evidence_path", ".agents/skills/wwise-waapi/resources/deferred/2022.1.json"),
+                "evidence_path": blocker.get("evidence_path", "resources/deferred/2022.1.json"),
                 "future_review_trigger": review_trigger,
                 "review_trigger": review_trigger,
                 "substitute_test": substitute_test,

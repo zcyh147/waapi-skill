@@ -15,3 +15,19 @@ __pycache__/
 venv/
 env/
 GeneratedSoundBanks/
+# Skill-local runtime data and generated artifacts
+data/
+logs/
+artifacts/
+tmp/
+cache/
+browser_state/
+auth/
+state.json
+auth_info.json
+library.json
+cookies.json
+session*.json
+.idea/
+.vscode/
+*~

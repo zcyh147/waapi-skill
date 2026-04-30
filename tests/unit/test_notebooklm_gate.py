@@ -107,7 +107,7 @@ def test_unreadable_evidence_blocks_docs_generation(tmp_path: Path) -> None:
 
 
 def test_workflow_docs_contain_required_command_templates() -> None:
-    workflow = Path(".agents/skills/wwise-waapi/references/notebooklm-workflow.md").read_text(encoding="utf-8")
+    workflow = Path("references/notebooklm-workflow.md").read_text(encoding="utf-8")
 
     assert "python scripts/run.py auth_manager.py status" in workflow
     assert "python scripts/run.py notebook_manager.py list" in workflow

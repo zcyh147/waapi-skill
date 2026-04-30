@@ -4,8 +4,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-RUNBOOK = ROOT / ".agents" / "skills" / "wwise-waapi" / "references" / "long-run-runbook.md"
-REVIEW_PACKET = ROOT / ".agents" / "skills" / "wwise-waapi" / "references" / "phase2-user-review-packet.md"
+RUNBOOK = ROOT / "references" / "long-run-runbook.md"
+REVIEW_PACKET = ROOT / "references" / "phase2-user-review-packet.md"
 
 
 def read_reference(path: Path) -> str:

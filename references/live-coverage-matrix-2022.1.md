@@ -1,6 +1,6 @@
 # Wwise WAAPI 2022.1 Live Coverage Matrix
 
-This reference summarizes `.agents/skills/wwise-waapi/resources/coverage/2022.1/live-coverage-matrix.json`.
+This reference summarizes `resources/coverage/2022.1/live-coverage-matrix.json`.
 It is a Phase 2 planning matrix: it preserves Phase 1 inventory and fake-route evidence while separating future live/sandbox targets from achieved behavior.
 
 ## Counts
