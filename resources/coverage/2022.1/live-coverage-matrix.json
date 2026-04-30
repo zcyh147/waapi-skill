@@ -2662,103 +2662,109 @@
     },
     {
       "achieved_status": "deferred-with-substitute-test",
-      "allowed_test_tier": "live-sandbox",
+      "allowed_test_tier": "conformance-only-policy",
       "category": "core.project",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
         "risk_level": "medium"
       },
-      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
-      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
-      "fixture_prerequisites": [
-        "live subscription fixture",
-        "bounded timeout",
-        "event publisher for the target topic"
-      ],
-      "item_type": "topic",
-      "phase1_behavioral_evidence": {
-        "coverage": "substitute-test",
-        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
-        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
-      },
-      "phase1_inventory_status": "reflected-schema-ok",
-      "skip_wrapper_rationale": "",
-      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
-      "target_status": "live-candidate",
-      "uri": "ak.wwise.core.project.loaded",
-      "version": "2022.1"
-    },
-    {
-      "achieved_status": "deferred-with-substitute-test",
-      "allowed_test_tier": "live-sandbox",
-      "category": "core.project",
-      "current_status": "deferred-with-substitute-test",
-      "destructive_risk": {
-        "destructive_opt_in": false,
-        "risk_level": "medium"
-      },
-      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
-      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
-      "fixture_prerequisites": [
-        "live subscription fixture",
-        "bounded timeout",
-        "event publisher for the target topic"
-      ],
-      "item_type": "topic",
-      "phase1_behavioral_evidence": {
-        "coverage": "substitute-test",
-        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
-        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
-      },
-      "phase1_inventory_status": "reflected-schema-ok",
-      "skip_wrapper_rationale": "",
-      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
-      "target_status": "live-candidate",
-      "uri": "ak.wwise.core.project.postClosed",
-      "version": "2022.1"
-    },
-    {
-      "achieved_status": "deferred-with-substitute-test",
-      "allowed_test_tier": "live-sandbox",
-      "category": "core.project",
-      "current_status": "deferred-with-substitute-test",
-      "destructive_risk": {
-        "destructive_opt_in": false,
-        "risk_level": "medium"
-      },
-      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
-      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
-      "fixture_prerequisites": [
-        "live subscription fixture",
-        "bounded timeout",
-        "event publisher for the target topic"
-      ],
-      "item_type": "topic",
-      "phase1_behavioral_evidence": {
-        "coverage": "substitute-test",
-        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
-        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
-      },
-      "phase1_inventory_status": "reflected-schema-ok",
-      "skip_wrapper_rationale": "",
-      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
-      "target_status": "live-candidate",
-      "uri": "ak.wwise.core.project.preClosed",
-      "version": "2022.1"
-    },
-    {
-      "achieved_status": "deferred-with-substitute-test",
-      "allowed_test_tier": "inventory-substitute-only",
-      "category": "core.project",
-      "current_status": "deferred-with-substitute-test",
-      "destructive_risk": {
-        "destructive_opt_in": false,
-        "risk_level": "medium"
-      },
-      "evidence_standard": "Deferred registry substitute evidence preserves inventory coverage only; live behavior remains unclaimed.",
-      "fallback_reason": "Fallback is deferred registry substitute evidence until a safe target tier is approved.",
+      "evidence_class": "conformance_only_skip",
+      "evidence_standard": "User-reviewed conformance-only policy plus reflected inventory evidence; do not execute or count as behavioral/live behavioral coverage.",
+      "fallback_reason": "Fallback is conformance-only policy with inventory evidence; live behavior remains unclaimed unless user requests lifecycle/state-transition proof.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "Lifecycle/state-transition behavior is intentionally not exercised by Task 8 policy.",
+      "skip_wrapper_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "conformance-only-skip",
+      "uri": "ak.wwise.core.project.loaded",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "conformance-only-policy",
+      "category": "core.project",
+      "counts_as_live_behavior": false,
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_class": "conformance_only_skip",
+      "evidence_standard": "User-reviewed conformance-only policy plus reflected inventory evidence; do not execute or count as behavioral/live behavioral coverage.",
+      "fallback_reason": "Fallback is conformance-only policy with inventory evidence; live behavior remains unclaimed unless user requests lifecycle/state-transition proof.",
+      "fixture_prerequisites": [],
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "Lifecycle/state-transition behavior is intentionally not exercised by Task 8 policy.",
+      "skip_wrapper_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "conformance-only-skip",
+      "uri": "ak.wwise.core.project.postClosed",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "conformance-only-policy",
+      "category": "core.project",
+      "counts_as_live_behavior": false,
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_class": "conformance_only_skip",
+      "evidence_standard": "User-reviewed conformance-only policy plus reflected inventory evidence; do not execute or count as behavioral/live behavioral coverage.",
+      "fallback_reason": "Fallback is conformance-only policy with inventory evidence; live behavior remains unclaimed unless user requests lifecycle/state-transition proof.",
+      "fixture_prerequisites": [],
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "Lifecycle/state-transition behavior is intentionally not exercised by Task 8 policy.",
+      "skip_wrapper_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "conformance-only-skip",
+      "uri": "ak.wwise.core.project.preClosed",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "conformance-only-policy",
+      "category": "core.project",
+      "counts_as_live_behavior": false,
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_class": "conformance_only_skip",
+      "evidence_standard": "User-reviewed conformance-only policy plus reflected inventory evidence; do not execute or count as behavioral/live behavioral coverage.",
+      "fallback_reason": "Fallback is conformance-only policy with inventory evidence; live behavior remains unclaimed unless user requests lifecycle/state-transition proof.",
+      "fixture_prerequisites": [],
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -2766,28 +2772,29 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
-      "skip_wrapper_rationale": "Requires live WAAPI fixture with bounded side-effect assertions before behavioral execution can be asserted.",
+      "risk_explanation": "Lifecycle/state-transition behavior is intentionally not exercised by Task 8 policy.",
+      "skip_wrapper_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
-      "target_status": "deferred-with-substitute-test",
+      "target_status": "conformance-only-skip",
       "uri": "ak.wwise.core.project.save",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
-      "allowed_test_tier": "live-sandbox",
+      "allowed_test_tier": "conformance-only-policy",
       "category": "core.project",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
         "risk_level": "medium"
       },
-      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
-      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
-      "fixture_prerequisites": [
-        "live subscription fixture",
-        "bounded timeout",
-        "event publisher for the target topic"
-      ],
+      "evidence_class": "conformance_only_skip",
+      "evidence_standard": "User-reviewed conformance-only policy plus reflected inventory evidence; do not execute or count as behavioral/live behavioral coverage.",
+      "fallback_reason": "Fallback is conformance-only policy with inventory evidence; live behavior remains unclaimed unless user requests lifecycle/state-transition proof.",
+      "fixture_prerequisites": [],
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
       "item_type": "topic",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -2795,10 +2802,12 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
-      "skip_wrapper_rationale": "",
+      "risk_explanation": "Lifecycle/state-transition behavior is intentionally not exercised by Task 8 policy.",
+      "skip_wrapper_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
-      "target_status": "live-candidate",
+      "target_status": "conformance-only-skip",
       "uri": "ak.wwise.core.project.saved",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
       "version": "2022.1"
     },
     {
@@ -3296,20 +3305,19 @@
     },
     {
       "achieved_status": "deferred-with-substitute-test",
-      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "allowed_test_tier": "conformance-only-policy",
       "category": "core.transport",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": true,
         "risk_level": "medium"
       },
-      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
-      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
-      "fixture_prerequisites": [
-        "sandbox fixture project",
-        "playable object fixture",
-        "transport cleanup guard"
-      ],
+      "evidence_class": "conformance_only_skip",
+      "evidence_standard": "User-reviewed conformance-only policy plus reflected inventory evidence; do not execute or count as behavioral/live behavioral coverage.",
+      "fallback_reason": "Fallback is conformance-only policy with inventory evidence; live behavior remains unclaimed unless user requests lifecycle/state-transition proof.",
+      "fixture_prerequisites": [],
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3317,28 +3325,29 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
-      "skip_wrapper_rationale": "",
+      "risk_explanation": "Lifecycle/state-transition behavior is intentionally not exercised by Task 8 policy.",
+      "skip_wrapper_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
-      "target_status": "live-candidate",
+      "target_status": "conformance-only-skip",
       "uri": "ak.wwise.core.transport.create",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
-      "allowed_test_tier": "live-sandbox",
+      "allowed_test_tier": "conformance-only-policy",
       "category": "core.transport",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
         "risk_level": "medium"
       },
-      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
-      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
-      "fixture_prerequisites": [
-        "sandbox fixture project",
-        "playable object fixture",
-        "transport cleanup guard"
-      ],
+      "evidence_class": "conformance_only_skip",
+      "evidence_standard": "User-reviewed conformance-only policy plus reflected inventory evidence; do not execute or count as behavioral/live behavioral coverage.",
+      "fallback_reason": "Fallback is conformance-only policy with inventory evidence; live behavior remains unclaimed unless user requests lifecycle/state-transition proof.",
+      "fixture_prerequisites": [],
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3346,28 +3355,29 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
-      "skip_wrapper_rationale": "",
+      "risk_explanation": "Lifecycle/state-transition behavior is intentionally not exercised by Task 8 policy.",
+      "skip_wrapper_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
-      "target_status": "live-candidate",
+      "target_status": "conformance-only-skip",
       "uri": "ak.wwise.core.transport.destroy",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
-      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "allowed_test_tier": "conformance-only-policy",
       "category": "core.transport",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": true,
         "risk_level": "medium"
       },
-      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
-      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
-      "fixture_prerequisites": [
-        "sandbox fixture project",
-        "playable object fixture",
-        "transport cleanup guard"
-      ],
+      "evidence_class": "conformance_only_skip",
+      "evidence_standard": "User-reviewed conformance-only policy plus reflected inventory evidence; do not execute or count as behavioral/live behavioral coverage.",
+      "fallback_reason": "Fallback is conformance-only policy with inventory evidence; live behavior remains unclaimed unless user requests lifecycle/state-transition proof.",
+      "fixture_prerequisites": [],
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3375,10 +3385,12 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
-      "skip_wrapper_rationale": "",
+      "risk_explanation": "Lifecycle/state-transition behavior is intentionally not exercised by Task 8 policy.",
+      "skip_wrapper_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
-      "target_status": "live-candidate",
+      "target_status": "conformance-only-skip",
       "uri": "ak.wwise.core.transport.executeAction",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
       "version": "2022.1"
     },
     {
@@ -3441,20 +3453,19 @@
     },
     {
       "achieved_status": "deferred-with-substitute-test",
-      "allowed_test_tier": "live-sandbox",
+      "allowed_test_tier": "conformance-only-policy",
       "category": "core.transport",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
         "risk_level": "medium"
       },
-      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
-      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
-      "fixture_prerequisites": [
-        "sandbox fixture project",
-        "playable object fixture",
-        "transport cleanup guard"
-      ],
+      "evidence_class": "conformance_only_skip",
+      "evidence_standard": "User-reviewed conformance-only policy plus reflected inventory evidence; do not execute or count as behavioral/live behavioral coverage.",
+      "fallback_reason": "Fallback is conformance-only policy with inventory evidence; live behavior remains unclaimed unless user requests lifecycle/state-transition proof.",
+      "fixture_prerequisites": [],
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3462,28 +3473,29 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
-      "skip_wrapper_rationale": "",
+      "risk_explanation": "Lifecycle/state-transition behavior is intentionally not exercised by Task 8 policy.",
+      "skip_wrapper_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
-      "target_status": "live-candidate",
+      "target_status": "conformance-only-skip",
       "uri": "ak.wwise.core.transport.prepare",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
-      "allowed_test_tier": "live-sandbox",
+      "allowed_test_tier": "conformance-only-policy",
       "category": "core.transport",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
         "risk_level": "medium"
       },
-      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
-      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
-      "fixture_prerequisites": [
-        "live subscription fixture",
-        "bounded timeout",
-        "event publisher for the target topic"
-      ],
+      "evidence_class": "conformance_only_skip",
+      "evidence_standard": "User-reviewed conformance-only policy plus reflected inventory evidence; do not execute or count as behavioral/live behavioral coverage.",
+      "fallback_reason": "Fallback is conformance-only policy with inventory evidence; live behavior remains unclaimed unless user requests lifecycle/state-transition proof.",
+      "fixture_prerequisites": [],
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
       "item_type": "topic",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3491,10 +3503,12 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
-      "skip_wrapper_rationale": "",
+      "risk_explanation": "Lifecycle/state-transition behavior is intentionally not exercised by Task 8 policy.",
+      "skip_wrapper_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
-      "target_status": "live-candidate",
+      "target_status": "conformance-only-skip",
       "uri": "ak.wwise.core.transport.stateChanged",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
       "version": "2022.1"
     },
     {
@@ -3528,20 +3542,19 @@
     },
     {
       "achieved_status": "deferred-with-substitute-test",
-      "allowed_test_tier": "live-sandbox",
+      "allowed_test_tier": "conformance-only-policy",
       "category": "core.undo",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
         "risk_level": "medium"
       },
-      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
-      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
-      "fixture_prerequisites": [
-        "sandbox fixture project",
-        "isolated undo group",
-        "rollback assertion"
-      ],
+      "evidence_class": "conformance_only_skip",
+      "evidence_standard": "User-reviewed conformance-only policy plus reflected inventory evidence; do not execute or count as behavioral/live behavioral coverage.",
+      "fallback_reason": "Fallback is conformance-only policy with inventory evidence; live behavior remains unclaimed unless user requests lifecycle/state-transition proof.",
+      "fixture_prerequisites": [],
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3549,10 +3562,12 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
-      "skip_wrapper_rationale": "",
+      "risk_explanation": "Lifecycle/state-transition behavior is intentionally not exercised by Task 8 policy.",
+      "skip_wrapper_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
-      "target_status": "live-candidate",
+      "target_status": "conformance-only-skip",
       "uri": "ak.wwise.core.undo.cancelGroup",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
       "version": "2022.1"
     },
     {
@@ -4171,16 +4186,32 @@
   ],
   "metadata": {
     "allowed_target_statuses": [
+      "conformance-only-skip",
       "deferred-with-substitute-test",
       "fake-route-tested",
       "live-candidate",
       "skipped-approved",
       "wrapper-only"
     ],
+    "conformance_only_policy_resource": "resources/coverage/2022.1/phase21-uri-policy.json",
+    "conformance_only_uris": [
+      "ak.wwise.core.project.loaded",
+      "ak.wwise.core.project.postClosed",
+      "ak.wwise.core.project.preClosed",
+      "ak.wwise.core.project.save",
+      "ak.wwise.core.project.saved",
+      "ak.wwise.core.transport.create",
+      "ak.wwise.core.transport.destroy",
+      "ak.wwise.core.transport.executeAction",
+      "ak.wwise.core.transport.prepare",
+      "ak.wwise.core.transport.stateChanged",
+      "ak.wwise.core.undo.cancelGroup"
+    ],
     "does_not_count_as_live_behavioral_coverage": [
-      "wrapper-only",
+      "conformance-only-skip",
+      "deferred-with-substitute-test",
       "skipped-approved",
-      "deferred-with-substitute-test"
+      "wrapper-only"
     ],
     "generator": "task-2 deterministic local resource builder",
     "live_candidate_policy": {
@@ -4222,10 +4253,12 @@
       "ui.project"
     ],
     "wrapper_skipped_policy_fields": [
-      "user_approved_rationale",
-      "risk_explanation",
+      "counts_as_live_behavior",
+      "evidence_class",
       "future_review_trigger",
-      "counts_as_live_behavior"
+      "risk_explanation",
+      "skip_wrapper_rationale",
+      "user_approved_rationale"
     ],
     "wrapper_skipped_policy_resource": "resources/coverage/2022.1/wrapper-only-category-policy.json"
   },
@@ -4262,9 +4295,10 @@
     "source_live_tested": 0,
     "source_safe_tested": 27,
     "target_status_counts": {
-      "deferred-with-substitute-test": 2,
+      "conformance-only-skip": 11,
+      "deferred-with-substitute-test": 1,
       "fake-route-tested": 8,
-      "live-candidate": 102,
+      "live-candidate": 92,
       "skipped-approved": 21,
       "wrapper-only": 11
     },

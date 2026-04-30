@@ -6,69 +6,69 @@
   "conformance_only_apis": [
     {
       "evidence_class": "conformance_only_skip",
-      "future_review_trigger": "Review when a deterministic user-driven playback or project lifecycle fixture can safely prove behavior without relying on route/schema conformance only.",
-      "user_approved_rationale": "User-approved Phase 2.1 conformance-only policy: keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
-      "uri": "ak.wwise.core.project.loaded"
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
+      "uri": "ak.wwise.core.project.loaded",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage."
     },
     {
       "evidence_class": "conformance_only_skip",
-      "future_review_trigger": "Review when a deterministic user-driven playback or project lifecycle fixture can safely prove behavior without relying on route/schema conformance only.",
-      "user_approved_rationale": "User-approved Phase 2.1 conformance-only policy: keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
-      "uri": "ak.wwise.core.project.postClosed"
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
+      "uri": "ak.wwise.core.project.postClosed",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage."
     },
     {
       "evidence_class": "conformance_only_skip",
-      "future_review_trigger": "Review when a deterministic user-driven playback or project lifecycle fixture can safely prove behavior without relying on route/schema conformance only.",
-      "user_approved_rationale": "User-approved Phase 2.1 conformance-only policy: keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
-      "uri": "ak.wwise.core.project.preClosed"
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
+      "uri": "ak.wwise.core.project.preClosed",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage."
     },
     {
       "evidence_class": "conformance_only_skip",
-      "future_review_trigger": "Review when a deterministic user-driven playback or project lifecycle fixture can safely prove behavior without relying on route/schema conformance only.",
-      "user_approved_rationale": "User-approved Phase 2.1 conformance-only policy: keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
-      "uri": "ak.wwise.core.project.save"
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
+      "uri": "ak.wwise.core.project.save",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage."
     },
     {
       "evidence_class": "conformance_only_skip",
-      "future_review_trigger": "Review when a deterministic user-driven playback or project lifecycle fixture can safely prove behavior without relying on route/schema conformance only.",
-      "user_approved_rationale": "User-approved Phase 2.1 conformance-only policy: keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
-      "uri": "ak.wwise.core.project.saved"
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
+      "uri": "ak.wwise.core.project.saved",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage."
     },
     {
       "evidence_class": "conformance_only_skip",
-      "future_review_trigger": "Review when a deterministic user-driven playback or project lifecycle fixture can safely prove behavior without relying on route/schema conformance only.",
-      "user_approved_rationale": "User-approved Phase 2.1 conformance-only policy: keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
-      "uri": "ak.wwise.core.transport.create"
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
+      "uri": "ak.wwise.core.transport.create",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage."
     },
     {
       "evidence_class": "conformance_only_skip",
-      "future_review_trigger": "Review when a deterministic user-driven playback or project lifecycle fixture can safely prove behavior without relying on route/schema conformance only.",
-      "user_approved_rationale": "User-approved Phase 2.1 conformance-only policy: keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
-      "uri": "ak.wwise.core.transport.destroy"
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
+      "uri": "ak.wwise.core.transport.destroy",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage."
     },
     {
       "evidence_class": "conformance_only_skip",
-      "future_review_trigger": "Review when a deterministic user-driven playback or project lifecycle fixture can safely prove behavior without relying on route/schema conformance only.",
-      "user_approved_rationale": "User-approved Phase 2.1 conformance-only policy: keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
-      "uri": "ak.wwise.core.transport.executeAction"
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
+      "uri": "ak.wwise.core.transport.executeAction",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage."
     },
     {
       "evidence_class": "conformance_only_skip",
-      "future_review_trigger": "Review when a deterministic user-driven playback or project lifecycle fixture can safely prove behavior without relying on route/schema conformance only.",
-      "user_approved_rationale": "User-approved Phase 2.1 conformance-only policy: keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
-      "uri": "ak.wwise.core.transport.prepare"
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
+      "uri": "ak.wwise.core.transport.prepare",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage."
     },
     {
       "evidence_class": "conformance_only_skip",
-      "future_review_trigger": "Review when a deterministic user-driven playback or project lifecycle fixture can safely prove behavior without relying on route/schema conformance only.",
-      "user_approved_rationale": "User-approved Phase 2.1 conformance-only policy: keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
-      "uri": "ak.wwise.core.transport.stateChanged"
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
+      "uri": "ak.wwise.core.transport.stateChanged",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage."
     },
     {
       "evidence_class": "conformance_only_skip",
-      "future_review_trigger": "Review when a deterministic user-driven playback or project lifecycle fixture can safely prove behavior without relying on route/schema conformance only.",
-      "user_approved_rationale": "User-approved Phase 2.1 conformance-only policy: keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage.",
-      "uri": "ak.wwise.core.undo.cancelGroup"
+      "future_review_trigger": "Reopen only if user later requests lifecycle/state-transition live proof.",
+      "uri": "ak.wwise.core.undo.cancelGroup",
+      "user_approved_rationale": "User reviewed these APIs as behaviorally simple; keep reflected schema and route conformance, but do not claim behavioral or live behavioral coverage."
     }
   ],
   "evidence_classes": [

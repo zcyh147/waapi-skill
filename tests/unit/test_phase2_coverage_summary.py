@@ -11,6 +11,10 @@ from wwise_waapi.phase2_coverage_summary import (  # pyright: ignore[reportMissi
     Phase2CoverageSummaryBuilder,
     phase2_status_records_from_summary,
 )
+from wwise_waapi.phase21_uri_policy import (  # pyright: ignore[reportMissingImports]
+    ACCEPTED_FAKE_ROUTE_PROFILER_READ_URIS,
+    CONFORMANCE_ONLY_URIS,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -57,15 +61,16 @@ def test_before_after_counts_preserve_phase1_baseline_and_phase2_policy() -> Non
     assert summary["reflected_count"] == 144
     assert summary["phase1_status_counts"] == {"deferred-with-substitute-test": 117, "fake-route-tested": 27}
     assert summary["original_deferred_before_phase2"] == 117
-    assert summary["original_deferred_after_phase2"] == 74
+    assert summary["original_deferred_after_phase2"] == 63
     assert summary["original_deferred_promoted_behavioral"] == 13
-    assert summary["original_deferred_policy_approved"] == 30
+    assert summary["original_deferred_policy_approved"] == 41
     assert summary["original_fake_route_promoted_live"] == 0
     assert summary["phase2_status_counts"] == {
+        "conformance-only-skip": 11,
         "fake-route-tested": 25,
         "sandbox-mutating-tested": 13,
         "skipped-approved": 21,
-        "still-deferred-with-evidence": 74,
+        "still-deferred-with-evidence": 63,
         "wrapper-only": 11,
     }
     assert summary["phase2_status_counts"].get("live-sandbox-tested", 0) == 0
@@ -122,7 +127,7 @@ def test_every_phase2_transition_has_evidence_and_deferred_entries_keep_blockers
             assert entry["future_review_trigger"], entry["uri"]
             assert entry["counts_as_behavioral"] is False, entry["uri"]
             assert entry["counts_as_live_behavioral"] is False, entry["uri"]
-        if entry["achieved_status"] in {"wrapper-only", "skipped-approved"}:
+        if entry["achieved_status"] in {"wrapper-only", "skipped-approved", "conformance-only-skip"}:
             assert entry["user_approved_rationale"], entry["uri"]
             assert entry["counts_as_behavioral"] is False, entry["uri"]
             assert entry["counts_as_live_behavioral"] is False, entry["uri"]
@@ -140,13 +145,13 @@ def test_truthful_promotions_and_required_blockers_are_not_overclaimed() -> None
     assert entries["ak.wwise.core.audio.imported"]["achieved_status"] == "sandbox-mutating-tested"
     assert entries["ak.wwise.core.soundbank.generated"]["achieved_status"] == "sandbox-mutating-tested"
 
-    assert_blocked(entries, "ak.wwise.core.project.saved", "ak.wwise.unavailable")
-    assert_blocked(entries, "ak.wwise.core.undo.cancelGroup", "left objects")
+    assert_conformance_only(entries, "ak.wwise.core.project.saved")
+    assert_conformance_only(entries, "ak.wwise.core.undo.cancelGroup")
     assert "undo.redo" in entries["ak.wwise.core.undo.cancelGroup"]["related_blocker"]
     assert_blocked(entries, "ak.wwise.core.switchContainer.addAssignment", "Switch Group reference")
     assert_fake_route_with_attempted_blocker(entries, "ak.wwise.core.switchContainer.getAssignments", "readback")
     assert_blocked(entries, "ak.wwise.core.soundbank.processDefinitionFiles", "SoundBank object readback")
-    assert_blocked(entries, "ak.wwise.core.transport.stateChanged", "getState transition")
+    assert_conformance_only(entries, "ak.wwise.core.transport.stateChanged")
     assert_blocked(entries, "ak.soundengine.postMsgMonitor", "capture-log topic payload")
     assert_blocked(entries, "ak.wwise.core.profiler.captureLog.itemAdded", "capture-log topic payload")
     assert_blocked(entries, "ak.soundengine.registerGameObj", "profiler game-object topic payloads")
@@ -167,6 +172,30 @@ def assert_blocked(entries: Mapping[str, Mapping[str, Any]], uri: str, blocker_t
     assert blocker_text in entry["blocking_condition"]
     assert entry["substitute_test"]
     assert entry["future_review_trigger"]
+
+
+def assert_conformance_only(entries: Mapping[str, Mapping[str, Any]], uri: str) -> None:
+    entry = entries[uri]
+    assert entry["achieved_status"] == "conformance-only-skip"
+    assert entry["evidence_class"] == "conformance_only_skip"
+    assert entry["counts_as_behavioral"] is False
+    assert entry["counts_as_live_behavioral"] is False
+    assert "behaviorally simple" in entry["user_approved_rationale"]
+    assert "lifecycle/state-transition live proof" in entry["future_review_trigger"]
+
+
+def test_conformance_only_policy_entries_are_explicit_and_non_live() -> None:
+    entries = _entries_by_uri()
+
+    assert {uri for uri, entry in entries.items() if entry["achieved_status"] == "conformance-only-skip"} == CONFORMANCE_ONLY_URIS
+    for uri in CONFORMANCE_ONLY_URIS:
+        assert_conformance_only(entries, uri)
+        assert entries[uri]["status_transition"] == "phase1-deferred-conformance-only-policy-approved"
+
+    for uri in ACCEPTED_FAKE_ROUTE_PROFILER_READ_URIS:
+        assert entries[uri]["achieved_status"] == "fake-route-tested"
+        assert entries[uri]["counts_as_behavioral"] is True
+        assert entries[uri]["counts_as_live_behavioral"] is False
 
 
 def assert_fake_route_with_attempted_blocker(

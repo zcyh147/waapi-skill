@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from wwise_waapi.phase21_uri_policy import CONFORMANCE_ONLY_URIS  # pyright: ignore[reportMissingImports]
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILL_ROOT = REPO_ROOT
@@ -35,11 +37,12 @@ ALLOWED_TARGET_STATUSES = {
     "deferred-with-substitute-test",
     "fake-route-tested",
     "live-candidate",
+    "conformance-only-skip",
     "skipped-approved",
     "wrapper-only",
 }
 ALLOWED_ACHIEVED_STATUSES = {"fake-route-tested", "deferred-with-substitute-test"}
-NON_LIVE_TARGET_STATUSES = {"wrapper-only", "skipped-approved", "deferred-with-substitute-test"}
+NON_LIVE_TARGET_STATUSES = {"wrapper-only", "skipped-approved", "conformance-only-skip", "deferred-with-substitute-test"}
 WRAPPER_ONLY_CATEGORIES = {"ui", "ui.commands", "ui.project"}
 SKIPPED_APPROVED_CATEGORIES = {"cli", "core.remote", "debug"}
 LIVE_CANDIDATE_CATEGORIES = {
@@ -108,6 +111,20 @@ def test_wrapper_and_skipped_entries_have_rationales() -> None:
             assert entry["fixture_prerequisites"] == [], entry["uri"]
 
 
+def test_conformance_only_entries_have_policy_rationales_and_are_not_live_candidates() -> None:
+    entries = _by_uri(_matrix_entries())
+
+    assert {uri for uri, entry in entries.items() if entry["target_status"] == "conformance-only-skip"} == CONFORMANCE_ONLY_URIS
+    for uri in CONFORMANCE_ONLY_URIS:
+        entry = entries[uri]
+        assert entry["allowed_test_tier"] == "conformance-only-policy"
+        assert entry["fixture_prerequisites"] == []
+        assert entry["counts_as_live_behavior"] is False
+        assert entry["evidence_class"] == "conformance_only_skip"
+        assert "behaviorally simple" in entry["user_approved_rationale"]
+        assert "lifecycle/state-transition live proof" in entry["future_review_trigger"]
+
+
 def test_user_category_policy() -> None:
     entries = _matrix_entries()
 
@@ -132,6 +149,8 @@ def test_user_category_policy() -> None:
 
 
 def _is_expected_live_candidate(entry: Mapping[str, Any]) -> bool:
+    if entry["uri"] in CONFORMANCE_ONLY_URIS:
+        return False
     category = entry["category"]
     if category in WRAPPER_ONLY_CATEGORIES or category in SKIPPED_APPROVED_CATEGORIES:
         return False

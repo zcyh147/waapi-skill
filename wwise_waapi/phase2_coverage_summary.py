@@ -11,6 +11,7 @@ from .api_coverage_audit import Phase2CoverageStatusRecord  # pyright: ignore[re
 from .category_policy import category_policy  # pyright: ignore[reportMissingImports]
 from .deferred_registry import DeferredRegistry
 from .manifest import DeterministicJsonWriter, ManifestStore
+from .phase21_uri_policy import CONFORMANCE_ONLY_URIS, load_phase21_uri_policy
 
 
 DEFAULT_WWISE_VERSION = "2022.1"
@@ -72,6 +73,9 @@ TASK9_LIVE_COMMAND = (
 UNIT_NO_SILENT_SKIP_COMMAND = "python -m pytest tests/unit/test_no_silent_skips.py -q"
 UNIT_ROUTE_COMMAND = "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q"
 UNIT_WRAPPER_POLICY_COMMAND = "python -m pytest tests/unit/test_wrapper_only_categories.py -q"
+UNIT_CONFORMANCE_POLICY_COMMAND = (
+    "python -m pytest tests/unit/test_phase21_uri_policy.py tests/unit/test_phase2_coverage_summary.py -q"
+)
 
 TASK7_EVIDENCE = ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-7-object-mutation.md"
 TASK7_UNDO_SWITCH_EVIDENCE = ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-7-undo-switch.md"
@@ -79,6 +83,8 @@ TASK8_AUDIO_EVIDENCE = ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/tas
 TASK8_SOUNDBANK_EVIDENCE = ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-8-soundbank.md"
 TASK9_PROFILER_TRANSPORT_EVIDENCE = ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-profiler-transport.md"
 TASK9_SOUNDENGINE_EVIDENCE = ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md"
+TASK8_CONFORMANCE_POLICY_EVIDENCE = ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-8-conformance-policy.md"
+TASK8_SUMMARY_ACCOUNTING_EVIDENCE = ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-8-summary-accounting.md"
 
 SPECIFIC_BLOCKERS: dict[str, dict[str, str]] = {
     "ak.wwise.core.project.saved": {
@@ -329,6 +335,31 @@ class Phase2CoverageSummaryBuilder:
                 }
             )
             return entry
+        if achieved_status == "conformance-only-skip":
+            policy = self._conformance_only_policy_by_uri()[uri]
+            future_review_trigger = str(policy["future_review_trigger"])
+            entry.update(
+                {
+                    "evidence_class": "conformance_only_skip",
+                    "evidence_command": UNIT_CONFORMANCE_POLICY_COMMAND,
+                    "evidence_path": TASK8_CONFORMANCE_POLICY_EVIDENCE,
+                    "evidence_paths": [
+                        TASK8_CONFORMANCE_POLICY_EVIDENCE,
+                        TASK8_SUMMARY_ACCOUNTING_EVIDENCE,
+                        "resources/coverage/2022.1/phase21-uri-policy.json",
+                    ],
+                    "future_review_trigger": future_review_trigger,
+                    "review_trigger": future_review_trigger,
+                    "status_policy": (
+                        "User-reviewed conformance-only skip: reflected schema and route conformance remain "
+                        "covered, but behavioral and live behavioral coverage are not claimed."
+                    ),
+                    "user_approved_rationale": str(policy["user_approved_rationale"]),
+                }
+            )
+            if uri == "ak.wwise.core.undo.cancelGroup":
+                entry["related_blocker"] = "ak.wwise.core.undo.redo is not reflected in the local 2022.1 manifest; redo remains unclaimed."
+            return entry
 
         deferred = self.deferred_registry.get(uri)
         blocker = SPECIFIC_BLOCKERS.get(uri, {})
@@ -364,6 +395,8 @@ class Phase2CoverageSummaryBuilder:
         policy = category_policy(category)
         if policy is not None:
             return policy.target_status
+        if uri in CONFORMANCE_ONLY_URIS:
+            return "conformance-only-skip"
         if phase1_status == "fake-route-tested":
             return "fake-route-tested"
         if uri in LIVE_SANDBOX_TESTED_URIS:
@@ -423,7 +456,9 @@ class Phase2CoverageSummaryBuilder:
         original_deferred_uris = {entry["uri"] for entry in entries if entry["phase1_status"] == "deferred-with-substitute-test"}
         still_deferred_uris = {entry["uri"] for entry in entries if entry["achieved_status"] == "still-deferred-with-evidence"}
         policy_approved_uris = {
-            entry["uri"] for entry in entries if entry["achieved_status"] in {"wrapper-only", "skipped-approved"}
+            entry["uri"]
+            for entry in entries
+            if entry["achieved_status"] in {"wrapper-only", "skipped-approved", "conformance-only-skip"}
         }
         behavioral_statuses = {"fake-route-tested", "live-sandbox-tested", "sandbox-mutating-tested", "soundengine-backed-tested"}
         live_behavioral_statuses = {"live-sandbox-tested", "sandbox-mutating-tested", "soundengine-backed-tested"}
@@ -494,11 +529,16 @@ class Phase2CoverageSummaryBuilder:
             return "phase1-fake-route-unchanged"
         if achieved_status in {"wrapper-only", "skipped-approved"}:
             return "phase1-deferred-policy-approved" if phase1_status != "fake-route-tested" else "phase1-fake-route-policy-approved"
+        if achieved_status == "conformance-only-skip":
+            return "phase1-deferred-conformance-only-policy-approved"
         if phase1_status == "fake-route-tested":
             return "phase1-fake-route-plus-live-evidence"
         if achieved_status == "still-deferred-with-evidence":
             return "phase1-deferred-still-blocked-with-evidence"
         return "phase1-deferred-promoted-with-evidence"
+
+    def _conformance_only_policy_by_uri(self) -> dict[str, Mapping[str, Any]]:
+        return {entry["uri"]: entry for entry in load_phase21_uri_policy()["conformance_only_apis"]}
 
 
 def phase2_status_records_from_summary(payload: Mapping[str, Any]) -> list[Phase2CoverageStatusRecord]:
