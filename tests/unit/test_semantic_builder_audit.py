@@ -1,0 +1,96 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import wwise_waapi.builders as builders  # pyright: ignore[reportMissingImports]
+from wwise_waapi.builders.common import BuilderFamily  # pyright: ignore[reportMissingImports]
+from wwise_waapi.builders.source_notes import EXPECTED_SOURCE_NOTE_URI_INVENTORY, source_note_uri_inventory  # pyright: ignore[reportMissingImports]
+
+
+ROOT = Path(__file__).resolve().parents[2]
+SOURCE_NOTES = ROOT / "resources" / "semantic" / "2022.1" / "source_notes.json"
+SKILL_MD = ROOT / "SKILL.md"
+
+INCLUDED_FAMILIES = {
+    "query",
+    "object-mutation",
+    "property-reference",
+    "import",
+    "soundbank",
+    "switchcontainer",
+}
+EXCLUDED_FAMILY_TERMS = ("profiler", "transport", "soundengine", "UI", "CLI", "remote", "debug")
+REQUIRED_PUBLIC_EXPORTS = {
+    "build_object_get_query",
+    "ObjectMutationBuilder",
+    "PropertyReferenceBuilder",
+    "MetadataBuilder",
+    "ImportBuilder",
+    "SoundBankBuilder",
+    "SwitchContainerAssignmentBuilder",
+    "SemanticPreview",
+    "SemanticValidationError",
+    "source_note_uri_inventory",
+}
+
+
+def test_builder_package_exports_stable_semantic_api_without_root_package_promotion() -> None:
+    exported = set(builders.__all__)
+
+    assert REQUIRED_PUBLIC_EXPORTS <= exported
+    for name in REQUIRED_PUBLIC_EXPORTS:
+        assert getattr(builders, name) is not None
+
+    root_init = (ROOT / "wwise_waapi" / "__init__.py").read_text(encoding="utf-8")
+    assert "build_object_get_query" not in root_init
+    assert "ObjectMutationBuilder" not in root_init
+
+
+def test_source_note_inventory_contains_only_planned_p0_p1_p2_families() -> None:
+    inventory = source_note_uri_inventory(SOURCE_NOTES)
+
+    assert set(inventory) == INCLUDED_FAMILIES
+    assert {family.value for family in BuilderFamily} == INCLUDED_FAMILIES
+    assert inventory == EXPECTED_SOURCE_NOTE_URI_INVENTORY
+    for family, endpoints in inventory.items():
+        assert endpoints, family
+        assert len(endpoints) == len(set(endpoints))
+
+
+def test_source_notes_are_grounded_and_exclude_out_of_scope_families() -> None:
+    payload = json.loads(SOURCE_NOTES.read_text(encoding="utf-8"))
+    notes = payload["notes"]
+
+    for family in INCLUDED_FAMILIES:
+        note = notes[family]
+        assert note["status"] == "grounded"
+        assert note["notebook_id"] == "wwise-2022.1-docs"
+        assert note["gate_evidence_path"] == "references/semantic-builder-notebooklm-gate.md"
+        assert note["endpoints"] == list(EXPECTED_SOURCE_NOTE_URI_INVENTORY[family])
+        assert set(note["required_fields"]) <= set(note["cited_required_fields"])
+
+    inventory_text = json.dumps(notes, sort_keys=True)
+    for term in EXCLUDED_FAMILY_TERMS:
+        assert term.lower() in inventory_text.lower()
+    for endpoints in EXPECTED_SOURCE_NOTE_URI_INVENTORY.values():
+        for uri in endpoints:
+            assert not any(excluded.lower() in uri.lower() for excluded in EXCLUDED_FAMILY_TERMS)
+
+
+def test_skill_docs_prefer_builders_without_claiming_live_execution() -> None:
+    text = SKILL_MD.read_text(encoding="utf-8")
+
+    assert "prefer `wwise_waapi.builders` semantic builders" in text
+    assert "Builders construct and validate source-grounded envelopes" in text
+    assert "they do not open Wwise, subscribe to topics, or dispatch live calls by default" in text
+    assert "raw `WwiseDispatcher` contract remains the explicit escape hatch" in text
+    for family in INCLUDED_FAMILIES:
+        assert f"`{family}`" in text
+    forbidden_claims = (
+        "builders execute live Wwise by default",
+        "semantic builders dispatch live calls by default",
+        "builders prove live execution",
+    )
+    for claim in forbidden_claims:
+        assert claim not in text

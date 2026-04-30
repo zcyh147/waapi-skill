@@ -42,6 +42,36 @@ result = WwiseDispatcher(client=waapi_client).dispatch(
 )
 ```
 
+
+## Semantic builder APIs
+
+For P0/P1/P2 complex WAAPI work, prefer `wwise_waapi.builders` semantic builders before writing raw dispatcher payloads. Builders construct and validate source-grounded envelopes, readback plans, and safe previews; they do not open Wwise, subscribe to topics, or dispatch live calls by default.
+
+Use semantic builders for these grounded families:
+
+- `query`: WAQL `ak.wwise.core.object.get` previews.
+- `object-mutation`: `object.create`, `object.set`, `object.delete`, copy/move/diff/pasteProperties, and undo previews.
+- `property-reference`: property/reference/curve/randomizer metadata and setter previews.
+- `import`: audio import, tab-delimited import, and imported-topic evidence previews.
+- `soundbank`: inclusion, generation, external-source, processDefinitionFiles, and topic evidence previews.
+- `switchcontainer`: assignment readback, guarded add/remove previews, and topic evidence expectations.
+
+Example preview pattern:
+
+```python
+from wwise_waapi.builders import QueryPredicate, build_object_get_query
+
+preview = build_object_get_query(
+    type="Sound",
+    where=QueryPredicate("@Volume", "<", 0),
+    return_fields=("id", "name", "path", "type", "@Volume"),
+)
+payload = preview.dispatch_payload()
+request = preview.to_dispatcher_request()
+```
+
+The raw `WwiseDispatcher` contract remains the explicit escape hatch for unsupported or low-level WAAPI work. When using that escape hatch, keep `dry_run=True` first for unfamiliar calls, set finite timeouts, and pass destructive opt-in only for isolated fixture or sandbox projects.
+
 ## Dispatcher input contract
 
 - `api` (required): reflected WAAPI URI such as `ak.wwise.core.getInfo`.
