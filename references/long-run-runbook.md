@@ -62,6 +62,29 @@ Required evidence paths:
 - `.sisyphus/evidence/task-12-approval-stop.md`
 ```
 
+
+## Semantic builder and source-note refresh workflow
+
+Default development remains Wwise-free. Semantic builders use persisted source notes in `resources/semantic/2022.1/source_notes.json` and must return previews, dispatcher-ready payloads, readback plans, or topic expectations only. They do not execute live WAAPI calls by default.
+
+Refresh the source-note gate only when semantic docs change:
+
+1. Query NotebookLM notebook `wwise-2022.1-docs` for the affected family and save the accepted gate evidence in `references/semantic-builder-notebooklm-gate.md`.
+2. Update the family note in `resources/semantic/2022.1/source_notes.json` with cited required fields and the exact endpoint inventory.
+3. Run `python -m pytest tests/unit/test_semantic_builder_source_notes.py tests/unit/test_semantic_builder_audit.py -q`.
+4. Do not promote profiler, transport, soundengine, UI, CLI, remote, or debug APIs into semantic builders without a new plan and source-note approval.
+
+Use these command tiers for semantic builder work:
+
+```bash
+python -m pytest tests/unit/test_semantic_builder_audit.py -q
+python -m pytest tests/unit/test_semantic_builder_query.py tests/unit/test_semantic_builder_object_mutation.py tests/unit/test_semantic_builder_properties.py tests/unit/test_semantic_builder_import.py tests/unit/test_semantic_builder_soundbank.py tests/unit/test_semantic_builder_switchcontainer.py -q
+WWISE_LIVE=1 python -m pytest tests/live/test_waql_live_matrix.py -q
+WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes python -m pytest tests/destructive/test_project_mutation_sandbox.py tests/destructive/test_soundbank_audio_sandbox.py tests/destructive/test_switchcontainer_assignment_sandbox.py -q
+```
+
+Live and destructive tests skip unless the matching environment variables are explicitly set. Never treat a skipped live/destructive suite as proof of live execution.
+
 ## Final verification approval stop
 
 Final verification is not self-completing. After targeted tests, full pytest, coverage, live-gated evidence review, Windows gate review, and final review agents complete, present the verification results to the user and wait for explicit user okay before marking the final verification wave complete.

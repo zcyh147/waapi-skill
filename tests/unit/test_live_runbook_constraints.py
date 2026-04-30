@@ -78,6 +78,26 @@ def test_runbook_explains_evidence_inspection_and_category_reruns() -> None:
     assert "returned IDs, empty mappings, capture start/stop, or no exceptions are context only" in text
 
 
+
+def test_runbook_documents_semantic_builder_refresh_and_execution_tiers() -> None:
+    text = read_reference(RUNBOOK)
+
+    for phrase in (
+        "Semantic builder and source-note refresh workflow",
+        "Default development remains Wwise-free",
+        "They do not execute live WAAPI calls by default",
+        "Query NotebookLM notebook `wwise-2022.1-docs`",
+        "references/semantic-builder-notebooklm-gate.md",
+        "resources/semantic/2022.1/source_notes.json",
+        "tests/unit/test_semantic_builder_source_notes.py tests/unit/test_semantic_builder_audit.py -q",
+        "profiler, transport, soundengine, UI, CLI, remote, or debug APIs",
+        "WWISE_LIVE=1 python -m pytest tests/live/test_waql_live_matrix.py -q",
+        "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes",
+        "Live and destructive tests skip unless the matching environment variables are explicitly set",
+        "Never treat a skipped live/destructive suite as proof of live execution",
+    ):
+        assert phrase in text
+
 def test_runbook_documents_phase21_status_meanings_without_overclaiming() -> None:
     text = read_reference(RUNBOOK)
 
