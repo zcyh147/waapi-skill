@@ -1,0 +1,104 @@
+{
+  "metadata": {
+    "version": "2022.1",
+    "task": "6. Add live sandbox tests for read-only object queries and selected topics",
+    "source_matrix": "resources/coverage/2022.1/live-coverage-matrix.json",
+    "live_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject python -m pytest tests/live/test_object_topics_sandbox.py -q",
+    "unit_command": "python -m pytest tests/unit/test_topic_live_plan.py -q"
+  },
+  "object_read_cases": [
+    {
+      "id": "object_get_project_identity",
+      "uri": "ak.wwise.core.object.get",
+      "args": {"waql": "$ from type Project"},
+      "options": {"return": ["id", "name", "type", "path"]},
+      "assertions": ["return array is non-empty", "all rows are Project objects", "id/name/type/path fields are present"],
+      "expected": {"result_count": {"policy": "at_least", "count": 1}, "type": "Project", "required_fields": ["id", "name", "type", "path"]},
+      "no_mutation": true,
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/object-read/object-get-project-identity.json"
+    },
+    {
+      "id": "object_get_types_contains_project_and_sound",
+      "uri": "ak.wwise.core.object.getTypes",
+      "args": {},
+      "options": {},
+      "assertions": ["return array is non-empty", "Project and Sound type names are present", "classId/name/type fields are present"],
+      "expected": {"contains_type_names": ["Project", "Sound"], "required_fields": ["classId", "name", "type"]},
+      "no_mutation": true,
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/object-read/object-get-types.json"
+    },
+    {
+      "id": "object_property_names_for_sound_class",
+      "uri": "ak.wwise.core.object.getPropertyAndReferenceNames",
+      "args": {"classIdFromType": "Sound"},
+      "options": {},
+      "assertions": ["return array is non-empty", "Volume is listed as a Sound property/reference name"],
+      "expected": {"contains": ["Volume"]},
+      "no_mutation": true,
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/object-read/sound-property-reference-names.json"
+    },
+    {
+      "id": "object_property_info_for_sound_volume",
+      "uri": "ak.wwise.core.object.getPropertyInfo",
+      "args": {"classIdFromType": "Sound", "property": "Volume"},
+      "options": {},
+      "assertions": ["property info name is Volume", "type/default/supports metadata is present when Wwise returns it"],
+      "expected": {"name": "Volume", "required_fields": ["name", "type"]},
+      "no_mutation": true,
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/object-read/sound-volume-property-info.json"
+    },
+    {
+      "id": "object_get_attenuation_curve_when_present",
+      "uri": "ak.wwise.core.object.getAttenuationCurve",
+      "args": {"objectFromWaql": "$ from type Attenuation", "curveType": "VolumeDryUsage"},
+      "options": {},
+      "assertions": ["attenuation object lookup is deterministic", "when an attenuation exists, curveType/use fields are asserted", "when absent, evidence records skipped documented-empty behavior"],
+      "expected": {"curveType": "VolumeDryUsage", "required_fields_when_present": ["curveType", "use"]},
+      "no_mutation": true,
+      "allow_documented_empty": true,
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/object-read/attenuation-curve-when-present.json"
+    }
+  ],
+  "topic_cases": [
+    {
+      "id": "project_saved_via_project_save",
+      "uri": "ak.wwise.core.project.saved",
+      "status": "still-deferred-with-evidence",
+      "attempted_publisher": {"uri": "ak.wwise.core.project.save", "args": {}, "options": {}, "deterministic": true},
+      "bounded_wait_seconds": 5.0,
+      "subscription_options": {},
+      "payload_assertions": {"required_fields": ["modifiedPaths"], "field_evidence": {"modifiedPaths": "array of modified Work Unit or Project paths from publishSchema"}},
+      "unsubscribe_assertion": "SubscriptionManager.active_topics is empty after wait_for_event returns or times out",
+      "cleanup": ["publisher thread joined", "WAAPI client disconnected", "sandbox lifecycle shutdown", "sandbox copy deleted or preserved only on failure policy"],
+      "blocker": "WwiseConsole sandbox rejects ak.wwise.core.project.saved subscription with ak.wwise.unavailable: Topic not available for this type of Wwise instance.",
+      "missing_requirements": ["Wwise Authoring instance or fixture type where the topic is subscribable", "successful subscription handle", "payload assertion after publish"],
+      "future_review_trigger": "Retry only when the live fixture can subscribe to project.saved before project.save.",
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/topics/project-saved-blocker.json",
+      "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject python -m pytest tests/live/test_object_topics_sandbox.py -q"
+    },
+    {
+      "id": "object_created_deferred_to_mutating_task",
+      "uri": "ak.wwise.core.object.created",
+      "status": "still-deferred-with-evidence",
+      "blocker": "Requires ak.wwise.core.object.create plus cleanup/delete on a disposable hierarchy; Task 7 owns mutating object groups.",
+      "missing_requirements": ["non-destructive deterministic publisher", "payload assertion without creating an object", "cleanup proof for created object"],
+      "future_review_trigger": "Promote only when Task 7 supplies disposable object hierarchy cleanup evidence."
+    },
+    {
+      "id": "object_property_changed_deferred_to_mutating_task",
+      "uri": "ak.wwise.core.object.propertyChanged",
+      "status": "still-deferred-with-evidence",
+      "blocker": "Requires setting a property on a sandbox object and restoring it; Task 7 owns mutating object groups.",
+      "missing_requirements": ["safe property mutation publisher", "old/new payload proof", "restore cleanup proof"],
+      "future_review_trigger": "Promote only with a reversible property mutation fixture and payload evidence."
+    },
+    {
+      "id": "object_reference_changed_deferred_to_mutating_task",
+      "uri": "ak.wwise.core.object.referenceChanged",
+      "status": "still-deferred-with-evidence",
+      "blocker": "Requires changing an object reference and restoring it; no deterministic read-only publisher exists in the local manifest.",
+      "missing_requirements": ["safe reference mutation publisher", "old/new/reference payload proof", "restore cleanup proof"],
+      "future_review_trigger": "Promote only with a reversible reference mutation fixture and payload evidence."
+    }
+  ]
+}
