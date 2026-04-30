@@ -1,0 +1,128 @@
+{
+  "allowed_committed_file_patterns": [
+    "*.wproj",
+    "**/*.wwu",
+    "Originals/**/*.wav",
+    "fixture-metadata.json",
+    "fixture-manifest.json",
+    "README.md"
+  ],
+  "excluded_generated_file_patterns": [
+    "*.akd",
+    "*.bnk",
+    "*.wem",
+    "*.prof",
+    "*.profraw",
+    "*.validationcache",
+    "*.wsettings",
+    "IncrementalSoundBankData.xml",
+    "*.log",
+    ".DS_Store"
+  ],
+  "excluded_generated_folders": [
+    ".backup/",
+    ".cache/",
+    ".pytest_cache/",
+    ".claude/",
+    "GeneratedSoundBanks/",
+    "**/GeneratedSoundBanks/",
+    "Logs/",
+    "Profiler/",
+    "Temp/",
+    "WwiseAudioCache/"
+  ],
+  "fixture_root": "tests/_org/2022.1",
+  "fixture_update_procedure": [
+    "Refresh from an installed Wwise 2022.1.19.8584 SampleProject or an explicitly reviewed replacement source.",
+    "Copy only source-control-safe authored project files and intentionally selected original media.",
+    "Regenerate fixture-manifest.json and fixture-metadata.json hashes.",
+    "Run python -m pytest tests/unit/test_org_fixture_source.py tests/unit/test_sandbox_fixture.py -q.",
+    "Confirm git lfs track or .gitattributes covers *.wav before committing media changes."
+  ],
+  "hash_strategy": {
+    "algorithm": "sha256",
+    "file_count": 67,
+    "manifest_digest": "0cc2c22606264b869e788532641159b2a1812d5e2cfa88353956154c978583b6",
+    "mode": "path-plus-content over committed fixture payload files; excludes fixture-metadata.json and fixture-manifest.json bookkeeping files to avoid circular hashes"
+  },
+  "immutability": {
+    "mutation_policy": "Never pass this directory or any descendant as WWISE_SANDBOX_ROOT or WWISE_FIXTURE_PROJECT for destructive tests; copy it to a per-test sandbox before mutation.",
+    "role": "committed immutable source fixture"
+  },
+  "lfs_managed_asset_patterns": [
+    "*.wav"
+  ],
+  "provenance": {
+    "copied_policy": "All authored .wproj/.wwu project source files plus a tiny original-media subset required for deterministic unit fixture and LFS coverage. Generated outputs, caches, local settings, validation caches, logs, profiler captures, and bulk media are intentionally excluded.",
+    "source_path": "/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject",
+    "type": "curated copy from local Audiokinetic SampleProject"
+  },
+  "required_authored_objects": [
+    {
+      "object": "Actor-Mixer Hierarchy/Default Work Unit/Silence",
+      "scenario": "object mutation roots",
+      "source": "Actor-Mixer Hierarchy/Default Work Unit.wwu",
+      "status": "available"
+    },
+    {
+      "object": "OutputBus Silence and Conversion PCM references",
+      "scenario": "property/reference targets",
+      "source": "Actor-Mixer Hierarchy/Default Work Unit.wwu",
+      "status": "available"
+    },
+    {
+      "object": "Footstep_Types",
+      "scenario": "SwitchContainer",
+      "source": "Actor-Mixer Hierarchy/Footsteps.wwu",
+      "status": "available"
+    },
+    {
+      "object": "FS_Type / Crouching, Running, Walking",
+      "scenario": "SwitchGroup/Switch",
+      "source": "Switches/Footsteps.wwu",
+      "status": "available"
+    },
+    {
+      "object": "SoundBanks/Default Work Unit",
+      "scenario": "SoundBank definition/process",
+      "source": "SoundBanks/Default Work Unit.wwu",
+      "status": "available-empty-definition"
+    },
+    {
+      "object": "Play_Footstep",
+      "scenario": "Event",
+      "source": "Events/Footsteps.wwu",
+      "status": "available"
+    },
+    {
+      "object": "States/Default Work Unit plus Music/Dynamic Dialogue authored state work units",
+      "scenario": "State",
+      "source": "States/*.wwu",
+      "status": "available"
+    },
+    {
+      "object": "NYC Ambience RTPC curves and Game Parameters",
+      "scenario": "RTPC",
+      "source": "Actor-Mixer Hierarchy/NYC Ambience.wwu; Game Parameters/*.wwu",
+      "status": "available"
+    },
+    {
+      "object": "WAAPI SoundEngine runtime-only scenario; no project-authored object required",
+      "scenario": "listener/game-object",
+      "source": "runtime API fixture declaration",
+      "status": "declared-runtime"
+    },
+    {
+      "object": "Read-only project suitable for copied sandbox launch; profiler captures are excluded generated evidence",
+      "scenario": "profiler/soundengine",
+      "source": "SampleProject.wproj",
+      "status": "declared-runtime"
+    }
+  ],
+  "schema_version": 1,
+  "wwise": {
+    "source_build": "8584",
+    "source_version": "v2022.1.19",
+    "version": "2022.1"
+  }
+}

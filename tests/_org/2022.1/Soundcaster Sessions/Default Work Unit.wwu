@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WwiseDocument Type="WorkUnit" ID="{8C516E3C-23AA-4358-ACBF-2C79E9DF888C}" SchemaVersion="110">
+	<SoundcasterSessions>
+		<WorkUnit Name="Default Work Unit" ID="{8C516E3C-23AA-4358-ACBF-2C79E9DF888C}" PersistMode="Standalone">
+			<ChildrenList>
+				<SoundcasterSession Name="New Soundcaster Session" ID="{E811ABDA-B8AD-4DF6-8BD1-8BEB0748DC9E}">
+					<ModuleList>
+						<Module>
+							<ObjectRef Name="Silence" ID="{7E821858-1435-4011-8A90-2AEF542988D4}" WorkUnitID="{B7237E6E-5972-4B02-A4C9-267862F2241B}"/>
+							<Position X="0" Y="0"/>
+						</Module>
+						<Module>
+							<ObjectRef Name="Footstep_Types" ID="{B5DB3AFA-044F-441E-BC4A-1397D20E2692}" WorkUnitID="{AC471307-FF2A-428C-BA6B-7E3856A3676B}"/>
+							<Position X="1" Y="0"/>
+						</Module>
+						<Module>
+							<ObjectRef Name="Stop_Minigun" ID="{CBA334AA-6BC1-4847-854B-A9B55D1571FE}" WorkUnitID="{ED23F4DA-DCE5-4423-887B-E01272D6C483}"/>
+							<Position X="2" Y="0"/>
+						</Module>
+					</ModuleList>
+					<RTPCValueList ShowAll="true"/>
+					<CurrentStateList ShowAll="true">
+						<CurrentStateRef Name="None" ID="{4BA09D62-D59B-4880-A78C-8BECE7D7899F}"/>
+						<CurrentStateRef Name="None" ID="{7993CD7C-BBA7-4A63-9E5A-4003C1B86F3C}"/>
+					</CurrentStateList>
+					<CurrentSwitchList ShowAll="true">
+						<CurrentSwitchRef Name="Crouching" ID="{64E633E6-BB40-41C9-A36D-13C35B7CDF83}"/>
+						<CurrentSwitchRef Name="Concrete" ID="{BC91E14D-8394-4D2A-98A2-B7A963C00954}"/>
+					</CurrentSwitchList>
+				</SoundcasterSession>
+			</ChildrenList>
+		</WorkUnit>
+	</SoundcasterSessions>
+</WwiseDocument>

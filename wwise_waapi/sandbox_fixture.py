@@ -22,6 +22,7 @@ from .live_environment import (  # pyright: ignore[reportMissingImports]
     LiveEnvironmentContract,
     LiveEnvironmentError,
     path_is_under,
+    path_is_under_org_fixture,
     require_destructive_environment,
     require_live_environment,
 )
@@ -320,6 +321,8 @@ def _resolve_sandbox_root(env: Mapping[str, str], explicit: Path | None) -> Path
 def _reject_unsafe_root(source_root: Path, sandbox_root: Path) -> None:
     source = source_root.expanduser().resolve(strict=True)
     sandbox = sandbox_root.expanduser().resolve(strict=False)
+    if path_is_under_org_fixture(sandbox):
+        raise SandboxFixtureError("sandbox root must not be inside immutable tests/_org fixture sources")
     if source == sandbox:
         raise SandboxFixtureError("sandbox root must not be the SampleProject source root")
     if path_is_under(sandbox, source):

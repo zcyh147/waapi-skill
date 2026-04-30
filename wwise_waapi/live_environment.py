@@ -20,6 +20,7 @@ ENV_WWISE_SANDBOX_ROOT = "WWISE_SANDBOX_ROOT"
 
 SUPPORTED_WWISE_VERSION = "2022.1"
 DEFAULT_SAMPLE_PROJECT_ROOT = Path("/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject")
+ORG_FIXTURE_SOURCE_ROOT = Path(__file__).resolve().parents[1] / "tests" / "_org"
 
 
 class LiveEnvironmentError(RuntimeError):
@@ -135,6 +136,10 @@ def require_destructive_environment(env: Mapping[str, str] | None = None) -> Liv
     if contract.fixture_project is not None and contract.sample_project_source is not None:
         if _same_path(contract.fixture_project, contract.sample_project_source):
             errors.append("destructive tests must not launch the immutable SampleProject source")
+    if contract.sandbox_root is not None and path_is_under_org_fixture(contract.sandbox_root):
+        errors.append(f"{ENV_WWISE_SANDBOX_ROOT} must not be under immutable tests/_org fixture sources")
+    if contract.fixture_project is not None and path_is_under_org_fixture(contract.fixture_project):
+        errors.append(f"{ENV_WWISE_FIXTURE_PROJECT} must not target immutable tests/_org fixture sources")
     if errors:
         raise LiveEnvironmentError("WWISE_DESTRUCTIVE=1 guard failure: " + "; ".join(errors))
     return contract
@@ -146,6 +151,12 @@ def path_is_under(path: Path, root: Path) -> bool:
     resolved_path = path.expanduser().resolve(strict=False)
     resolved_root = root.expanduser().resolve(strict=False)
     return resolved_path == resolved_root or resolved_root in resolved_path.parents
+
+
+def path_is_under_org_fixture(path: Path) -> bool:
+    """Return True when a path points at the committed immutable tests/_org source fixture tree."""
+
+    return path_is_under(path, ORG_FIXTURE_SOURCE_ROOT)
 
 
 def _canonical_optional_path(raw: str | None) -> Path | None:
@@ -176,9 +187,11 @@ __all__ = [
     "ENV_WWISE_VERSION",
     "LiveEnvironmentContract",
     "LiveEnvironmentError",
+    "ORG_FIXTURE_SOURCE_ROOT",
     "SUPPORTED_WWISE_VERSION",
     "parse_live_environment",
     "path_is_under",
+    "path_is_under_org_fixture",
     "require_destructive_environment",
     "require_live_environment",
     "resolve_sample_project_source",

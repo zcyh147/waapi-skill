@@ -18,6 +18,11 @@ from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImport
     prepare_sample_project_sandbox,
     shutdown_sandboxed_wwise,
 )
+from wwise_waapi.live_environment import LiveEnvironmentError, require_destructive_environment  # pyright: ignore[reportMissingImports]
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+ORG_FIXTURE_ROOT = REPO_ROOT / "tests" / "_org" / "2022.1"
 
 
 def make_console(tmp_path: Path) -> Path:
@@ -101,6 +106,48 @@ def test_rejects_sandbox_roots_that_overlap_source(tmp_path: Path) -> None:
         prepare_sample_project_sandbox(base_env(console, source_project, source_root / "child"))
     with pytest.raises(SandboxFixtureError, match="contain"):
         prepare_sample_project_sandbox(base_env(console, source_project, tmp_path))
+
+
+def test_rejects_sandbox_roots_under_committed_org_fixture_source(tmp_path: Path) -> None:
+    console = make_console(tmp_path)
+    source_project = make_sample_project(tmp_path / "source")
+
+    with pytest.raises(SandboxFixtureError, match="tests/_org"):
+        prepare_sample_project_sandbox(base_env(console, source_project, ORG_FIXTURE_ROOT / "runtime-sandbox"))
+
+
+def test_committed_org_fixture_source_is_copied_outside_source(tmp_path: Path) -> None:
+    console = make_console(tmp_path)
+    source_project = ORG_FIXTURE_ROOT / "SampleProject.wproj"
+    sandbox_root = tmp_path / "sandbox-root"
+
+    sandbox = prepare_sample_project_sandbox(base_env(console, source_project, sandbox_root))
+
+    try:
+        assert sandbox.source_root == ORG_FIXTURE_ROOT.resolve(strict=True)
+        assert sandbox.sandbox_project.exists()
+        assert ORG_FIXTURE_ROOT.resolve(strict=True) not in sandbox.sandbox_project.resolve(strict=True).parents
+        assert sandbox.sandbox_root == sandbox_root.resolve(strict=False)
+        assert sandbox.metadata.sandbox_hash.digest == sandbox.metadata.source_hash.digest
+    finally:
+        cleanup_sandbox(sandbox)
+
+
+def test_destructive_environment_rejects_committed_org_fixture_targets(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    console = make_console(tmp_path)
+    source_project = ORG_FIXTURE_ROOT / "SampleProject.wproj"
+    sandbox_root = ORG_FIXTURE_ROOT / "runtime-sandbox"
+    monkeypatch.setenv("WWISE_LIVE", "1")
+    monkeypatch.setenv("WWISE_DESTRUCTIVE", "1")
+    monkeypatch.setenv("WWISE_CONSOLE", str(console))
+    monkeypatch.setenv("WWISE_SAMPLE_PROJECT_PATH", str(source_project))
+    monkeypatch.setenv("WWISE_FIXTURE_PROJECT", str(source_project))
+    monkeypatch.setenv("WWISE_SANDBOX_ROOT", str(sandbox_root))
+
+    with pytest.raises(LiveEnvironmentError, match="tests/_org"):
+        require_destructive_environment()
 
 
 def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

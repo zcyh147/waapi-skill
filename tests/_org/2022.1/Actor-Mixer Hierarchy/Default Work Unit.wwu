@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WwiseDocument Type="WorkUnit" ID="{B7237E6E-5972-4B02-A4C9-267862F2241B}" SchemaVersion="110">
+	<AudioObjects>
+		<WorkUnit Name="Default Work Unit" ID="{B7237E6E-5972-4B02-A4C9-267862F2241B}" PersistMode="Standalone">
+			<ChildrenList>
+				<Sound Name="Silence" ID="{7E821858-1435-4011-8A90-2AEF542988D4}" ShortID="611754990">
+					<PropertyList>
+						<Property Name="BelowThresholdBehavior" Type="int16" Value="2"/>
+						<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+						<Property Name="IsLoopingEnabled" Type="bool" Value="True"/>
+						<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+					</PropertyList>
+					<ReferenceList>
+						<Reference Name="Conversion">
+							<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+						</Reference>
+						<Reference Name="OutputBus">
+							<ObjectRef Name="Silence" ID="{F75205D5-9F9A-4B16-AC55-779B11FD8EEB}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+						</Reference>
+						<Reference Name="UserAuxSend0">
+							<ObjectRef Name="Gun_Aux" ID="{EB5C5015-F3C3-4DF2-82E1-83223D5F3A39}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+						</Reference>
+					</ReferenceList>
+					<ChildrenList>
+						<SourcePlugin Name="Silence" ID="{97609193-5C75-4EC4-A378-0E856B1E94D6}" ShortID="723350896" PluginName="Wwise Silence" CompanyID="0" PluginID="101">
+							<PropertyList>
+								<Property Name="Length" Type="Real32" Value="10"/>
+							</PropertyList>
+							<Language>SFX</Language>
+						</SourcePlugin>
+					</ChildrenList>
+					<ActiveSourceList>
+						<ActiveSource Name="Silence" ID="{97609193-5C75-4EC4-A378-0E856B1E94D6}" Platform="Linked"/>
+					</ActiveSourceList>
+				</Sound>
+			</ChildrenList>
+		</WorkUnit>
+	</AudioObjects>
+</WwiseDocument>

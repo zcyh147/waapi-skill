@@ -15,6 +15,33 @@ __pycache__/
 venv/
 env/
 GeneratedSoundBanks/
+
+# Wwise generated/runtime artifacts. Keep tests/_org source fixtures committed,
+# but never commit generated banks, caches, local settings, captures, or sandboxes.
+**/GeneratedSoundBanks/
+**/.backup/
+**/.cache/
+**/WwiseAudioCache/
+**/Profiler/
+**/*.akd
+**/*.bnk
+**/*.wem
+**/*.prof
+**/*.profraw
+**/*.validationcache
+**/*.wsettings
+**/IncrementalSoundBankData.xml
+tests/_sandboxes/
+tests/_runtime/
+tests/_org/**/GeneratedSoundBanks/
+tests/_org/**/.backup/
+tests/_org/**/.cache/
+tests/_org/**/*.akd
+tests/_org/**/*.bnk
+tests/_org/**/*.wem
+tests/_org/**/*.prof
+tests/_org/**/*.validationcache
+tests/_org/**/*.wsettings
 # Skill-local runtime data and generated artifacts
 data/
 logs/
