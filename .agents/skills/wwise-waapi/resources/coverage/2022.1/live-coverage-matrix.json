@@ -1,0 +1,4107 @@
+{
+  "matrix": [
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.executeActionOnEvent",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.getState",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.getSwitch",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.postEvent",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.postMsgMonitor",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.postTrigger",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.registerGameObj",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.resetRTPCValue",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.seekOnEvent",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.setDefaultListeners",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.setGameObjectAuxSendValues",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.setGameObjectOutputBusVolume",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.setListenerSpatialization",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.setListeners",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.setMultiplePositions",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.setObjectObstructionAndOcclusion",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.setPosition",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.setRTPCValue",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.setScalingFactor",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.setState",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.setSwitch",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.stopAll",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.stopPlayingID",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "soundengine",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "initialized sound engine",
+        "fixture game object ids",
+        "bounded side-effect assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.soundengine.unregisterGameObj",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "cli",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.cli.addNewPlatform",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "cli",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.cli.convertExternalSource",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "cli",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "high"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.cli.createNewProject",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "cli",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.cli.dumpObjects",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "cli",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.cli.generateSoundbank",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "cli",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "high"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.cli.migrate",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "cli",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.cli.moveMediaIdsToSingleFile",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "cli",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.cli.moveMediaIdsToWorkUnits",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "cli",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.cli.tabDelimitedImport",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "cli",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.cli.updateMediaIdsInSingleFile",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "cli",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.cli.verify",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "cli",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.cli.waapiServer",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "core.audio",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "temporary source audio files",
+        "bounded import assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.audio.import",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "core.audio",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "temporary source audio files",
+        "bounded import assertions"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.audio.importTabDelimited",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.audio",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.audio.imported",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "fake-route",
+      "category": "core.audioSourcePeaks",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Injected fake WAAPI route test remains valid Phase 1-safe behavior evidence.",
+      "fallback_reason": "No fallback needed; Phase 1 fake-route evidence remains the target and achieved status.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "fake-route-tested",
+      "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "fake-route",
+      "category": "core.audioSourcePeaks",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Injected fake WAAPI route test remains valid Phase 1-safe behavior evidence.",
+      "fallback_reason": "No fallback needed; Phase 1 fake-route evidence remains the target and achieved status.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "fake-route-tested",
+      "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "fake-route",
+      "category": "core",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Injected fake WAAPI route test remains valid Phase 1-safe behavior evidence.",
+      "fallback_reason": "No fallback needed; Phase 1 fake-route evidence remains the target and achieved status.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "fake-route-tested",
+      "uri": "ak.wwise.core.getInfo",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "fake-route",
+      "category": "core",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Injected fake WAAPI route test remains valid Phase 1-safe behavior evidence.",
+      "fallback_reason": "No fallback needed; Phase 1 fake-route evidence remains the target and achieved status.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "fake-route-tested",
+      "uri": "ak.wwise.core.getProjectInfo",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "fake-route",
+      "category": "core.log",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Injected fake WAAPI route test remains valid Phase 1-safe behavior evidence.",
+      "fallback_reason": "No fallback needed; Phase 1 fake-route evidence remains the target and achieved status.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "fake-route-tested",
+      "uri": "ak.wwise.core.log.get",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.log",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.log.itemAdded",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.attenuationCurveChanged",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.attenuationCurveLinkChanged",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.childAdded",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.childRemoved",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable object hierarchy",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.copy",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable object hierarchy",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.create",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.created",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.curveChanged",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "high"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable object hierarchy",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.delete",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable object hierarchy",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.diff",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "read-only WAQL query examples",
+        ".agents/skills/wwise-waapi/references/waql-2022.1.md"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested-and-waql-reference-gated",
+        "evidence": ".agents/skills/wwise-waapi/references/waql-2022.1.md",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.get",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable object hierarchy",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.getAttenuationCurve",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable object hierarchy",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.getPropertyAndReferenceNames",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable object hierarchy",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.getPropertyInfo",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable object hierarchy",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.getTypes",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable object hierarchy",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.isPropertyEnabled",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable object hierarchy",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.move",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.nameChanged",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.notesChanged",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable object hierarchy",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.pasteProperties",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "high"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.postDeleted",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "high"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.preDeleted",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.propertyChanged",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.referenceChanged",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable object hierarchy",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.set",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable object hierarchy",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.setAttenuationCurve",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable object hierarchy",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.setName",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable object hierarchy",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.setNotes",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable object hierarchy",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.setProperty",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable object hierarchy",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.setRandomizer",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "core.object",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable object hierarchy",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.object.setReference",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.profiler.captureLog",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.profiler",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live authoring instance",
+        "profiler capture fixture",
+        "bounded capture window"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.profiler.enableProfilerData",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.profiler",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.profiler.gameObjectRegistered",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.profiler",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.profiler.gameObjectReset",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.profiler",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.profiler.gameObjectUnregistered",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.profiler",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live authoring instance",
+        "profiler capture fixture",
+        "bounded capture window"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.profiler.getAudioObjects",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.profiler",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live authoring instance",
+        "profiler capture fixture",
+        "bounded capture window"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.profiler.getBusses",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.profiler",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live authoring instance",
+        "profiler capture fixture",
+        "bounded capture window"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.profiler.getCursorTime",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.profiler",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live authoring instance",
+        "profiler capture fixture",
+        "bounded capture window"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.profiler.getGameObjects",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.profiler",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live authoring instance",
+        "profiler capture fixture",
+        "bounded capture window"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.profiler.getRTPCs",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.profiler",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live authoring instance",
+        "profiler capture fixture",
+        "bounded capture window"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.profiler.getVoiceContributions",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.profiler",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live authoring instance",
+        "profiler capture fixture",
+        "bounded capture window"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.profiler.getVoices",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.profiler",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live authoring instance",
+        "profiler capture fixture",
+        "bounded capture window"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.profiler.startCapture",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.profiler",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.profiler.stateChanged",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.profiler",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live authoring instance",
+        "profiler capture fixture",
+        "bounded capture window"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.profiler.stopCapture",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.profiler",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.profiler.switchChanged",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.project",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.project.loaded",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.project",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.project.postClosed",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.project",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.project.preClosed",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "inventory-substitute-only",
+      "category": "core.project",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Deferred registry substitute evidence preserves inventory coverage only; live behavior remains unclaimed.",
+      "fallback_reason": "Fallback is deferred registry substitute evidence until a safe target tier is approved.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "Requires live WAAPI fixture with bounded side-effect assertions before behavioral execution can be asserted.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "deferred-with-substitute-test",
+      "uri": "ak.wwise.core.project.save",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.project",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.project.saved",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "core.remote",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "core.remote is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.core.remote.connect",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "core.remote",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "core.remote is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.core.remote.disconnect",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "skipped-policy",
+      "category": "core.remote",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "core.remote is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.core.remote.getAvailableConsoles",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "skipped-policy",
+      "category": "core.remote",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "core.remote is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.core.remote.getConnectionStatus",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "inventory-substitute-only",
+      "category": "core.sound",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Deferred registry substitute evidence preserves inventory coverage only; live behavior remains unclaimed.",
+      "fallback_reason": "Fallback is deferred registry substitute evidence until a safe target tier is approved.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "Requires live WAAPI fixture with bounded side-effect assertions before behavioral execution can be asserted.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "deferred-with-substitute-test",
+      "uri": "ak.wwise.core.sound.setActiveSource",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.soundbank",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "temporary soundbank definition/output path",
+        "cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.soundbank.convertExternalSources",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.soundbank",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "temporary soundbank definition/output path",
+        "cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.soundbank.generate",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.soundbank",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.soundbank.generated",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.soundbank",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.soundbank.generationDone",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.soundbank",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "temporary soundbank definition/output path",
+        "cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.soundbank.getInclusions",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.soundbank",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "temporary soundbank definition/output path",
+        "cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.soundbank.processDefinitionFiles",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "core.soundbank",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "temporary soundbank definition/output path",
+        "cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.soundbank.setInclusions",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.switchContainer",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable switch container",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.switchContainer.addAssignment",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.switchContainer",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.switchContainer.assignmentAdded",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.switchContainer",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.switchContainer.assignmentRemoved",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.switchContainer",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable switch container",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.switchContainer.getAssignments",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.switchContainer",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "disposable switch container",
+        "undo cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.switchContainer.removeAssignment",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "core.transport",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "playable object fixture",
+        "transport cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.transport.create",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.transport",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "playable object fixture",
+        "transport cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.transport.destroy",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox-destructive-opt-in",
+      "category": "core.transport",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "playable object fixture",
+        "transport cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.transport.executeAction",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.transport",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "playable object fixture",
+        "transport cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.transport.getList",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.transport",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "playable object fixture",
+        "transport cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.transport.getState",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.transport",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "playable object fixture",
+        "transport cleanup guard"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.transport.prepare",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.transport",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "live subscription fixture",
+        "bounded timeout",
+        "event publisher for the target topic"
+      ],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.transport.stateChanged",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.undo",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "isolated undo group",
+        "rollback assertion"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.undo.beginGroup",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.undo",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "isolated undo group",
+        "rollback assertion"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.undo.cancelGroup",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.undo",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "isolated undo group",
+        "rollback assertion"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.undo.endGroup",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "live-sandbox",
+      "category": "core.undo",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Live/sandbox test must assert bounded behavior against a fixture and record cleanup; inventory evidence alone is insufficient.",
+      "fallback_reason": "Fallback to current achieved status until the required live/sandbox fixture and behavioral assertions exist.",
+      "fixture_prerequisites": [
+        "sandbox fixture project",
+        "isolated undo group",
+        "rollback assertion"
+      ],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "live-candidate",
+      "uri": "ak.wwise.core.undo.undo",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "debug",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "debug is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.debug.assertFailed",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "debug",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "debug is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.debug.enableAsserts",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "debug",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "debug is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.debug.enableAutomationMode",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "debug",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "debug is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.debug.testAssert",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "skipped-policy",
+      "category": "debug",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "high"
+      },
+      "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
+      "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "debug is excluded from Phase 2 live execution by user policy.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "skipped-approved",
+      "uri": "ak.wwise.debug.testCrash",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "wrapper-unit",
+      "category": "ui",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
+      "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "ui depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "wrapper-only",
+      "uri": "ak.wwise.ui.bringToForeground",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "wrapper-unit",
+      "category": "ui",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
+      "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "ui depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "wrapper-only",
+      "uri": "ak.wwise.ui.captureScreen",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "wrapper-unit",
+      "category": "ui.commands",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
+      "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "ui.commands depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "wrapper-only",
+      "uri": "ak.wwise.ui.commands.execute",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "wrapper-unit",
+      "category": "ui.commands",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
+      "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
+      "fixture_prerequisites": [],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "ui.commands depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "wrapper-only",
+      "uri": "ak.wwise.ui.commands.executed",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "wrapper-unit",
+      "category": "ui.commands",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
+      "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "ui.commands depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "wrapper-only",
+      "uri": "ak.wwise.ui.commands.getCommands",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "wrapper-unit",
+      "category": "ui.commands",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
+      "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "ui.commands depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "wrapper-only",
+      "uri": "ak.wwise.ui.commands.register",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "wrapper-unit",
+      "category": "ui.commands",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
+      "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "ui.commands depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "wrapper-only",
+      "uri": "ak.wwise.ui.commands.unregister",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "wrapper-unit",
+      "category": "ui",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
+      "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "ui depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "wrapper-only",
+      "uri": "ak.wwise.ui.getSelectedObjects",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "wrapper-unit",
+      "category": "ui.project",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "high"
+      },
+      "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
+      "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "ui.project depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "wrapper-only",
+      "uri": "ak.wwise.ui.project.close",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "wrapper-unit",
+      "category": "ui.project",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": true,
+        "risk_level": "high"
+      },
+      "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
+      "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "ui.project depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "wrapper-only",
+      "uri": "ak.wwise.ui.project.open",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "deferred-with-substitute-test",
+      "allowed_test_tier": "wrapper-unit",
+      "category": "ui",
+      "current_status": "deferred-with-substitute-test",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "medium"
+      },
+      "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
+      "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
+      "fixture_prerequisites": [],
+      "item_type": "topic",
+      "phase1_behavioral_evidence": {
+        "coverage": "substitute-test",
+        "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+        "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "ui depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "wrapper-only",
+      "uri": "ak.wwise.ui.selectionChanged",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "fake-route",
+      "category": "waapi",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Injected fake WAAPI route test remains valid Phase 1-safe behavior evidence.",
+      "fallback_reason": "No fallback needed; Phase 1 fake-route evidence remains the target and achieved status.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "fake-route-tested",
+      "uri": "ak.wwise.waapi.getFunctions",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "fake-route",
+      "category": "waapi",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Injected fake WAAPI route test remains valid Phase 1-safe behavior evidence.",
+      "fallback_reason": "No fallback needed; Phase 1 fake-route evidence remains the target and achieved status.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "fake-route-tested",
+      "uri": "ak.wwise.waapi.getSchema",
+      "version": "2022.1"
+    },
+    {
+      "achieved_status": "fake-route-tested",
+      "allowed_test_tier": "fake-route",
+      "category": "waapi",
+      "current_status": "fake-route-tested",
+      "destructive_risk": {
+        "destructive_opt_in": false,
+        "risk_level": "low"
+      },
+      "evidence_standard": "Injected fake WAAPI route test remains valid Phase 1-safe behavior evidence.",
+      "fallback_reason": "No fallback needed; Phase 1 fake-route evidence remains the target and achieved status.",
+      "fixture_prerequisites": [],
+      "item_type": "function",
+      "phase1_behavioral_evidence": {
+        "coverage": "fake-route-tested",
+        "evidence": "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+        "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
+      },
+      "phase1_inventory_status": "reflected-schema-ok",
+      "skip_wrapper_rationale": "",
+      "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
+      "target_status": "fake-route-tested",
+      "uri": "ak.wwise.waapi.getTopics",
+      "version": "2022.1"
+    }
+  ],
+  "metadata": {
+    "allowed_target_statuses": [
+      "deferred-with-substitute-test",
+      "fake-route-tested",
+      "live-candidate",
+      "skipped-approved",
+      "wrapper-only"
+    ],
+    "does_not_count_as_live_behavioral_coverage": [
+      "wrapper-only",
+      "skipped-approved",
+      "deferred-with-substitute-test"
+    ],
+    "generator": "task-2 deterministic local resource builder",
+    "live_candidate_policy": {
+      "categories": [
+        "core.audio",
+        "core.object",
+        "core.profiler",
+        "core.profiler.captureLog",
+        "core.soundbank",
+        "core.switchContainer",
+        "core.transport",
+        "core.undo",
+        "soundengine"
+      ],
+      "topics": "all topics except categories superseded by wrapper-only/skipped-approved user policy",
+      "waql_uri": "ak.wwise.core.object.get"
+    },
+    "skipped_approved_categories": [
+      "cli",
+      "core.remote",
+      "debug"
+    ],
+    "sort_key": "uri",
+    "source_coverage": "resources/coverage/2022.1/api-coverage.json",
+    "source_deferred": "resources/deferred/2022.1.json",
+    "source_inventory": [
+      "resources/manifest/2022.1/functions.json",
+      "resources/manifest/2022.1/topics.json"
+    ],
+    "status_model": {
+      "achieved_status": "Evidence actually achieved today; Phase 1 fake-route statuses are preserved",
+      "current_status": "Phase 1 status from api-coverage.json",
+      "target_status": "Phase 2 policy target for future behavior work"
+    },
+    "version": "2022.1",
+    "wrapper_only_categories": [
+      "ui",
+      "ui.commands",
+      "ui.project"
+    ]
+  },
+  "summary": {
+    "achieved_status_counts": {
+      "deferred-with-substitute-test": 117,
+      "fake-route-tested": 27
+    },
+    "category_counts": {
+      "cli": 12,
+      "core": 2,
+      "core.audio": 3,
+      "core.audioSourcePeaks": 2,
+      "core.log": 2,
+      "core.object": 31,
+      "core.profiler": 15,
+      "core.profiler.captureLog": 1,
+      "core.project": 5,
+      "core.remote": 4,
+      "core.sound": 1,
+      "core.soundbank": 7,
+      "core.switchContainer": 5,
+      "core.transport": 7,
+      "core.undo": 4,
+      "debug": 5,
+      "soundengine": 24,
+      "ui": 4,
+      "ui.commands": 5,
+      "ui.project": 2,
+      "waapi": 3
+    },
+    "implemented": 144,
+    "source_deferred": 117,
+    "source_live_tested": 0,
+    "source_safe_tested": 27,
+    "target_status_counts": {
+      "deferred-with-substitute-test": 2,
+      "fake-route-tested": 8,
+      "live-candidate": 102,
+      "skipped-approved": 21,
+      "wrapper-only": 11
+    },
+    "total_functions": 112,
+    "total_topics": 32
+  }
+}
