@@ -43,8 +43,17 @@ PLAN_PATH = (
     / "2022.1"
     / "task-8-soundbank-audio-sandbox-plan.json"
 )
+TASK6_PLAN_PATH = (
+    REPO_ROOT
+    / "resources"
+    / "coverage"
+    / "2022.1"
+    / "task-6-process-definition-files-plan.json"
+)
 EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-waapi-live-sandbox-coverage"
+TASK6_EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-waapi-deferred-reevaluation"
 TEMP_PREFIX = "WAAPI_TASK8_SANDBOX_"
+TASK6_TEMP_PREFIX = "WAAPI_TASK6_SANDBANK_"
 ACTOR_PARENT = r"\Actor-Mixer Hierarchy\Default Work Unit"
 SOUNDBANK_PARENT = r"\SoundBanks\Default Work Unit"
 READBACK_FIELDS = ["id", "name", "type", "path", "notes"]
@@ -383,8 +392,6 @@ def test_soundbank_process_definition_file_or_records_blocker() -> None:
                 runtime.skip_after_blocker = True
                 pytest.skip("soundbank definition fixture returned no WAAPI mapping to assert")
             rows = _find_objects_by_name(client, bank_name, "SoundBank")
-            if rows:
-                bank_id = _row_id(rows[0])
             if not rows:
                 _write_case_evidence(
                     case,
@@ -412,6 +419,101 @@ def test_soundbank_process_definition_file_or_records_blocker() -> None:
             if _is_assertion_or_skip(exc):
                 raise
             _write_case_evidence(case, status="blocked", details=_exception_details(exc, blocker=case["blockers"][0]))
+            runtime.skip_after_blocker = True
+            pytest.skip(f"soundbank definition fixture was rejected by Wwise: {type(exc).__name__}: {exc}")
+        finally:
+            if bank_id is not None:
+                _delete_if_present(client, bank_id)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_soundbank_process_definition_file_version_correct_or_records_blocker() -> None:
+    case = _task6_case()
+
+    with _destructive_sandbox(case) as runtime:
+        client = runtime.require_client()
+        bank_name = _unique_name_with_prefix(TASK6_TEMP_PREFIX, "definition_bank")
+        bank_id: str | None = None
+        definition_file: Path | None = None
+        try:
+            definition_file = _write_soundbank_definition(
+                runtime.require_sandbox_path() / "Task6SoundBankDefinitions", bank_name
+            )
+            definition_content = definition_file.read_text(encoding="utf-8")
+            assert _path_is_under(definition_file, runtime.require_sandbox_path())
+            result = client.call(
+                "ak.wwise.core.soundbank.processDefinitionFiles",
+                {"files": [str(definition_file)]},
+                options={},
+            )
+            if _process_definition_result_is_unusable(result):
+                _write_case_evidence(
+                    case,
+                    status="blocked",
+                    details={
+                        "blocker": case["blockers"][0],
+                        "definition": _definition_evidence(definition_file, runtime.require_sandbox_path(), bank_name),
+                        "definition_content": definition_content,
+                        "process_result": _json_safe(result),
+                        "reason": "processDefinitionFiles returned no usable mapping, an empty mapping, or ak.wwise.file_error",
+                        "source_hash_proof": _source_hash_proof(runtime),
+                    },
+                )
+                runtime.skip_after_blocker = True
+                pytest.skip("soundbank definition fixture returned no usable WAAPI mapping to assert")
+
+            rows = _find_objects_by_name(client, bank_name, "SoundBank")
+            if rows:
+                bank_id = _row_id(rows[0])
+            if not rows:
+                _write_case_evidence(
+                    case,
+                    status="blocked",
+                    details={
+                        "blocker": case["blockers"][0],
+                        "definition": _definition_evidence(definition_file, runtime.require_sandbox_path(), bank_name),
+                        "definition_content": definition_content,
+                        "process_result": _json_safe(result),
+                        "reason": "processDefinitionFiles returned a mapping but no SoundBank object readback tied to the definition ShortName",
+                        "source_hash_proof": _source_hash_proof(runtime),
+                    },
+                )
+                runtime.skip_after_blocker = True
+                pytest.skip("soundbank definition fixture produced no SoundBank object readback to assert")
+            created_bank_id = _row_id(rows[0])
+            bank_id = created_bank_id
+
+            _delete_if_present(client, created_bank_id)
+            cleanup_readback = _read_rows(client, created_bank_id)
+            assert cleanup_readback == []
+            cleanup_proof = {"deleted_soundbank_id": created_bank_id, "read_after_delete": cleanup_readback}
+            bank_id = None
+            assert _no_source_generated_outputs(runtime.source_generated_snapshot_before)
+            source_hash_proof = _source_hash_proof(runtime)
+            assert source_hash_proof["before"] == source_hash_proof["after"]
+            _write_case_evidence(
+                case,
+                status="passed",
+                details={
+                    "definition": _definition_evidence(definition_file, runtime.require_sandbox_path(), bank_name),
+                    "definition_content": definition_content,
+                    "process_result": _json_safe(result),
+                    "soundbank_readback": _json_safe(rows),
+                    "cleanup_proof": cleanup_proof,
+                    "source_hash_proof": source_hash_proof,
+                },
+            )
+        except BaseException as exc:
+            if _is_assertion_or_skip(exc):
+                raise
+            blocker = case["blockers"][1] if "ak.wwise.file_error" in str(exc) else case["blockers"][0]
+            details: dict[str, Any] = _exception_details(exc, blocker=blocker)
+            if definition_file is not None:
+                details["definition"] = _definition_evidence(definition_file, runtime.require_sandbox_path(), bank_name)
+                details["definition_content"] = definition_file.read_text(encoding="utf-8")
+            details["source_hash_proof"] = _source_hash_proof(runtime)
+            _write_case_evidence(case, status="blocked", details=details)
             runtime.skip_after_blocker = True
             pytest.skip(f"soundbank definition fixture was rejected by Wwise: {type(exc).__name__}: {exc}")
         finally:
@@ -562,14 +664,35 @@ def _write_soundbank_definition(root: Path, bank_name: str) -> Path:
     path = root / f"{bank_name}.xml"
     path.write_text(
         '<?xml version="1.0" encoding="utf-8"?>\n'
-        "<SoundBanksInfo>\n"
+        '<SoundBanksInfo Platform="Mac" BasePlatform="Mac" SchemaVersion="16" SoundBankVersion="145">\n'
         "  <SoundBanks>\n"
-        f'    <SoundBank Name="{bank_name}" />\n'
+        '    <SoundBank Type="User" Language="SFX">\n'
+        f"      <ShortName>{bank_name}</ShortName>\n"
+        f"      <Path>{bank_name}.bnk</Path>\n"
+        "    </SoundBank>\n"
         "  </SoundBanks>\n"
         "</SoundBanksInfo>\n",
         encoding="utf-8",
     )
     return path
+
+
+def _definition_evidence(definition_file: Path, sandbox_path: Path, bank_name: str) -> dict[str, Any]:
+    content = definition_file.read_bytes()
+    return {
+        "file": _relative_to_sandbox(definition_file, sandbox_path),
+        "short_name": bank_name,
+        "sha256": hashlib.sha256(content).hexdigest(),
+        "shape": "SoundBanksInfo Platform/BasePlatform=Mac SchemaVersion=16 SoundBankVersion=145 User/SFX SoundBank ShortName+Path",
+    }
+
+
+def _process_definition_result_is_unusable(result: Any) -> bool:
+    if not isinstance(result, Mapping):
+        return True
+    if not result:
+        return True
+    return "ak.wwise.file_error" in json.dumps(_json_safe(result), sort_keys=True)
 
 
 def _create_object(client: Any, parent: str, object_type: str, name: str) -> str:
@@ -724,7 +847,7 @@ def _hash_mutation_bearing_project_files(root: Path) -> tuple[str, int, int]:
 
 
 def _generated_output_snapshot(root: Path) -> tuple[str, ...]:
-    names = {"GeneratedSoundBanks", ".cache", "Originals", "Task8GeneratedAudio", "Task8SoundBankDefinitions"}
+    names = {"GeneratedSoundBanks", ".cache", "Originals", "Task8GeneratedAudio", "Task8SoundBankDefinitions", "Task6SoundBankDefinitions"}
     paths = []
     for path in sorted(root.rglob("*")):
         if any(part in names for part in path.relative_to(root).parts):
@@ -733,7 +856,7 @@ def _generated_output_snapshot(root: Path) -> tuple[str, ...]:
 
 
 def _sandbox_generated_outputs(root: Path) -> set[Path]:
-    names = {"GeneratedSoundBanks", ".cache", "Originals", "Task8GeneratedAudio", "Task8SoundBankDefinitions"}
+    names = {"GeneratedSoundBanks", ".cache", "Originals", "Task8GeneratedAudio", "Task8SoundBankDefinitions", "Task6SoundBankDefinitions"}
     outputs = set()
     for path in root.rglob("*"):
         if any(part in names for part in path.relative_to(root).parts):
@@ -761,8 +884,22 @@ def _safe_lock_root(env: Mapping[str, str]) -> Path:
 
 
 def _unique_name(label: str) -> str:
+    return _unique_name_with_prefix(TEMP_PREFIX, label)
+
+
+def _unique_name_with_prefix(prefix: str, label: str) -> str:
     safe_label = "".join(character if character.isalnum() else "_" for character in label)
-    return f"{TEMP_PREFIX}{safe_label}_{uuid.uuid4().hex[:12]}"
+    return f"{prefix}{safe_label}_{uuid.uuid4().hex[:12]}"
+
+
+def _source_hash_proof(runtime: _SandboxRuntime) -> dict[str, Any]:
+    assert runtime.sandbox is not None
+    return {
+        "before": runtime.source_project_files_hash_before,
+        "after": _hash_mutation_bearing_project_files(runtime.sandbox.source_root),
+        "generated_outputs_before": runtime.source_generated_snapshot_before,
+        "generated_outputs_after": _generated_output_snapshot(runtime.sandbox.source_root),
+    }
 
 
 def _write_case_evidence(case: Mapping[str, Any], *, status: str, details: Mapping[str, Any]) -> None:
@@ -784,7 +921,7 @@ def _write_case_evidence(case: Mapping[str, Any], *, status: str, details: Mappi
 
 def _safe_evidence_path(path: str) -> Path:
     target = (REPO_ROOT / path).resolve(strict=False)
-    expected_root = EVIDENCE_ROOT.resolve(strict=False)
+    expected_root = TASK6_EVIDENCE_ROOT.resolve(strict=False) if "wwise-waapi-deferred-reevaluation" in path else EVIDENCE_ROOT.resolve(strict=False)
     if not path_is_under(target, expected_root):
         raise AssertionError(f"evidence path must stay under {expected_root}: {target}")
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -797,6 +934,10 @@ def _audio_case(case_id: str) -> Mapping[str, Any]:
 
 def _soundbank_case(case_id: str) -> Mapping[str, Any]:
     return _case("soundbank_cases", case_id)
+
+
+def _task6_case() -> Mapping[str, Any]:
+    return json.loads(TASK6_PLAN_PATH.read_text(encoding="utf-8"))["process_definition_case"]
 
 
 def _case(group: str, case_id: str) -> Mapping[str, Any]:

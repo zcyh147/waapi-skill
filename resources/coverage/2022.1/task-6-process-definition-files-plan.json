@@ -1,0 +1,75 @@
+{
+  "definition_fixture": {
+    "content_shape": "Wwise 2022.1 SoundBanksInfo XML with Platform/BasePlatform=Mac, SchemaVersion=16, SoundBankVersion=145, one User/SFX SoundBank, ShortName matching the unique WAAPI_TASK6_SANDBANK_* input name, and Path matching '<ShortName>.bnk'.",
+    "output_root": "sandbox_path/Task6SoundBankDefinitions",
+    "source_reference": "/Applications/Audiokinetic/Wwise2022.1.19.8584/SDK/samples/IntegrationDemo/WwiseProject/GeneratedSoundBanks/Mac/SoundbanksInfo.xml",
+    "source_reference_hash_policy": "record SHA-256 of the generated definition content and source project *.wproj/*.wwu hash before/after the destructive run",
+    "template": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<SoundBanksInfo Platform=\"Mac\" BasePlatform=\"Mac\" SchemaVersion=\"16\" SoundBankVersion=\"145\">\n  <SoundBanks>\n    <SoundBank Type=\"User\" Language=\"SFX\">\n      <ShortName>{bank_name}</ShortName>\n      <Path>{bank_name}.bnk</Path>\n    </SoundBank>\n  </SoundBanks>\n</SoundBanksInfo>\n"
+  },
+  "metadata": {
+    "destructive_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=tests/_org/2022.1/SampleProject.wproj python -m pytest tests/destructive/test_soundbank_audio_sandbox.py -q",
+    "evidence_paths": [
+      ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-6-process-definition-files.md",
+      ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-6-definition-validator.md"
+    ],
+    "promotion_policy": "Do not promote ak.wwise.core.soundbank.processDefinitionFiles from call success, an empty mapping, or ak.wwise.file_error. Promotion requires WAAPI-visible SoundBank readback tied to the definition ShortName and cleanup/source immutability proof.",
+    "source_fixture": "tests/_org/2022.1/SampleProject.wproj",
+    "task": "6. Reopen core.soundbank.processDefinitionFiles",
+    "unit_command": "python -m pytest tests/unit/test_soundbank_process_definition_plan.py -q"
+  },
+  "process_definition_case": {
+    "assertions": [
+      "definition file path is under the copied sandbox root and never under tests/_org/2022.1",
+      "processDefinitionFiles result is not accepted as proof when it is an empty mapping, contains only call success, or contains only ak.wwise.file_error",
+      "object.get readback finds a SoundBank whose name equals the definition ShortName and path ends with that ShortName",
+      "cleanup deletes the created SoundBank and object.get by id returns an empty array",
+      "source .wproj mtime, source mutation-bearing project-file hash (*.wproj, *.wwu), and source generated-output snapshot are unchanged"
+    ],
+    "allowlist": {
+      "cleanup_expectations": [
+        "definition file remains only under sandbox output until sandbox cleanup",
+        "no WAAPI_TASK6_SANDBANK_ SoundBank remains after successful test"
+      ],
+      "expected_mutations": [
+        "process a sandbox-only SoundBank definition file if Wwise accepts the version-correct fixture"
+      ],
+      "output_roots": [
+        "sandbox_path/Task6SoundBankDefinitions",
+        ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/"
+      ],
+      "refuse_source_outputs": true
+    },
+    "blockers": [
+      {
+        "reason": "Wwise 2022.1 returned no usable SoundBank mapping/readback for the version-correct SoundBanksInfo definition, so the exact result/error must be recorded without promotion.",
+        "uri": "ak.wwise.core.soundbank.processDefinitionFiles"
+      },
+      {
+        "reason": "ak.wwise.file_error is a parser/file blocker and is not behavioral evidence for processDefinitionFiles.",
+        "uri": "ak.wwise.file_error"
+      }
+    ],
+    "cleanup": [
+      "delete created SoundBank if object readback identified one",
+      "object.get by created SoundBank id returns an empty array",
+      "disconnect WAAPI client",
+      "shutdown WwiseConsole",
+      "delete sandbox unless keep-on-failure policy applies"
+    ],
+    "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-6-process-definition-files.md",
+    "gate": {
+      "allow_source_mutation": false,
+      "env": {
+        "WWISE_DESTRUCTIVE": "1",
+        "WWISE_LIVE": "1"
+      }
+    },
+    "id": "soundbank_process_definition_file_version_correct_or_records_blocker",
+    "status": "sandbox-mutating-tested-or-blocked",
+    "temporary_name_prefix": "WAAPI_TASK6_SANDBANK_",
+    "uri": "ak.wwise.core.soundbank.processDefinitionFiles",
+    "uris": [
+      "ak.wwise.core.soundbank.processDefinitionFiles"
+    ]
+  }
+}
