@@ -8,6 +8,40 @@ from typing import Any, Iterable, Mapping
 from .deferred_registry import ApiClassifier, DeferredEntry, DeferredRegistry
 
 
+PHASE2_ACHIEVED_STATUSES = frozenset(
+    {
+        "fake-route-tested",
+        "live-smoke-tested",
+        "live-sandbox-tested",
+        "sandbox-mutating-tested",
+        "profiler-backed-tested",
+        "soundengine-backed-tested",
+        "wrapper-only",
+        "skipped-approved",
+        "still-deferred-with-evidence",
+    }
+)
+LIVE_EVIDENCE_REQUIRED_STATUSES = frozenset(
+    {
+        "live-smoke-tested",
+        "live-sandbox-tested",
+        "sandbox-mutating-tested",
+        "profiler-backed-tested",
+        "soundengine-backed-tested",
+    }
+)
+LIVE_BEHAVIOR_STATUSES = frozenset(
+    {
+        "live-smoke-tested",
+        "live-sandbox-tested",
+        "sandbox-mutating-tested",
+        "soundengine-backed-tested",
+    }
+)
+POLICY_APPROVED_NON_BEHAVIOR_STATUSES = frozenset({"wrapper-only", "skipped-approved"})
+STILL_DEFERRED_STATUS = "still-deferred-with-evidence"
+
+
 @dataclass(slots=True, frozen=True)
 class ReflectedApiItem:
     """One function or topic reflected from the manifest inventory."""
@@ -41,6 +75,92 @@ class BehavioralCoverageRecord:
 
 
 @dataclass(slots=True, frozen=True)
+class Phase2CoverageStatusRecord:
+    """Phase 2 coverage status with evidence separate from reflected inventory."""
+
+    uri: str
+    version: str
+    category: str
+    inventory_coverage: str
+    achieved_status: str = ""
+    achieved_statuses: tuple[str, ...] = ()
+    evidence_path: str = ""
+    evidence_command: str = ""
+    user_approved_rationale: str = ""
+    future_review_trigger: str = ""
+    behavioral_coverage: str = "not-behavioral"
+
+    def validate(self) -> None:
+        missing = [
+            name
+            for name in ("uri", "version", "category", "inventory_coverage")
+            if not isinstance(getattr(self, name), str) or not getattr(self, name).strip()
+        ]
+        if missing:
+            raise ValueError(f"Phase 2 coverage record {self.uri or '<unknown>'} missing: {', '.join(missing)}")
+
+        statuses = self.statuses
+        if LIVE_EVIDENCE_REQUIRED_STATUSES.intersection(statuses) and STILL_DEFERRED_STATUS in statuses:
+            raise ValueError(f"Phase 2 coverage record {self.uri} live status cannot overlap with still-deferred")
+        if len(statuses) != 1:
+            raise ValueError(f"Phase 2 coverage record {self.uri} must declare exactly one achieved status")
+
+        status = statuses[0]
+        if status not in PHASE2_ACHIEVED_STATUSES:
+            raise ValueError(f"Phase 2 coverage record {self.uri} has invalid achieved status {status!r}")
+        if status in LIVE_EVIDENCE_REQUIRED_STATUSES:
+            missing_evidence = [
+                name
+                for name in ("evidence_path", "evidence_command")
+                if not isinstance(getattr(self, name), str) or not getattr(self, name).strip()
+            ]
+            if missing_evidence:
+                raise ValueError(
+                    f"Phase 2 coverage record {self.uri} status {status!r} missing: "
+                    + ", ".join(missing_evidence)
+                )
+        if status in POLICY_APPROVED_NON_BEHAVIOR_STATUSES:
+            missing_policy = [
+                name
+                for name in ("user_approved_rationale", "future_review_trigger")
+                if not isinstance(getattr(self, name), str) or not getattr(self, name).strip()
+            ]
+            if missing_policy:
+                raise ValueError(
+                    f"Phase 2 coverage record {self.uri} status {status!r} missing: " + ", ".join(missing_policy)
+                )
+        if status == STILL_DEFERRED_STATUS and not self.future_review_trigger.strip():
+            raise ValueError(
+                f"Phase 2 coverage record {self.uri} status {status!r} missing: future_review_trigger"
+            )
+
+    @property
+    def statuses(self) -> tuple[str, ...]:
+        statuses: list[str] = []
+        if isinstance(self.achieved_status, str) and self.achieved_status.strip():
+            statuses.append(self.achieved_status.strip())
+        statuses.extend(status.strip() for status in self.achieved_statuses if isinstance(status, str) and status.strip())
+        return tuple(statuses)
+
+    @property
+    def status(self) -> str:
+        statuses = self.statuses
+        return statuses[0] if len(statuses) == 1 else ""
+
+    @property
+    def counts_as_behavioral(self) -> bool:
+        if self.status == "profiler-backed-tested":
+            return self.behavioral_coverage == "direct-behavior-with-profiler-evidence"
+        return self.status in {"fake-route-tested", *LIVE_BEHAVIOR_STATUSES}
+
+    @property
+    def counts_as_live_behavioral(self) -> bool:
+        if self.status == "profiler-backed-tested":
+            return self.behavioral_coverage == "direct-behavior-with-profiler-evidence"
+        return self.status in LIVE_BEHAVIOR_STATUSES
+
+
+@dataclass(slots=True, frozen=True)
 class ApiCoverageAuditResult:
     """Outcome of classifying all reflected WAAPI inventory."""
 
@@ -49,15 +169,18 @@ class ApiCoverageAuditResult:
     inventory_covered_count: int
     behavioral_covered_count: int
     deferred_count: int
+    covered_count: int = 0
+    phase2_status_covered_count: int = 0
+    live_behavioral_covered_count: int = 0
     missing: tuple[str, ...] = ()
     invalid: tuple[str, ...] = ()
     categories: dict[str, int] = field(default_factory=dict)
+    status_counts: dict[str, int] = field(default_factory=dict)
 
     @property
     def passed(self) -> bool:
-        return not self.missing and not self.invalid and (
-            self.behavioral_covered_count + self.deferred_count == self.reflected_count
-        )
+        covered_count = self.covered_count or self.behavioral_covered_count + self.deferred_count
+        return not self.missing and not self.invalid and covered_count == self.reflected_count
 
     def raise_for_failures(self) -> None:
         if self.passed:
@@ -79,38 +202,60 @@ class ApiCoverageAuditor:
         behavioral_records: Iterable[BehavioralCoverageRecord] = (),
         *,
         version: str = "2022.1",
+        phase2_status_records: Iterable[Phase2CoverageStatusRecord] = (),
     ) -> ApiCoverageAuditResult:
         items = self._manifest_items(manifest)
         deferred_registry.validate_all()
         behavior_by_uri = self._behavior_by_uri(behavioral_records, version)
+        phase2_by_uri, phase2_invalid, invalid_phase2_uris = self._phase2_by_uri(phase2_status_records, version)
         manifest_uris = {item.uri for item in items}
-        invalid: list[str] = []
+        invalid: list[str] = [*phase2_invalid]
         missing: list[str] = []
         categories: dict[str, int] = {}
+        status_counts: dict[str, int] = {}
         deferred_count = 0
         behavioral_count = 0
+        covered_count = 0
+        phase2_status_count = 0
+        live_behavioral_count = 0
 
         for uri in sorted(set(behavior_by_uri) & set(deferred_registry.entries)):
             invalid.append(f"URI {uri} has both behavioral coverage and a deferred entry")
 
         for item in items:
             categories[item.category] = categories.get(item.category, 0) + 1
+            phase2 = phase2_by_uri.get(item.uri)
             behavior = behavior_by_uri.get(item.uri)
             deferred = deferred_registry.get(item.uri)
+            if phase2 is not None:
+                invalid.extend(self._validate_phase2_status_record(phase2, item, version))
+                status_counts[phase2.status] = status_counts.get(phase2.status, 0) + 1
+                phase2_status_count += 1
+                if phase2.counts_as_behavioral:
+                    behavioral_count += 1
+                if phase2.counts_as_live_behavioral:
+                    live_behavioral_count += 1
+                covered_count += 1
+                continue
             if behavior is not None:
                 invalid.extend(self._validate_behavior_record(behavior, item, version))
                 behavioral_count += 1
+                covered_count += 1
                 continue
             if deferred is not None:
                 invalid.extend(self._validate_deferred_entry(deferred, item, version))
                 deferred_count += 1
+                covered_count += 1
                 continue
-            missing.append(item.uri)
+            if item.uri not in invalid_phase2_uris:
+                missing.append(item.uri)
 
         for uri in sorted(set(deferred_registry.entries) - manifest_uris):
             invalid.append(f"Deferred entry {uri} is not present in reflected manifest inventory")
         for uri in sorted(set(behavior_by_uri) - manifest_uris):
             invalid.append(f"Behavioral coverage record {uri} is not present in reflected manifest inventory")
+        for uri in sorted(set(phase2_by_uri) - manifest_uris):
+            invalid.append(f"Phase 2 coverage record {uri} is not present in reflected manifest inventory")
 
         return ApiCoverageAuditResult(
             version=version,
@@ -118,9 +263,13 @@ class ApiCoverageAuditor:
             inventory_covered_count=len(items),
             behavioral_covered_count=behavioral_count,
             deferred_count=deferred_count,
+            covered_count=covered_count,
+            phase2_status_covered_count=phase2_status_count,
+            live_behavioral_covered_count=live_behavioral_count,
             missing=tuple(sorted(missing)),
             invalid=tuple(invalid),
             categories=dict(sorted(categories.items())),
+            status_counts=dict(sorted(status_counts.items())),
         )
 
     def _manifest_items(self, manifest: Mapping[str, Any]) -> list[ReflectedApiItem]:
@@ -170,6 +319,30 @@ class ApiCoverageAuditor:
             by_uri[record.uri] = record
         return by_uri
 
+    def _phase2_by_uri(
+        self, records: Iterable[Phase2CoverageStatusRecord], version: str
+    ) -> tuple[dict[str, Phase2CoverageStatusRecord], list[str], set[str]]:
+        by_uri: dict[str, Phase2CoverageStatusRecord] = {}
+        invalid: list[str] = []
+        invalid_uris: set[str] = set()
+        for record in records:
+            try:
+                record.validate()
+            except ValueError as exc:
+                invalid.append(str(exc))
+                if isinstance(record.uri, str) and record.uri.strip():
+                    invalid_uris.add(record.uri)
+                continue
+            if record.version != version:
+                invalid.append(f"Phase 2 coverage record {record.uri} targets {record.version}, expected {version}")
+                invalid_uris.add(record.uri)
+            if record.uri in by_uri:
+                invalid.append(f"URI {record.uri} has multiple Phase 2 achieved statuses")
+                invalid_uris.add(record.uri)
+                continue
+            by_uri[record.uri] = record
+        return by_uri, invalid, invalid_uris
+
     def _validate_behavior_record(
         self, record: BehavioralCoverageRecord, item: ReflectedApiItem, version: str
     ) -> list[str]:
@@ -180,6 +353,22 @@ class ApiCoverageAuditor:
             invalid.append(
                 f"Behavioral coverage record {record.uri} category {record.category!r} != deterministic {item.category!r}"
             )
+        return invalid
+
+    def _validate_phase2_status_record(
+        self, record: Phase2CoverageStatusRecord, item: ReflectedApiItem, version: str
+    ) -> list[str]:
+        invalid: list[str] = []
+        if record.version != version:
+            invalid.append(f"Phase 2 coverage record {record.uri} version {record.version} != {version}")
+        if record.category != item.category:
+            invalid.append(
+                f"Phase 2 coverage record {record.uri} category {record.category!r} != deterministic {item.category!r}"
+            )
+        if record.inventory_coverage == record.behavioral_coverage:
+            invalid.append(f"Phase 2 coverage record {record.uri} must keep inventory coverage separate from behavior")
+        if record.status in POLICY_APPROVED_NON_BEHAVIOR_STATUSES and record.counts_as_live_behavioral:
+            invalid.append(f"Phase 2 coverage record {record.uri} must not count {record.status!r} as live behavior")
         return invalid
 
     def _validate_deferred_entry(self, entry: DeferredEntry, item: ReflectedApiItem, version: str) -> list[str]:

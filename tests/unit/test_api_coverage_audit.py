@@ -7,6 +7,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 from wwise_waapi.api_coverage_audit import (  # pyright: ignore[reportMissingImports]
     ApiCoverageAuditor,
     BehavioralCoverageRecord,
+    Phase2CoverageStatusRecord,
 )
 from wwise_waapi.deferred_registry import ApiClassifier, DeferredRegistry  # pyright: ignore[reportMissingImports]
 from wwise_waapi.manifest import ManifestStore  # pyright: ignore[reportMissingImports]
@@ -125,6 +126,25 @@ def test_audit_rejects_behavioral_and_deferred_overlap() -> None:
 
     assert result.passed is False
     assert result.invalid == ("URI ak.wwise.core.getInfo has both behavioral coverage and a deferred entry",)
+
+
+def test_phase2_statuses_are_exclusive() -> None:
+    manifest = {"functions": [{"uri": "ak.wwise.core.getInfo"}], "topics": []}
+    status = Phase2CoverageStatusRecord(
+        uri="ak.wwise.core.getInfo",
+        version="2022.1",
+        category="core",
+        inventory_coverage="reflected-schema-ok",
+        achieved_statuses=("live-smoke-tested", "still-deferred-with-evidence"),
+        future_review_trigger="Review when live smoke evidence changes.",
+    )
+
+    result = ApiCoverageAuditor().audit(manifest, DeferredRegistry(), version="2022.1", phase2_status_records=[status])
+
+    assert result.passed is False
+    assert result.invalid == (
+        "Phase 2 coverage record ak.wwise.core.getInfo live status cannot overlap with still-deferred",
+    )
 
 
 def test_deferred_entry_with_wrong_risk_level_fails_usefully() -> None:
