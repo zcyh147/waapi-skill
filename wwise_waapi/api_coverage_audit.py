@@ -18,7 +18,16 @@ PHASE2_ACHIEVED_STATUSES = frozenset(
         "soundengine-backed-tested",
         "wrapper-only",
         "skipped-approved",
+        "conformance-only-skip",
         "still-deferred-with-evidence",
+    }
+)
+PHASE21_EVIDENCE_CLASSES = frozenset(
+    {
+        "live_behavioral_waapi",
+        "live_behavioral_profiler",
+        "conformance_only_skip",
+        "still_deferred_with_evidence",
     }
 )
 LIVE_EVIDENCE_REQUIRED_STATUSES = frozenset(
@@ -38,8 +47,9 @@ LIVE_BEHAVIOR_STATUSES = frozenset(
         "soundengine-backed-tested",
     }
 )
-POLICY_APPROVED_NON_BEHAVIOR_STATUSES = frozenset({"wrapper-only", "skipped-approved"})
+POLICY_APPROVED_NON_BEHAVIOR_STATUSES = frozenset({"wrapper-only", "skipped-approved", "conformance-only-skip"})
 STILL_DEFERRED_STATUS = "still-deferred-with-evidence"
+CONFORMANCE_ONLY_STATUS = "conformance-only-skip"
 
 
 @dataclass(slots=True, frozen=True)
@@ -86,6 +96,7 @@ class Phase2CoverageStatusRecord:
     achieved_statuses: tuple[str, ...] = ()
     evidence_path: str = ""
     evidence_command: str = ""
+    evidence_class: str = ""
     user_approved_rationale: str = ""
     future_review_trigger: str = ""
     behavioral_coverage: str = "not-behavioral"
@@ -108,6 +119,10 @@ class Phase2CoverageStatusRecord:
         status = statuses[0]
         if status not in PHASE2_ACHIEVED_STATUSES:
             raise ValueError(f"Phase 2 coverage record {self.uri} has invalid achieved status {status!r}")
+        if self.evidence_class.strip() and self.evidence_class.strip() not in PHASE21_EVIDENCE_CLASSES:
+            raise ValueError(
+                f"Phase 2 coverage record {self.uri} has invalid evidence class {self.evidence_class!r}"
+            )
         if status in LIVE_EVIDENCE_REQUIRED_STATUSES:
             missing_evidence = [
                 name
@@ -119,6 +134,7 @@ class Phase2CoverageStatusRecord:
                     f"Phase 2 coverage record {self.uri} status {status!r} missing: "
                     + ", ".join(missing_evidence)
                 )
+        self._validate_evidence_class(status)
         if status in POLICY_APPROVED_NON_BEHAVIOR_STATUSES:
             missing_policy = [
                 name
@@ -132,6 +148,27 @@ class Phase2CoverageStatusRecord:
         if status == STILL_DEFERRED_STATUS and not self.future_review_trigger.strip():
             raise ValueError(
                 f"Phase 2 coverage record {self.uri} status {status!r} missing: future_review_trigger"
+            )
+
+    def _validate_evidence_class(self, status: str) -> None:
+        evidence_class = self.evidence_class.strip()
+        if not evidence_class:
+            return
+        if status == "profiler-backed-tested" and evidence_class != "live_behavioral_profiler":
+            raise ValueError(
+                f"Phase 2 coverage record {self.uri} status {status!r} requires evidence class 'live_behavioral_profiler'"
+            )
+        if status in {"live-smoke-tested", "live-sandbox-tested", "sandbox-mutating-tested", "soundengine-backed-tested"} and evidence_class != "live_behavioral_waapi":
+            raise ValueError(
+                f"Phase 2 coverage record {self.uri} status {status!r} requires evidence class 'live_behavioral_waapi'"
+            )
+        if status == CONFORMANCE_ONLY_STATUS and evidence_class != "conformance_only_skip":
+            raise ValueError(
+                f"Phase 2 coverage record {self.uri} status {status!r} requires evidence class 'conformance_only_skip'"
+            )
+        if status == STILL_DEFERRED_STATUS and evidence_class != "still_deferred_with_evidence":
+            raise ValueError(
+                f"Phase 2 coverage record {self.uri} status {status!r} requires evidence class 'still_deferred_with_evidence'"
             )
 
     @property
@@ -369,6 +406,8 @@ class ApiCoverageAuditor:
             invalid.append(f"Phase 2 coverage record {record.uri} must keep inventory coverage separate from behavior")
         if record.status in POLICY_APPROVED_NON_BEHAVIOR_STATUSES and record.counts_as_live_behavioral:
             invalid.append(f"Phase 2 coverage record {record.uri} must not count {record.status!r} as live behavior")
+        if record.status in POLICY_APPROVED_NON_BEHAVIOR_STATUSES and record.counts_as_behavioral:
+            invalid.append(f"Phase 2 coverage record {record.uri} must not count {record.status!r} as behavior")
         return invalid
 
     def _validate_deferred_entry(self, entry: DeferredEntry, item: ReflectedApiItem, version: str) -> list[str]:

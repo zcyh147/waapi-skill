@@ -147,6 +147,47 @@ def test_phase2_statuses_are_exclusive() -> None:
     )
 
 
+def test_conformance_only_phase2_status_requires_policy_and_never_counts_as_behavior() -> None:
+    manifest = {"functions": [{"uri": "ak.wwise.core.transport.create"}], "topics": []}
+    status = Phase2CoverageStatusRecord(
+        uri="ak.wwise.core.transport.create",
+        version="2022.1",
+        category="core.transport",
+        inventory_coverage="reflected-schema-ok",
+        achieved_status="conformance-only-skip",
+        evidence_class="conformance_only_skip",
+        user_approved_rationale="User approved conformance-only route/schema coverage without behavior claim.",
+        future_review_trigger="Review when a deterministic transport playback fixture can prove behavior.",
+    )
+
+    result = ApiCoverageAuditor().audit(manifest, DeferredRegistry(), version="2022.1", phase2_status_records=[status])
+
+    assert result.passed is True
+    assert result.behavioral_covered_count == 0
+    assert result.live_behavioral_covered_count == 0
+    assert result.status_counts == {"conformance-only-skip": 1}
+
+
+def test_conformance_only_phase2_status_rejects_missing_user_policy() -> None:
+    manifest = {"functions": [{"uri": "ak.wwise.core.transport.create"}], "topics": []}
+    status = Phase2CoverageStatusRecord(
+        uri="ak.wwise.core.transport.create",
+        version="2022.1",
+        category="core.transport",
+        inventory_coverage="reflected-schema-ok",
+        achieved_status="conformance-only-skip",
+        evidence_class="conformance_only_skip",
+    )
+
+    result = ApiCoverageAuditor().audit(manifest, DeferredRegistry(), version="2022.1", phase2_status_records=[status])
+
+    assert result.passed is False
+    assert result.invalid == (
+        "Phase 2 coverage record ak.wwise.core.transport.create status 'conformance-only-skip' missing: "
+        "user_approved_rationale, future_review_trigger",
+    )
+
+
 def test_deferred_entry_with_wrong_risk_level_fails_usefully() -> None:
     manifest = {"functions": [{"uri": "ak.wwise.debug.testCrash"}], "topics": []}
     payload = _valid_deferred_payload("ak.wwise.debug.testCrash")

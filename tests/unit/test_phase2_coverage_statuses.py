@@ -20,6 +20,7 @@ from wwise_waapi.deferred_registry import DeferredRegistry  # pyright: ignore[re
         ("soundengine-backed-tested", "ak.soundengine.getState", 1, 1),
         ("wrapper-only", "ak.wwise.ui.getSelectedObjects", 0, 0),
         ("skipped-approved", "ak.wwise.cli.verify", 0, 0),
+        ("conformance-only-skip", "ak.wwise.core.transport.create", 0, 0),
         ("still-deferred-with-evidence", "ak.wwise.core.getProjectInfo", 0, 0),
     ],
 )
@@ -92,9 +93,14 @@ def test_live_phase2_status_cannot_overlap_with_still_deferred() -> None:
     )
 
 
-@pytest.mark.parametrize("status", ["wrapper-only", "skipped-approved"])
+@pytest.mark.parametrize("status", ["wrapper-only", "skipped-approved", "conformance-only-skip"])
 def test_policy_approved_phase2_status_requires_rationale_and_review_trigger(status: str) -> None:
-    uri = "ak.wwise.ui.getSelectedObjects" if status == "wrapper-only" else "ak.wwise.cli.verify"
+    uri_by_status = {
+        "wrapper-only": "ak.wwise.ui.getSelectedObjects",
+        "skipped-approved": "ak.wwise.cli.verify",
+        "conformance-only-skip": "ak.wwise.core.transport.create",
+    }
+    uri = uri_by_status[status]
     result = _audit_status(_phase2_record(uri, status, user_approved_rationale="", future_review_trigger=""))
 
     assert result.passed is False
@@ -110,6 +116,54 @@ def test_wrapper_only_is_not_counted_as_behavioral_live_coverage() -> None:
     assert result.behavioral_covered_count == 0
     assert result.live_behavioral_covered_count == 0
     assert result.phase2_status_covered_count == 1
+
+
+def test_conformance_only_skip_is_not_counted_as_behavioral_or_live_behavioral() -> None:
+    result = _audit_status(
+        _phase2_record(
+            "ak.wwise.core.transport.create",
+            "conformance-only-skip",
+            evidence_class="conformance_only_skip",
+        )
+    )
+
+    assert result.passed is True
+    assert result.behavioral_covered_count == 0
+    assert result.live_behavioral_covered_count == 0
+    assert result.status_counts == {"conformance-only-skip": 1}
+
+
+@pytest.mark.parametrize(
+    ("status", "evidence_class"),
+    [
+        ("live-sandbox-tested", "live_behavioral_waapi"),
+        ("profiler-backed-tested", "live_behavioral_profiler"),
+        ("conformance-only-skip", "conformance_only_skip"),
+        ("still-deferred-with-evidence", "still_deferred_with_evidence"),
+    ],
+)
+def test_phase21_evidence_classes_are_accepted_for_matching_statuses(status: str, evidence_class: str) -> None:
+    record = _phase2_record("ak.wwise.core.transport.create", status, evidence_class=evidence_class)
+
+    result = _audit_status(record)
+
+    assert result.passed is True
+
+
+def test_phase21_evidence_class_must_match_status() -> None:
+    result = _audit_status(
+        _phase2_record(
+            "ak.wwise.core.transport.create",
+            "conformance-only-skip",
+            evidence_class="live_behavioral_waapi",
+        )
+    )
+
+    assert result.passed is False
+    assert result.invalid == (
+        "Phase 2 coverage record ak.wwise.core.transport.create status 'conformance-only-skip' "
+        "requires evidence class 'conformance_only_skip'",
+    )
 
 
 def _audit_status(record: Phase2CoverageStatusRecord):
@@ -130,6 +184,7 @@ def _phase2_record(
     evidence_command: str = "python -m pytest tests/unit/test_phase2_coverage_statuses.py -q",
     user_approved_rationale: str = "User approved non-live Phase 2 coverage for this category.",
     future_review_trigger: str = "Review when Phase 2 coverage policy or reflected inventory changes.",
+    evidence_class: str = "",
 ) -> Phase2CoverageStatusRecord:
     return Phase2CoverageStatusRecord(
         uri=uri,
@@ -139,9 +194,12 @@ def _phase2_record(
         achieved_status=status,
         evidence_path=evidence_path if status_requires_evidence(status) else "",
         evidence_command=evidence_command if status_requires_evidence(status) else "",
-        user_approved_rationale=user_approved_rationale if status in {"wrapper-only", "skipped-approved"} else "",
+        evidence_class=evidence_class,
+        user_approved_rationale=user_approved_rationale
+        if status in {"wrapper-only", "skipped-approved", "conformance-only-skip"}
+        else "",
         future_review_trigger=future_review_trigger
-        if status in {"wrapper-only", "skipped-approved", "still-deferred-with-evidence"}
+        if status in {"wrapper-only", "skipped-approved", "conformance-only-skip", "still-deferred-with-evidence"}
         else "",
     )
 

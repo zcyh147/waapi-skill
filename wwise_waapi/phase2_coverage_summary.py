@@ -513,6 +513,7 @@ def phase2_status_records_from_summary(payload: Mapping[str, Any]) -> list[Phase
                 achieved_status=entry["achieved_status"],
                 evidence_path=entry["evidence_path"],
                 evidence_command=entry["evidence_command"],
+                evidence_class=entry.get("evidence_class", ""),
                 user_approved_rationale=entry["user_approved_rationale"],
                 future_review_trigger=entry["future_review_trigger"],
             )
