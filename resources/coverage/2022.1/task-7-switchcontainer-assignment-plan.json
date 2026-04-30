@@ -1,0 +1,165 @@
+{
+  "assignment_case": {
+    "allowlist": {
+      "cleanup_expectations": [
+        "getAssignments after remove no longer contains the target/switch pair",
+        "object.get after deleting the disposable target returns an empty array",
+        "source .wproj/.wwu hash and source .wproj mtime remain unchanged",
+        "sandbox copy deleted on success or preserved only for failure evidence"
+      ],
+      "expected_mutations": [
+        "create one disposable Sound target under the copied sandbox Footstep_Types SwitchContainer",
+        "add one assignment from that target object to the authored Running Switch",
+        "remove that assignment before cleanup"
+      ],
+      "refuse_source_mutation": true
+    },
+    "assertions": [
+      "pre-read getAssignments on the copied sandbox SwitchContainer before addAssignment",
+      "after addAssignment, getAssignments must contain the disposable target object and Running Switch pair",
+      "after removeAssignment, getAssignments must no longer contain that pair",
+      "cleanup proof must include empty object.get readback for the disposable target and unchanged source hash proof",
+      "if Wwise rejects the authored relationship or pair does not materialize, record exact fixture state and blocker without claiming coverage"
+    ],
+    "blockers": [
+      {
+        "reason": "Wwise may reject the authored SwitchContainer/Switch pair or fail to materialize a getAssignments pair; such evidence remains blocked, not promoted.",
+        "uri": "ak.wwise.core.switchContainer.addAssignment"
+      }
+    ],
+    "cleanup": [
+      "remove assignment if getAssignments still contains the pair",
+      "delete disposable Sound target if present",
+      "disconnect WAAPI client and shutdown WwiseConsole",
+      "delete sandbox unless keep-on-failure policy applies"
+    ],
+    "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-7-switch-assignments.md",
+    "gate": {
+      "allow_source_mutation": false,
+      "env": {
+        "WWISE_DESTRUCTIVE": "1",
+        "WWISE_LIVE": "1"
+      }
+    },
+    "id": "switch_container_assignment_add_get_remove_readback",
+    "status": "sandbox-mutating-tested-or-blocked",
+    "uris": [
+      "ak.wwise.core.switchContainer.addAssignment",
+      "ak.wwise.core.switchContainer.getAssignments",
+      "ak.wwise.core.switchContainer.removeAssignment"
+    ]
+  },
+  "fixture": {
+    "accepted_switch_container": {
+      "id": "{B5DB3AFA-044F-441E-BC4A-1397D20E2692}",
+      "name": "Footstep_Types",
+      "path": "\\Actor-Mixer Hierarchy\\Footsteps\\Footstep_Types",
+      "required_reference": {
+        "name": "SwitchGroupOrStateGroup",
+        "source_file": "tests/_org/2022.1/Actor-Mixer Hierarchy/Footsteps.wwu",
+        "target_id": "{9127B7FC-12D5-45F1-99E7-D9EC0CF8E8B1}",
+        "target_name": "FS_Type"
+      }
+    },
+    "accepted_switch_group": {
+      "id": "{9127B7FC-12D5-45F1-99E7-D9EC0CF8E8B1}",
+      "name": "FS_Type",
+      "path": "\\Switches\\Footsteps\\FS_Type",
+      "source_file": "tests/_org/2022.1/Switches/Footsteps.wwu"
+    },
+    "switch_child": {
+      "id": "{30D56DEF-DA40-45C9-A9EC-37FEBDF904E4}",
+      "name": "Running",
+      "path": "\\Switches\\Footsteps\\FS_Type\\Running"
+    },
+    "target_object": {
+      "cleanup": "delete disposable Sound child and assert object.get by id returns an empty array",
+      "create_under": "{B5DB3AFA-044F-441E-BC4A-1397D20E2692}",
+      "name_prefix": "WAAPI_TASK7_SWITCH_target_",
+      "type": "Sound"
+    },
+    "temporary_name_prefix": "WAAPI_TASK7_SWITCH_"
+  },
+  "metadata": {
+    "destructive_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=tests/_org/2022.1/SampleProject.wproj python -m pytest tests/destructive/test_switchcontainer_assignment_sandbox.py -q",
+    "evidence_paths": [
+      ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-7-switch-assignments.md",
+      ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-7-switch-topics.md"
+    ],
+    "promotion_policy": "Do not promote addAssignment/removeAssignment or topics from call success, timed waits, or exceptions alone; promotion requires getAssignments readback before/after mutation, assignment cleanup proof, source hash proof, and topic payload identity.",
+    "sandbox_policy": "Always copy the immutable SampleProject source into a per-test sandbox before creating/removing assignments.",
+    "source_fixture": "tests/_org/2022.1/SampleProject.wproj",
+    "task": "7. Reopen core.switchContainer.*Assignment",
+    "unit_command": "python -m pytest tests/unit/test_switchcontainer_assignment_plan.py -q",
+    "version": "2022.1"
+  },
+  "topic_cases": [
+    {
+      "bounded_wait_seconds": 5.0,
+      "cleanup": [
+        "remove assignment and assert getAssignments no longer contains the pair",
+        "delete disposable target and assert empty object.get readback"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-7-switch-topics.md",
+      "id": "switch_container_assignment_added_payload_identity",
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ]
+      },
+      "payload_identity_requirements": {
+        "assignment_id_required_when_available": true,
+        "match_child_object_id": true,
+        "match_container_id": true,
+        "match_state_or_switch_id": true,
+        "required_payload_fields": [
+          "switchContainer",
+          "child",
+          "stateOrSwitch"
+        ]
+      },
+      "readback_requirement": "getAssignments after addAssignment must contain the disposable target and Running Switch pair before topic evidence can pass.",
+      "source_immutability_proof": "source .wproj mtime and mutation-bearing .wproj/.wwu hash unchanged",
+      "status": "sandbox-topic-tested-or-blocked",
+      "subscribe_before_mutation": true,
+      "trigger_uri": "ak.wwise.core.switchContainer.addAssignment",
+      "uri": "ak.wwise.core.switchContainer.assignmentAdded"
+    },
+    {
+      "bounded_wait_seconds": 5.0,
+      "cleanup": [
+        "delete disposable target and assert empty object.get readback"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-7-switch-topics.md",
+      "id": "switch_container_assignment_removed_payload_identity",
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ]
+      },
+      "payload_identity_requirements": {
+        "assignment_id_required_when_available": true,
+        "match_child_object_id": true,
+        "match_container_id": true,
+        "match_state_or_switch_id": true,
+        "required_payload_fields": [
+          "switchContainer",
+          "child",
+          "stateOrSwitch"
+        ]
+      },
+      "readback_requirement": "getAssignments before removeAssignment must contain the pair and getAssignments after removeAssignment must not contain it.",
+      "source_immutability_proof": "source .wproj mtime and mutation-bearing .wproj/.wwu hash unchanged",
+      "status": "sandbox-topic-tested-or-blocked",
+      "subscribe_before_mutation": true,
+      "trigger_uri": "ak.wwise.core.switchContainer.removeAssignment",
+      "uri": "ak.wwise.core.switchContainer.assignmentRemoved"
+    }
+  ]
+}
