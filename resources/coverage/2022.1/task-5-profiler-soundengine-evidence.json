@@ -1,0 +1,620 @@
+{
+  "metadata": {
+    "capture_policy": "Task 5 reopens soundengine only with profiler-backed proof: startCapture -> subscribe -> deterministic fixture trigger/action -> bounded wait -> stopCapture -> cleanup proof. Capture start/stop, accepted calls, returned IDs, no exception, and empty arrays are context only, never proof.",
+    "evidence_paths": [
+      ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+      ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-no-overclaim.md"
+    ],
+    "evidence_root": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/",
+    "live_command": "WWISE_LIVE=1 python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
+    "promotes_coverage": false,
+    "sandbox_policy": "Each live probe copies tests/_org/2022.1/SampleProject.wproj into a sandbox and launches WwiseConsole against the sandbox only; tests/_org is immutable source.",
+    "source_fixture": "tests/_org/2022.1/SampleProject.wproj",
+    "task": "5. Reopen soundengine with profiler-backed evidence bundles",
+    "unit_command": "python -m pytest tests/unit/test_profiler_soundengine_feasibility.py -q",
+    "version": "2022.1"
+  },
+  "soundengine_cases": [
+    {
+      "assertions": [
+        "Every reflected ak.soundengine.* URI has exactly one evidence row with trigger call, timestamp/window mapping, bounded wait, cleanup proof, artifact path, and either observed payload fields or an exact blocker.",
+        "No soundengine URI is promoted from capture start/stop, accepted calls, returned playing IDs, no exception, or empty returns.",
+        "Task 3 host blockers are inherited: postMsgMonitor/registerGameObj/unregisterGameObj were accepted but no matching profiler topic payload appeared within bounded waits.",
+        "Event/State/Switch/RTPC/listener/game-object probes require deterministic copied-sandbox fixtures and profiler/captureLog/topic payload behavior before promotion."
+      ],
+      "blockers": [
+        {
+          "reason": "Prerequisite blocked: playable Event evidence did not produce profiler/transport payload behavior on this WwiseConsole/headless path; returned playing IDs and stop calls are context only.",
+          "uri": "ak.soundengine.executeActionOnEvent"
+        },
+        {
+          "reason": "Prerequisite blocked: no deterministic authored State fixture plus observed profiler stateChanged topic payload was available in the copied SampleProject sandbox; empty return/no exception would be insufficient.",
+          "uri": "ak.soundengine.getState"
+        },
+        {
+          "reason": "Prerequisite blocked: no deterministic authored Switch fixture plus observed profiler switchChanged topic payload was available in the copied SampleProject sandbox; empty return/no exception would be insufficient.",
+          "uri": "ak.soundengine.getSwitch"
+        },
+        {
+          "reason": "Prerequisite blocked: playable Event evidence did not produce profiler/transport payload behavior on this WwiseConsole/headless path; returned playing IDs and stop calls are context only.",
+          "uri": "ak.soundengine.postEvent"
+        },
+        {
+          "reason": "Task 3 WwiseConsole/headless accepted postMsgMonitor during capture, but emitted no matching capture-log topic payload within 5.0s; capture start/stop and no exception remain context only.",
+          "uri": "ak.soundengine.postMsgMonitor"
+        },
+        {
+          "reason": "Prerequisite blocked: no deterministic authored Trigger fixture plus observed profiler/captureLog topic payload was available in the copied SampleProject sandbox; no exception would be insufficient.",
+          "uri": "ak.soundengine.postTrigger"
+        },
+        {
+          "reason": "Task 3 WwiseConsole/headless accepted registerGameObj during capture, but emitted no matching profiler gameObjectRegistered topic payload within 5.0s; accepted call is not proof.",
+          "uri": "ak.soundengine.registerGameObj"
+        },
+        {
+          "reason": "Prerequisite blocked: no deterministic authored RTPC fixture plus observed profiler RTPC/topic or capture-log payload was available in the copied SampleProject sandbox; accepted calls would be insufficient.",
+          "uri": "ak.soundengine.resetRTPCValue"
+        },
+        {
+          "reason": "Prerequisite blocked: playable Event evidence did not produce profiler/transport payload behavior on this WwiseConsole/headless path; returned playing IDs and stop calls are context only.",
+          "uri": "ak.soundengine.seekOnEvent"
+        },
+        {
+          "reason": "Prerequisite blocked: listener/game-object spatialization setup lacks an observed profiler/captureLog topic payload in the copied SampleProject sandbox; empty mappings and accepted calls are context only.",
+          "uri": "ak.soundengine.setDefaultListeners"
+        },
+        {
+          "reason": "Prerequisite blocked: listener/game-object spatialization setup lacks an observed profiler/captureLog topic payload in the copied SampleProject sandbox; empty mappings and accepted calls are context only.",
+          "uri": "ak.soundengine.setGameObjectAuxSendValues"
+        },
+        {
+          "reason": "Prerequisite blocked: listener/game-object spatialization setup lacks an observed profiler/captureLog topic payload in the copied SampleProject sandbox; empty mappings and accepted calls are context only.",
+          "uri": "ak.soundengine.setGameObjectOutputBusVolume"
+        },
+        {
+          "reason": "Prerequisite blocked: listener/game-object spatialization setup lacks an observed profiler/captureLog topic payload in the copied SampleProject sandbox; empty mappings and accepted calls are context only.",
+          "uri": "ak.soundengine.setListenerSpatialization"
+        },
+        {
+          "reason": "Prerequisite blocked: listener/game-object spatialization setup lacks an observed profiler/captureLog topic payload in the copied SampleProject sandbox; empty mappings and accepted calls are context only.",
+          "uri": "ak.soundengine.setListeners"
+        },
+        {
+          "reason": "Prerequisite blocked: listener/game-object spatialization setup lacks an observed profiler/captureLog topic payload in the copied SampleProject sandbox; empty mappings and accepted calls are context only.",
+          "uri": "ak.soundengine.setMultiplePositions"
+        },
+        {
+          "reason": "Prerequisite blocked: listener/game-object spatialization setup lacks an observed profiler/captureLog topic payload in the copied SampleProject sandbox; empty mappings and accepted calls are context only.",
+          "uri": "ak.soundengine.setObjectObstructionAndOcclusion"
+        },
+        {
+          "reason": "Prerequisite blocked: listener/game-object spatialization setup lacks an observed profiler/captureLog topic payload in the copied SampleProject sandbox; empty mappings and accepted calls are context only.",
+          "uri": "ak.soundengine.setPosition"
+        },
+        {
+          "reason": "Prerequisite blocked: no deterministic authored RTPC fixture plus observed profiler RTPC/topic or capture-log payload was available in the copied SampleProject sandbox; accepted calls would be insufficient.",
+          "uri": "ak.soundengine.setRTPCValue"
+        },
+        {
+          "reason": "Prerequisite blocked: listener/game-object spatialization setup lacks an observed profiler/captureLog topic payload in the copied SampleProject sandbox; empty mappings and accepted calls are context only.",
+          "uri": "ak.soundengine.setScalingFactor"
+        },
+        {
+          "reason": "Prerequisite blocked: no deterministic authored State fixture plus observed profiler stateChanged topic payload was available in the copied SampleProject sandbox; empty return/no exception would be insufficient.",
+          "uri": "ak.soundengine.setState"
+        },
+        {
+          "reason": "Prerequisite blocked: no deterministic authored Switch fixture plus observed profiler switchChanged topic payload was available in the copied SampleProject sandbox; empty return/no exception would be insufficient.",
+          "uri": "ak.soundengine.setSwitch"
+        },
+        {
+          "reason": "Prerequisite blocked: playable Event evidence did not produce profiler/transport payload behavior on this WwiseConsole/headless path; returned playing IDs and stop calls are context only.",
+          "uri": "ak.soundengine.stopAll"
+        },
+        {
+          "reason": "Prerequisite blocked: playable Event evidence did not produce profiler/transport payload behavior on this WwiseConsole/headless path; returned playing IDs and stop calls are context only.",
+          "uri": "ak.soundengine.stopPlayingID"
+        },
+        {
+          "reason": "Task 3 WwiseConsole/headless accepted unregisterGameObj during capture, but emitted no matching profiler gameObjectUnregistered topic payload within 5.0s; accepted call is not proof.",
+          "uri": "ak.soundengine.unregisterGameObj"
+        }
+      ],
+      "capture_sequence": [
+        "copy tests/_org/2022.1/SampleProject.wproj source fixture into a sandbox",
+        "discover deterministic Event/State/Switch/RTPC/listener/game-object prerequisites where the copied SampleProject exposes them",
+        "call ak.wwise.core.profiler.startCapture and record returned capture cursor",
+        "subscribe to captureLog.itemAdded, gameObjectRegistered/gameObjectUnregistered, stateChanged, switchChanged, or the narrowest available profiler topic for each URI",
+        "trigger each attempted ak.soundengine.* URI with deterministic sandbox arguments only when prerequisites are present",
+        "bounded-wait per URI for matching profiler/captureLog/topic payload fields",
+        "call ak.wwise.core.profiler.stopCapture and record returned capture cursor"
+      ],
+      "cleanup": [
+        "stop all playback and stop/destroy transient transports if created for event probes",
+        "unregister game objects and reset listeners/default listeners if registration reached action phase",
+        "cancel all profiler topic subscriptions",
+        "stop capture if capture started",
+        "disconnect WAAPI client",
+        "shutdown WwiseConsole",
+        "delete sandbox unless keep-on-failure policy applies",
+        "prove source fixture mtime and bounded hash are unchanged"
+      ],
+      "evidence_command": "WWISE_LIVE=1 python -m pytest tests/live/test_profiler_transport_soundengine.py::test_soundengine_profiler_backed_smoke -q",
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+      "evidence_rows": [
+        {
+          "api_uri": "ak.soundengine.executeActionOnEvent",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: playable Event evidence did not produce profiler/transport payload behavior on this WwiseConsole/headless path; returned playing IDs and stop calls are context only.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.executeActionOnEvent trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.executeActionOnEvent"
+        },
+        {
+          "api_uri": "ak.soundengine.getState",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: no deterministic authored State fixture plus observed profiler stateChanged topic payload was available in the copied SampleProject sandbox; empty return/no exception would be insufficient.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.stateChanged",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.getState trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.getState"
+        },
+        {
+          "api_uri": "ak.soundengine.getSwitch",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: no deterministic authored Switch fixture plus observed profiler switchChanged topic payload was available in the copied SampleProject sandbox; empty return/no exception would be insufficient.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.switchChanged",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.getSwitch trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.getSwitch"
+        },
+        {
+          "api_uri": "ak.soundengine.postEvent",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: playable Event evidence did not produce profiler/transport payload behavior on this WwiseConsole/headless path; returned playing IDs and stop calls are context only.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.postEvent trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.postEvent"
+        },
+        {
+          "api_uri": "ak.soundengine.postMsgMonitor",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Task 3 WwiseConsole/headless accepted postMsgMonitor during capture, but emitted no matching capture-log topic payload within 5.0s; capture start/stop and no exception remain context only.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.postMsgMonitor trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.postMsgMonitor"
+        },
+        {
+          "api_uri": "ak.soundengine.postTrigger",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: no deterministic authored Trigger fixture plus observed profiler/captureLog topic payload was available in the copied SampleProject sandbox; no exception would be insufficient.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.postTrigger trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.postTrigger"
+        },
+        {
+          "api_uri": "ak.soundengine.registerGameObj",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Task 3 WwiseConsole/headless accepted registerGameObj during capture, but emitted no matching profiler gameObjectRegistered topic payload within 5.0s; accepted call is not proof.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.gameObjectRegistered",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.registerGameObj trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.registerGameObj"
+        },
+        {
+          "api_uri": "ak.soundengine.resetRTPCValue",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: no deterministic authored RTPC fixture plus observed profiler RTPC/topic or capture-log payload was available in the copied SampleProject sandbox; accepted calls would be insufficient.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.resetRTPCValue trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.resetRTPCValue"
+        },
+        {
+          "api_uri": "ak.soundengine.seekOnEvent",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: playable Event evidence did not produce profiler/transport payload behavior on this WwiseConsole/headless path; returned playing IDs and stop calls are context only.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.seekOnEvent trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.seekOnEvent"
+        },
+        {
+          "api_uri": "ak.soundengine.setDefaultListeners",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: listener/game-object spatialization setup lacks an observed profiler/captureLog topic payload in the copied SampleProject sandbox; empty mappings and accepted calls are context only.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.setDefaultListeners trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.setDefaultListeners"
+        },
+        {
+          "api_uri": "ak.soundengine.setGameObjectAuxSendValues",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: listener/game-object spatialization setup lacks an observed profiler/captureLog topic payload in the copied SampleProject sandbox; empty mappings and accepted calls are context only.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.setGameObjectAuxSendValues trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.setGameObjectAuxSendValues"
+        },
+        {
+          "api_uri": "ak.soundengine.setGameObjectOutputBusVolume",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: listener/game-object spatialization setup lacks an observed profiler/captureLog topic payload in the copied SampleProject sandbox; empty mappings and accepted calls are context only.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.setGameObjectOutputBusVolume trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.setGameObjectOutputBusVolume"
+        },
+        {
+          "api_uri": "ak.soundengine.setListenerSpatialization",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: listener/game-object spatialization setup lacks an observed profiler/captureLog topic payload in the copied SampleProject sandbox; empty mappings and accepted calls are context only.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.setListenerSpatialization trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.setListenerSpatialization"
+        },
+        {
+          "api_uri": "ak.soundengine.setListeners",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: listener/game-object spatialization setup lacks an observed profiler/captureLog topic payload in the copied SampleProject sandbox; empty mappings and accepted calls are context only.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.setListeners trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.setListeners"
+        },
+        {
+          "api_uri": "ak.soundengine.setMultiplePositions",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: listener/game-object spatialization setup lacks an observed profiler/captureLog topic payload in the copied SampleProject sandbox; empty mappings and accepted calls are context only.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.setMultiplePositions trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.setMultiplePositions"
+        },
+        {
+          "api_uri": "ak.soundengine.setObjectObstructionAndOcclusion",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: listener/game-object spatialization setup lacks an observed profiler/captureLog topic payload in the copied SampleProject sandbox; empty mappings and accepted calls are context only.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.setObjectObstructionAndOcclusion trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.setObjectObstructionAndOcclusion"
+        },
+        {
+          "api_uri": "ak.soundengine.setPosition",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: listener/game-object spatialization setup lacks an observed profiler/captureLog topic payload in the copied SampleProject sandbox; empty mappings and accepted calls are context only.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.setPosition trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.setPosition"
+        },
+        {
+          "api_uri": "ak.soundengine.setRTPCValue",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: no deterministic authored RTPC fixture plus observed profiler RTPC/topic or capture-log payload was available in the copied SampleProject sandbox; accepted calls would be insufficient.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.setRTPCValue trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.setRTPCValue"
+        },
+        {
+          "api_uri": "ak.soundengine.setScalingFactor",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: listener/game-object spatialization setup lacks an observed profiler/captureLog topic payload in the copied SampleProject sandbox; empty mappings and accepted calls are context only.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.setScalingFactor trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.setScalingFactor"
+        },
+        {
+          "api_uri": "ak.soundengine.setState",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: no deterministic authored State fixture plus observed profiler stateChanged topic payload was available in the copied SampleProject sandbox; empty return/no exception would be insufficient.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.stateChanged",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.setState trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.setState"
+        },
+        {
+          "api_uri": "ak.soundengine.setSwitch",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: no deterministic authored Switch fixture plus observed profiler switchChanged topic payload was available in the copied SampleProject sandbox; empty return/no exception would be insufficient.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.switchChanged",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.setSwitch trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.setSwitch"
+        },
+        {
+          "api_uri": "ak.soundengine.stopAll",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: playable Event evidence did not produce profiler/transport payload behavior on this WwiseConsole/headless path; returned playing IDs and stop calls are context only.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.stopAll trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.stopAll"
+        },
+        {
+          "api_uri": "ak.soundengine.stopPlayingID",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Prerequisite blocked: playable Event evidence did not produce profiler/transport payload behavior on this WwiseConsole/headless path; returned playing IDs and stop calls are context only.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.stopPlayingID trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.stopPlayingID"
+        },
+        {
+          "api_uri": "ak.soundengine.unregisterGameObj",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "Task 3 WwiseConsole/headless accepted unregisterGameObj during capture, but emitted no matching profiler gameObjectUnregistered topic payload within 5.0s; accepted call is not proof.",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.gameObjectUnregistered",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the ak.soundengine.unregisterGameObj trigger window; no matching payload was observed, so the row remains blocked",
+          "trigger_call": "ak.soundengine.unregisterGameObj"
+        }
+      ],
+      "group": "soundengine",
+      "id": "soundengine_all_reopened_profiler_evidence",
+      "setup": {
+        "fixture_strategy": "copied SampleProject sandbox; deterministic Event/State/Switch/RTPC/listener/game-object setup is required before invoking a URI",
+        "sandbox": "prepare_sample_project_sandbox(hash_strategy=bounded) from tests/_org/2022.1/SampleProject.wproj",
+        "topic_subscription": "per-URI profiler/captureLog/topic subscription selected from observed Task 3 capability topics and reflected soundengine side-effect topics"
+      },
+      "status": "still-deferred-with-evidence",
+      "trigger": {
+        "bounded_wait_seconds": 5,
+        "predicate": "per-URI profiler/captureLog/topic payload fields match the triggered soundengine object/game-object/listener/event/state/switch/RTPC action",
+        "uris": [
+          "ak.soundengine.executeActionOnEvent",
+          "ak.soundengine.getState",
+          "ak.soundengine.getSwitch",
+          "ak.soundengine.postEvent",
+          "ak.soundengine.postMsgMonitor",
+          "ak.soundengine.postTrigger",
+          "ak.soundengine.registerGameObj",
+          "ak.soundengine.resetRTPCValue",
+          "ak.soundengine.seekOnEvent",
+          "ak.soundengine.setDefaultListeners",
+          "ak.soundengine.setGameObjectAuxSendValues",
+          "ak.soundengine.setGameObjectOutputBusVolume",
+          "ak.soundengine.setListenerSpatialization",
+          "ak.soundengine.setListeners",
+          "ak.soundengine.setMultiplePositions",
+          "ak.soundengine.setObjectObstructionAndOcclusion",
+          "ak.soundengine.setPosition",
+          "ak.soundengine.setRTPCValue",
+          "ak.soundengine.setScalingFactor",
+          "ak.soundengine.setState",
+          "ak.soundengine.setSwitch",
+          "ak.soundengine.stopAll",
+          "ak.soundengine.stopPlayingID",
+          "ak.soundengine.unregisterGameObj"
+        ]
+      },
+      "uris": [
+        "ak.soundengine.executeActionOnEvent",
+        "ak.soundengine.getState",
+        "ak.soundengine.getSwitch",
+        "ak.soundengine.postEvent",
+        "ak.soundengine.postMsgMonitor",
+        "ak.soundengine.postTrigger",
+        "ak.soundengine.registerGameObj",
+        "ak.soundengine.resetRTPCValue",
+        "ak.soundengine.seekOnEvent",
+        "ak.soundengine.setDefaultListeners",
+        "ak.soundengine.setGameObjectAuxSendValues",
+        "ak.soundengine.setGameObjectOutputBusVolume",
+        "ak.soundengine.setListenerSpatialization",
+        "ak.soundengine.setListeners",
+        "ak.soundengine.setMultiplePositions",
+        "ak.soundengine.setObjectObstructionAndOcclusion",
+        "ak.soundengine.setPosition",
+        "ak.soundengine.setRTPCValue",
+        "ak.soundengine.setScalingFactor",
+        "ak.soundengine.setState",
+        "ak.soundengine.setSwitch",
+        "ak.soundengine.stopAll",
+        "ak.soundengine.stopPlayingID",
+        "ak.soundengine.unregisterGameObj"
+      ]
+    }
+  ]
+}

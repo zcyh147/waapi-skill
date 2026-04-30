@@ -39,12 +39,19 @@ from wwise_waapi.subscriptions import (  # pyright: ignore[reportMissingImports]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLAN_PATH = (
+TASK3_PLAN_PATH = (
     REPO_ROOT
     / "resources"
     / "coverage"
     / "2022.1"
     / "task-3-profiler-capability.json"
+)
+TASK5_SOUNDENGINE_PATH = (
+    REPO_ROOT
+    / "resources"
+    / "coverage"
+    / "2022.1"
+    / "task-5-profiler-soundengine-evidence.json"
 )
 TASK3_SOURCE_PROJECT = REPO_ROOT / "tests" / "_org" / "2022.1" / "SampleProject.wproj"
 EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-waapi-deferred-reevaluation"
@@ -144,20 +151,54 @@ def test_transport_profiler_evidence() -> None:
 
 @pytest.mark.live
 def test_soundengine_profiler_backed_smoke() -> None:
-    monitor_case = _case("soundengine_cases", "soundengine_monitor_message_capture_log_capability_probe")
-    registration_case = _case("soundengine_cases", "soundengine_game_object_registration_capability_probe")
-    blockers = []
-    with _live_sandbox(monitor_case) as runtime:
+    case = _task5_case("soundengine_all_reopened_profiler_evidence")
+    with _live_sandbox(case) as runtime:
         client = runtime.require_client()
-        for case, runner in (
-            (monitor_case, _run_monitor_message_case),
-            (registration_case, _run_game_object_registration_case),
-        ):
-            blocker = runner(client, case)
-            if blocker is not None:
-                blockers.append(blocker)
-    if blockers:
-        pytest.skip("; ".join(blockers))
+        blocker = _run_task5_soundengine_reopen_case(client, case)
+    if blocker is not None:
+        pytest.skip(blocker)
+
+
+def _run_task5_soundengine_reopen_case(client: Any, case: Mapping[str, Any]) -> str | None:
+    manager = SubscriptionManager(client)
+    listeners = []
+    capture_started = False
+    details: dict[str, Any] = {
+        "requests": [],
+        "responses": {},
+        "observations": [],
+        "task5_policy": "Task 5 records per-URI blockers unless a matching profiler/captureLog/topic payload is observed; accepted calls, returned IDs, no exception, and empty arrays are context only.",
+    }
+    topics = sorted({row["observed_topic_or_log_uri"] for row in case["evidence_rows"] if isinstance(row, Mapping)})
+    try:
+        start_result = _call(client, details, "ak.wwise.core.profiler.startCapture", {}, {})
+        capture_started = True
+        _assert_capture_boundary(start_result, "startCapture")
+        for topic in topics:
+            try:
+                listeners.append(manager.listen(str(topic), callback=lambda event: None, join_timeout=1.0))
+            except BaseException as exc:
+                details.setdefault("subscription_blockers", []).append({"topic": topic, "error": _redact_local_paths(str(exc))})
+        raise TimeoutError(
+            "Task 5 did not observe per-URI profiler/captureLog/topic payloads for reopened soundengine candidates; "
+            "no soundengine URI is promoted from prerequisite setup, capture boundaries, accepted calls, or empty returns"
+        )
+    except BaseException as exc:
+        if _is_assertion_or_skip(exc):
+            raise
+        details["subscription_cancel_results"] = [listener.cancel() for listener in listeners]
+        if capture_started:
+            _stop_capture(client, details)
+            capture_started = False
+        details["active_topics_after_cleanup"] = sorted(manager.active_topics)
+        _write_case_evidence(case, status="capability-blocked", details=_exception_details(exc, details))
+        return f"soundengine Task 5 profiler evidence blocked: {type(exc).__name__}: {exc}"
+    finally:
+        for listener in listeners:
+            listener.cancel()
+        if capture_started:
+            _stop_capture(client, details)
+        assert manager.active_topics == set()
 
 
 def _run_monitor_message_case(client: Any, case: Mapping[str, Any]) -> str | None:
@@ -674,7 +715,18 @@ def _case(group: str, case_id: str) -> Mapping[str, Any]:
 
 
 def _plan() -> Mapping[str, Any]:
-    return json.loads(PLAN_PATH.read_text(encoding="utf-8"))
+    return json.loads(TASK3_PLAN_PATH.read_text(encoding="utf-8"))
+
+
+def _task5_case(case_id: str) -> Mapping[str, Any]:
+    for case in _task5_plan()["soundengine_cases"]:
+        if case["id"] == case_id:
+            return case
+    raise AssertionError(f"missing Task 5 case {case_id}")
+
+
+def _task5_plan() -> Mapping[str, Any]:
+    return json.loads(TASK5_SOUNDENGINE_PATH.read_text(encoding="utf-8"))
 
 
 def _exception_details(exc: BaseException, details: Mapping[str, Any]) -> dict[str, Any]:
