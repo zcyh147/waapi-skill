@@ -72,6 +72,14 @@ The approval stop must be recorded in `.sisyphus/evidence/task-12-approval-stop.
 
 Use these commands from the repository root. Default pytest must stay Wwise-free, and live or destructive suites must be opt-in through environment variables.
 
+Phase 2.1 uses five workflow families:
+
+- Default workflow: `python -m pytest -q` must remain Wwise-free.
+- Unit workflow: targeted unit tests validate generated coverage resources, deferred evidence rules, and review-packet wording without launching Wwise.
+- Live workflow: `WWISE_LIVE=1` read-only suites may inspect copied fixture projects after prerequisites pass.
+- Destructive workflow: `WWISE_LIVE=1 WWISE_DESTRUCTIVE=1` suites may mutate only copied sandboxes under `WWISE_SANDBOX_ROOT`.
+- Profiler workflow: profiler, transport, and soundengine probes may record capability or blocker evidence, but accepted calls alone never promote coverage.
+
 ### Default Wwise-free verification
 
 ```bash
@@ -79,6 +87,14 @@ python -m pytest -q
 ```
 
 Expected result: unit tests pass without launching Wwise, opening WwiseConsole, requiring SampleProject, or reading live credentials.
+
+### Unit coverage and packet verification
+
+```bash
+python -m pytest tests/unit/test_phase2_coverage_summary.py tests/unit/test_live_runbook_constraints.py -q
+```
+
+Expected result: generated Phase 2.1 status accounting and the user review packet agree on the final counts. Unit tests may read committed resources such as `resources/coverage/2022.1/phase2-coverage-summary.json`, but they must not require a live authoring process or mutate fixture source files.
 
 ### Live smoke prerequisites
 
@@ -89,6 +105,8 @@ python -m pytest tests/live/test_live_prerequisites.py -q
 ```
 
 Expected result: the prerequisite gate proves that the local Wwise 2022.1 console and immutable SampleProject source are present. If the gate fails, do not run live or destructive suites. Record the exact missing prerequisite instead.
+
+The committed `tests/_org/2022.1` tree is immutable fixture source, not disposable runtime state. Sandbox tests copy from `tests/_org/2022.1` or from the installed SampleProject source named by `WWISE_SAMPLE_PROJECT_PATH`; normal tests must never mutate either source fixture tree.
 
 ### Live sandbox read-only workflows
 
@@ -125,6 +143,8 @@ python -m pytest tests/destructive/test_project_mutation_sandbox.py -q
 
 When a destructive sandbox fails and `WWISE_SANDBOX_KEEP_ON_FAILURE=1` is set, inspect the preserved sandbox and evidence under `.sisyphus/evidence/wwise-waapi-live-sandbox-coverage/`. Compare copied `.wproj`, `.wwu`, generated bank, audio, and log artifacts there. Do not commit preserved sandboxes, generated banks, generated audio, runtime logs, caches, `.venv`, or auth/session state.
 
+Committed fixture `.wav` inputs under `tests/_org/2022.1` are handled through Git LFS and may be used as source audio for copied sandboxes. Generated `.wav` files, converted audio, SoundBank output, profiler captures, runtime sandboxes, caches, auth state, and session state are runtime artifacts and must not be committed.
+
 ### Prerequisite failure workflow
 
 ```bash
@@ -152,6 +172,15 @@ Expected result: the summary keeps `windows_validation` as `pending` unless Wind
 - `WWISE_LIVE`: set to `1` to opt into live Wwise prerequisite and read-only sandbox suites.
 - `WWISE_DESTRUCTIVE`: set to `1` together with `WWISE_LIVE=1` to opt into copied-sandbox mutation suites. It has no destructive effect without the live gate.
 
+## Phase 2.1 status meanings
+
+- `fake-route-tested`: Phase 1 fake-route behavior remains accepted for non-policy APIs, but it is not live behavior.
+- `sandbox-mutating-tested`: copied-sandbox behavior evidence exists and counts as live behavioral coverage.
+- `skipped-approved`: user-approved inventory-only exclusion, not behavioral or live behavioral coverage.
+- `wrapper-only`: wrapper diagnostics or route coverage only, not behavioral or live behavioral coverage.
+- `conformance-only-skip`: user-approved reflected schema and route conformance only, not behavioral or live behavioral coverage.
+- `still-deferred-with-evidence`: blocker evidence and future review trigger exist, but coverage is not promoted.
+
 ## Rerunning failed category suites
 
 Rerun only the failed category after the prerequisite smoke test passes. Keep the same env contract so evidence remains comparable.
@@ -163,3 +192,5 @@ WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=/Applications/Audioki
 ```
 
 Accepted WAAPI calls alone are not coverage. Promotion requires bounded readback, topic payload, profiler payload, generated artifact, or cleanup evidence that matches the category contract.
+
+For profiler, transport, and soundengine probes, accepted calls, returned IDs, empty mappings, capture start/stop, or no exceptions are context only. They do not promote coverage unless paired with the observable evidence required by the status contract.
