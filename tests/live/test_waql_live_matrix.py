@@ -98,6 +98,32 @@ def test_live_waql_matrix_runs_read_only_against_sandbox() -> None:
             cleanup_sandbox(sandbox, failed=failed)
 
 
+def _safe_lock_root(env: Mapping[str, str]) -> Path:
+    raw_root = env.get("WWISE_SANDBOX_ROOT")
+    root = Path(raw_root).expanduser() if raw_root else REPO_ROOT / ".sisyphus" / "runtime" / "wwise-waapi-sandboxes"
+    root = root.resolve(strict=False)
+    source_project = resolve_sample_project_source(env)
+    if source_project is not None:
+        source_root = source_project.parent.resolve(strict=False)
+        if root == source_root or path_is_under(root, source_root) or path_is_under(source_root, root):
+            raise SandboxFixtureError("sandbox lock root must not overlap the immutable SampleProject source")
+    return root
+
+
+def _safe_case_evidence_path(case: Mapping[str, Any]) -> Path:
+    target = (REPO_ROOT / str(case["evidence_path"])).resolve(strict=False)
+    evidence_root = WAQL_EVIDENCE_ROOT.resolve(strict=False)
+    if not path_is_under(target, evidence_root):
+        raise AssertionError(f"case evidence path must stay under {WAQL_EVIDENCE_ROOT}: {target}")
+    return target
+
+
+def _redact_local_paths(message: str) -> str:
+    redacted = message.replace(str(REPO_ROOT), "<repo>")
+    redacted = redacted.replace(str(Path.home()), "<home>")
+    return redacted.replace("/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject", "$WWISE_SAMPLE_PROJECT_PATH")
+
+
 def _rows(result: Any) -> list[dict[str, Any]]:
     assert isinstance(result, Mapping), f"WAAPI result must be a mapping, got {type(result).__name__}"
     rows = result.get("return")
