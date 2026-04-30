@@ -55,14 +55,7 @@ class SemanticSchemaValidator:
             raise _schema_error(uri, self.version, f"WAAPI URI {uri!r} is missing required args: {', '.join(missing)}", missing_args=missing)
 
         required_families = _required_families(args_schema)
-        missing_families = tuple(family for family in required_families if not any(field in arg_payload for field in family))
-        if missing_families:
-            raise _schema_error(
-                uri,
-                self.version,
-                f"WAAPI URI {uri!r} is missing one required arg family.",
-                missing_arg_families=missing_families,
-            )
+        _validate_required_alternatives(uri, self.version, args_schema, arg_payload)
 
         _reject_unknown_fields(uri, self.version, "args", args_schema, arg_payload)
         _reject_unknown_fields(uri, self.version, "options", options_schema, option_payload)
@@ -103,10 +96,41 @@ def _required_families(schema: Mapping[str, Any]) -> tuple[tuple[str, ...], ...]
         entries = schema.get(key)
         if not isinstance(entries, list):
             continue
-        family = tuple(field for entry in entries for field in _required_fields(_mapping_or_empty(entry)))
-        if family:
-            families.append(family)
+        for entry in entries:
+            family = _required_fields(_mapping_or_empty(entry))
+            if family:
+                families.append(family)
     return tuple(families)
+
+
+def _validate_required_alternatives(uri: str, version: str, schema: Mapping[str, Any], payload: Mapping[str, Any]) -> None:
+    for key, policy in (("oneOf", "exactly one"), ("anyOf", "at least one")):
+        entries = schema.get(key)
+        if not isinstance(entries, list):
+            continue
+        alternatives = tuple(_required_fields(_mapping_or_empty(entry)) for entry in entries)
+        alternatives = tuple(fields for fields in alternatives if fields)
+        if not alternatives:
+            continue
+        matches = tuple(fields for fields in alternatives if all(field in payload for field in fields))
+        if key == "oneOf" and len(matches) != 1:
+            raise _schema_error(
+                uri,
+                version,
+                f"WAAPI URI {uri!r} must satisfy exactly one required args branch.",
+                required_policy=policy,
+                required_alternatives=alternatives,
+                matched_alternatives=matches,
+            )
+        if key == "anyOf" and not matches:
+            raise _schema_error(
+                uri,
+                version,
+                f"WAAPI URI {uri!r} must satisfy at least one required args branch.",
+                required_policy=policy,
+                required_alternatives=alternatives,
+                matched_alternatives=matches,
+            )
 
 
 def _reject_unknown_fields(uri: str, version: str, section: str, schema: Mapping[str, Any], payload: Mapping[str, Any]) -> None:

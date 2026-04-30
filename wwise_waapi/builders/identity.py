@@ -34,18 +34,25 @@ class ObjectIdentity:
 
     @property
     def kind(self) -> ObjectIdentityKind:
-        if self.id is not None:
-            return ObjectIdentityKind.EXACT_ID
-        if _non_empty(self.path):
-            return ObjectIdentityKind.EXACT_PATH
-        if _non_empty(self.waql):
-            return ObjectIdentityKind.WAQL
-        if _non_empty(self.name) and _non_empty(self.type) and _non_empty(self.parent):
-            return ObjectIdentityKind.SCOPED_NAME
+        shapes = self._shapes()
+        if len(shapes) == 1:
+            return shapes[0]
         raise IdentityAmbiguityError(
-            "Object identity must be an explicit id/GUID, exact path, WAQL, or name scoped by type and parent.",
-            details={"identity": self.as_dict()},
+            "Object identity must specify exactly one shape: explicit id/GUID, exact path, WAQL, or name scoped by type and parent.",
+            details={"identity": self.as_dict(), "shapes": [shape.value for shape in shapes]},
         )
+
+    def _shapes(self) -> tuple[ObjectIdentityKind, ...]:
+        shapes: list[ObjectIdentityKind] = []
+        if _valid_id(self.id):
+            shapes.append(ObjectIdentityKind.EXACT_ID)
+        if _non_empty(self.path):
+            shapes.append(ObjectIdentityKind.EXACT_PATH)
+        if _non_empty(self.waql):
+            shapes.append(ObjectIdentityKind.WAQL)
+        if _non_empty(self.name) and _non_empty(self.type) and _non_empty(self.parent):
+            shapes.append(ObjectIdentityKind.SCOPED_NAME)
+        return tuple(shapes)
 
     @property
     def is_exact(self) -> bool:
@@ -130,10 +137,15 @@ def resolve_resolution_plan(plan: ResolutionPlan, rows: Sequence[Mapping[str, An
 
     normalized = _rows(rows)
     matching = tuple(row for row in normalized if _row_matches(plan.identity, row))
-    if len(matching) != 1:
+    if len(normalized) != 1 or len(matching) != 1:
         raise IdentityAmbiguityError(
-            "Object identity resolution must produce exactly one matching row.",
-            details={"identity": plan.identity.as_dict(), "row_count": len(matching), "rows": [dict(row) for row in matching]},
+            "Object identity resolution readback must return exactly one row and that row must match the identity.",
+            details={
+                "identity": plan.identity.as_dict(),
+                "row_count": len(normalized),
+                "matching_row_count": len(matching),
+                "rows": [dict(row) for row in normalized],
+            },
         )
     row = matching[0]
     object_value = row.get("id") or row.get("path")
@@ -189,6 +201,14 @@ def _rows(rows: Sequence[Mapping[str, Any]] | Mapping[str, Any]) -> tuple[Mappin
             return tuple(row for row in value if isinstance(row, Mapping))
         return ()
     return tuple(row for row in rows if isinstance(row, Mapping))
+
+
+def _valid_id(value: str | int | None) -> bool:
+    if isinstance(value, bool) or value is None:
+        return False
+    if isinstance(value, int):
+        return True
+    return _non_empty(value)
 
 
 def _non_empty(value: str | None) -> bool:

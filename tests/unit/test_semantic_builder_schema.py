@@ -49,6 +49,27 @@ def fake_manifest_loader() -> ManifestSchemaLoader:
                         "optionsSchema": {"additionalProperties": False, "properties": {}, "type": "object"},
                     },
                 },
+                {
+                    "uri": "ak.soundengine.seekOnEvent",
+                    "status": "ok",
+                    "schema": {
+                        "argsSchema": {
+                            "additionalProperties": False,
+                            "oneOf": [
+                                {"required": ["event", "gameObject", "position"]},
+                                {"required": ["event", "gameObject", "percent"]},
+                            ],
+                            "properties": {
+                                "event": {"type": "string"},
+                                "gameObject": {"type": "integer"},
+                                "position": {"type": "integer"},
+                                "percent": {"type": "number"},
+                            },
+                            "type": "object",
+                        },
+                        "optionsSchema": {"additionalProperties": False, "properties": {}, "type": "object"},
+                    },
+                },
             ]
         },
     )
@@ -98,13 +119,13 @@ def test_schema_required_arg_family_is_conservative() -> None:
     validator = SemanticSchemaValidator(manifest_loader=fake_manifest_loader())
 
     result = validator.validate("ak.wwise.core.object.getPropertyInfo", {"classId": 1})
-    assert result.required_families == (("object", "classId"),)
+    assert result.required_families == (("object",), ("classId",))
 
     with pytest.raises(SemanticValidationError) as exc:
         validator.validate("ak.wwise.core.object.getPropertyInfo", {})
 
     assert exc.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
-    assert exc.value.details["missing_arg_families"] == [["object", "classId"]]
+    assert exc.value.details["required_alternatives"] == [["object"], ["classId"]]
 
 
 def test_schema_unknown_or_wrong_type_fields_rejected() -> None:
@@ -119,3 +140,22 @@ def test_schema_unknown_or_wrong_type_fields_rejected() -> None:
         validator.validate("ak.wwise.core.object.delete", {"object": 123})
     assert wrong_type.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
     assert wrong_type.value.details["expected_type"] == "string"
+
+
+def test_schema_oneof_requires_exactly_one_complete_branch() -> None:
+    validator = SemanticSchemaValidator(manifest_loader=fake_manifest_loader())
+
+    validator.validate("ak.soundengine.seekOnEvent", {"event": "Play", "gameObject": 1, "position": 100})
+
+    with pytest.raises(SemanticValidationError) as incomplete:
+        validator.validate("ak.soundengine.seekOnEvent", {"event": "Play"})
+    assert incomplete.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+    assert incomplete.value.details["matched_alternatives"] == []
+
+    with pytest.raises(SemanticValidationError) as overlapping:
+        validator.validate(
+            "ak.soundengine.seekOnEvent",
+            {"event": "Play", "gameObject": 1, "position": 100, "percent": 50.0},
+        )
+    assert overlapping.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+    assert overlapping.value.details["required_policy"] == "exactly one"

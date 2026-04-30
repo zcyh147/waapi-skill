@@ -89,3 +89,31 @@ def test_name_only_identity_requires_unique_scope() -> None:
             ],
             destructive_use=True,
         )
+
+
+def test_identity_rejects_conflicting_or_blank_exact_shapes() -> None:
+    with pytest.raises(IdentityAmbiguityError) as conflict:
+        resolve_object_identity(ObjectIdentity(id="{id}", path=r"\Actor-Mixer Hierarchy\Default Work Unit\Sound"))
+    assert conflict.value.error_code == SemanticErrorCode.AMBIGUOUS_OBJECT_IDENTITY
+    assert conflict.value.details["shapes"] == ["exact-id", "exact-path"]
+
+    with pytest.raises(IdentityAmbiguityError):
+        resolve_object_identity(ObjectIdentity(id=""))
+
+
+def test_scoped_identity_rejects_multirow_readback_even_with_one_match() -> None:
+    scoped = ObjectIdentity(name="Explosion", type="Sound", parent=r"\Actor-Mixer Hierarchy\Default Work Unit")
+
+    with pytest.raises(IdentityAmbiguityError) as exc:
+        resolve_object_identity(
+            scoped,
+            [
+                {"id": "{match}", "name": "Explosion", "type": "Sound", "parent": r"\Actor-Mixer Hierarchy\Default Work Unit"},
+                {"id": "{other}", "name": "Other", "type": "Sound", "parent": r"\Actor-Mixer Hierarchy\Default Work Unit"},
+            ],
+            destructive_use=True,
+        )
+
+    assert exc.value.error_code == SemanticErrorCode.AMBIGUOUS_OBJECT_IDENTITY
+    assert exc.value.details["row_count"] == 2
+    assert exc.value.details["matching_row_count"] == 1
