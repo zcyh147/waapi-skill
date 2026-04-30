@@ -1,0 +1,190 @@
+{
+  "metadata": {
+    "live_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/destructive/test_project_mutation_sandbox.py -q",
+    "sandbox_policy": "Each live test prepares a fresh Task 3 SampleProject sandbox and launches WwiseConsole only with WWISE_FIXTURE_PROJECT under WWISE_SANDBOX_ROOT.",
+    "source_immutability_hash": "sha256 over mutation-bearing Wwise project files (*.wproj, *.wwu), plus source .wproj mtime",
+    "source_matrix": "resources/coverage/2022.1/live-coverage-matrix.json",
+    "task": "7. Add destructive sandbox tests for project mutation groups",
+    "temporary_name_prefix": "WAAPI_TASK7_SANDBOX_",
+    "unit_command": "python -m pytest tests/unit/test_mutating_live_plan.py -q",
+    "version": "2022.1"
+  },
+  "mutation_cases": [
+    {
+      "action": [
+        "create an ActorMixer with a unique prefixed name",
+        "set Notes on the created object through ak.wwise.core.object.set",
+        "delete the created object through ak.wwise.core.object.delete"
+      ],
+      "allowlist": {
+        "cleanup_expectations": [
+          "no WAAPI_TASK7_SANDBOX_ object remains after successful test",
+          "sandbox copy deleted on success"
+        ],
+        "expected_mutations": [
+          "create disposable ActorMixer under sandbox Actor-Mixer Hierarchy",
+          "set Notes on disposable object",
+          "delete disposable object"
+        ]
+      },
+      "assertions": [
+        "creation returns an id and readback by id returns matching id/name/type",
+        "set is followed by readback of Notes matching the unique value",
+        "delete is followed by readback by id returning an empty array",
+        "source project .wproj mtime and mutation-bearing project-file hash (*.wproj, *.wwu) are unchanged"
+      ],
+      "cleanup": [
+        "delete created object if still present",
+        "disconnect WAAPI client",
+        "shutdown WwiseConsole",
+        "delete sandbox unless keep-on-failure policy applies"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-7-object-mutation.md",
+      "gate": {
+        "allow_source_mutation": false,
+        "env": {
+          "WWISE_DESTRUCTIVE": "1",
+          "WWISE_LIVE": "1"
+        }
+      },
+      "group": "core.object",
+      "id": "object_create_set_delete_actor_mixer",
+      "setup": {
+        "object_type": "ActorMixer",
+        "parent": "\\\\Actor-Mixer Hierarchy\\\\Default Work Unit",
+        "sandbox": "prepare_sample_project_sandbox(hash_strategy=bounded)"
+      },
+      "status": "sandbox-mutating-tested",
+      "temporary_name_prefix": "WAAPI_TASK7_SANDBOX_",
+      "uris": [
+        "ak.wwise.core.object.create",
+        "ak.wwise.core.object.set",
+        "ak.wwise.core.object.delete"
+      ]
+    },
+    {
+      "action": [
+        "begin undo group, create disposable object, end group, call undo",
+        "begin second undo group, create disposable object, cancel group"
+      ],
+      "allowlist": {
+        "cleanup_expectations": [
+          "no WAAPI_TASK7_SANDBOX_ object remains after successful test",
+          "sandbox copy deleted on success"
+        ],
+        "expected_mutations": [
+          "temporary creation inside undo groups",
+          "undo/cancel rollback of disposable objects"
+        ]
+      },
+      "assertions": [
+        "object exists after endGroup before undo",
+        "object readback by id is empty after undo",
+        "cancelGroup is followed by readback; if the object remains, blocker evidence is recorded and the disposable object is deleted explicitly",
+        "source project .wproj mtime and mutation-bearing project-file hash (*.wproj, *.wwu) are unchanged"
+      ],
+      "blockers": [
+        {
+          "reason": "No redo URI is reflected in the local Wwise 2022.1 functions manifest, so redo behavior cannot be asserted without inventing an API.",
+          "uri": "ak.wwise.core.undo.redo"
+        },
+        {
+          "reason": "Local WwiseConsole fixture can leave objects created after beginGroup in place after cancelGroup; the destructive test records readback evidence and deletes the disposable object explicitly if this occurs.",
+          "uri": "ak.wwise.core.undo.cancelGroup"
+        }
+      ],
+      "cleanup": [
+        "delete any remaining disposable objects",
+        "disconnect WAAPI client",
+        "shutdown WwiseConsole",
+        "delete sandbox unless keep-on-failure policy applies"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-7-undo-switch.md",
+      "gate": {
+        "allow_source_mutation": false,
+        "env": {
+          "WWISE_DESTRUCTIVE": "1",
+          "WWISE_LIVE": "1"
+        }
+      },
+      "group": "core.undo",
+      "id": "undo_group_create_then_undo_and_cancel",
+      "setup": {
+        "object_type": "ActorMixer",
+        "parent": "\\\\Actor-Mixer Hierarchy\\\\Default Work Unit",
+        "sandbox": "prepare_sample_project_sandbox(hash_strategy=bounded)"
+      },
+      "status": "sandbox-mutating-tested",
+      "temporary_name_prefix": "WAAPI_TASK7_SANDBOX_",
+      "uris": [
+        "ak.wwise.core.undo.beginGroup",
+        "ak.wwise.core.undo.endGroup",
+        "ak.wwise.core.undo.undo",
+        "ak.wwise.core.undo.cancelGroup"
+      ]
+    },
+    {
+      "action": [
+        "create disposable SwitchContainer and Sound child",
+        "create disposable SwitchGroup and Switch",
+        "attempt addAssignment, verify getAssignments, then removeAssignment"
+      ],
+      "allowlist": {
+        "cleanup_expectations": [
+          "no WAAPI_TASK7_SANDBOX_ object remains after successful covered test",
+          "sandbox copy deleted on success or preserved only for failure evidence"
+        ],
+        "expected_mutations": [
+          "create disposable switch/audio hierarchy objects",
+          "add/remove one switch container assignment when the fixture is accepted"
+        ]
+      },
+      "assertions": [
+        "if addAssignment succeeds, getAssignments contains the child/state pair",
+        "after removeAssignment, getAssignments no longer contains that pair",
+        "if Wwise rejects the fixture shape, blocker evidence records the WAAPI error without claiming coverage",
+        "source project .wproj mtime and mutation-bearing project-file hash (*.wproj, *.wwu) are unchanged"
+      ],
+      "blockers": [
+        {
+          "reason": "Switch assignment requires a Wwise-accepted SwitchContainer/SwitchGroup relationship; local manifest does not expose a dedicated safe fixture builder. The live test records the concrete WAAPI error if this shape is rejected.",
+          "uri": "ak.wwise.core.switchContainer.addAssignment"
+        }
+      ],
+      "cleanup": [
+        "delete created switch/audio hierarchy roots if present",
+        "disconnect WAAPI client",
+        "shutdown WwiseConsole",
+        "delete sandbox unless keep-on-failure policy applies"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-7-undo-switch.md",
+      "gate": {
+        "allow_source_mutation": false,
+        "env": {
+          "WWISE_DESTRUCTIVE": "1",
+          "WWISE_LIVE": "1"
+        }
+      },
+      "group": "core.switchContainer",
+      "id": "switch_container_assignment_add_get_remove",
+      "setup": {
+        "actor_parent": "\\\\Actor-Mixer Hierarchy\\\\Default Work Unit",
+        "object_types": [
+          "SwitchContainer",
+          "Sound",
+          "SwitchGroup",
+          "Switch"
+        ],
+        "sandbox": "prepare_sample_project_sandbox(hash_strategy=bounded)",
+        "switch_parent": "\\\\Switches\\\\Default Work Unit"
+      },
+      "status": "sandbox-mutating-tested-or-blocked",
+      "temporary_name_prefix": "WAAPI_TASK7_SANDBOX_",
+      "uris": [
+        "ak.wwise.core.switchContainer.addAssignment",
+        "ak.wwise.core.switchContainer.getAssignments",
+        "ak.wwise.core.switchContainer.removeAssignment"
+      ]
+    }
+  ]
+}
