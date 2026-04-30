@@ -70,6 +70,16 @@ def test_property_and_reference_names_envelope() -> None:
     assert_preview(preview, GET_PROPERTY_AND_REFERENCE_NAMES_URI, {"classId": 123}, "parse_property_and_reference_names_result")
 
 
+def test_property_and_reference_names_object_scope_envelope() -> None:
+    preview = builder().get_property_and_reference_names(object="{sound}")
+
+    assert_preview(preview, GET_PROPERTY_AND_REFERENCE_NAMES_URI, {"object": "{sound}"}, "parse_property_and_reference_names_result")
+
+    with pytest.raises(SemanticValidationError) as both:
+        builder().get_property_and_reference_names(object="{sound}", class_id=123)
+    assert both.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+
+
 def test_get_property_info_envelope() -> None:
     preview = builder().get_property_info(class_id=123, property="Volume")
 
@@ -162,6 +172,10 @@ def test_get_types_parser_returns_records_and_rejects_missing_required_fields() 
     assert exc.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
     assert exc.value.details["missing_fields"] == ["classId"]
 
+    with pytest.raises(SemanticValidationError) as negative:
+        parse_get_types_result({"return": [{"classId": -1, "name": "Sound", "type": "Sound"}]})
+    assert negative.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+
 
 def test_property_and_reference_names_parser_requires_return_string_array() -> None:
     records = parse_property_and_reference_names_result({"return": ["Volume", "OutputBus"]})
@@ -183,6 +197,10 @@ def test_property_info_parser_rejects_missing_required_fields() -> None:
         parse_get_property_info_result({"name": "Volume"})
     assert exc.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
     assert exc.value.details["missing_fields"] == ["type"]
+
+    with pytest.raises(SemanticValidationError) as negative:
+        parse_get_property_info_result({"name": "Volume", "type": "Real32", "audioEngineId": -1})
+    assert negative.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
 
 
 def test_property_enabled_parser_rejects_non_boolean_return() -> None:

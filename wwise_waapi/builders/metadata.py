@@ -167,11 +167,11 @@ class MetadataBuilder:
             ),
         )
 
-    def get_property_and_reference_names(self, *, class_id: int) -> SemanticPreview:
-        _require_uint32("class_id", class_id)
+    def get_property_and_reference_names(self, *, object: str | int | None = None, class_id: int | None = None) -> SemanticPreview:
+        args = _exactly_one_scope(object=object, class_id=class_id)
         return self._build_preview(
             MetadataOperation.GET_PROPERTY_AND_REFERENCE_NAMES,
-            {"classId": class_id},
+            args,
             MetadataReturnExpectation(
                 parser="parse_property_and_reference_names_result",
                 shape="object-with-return-string-array",
@@ -229,7 +229,7 @@ class MetadataBuilder:
             _reject_kwargs(normalized, kwargs)
             return self.get_types()
         if normalized == MetadataOperation.GET_PROPERTY_AND_REFERENCE_NAMES:
-            return self.get_property_and_reference_names(class_id=_required_kw(normalized, kwargs, "class_id"))
+            return self.get_property_and_reference_names(object=kwargs.get("object"), class_id=kwargs.get("class_id"))
         if normalized == MetadataOperation.GET_PROPERTY_INFO:
             return self.get_property_info(
                 property=_required_kw(normalized, kwargs, "property"),
@@ -304,7 +304,7 @@ def parse_get_types_result(result: Mapping[str, Any]) -> tuple[ObjectTypeMetadat
         if not isinstance(row, Mapping):
             raise _result_error(GET_TYPES_URI, "getTypes return rows must be objects.", row_index=index, actual_type=type(row).__name__)
         _require_result_fields(GET_TYPES_URI, row, ("classId", "name", "type"), row_index=index)
-        if not isinstance(row["classId"], int) or isinstance(row["classId"], bool):
+        if not _is_uint32(row["classId"]):
             raise _result_error(GET_TYPES_URI, "getTypes classId must be an integer.", row_index=index, field="classId")
         if not isinstance(row["name"], str) or not isinstance(row["type"], str):
             raise _result_error(GET_TYPES_URI, "getTypes name and type must be strings.", row_index=index)
@@ -338,8 +338,8 @@ def parse_get_property_info_result(result: Mapping[str, Any]) -> PropertyInfoMet
     if not isinstance(dependencies, list | tuple) or not all(isinstance(item, Mapping) for item in dependencies):
         raise _result_error(GET_PROPERTY_INFO_URI, "Property info dependencies must be an array of objects when present.")
     audio_engine_id = result.get("audioEngineId")
-    if audio_engine_id is not None and (not isinstance(audio_engine_id, int) or isinstance(audio_engine_id, bool)):
-        raise _result_error(GET_PROPERTY_INFO_URI, "Property info audioEngineId must be an integer when present.")
+    if audio_engine_id is not None and not _is_uint32(audio_engine_id):
+        raise _result_error(GET_PROPERTY_INFO_URI, "Property info audioEngineId must be a non-negative integer when present.")
     return PropertyInfoMetadataRecord(
         name=result["name"],
         type=result["type"],
@@ -467,12 +467,16 @@ def _require_non_empty_string(name: str, value: Any) -> None:
 
 
 def _require_uint32(name: str, value: Any) -> None:
-    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+    if not _is_uint32(value):
         raise SemanticValidationError(
             SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
             f"Metadata argument {name!r} must be a non-negative integer class id.",
             details={"field": name, "expected_type": "uint32", "actual_type": type(value).__name__},
         )
+
+
+def _is_uint32(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 0xFFFFFFFF
 
 
 def _require_object_arg(name: str, value: Any) -> None:
