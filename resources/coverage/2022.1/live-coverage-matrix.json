@@ -4229,6 +4229,22 @@
       "topics": "all topics except categories superseded by wrapper-only/skipped-approved user policy",
       "waql_uri": "ak.wwise.core.object.get"
     },
+    "phase2_consolidation": {
+      "audit_resource": "wwise_waapi/api_coverage_audit.py",
+      "evidence_classes": [
+        "live_behavioral_waapi",
+        "live_behavioral_profiler",
+        "conformance_only_skip",
+        "still_deferred_with_evidence"
+      ],
+      "final_summary_resource": "resources/coverage/2022.1/phase2-coverage-summary.json",
+      "policy": "The matrix remains Phase 1/current-target inventory; final one-status-per-URI Phase 2.1 outcomes are consolidated in the generated summary resource.",
+      "task9_evidence_paths": [
+        ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-9-coverage-summary.md",
+        ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-9-no-overclaim.md"
+      ],
+      "windows_validation": "pending"
+    },
     "skipped_approved_categories": [
       "cli",
       "core.remote",

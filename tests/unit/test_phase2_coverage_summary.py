@@ -48,6 +48,7 @@ def test_phase2_summary_covers_144_reflected_apis_and_audits_statuses() -> None:
     assert result.behavioral_covered_count == 38
     assert result.live_behavioral_covered_count == 13
     assert result.status_counts == payload["summary"]["phase2_status_counts"]
+    assert sum(payload["summary"]["phase2_status_counts"].values()) == 144
     assert [entry["uri"] for entry in payload["entries"]] == sorted(
         entry["uri"] for entry in manifest["functions"] + manifest["topics"]
     )
@@ -115,12 +116,15 @@ def test_non_policy_phase1_fake_route_tested_apis_remain_accepted_and_unchanged(
 
 def test_every_phase2_transition_has_evidence_and_deferred_entries_keep_blockers() -> None:
     for entry in _summary_payload()["entries"]:
+        assert isinstance(entry["achieved_status"], str) and entry["achieved_status"], entry["uri"]
+        assert "achieved_statuses" not in entry, entry["uri"]
         assert entry["evidence_path"], entry["uri"]
         assert entry["evidence_command"], entry["uri"]
         assert entry["evidence_paths"], entry["uri"]
         assert entry["inventory_coverage"] == "reflected-schema-ok", entry["uri"]
         assert entry["windows_validation"] == "pending", entry["uri"]
         if entry["achieved_status"] == "still-deferred-with-evidence":
+            assert entry["evidence_class"] == "still_deferred_with_evidence", entry["uri"]
             assert entry["substitute_test"], entry["uri"]
             assert "not behavioral coverage" in entry["substitute_test"], entry["uri"]
             assert entry["blocking_condition"], entry["uri"]
@@ -131,6 +135,23 @@ def test_every_phase2_transition_has_evidence_and_deferred_entries_keep_blockers
             assert entry["user_approved_rationale"], entry["uri"]
             assert entry["counts_as_behavioral"] is False, entry["uri"]
             assert entry["counts_as_live_behavioral"] is False, entry["uri"]
+
+
+def test_promoted_phase21_entries_have_matching_evidence_class() -> None:
+    expected_class_by_status = {
+        "live-sandbox-tested": "live_behavioral_waapi",
+        "sandbox-mutating-tested": "live_behavioral_waapi",
+        "profiler-backed-tested": "live_behavioral_profiler",
+        "soundengine-backed-tested": "live_behavioral_waapi",
+    }
+
+    for entry in _summary_payload()["entries"]:
+        expected_class = expected_class_by_status.get(entry["achieved_status"])
+        if expected_class is None:
+            continue
+        assert entry["evidence_path"], entry["uri"]
+        assert entry["evidence_command"], entry["uri"]
+        assert entry["evidence_class"] == expected_class, entry["uri"]
 
 
 def test_truthful_promotions_and_required_blockers_are_not_overclaimed() -> None:

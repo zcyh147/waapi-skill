@@ -6,6 +6,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -36,6 +37,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -66,6 +68,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -96,6 +99,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -126,6 +130,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -156,6 +161,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -186,6 +192,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -216,6 +223,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -246,6 +254,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -276,6 +285,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -306,6 +316,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -336,6 +347,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -366,6 +378,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -396,6 +409,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -426,6 +440,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -456,6 +471,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -486,6 +502,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -516,6 +533,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -546,6 +564,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -576,6 +595,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -606,6 +626,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -636,6 +657,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -666,6 +688,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -696,6 +719,7 @@
       "category": "soundengine",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -726,6 +750,7 @@
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -756,6 +781,7 @@
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -786,6 +812,7 @@
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -816,6 +843,7 @@
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -846,6 +874,7 @@
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -876,6 +905,7 @@
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -906,6 +936,7 @@
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -936,6 +967,7 @@
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -966,6 +998,7 @@
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -996,6 +1029,7 @@
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -1026,6 +1060,7 @@
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -1056,6 +1091,7 @@
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -1086,6 +1122,7 @@
       "category": "core.audio",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": true,
+      "evidence_class": "live_behavioral_waapi",
       "evidence_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/destructive/test_soundbank_audio_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-8-audio.md",
       "evidence_paths": [
@@ -1116,6 +1153,7 @@
       "category": "core.audio",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": true,
+      "evidence_class": "live_behavioral_waapi",
       "evidence_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/destructive/test_soundbank_audio_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-8-audio.md",
       "evidence_paths": [
@@ -1146,6 +1184,7 @@
       "category": "core.audio",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": true,
+      "evidence_class": "live_behavioral_waapi",
       "evidence_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/destructive/test_soundbank_audio_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-8-audio.md",
       "evidence_paths": [
@@ -1176,6 +1215,7 @@
       "category": "core.audioSourcePeaks",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -1206,6 +1246,7 @@
       "category": "core.audioSourcePeaks",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -1236,6 +1277,7 @@
       "category": "core",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -1266,6 +1308,7 @@
       "category": "core",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -1296,6 +1339,7 @@
       "category": "core.log",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -1326,6 +1370,7 @@
       "category": "core.log",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -1356,6 +1401,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -1386,6 +1432,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -1416,6 +1463,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -1446,6 +1494,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -1476,6 +1525,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -1506,6 +1556,7 @@
       "category": "core.object",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": true,
+      "evidence_class": "live_behavioral_waapi",
       "evidence_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/destructive/test_project_mutation_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-7-object-mutation.md",
       "evidence_paths": [
@@ -1536,6 +1587,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject python -m pytest tests/live/test_object_topics_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-6-topics.md",
       "evidence_paths": [
@@ -1566,6 +1618,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -1596,6 +1649,7 @@
       "category": "core.object",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": true,
+      "evidence_class": "live_behavioral_waapi",
       "evidence_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/destructive/test_project_mutation_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-7-object-mutation.md",
       "evidence_paths": [
@@ -1626,6 +1680,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -1656,6 +1711,7 @@
       "category": "core.object",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -1694,6 +1750,7 @@
       "category": "core.object",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -1731,6 +1788,7 @@
       "category": "core.object",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -1768,6 +1826,7 @@
       "category": "core.object",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -1805,6 +1864,7 @@
       "category": "core.object",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -1842,6 +1902,7 @@
       "category": "core.object",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -1872,6 +1933,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -1902,6 +1964,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -1932,6 +1995,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -1962,6 +2026,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -1992,6 +2057,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -2022,6 +2088,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -2052,6 +2119,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject python -m pytest tests/live/test_object_topics_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-6-topics.md",
       "evidence_paths": [
@@ -2082,6 +2150,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject python -m pytest tests/live/test_object_topics_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-6-topics.md",
       "evidence_paths": [
@@ -2112,6 +2181,7 @@
       "category": "core.object",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": true,
+      "evidence_class": "live_behavioral_waapi",
       "evidence_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/destructive/test_project_mutation_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-7-object-mutation.md",
       "evidence_paths": [
@@ -2142,6 +2212,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -2172,6 +2243,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -2202,6 +2274,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -2232,6 +2305,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -2262,6 +2336,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -2292,6 +2367,7 @@
       "category": "core.object",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -2322,6 +2398,7 @@
       "category": "core.profiler.captureLog",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -2352,6 +2429,7 @@
       "category": "core.profiler",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-profiler-transport.md",
       "evidence_paths": [
@@ -2382,6 +2460,7 @@
       "category": "core.profiler",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -2412,6 +2491,7 @@
       "category": "core.profiler",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-profiler-transport.md",
       "evidence_paths": [
@@ -2442,6 +2522,7 @@
       "category": "core.profiler",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-soundengine.md",
       "evidence_paths": [
@@ -2476,6 +2557,7 @@
       "category": "core.profiler",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -2510,6 +2592,7 @@
       "category": "core.profiler",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -2544,6 +2627,7 @@
       "category": "core.profiler",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -2578,6 +2662,7 @@
       "category": "core.profiler",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -2612,6 +2697,7 @@
       "category": "core.profiler",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -2646,6 +2732,7 @@
       "category": "core.profiler",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -2680,6 +2767,7 @@
       "category": "core.profiler",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -2710,6 +2798,7 @@
       "category": "core.profiler",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-profiler-transport.md",
       "evidence_paths": [
@@ -2740,6 +2829,7 @@
       "category": "core.profiler",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-profiler-transport.md",
       "evidence_paths": [
@@ -2770,6 +2860,7 @@
       "category": "core.profiler",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-profiler-transport.md",
       "evidence_paths": [
@@ -2800,6 +2891,7 @@
       "category": "core.profiler",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-9-profiler-transport.md",
       "evidence_paths": [
@@ -3000,6 +3092,7 @@
       "category": "core.remote",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -3030,6 +3123,7 @@
       "category": "core.remote",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -3060,6 +3154,7 @@
       "category": "core.remote",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -3090,6 +3185,7 @@
       "category": "core.remote",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -3120,6 +3216,7 @@
       "category": "core.sound",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -3150,6 +3247,7 @@
       "category": "core.soundbank",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -3180,6 +3278,7 @@
       "category": "core.soundbank",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": true,
+      "evidence_class": "live_behavioral_waapi",
       "evidence_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/destructive/test_soundbank_audio_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-8-soundbank.md",
       "evidence_paths": [
@@ -3210,6 +3309,7 @@
       "category": "core.soundbank",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": true,
+      "evidence_class": "live_behavioral_waapi",
       "evidence_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/destructive/test_soundbank_audio_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-8-soundbank.md",
       "evidence_paths": [
@@ -3240,6 +3340,7 @@
       "category": "core.soundbank",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": true,
+      "evidence_class": "live_behavioral_waapi",
       "evidence_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/destructive/test_soundbank_audio_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-8-soundbank.md",
       "evidence_paths": [
@@ -3270,6 +3371,7 @@
       "category": "core.soundbank",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -3307,6 +3409,7 @@
       "category": "core.soundbank",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/destructive/test_soundbank_audio_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-8-soundbank.md",
       "evidence_paths": [
@@ -3337,6 +3440,7 @@
       "category": "core.soundbank",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": true,
+      "evidence_class": "live_behavioral_waapi",
       "evidence_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/destructive/test_soundbank_audio_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-8-soundbank.md",
       "evidence_paths": [
@@ -3367,6 +3471,7 @@
       "category": "core.switchContainer",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/destructive/test_project_mutation_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-7-undo-switch.md",
       "evidence_paths": [
@@ -3397,6 +3502,7 @@
       "category": "core.switchContainer",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -3427,6 +3533,7 @@
       "category": "core.switchContainer",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "python -m pytest tests/unit/test_no_silent_skips.py -q",
       "evidence_path": "resources/deferred/2022.1.json",
       "evidence_paths": [
@@ -3461,6 +3568,7 @@
       "category": "core.switchContainer",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -3491,6 +3599,7 @@
       "category": "core.switchContainer",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "still_deferred_with_evidence",
       "evidence_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/destructive/test_project_mutation_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-7-undo-switch.md",
       "evidence_paths": [
@@ -3627,6 +3736,7 @@
       "category": "core.transport",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -3661,6 +3771,7 @@
       "category": "core.transport",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -3759,6 +3870,7 @@
       "category": "core.undo",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": true,
+      "evidence_class": "live_behavioral_waapi",
       "evidence_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/destructive/test_project_mutation_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-7-undo-switch.md",
       "evidence_paths": [
@@ -3824,6 +3936,7 @@
       "category": "core.undo",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": true,
+      "evidence_class": "live_behavioral_waapi",
       "evidence_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/destructive/test_project_mutation_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-7-undo-switch.md",
       "evidence_paths": [
@@ -3854,6 +3967,7 @@
       "category": "core.undo",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": true,
+      "evidence_class": "live_behavioral_waapi",
       "evidence_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/destructive/test_project_mutation_sandbox.py -q",
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-7-undo-switch.md",
       "evidence_paths": [
@@ -3884,6 +3998,7 @@
       "category": "debug",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -3914,6 +4029,7 @@
       "category": "debug",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -3944,6 +4060,7 @@
       "category": "debug",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -3974,6 +4091,7 @@
       "category": "debug",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -4004,6 +4122,7 @@
       "category": "debug",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -4034,6 +4153,7 @@
       "category": "ui",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -4064,6 +4184,7 @@
       "category": "ui",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -4094,6 +4215,7 @@
       "category": "ui.commands",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -4124,6 +4246,7 @@
       "category": "ui.commands",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -4154,6 +4277,7 @@
       "category": "ui.commands",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -4184,6 +4308,7 @@
       "category": "ui.commands",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -4214,6 +4339,7 @@
       "category": "ui.commands",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -4244,6 +4370,7 @@
       "category": "ui",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -4274,6 +4401,7 @@
       "category": "ui.project",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -4304,6 +4432,7 @@
       "category": "ui.project",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -4334,6 +4463,7 @@
       "category": "ui",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
       "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
       "evidence_paths": [
@@ -4364,6 +4494,7 @@
       "category": "waapi",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -4394,6 +4525,7 @@
       "category": "waapi",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -4424,6 +4556,7 @@
       "category": "waapi",
       "counts_as_behavioral": true,
       "counts_as_live_behavioral": false,
+      "evidence_class": "",
       "evidence_command": "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q",
       "evidence_path": "resources/coverage/2022.1/api-coverage.json",
       "evidence_paths": [
@@ -4455,10 +4588,15 @@
     "generator": "wwise_waapi.phase2_coverage_summary.Phase2CoverageSummaryBuilder",
     "live_matrix_resource": "resources/coverage/2022.1/live-coverage-matrix.json",
     "status_resources": [
+      "resources/coverage/2022.1/phase21-uri-policy.json",
+      "resources/coverage/2022.1/task-4-core-object-deferred-plan.json",
+      "resources/coverage/2022.1/task-5-profiler-soundengine-evidence.json",
+      "resources/coverage/2022.1/task-6-process-definition-files-plan.json",
+      "resources/coverage/2022.1/task-7-switchcontainer-assignment-plan.json",
+      "resources/coverage/2022.1/task-8-soundbank-audio-sandbox-plan.json",
       "resources/waql/2022.1/object-get-live-matrix.json",
       "resources/coverage/2022.1/task-6-object-topic-live-plan.json",
       "resources/coverage/2022.1/task-7-project-mutation-sandbox-plan.json",
-      "resources/coverage/2022.1/task-8-soundbank-audio-sandbox-plan.json",
       "resources/coverage/2022.1/task-9-profiler-soundengine-feasibility.json",
       "resources/coverage/2022.1/wrapper-only-category-policy.json"
     ],

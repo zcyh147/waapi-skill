@@ -136,6 +136,7 @@ def test_phase2_statuses_are_exclusive() -> None:
         category="core",
         inventory_coverage="reflected-schema-ok",
         achieved_statuses=("live-smoke-tested", "still-deferred-with-evidence"),
+        evidence_class="live_behavioral_waapi",
         future_review_trigger="Review when live smoke evidence changes.",
     )
 
@@ -185,6 +186,67 @@ def test_conformance_only_phase2_status_rejects_missing_user_policy() -> None:
     assert result.invalid == (
         "Phase 2 coverage record ak.wwise.core.transport.create status 'conformance-only-skip' missing: "
         "user_approved_rationale, future_review_trigger",
+    )
+
+
+def test_live_phase2_status_requires_evidence_class() -> None:
+    manifest = {"functions": [{"uri": "ak.wwise.core.object.create"}], "topics": []}
+    status = Phase2CoverageStatusRecord(
+        uri="ak.wwise.core.object.create",
+        version="2022.1",
+        category="core.object",
+        inventory_coverage="reflected-schema-ok",
+        achieved_status="sandbox-mutating-tested",
+        evidence_path=".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-7-object-mutation.md",
+        evidence_command="python -m pytest tests/destructive/test_project_mutation_sandbox.py -q",
+    )
+
+    result = ApiCoverageAuditor().audit(manifest, DeferredRegistry(), version="2022.1", phase2_status_records=[status])
+
+    assert result.passed is False
+    assert result.invalid == (
+        "Phase 2 coverage record ak.wwise.core.object.create status 'sandbox-mutating-tested' missing: evidence_class",
+    )
+
+
+def test_still_deferred_phase2_status_requires_evidence() -> None:
+    manifest = {"functions": [{"uri": "ak.wwise.core.soundbank.processDefinitionFiles"}], "topics": []}
+    status = Phase2CoverageStatusRecord(
+        uri="ak.wwise.core.soundbank.processDefinitionFiles",
+        version="2022.1",
+        category="core.soundbank",
+        inventory_coverage="reflected-schema-ok",
+        achieved_status="still-deferred-with-evidence",
+    )
+
+    result = ApiCoverageAuditor().audit(manifest, DeferredRegistry(), version="2022.1", phase2_status_records=[status])
+
+    assert result.passed is False
+    assert result.invalid == (
+        "Phase 2 coverage record ak.wwise.core.soundbank.processDefinitionFiles status "
+        "'still-deferred-with-evidence' missing: evidence_path, evidence_command, evidence_class",
+    )
+
+
+def test_still_deferred_phase2_status_requires_review_trigger() -> None:
+    manifest = {"functions": [{"uri": "ak.wwise.core.soundbank.processDefinitionFiles"}], "topics": []}
+    status = Phase2CoverageStatusRecord(
+        uri="ak.wwise.core.soundbank.processDefinitionFiles",
+        version="2022.1",
+        category="core.soundbank",
+        inventory_coverage="reflected-schema-ok",
+        achieved_status="still-deferred-with-evidence",
+        evidence_path=".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-6-process-definition-files.md",
+        evidence_command="python -m pytest tests/destructive/test_soundbank_audio_sandbox.py -q",
+        evidence_class="still_deferred_with_evidence",
+    )
+
+    result = ApiCoverageAuditor().audit(manifest, DeferredRegistry(), version="2022.1", phase2_status_records=[status])
+
+    assert result.passed is False
+    assert result.invalid == (
+        "Phase 2 coverage record ak.wwise.core.soundbank.processDefinitionFiles status "
+        "'still-deferred-with-evidence' missing: future_review_trigger",
     )
 
 

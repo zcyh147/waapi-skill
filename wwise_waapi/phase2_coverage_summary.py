@@ -282,6 +282,7 @@ class Phase2CoverageSummaryBuilder:
             "counts_as_behavioral": achieved_status in {"fake-route-tested", "live-sandbox-tested", "sandbox-mutating-tested", "soundengine-backed-tested"},
             "counts_as_live_behavioral": achieved_status in {"live-sandbox-tested", "sandbox-mutating-tested", "soundengine-backed-tested"},
             "evidence_command": "",
+            "evidence_class": "",
             "evidence_path": "",
             "evidence_paths": [],
             "future_review_trigger": "",
@@ -314,11 +315,45 @@ class Phase2CoverageSummaryBuilder:
                 ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-6-object-read.md",
                 *([".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-5-waql-live.md"] if uri == "ak.wwise.core.object.get" else []),
             ]
-            entry.update({"evidence_command": TASK6_LIVE_COMMAND, "evidence_path": paths[0], "evidence_paths": paths})
+            entry.update(
+                {
+                    "evidence_class": "live_behavioral_waapi",
+                    "evidence_command": TASK6_LIVE_COMMAND,
+                    "evidence_path": paths[0],
+                    "evidence_paths": paths,
+                }
+            )
             return entry
         if achieved_status == "sandbox-mutating-tested":
             evidence_path, evidence_command = self._sandbox_evidence(uri)
-            entry.update({"evidence_command": evidence_command, "evidence_path": evidence_path, "evidence_paths": [evidence_path]})
+            entry.update(
+                {
+                    "evidence_class": "live_behavioral_waapi",
+                    "evidence_command": evidence_command,
+                    "evidence_path": evidence_path,
+                    "evidence_paths": [evidence_path],
+                }
+            )
+            return entry
+        if achieved_status == "profiler-backed-tested":
+            entry.update(
+                {
+                    "evidence_class": "live_behavioral_profiler",
+                    "evidence_command": TASK9_LIVE_COMMAND,
+                    "evidence_path": TASK9_PROFILER_TRANSPORT_EVIDENCE,
+                    "evidence_paths": [TASK9_PROFILER_TRANSPORT_EVIDENCE],
+                }
+            )
+            return entry
+        if achieved_status == "soundengine-backed-tested":
+            entry.update(
+                {
+                    "evidence_class": "live_behavioral_waapi",
+                    "evidence_command": TASK9_LIVE_COMMAND,
+                    "evidence_path": TASK9_SOUNDENGINE_EVIDENCE,
+                    "evidence_paths": [TASK9_SOUNDENGINE_EVIDENCE],
+                }
+            )
             return entry
         if achieved_status in {"wrapper-only", "skipped-approved"}:
             policy = category_policy(category)
@@ -380,6 +415,7 @@ class Phase2CoverageSummaryBuilder:
             {
                 "blocking_condition": blocking_condition,
                 "evidence_command": blocker.get("evidence_command", UNIT_NO_SILENT_SKIP_COMMAND),
+                "evidence_class": "still_deferred_with_evidence",
                 "evidence_path": blocker.get("evidence_path", "resources/deferred/2022.1.json"),
                 "future_review_trigger": review_trigger,
                 "review_trigger": review_trigger,
@@ -504,10 +540,15 @@ class Phase2CoverageSummaryBuilder:
             "generator": "wwise_waapi.phase2_coverage_summary.Phase2CoverageSummaryBuilder",
             "live_matrix_resource": "resources/coverage/2022.1/live-coverage-matrix.json",
             "status_resources": [
+                "resources/coverage/2022.1/phase21-uri-policy.json",
+                "resources/coverage/2022.1/task-4-core-object-deferred-plan.json",
+                "resources/coverage/2022.1/task-5-profiler-soundengine-evidence.json",
+                "resources/coverage/2022.1/task-6-process-definition-files-plan.json",
+                "resources/coverage/2022.1/task-7-switchcontainer-assignment-plan.json",
+                "resources/coverage/2022.1/task-8-soundbank-audio-sandbox-plan.json",
                 "resources/waql/2022.1/object-get-live-matrix.json",
                 "resources/coverage/2022.1/task-6-object-topic-live-plan.json",
                 "resources/coverage/2022.1/task-7-project-mutation-sandbox-plan.json",
-                "resources/coverage/2022.1/task-8-soundbank-audio-sandbox-plan.json",
                 "resources/coverage/2022.1/task-9-profiler-soundengine-feasibility.json",
                 "resources/coverage/2022.1/wrapper-only-category-policy.json",
             ],

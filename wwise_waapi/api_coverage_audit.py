@@ -30,6 +30,8 @@ PHASE21_EVIDENCE_CLASSES = frozenset(
         "still_deferred_with_evidence",
     }
 )
+STILL_DEFERRED_STATUS = "still-deferred-with-evidence"
+CONFORMANCE_ONLY_STATUS = "conformance-only-skip"
 LIVE_EVIDENCE_REQUIRED_STATUSES = frozenset(
     {
         "live-smoke-tested",
@@ -39,6 +41,7 @@ LIVE_EVIDENCE_REQUIRED_STATUSES = frozenset(
         "soundengine-backed-tested",
     }
 )
+EVIDENCE_PATH_REQUIRED_STATUSES = LIVE_EVIDENCE_REQUIRED_STATUSES | {STILL_DEFERRED_STATUS}
 LIVE_BEHAVIOR_STATUSES = frozenset(
     {
         "live-smoke-tested",
@@ -48,8 +51,6 @@ LIVE_BEHAVIOR_STATUSES = frozenset(
     }
 )
 POLICY_APPROVED_NON_BEHAVIOR_STATUSES = frozenset({"wrapper-only", "skipped-approved", "conformance-only-skip"})
-STILL_DEFERRED_STATUS = "still-deferred-with-evidence"
-CONFORMANCE_ONLY_STATUS = "conformance-only-skip"
 
 
 @dataclass(slots=True, frozen=True)
@@ -123,10 +124,10 @@ class Phase2CoverageStatusRecord:
             raise ValueError(
                 f"Phase 2 coverage record {self.uri} has invalid evidence class {self.evidence_class!r}"
             )
-        if status in LIVE_EVIDENCE_REQUIRED_STATUSES:
+        if status in EVIDENCE_PATH_REQUIRED_STATUSES:
             missing_evidence = [
                 name
-                for name in ("evidence_path", "evidence_command")
+                for name in ("evidence_path", "evidence_command", "evidence_class")
                 if not isinstance(getattr(self, name), str) or not getattr(self, name).strip()
             ]
             if missing_evidence:

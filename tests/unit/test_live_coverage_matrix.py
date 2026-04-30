@@ -125,6 +125,21 @@ def test_conformance_only_entries_have_policy_rationales_and_are_not_live_candid
         assert "lifecycle/state-transition live proof" in entry["future_review_trigger"]
 
 
+def test_matrix_points_to_final_phase21_consolidation_without_claiming_windows() -> None:
+    consolidation = _matrix_payload()["metadata"]["phase2_consolidation"]
+
+    assert consolidation["final_summary_resource"] == "resources/coverage/2022.1/phase2-coverage-summary.json"
+    assert consolidation["audit_resource"] == "wwise_waapi/api_coverage_audit.py"
+    assert consolidation["evidence_classes"] == [
+        "live_behavioral_waapi",
+        "live_behavioral_profiler",
+        "conformance_only_skip",
+        "still_deferred_with_evidence",
+    ]
+    assert consolidation["windows_validation"] == "pending"
+    assert "final one-status-per-URI" in consolidation["policy"]
+
+
 def test_user_category_policy() -> None:
     entries = _matrix_entries()
 

@@ -56,6 +56,7 @@ def test_multiple_phase2_achieved_statuses_are_rejected() -> None:
         achieved_statuses=("fake-route-tested", "live-smoke-tested"),
         evidence_path=record.evidence_path,
         evidence_command=record.evidence_command,
+        evidence_class="live_behavioral_waapi",
     )
 
     result = _audit_status(record)
@@ -82,6 +83,7 @@ def test_live_phase2_status_cannot_overlap_with_still_deferred() -> None:
         achieved_statuses=("live-sandbox-tested", "still-deferred-with-evidence"),
         evidence_path=".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/live.md",
         evidence_command="python -m pytest tests/live/test_example.py -q",
+        evidence_class="live_behavioral_waapi",
         future_review_trigger="Review when live sandbox fixture changes.",
     )
 
@@ -186,6 +188,7 @@ def _phase2_record(
     future_review_trigger: str = "Review when Phase 2 coverage policy or reflected inventory changes.",
     evidence_class: str = "",
 ) -> Phase2CoverageStatusRecord:
+    status_evidence_class = evidence_class or evidence_class_for_status(status)
     return Phase2CoverageStatusRecord(
         uri=uri,
         version="2022.1",
@@ -194,7 +197,7 @@ def _phase2_record(
         achieved_status=status,
         evidence_path=evidence_path if status_requires_evidence(status) else "",
         evidence_command=evidence_command if status_requires_evidence(status) else "",
-        evidence_class=evidence_class,
+        evidence_class=status_evidence_class,
         user_approved_rationale=user_approved_rationale
         if status in {"wrapper-only", "skipped-approved", "conformance-only-skip"}
         else "",
@@ -211,7 +214,20 @@ def status_requires_evidence(status: str) -> bool:
         "sandbox-mutating-tested",
         "profiler-backed-tested",
         "soundengine-backed-tested",
+        "still-deferred-with-evidence",
     }
+
+
+def evidence_class_for_status(status: str) -> str:
+    if status == "profiler-backed-tested":
+        return "live_behavioral_profiler"
+    if status in {"live-smoke-tested", "live-sandbox-tested", "sandbox-mutating-tested", "soundengine-backed-tested"}:
+        return "live_behavioral_waapi"
+    if status == "conformance-only-skip":
+        return "conformance_only_skip"
+    if status == "still-deferred-with-evidence":
+        return "still_deferred_with_evidence"
+    return ""
 
 
 def _category_for(uri: str) -> str:
