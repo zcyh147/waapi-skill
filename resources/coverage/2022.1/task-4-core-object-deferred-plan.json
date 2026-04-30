@@ -1,0 +1,646 @@
+{
+  "function_cases": [
+    {
+      "after_read": "object.get by id returns the new unique name and unchanged id/path parent identity",
+      "cleanup": [
+        "delete disposable ActorMixer",
+        "object.get by id returns an empty array"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object.md",
+      "id": "object_set_name_actor_mixer",
+      "mutation": {
+        "field": "name",
+        "operation": "setName"
+      },
+      "precondition": "read disposable ActorMixer id/name/type/path before rename",
+      "setup": [
+        "create disposable ActorMixer under Actor-Mixer Hierarchy Default Work Unit"
+      ],
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "sandbox-mutating-tested-or-blocked",
+      "uri": "ak.wwise.core.object.setName"
+    },
+    {
+      "after_read": "object.get by id returns the exact unique notes value",
+      "cleanup": [
+        "delete disposable ActorMixer",
+        "object.get by id returns an empty array"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object.md",
+      "id": "object_set_notes_actor_mixer",
+      "mutation": {
+        "field": "notes",
+        "operation": "setNotes"
+      },
+      "precondition": "read disposable ActorMixer id/name/type/path/notes before notes mutation",
+      "setup": [
+        "create disposable ActorMixer under Actor-Mixer Hierarchy Default Work Unit"
+      ],
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "sandbox-mutating-tested-or-blocked",
+      "uri": "ak.wwise.core.object.setNotes"
+    },
+    {
+      "after_read": "object.get by id returns the exact unique Volume value",
+      "cleanup": [
+        "delete disposable ActorMixer",
+        "object.get by id returns an empty array"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object.md",
+      "id": "object_set_property_volume_actor_mixer",
+      "mutation": {
+        "operation": "setProperty",
+        "property": "Volume"
+      },
+      "precondition": "read disposable ActorMixer id/name/type/path/Volume before property mutation",
+      "setup": [
+        "create disposable ActorMixer under Actor-Mixer Hierarchy Default Work Unit"
+      ],
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "sandbox-mutating-tested-or-blocked",
+      "uri": "ak.wwise.core.object.setProperty"
+    },
+    {
+      "after_read": "object.get by copied id returns an object under the destination parent path",
+      "cleanup": [
+        "delete copied object and disposable roots",
+        "object.get by copied/source/root ids returns an empty array for deleted objects"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object.md",
+      "id": "object_copy_actor_mixer",
+      "mutation": {
+        "onNameConflict": "rename",
+        "operation": "copy"
+      },
+      "precondition": "read source and destination parent ids/paths before copy",
+      "setup": [
+        "create disposable source ActorMixer and disposable destination parent ActorMixer"
+      ],
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "sandbox-mutating-tested-or-blocked",
+      "uri": "ak.wwise.core.object.copy"
+    },
+    {
+      "after_read": "object.get by moved id returns a path under the destination parent",
+      "cleanup": [
+        "delete moved object and disposable parents",
+        "object.get by moved/root ids returns an empty array for deleted objects"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object.md",
+      "id": "object_move_actor_mixer",
+      "mutation": {
+        "onNameConflict": "fail",
+        "operation": "move"
+      },
+      "precondition": "read source and both parent ids/paths before move",
+      "setup": [
+        "create disposable source ActorMixer and two disposable parent ActorMixers"
+      ],
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "sandbox-mutating-tested-or-blocked",
+      "uri": "ak.wwise.core.object.move"
+    },
+    {
+      "after_read": "diff response is captured and both objects still read by id after the call",
+      "cleanup": [
+        "delete both disposable objects",
+        "object.get by both ids returns an empty array"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object.md",
+      "id": "object_diff_actor_mixer_notes",
+      "mutation": {
+        "operation": "diff",
+        "side_effect": "none"
+      },
+      "precondition": "read both objects before diff and confirm distinct notes state",
+      "setup": [
+        "create two disposable ActorMixers and set Notes on one of them"
+      ],
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "sandbox-mutating-tested-or-blocked",
+      "uri": "ak.wwise.core.object.diff"
+    },
+    {
+      "after_read": "target object readback shows source Notes copied when Wwise accepts the property inclusion",
+      "cleanup": [
+        "delete source and target disposable objects",
+        "object.get by both ids returns an empty array"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object.md",
+      "id": "object_paste_properties_notes",
+      "mutation": {
+        "inclusion": [
+          "Notes"
+        ],
+        "operation": "pasteProperties"
+      },
+      "precondition": "read source and target notes before pasteProperties",
+      "setup": [
+        "create source and target disposable ActorMixers with distinct Notes"
+      ],
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "sandbox-mutating-tested-or-blocked",
+      "uri": "ak.wwise.core.object.pasteProperties"
+    },
+    {
+      "after_read": "blocked: no generic object.get reference return field is established for source/restore proof",
+      "blocker": "No deterministic SampleProject reference fixture is proven for setReference with WAAPI-readable old/new reference readback and restore proof.",
+      "cleanup": [
+        "do not attempt without exact restore proof"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object.md",
+      "id": "object_set_reference_output_bus",
+      "mutation": {
+        "operation": "setReference",
+        "reference": "OutputBus"
+      },
+      "precondition": "blocked until a reflected schema-safe reference name and target object pair is proven on the SampleProject fixture",
+      "setup": [
+        "would require a disposable object class/reference pair and safe original reference readback"
+      ],
+      "source_immutability_proof": "source project not mutated because the case is not attempted; exact blocker recorded instead of promotion",
+      "status": "still-deferred-with-evidence",
+      "uri": "ak.wwise.core.object.setReference"
+    },
+    {
+      "after_read": "blocked: object.get property readback does not expose randomizer min/max/enabled proof in the current local contract",
+      "blocker": "No WAAPI-readable randomizer readback field is established for min/max/enabled postconditions on the local 2022.1 fixture.",
+      "cleanup": [
+        "do not attempt without exact restore or delete proof for the randomized state"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object.md",
+      "id": "object_set_randomizer_volume",
+      "mutation": {
+        "operation": "setRandomizer",
+        "property": "Volume"
+      },
+      "precondition": "blocked until a WAAPI-readable randomizer after-read field is identified",
+      "setup": [
+        "would require randomizer readback for min/max/enabled on a disposable object property"
+      ],
+      "source_immutability_proof": "source project not mutated because the case is not attempted; exact blocker recorded instead of promotion",
+      "status": "still-deferred-with-evidence",
+      "uri": "ak.wwise.core.object.setRandomizer"
+    },
+    {
+      "after_read": "blocked: no guaranteed attenuation object exists in the committed SampleProject sandbox",
+      "blocker": "Task 6 object read plan allows documented-empty attenuation lookup; without a guaranteed Attenuation object, setAttenuationCurve cannot prove reversible WAAPI-readable postconditions.",
+      "cleanup": [
+        "do not attempt without exact curve restore proof"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object.md",
+      "id": "object_set_attenuation_curve",
+      "mutation": {
+        "curveType": "VolumeDryUsage",
+        "operation": "setAttenuationCurve"
+      },
+      "precondition": "blocked when no disposable attenuation fixture and baseline getAttenuationCurve restore proof are available",
+      "setup": [
+        "would require a disposable or restorable Attenuation object with baseline curve readback"
+      ],
+      "source_immutability_proof": "source project not mutated because the case is not attempted; exact blocker recorded instead of promotion",
+      "status": "still-deferred-with-evidence",
+      "uri": "ak.wwise.core.object.setAttenuationCurve"
+    }
+  ],
+  "metadata": {
+    "destructive_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=tests/_org/2022.1/SampleProject.wproj python -m pytest tests/destructive/test_object_deferred_sandbox.py -q",
+    "evidence_paths": [
+      ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object.md",
+      ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object-topics.md"
+    ],
+    "promotion_policy": "Do not promote a URI from timed waits or no-exception results; require WAAPI-readable postconditions, payload identity, cleanup proof, and source immutability proof.",
+    "source_policy": "Use tests/_org/2022.1/SampleProject.wproj as immutable source and copy to sandbox before mutation.",
+    "task": "4. Reopen core.object WAAPI-readable mutations and topics",
+    "temporary_name_prefix": "WAAPI_TASK4_OBJECT_",
+    "unit_command": "python -m pytest tests/unit/test_core_object_deferred_plan.py -q",
+    "version": "2022.1"
+  },
+  "topic_cases": [
+    {
+      "assertions": [
+        "object id/path matches created object"
+      ],
+      "bounded_wait_seconds": 5.0,
+      "cleanup": [
+        "delete disposable object hierarchy if still present",
+        "object.get by tracked ids proves cleanup",
+        "sandbox copy deleted on success"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object-topics.md",
+      "id": "object_created_by_create",
+      "payload_identity_requirements": {
+        "match_object_id_or_path": true,
+        "old_new_required_when_applicable": false,
+        "required_return_fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "topic_specific_fields": [
+          "id",
+          "name",
+          "path",
+          "type"
+        ]
+      },
+      "publisher": "create disposable ActorMixer",
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "sandbox-topic-tested-or-blocked",
+      "subscribe_before_mutation": true,
+      "unsubscribe_assertion": "subscription handle is unsubscribed and active topic set is empty after event or blocker",
+      "uri": "ak.wwise.core.object.created"
+    },
+    {
+      "assertions": [
+        "payload identifies child id/path and parent when Wwise returns it"
+      ],
+      "bounded_wait_seconds": 5.0,
+      "cleanup": [
+        "delete disposable object hierarchy if still present",
+        "object.get by tracked ids proves cleanup",
+        "sandbox copy deleted on success"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object-topics.md",
+      "id": "object_child_added_by_create_child",
+      "payload_identity_requirements": {
+        "match_object_id_or_path": true,
+        "old_new_required_when_applicable": false,
+        "required_return_fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "topic_specific_fields": [
+          "id",
+          "parent",
+          "path",
+          "type"
+        ]
+      },
+      "publisher": "create disposable child ActorMixer under disposable parent",
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "sandbox-topic-tested-or-blocked",
+      "subscribe_before_mutation": true,
+      "unsubscribe_assertion": "subscription handle is unsubscribed and active topic set is empty after event or blocker",
+      "uri": "ak.wwise.core.object.childAdded"
+    },
+    {
+      "assertions": [
+        "payload identifies removed child id/path and parent when Wwise returns it"
+      ],
+      "bounded_wait_seconds": 5.0,
+      "cleanup": [
+        "delete disposable object hierarchy if still present",
+        "object.get by tracked ids proves cleanup",
+        "sandbox copy deleted on success"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object-topics.md",
+      "id": "object_child_removed_by_delete_child",
+      "payload_identity_requirements": {
+        "match_object_id_or_path": true,
+        "old_new_required_when_applicable": false,
+        "required_return_fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "topic_specific_fields": [
+          "id",
+          "parent",
+          "path",
+          "type"
+        ]
+      },
+      "publisher": "delete disposable child ActorMixer under disposable parent",
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "sandbox-topic-tested-or-blocked",
+      "subscribe_before_mutation": true,
+      "unsubscribe_assertion": "subscription handle is unsubscribed and active topic set is empty after event or blocker",
+      "uri": "ak.wwise.core.object.childRemoved"
+    },
+    {
+      "assertions": [
+        "payload identifies object before deletion"
+      ],
+      "bounded_wait_seconds": 5.0,
+      "cleanup": [
+        "delete disposable object hierarchy if still present",
+        "object.get by tracked ids proves cleanup",
+        "sandbox copy deleted on success"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object-topics.md",
+      "id": "object_pre_deleted_by_delete",
+      "payload_identity_requirements": {
+        "match_object_id_or_path": true,
+        "old_new_required_when_applicable": false,
+        "required_return_fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "topic_specific_fields": [
+          "id",
+          "path",
+          "type"
+        ]
+      },
+      "publisher": "delete disposable ActorMixer",
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "sandbox-topic-tested-or-blocked",
+      "subscribe_before_mutation": true,
+      "unsubscribe_assertion": "subscription handle is unsubscribed and active topic set is empty after event or blocker",
+      "uri": "ak.wwise.core.object.preDeleted"
+    },
+    {
+      "assertions": [
+        "payload identifies object after deletion"
+      ],
+      "bounded_wait_seconds": 5.0,
+      "cleanup": [
+        "delete disposable object hierarchy if still present",
+        "object.get by tracked ids proves cleanup",
+        "sandbox copy deleted on success"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object-topics.md",
+      "id": "object_post_deleted_by_delete",
+      "payload_identity_requirements": {
+        "match_object_id_or_path": true,
+        "old_new_required_when_applicable": false,
+        "required_return_fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "topic_specific_fields": [
+          "id",
+          "path",
+          "type"
+        ]
+      },
+      "publisher": "delete disposable ActorMixer",
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "sandbox-topic-tested-or-blocked",
+      "subscribe_before_mutation": true,
+      "unsubscribe_assertion": "subscription handle is unsubscribed and active topic set is empty after event or blocker",
+      "uri": "ak.wwise.core.object.postDeleted"
+    },
+    {
+      "assertions": [
+        "payload identifies object id/path and old/new name when Wwise returns them"
+      ],
+      "bounded_wait_seconds": 5.0,
+      "cleanup": [
+        "delete disposable object hierarchy if still present",
+        "object.get by tracked ids proves cleanup",
+        "sandbox copy deleted on success"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object-topics.md",
+      "id": "object_name_changed_by_set_name",
+      "payload_identity_requirements": {
+        "match_object_id_or_path": true,
+        "old_new_required_when_applicable": true,
+        "required_return_fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "topic_specific_fields": [
+          "id",
+          "path",
+          "name"
+        ]
+      },
+      "publisher": "rename disposable ActorMixer",
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "sandbox-topic-tested-or-blocked",
+      "subscribe_before_mutation": true,
+      "unsubscribe_assertion": "subscription handle is unsubscribed and active topic set is empty after event or blocker",
+      "uri": "ak.wwise.core.object.nameChanged"
+    },
+    {
+      "assertions": [
+        "payload identifies object id/path and old/new notes when Wwise returns them"
+      ],
+      "bounded_wait_seconds": 5.0,
+      "cleanup": [
+        "delete disposable object hierarchy if still present",
+        "object.get by tracked ids proves cleanup",
+        "sandbox copy deleted on success"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object-topics.md",
+      "id": "object_notes_changed_by_set_notes",
+      "payload_identity_requirements": {
+        "match_object_id_or_path": true,
+        "old_new_required_when_applicable": true,
+        "required_return_fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "topic_specific_fields": [
+          "id",
+          "path",
+          "notes"
+        ]
+      },
+      "publisher": "set Notes on disposable ActorMixer",
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "sandbox-topic-tested-or-blocked",
+      "subscribe_before_mutation": true,
+      "unsubscribe_assertion": "subscription handle is unsubscribed and active topic set is empty after event or blocker",
+      "uri": "ak.wwise.core.object.notesChanged"
+    },
+    {
+      "assertions": [
+        "payload identifies object id/path plus Volume old/new value"
+      ],
+      "bounded_wait_seconds": 5.0,
+      "cleanup": [
+        "delete disposable object hierarchy if still present",
+        "object.get by tracked ids proves cleanup",
+        "sandbox copy deleted on success"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object-topics.md",
+      "id": "object_property_changed_by_volume",
+      "payload_identity_requirements": {
+        "match_object_id_or_path": true,
+        "old_new_required_when_applicable": true,
+        "required_return_fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "topic_specific_fields": [
+          "id",
+          "path",
+          "property",
+          "old",
+          "new"
+        ]
+      },
+      "publisher": "set Volume on disposable ActorMixer",
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "sandbox-topic-tested-or-blocked",
+      "subscribe_before_mutation": true,
+      "unsubscribe_assertion": "subscription handle is unsubscribed and active topic set is empty after event or blocker",
+      "uri": "ak.wwise.core.object.propertyChanged"
+    },
+    {
+      "assertions": [
+        "blocked until a safe reference fixture/readback exists"
+      ],
+      "blocker": "No deterministic setReference fixture exists with old/new reference readback and restore proof.",
+      "bounded_wait_seconds": 5.0,
+      "cleanup": [
+        "delete disposable object hierarchy if still present",
+        "object.get by tracked ids proves cleanup",
+        "sandbox copy deleted on success"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object-topics.md",
+      "id": "object_reference_changed_blocked",
+      "payload_identity_requirements": {
+        "match_object_id_or_path": true,
+        "old_new_required_when_applicable": true,
+        "required_return_fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "topic_specific_fields": [
+          "id",
+          "path",
+          "reference",
+          "old",
+          "new"
+        ]
+      },
+      "publisher": "would set and restore a reference",
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "still-deferred-with-evidence",
+      "subscribe_before_mutation": true,
+      "unsubscribe_assertion": "subscription handle is unsubscribed and active topic set is empty after event or blocker",
+      "uri": "ak.wwise.core.object.referenceChanged"
+    },
+    {
+      "assertions": [
+        "blocked until an Attenuation fixture exists"
+      ],
+      "blocker": "No guaranteed Attenuation object exists in the committed SampleProject sandbox for reversible curve mutation.",
+      "bounded_wait_seconds": 5.0,
+      "cleanup": [
+        "delete disposable object hierarchy if still present",
+        "object.get by tracked ids proves cleanup",
+        "sandbox copy deleted on success"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object-topics.md",
+      "id": "object_attenuation_curve_changed_blocked",
+      "payload_identity_requirements": {
+        "match_object_id_or_path": true,
+        "old_new_required_when_applicable": true,
+        "required_return_fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "topic_specific_fields": [
+          "id",
+          "path",
+          "curveType",
+          "old",
+          "new"
+        ]
+      },
+      "publisher": "would set and restore an attenuation curve",
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "still-deferred-with-evidence",
+      "subscribe_before_mutation": true,
+      "unsubscribe_assertion": "subscription handle is unsubscribed and active topic set is empty after event or blocker",
+      "uri": "ak.wwise.core.object.attenuationCurveChanged"
+    },
+    {
+      "assertions": [
+        "blocked until link-state readback/restore exists"
+      ],
+      "blocker": "No curve-link readback/restore contract is established for the local 2022.1 fixture.",
+      "bounded_wait_seconds": 5.0,
+      "cleanup": [
+        "delete disposable object hierarchy if still present",
+        "object.get by tracked ids proves cleanup",
+        "sandbox copy deleted on success"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object-topics.md",
+      "id": "object_attenuation_curve_link_changed_blocked",
+      "payload_identity_requirements": {
+        "match_object_id_or_path": true,
+        "old_new_required_when_applicable": true,
+        "required_return_fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "topic_specific_fields": [
+          "id",
+          "path",
+          "curveType",
+          "old",
+          "new"
+        ]
+      },
+      "publisher": "would toggle attenuation curve link state",
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "still-deferred-with-evidence",
+      "subscribe_before_mutation": true,
+      "unsubscribe_assertion": "subscription handle is unsubscribed and active topic set is empty after event or blocker",
+      "uri": "ak.wwise.core.object.attenuationCurveLinkChanged"
+    },
+    {
+      "assertions": [
+        "blocked until a curve-bearing disposable fixture exists"
+      ],
+      "blocker": "No generic curve-bearing disposable object fixture is established with old/new curve payload identity.",
+      "bounded_wait_seconds": 5.0,
+      "cleanup": [
+        "delete disposable object hierarchy if still present",
+        "object.get by tracked ids proves cleanup",
+        "sandbox copy deleted on success"
+      ],
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-4-core-object-topics.md",
+      "id": "object_curve_changed_blocked",
+      "payload_identity_requirements": {
+        "match_object_id_or_path": true,
+        "old_new_required_when_applicable": true,
+        "required_return_fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "topic_specific_fields": [
+          "id",
+          "path",
+          "curveType",
+          "old",
+          "new"
+        ]
+      },
+      "publisher": "would mutate a custom curve with restore proof",
+      "source_immutability_proof": "source .wproj mtime and source *.wproj/*.wwu hash unchanged",
+      "status": "still-deferred-with-evidence",
+      "subscribe_before_mutation": true,
+      "unsubscribe_assertion": "subscription handle is unsubscribed and active topic set is empty after event or blocker",
+      "uri": "ak.wwise.core.object.curveChanged"
+    }
+  ]
+}
