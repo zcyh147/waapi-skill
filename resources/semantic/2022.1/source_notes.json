@@ -1,0 +1,319 @@
+{
+  "version": "2022.1",
+  "notebook_id": "wwise-2022.1-docs",
+  "protocol": "references/semantic-builder-protocol.md",
+  "notes": {
+    "query": {
+      "family": "query",
+      "status": "grounded",
+      "notebook_id": "wwise-2022.1-docs",
+      "version_target": "2022.1",
+      "gate_evidence_path": "references/semantic-builder-notebooklm-gate.md",
+      "official_urls": [
+        "https://www.audiokinetic.com/library/2025.1.3_9037/?id=waql_reference.html",
+        "https://www.audiokinetic.com/en/library/edge/?id=ak_wwise_core_object_get.html"
+      ],
+      "source_urls": [
+        "references/notebooklm-workflow.md",
+        "references/waql-2022.1.md",
+        "NotebookLM notebook wwise-2022.1-docs; cited answer for WAQL and ak.wwise.core.object.get"
+      ],
+      "endpoints": [
+        "ak.wwise.core.object.get"
+      ],
+      "required_fields": [
+        "ak.wwise.core.object.get: waql or legacy query expression"
+      ],
+      "optional_fields": [
+        "options.return",
+        "options.platform",
+        "options.language"
+      ],
+      "return_shape": "Object with a return array; each returned object contains key-value pairs requested by options.return, defaulting to id and name when no return list is supplied.",
+      "destructive_behavior": "Read-only. Query builders must not mutate Wwise state or dispatch automatically.",
+      "ambiguity_constraints": "Return fields that do not apply to a matched object can be omitted by Wwise; legacy JSON queries have poorer error handling than WAQL and should not be preferred.",
+      "unsupported_cases": "Profiler, transport, soundengine, UI, CLI, remote, debug, and mutating WAQL-like operations are outside this family.",
+      "cited_required_fields": [
+        "ak.wwise.core.object.get: waql or legacy query expression"
+      ]
+    },
+    "object-mutation": {
+      "family": "object-mutation",
+      "status": "grounded",
+      "notebook_id": "wwise-2022.1-docs",
+      "version_target": "2022.1",
+      "gate_evidence_path": "references/semantic-builder-notebooklm-gate.md",
+      "official_urls": [
+        "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_object_set.html",
+        "https://www.audiokinetic.com/en/public-library/2024.1.4_8780/?id=ak_wwise_core_object_create_example_creating_a_random_container_with_two_sound_objects.html"
+      ],
+      "source_urls": [
+        "resources/manifest/2022.1/schemas.json",
+        "NotebookLM notebook wwise-2022.1-docs; cited answer for object mutation and undo endpoints"
+      ],
+      "endpoints": [
+        "ak.wwise.core.object.create",
+        "ak.wwise.core.object.set",
+        "ak.wwise.core.object.delete",
+        "ak.wwise.core.object.copy",
+        "ak.wwise.core.object.move",
+        "ak.wwise.core.object.diff",
+        "ak.wwise.core.object.pasteProperties",
+        "ak.wwise.core.undo.beginGroup",
+        "ak.wwise.core.undo.endGroup",
+        "ak.wwise.core.undo.undo"
+      ],
+      "required_fields": [
+        "ak.wwise.core.object.create: parent, type, name",
+        "ak.wwise.core.object.set: objects array",
+        "ak.wwise.core.object.set: object identifier by id, name, or path",
+        "ak.wwise.core.object.delete: object",
+        "ak.wwise.core.object.copy: object, parent",
+        "ak.wwise.core.object.move: object, parent",
+        "ak.wwise.core.object.diff: object, other",
+        "ak.wwise.core.object.pasteProperties: source, target",
+        "ak.wwise.core.undo.beginGroup: displayName",
+        "ak.wwise.core.undo.endGroup: no required fields",
+        "ak.wwise.core.undo.undo: no required fields"
+      ],
+      "optional_fields": [
+        "platform",
+        "onNameConflict",
+        "listMode",
+        "autoAddToSourceControl",
+        "properties and references expressed with @ fields",
+        "options.return"
+      ],
+      "return_shape": "Object containing an objects array for modified or created objects, with fields controlled by options.return.",
+      "destructive_behavior": "Mutating. onNameConflict=replace deletes the matched object and children before creation; listMode=replaceAll clears existing list items.",
+      "ambiguity_constraints": "Name identifiers must be globally unique and use type:name or Global:shortId where string identity would otherwise be ambiguous.",
+      "unsupported_cases": "Do not create Query objects or Source, Effect, or Metadata plug-ins here; do not populate Metadata, Clips, Sequences, or Stingers lists; do not rely on WAAPI creation order for constrained references.",
+      "cited_required_fields": [
+        "ak.wwise.core.object.create: parent, type, name",
+        "ak.wwise.core.object.set: objects array",
+        "ak.wwise.core.object.set: object identifier by id, name, or path",
+        "ak.wwise.core.object.delete: object",
+        "ak.wwise.core.object.copy: object, parent",
+        "ak.wwise.core.object.move: object, parent",
+        "ak.wwise.core.object.diff: object, other",
+        "ak.wwise.core.object.pasteProperties: source, target",
+        "ak.wwise.core.undo.beginGroup: displayName",
+        "ak.wwise.core.undo.endGroup: no required fields",
+        "ak.wwise.core.undo.undo: no required fields"
+      ]
+    },
+    "property-reference": {
+      "family": "property-reference",
+      "status": "grounded",
+      "notebook_id": "wwise-2022.1-docs",
+      "version_target": "2022.1",
+      "gate_evidence_path": "references/semantic-builder-notebooklm-gate.md",
+      "official_urls": [
+        "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_object_setproperty.html",
+        "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_object_setreference.html",
+        "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_object_setrandomizer.html",
+        "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_object_setattenuationcurve.html",
+        "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_object_getpropertyinfo.html"
+      ],
+      "source_urls": [
+        "resources/manifest/2022.1/schemas.json",
+        "NotebookLM notebook wwise-2022.1-docs; cited answer for property/reference endpoints"
+      ],
+      "endpoints": [
+        "ak.wwise.core.object.getTypes",
+        "ak.wwise.core.object.getPropertyAndReferenceNames",
+        "ak.wwise.core.object.getPropertyInfo",
+        "ak.wwise.core.object.isPropertyEnabled",
+        "ak.wwise.core.object.getAttenuationCurve",
+        "ak.wwise.core.object.setName",
+        "ak.wwise.core.object.setNotes",
+        "ak.wwise.core.object.setProperty",
+        "ak.wwise.core.object.setReference",
+        "ak.wwise.core.object.setRandomizer",
+        "ak.wwise.core.object.setAttenuationCurve"
+      ],
+      "required_fields": [
+        "ak.wwise.core.object.getTypes: no required fields",
+        "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+        "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+        "ak.wwise.core.object.isPropertyEnabled: object, property",
+        "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+        "ak.wwise.core.object.setName: object, value",
+        "ak.wwise.core.object.setNotes: object, value",
+        "ak.wwise.core.object.setProperty: object, property, value",
+        "ak.wwise.core.object.setReference: object, reference, value",
+        "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+        "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+      ],
+      "optional_fields": [
+        "platform for setting commands",
+        "setRandomizer may include enabled, min, and max together"
+      ],
+      "return_shape": "Metadata getters return object type/property/reference/curve metadata; setName, setNotes, setProperty, setReference, setRandomizer, and setAttenuationCurve return empty JSON objects; getPropertyInfo returns property metadata such as type, default, supports, display, dependencies, restrictions, and UI metadata.",
+      "destructive_behavior": "Mutating setters overwrite properties, references, randomizers, or attenuation curves. getPropertyInfo is read-only.",
+      "ambiguity_constraints": "Object names must use type:name or Global:shortId when strings are used; getPropertyInfo requires exactly one identity scope, object or classId.",
+      "unsupported_cases": "getPropertyInfo does not read the current property value; use ak.wwise.core.object.get for value readback instead.",
+      "cited_required_fields": [
+        "ak.wwise.core.object.getTypes: no required fields",
+        "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+        "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+        "ak.wwise.core.object.isPropertyEnabled: object, property",
+        "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+        "ak.wwise.core.object.setName: object, value",
+        "ak.wwise.core.object.setNotes: object, value",
+        "ak.wwise.core.object.setProperty: object, property, value",
+        "ak.wwise.core.object.setReference: object, reference, value",
+        "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+        "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+      ]
+    },
+    "import": {
+      "family": "import",
+      "status": "grounded",
+      "notebook_id": "wwise-2022.1-docs",
+      "version_target": "2022.1",
+      "gate_evidence_path": "references/semantic-builder-notebooklm-gate.md",
+      "official_urls": [
+        "https://www.audiokinetic.com/en/public-library/2024.1.4_8780/?id=ak_wwise_core_audio_import.html",
+        "https://www.audiokinetic.com/library/edge/?source=Help&id=importing_media_files_from_tab_delimited_text_file"
+      ],
+      "source_urls": [
+        "resources/manifest/2022.1/schemas.json",
+        "NotebookLM notebook wwise-2022.1-docs; cited answer for audio import endpoints"
+      ],
+      "endpoints": [
+        "ak.wwise.core.audio.import",
+        "ak.wwise.core.audio.importTabDelimited",
+        "ak.wwise.core.audio.imported"
+      ],
+      "required_fields": [
+        "ak.wwise.core.audio.import: imports array",
+        "ak.wwise.core.audio.import: each import item objectPath",
+        "ak.wwise.core.audio.importTabDelimited: importLocation, importLanguage, importOperation, importFile",
+        "ak.wwise.core.audio.imported: topic payload only"
+      ],
+      "optional_fields": [
+        "importOperation",
+        "default",
+        "autoAddToSourceControl",
+        "options.return",
+        "options.platform",
+        "options.language",
+        "per-import audioFile, audioFileBase64, objectType, notes, @PropertyName"
+      ],
+      "return_shape": "Object with an objects array describing created or replaced objects according to options.return.",
+      "destructive_behavior": "Mutating. replaceExisting permanently destroys existing objects with the same name before import replacement.",
+      "ambiguity_constraints": "String object names must use type:name or Global:shortId; missing absolute media paths fail import; constrained references should not rely on sequential resolution during import.",
+      "unsupported_cases": "Do not use this family for profiler, transport, soundengine, UI, CLI, remote, or debug APIs; do not set Switch Container state constraints through import builders.",
+      "cited_required_fields": [
+        "ak.wwise.core.audio.import: imports array",
+        "ak.wwise.core.audio.import: each import item objectPath",
+        "ak.wwise.core.audio.importTabDelimited: importLocation, importLanguage, importOperation, importFile",
+        "ak.wwise.core.audio.imported: topic payload only"
+      ]
+    },
+    "soundbank": {
+      "family": "soundbank",
+      "status": "grounded",
+      "notebook_id": "wwise-2022.1-docs",
+      "version_target": "2022.1",
+      "gate_evidence_path": "references/semantic-builder-notebooklm-gate.md",
+      "official_urls": [
+        "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_soundbank_generate.html",
+        "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_soundbank_setinclusions.html",
+        "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_soundbank_processdefinitionfiles.html",
+        "https://www.audiokinetic.com/en/public-library/2025.1.5_9095/?id=ak_wwise_core_soundbank_setinclusions_example_adding_an_object_to_the_inclusion_list.html"
+      ],
+      "source_urls": [
+        "resources/manifest/2022.1/schemas.json",
+        "NotebookLM notebook wwise-2022.1-docs; cited answer for SoundBank endpoints"
+      ],
+      "endpoints": [
+        "ak.wwise.core.soundbank.getInclusions",
+        "ak.wwise.core.soundbank.setInclusions",
+        "ak.wwise.core.soundbank.generate",
+        "ak.wwise.core.soundbank.convertExternalSources",
+        "ak.wwise.core.soundbank.processDefinitionFiles",
+        "ak.wwise.core.soundbank.generated",
+        "ak.wwise.core.soundbank.generationDone"
+      ],
+      "required_fields": [
+        "ak.wwise.core.soundbank.getInclusions: soundbank",
+        "ak.wwise.core.soundbank.setInclusions: soundbank, operation, inclusions",
+        "ak.wwise.core.soundbank.generate: no required fields unless soundbanks entries are supplied",
+        "ak.wwise.core.soundbank.convertExternalSources: no required fields",
+        "ak.wwise.core.soundbank.processDefinitionFiles: files array",
+        "ak.wwise.core.soundbank.generated: topic payload only",
+        "ak.wwise.core.soundbank.generationDone: topic payload only"
+      ],
+      "optional_fields": [
+        "generate soundbanks with name, events, auxBusses, inclusions, rebuild",
+        "platforms",
+        "languages",
+        "skipLanguages",
+        "rebuildSoundBanks",
+        "clearAudioFileCache",
+        "writeToDisk",
+        "rebuildInitBank"
+      ],
+      "return_shape": "getInclusions returns inclusion records; generate returns a logs array; setInclusions and convertExternalSources return empty JSON objects; processDefinitionFiles reports generation through WAAPI log output; generated and generationDone are topic payloads.",
+      "destructive_behavior": "Mutating. clearAudioFileCache deletes the audio file cache for all platforms; setInclusions operation=replace clears existing SoundBank inclusions.",
+      "ambiguity_constraints": "String object references must use type:name or Global:shortId; generationDone is not sufficient proof that generation fully completed.",
+      "unsupported_cases": "Do not include profiler, transport, soundengine, UI, CLI, remote, or debug APIs; do not treat generationDone as a completion gate.",
+      "cited_required_fields": [
+        "ak.wwise.core.soundbank.getInclusions: soundbank",
+        "ak.wwise.core.soundbank.setInclusions: soundbank, operation, inclusions",
+        "ak.wwise.core.soundbank.generate: no required fields unless soundbanks entries are supplied",
+        "ak.wwise.core.soundbank.convertExternalSources: no required fields",
+        "ak.wwise.core.soundbank.processDefinitionFiles: files array",
+        "ak.wwise.core.soundbank.generated: topic payload only",
+        "ak.wwise.core.soundbank.generationDone: topic payload only"
+      ]
+    },
+    "switchcontainer": {
+      "family": "switchcontainer",
+      "status": "grounded",
+      "notebook_id": "wwise-2022.1-docs",
+      "version_target": "2022.1",
+      "gate_evidence_path": "references/semantic-builder-notebooklm-gate.md",
+      "official_urls": [
+        "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_switchcontainer_addassignment.html",
+        "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_switchcontainer_getassignments.html",
+        "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_switchcontainer_removeassignment.html",
+        "https://www.audiokinetic.com/en/public-library/2024.1.0_8669/?id=ak_wwise_core_switchcontainer_getassignments_example_getting_the_assignments_of_a_switch_container.html"
+      ],
+      "source_urls": [
+        "resources/manifest/2022.1/schemas.json",
+        "NotebookLM notebook wwise-2022.1-docs; cited answer for Switch Container assignment endpoints"
+      ],
+      "endpoints": [
+        "ak.wwise.core.switchContainer.getAssignments",
+        "ak.wwise.core.switchContainer.addAssignment",
+        "ak.wwise.core.switchContainer.removeAssignment",
+        "ak.wwise.core.switchContainer.assignmentAdded",
+        "ak.wwise.core.switchContainer.assignmentRemoved"
+      ],
+      "required_fields": [
+        "ak.wwise.core.switchContainer.addAssignment: child, stateOrSwitch",
+        "ak.wwise.core.switchContainer.getAssignments: id",
+        "ak.wwise.core.switchContainer.removeAssignment: child, stateOrSwitch",
+        "ak.wwise.core.switchContainer.assignmentAdded: topic payload only",
+        "ak.wwise.core.switchContainer.assignmentRemoved: topic payload only"
+      ],
+      "optional_fields": [
+        "options.return"
+      ],
+      "return_shape": "addAssignment and removeAssignment return empty JSON objects; getAssignments returns a return array of child and stateOrSwitch assignment pairs; assignmentAdded and assignmentRemoved are topic payloads.",
+      "destructive_behavior": "Mutating for addAssignment/removeAssignment. removeAssignment deletes the mapping between the child and the state or switch.",
+      "ambiguity_constraints": "String identifiers must use type:name or Global:shortId; the state or switch must belong to the group currently bound to the Switch Container.",
+      "unsupported_cases": "No profiler, transport, soundengine, UI, CLI, remote, or debug APIs are part of this family.",
+      "cited_required_fields": [
+        "ak.wwise.core.switchContainer.addAssignment: child, stateOrSwitch",
+        "ak.wwise.core.switchContainer.getAssignments: id",
+        "ak.wwise.core.switchContainer.removeAssignment: child, stateOrSwitch",
+        "ak.wwise.core.switchContainer.assignmentAdded: topic payload only",
+        "ak.wwise.core.switchContainer.assignmentRemoved: topic payload only"
+      ]
+    }
+  }
+}
