@@ -16,6 +16,12 @@ REQUIRED_CATEGORIES = {
     "destructive-call refusal",
     "missing Wwise diagnostic",
     "deferred API explanation",
+    "semantic builder WAQL query",
+    "semantic builder object create dry-run",
+    "semantic builder setProperty fail-closed",
+    "semantic builder audio import dry-run",
+    "semantic builder SoundBank guarded preview",
+    "semantic builder SwitchContainer preflight",
 }
 FORBIDDEN_LOCAL_MARKERS = (
     "/Users/",
@@ -82,6 +88,26 @@ def test_eval_metadata_covers_safety_and_gating_requirements() -> None:
     assert _entry_mentions(deferred, "behavioral coverage")
     assert _entry_mentions(deferred, "deferred")
 
+
+
+def test_eval_metadata_covers_semantic_builder_safety_examples() -> None:
+    by_id = {entry["id"]: entry for entry in _eval_payload()["evals"]}
+
+    expected = {
+        "semantic-builder-waql-query-preview": ("build_object_get_query", "SemanticPreview"),
+        "semantic-builder-object-create-dry-run": ("ObjectMutationBuilder", "requires_destructive_gate"),
+        "semantic-builder-setproperty-fail-closed": ("PropertyReferenceBuilder", "fail closed"),
+        "semantic-builder-audio-import-dry-run": ("ImportBuilder", "requires_destructive_gate"),
+        "semantic-builder-soundbank-guarded-preview": ("SoundBankBuilder", "generationDone"),
+        "semantic-builder-switchcontainer-preflight": ("SwitchContainerAssignmentBuilder", "existing_assignments"),
+    }
+    for eval_id, terms in expected.items():
+        assert eval_id in by_id
+        for term in terms:
+            assert _entry_mentions(by_id[eval_id], term)
+        prompt_and_expected = f"{by_id[eval_id]['prompt']} {by_id[eval_id]['expected_output']}"
+        assert "executed in Wwise" not in prompt_and_expected
+        assert "created Wwise objects" not in prompt_and_expected
 
 def test_review_workflow_documents_generate_review_static_fallback_and_pytest() -> None:
     text = REVIEW_WORKFLOW.read_text(encoding="utf-8")

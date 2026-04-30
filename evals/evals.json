@@ -259,6 +259,259 @@
           ]
         }
       ]
+    },
+    {
+      "id": "semantic-builder-waql-query-preview",
+      "category": "semantic builder WAQL query",
+      "prompt": "Show a safe semantic builder preview for finding Sound objects with negative direct Volume. Return id, name, path, type, and @Volume without claiming Wwise was contacted.",
+      "expected_output": "Uses wwise_waapi.builders build_object_get_query or QueryPredicate, returns or explains a SemanticPreview dispatch_payload, keeps the workflow read-only, and says no live WAAPI execution happened by default.",
+      "files": [
+        "SKILL.md",
+        "wwise_waapi/builders/query.py"
+      ],
+      "assertions": [
+        {
+          "name": "uses_query_builder",
+          "text": "Output uses the semantic WAQL builder API.",
+          "required_terms_any": [
+            "build_object_get_query",
+            "QueryPredicate"
+          ]
+        },
+        {
+          "name": "read_only_preview",
+          "text": "Output describes preview construction rather than live execution.",
+          "required_terms_any": [
+            "SemanticPreview",
+            "dispatch_payload",
+            "preview"
+          ],
+          "forbidden_terms": [
+            "executed in Wwise",
+            "live Wwise result"
+          ]
+        },
+        {
+          "name": "requested_return_fields",
+          "text": "Output includes the requested fields.",
+          "required_terms": [
+            "@Volume",
+            "id",
+            "name",
+            "path",
+            "type"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "semantic-builder-object-create-dry-run",
+      "category": "semantic builder object create dry-run",
+      "prompt": "Prepare a safe object.create preview for a test Sound under a resolved Actor-Mixer parent. Keep it dry-run and do not mutate Wwise.",
+      "expected_output": "Uses ObjectMutationBuilder or build_object_mutation_preview for object.create with an exact or resolved parent identity, notes requires_destructive_gate, and converts to a dry-run dispatcher request only if needed.",
+      "files": [
+        "SKILL.md",
+        "wwise_waapi/builders/object_mutation.py"
+      ],
+      "assertions": [
+        {
+          "name": "uses_object_mutation_builder",
+          "text": "Output uses the object mutation semantic builder.",
+          "required_terms_any": [
+            "ObjectMutationBuilder",
+            "build_object_mutation_preview"
+          ]
+        },
+        {
+          "name": "dry_run_preview_only",
+          "text": "Output keeps mutation as a preview or dry-run request.",
+          "required_terms_any": [
+            "requires_destructive_gate",
+            "dry_run=True",
+            "preview"
+          ],
+          "forbidden_terms": [
+            "created the object",
+            "executed object.create"
+          ]
+        },
+        {
+          "name": "resolved_identity",
+          "text": "Output requires exact or resolved parent identity.",
+          "required_terms_any": [
+            "ObjectIdentity",
+            "ResolvedObject",
+            "resolved parent"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "semantic-builder-setproperty-fail-closed",
+      "category": "semantic builder setProperty fail-closed",
+      "prompt": "Build a setProperty preview for Volume only if metadata proves the property is supported and enabled. Show what happens when metadata is missing.",
+      "expected_output": "Uses PropertyReferenceBuilder or build_set_property_preview with PropertyInfoMetadataRecord and fails closed with a semantic validation error when metadata or enabled-state evidence is missing or negative.",
+      "files": [
+        "SKILL.md",
+        "wwise_waapi/builders/properties.py",
+        "wwise_waapi/builders/metadata.py"
+      ],
+      "assertions": [
+        {
+          "name": "uses_property_builder",
+          "text": "Output uses property/reference semantic APIs.",
+          "required_terms_any": [
+            "PropertyReferenceBuilder",
+            "build_set_property_preview"
+          ]
+        },
+        {
+          "name": "metadata_required",
+          "text": "Output requires metadata and enabled-state checks.",
+          "required_terms_any": [
+            "PropertyInfoMetadataRecord",
+            "property_enabled",
+            "metadata"
+          ]
+        },
+        {
+          "name": "fail_closed",
+          "text": "Output fails closed instead of dispatching when proof is missing.",
+          "required_terms_any": [
+            "fail closed",
+            "SemanticValidationError",
+            "SEMANTIC_PROPERTY_UNSUPPORTED"
+          ],
+          "forbidden_terms": [
+            "try it live anyway",
+            "set the property without metadata"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "semantic-builder-audio-import-dry-run",
+      "category": "semantic builder audio import dry-run",
+      "prompt": "Prepare an audio.import semantic preview for one WAV file into a sandbox path. Do not write files or run Wwise.",
+      "expected_output": "Uses ImportBuilder, ImportItem, or build_audio_import_preview, includes a sandbox-oriented objectPath, states the preview is destructive-gated, and does not claim imported objects exist.",
+      "files": [
+        "SKILL.md",
+        "wwise_waapi/builders/imports.py"
+      ],
+      "assertions": [
+        {
+          "name": "uses_import_builder",
+          "text": "Output uses the audio import builder API.",
+          "required_terms_any": [
+            "ImportBuilder",
+            "ImportItem",
+            "build_audio_import_preview"
+          ]
+        },
+        {
+          "name": "dry_run_no_files",
+          "text": "Output says no live import or generated file write happened by default.",
+          "required_terms_any": [
+            "preview",
+            "requires_destructive_gate",
+            "dry-run"
+          ],
+          "forbidden_terms": [
+            "imported the WAV",
+            "created Wwise objects"
+          ]
+        },
+        {
+          "name": "sandbox_guidance",
+          "text": "Output keeps mutation tied to sandbox or fixture safety.",
+          "required_terms_any": [
+            "sandbox",
+            "fixture",
+            "WWISE_DESTRUCTIVE=1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "semantic-builder-soundbank-guarded-preview",
+      "category": "semantic builder SoundBank guarded preview",
+      "prompt": "Show a guarded SoundBank generation preview for one SoundBank and explain the evidence needed before claiming success.",
+      "expected_output": "Uses SoundBankBuilder or build_generate_preview, includes artifact and topic evidence as expectations only, and says generationDone is not proof of completion by itself.",
+      "files": [
+        "SKILL.md",
+        "wwise_waapi/builders/soundbank.py"
+      ],
+      "assertions": [
+        {
+          "name": "uses_soundbank_builder",
+          "text": "Output uses the SoundBank semantic builder.",
+          "required_terms_any": [
+            "SoundBankBuilder",
+            "build_generate_preview"
+          ]
+        },
+        {
+          "name": "guarded_preview",
+          "text": "Output keeps generation destructive-gated and preview-only.",
+          "required_terms_any": [
+            "requires_destructive_gate",
+            "artifact_evidence_plan",
+            "preview"
+          ]
+        },
+        {
+          "name": "no_completion_overclaim",
+          "text": "Output does not treat generationDone as final proof.",
+          "required_terms": [
+            "generationDone"
+          ],
+          "forbidden_terms": [
+            "generationDone proves completion",
+            "SoundBank was generated"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "semantic-builder-switchcontainer-preflight",
+      "category": "semantic builder SwitchContainer preflight",
+      "prompt": "Prepare a Switch Container addAssignment preview that fails closed unless getAssignments preflight rows prove the child is unassigned.",
+      "expected_output": "Uses SwitchContainerAssignmentBuilder or build_add_assignment_preview, requires existing_assignments preflight rows, and returns a destructive-gated preview without subscribing or dispatching.",
+      "files": [
+        "SKILL.md",
+        "wwise_waapi/builders/switchcontainer.py"
+      ],
+      "assertions": [
+        {
+          "name": "uses_switchcontainer_builder",
+          "text": "Output uses SwitchContainer assignment semantic APIs.",
+          "required_terms_any": [
+            "SwitchContainerAssignmentBuilder",
+            "build_add_assignment_preview"
+          ]
+        },
+        {
+          "name": "preflight_required",
+          "text": "Output requires getAssignments preflight evidence.",
+          "required_terms": [
+            "getAssignments",
+            "existing_assignments"
+          ]
+        },
+        {
+          "name": "no_live_claim",
+          "text": "Output does not claim assignment was changed live.",
+          "required_terms_any": [
+            "preview",
+            "requires_destructive_gate",
+            "fail closed"
+          ],
+          "forbidden_terms": [
+            "assignment was added",
+            "subscribed to Wwise"
+          ]
+        }
+      ]
     }
   ]
 }
