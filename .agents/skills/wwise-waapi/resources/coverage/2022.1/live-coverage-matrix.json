@@ -700,6 +700,7 @@
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "cli",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -708,6 +709,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -715,16 +717,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
       "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.cli.addNewPlatform",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "cli",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -733,6 +739,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -740,16 +747,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
       "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.cli.convertExternalSource",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "cli",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": true,
@@ -758,6 +769,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -765,16 +777,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
       "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.cli.createNewProject",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "cli",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -783,6 +799,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -790,16 +807,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
       "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.cli.dumpObjects",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "cli",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -808,6 +829,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -815,16 +837,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
       "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.cli.generateSoundbank",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "cli",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": true,
@@ -833,6 +859,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -840,16 +867,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
       "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.cli.migrate",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "cli",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": true,
@@ -858,6 +889,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -865,16 +897,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
       "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.cli.moveMediaIdsToSingleFile",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "cli",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": true,
@@ -883,6 +919,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -890,16 +927,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
       "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.cli.moveMediaIdsToWorkUnits",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "cli",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -908,6 +949,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -915,16 +957,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
       "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.cli.tabDelimitedImport",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "cli",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -933,6 +979,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -940,16 +987,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
       "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.cli.updateMediaIdsInSingleFile",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "cli",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -958,6 +1009,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -965,16 +1017,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
       "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.cli.verify",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "cli",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -983,6 +1039,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -990,10 +1047,13 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
       "skip_wrapper_rationale": "cli is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.cli.waapiServer",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
@@ -2745,6 +2805,7 @@
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "core.remote",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -2753,6 +2814,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -2760,16 +2822,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "Remote connect/disconnect behavior depends on external consoles and network/session state not provided by the local sandbox.",
       "skip_wrapper_rationale": "core.remote is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.core.remote.connect",
+      "user_approved_rationale": "User guidance approves skipping remote-console behavior because a deterministic remote console environment is unavailable.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "core.remote",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -2778,6 +2844,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -2785,16 +2852,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "Remote connect/disconnect behavior depends on external consoles and network/session state not provided by the local sandbox.",
       "skip_wrapper_rationale": "core.remote is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.core.remote.disconnect",
+      "user_approved_rationale": "User guidance approves skipping remote-console behavior because a deterministic remote console environment is unavailable.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "fake-route-tested",
       "allowed_test_tier": "skipped-policy",
       "category": "core.remote",
+      "counts_as_live_behavior": false,
       "current_status": "fake-route-tested",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -2803,6 +2874,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "fake-route-tested",
@@ -2810,16 +2882,20 @@
         "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "Remote connect/disconnect behavior depends on external consoles and network/session state not provided by the local sandbox.",
       "skip_wrapper_rationale": "core.remote is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.core.remote.getAvailableConsoles",
+      "user_approved_rationale": "User guidance approves skipping remote-console behavior because a deterministic remote console environment is unavailable.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "fake-route-tested",
       "allowed_test_tier": "skipped-policy",
       "category": "core.remote",
+      "counts_as_live_behavior": false,
       "current_status": "fake-route-tested",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -2828,6 +2904,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "fake-route-tested",
@@ -2835,10 +2912,13 @@
         "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "Remote connect/disconnect behavior depends on external consoles and network/session state not provided by the local sandbox.",
       "skip_wrapper_rationale": "core.remote is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.core.remote.getConnectionStatus",
+      "user_approved_rationale": "User guidance approves skipping remote-console behavior because a deterministic remote console environment is unavailable.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
@@ -3537,6 +3617,7 @@
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "debug",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -3545,6 +3626,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
       "item_type": "topic",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3552,16 +3634,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "Debug assert/crash APIs can intentionally fail, crash, or alter automation/assert handling in the running Wwise instance.",
       "skip_wrapper_rationale": "debug is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.debug.assertFailed",
+      "user_approved_rationale": "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "debug",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -3570,6 +3656,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3577,16 +3664,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "Debug assert/crash APIs can intentionally fail, crash, or alter automation/assert handling in the running Wwise instance.",
       "skip_wrapper_rationale": "debug is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.debug.enableAsserts",
+      "user_approved_rationale": "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "debug",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -3595,6 +3686,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3602,16 +3694,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "Debug assert/crash APIs can intentionally fail, crash, or alter automation/assert handling in the running Wwise instance.",
       "skip_wrapper_rationale": "debug is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.debug.enableAutomationMode",
+      "user_approved_rationale": "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "debug",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -3620,6 +3716,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3627,16 +3724,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "Debug assert/crash APIs can intentionally fail, crash, or alter automation/assert handling in the running Wwise instance.",
       "skip_wrapper_rationale": "debug is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.debug.testAssert",
+      "user_approved_rationale": "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "skipped-policy",
       "category": "debug",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": true,
@@ -3645,6 +3746,7 @@
       "evidence_standard": "User policy approval plus reflected inventory evidence; do not execute or count as live behavioral coverage.",
       "fallback_reason": "Fallback is policy-approved skip with inventory evidence only.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3652,16 +3754,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "Debug assert/crash APIs can intentionally fail, crash, or alter automation/assert handling in the running Wwise instance.",
       "skip_wrapper_rationale": "debug is excluded from Phase 2 live execution by user policy.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "skipped-approved",
       "uri": "ak.wwise.debug.testCrash",
+      "user_approved_rationale": "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "wrapper-unit",
       "category": "ui",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -3670,6 +3776,7 @@
       "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
       "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3677,16 +3784,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
       "skip_wrapper_rationale": "ui depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "wrapper-only",
       "uri": "ak.wwise.ui.bringToForeground",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "wrapper-unit",
       "category": "ui",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -3695,6 +3806,7 @@
       "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
       "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3702,16 +3814,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
       "skip_wrapper_rationale": "ui depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "wrapper-only",
       "uri": "ak.wwise.ui.captureScreen",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "wrapper-unit",
       "category": "ui.commands",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": true,
@@ -3720,6 +3836,7 @@
       "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
       "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3727,16 +3844,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
       "skip_wrapper_rationale": "ui.commands depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "wrapper-only",
       "uri": "ak.wwise.ui.commands.execute",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "wrapper-unit",
       "category": "ui.commands",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -3745,6 +3866,7 @@
       "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
       "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "item_type": "topic",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3752,16 +3874,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
       "skip_wrapper_rationale": "ui.commands depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "wrapper-only",
       "uri": "ak.wwise.ui.commands.executed",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "wrapper-unit",
       "category": "ui.commands",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -3770,6 +3896,7 @@
       "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
       "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3777,16 +3904,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
       "skip_wrapper_rationale": "ui.commands depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "wrapper-only",
       "uri": "ak.wwise.ui.commands.getCommands",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "wrapper-unit",
       "category": "ui.commands",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -3795,6 +3926,7 @@
       "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
       "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3802,16 +3934,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
       "skip_wrapper_rationale": "ui.commands depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "wrapper-only",
       "uri": "ak.wwise.ui.commands.register",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "wrapper-unit",
       "category": "ui.commands",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -3820,6 +3956,7 @@
       "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
       "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3827,16 +3964,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
       "skip_wrapper_rationale": "ui.commands depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "wrapper-only",
       "uri": "ak.wwise.ui.commands.unregister",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "wrapper-unit",
       "category": "ui",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -3845,6 +3986,7 @@
       "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
       "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3852,16 +3994,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
       "skip_wrapper_rationale": "ui depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "wrapper-only",
       "uri": "ak.wwise.ui.getSelectedObjects",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "wrapper-unit",
       "category": "ui.project",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": true,
@@ -3870,6 +4016,7 @@
       "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
       "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3877,16 +4024,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
       "skip_wrapper_rationale": "ui.project depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "wrapper-only",
       "uri": "ak.wwise.ui.project.close",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "wrapper-unit",
       "category": "ui.project",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": true,
@@ -3895,6 +4046,7 @@
       "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
       "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3902,16 +4054,20 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
       "skip_wrapper_rationale": "ui.project depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "wrapper-only",
       "uri": "ak.wwise.ui.project.open",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
       "achieved_status": "deferred-with-substitute-test",
       "allowed_test_tier": "wrapper-unit",
       "category": "ui",
+      "counts_as_live_behavior": false,
       "current_status": "deferred-with-substitute-test",
       "destructive_risk": {
         "destructive_opt_in": false,
@@ -3920,6 +4076,7 @@
       "evidence_standard": "Wrapper/unit tests may validate routing and adapter contracts only; do not count as live behavioral coverage.",
       "fallback_reason": "Fallback is wrapper/unit coverage because live UI behavior is nondeterministic or manually stateful.",
       "fixture_prerequisites": [],
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "item_type": "topic",
       "phase1_behavioral_evidence": {
         "coverage": "substitute-test",
@@ -3927,10 +4084,13 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_inventory_status": "reflected-schema-ok",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
       "skip_wrapper_rationale": "ui depends on foreground/UI/project-window state; policy allows wrapper-only coverage.",
       "source_coverage_uri": "resources/coverage/2022.1/api-coverage.json",
       "target_status": "wrapper-only",
       "uri": "ak.wwise.ui.selectionChanged",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
       "version": "2022.1"
     },
     {
@@ -4060,7 +4220,14 @@
       "ui",
       "ui.commands",
       "ui.project"
-    ]
+    ],
+    "wrapper_skipped_policy_fields": [
+      "user_approved_rationale",
+      "risk_explanation",
+      "future_review_trigger",
+      "counts_as_live_behavior"
+    ],
+    "wrapper_skipped_policy_resource": "resources/coverage/2022.1/wrapper-only-category-policy.json"
   },
   "summary": {
     "achieved_status_counts": {

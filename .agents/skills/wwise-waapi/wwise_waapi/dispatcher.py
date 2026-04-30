@@ -11,6 +11,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 
+from .category_policy import (  # pyright: ignore[reportMissingImports]
+    is_policy_exempt_category,
+    is_unsafe_debug_live_uri,
+    unsupported_live_behavior_message,
+)
 from .deferred_registry import ApiClassifier
 from .manifest import ManifestStore
 from .subscriptions import SubscriptionManager, SubscriptionTimeout, SubscriptionUnavailable
@@ -59,6 +64,7 @@ class DispatcherRequest:
     allow_destructive: bool = False
     evidence_dir: Path | None = None
     topic_mode: str = "wait"
+    live_behavior: bool = False
 
 
 @dataclass(slots=True, frozen=True)
@@ -97,6 +103,7 @@ class WwiseDispatcher:
         allow_destructive: bool = False,
         evidence_dir: str | Path | None = None,
         topic_mode: str = "wait",
+        live_behavior: bool = False,
     ) -> dict[str, Any]:
         """Dispatch one WAAPI function or topic and return a structured result."""
 
@@ -110,6 +117,7 @@ class WwiseDispatcher:
             allow_destructive=allow_destructive,
             evidence_dir=evidence_dir,
             topic_mode=topic_mode,
+            live_behavior=live_behavior,
         )
         try:
             result = self._dispatch(request)
@@ -135,6 +143,16 @@ class WwiseDispatcher:
                 request.version,
                 "API_NOT_FOUND",
                 f"WAAPI URI {request.api!r} is not present in generated manifest {request.version}",
+            )
+        if self._unsupported_live_behavior(request, entry):
+            return self._error_result(
+                request.api,
+                request.version,
+                "UNSUPPORTED_LIVE_BEHAVIOR",
+                unsupported_live_behavior_message(request.api, entry.category),
+                item_type=entry.item_type,
+                category=entry.category,
+                risk_level=entry.risk_level,
             )
         if request.dry_run:
             return self._success_result(
@@ -277,6 +295,7 @@ class WwiseDispatcher:
             allow_destructive=bool(kwargs["allow_destructive"]),
             evidence_dir=Path(evidence) if evidence is not None else None,
             topic_mode=str(kwargs["topic_mode"]),
+            live_behavior=bool(kwargs["live_behavior"]),
         )
 
     def _destructive_allowed(self, request: DispatcherRequest) -> bool:
@@ -287,6 +306,13 @@ class WwiseDispatcher:
             return False
         operation = entry.uri.rsplit(".", 1)[-1].lower()
         return entry.risk_level == "high" or any(operation.startswith(token) for token in DESTRUCTIVE_TOKENS)
+
+    def _unsupported_live_behavior(self, request: DispatcherRequest, entry: ManifestApiEntry) -> bool:
+        if request.dry_run:
+            return False
+        if is_unsafe_debug_live_uri(request.api, entry.category):
+            return True
+        return request.live_behavior and is_policy_exempt_category(entry.category)
 
     def _error_code(self, exc: Exception) -> str:
         if isinstance(exc, TimeoutError):
