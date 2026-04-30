@@ -9,6 +9,16 @@ from .api_coverage_audit import (  # pyright: ignore[reportMissingImports]
 from .deferred_registry import DeferredRegistry
 from .dispatcher import DispatcherRequest, WwiseDispatcher
 from .headless import HeadlessLifecycle
+from .live_environment import (  # pyright: ignore[reportMissingImports]
+    DEFAULT_SAMPLE_PROJECT_ROOT,
+    ENV_WWISE_SAMPLE_PROJECT_PATH,
+    ENV_WWISE_SANDBOX_ROOT,
+    LiveEnvironmentContract,
+    LiveEnvironmentError,
+    parse_live_environment,
+    require_destructive_environment,
+    require_live_environment,
+)
 from .manifest import ManifestAudit, ManifestStore, ReflectionManifestBuilder, WaapiReflectionClient
 from .notebooklm_gate import (  # pyright: ignore[reportMissingImports]
     NotebookLMGate,
@@ -45,6 +55,11 @@ __all__ = [
     "ApiCoverageAuditResult",
     "BehavioralCoverageRecord",
     "HeadlessLifecycle",
+    "DEFAULT_SAMPLE_PROJECT_ROOT",
+    "ENV_WWISE_SAMPLE_PROJECT_PATH",
+    "ENV_WWISE_SANDBOX_ROOT",
+    "LiveEnvironmentContract",
+    "LiveEnvironmentError",
     "ManifestAudit",
     "ManifestStore",
     "NotebookLMGate",
@@ -67,6 +82,9 @@ __all__ = [
     "validate_waql_example",
     "waql_api_uris",
     "build_wwise_console_command",
+    "parse_live_environment",
+    "require_destructive_environment",
+    "require_live_environment",
     "resolve_windows_wwise_console_from_env",
     "windows_validation_status",
     "windows_wwise_console_path",

@@ -49,6 +49,9 @@ class SkillConfig:
     wwise_destructive_env: str = "WWISE_DESTRUCTIVE"
     wwise_version_env: str = "WWISE_VERSION"
     wwise_console_env: str = "WWISE_CONSOLE"
+    wwise_fixture_project_env: str = "WWISE_FIXTURE_PROJECT"
+    wwise_sample_project_path_env: str = "WWISE_SAMPLE_PROJECT_PATH"
+    wwise_sandbox_root_env: str = "WWISE_SANDBOX_ROOT"
     wwise_root_env: str = "WWISEROOT"
     default_wwise_console_macos: Path = DEFAULT_WWISE_CONSOLE_MACOS
     windows_wwise_console_relative: Path = WINDOWS_WWISE_CONSOLE_RELATIVE

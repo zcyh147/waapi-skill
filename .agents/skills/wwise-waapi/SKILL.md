@@ -92,6 +92,7 @@ Required error fields are `ok`, `api`, `version`, `error_code`, `message`, and `
 - Generated manifests are authoritative for API existence and for distinguishing functions from topics.
 - Destructive or mutating functions are blocked by default. Use `dry_run=True` first, then pass `allow_destructive=True` only for fixture projects or intentionally destructive test gates.
 - Default pytest collection skips `live` and `destructive` tests unless `WWISE_LIVE=1` and `WWISE_DESTRUCTIVE=1` are present.
+- Phase 2 live tests use the canonical environment contract in `wwise_waapi.live_environment`: `WWISE_SAMPLE_PROJECT_PATH` is the immutable source-to-copy (defaulting to `/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject` only when that path exists), `WWISE_FIXTURE_PROJECT` is read-only for live smoke, and destructive tests may only mutate a fixture project under `WWISE_SANDBOX_ROOT` with both `WWISE_LIVE=1` and `WWISE_DESTRUCTIVE=1`.
 - Do not mutate user Wwise projects in unit tests. Use injectable fake clients for dispatcher and subscription tests.
 - Keep runtime data, logs, auth state, and evidence artifacts out of git unless the plan explicitly asks for committed evidence.
 
