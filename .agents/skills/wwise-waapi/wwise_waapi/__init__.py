@@ -26,6 +26,15 @@ from .notebooklm_gate import (  # pyright: ignore[reportMissingImports]
     docs_generation_allowed,
     require_docs_generation,
 )
+from .sandbox_fixture import (  # pyright: ignore[reportMissingImports]
+    LiveSandboxLock,
+    SandboxFixtureError,
+    SandboxProject,
+    cleanup_sandbox,
+    launch_sandboxed_wwise,
+    prepare_sample_project_sandbox,
+    shutdown_sandboxed_wwise,
+)
 from .platform_paths import (  # pyright: ignore[reportMissingImports]
     WINDOWS_WWISE_CONSOLE_ENV_TEMPLATE,
     build_wwise_console_command,
@@ -67,6 +76,9 @@ __all__ = [
     "WINDOWS_WWISE_CONSOLE_ENV_TEMPLATE",
     "docs_generation_allowed",
     "require_docs_generation",
+    "LiveSandboxLock",
+    "SandboxFixtureError",
+    "SandboxProject",
     "SkillConfig",
     "SkillPaths",
     "SubscriptionManager",
@@ -82,7 +94,11 @@ __all__ = [
     "validate_waql_example",
     "waql_api_uris",
     "build_wwise_console_command",
+    "cleanup_sandbox",
+    "launch_sandboxed_wwise",
     "parse_live_environment",
+    "prepare_sample_project_sandbox",
+    "shutdown_sandboxed_wwise",
     "require_destructive_environment",
     "require_live_environment",
     "resolve_windows_wwise_console_from_env",
