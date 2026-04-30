@@ -1,0 +1,258 @@
+{
+  "metadata": {
+    "capture_policy": "Capability probes use startCapture -> subscribe -> trigger/action -> bounded wait -> stopCapture -> cleanup proof. Capture start/stop, accepted calls, returned IDs, and empty arrays are recorded only as context and never as promotion proof.",
+    "evidence_root": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/",
+    "live_command": "WWISE_LIVE=1 python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
+    "promotes_coverage": false,
+    "sandbox_policy": "Each live probe copies tests/_org/2022.1/SampleProject.wproj into a sandbox and launches WwiseConsole against the sandbox only; tests/_org is immutable source.",
+    "source_fixture": "tests/_org/2022.1/SampleProject.wproj",
+    "task": "3. Implement profiler capability probe and evidence schema",
+    "unit_command": "python -m pytest tests/unit/test_profiler_soundengine_feasibility.py -q",
+    "version": "2022.1"
+  },
+  "profiler_transport_cases": [
+    {
+      "assertions": [
+        "startCapture and stopCapture boundaries are recorded as capture context, not standalone promotion proof",
+        "getList contains the created transport before destroy, and transport.stateChanged or getState transition must expose a state payload/field within the bounded wait, otherwise an exact missing-payload blocker is recorded",
+        "transport destroy, subscription cancellation, source fixture immutability, and sandbox cleanup are recorded"
+      ],
+      "blockers": [
+        {
+          "reason": "WwiseConsole/headless may not publish transport.stateChanged for the copied SampleProject event; without a topic payload or getState transition, this remains capability-blocked.",
+          "uri": "ak.wwise.core.transport.stateChanged"
+        }
+      ],
+      "capture_sequence": [
+        "copy tests/_org/2022.1/SampleProject.wproj source fixture into a sandbox",
+        "call ak.wwise.core.profiler.startCapture and record returned capture cursor",
+        "create a transport for an existing sandbox Event object",
+        "subscribe to ak.wwise.core.transport.stateChanged with options {transport}",
+        "execute play then stop actions",
+        "bounded-wait for stateChanged payload or bounded-poll getState transition",
+        "call ak.wwise.core.profiler.stopCapture and record returned capture cursor"
+      ],
+      "cleanup": [
+        "execute stop action if transport was created",
+        "unsubscribe transport.stateChanged subscription",
+        "destroy transport if created",
+        "stop capture if capture started",
+        "disconnect WAAPI client",
+        "shutdown WwiseConsole",
+        "delete sandbox unless keep-on-failure policy applies",
+        "prove source fixture mtime and bounded hash are unchanged"
+      ],
+      "evidence_command": "WWISE_LIVE=1 python -m pytest tests/live/test_profiler_transport_soundengine.py::test_transport_profiler_evidence -q",
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-3-profiler-capability.md",
+      "evidence_rows": [
+        {
+          "api_uri": "ak.wwise.core.transport.executeAction",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-3-profiler-capability.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true,
+            "transport_destroyed": true
+          },
+          "missing_payload_blocker": "transport 0 did not produce a stateChanged payload or getState transition within 5.0s; initial_state='stopped', last_state='stopped'",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.transport.stateChanged",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the play/stop trigger window",
+          "trigger_call": "ak.wwise.core.transport.executeAction(play|stop)"
+        }
+      ],
+      "group": "core.transport",
+      "id": "profiler_transport_state_capability_probe",
+      "setup": {
+        "sandbox": "prepare_sample_project_sandbox(hash_strategy=bounded) from tests/_org/2022.1/SampleProject.wproj",
+        "target_object_discovery": "ak.wwise.core.object.get WAQL query for an existing Event with return id/name/type/path",
+        "topic_subscription": "ak.wwise.core.transport.stateChanged subscribed with the created transport id"
+      },
+      "status": "capability-blocked",
+      "trigger": {
+        "actions": [
+          "play",
+          "stop"
+        ],
+        "bounded_wait_seconds": 5,
+        "predicate": "stateChanged payload for created transport or getState transition among playing/stopped/paused",
+        "uri": "ak.wwise.core.transport.executeAction"
+      },
+      "uris": [
+        "ak.wwise.core.profiler.startCapture",
+        "ak.wwise.core.profiler.stopCapture",
+        "ak.wwise.core.transport.create",
+        "ak.wwise.core.transport.getList",
+        "ak.wwise.core.transport.getState",
+        "ak.wwise.core.transport.executeAction",
+        "ak.wwise.core.transport.destroy",
+        "ak.wwise.core.transport.stateChanged"
+      ]
+    }
+  ],
+  "soundengine_cases": [
+    {
+      "assertions": [
+        "postMsgMonitor is not claimed from an empty response alone; capability requires a capture-log payload containing the unique message or an exact missing-payload blocker",
+        "capture start/end boundaries and subscription setup are recorded",
+        "subscription cleanup, source fixture immutability, bounded wait duration, and artifact path are recorded"
+      ],
+      "blockers": [
+        {
+          "reason": "Reflected profiler capture-log topics may be unavailable or not delivered in WwiseConsole/headless; without a matching payload, postMsgMonitor remains capability-blocked and must not promote soundengine coverage.",
+          "uri": "ak.wwise.core.profiler.captureLog.itemAdded"
+        }
+      ],
+      "capture_sequence": [
+        "copy tests/_org/2022.1/SampleProject.wproj source fixture into a sandbox",
+        "start profiler capture",
+        "subscribe to captureLog.itemAdded before calling postMsgMonitor",
+        "post a unique WAAPI_TASK3_SANDBOX_ monitor message",
+        "bounded-wait for capture-log payload mentioning the unique message",
+        "stop profiler capture in cleanup"
+      ],
+      "cleanup": [
+        "unsubscribe captureLog.itemAdded subscription",
+        "stop capture if capture started",
+        "disconnect WAAPI client",
+        "shutdown WwiseConsole",
+        "delete sandbox unless keep-on-failure policy applies",
+        "prove source fixture mtime and bounded hash are unchanged"
+      ],
+      "evidence_command": "WWISE_LIVE=1 python -m pytest tests/live/test_profiler_transport_soundengine.py::test_soundengine_profiler_backed_smoke -q",
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-3-profiler-capability.md",
+      "evidence_rows": [
+        {
+          "api_uri": "ak.soundengine.postMsgMonitor",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-3-profiler-capability.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "no matching profiler topic payload within 5.0s; seen=[]",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the monitor-message trigger window",
+          "trigger_call": "ak.soundengine.postMsgMonitor"
+        }
+      ],
+      "group": "soundengine",
+      "id": "soundengine_monitor_message_capture_log_capability_probe",
+      "setup": {
+        "sandbox": "prepare_sample_project_sandbox(hash_strategy=bounded) from tests/_org/2022.1/SampleProject.wproj",
+        "topic_subscription": "ak.wwise.core.profiler.captureLog.itemAdded filtered to Message/APICall where available"
+      },
+      "status": "capability-blocked",
+      "trigger": {
+        "bounded_wait_seconds": 5,
+        "predicate": "captureLog.itemAdded payload has severity/type fields and description containing the unique monitor message",
+        "uri": "ak.soundengine.postMsgMonitor"
+      },
+      "uris": [
+        "ak.wwise.core.profiler.startCapture",
+        "ak.wwise.core.profiler.stopCapture",
+        "ak.wwise.core.profiler.captureLog.itemAdded",
+        "ak.soundengine.postMsgMonitor"
+      ]
+    },
+    {
+      "assertions": [
+        "registration and unregistration are not claimed from empty responses alone; matching profiler topic payloads are required or exact missing-payload blockers are recorded",
+        "capture start/end boundaries and subscription setup are recorded",
+        "all subscriptions are canceled and active topics are empty after cleanup"
+      ],
+      "blockers": [
+        {
+          "reason": "WwiseConsole/headless may accept registerGameObj but not publish profiler registration topics unless profiler game-object data is available; no topic payload means the case remains capability-blocked.",
+          "uri": "ak.wwise.core.profiler.gameObjectRegistered"
+        }
+      ],
+      "capture_sequence": [
+        "copy tests/_org/2022.1/SampleProject.wproj source fixture into a sandbox",
+        "start profiler capture",
+        "subscribe to registration and unregistration profiler topics",
+        "call registerGameObj with a unique id/name",
+        "bounded-wait for gameObjectRegistered payload matching id/name",
+        "call unregisterGameObj for the same id",
+        "bounded-wait for gameObjectUnregistered payload matching id/name",
+        "stop profiler capture in cleanup"
+      ],
+      "cleanup": [
+        "unregister game object if registration reached action phase",
+        "cancel background subscriptions",
+        "stop capture if capture started",
+        "disconnect WAAPI client",
+        "shutdown WwiseConsole",
+        "delete sandbox unless keep-on-failure policy applies",
+        "prove source fixture mtime and bounded hash are unchanged"
+      ],
+      "evidence_command": "WWISE_LIVE=1 python -m pytest tests/live/test_profiler_transport_soundengine.py::test_soundengine_profiler_backed_smoke -q",
+      "evidence_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-3-profiler-capability.md",
+      "evidence_rows": [
+        {
+          "api_uri": "ak.soundengine.registerGameObj",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-3-profiler-capability.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "no matching profiler topic payload within 5.0s; seen=[]",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.gameObjectRegistered",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the registerGameObj trigger window",
+          "trigger_call": "ak.soundengine.registerGameObj"
+        },
+        {
+          "api_uri": "ak.soundengine.unregisterGameObj",
+          "artifact_path": ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-3-profiler-capability.md",
+          "bounded_wait_seconds": 5,
+          "cleanup_proof": {
+            "capture_stopped": true,
+            "game_object_unregistered": true,
+            "sandbox_deleted_or_preserved": "recorded",
+            "source_fixture_unchanged": true,
+            "subscriptions_cleared": true
+          },
+          "missing_payload_blocker": "no matching profiler topic payload within 5.0s; seen=[]",
+          "observed_payload_fields": [],
+          "observed_topic_or_log_uri": "ak.wwise.core.profiler.gameObjectUnregistered",
+          "timestamp_window_mapping": "capture start cursor/time through stop cursor/time bounds the unregisterGameObj trigger window",
+          "trigger_call": "ak.soundengine.unregisterGameObj"
+        }
+      ],
+      "group": "soundengine",
+      "id": "soundengine_game_object_registration_capability_probe",
+      "setup": {
+        "game_object_id": "unique deterministic uint64 below signed 32-bit boundary for Wwise 2022.1 WAAPI compatibility",
+        "sandbox": "prepare_sample_project_sandbox(hash_strategy=bounded) from tests/_org/2022.1/SampleProject.wproj",
+        "topic_subscription": "background listeners for profiler gameObjectRegistered and gameObjectUnregistered"
+      },
+      "status": "capability-blocked",
+      "trigger": {
+        "bounded_wait_seconds": 5,
+        "predicate": "profiler topic payload gameObjectId/name matches the registered object",
+        "uris": [
+          "ak.soundengine.registerGameObj",
+          "ak.soundengine.unregisterGameObj"
+        ]
+      },
+      "uris": [
+        "ak.wwise.core.profiler.startCapture",
+        "ak.wwise.core.profiler.stopCapture",
+        "ak.wwise.core.profiler.gameObjectRegistered",
+        "ak.wwise.core.profiler.gameObjectUnregistered",
+        "ak.soundengine.registerGameObj",
+        "ak.soundengine.unregisterGameObj"
+      ]
+    }
+  ]
+}

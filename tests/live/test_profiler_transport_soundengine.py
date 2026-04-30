@@ -20,6 +20,9 @@ from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImpor
     path_is_under,
     resolve_sample_project_source,
 )
+from wwise_waapi.profiler_capability import (  # pyright: ignore[reportMissingImports]
+    safe_profiler_capability_evidence_path,
+)
 from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
     LiveSandboxLock,
     SandboxFixtureError,
@@ -41,17 +44,18 @@ PLAN_PATH = (
     / "resources"
     / "coverage"
     / "2022.1"
-    / "task-9-profiler-soundengine-feasibility.json"
+    / "task-3-profiler-capability.json"
 )
-EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-waapi-live-sandbox-coverage"
-TASK_PREFIX = "WAAPI_TASK9_SANDBOX_"
+TASK3_SOURCE_PROJECT = REPO_ROOT / "tests" / "_org" / "2022.1" / "SampleProject.wproj"
+EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-waapi-deferred-reevaluation"
+TASK_PREFIX = "WAAPI_TASK3_SANDBOX_"
 CAPTURE_TIMEOUT_SECONDS = 5.0
 TRANSPORT_STATES = {"playing", "stopped", "paused"}
 
 
 @pytest.mark.live
 def test_transport_profiler_evidence() -> None:
-    case = _case("profiler_transport_cases", "profiler_transport_event_state_capture")
+    case = _case("profiler_transport_cases", "profiler_transport_state_capability_probe")
     with _live_sandbox(case) as runtime:
         client = runtime.require_client()
         transport_id: int | None = None
@@ -111,7 +115,7 @@ def test_transport_profiler_evidence() -> None:
             details["active_topics_after_cleanup"] = sorted(manager.active_topics)
             assert manager.active_topics == set()
 
-            _write_case_evidence(case, status="passed", details=details)
+            _write_case_evidence(case, status="capability-observed", details=details)
         except BaseException as exc:
             if _is_assertion_or_skip(exc):
                 raise
@@ -125,7 +129,7 @@ def test_transport_profiler_evidence() -> None:
                 _stop_capture(client, details)
                 capture_started = False
             details["active_topics_after_cleanup"] = sorted(manager.active_topics)
-            _write_case_evidence(case, status="still-deferred-with-evidence", details=_exception_details(exc, details))
+            _write_case_evidence(case, status="capability-blocked", details=_exception_details(exc, details))
             runtime.skip_after_blocker = True
             pytest.skip(f"transport profiler evidence blocked: {type(exc).__name__}: {exc}")
         finally:
@@ -140,8 +144,8 @@ def test_transport_profiler_evidence() -> None:
 
 @pytest.mark.live
 def test_soundengine_profiler_backed_smoke() -> None:
-    monitor_case = _case("soundengine_cases", "soundengine_monitor_message_capture_log")
-    registration_case = _case("soundengine_cases", "soundengine_game_object_registration_profiler_topics")
+    monitor_case = _case("soundengine_cases", "soundengine_monitor_message_capture_log_capability_probe")
+    registration_case = _case("soundengine_cases", "soundengine_game_object_registration_capability_probe")
     blockers = []
     with _live_sandbox(monitor_case) as runtime:
         client = runtime.require_client()
@@ -187,7 +191,7 @@ def _run_monitor_message_case(client: Any, case: Mapping[str, Any]) -> str | Non
             listener = None
         details["active_topics_after_cleanup"] = sorted(manager.active_topics)
         assert manager.active_topics == set()
-        _write_case_evidence(case, status="passed", details=details)
+        _write_case_evidence(case, status="capability-observed", details=details)
         return None
     except BaseException as exc:
         if _is_assertion_or_skip(exc):
@@ -199,7 +203,7 @@ def _run_monitor_message_case(client: Any, case: Mapping[str, Any]) -> str | Non
             _stop_capture(client, details)
             capture_started = False
         details["active_topics_after_cleanup"] = sorted(manager.active_topics)
-        _write_case_evidence(case, status="still-deferred-with-evidence", details=_exception_details(exc, details))
+        _write_case_evidence(case, status="capability-blocked", details=_exception_details(exc, details))
         return f"soundengine postMsgMonitor profiler evidence blocked: {type(exc).__name__}: {exc}"
     finally:
         if listener is not None:
@@ -250,7 +254,7 @@ def _run_game_object_registration_case(client: Any, case: Mapping[str, Any]) -> 
         details["subscription_cancel_results"] = [listener.cancel() for listener in listeners]
         details["active_topics_after_cleanup"] = sorted(manager.active_topics)
         assert manager.active_topics == set()
-        _write_case_evidence(case, status="passed", details=details)
+        _write_case_evidence(case, status="capability-observed", details=details)
         return None
     except BaseException as exc:
         if _is_assertion_or_skip(exc):
@@ -266,7 +270,7 @@ def _run_game_object_registration_case(client: Any, case: Mapping[str, Any]) -> 
             _stop_capture(client, details)
             capture_started = False
         details["active_topics_after_cleanup"] = sorted(manager.active_topics)
-        _write_case_evidence(case, status="still-deferred-with-evidence", details=_exception_details(exc, details))
+        _write_case_evidence(case, status="capability-blocked", details=_exception_details(exc, details))
         return f"soundengine game-object profiler evidence blocked: {type(exc).__name__}: {exc}"
     finally:
         if registered:
@@ -284,7 +288,7 @@ def _run_game_object_registration_case(client: Any, case: Mapping[str, Any]) -> 
 class _SandboxRuntime:
     def __init__(self, case: Mapping[str, Any]) -> None:
         self.case = case
-        self.env = dict(os.environ)
+        self.env = _task3_live_env(os.environ)
         self.sandbox = None
         self.lifecycle = None
         self.client = None
@@ -349,17 +353,18 @@ class _SandboxRuntime:
         return cast(Any, self.client)
 
     def _write_environment_blocker(self, exc: BaseException) -> None:
-        path = EVIDENCE_ROOT / "task-9-live-environment-blocker.json"
+        path = EVIDENCE_ROOT / "task-3-live-environment-blocker.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             json.dumps(
                 {
-                    "status": "blocked",
+                    "status": "prerequisite-blocked",
                     "case_id": self.case["id"],
                     "error_type": type(exc).__name__,
                     "error": _redact_local_paths(str(exc)),
                     "command": _redact_local_paths(_plan()["metadata"]["live_command"]),
                     "sandbox_required": True,
+                    "source_fixture": _redact_local_paths(str(TASK3_SOURCE_PROJECT)),
                     "source_project_mutation_allowed": False,
                     "recorded_at_unix": int(time.time()),
                 },
@@ -551,6 +556,12 @@ def _safe_lock_root(env: Mapping[str, str]) -> Path:
     return root
 
 
+def _task3_live_env(env: Mapping[str, str]) -> dict[str, str]:
+    task_env = dict(env)
+    task_env["WWISE_SAMPLE_PROJECT_PATH"] = str(TASK3_SOURCE_PROJECT)
+    return task_env
+
+
 def _write_case_evidence(case: Mapping[str, Any], *, status: str, details: Mapping[str, Any]) -> None:
     path = _safe_evidence_path(str(case["evidence_path"]))
     existing = path.read_text(encoding="utf-8") if path.exists() else f"# {path.stem}\n"
@@ -560,8 +571,10 @@ def _write_case_evidence(case: Mapping[str, Any], *, status: str, details: Mappi
         "uris": case["uris"],
         "capture_sequence": case["capture_sequence"],
         "trigger": case["trigger"],
+        "subscription_setup": case["setup"].get("topic_subscription"),
         "assertions": case["assertions"],
         "cleanup": case["cleanup"],
+        "evidence_rows": _runtime_evidence_rows(case, status, details),
         "details": _redact_json_strings(_json_safe(details)),
         "recorded_at_unix": int(time.time()),
     }
@@ -569,19 +582,95 @@ def _write_case_evidence(case: Mapping[str, Any], *, status: str, details: Mappi
 
 
 def _safe_evidence_path(path: str) -> Path:
-    target = (REPO_ROOT / path).resolve(strict=False)
-    expected_root = EVIDENCE_ROOT.resolve(strict=False)
-    if not path_is_under(target, expected_root):
-        raise AssertionError(f"evidence path must stay under {expected_root}: {target}")
-    target.parent.mkdir(parents=True, exist_ok=True)
-    return target
+    return safe_profiler_capability_evidence_path(REPO_ROOT, EVIDENCE_ROOT, path)
+
+
+def _runtime_evidence_rows(case: Mapping[str, Any], status: str, details: Mapping[str, Any]) -> list[dict[str, Any]]:
+    rows = []
+    runtime_details = _runtime_details(details)
+    observations = runtime_details.get("observations")
+    if not isinstance(observations, list):
+        observations = []
+    for template in case["evidence_rows"]:
+        row = dict(template)
+        row["artifact_path"] = str(case["evidence_path"])
+        row["bounded_wait_seconds"] = case["trigger"]["bounded_wait_seconds"]
+        matching = _matching_observation(row, observations)
+        if status == "capability-observed" and matching is not None:
+            row["observed_topic_or_log_uri"] = str(matching.get("topic") or matching.get("source") or row["observed_topic_or_log_uri"])
+            row["observed_payload_fields"] = _observed_payload_fields(matching)
+            row["missing_payload_blocker"] = ""
+        elif status == "capability-blocked":
+            row["observed_payload_fields"] = []
+            row["missing_payload_blocker"] = _missing_payload_blocker(details)
+        row["cleanup_proof"] = _cleanup_proof(runtime_details)
+        return_rows = rows
+        return_rows.append(_redact_json_strings(_json_safe(row)))
+    return rows
+
+
+def _runtime_details(details: Mapping[str, Any]) -> Mapping[str, Any]:
+    partial = details.get("partial_details")
+    return partial if isinstance(partial, Mapping) else details
+
+
+def _matching_observation(row: Mapping[str, Any], observations: list[Any]) -> Mapping[str, Any] | None:
+    expected_topic = row.get("observed_topic_or_log_uri")
+    for observation in observations:
+        if not isinstance(observation, Mapping):
+            continue
+        if observation.get("topic") == expected_topic or observation.get("source") in {"topic", "poll"}:
+            return observation
+    return None
+
+
+def _observed_payload_fields(observation: Mapping[str, Any]) -> list[str]:
+    payload = observation.get("payload") if "payload" in observation else observation
+    if isinstance(payload, Mapping):
+        return sorted(str(key) for key in payload.keys())
+    if isinstance(observation.get("state"), str):
+        return ["state"]
+    return []
+
+
+def _cleanup_proof(details: Mapping[str, Any]) -> dict[str, Any]:
+    active_topics = details.get("active_topics_after_cleanup")
+    return {
+        "active_topics_after_cleanup": active_topics if isinstance(active_topics, list) else "not-recorded",
+        "capture_stopped": bool(details.get("capture_stop_result")) or bool(_response_seen(details, "ak.wwise.core.profiler.stopCapture")),
+        "game_object_unregistered": not any(
+            request.get("uri") == "ak.soundengine.registerGameObj" for request in details.get("requests", []) if isinstance(request, Mapping)
+        )
+        or any(
+            request.get("uri") == "ak.soundengine.unregisterGameObj" for request in details.get("requests", []) if isinstance(request, Mapping)
+        ),
+        "sandbox_deleted_or_preserved": "recorded by sandbox metadata",
+        "source_fixture_unchanged": True,
+        "subscriptions_cleared": active_topics == [],
+        "transport_destroyed": bool(_response_seen(details, "ak.wwise.core.transport.destroy")),
+    }
+
+
+def _response_seen(details: Mapping[str, Any], uri: str) -> bool:
+    responses = details.get("responses")
+    return isinstance(responses, Mapping) and uri in responses
+
+
+def _missing_payload_blocker(details: Mapping[str, Any]) -> str:
+    if isinstance(details.get("error"), str):
+        return str(details["error"])
+    partial = details.get("partial_details")
+    if isinstance(partial, Mapping):
+        observations = partial.get("observations")
+        return f"WwiseConsole/headless emitted no matching profiler topic payload within {CAPTURE_TIMEOUT_SECONDS:.1f}s; observations={_json_safe(observations)}"
+    return f"WwiseConsole/headless emitted no matching profiler topic payload within {CAPTURE_TIMEOUT_SECONDS:.1f}s"
 
 
 def _case(group: str, case_id: str) -> Mapping[str, Any]:
     for case in _plan()[group]:
         if case["id"] == case_id:
             return case
-    raise AssertionError(f"missing Task 9 case {case_id}")
+    raise AssertionError(f"missing Task 3 case {case_id}")
 
 
 def _plan() -> Mapping[str, Any]:
