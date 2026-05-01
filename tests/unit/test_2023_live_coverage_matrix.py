@@ -9,9 +9,20 @@ VERSION = "2023.1"
 MATRIX_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "live-coverage-matrix.json"
 SUMMARY_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "phase2-coverage-summary.json"
 API_COVERAGE_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "api-coverage.json"
+POLICY_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "phase21-uri-policy.json"
 WAQL_RESOURCE = REPO_ROOT / "resources" / "waql" / VERSION / "object-get-live-matrix.json"
 FUNCTIONS_MANIFEST = REPO_ROOT / "resources" / "manifest" / VERSION / "functions.json"
 TOPICS_MANIFEST = REPO_ROOT / "resources" / "manifest" / VERSION / "topics.json"
+ALLOWED_PARITY_BUCKETS = {
+    "live-tested",
+    "sandbox-mutating-tested",
+    "fake-route-tested",
+    "evidence-only",
+    "conformance-only",
+    "wrapper-only",
+    "deferred",
+    "excluded",
+}
 
 
 def test_2023_live_matrix_covers_every_reflected_api_once() -> None:
@@ -33,6 +44,9 @@ def test_2023_live_matrix_has_no_manifest_only_live_claims() -> None:
     for entry in matrix_payload["matrix"]:
         source = coverage_by_uri[entry["uri"]]
         assert entry["coverage_status"] == source["coverage_status"], entry["uri"]
+        assert entry["parity_bucket"] == source["parity_bucket"], entry["uri"]
+        assert entry["parity_bucket"] in ALLOWED_PARITY_BUCKETS, entry["uri"]
+        assert entry["evidence_standard"] == source["evidence_standard"], entry["uri"]
         assert entry["counts_as_behavioral"] is False, entry["uri"]
         assert entry["counts_as_live_behavioral"] is False, entry["uri"]
         assert entry["achieved_status"] != "live-tested", entry["uri"]
@@ -46,9 +60,31 @@ def test_2023_phase2_summary_matches_matrix_without_behavioral_overclaim() -> No
     assert summary["metadata"]["baseline_resource"] == "resources/coverage/2023.1/api-coverage.json"
     assert summary["metadata"]["live_matrix_resource"] == "resources/coverage/2023.1/live-coverage-matrix.json"
     assert summary["summary"]["status_counts"] == matrix["summary"]["status_counts"]
+    assert summary["summary"]["parity_bucket_counts"] == matrix["summary"]["parity_bucket_counts"]
+    assert set(summary["summary"]["parity_bucket_counts"]) == ALLOWED_PARITY_BUCKETS
+    assert summary["summary"]["parity_bucket_total"] == matrix["summary"]["parity_bucket_total"] == 181
     assert summary["summary"]["behavioral_covered_count"] == 0
     assert summary["summary"]["live_behavioral_covered_count"] == 0
     assert all(entry["version"] == VERSION for entry in summary["entries"])
+    assert all(entry["parity_bucket"] in ALLOWED_PARITY_BUCKETS for entry in summary["entries"])
+    assert all(entry["evidence_standard"] for entry in summary["entries"])
+
+
+def test_2023_phase21_policy_reconciles_parity_buckets_to_reflected_apis() -> None:
+    policy = json.loads(POLICY_RESOURCE.read_text(encoding="utf-8"))
+    coverage_by_uri = {entry["uri"]: entry for entry in _coverage_payload()["coverage"]}
+    parity_buckets = policy["policy"]["parity_buckets"]
+
+    assert set(parity_buckets) == ALLOWED_PARITY_BUCKETS
+    assert policy["summary"]["parity_bucket_total"] == 181
+    assert sum(policy["summary"]["parity_bucket_counts"].values()) == 181
+
+    assigned = [uri for uris in parity_buckets.values() for uri in uris]
+    assert sorted(assigned) == sorted(coverage_by_uri)
+    assert len(assigned) == len(set(assigned)) == 181
+    for bucket, uris in parity_buckets.items():
+        assert policy["summary"]["parity_bucket_counts"][bucket] == len(uris)
+        assert all(coverage_by_uri[uri]["parity_bucket"] == bucket for uri in uris)
 
 
 def test_2023_waql_matrix_is_evidence_only_and_does_not_reuse_2022_evidence() -> None:

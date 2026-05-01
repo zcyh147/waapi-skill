@@ -149,7 +149,7 @@ Wave 4: Final Verification Wave F1-F4.
 
   **Commit**: YES | Message: `test(wwise): map 2023 parity baseline` | Files: `.sisyphus/evidence/wwise-2023-test-parity/parity-baseline.json`, `.sisyphus/evidence/task-1-parity-baseline*.md`
 
-- [ ] 2. Reclassify 2023.1 coverage resources to parity taxonomy
+- [x] 2. Reclassify 2023.1 coverage resources to parity taxonomy
 
   **What to do**: Update `resources/coverage/2023.1/api-coverage.json`, `live-coverage-matrix.json`, `phase2-coverage-summary.json`, and `phase21-uri-policy.json` so every 2023.1 API has one evidence-backed bucket: `live-tested`, `sandbox-mutating-tested`, `fake-route-tested`, `evidence-only`, `conformance-only`, `wrapper-only`, `deferred`, or `excluded`. Preserve existing status fields if tests require them, but add parity-specific metadata rather than losing current compatibility. Keep all risky families deferred/excluded unless Task 1 found an already safe read-only probe.
   **Must NOT do**: Do not mark `counts_as_behavioral` or `counts_as_live_behavioral` true unless a task has real 2023.1 evidence path and assertions. Do not edit 2022.1 resources.

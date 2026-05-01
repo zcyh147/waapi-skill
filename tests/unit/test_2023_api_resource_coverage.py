@@ -13,6 +13,16 @@ VERSION = "2023.1"
 MANIFEST_ROOT = REPO_ROOT / "resources" / "manifest"
 COVERAGE_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "api-coverage.json"
 ALLOWED_STATUSES = {"supported", "deferred", "excluded", "untested", "evidence-only", "live-tested"}
+ALLOWED_PARITY_BUCKETS = {
+    "live-tested",
+    "sandbox-mutating-tested",
+    "fake-route-tested",
+    "evidence-only",
+    "conformance-only",
+    "wrapper-only",
+    "deferred",
+    "excluded",
+}
 EXCLUDED_CATEGORY_PREFIXES = (
     "soundengine",
     "core.profiler",
@@ -54,6 +64,10 @@ def test_2023_coverage_entries_have_required_versioned_metadata() -> None:
         assert entry["category"] == expected.category
         assert entry["risk_level"] == expected.risk_level
         assert entry["behavioral_evidence"]["coverage"] == entry["coverage_status"]
+        assert entry["parity_bucket"] in ALLOWED_PARITY_BUCKETS, entry["uri"]
+        assert entry["evidence_standard"], entry["uri"]
+        assert entry["behavioral_evidence"]["parity_bucket"] == entry["parity_bucket"], entry["uri"]
+        assert entry["behavioral_evidence"]["evidence_standard"] == entry["evidence_standard"], entry["uri"]
         assert entry["behavioral_evidence"]["counts_as_behavioral"] is False
         assert entry["behavioral_evidence"]["counts_as_live_behavioral"] is False
 
@@ -63,8 +77,13 @@ def test_2023_coverage_statuses_are_not_manifest_only_claims() -> None:
     status_model = payload["metadata"]["status_model"]
     status_counts = payload["summary"]["status_counts"]
 
+    parity_counts = payload["summary"]["parity_bucket_counts"]
+
     assert set(status_model) == ALLOWED_STATUSES
     assert set(status_counts) <= ALLOWED_STATUSES
+    assert set(payload["metadata"]["parity_bucket_model"]) == ALLOWED_PARITY_BUCKETS
+    assert set(parity_counts) == ALLOWED_PARITY_BUCKETS
+    assert sum(parity_counts.values()) == len(payload["coverage"]) == 181
     assert status_counts["supported"] > 0
     assert status_counts["deferred"] > 0
     assert status_counts["excluded"] > 0

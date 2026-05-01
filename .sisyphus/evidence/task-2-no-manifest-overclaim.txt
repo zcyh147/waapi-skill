@@ -1,0 +1,6 @@
+Command: python -c 'import json, pathlib; payload=json.loads(pathlib.Path('"'"'resources/coverage/2023.1/api-coverage.json'"'"').read_text(encoding='"'"'utf-8'"'"')); bad=[e['"'"'uri'"'"'] for e in payload['"'"'coverage'"'"'] if e['"'"'behavioral_evidence'"'"'].get('"'"'manifest_reflection_only'"'"') is True and (e['"'"'behavioral_evidence'"'"'].get('"'"'counts_as_behavioral'"'"') is True or e['"'"'behavioral_evidence'"'"'].get('"'"'counts_as_live_behavioral'"'"') is True)]; assert not bad, bad; print('"'"'invalid_manifest_only_promotions=0'"'"')'
+Exit code: 0
+Result: PASS
+
+stdout:
+invalid_manifest_only_promotions=0
