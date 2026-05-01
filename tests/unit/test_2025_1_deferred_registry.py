@@ -13,6 +13,7 @@ DEFERRED_RESOURCE = REPO_ROOT / "resources" / "deferred" / f"{VERSION}.json"
 COVERAGE_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "api-coverage.json"
 
 FORBIDDEN_PROMOTED_STATUSES = {"live-tested", "sandbox-mutating-tested"}
+REQUIRED_EXCLUDED_FAMILIES = {"CLI", "UI", "debug", "remote", "soundengine"}
 
 
 def test_2025_deferred_registry_loads_and_matches_all_blocked_coverage() -> None:
@@ -78,6 +79,17 @@ def test_2025_deferred_summary_reconciles_deferred_and_excluded_counts() -> None
     assert payload["summary"]["status_counts"] == status_counts
     assert status_counts["deferred"] + status_counts["excluded"] == 154
     assert payload["metadata"]["baseline_comparison"]["policy"] == "2024.1 evidence is comparison metadata only and never counts as 2025.1 proof."
+
+
+def test_2025_excluded_families_follow_policy_names() -> None:
+    payload = _deferred_payload()
+    excluded_entries = [entry for entry in payload["deferred"] if entry["coverage_status"] == "excluded"]
+    excluded_family_values = {entry["excluded_family"] for entry in excluded_entries}
+
+    assert REQUIRED_EXCLUDED_FAMILIES <= set(payload["metadata"]["excluded_families"])
+    assert excluded_family_values <= REQUIRED_EXCLUDED_FAMILIES
+    assert "cli" not in excluded_family_values
+    assert "CLI" in excluded_family_values
 
 
 def _deferred_payload() -> dict:

@@ -105,14 +105,12 @@ def test_2025_phase21_policy_reconciles_parity_buckets_candidates_and_blocked_li
     assert all(coverage_by_uri[uri]["coverage_status"] in {"deferred", "excluded"} for uri in candidate_uris)
 
 
-def test_2025_no_accidental_promotion_evidence_and_policy_agree() -> None:
+def test_2025_no_accidental_promotion_policy_is_tracked_json_only() -> None:
     policy = json.loads(POLICY_RESOURCE.read_text(encoding="utf-8"))
-    evidence_text = (REPO_ROOT / ".sisyphus" / "evidence" / "task-2025-7-no-accidental-promotion.txt").read_text(encoding="utf-8")
 
-    assert "Coverage live-tested count: 0" in evidence_text
-    assert "Coverage sandbox-mutating-tested count: 0" in evidence_text
     assert policy["summary"]["status_counts"]["live-tested"] == 0
     assert policy["summary"]["status_counts"]["sandbox-mutating-tested"] == 0
+    assert policy["summary"]["forbidden_promoted_counts"] == {"live-tested": 0, "sandbox-mutating-tested": 0}
     assert policy["policy"]["live_tested_uris"] == []
     assert policy["policy"]["sandbox_mutating_tested_uris"] == []
 
