@@ -1,0 +1,12 @@
+Task 1 evidence: 2024.1 fail-closed behavior
+
+Command: python -m pytest tests/unit/test_2024_version_contract.py tests/unit/test_2024_live_environment_contract.py -q
+Observed output:
+.........                                                                [100%]
+9 passed in 0.04s
+
+Scenario notes:
+- Wrong WwiseConsole paths are rejected with messages requiring the exact 2024.1 WwiseConsole path.
+- Wrong SampleProject paths are rejected with messages requiring the exact 2024.1 SampleProject path.
+- Bare WWISE_VERSION=2024 is not accepted as an alias for 2024.1.
+- Explicit WWISE_VERSION=2024.1 does not fall back to 2022.1, 2023.1, or generic 2024 paths.
