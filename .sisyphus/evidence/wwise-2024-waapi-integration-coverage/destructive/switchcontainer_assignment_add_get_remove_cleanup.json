@@ -2,24 +2,24 @@
   "case_id": "switchcontainer_assignment_add_get_remove_cleanup",
   "cleanup": "assignment is removed and disposable objects are deleted before test exit",
   "details": {
-    "active_destructive_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/sample-project-3be87ee99b89406b913d30137d9215ce/SampleProject.wproj",
+    "active_destructive_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/sample-project-e8dc3c34248d4524b6aa574719bc2258/SampleProject.wproj",
     "assignments_after_add": [
       {
-        "child": "{3CBAA43A-2FF2-4284-B100-F26E5BE6DDAE}",
-        "stateOrSwitch": "{1EFEBCA5-BB37-482C-87F3-2FC98A461B0E}"
+        "child": "{6776F345-20C6-48F0-BDEC-56C2FCD1A5CA}",
+        "stateOrSwitch": "{F4FC5434-802C-4F07-94E8-86402CD86ECB}"
       }
     ],
     "assignments_after_remove": [],
     "assignments_before": [],
     "read_after_target_delete": [],
-    "sandbox_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/sample-project-3be87ee99b89406b913d30137d9215ce/SampleProject.wproj",
+    "sandbox_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/sample-project-e8dc3c34248d4524b6aa574719bc2258/SampleProject.wproj",
     "source_immutability_guard": "Destructive2024SandboxRuntime.assert_source_unchanged runs on exit",
-    "switch_container_id": "{9AAA8FEC-36AE-4BFA-ABAE-90ACC4339DFB}",
-    "switch_group_id": "{4E175F66-15DA-483C-83EF-8E4B5D32F31F}",
-    "switch_id": "{1EFEBCA5-BB37-482C-87F3-2FC98A461B0E}",
-    "target_id": "{3CBAA43A-2FF2-4284-B100-F26E5BE6DDAE}"
+    "switch_container_id": "{E0C5887A-543A-4C9E-B768-877781EE24F4}",
+    "switch_group_id": "{3562796B-1382-41F6-9E78-FD1F5F7D3AC5}",
+    "switch_id": "{F4FC5434-802C-4F07-94E8-86402CD86ECB}",
+    "target_id": "{6776F345-20C6-48F0-BDEC-56C2FCD1A5CA}"
   },
-  "recorded_at_unix": 1777640982,
+  "recorded_at_unix": 1777641880,
   "sandbox_required": true,
   "source_project_mutation_allowed": false,
   "status": "passed",
