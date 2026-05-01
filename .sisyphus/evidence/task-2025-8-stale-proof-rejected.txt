@@ -1,0 +1,15 @@
+Task 2025-8 stale-proof rejection evidence
+
+Scope: local fail-closed unit mutations only. No behavior evidence was created and no URI was promoted.
+
+The hardened 2025.1 audit now rejects promoted entries when proof uses:
+- stale 2022, 2023, or 2024 paths/text;
+- bare 2025 roots such as resources/coverage/2025/, resources/waql/2025/, references/semantic/2025/, or .sisyphus/evidence/wwise-2025/;
+- an approved 2025.1 root with no fresh behavior content;
+- manifest-only, skipped-test, helper-only, or NotebookLM-only proof.
+
+The same test module includes a positive local mutation proving an approved 2025.1 root plus explicit fresh behavior text is accepted by the guard shape. This is a guard-only fixture, not a resource promotion.
+
+Focused stale-proof command during implementation:
+python -m pytest tests/unit/test_2025_1_cross_version_audit.py -q
+Result: 17 passed.
