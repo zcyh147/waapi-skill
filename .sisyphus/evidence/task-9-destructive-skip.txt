@@ -1,0 +1,5 @@
+Command: WWISE_VERSION=2023.1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py -q
+
+=========================== short test summary info ============================
+SKIPPED [1] tests/destructive/test_2023_project_mutation_sandbox.py:13: WWISE_LIVE=1 and WWISE_DESTRUCTIVE=1 are required for 2023.1 destructive sandbox tests
+1 skipped in 0.00s

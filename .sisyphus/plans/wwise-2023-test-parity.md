@@ -439,7 +439,7 @@ Wave 4: Final Verification Wave F1-F4.
 
   **Commit**: YES | Message: `docs(wwise): document 2023 parity evidence` | Files: `references/*.md`, `SKILL.md`, `evals/evals.json`, `.sisyphus/evidence/wwise-2023-test-parity/parity-review-packet.md`, `tests/unit/test_2023_docs_contract.py`
 
-- [ ] 9. Verify default Wwise-free behavior and 2023 explicit opt-in gates
+- [x] 9. Verify default Wwise-free behavior and 2023 explicit opt-in gates
 
   **What to do**: Run and, if needed, update tests that prove default pytest remains Wwise-free and default dispatch remains 2022.1. Ensure 2023.1 live/destructive tests skip unless explicitly opted in. Record command output in `.sisyphus/evidence/task-9-default-and-gates.txt`.
   **Must NOT do**: Do not require WwiseConsole for `python -m pytest -q`. Do not set repository-global environment defaults to 2023.1.
