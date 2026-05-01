@@ -1,0 +1,5 @@
+Task 2025-13 2025.1 unit suite verification
+command: python -m pytest tests/unit/test_2025_1_*.py -q
+exit_status: 0
+output_summary: 93 passed in 0.32s
+status: passed

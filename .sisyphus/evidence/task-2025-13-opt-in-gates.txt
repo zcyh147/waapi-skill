@@ -1,0 +1,9 @@
+Task 2025-13 opt-in gates verification
+command: python -m pytest tests/live/test_2025_1_live_prerequisites.py tests/live/test_2025_1_reflection_inventory.py tests/live/test_2025_1_waql_live_matrix.py -q
+exit_status: 0
+output_summary: 12 skipped in 0.02s; all 2025.1 live tests failed closed because `WWISE_LIVE=1` was absent
+command: python -m pytest tests/destructive/test_2025_1_project_mutation_sandbox.py tests/destructive/test_2025_1_soundbank_audio_sandbox.py tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py -q
+exit_status: 0
+output_summary: 3 skipped in 0.01s; all 2025.1 destructive tests failed closed because `WWISE_LIVE=1` and `WWISE_DESTRUCTIVE=1` were absent
+runtime_leakage_check: `git status --short -- .sisyphus/runtime` and `git ls-files .sisyphus/runtime` produced no output
+status: passed

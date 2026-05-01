@@ -605,7 +605,7 @@ Wave 5: F1-F4 final review agents.
 
   **Commit**: YES | Message: `docs(wwise): document 2025 parity evidence` | Files: `references/*.md` if needed, `evals/evals.json` if needed, `tests/unit/test_2025_1_docs_contract.py`, `.sisyphus/evidence/wwise-2025-waapi-integration-coverage/parity-review-packet.md`, `.sisyphus/evidence/task-2025-12-*.txt`
 
-- [ ] 13. Verify 2025 opt-in gates and 2022/2024 regression safety
+- [x] 13. Verify 2025 opt-in gates and 2022/2024 regression safety
 
   **What to do**: Prove default pytest remains Wwise-free/2022.1-compatible and 2025 live/destructive suites require explicit opt-in. Add or update gate tests as needed. Run default full suite, focused 2025 unit suite, 2024 regression tests after shared-code changes, live-without-opt-in skip/fail-safe check, and destructive-without-opt-in skip/fail-safe check. Record exact outputs.
   **Must NOT do**: Do not mark skipped live/destructive tests as behavior evidence.

@@ -41,3 +41,6 @@
 - Docs/evals no-overclaim guards should avoid repeating forbidden Windows or support claims verbatim, even inside warning text or eval forbidden terms, because the contract scans user-facing surfaces as plain text.
 
 - Task 12 residual cleanup kept `SKILL.md` in the docs contract because it is the primary user-facing skill surface; stale 2025 follow-up wording there breaks scoped 2025.1 support claims even when reference packets are correct.
+
+- Task 13 confirmed the default suite stays Wwise-free: `python -m pytest -q` passed with live/destructive tests skipped only through the `WWISE_LIVE` / `WWISE_DESTRUCTIVE` opt-in gates.
+- Task 13 confirmed 2025.1 gate behavior without opt-in: live suites skipped before Wwise launch and destructive suites skipped before sandbox mutation, while the 2024 regression slice still passed unchanged.

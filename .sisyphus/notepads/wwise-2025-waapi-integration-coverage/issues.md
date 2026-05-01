@@ -43,3 +43,5 @@
 
 - Resolved during Task 12 residual cleanup: `.gitignore` evidence exceptions were scope creep because prior planned `.sisyphus/evidence` artifacts can be included with `git add -f`; reverted the ignore-policy change and kept only scoped docs/test updates.
 - Resolved during Task 12 residual cleanup: full pytest exposed stale 2023 docs-contract wording that expected 2025 to remain future-only; updated the regression to assert scoped 2025.1 support instead.
+
+- Task 13 had no new blockers; the only noteworthy outcome was that live/destructive 2025.1 selections failed closed exactly as intended when opt-in env vars were absent.
