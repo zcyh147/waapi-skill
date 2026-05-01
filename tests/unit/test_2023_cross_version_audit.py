@@ -34,10 +34,20 @@ COVERAGE_2022 = ROOT / "resources" / "coverage" / VERSION_2022 / "api-coverage.j
 COVERAGE_2023 = ROOT / "resources" / "coverage" / VERSION_2023 / "api-coverage.json"
 LIVE_MATRIX_2023 = ROOT / "resources" / "coverage" / VERSION_2023 / "live-coverage-matrix.json"
 PHASE2_SUMMARY_2023 = ROOT / "resources" / "coverage" / VERSION_2023 / "phase2-coverage-summary.json"
+POLICY_2023 = ROOT / "resources" / "coverage" / VERSION_2023 / "phase21-uri-policy.json"
 DEFERRED_2023 = ROOT / "resources" / "deferred" / "2023.1.json"
 WAQL_2023 = ROOT / "resources" / "waql" / VERSION_2023 / "object-get-live-matrix.json"
 FIXTURE_2023 = ROOT / "tests" / "_org" / VERSION_2023
 REFERENCES_2023 = ROOT / "references" / "semantic" / VERSION_2023
+LIVE_TESTED_2023_URI = "ak.wwise.core.object.get"
+READBACK_HELPER_URIS = {
+    "ak.wwise.core.soundbank.getInclusions",
+    "ak.wwise.core.switchContainer.getAssignments",
+}
+APPROVED_2023_PROMOTION_EVIDENCE = (
+    ".sisyphus/evidence/wwise-2023-test-parity/",
+    "resources/waql/2023.1/",
+)
 EXPECTED_FAMILIES = {
     "query",
     "object-mutation",
@@ -147,33 +157,66 @@ def test_2023_semantic_source_notes_use_2023_notebook_and_versioned_references()
 
 
 def test_2023_coverage_deferred_and_waql_counts_are_version_separated() -> None:
+    manifest = ManifestStore(root=MANIFEST_ROOT).load(VERSION_2023)
     coverage = _read_json(COVERAGE_2023)
     live_matrix = _read_json(LIVE_MATRIX_2023)
     phase2_summary = _read_json(PHASE2_SUMMARY_2023)
+    policy = _read_json(POLICY_2023)
     deferred = _read_json(DEFERRED_2023)
     waql = _read_json(WAQL_2023)
+    coverage_entries = coverage["coverage"]
+    matrix_entries = live_matrix["matrix"]
+    summary_entries = phase2_summary["entries"]
+    coverage_by_uri = {entry["uri"]: entry for entry in coverage_entries}
+    matrix_by_uri = {entry["uri"]: entry for entry in matrix_entries}
+    summary_by_uri = {entry["uri"]: entry for entry in summary_entries}
+    reflected_uris = sorted(entry["uri"] for entry in manifest["functions"] + manifest["topics"])
+    expected_status_counts = _counts_with_summary_zeroes(_count_by_key(coverage_entries, "coverage_status"), coverage["summary"]["status_counts"])
+    expected_parity_counts = _counts_with_summary_zeroes(
+        _count_by_key(coverage_entries, "parity_bucket"),
+        coverage["summary"]["parity_bucket_counts"],
+    )
+    behavioral_uris = {entry["uri"] for entry in matrix_entries if entry["counts_as_behavioral"] is True}
+    live_behavioral_uris = {entry["uri"] for entry in matrix_entries if entry["counts_as_live_behavioral"] is True}
+    promoted_uris = {LIVE_TESTED_2023_URI, *SANDBOX_MUTATING_TESTED_2023_URIS}
 
     assert coverage["summary"]["implemented"] == 181
     assert coverage["summary"]["total_functions"] == 149
     assert coverage["summary"]["total_topics"] == 32
-    assert sum(coverage["summary"]["status_counts"].values()) == 181
+    assert [entry["uri"] for entry in coverage_entries] == reflected_uris
+    assert [entry["uri"] for entry in matrix_entries] == reflected_uris
+    assert [entry["uri"] for entry in summary_entries] == reflected_uris
+    assert len(coverage_by_uri) == len(matrix_by_uri) == len(summary_by_uri) == 181
+    assert coverage["summary"]["status_counts"] == expected_status_counts
+    assert coverage["summary"]["parity_bucket_counts"] == expected_parity_counts
+    assert coverage["summary"]["parity_bucket_total"] == 181
     assert coverage["summary"]["live_tested"] == 1
-    assert coverage["summary"]["behavioral_supported"] == 1 + len(SANDBOX_MUTATING_TESTED_2023_URIS)
-    assert {entry["version"] for entry in coverage["coverage"]} == {VERSION_2023}
-    assert all(entry["schema_mapping"]["manifest_uri"].startswith("resources/manifest/2023.1/") for entry in coverage["coverage"])
+    assert coverage["summary"]["behavioral_supported"] == len(promoted_uris)
+    assert {entry["version"] for entry in coverage_entries} == {VERSION_2023}
+    assert all(entry["schema_mapping"]["manifest_uri"].startswith("resources/manifest/2023.1/") for entry in coverage_entries)
 
     assert live_matrix["summary"]["reflected_count"] == 181
-    assert len(live_matrix["matrix"]) == 181
-    assert sum(live_matrix["summary"]["status_counts"].values()) == 181
+    assert len(matrix_entries) == 181
+    assert live_matrix["summary"]["status_counts"] == expected_status_counts
+    assert live_matrix["summary"]["parity_bucket_counts"] == expected_parity_counts
+    assert live_matrix["summary"]["parity_bucket_total"] == 181
     assert live_matrix["summary"]["live_tested"] == 1
-    assert {entry["version"] for entry in live_matrix["matrix"]} == {VERSION_2023}
-    assert all(entry["source_coverage_uri"] == "resources/coverage/2023.1/api-coverage.json" for entry in live_matrix["matrix"])
+    assert {entry["version"] for entry in matrix_entries} == {VERSION_2023}
+    assert all(entry["source_coverage_uri"] == "resources/coverage/2023.1/api-coverage.json" for entry in matrix_entries)
     assert phase2_summary["metadata"]["baseline_resource"] == "resources/coverage/2023.1/api-coverage.json"
     assert phase2_summary["metadata"]["live_matrix_resource"] == "resources/coverage/2023.1/live-coverage-matrix.json"
-    assert phase2_summary["summary"]["behavioral_covered_count"] == 1 + len(SANDBOX_MUTATING_TESTED_2023_URIS)
-    assert phase2_summary["summary"]["live_behavioral_covered_count"] == 1 + len(SANDBOX_MUTATING_TESTED_2023_URIS)
-    coverage_status_counts = coverage["summary"]["status_counts"]
-    coverage_by_uri = {entry["uri"]: entry for entry in coverage["coverage"]}
+    assert phase2_summary["summary"]["reflected_count"] == 181
+    assert phase2_summary["summary"]["status_counts"] == expected_status_counts
+    assert phase2_summary["summary"]["parity_bucket_counts"] == expected_parity_counts
+    assert phase2_summary["summary"]["parity_bucket_total"] == 181
+    assert phase2_summary["summary"]["behavioral_covered_count"] == len(behavioral_uris) == len(promoted_uris)
+    assert phase2_summary["summary"]["live_behavioral_covered_count"] == len(live_behavioral_uris) == len(promoted_uris)
+    assigned_policy_uris = [uri for uris in policy["policy"]["parity_buckets"].values() for uri in uris]
+    assert sorted(assigned_policy_uris) == reflected_uris
+    assert len(assigned_policy_uris) == len(set(assigned_policy_uris)) == 181
+    assert policy["summary"]["status_counts"] == expected_status_counts
+    assert policy["summary"]["parity_bucket_counts"] == expected_parity_counts
+    assert policy["summary"]["parity_bucket_total"] == 181
     active_deferred_entries = [
         entry
         for entry in deferred["deferred"]
@@ -181,13 +224,40 @@ def test_2023_coverage_deferred_and_waql_counts_are_version_separated() -> None:
     ]
     deferred_status_counts = _count_by_key(active_deferred_entries, "coverage_status")
     assert deferred_status_counts == {
-        "deferred": coverage_status_counts["deferred"],
-        "excluded": coverage_status_counts["excluded"],
+        "deferred": expected_status_counts["deferred"],
+        "excluded": expected_status_counts["excluded"],
     }
-    assert {entry["uri"] for entry in coverage["coverage"] if entry["coverage_status"] == "sandbox-mutating-tested"} == SANDBOX_MUTATING_TESTED_2023_URIS
-    assert coverage_status_counts["untested"] > 0
+    assert {entry["uri"] for entry in deferred["deferred"]} == {
+        entry["uri"] for entry in coverage_entries if entry["coverage_status"] in {"deferred", "excluded"}
+    }
+    assert {entry["uri"] for entry in coverage_entries if entry["coverage_status"] == "live-tested"} == {LIVE_TESTED_2023_URI}
+    assert {entry["uri"] for entry in coverage_entries if entry["coverage_status"] == "sandbox-mutating-tested"} == SANDBOX_MUTATING_TESTED_2023_URIS
+    assert expected_status_counts["untested"] > 0
     assert {entry["version"] for entry in deferred["deferred"]} == {VERSION_2023}
     assert all("resources/manifest/2023.1" in entry["evidence_source"] for entry in deferred["deferred"])
+    assert all(coverage_by_uri[uri]["coverage_status"] == "supported" for uri in READBACK_HELPER_URIS)
+    assert all(coverage_by_uri[uri]["parity_bucket"] == "conformance-only" for uri in READBACK_HELPER_URIS)
+    assert all(matrix_by_uri[uri]["counts_as_behavioral"] is False for uri in READBACK_HELPER_URIS)
+    for uri, entry in coverage_by_uri.items():
+        matrix_entry = matrix_by_uri[uri]
+        summary_entry = summary_by_uri[uri]
+        evidence = entry["behavioral_evidence"]
+        assert matrix_entry["coverage_status"] == entry["coverage_status"], uri
+        assert summary_entry["coverage_status"] == entry["coverage_status"], uri
+        assert matrix_entry["parity_bucket"] == entry["parity_bucket"], uri
+        assert summary_entry["parity_bucket"] == entry["parity_bucket"], uri
+        assert matrix_entry["counts_as_behavioral"] == evidence["counts_as_behavioral"], uri
+        assert matrix_entry["counts_as_live_behavioral"] == evidence["counts_as_live_behavioral"], uri
+        if uri in promoted_uris:
+            assert evidence["manifest_reflection_only"] is False, uri
+            assert evidence["counts_as_behavioral"] is True, uri
+            assert evidence["counts_as_live_behavioral"] is True, uri
+            assert _has_approved_2023_promotion_evidence(evidence), uri
+        elif evidence.get("manifest_reflection_only") is True:
+            assert entry["coverage_status"] not in {"live-tested", "sandbox-mutating-tested"}, uri
+            assert entry["parity_bucket"] not in {"live-tested", "sandbox-mutating-tested"}, uri
+            assert evidence["counts_as_behavioral"] is False, uri
+            assert evidence["counts_as_live_behavioral"] is False, uri
 
     assert waql["summary"]["version"] == VERSION_2023
     assert waql["summary"]["coverage_status"] == "live-tested"
@@ -235,3 +305,12 @@ def _count_by_key(entries: list[dict[str, Any]], key: str) -> dict[str, int]:
         value = str(entry[key])
         counts[value] = counts.get(value, 0) + 1
     return counts
+
+
+def _has_approved_2023_promotion_evidence(evidence: dict[str, Any]) -> bool:
+    encoded_evidence = json.dumps(evidence, sort_keys=True)
+    return any(source in encoded_evidence for source in APPROVED_2023_PROMOTION_EVIDENCE)
+
+
+def _counts_with_summary_zeroes(counts: dict[str, int], summary_counts: dict[str, int]) -> dict[str, int]:
+    return {key: counts.get(key, 0) for key in summary_counts}

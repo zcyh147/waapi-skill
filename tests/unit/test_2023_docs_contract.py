@@ -28,6 +28,8 @@ def test_2023_docs_include_exact_paths_and_no_full_coverage_claims() -> None:
     assert "Runtime reads local persisted evidence" in combined
     assert "2024 and 2025 are future sequential follow-ups" in combined
     assert "not implemented here" in combined
+    assert "Manifest reflection proves inventory only" in combined
+    assert "Manifest reflection, skipped live tests, and skipped destructive tests are not behavioral proof." in combined
 
     forbidden_positive_claims = (
         "complete 2023.1 support",
@@ -35,6 +37,9 @@ def test_2023_docs_include_exact_paths_and_no_full_coverage_claims() -> None:
         "all 2023.1 APIs are behavior-tested",
         "all 2023.1 APIs are live-tested",
         "2023.1 full WAAPI coverage",
+        "manifest reflection proves behavioral support",
+        "manifest reflection is live evidence",
+        "manifest-only live-tested",
     )
     lowered = combined.lower()
     for claim in forbidden_positive_claims:

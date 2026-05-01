@@ -358,7 +358,7 @@ Wave 4: Final Verification Wave F1-F4.
 
   **Commit**: YES | Message: `test(live): harden 2023 destructive safety gates` | Files: `wwise_waapi/live_environment.py`, `wwise_waapi/destructive_2023_sandbox.py`, `wwise_waapi/sandbox_fixture.py`, `tests/unit/*`, `tests/destructive/test_2023_*.py`
 
-- [ ] 7. Update audit tests to enforce parity counts and evidence-backed promotions
+- [x] 7. Update audit tests to enforce parity counts and evidence-backed promotions
 
   **What to do**: Update unit/audit tests so 2023.1 parity cannot regress: all 181 APIs classified exactly once; coverage/matrix/summary/deferred counts reconcile; no unsupported promotion; default version stays 2022.1; explicit 2023.1 resource lookups never read 2022.1 fallback paths. The tests must permit new evidence-backed 2023.1 behavioral counts from Tasks 3-4 while rejecting manifest-only claims.
   **Must NOT do**: Do not hardcode obsolete `live_tested == 0` if Tasks 3-4 legitimately promote live evidence. Replace with evidence-backed assertions.
