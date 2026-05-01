@@ -164,7 +164,7 @@ Wave 5: F1-F4 final review agents.
 
   **Commit**: YES | Message: `feat(wwise): add 2025 version contracts` | Files: `wwise_waapi/versions.py`, `wwise_waapi/live_environment.py`, `tests/unit/test_2025_1_*.py`
 
-- [ ] 2. Create immutable 2025.1 fixture source from installed SampleProject
+- [x] 2. Create immutable 2025.1 fixture source from installed SampleProject
 
   **What to do**: Copy only `/Applications/Audiokinetic/SampleProject2025.1.7.9143/SampleProject/SampleProject.wproj` and authored `.wwu` files into `tests/_org/2025.1/`. Generate `README.md`, `fixture-metadata.json`, and `fixture-manifest.json` matching the 2024 fixture conventions. Exclude generated banks, logs, caches, audio outputs, runtime files, auth state, and platform-generated outputs.
   **Must NOT do**: Do not mutate or commit the installed SampleProject. Do not copy generated artifacts.
