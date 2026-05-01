@@ -1,0 +1,43 @@
+Task 13 runtime/generated artifact leakage check
+Date: 2026-05-01
+
+Command:
+git status --short
+
+Output:
+ M .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/audio_import_generated_wav_readback_cleanup.json
+ M .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/object_create_set_delete_readback.json
+ M .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/soundbank_inclusions_replace_read_remove_cleanup.json
+ M .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/switchcontainer_assignment_add_get_remove_cleanup.json
+ M .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json
+ M .sisyphus/evidence/wwise-2024-waapi-integration-coverage/live-read-only/children_count_property_comparison_2024_contract.json
+ M .sisyphus/evidence/wwise-2024-waapi-integration-coverage/live-read-only/descendant_traversal_actor_mixer_2024_contract.json
+ M .sisyphus/evidence/wwise-2024-waapi-integration-coverage/live-read-only/empty_results_missing_name_2024_contract.json
+ M .sisyphus/evidence/wwise-2024-waapi-integration-coverage/live-read-only/guid_actor_mixer_root_2024_contract.json
+ M .sisyphus/evidence/wwise-2024-waapi-integration-coverage/live-read-only/path_actor_mixer_root_2024_contract.json
+ M .sisyphus/evidence/wwise-2024-waapi-integration-coverage/live-read-only/quoted_search_default_work_unit_2024_contract.json
+ M .sisyphus/evidence/wwise-2024-waapi-integration-coverage/live-read-only/return_options_selection_2024_contract.json
+ M .sisyphus/evidence/wwise-2024-waapi-integration-coverage/live-read-only/type_sound_filter_2024_contract.json
+
+Interpretation:
+Only existing tracked 2024 evidence JSON rewrites from the exact live/destructive reruns were present before creating Task 13 evidence files and updating the packet. No .sisyphus/runtime paths, sandbox copies, generated banks, logs, .akd, .bnk, .wem, caches, or audio artifacts appeared in working status.
+
+Command:
+git status --short -- .sisyphus/runtime
+
+Output:
+(no output)
+
+Command:
+git ls-files .sisyphus/runtime
+
+Output:
+(no output)
+
+Conclusion:
+No runtime/generated artifacts are staged or tracked. The runtime root retained no copied sandbox directory leakage in git status or tracked files.
+
+Runtime directory readback:
+- .sisyphus/runtime/wwise-waapi-sandboxes contains only .wwise-live-sandbox.lock.
+- .sisyphus/runtime/wwise-2024-live-smoke-sandboxes contains only .wwise-live-sandbox.lock.
+- No copied SampleProject sandbox directories, generated banks, logs, caches, .akd, .bnk, .wem, or audio artifacts remained under the inspected runtime roots.

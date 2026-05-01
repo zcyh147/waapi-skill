@@ -567,7 +567,7 @@ Support Wwise 2024.1.13 WAAPI resources and tests as an explicit opt-in version 
 
   **Commit**: YES | Message: `test(wwise): verify 2024 opt-in gates` | Files: `.sisyphus/evidence/task-2024-12-*.txt`, tests only if gate fixes needed
 
-- [ ] 13. Final 2024 resource, evidence, and artifact reconciliation
+- [x] 13. Final 2024 resource, evidence, and artifact reconciliation
 
   **What to do**: Reconcile all 2024 resources and evidence after Tasks 1-12. Confirm no orphan APIs, no stale 2023/2022 paths in explicit 2024 resources, no missing evidence files for promoted entries, no risky accidental promotions, no docs contradictions, and no runtime artifacts staged/tracked. Update 2024 parity review packet with final command results and counts.
   **Must NOT do**: Do not silently drop APIs to make counts pass; do not run 2025 work.

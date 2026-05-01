@@ -55,6 +55,22 @@ Task 11 docs contract command:
 python -m pytest tests/unit/test_2024_docs_contract.py -q
 ```
 
+Task 13 final focused 2024 audit command:
+
+```bash
+python -m pytest tests/unit/test_2024_api_resource_coverage.py tests/unit/test_2024_deferred_registry.py tests/unit/test_2024_live_coverage_matrix.py tests/unit/test_2024_cross_version_audit.py tests/unit/test_2024_docs_contract.py -q
+```
+
+Result: `26 passed in 0.10s`.
+
+Task 13 final exact 2024 live command result: `10 passed in 81.37s (0:01:21)`.
+
+Task 13 final exact 2024 destructive command result: `5 passed in 203.54s (0:03:23)`.
+
+Task 13 final default full suite result: `553 passed, 42 skipped in 1.51s`.
+
+Task 13 final reconciliation counts: 148 reflected functions, 148 coverage entries, 148 live matrix entries, 137 deferred/excluded registry entries, one live-tested URI (`ak.wwise.core.object.get`), ten sandbox-mutating-tested URIs, 64 deferred entries, 73 excluded entries, zero risky-family promotions, and zero missing promoted evidence paths.
+
 ## Source Immutability
 
 Task 10 ran through the 2024.1 destructive sandbox runtime, which asserts source SampleProject `.wproj` and `.wwu` hash and mtime invariance during cleanup. Each mutating test used a copied 2024.1 SampleProject sandbox under `WWISE_SANDBOX_ROOT`, unique WAAPI names, readback or state assertions, and cleanup or read-after-delete checks.
