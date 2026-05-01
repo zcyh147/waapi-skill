@@ -23,6 +23,7 @@ DOC_PATHS = (
     TASK12_REVIEW_PACKET,
 )
 DOC_CONTRACT_PATHS = (
+    ROOT / "SKILL.md",
     ROOT / "references" / "long-run-runbook.md",
     ROOT / "references" / "eval-review-workflow.md",
     ROOT / "references" / "phase2-user-review-packet.md",
@@ -155,6 +156,10 @@ def test_2025_docs_include_exact_counts_paths_commands_and_limited_claims() -> N
     assert "95 deferred" in combined
     assert "48 excluded" in combined
     assert "2024 evidence is comparison metadata only" in combined
+    assert "Wwise 2023.1, 2024.1, and 2025.1 are supported only where versioned manifests" in combined
+    assert "resources/manifest/2025.1/" in combined
+    assert "resources/semantic/2025.1/source_notes.json" in combined
+    assert "resources/coverage/2025.1/" in combined
     assert "skipped live or destructive tests" in combined
     assert "NotebookLM-only text" in combined
     assert "not runtime proof" in combined
@@ -251,7 +256,11 @@ def _claim_surfaces() -> list[tuple[Path, str]]:
             continue
         text = path.read_text(encoding="utf-8")
         is_2025_surface = SEMANTIC_2025_REFERENCES in path.parents or "2025" in path.name or path.name == "SKILL.md" or path == TASK12_REVIEW_PACKET
-        if is_2025_surface and "2025.1" in text:
+        if not is_2025_surface or "2025.1" not in text:
+            continue
+        if path.name == "SKILL.md":
+            surfaces.extend((path, line) for line in text.splitlines() if "2025.1" in line)
+        else:
             surfaces.append((path, text))
 
     payload: dict[str, Any] = json.loads(EVALS_JSON.read_text(encoding="utf-8"))

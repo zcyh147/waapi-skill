@@ -39,3 +39,5 @@
 - Task 12 docs contract now verifies 2025.1 parity wording from live resources: 154 reflected functions, one live-tested read-only URI, ten sandbox-mutating-tested URIs, and 143 deferred/excluded entries split as 95 deferred and 48 excluded.
 - The 2025.1 review packet must keep Task 6 classification separate from behavior evidence: 70 added/changed entries, 59 functions, 11 topics, 7 added, 63 changed, with candidate statuses treated as review hints only.
 - Docs/evals no-overclaim guards should avoid repeating forbidden Windows or support claims verbatim, even inside warning text or eval forbidden terms, because the contract scans user-facing surfaces as plain text.
+
+- Task 12 residual cleanup kept `SKILL.md` in the docs contract because it is the primary user-facing skill surface; stale 2025 follow-up wording there breaks scoped 2025.1 support claims even when reference packets are correct.

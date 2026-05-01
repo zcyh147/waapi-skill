@@ -40,3 +40,6 @@
 
 - Resolved during Task 12: the initial docs contract failed because an eval forbidden term and a runbook warning repeated Windows-overclaim phrases verbatim. Reworded both to reject the claim without embedding the exact forbidden language.
 - Task 12 verification note: JSON resources and eval metadata were validated through Python JSON loading plus `python -m pytest tests/unit/test_2025_1_docs_contract.py tests/unit/test_eval_metadata.py -q`; Python LSP diagnostics were clean for the new test.
+
+- Resolved during Task 12 residual cleanup: `.gitignore` evidence exceptions were scope creep because prior planned `.sisyphus/evidence` artifacts can be included with `git add -f`; reverted the ignore-policy change and kept only scoped docs/test updates.
+- Resolved during Task 12 residual cleanup: full pytest exposed stale 2023 docs-contract wording that expected 2025 to remain future-only; updated the regression to assert scoped 2025.1 support instead.
