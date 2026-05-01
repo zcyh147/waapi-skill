@@ -1,0 +1,27 @@
+{
+  "case_id": "audio_import_generated_wav_readback_cleanup",
+  "cleanup": "objects are removed and read back absent before test exit",
+  "details": {
+    "active_destructive_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/sample-project-953920f0df2a4c4cb5cbf2393d2a7ebb/SampleProject.wproj",
+    "audio_file": "Task2025GeneratedAudio/WAAPI_2025_AUDIO_import_c025b3070181.wav",
+    "imported_name": "WAAPI_2025_AUDIO_import_c025b3070181",
+    "readback": {
+      "id": "{3D23C313-683D-43BA-BD62-704A49CBDF40}",
+      "name": "WAAPI_2025_AUDIO_import_c025b3070181",
+      "notes": "2025.1 generated audio import behavior WAAPI_2025_AUDIO_import_c025b3070181",
+      "path": "\\Containers\\Default Work Unit\\WAAPI_2025_AUDIO_import_c025b3070181",
+      "type": "Sound"
+    },
+    "sandbox_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/sample-project-953920f0df2a4c4cb5cbf2393d2a7ebb/SampleProject.wproj",
+    "sound_id": "{3D23C313-683D-43BA-BD62-704A49CBDF40}",
+    "source_immutability_guard": "Destructive2025SandboxRuntime.assert_source_unchanged runs on exit"
+  },
+  "recorded_at_unix": 1777659270,
+  "sandbox_required": true,
+  "source_project_mutation_allowed": false,
+  "status": "passed",
+  "uris": [
+    "ak.wwise.core.audio.import"
+  ],
+  "version": "2025.1"
+}

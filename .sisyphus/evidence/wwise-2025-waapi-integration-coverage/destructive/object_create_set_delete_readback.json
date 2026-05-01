@@ -1,0 +1,23 @@
+{
+  "case_id": "object_create_set_delete_readback",
+  "cleanup": "objects are removed and read back absent before test exit",
+  "details": {
+    "active_destructive_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/sample-project-58ab5b49704f4175a821e5941891ce73/SampleProject.wproj",
+    "created_id": "{1CD978E1-E7AD-4182-82A6-D21D127E3DA4}",
+    "created_name": "WAAPI_2025_MUTATION_actor_99e9e4e264cc",
+    "notes_readback": "2025.1 destructive sandbox behavior notes WAAPI_2025_MUTATION_actor_99e9e4e264cc",
+    "read_after_delete": [],
+    "sandbox_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/sample-project-58ab5b49704f4175a821e5941891ce73/SampleProject.wproj",
+    "source_immutability_guard": "Destructive2025SandboxRuntime.assert_source_unchanged runs on exit"
+  },
+  "recorded_at_unix": 1777659121,
+  "sandbox_required": true,
+  "source_project_mutation_allowed": false,
+  "status": "passed",
+  "uris": [
+    "ak.wwise.core.object.create",
+    "ak.wwise.core.object.set",
+    "ak.wwise.core.object.delete"
+  ],
+  "version": "2025.1"
+}

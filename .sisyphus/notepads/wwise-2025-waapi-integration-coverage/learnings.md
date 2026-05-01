@@ -32,3 +32,6 @@
 
 - Task 10 added a separate 2025.1 destructive sandbox wrapper instead of changing the default dispatcher/runtime: opt-in/version/exact-path gates run before lock/prep, copied-sandbox target checks run before source hashing or launch, and immutable installed/tests/_org targets fail closed.
 - Task 10 verification passed with `python -m pytest tests/unit/test_2025_1_destructive_safety.py -q`, the 2024 regression command, and focused 2025.1 live-environment/fixture regressions; evidence is saved under `.sisyphus/evidence/task-2025-10-*.txt`.
+
+- Task 11 promoted ten fresh 2025.1 copied-sandbox destructive mutators: audio.import; object.create/delete/set; soundbank.setInclusions; switchContainer.add/removeAssignment; undo.begin/end/undo. Helper readbacks (`object.get`, `soundbank.getInclusions`, `switchContainer.getAssignments`) remain unpromoted unless separately behavior-tested.
+- 2025.1 object creation under `\\Containers\\Default Work Unit` reads back `ActorMixer` creations as `PropertyContainer`, so destructive parity assertions must use 2025 readback semantics rather than 2024 `ActorMixer` type expectations.

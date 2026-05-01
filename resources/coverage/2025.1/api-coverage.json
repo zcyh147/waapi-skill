@@ -3991,13 +3991,19 @@
       "behavioral_evidence": {
         "candidate_origin": "task6-classification",
         "candidate_status": "candidate-sandbox-mutating",
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "2025.1 manifest/source-note/classification reconciliation only; no behavior evidence was created in this task.",
-        "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": "Fresh 2025.1 copied-sandbox destructive behavior passed for ak.wwise.core.audio.import.",
+        "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/audio_import_generated_wav_readback_cleanup.json",
+        "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/audio_import_generated_wav_readback_cleanup.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.audio.import.",
+        "fixture_prerequisites": [
+          ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/audio_import_generated_wav_readback_cleanup.json"
+        ],
+        "live_command_evidence": ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
         "previous_2024_status": "sandbox-mutating-tested",
         "source_note_family": "import",
         "source_paths": [
@@ -4006,38 +4012,38 @@
           "resources/semantic/2025.1/source_notes.json",
           "resources/coverage/2025.1/added-api-classification.json"
         ],
-        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+        "test": "tests/destructive/test_2025_1_soundbank_audio_sandbox.py"
       },
       "candidate_status": "candidate-sandbox-mutating",
       "category": "core.audio",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Task 6 marked this as a candidate only; Tasks 9/11 must add fresh 2025.1 live or sandbox behavior evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2025.1/functions.json (live reflection via 2025.1 SampleProject)",
-        "review_trigger": "When fresh 2025.1 behavioral tests, live evidence, or policy for core.audio changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note/classification reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by fresh 2025.1 copied-sandbox destructive behavior evidence with readback and cleanup assertions.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/audio_import_generated_wav_readback_cleanup.json",
+        "review_trigger": "When the 2025.1 destructive copied-sandbox behavior contract changes or evidence is refreshed.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2025_1_soundbank_audio_sandbox.py."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
+      "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/audio_import_generated_wav_readback_cleanup.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.audio.import.",
       "inventory_change": "changed",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "previous_2024_status": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2025_1_deferred_registry.py",
+        "route_test": "tests/destructive/test_2025_1_soundbank_audio_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "Task 6 classified this 2025.1 inventory entry as planning-only; no 2025 behavior evidence exists yet."
+        "reason": "Fresh 2025.1 destructive copied-sandbox test passed with reversible mutation, readback, cleanup, and source immutability guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.audio.import",
@@ -4079,11 +4085,11 @@
       "schema_status": "ok",
       "source_note_family": "import",
       "task6_classification_status": "candidate-sandbox-mutating",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.audio.import",
       "usage_guidance": {
-        "default_path": "candidate-sandbox-mutating-needs-2025-evidence",
-        "notes": "Do not use 2024 evidence or manifest reflection as 2025.1 behavior proof; keep blocked until fresh 2025.1 evidence exists."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Use only with WWISE_LIVE=1, WWISE_DESTRUCTIVE=1, exact 2025.1 installed paths, and copied-sandbox safety gates."
       },
       "version": "2025.1"
     },
@@ -6150,13 +6156,19 @@
       "behavioral_evidence": {
         "candidate_origin": "task6-classification",
         "candidate_status": "candidate-sandbox-mutating",
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "2025.1 manifest/source-note/classification reconciliation only; no behavior evidence was created in this task.",
-        "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": "Fresh 2025.1 copied-sandbox destructive behavior passed for ak.wwise.core.object.create.",
+        "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/object_create_set_delete_readback.json",
+        "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/object_create_set_delete_readback.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.object.create.",
+        "fixture_prerequisites": [
+          ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/object_create_set_delete_readback.json"
+        ],
+        "live_command_evidence": ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
         "previous_2024_status": "sandbox-mutating-tested",
         "source_note_family": "object-mutation",
         "source_paths": [
@@ -6165,38 +6177,38 @@
           "resources/semantic/2025.1/source_notes.json",
           "resources/coverage/2025.1/added-api-classification.json"
         ],
-        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+        "test": "tests/destructive/test_2025_1_project_mutation_sandbox.py"
       },
       "candidate_status": "candidate-sandbox-mutating",
       "category": "core.object",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Task 6 marked this as a candidate only; Tasks 9/11 must add fresh 2025.1 live or sandbox behavior evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2025.1/functions.json (live reflection via 2025.1 SampleProject)",
-        "review_trigger": "When fresh 2025.1 behavioral tests, live evidence, or policy for core.object changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note/classification reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by fresh 2025.1 copied-sandbox destructive behavior evidence with readback and cleanup assertions.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/object_create_set_delete_readback.json",
+        "review_trigger": "When the 2025.1 destructive copied-sandbox behavior contract changes or evidence is refreshed.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2025_1_project_mutation_sandbox.py."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
+      "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/object_create_set_delete_readback.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.object.create.",
       "inventory_change": "changed",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "previous_2024_status": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2025_1_deferred_registry.py",
+        "route_test": "tests/destructive/test_2025_1_project_mutation_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "Task 6 classified this 2025.1 inventory entry as planning-only; no 2025 behavior evidence exists yet."
+        "reason": "Fresh 2025.1 destructive copied-sandbox test passed with reversible mutation, readback, cleanup, and source immutability guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.create",
@@ -6241,11 +6253,11 @@
       "schema_status": "ok",
       "source_note_family": "object-mutation",
       "task6_classification_status": "candidate-sandbox-mutating",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.object.create",
       "usage_guidance": {
-        "default_path": "candidate-sandbox-mutating-needs-2025-evidence",
-        "notes": "Do not use 2024 evidence or manifest reflection as 2025.1 behavior proof; keep blocked until fresh 2025.1 evidence exists."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Use only with WWISE_LIVE=1, WWISE_DESTRUCTIVE=1, exact 2025.1 installed paths, and copied-sandbox safety gates."
       },
       "version": "2025.1"
     },
@@ -6253,13 +6265,19 @@
       "behavioral_evidence": {
         "candidate_origin": "2024-baseline-comparison-only",
         "candidate_status": "candidate-sandbox-mutating",
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "2025.1 manifest/source-note/classification reconciliation only; no behavior evidence was created in this task.",
-        "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": "Fresh 2025.1 copied-sandbox destructive behavior passed for ak.wwise.core.object.delete.",
+        "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/object_create_set_delete_readback.json",
+        "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/object_create_set_delete_readback.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.object.delete.",
+        "fixture_prerequisites": [
+          ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/object_create_set_delete_readback.json"
+        ],
+        "live_command_evidence": ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
         "previous_2024_status": "sandbox-mutating-tested",
         "source_note_family": "object-mutation",
         "source_paths": [
@@ -6268,38 +6286,38 @@
           "resources/semantic/2025.1/source_notes.json",
           "resources/coverage/2025.1/added-api-classification.json"
         ],
-        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+        "test": "tests/destructive/test_2025_1_project_mutation_sandbox.py"
       },
       "candidate_status": "candidate-sandbox-mutating",
       "category": "core.object",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Previous 2024 proof is not reusable as 2025.1 proof; rerun version-specific live/sandbox evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2025.1/functions.json (live reflection via 2025.1 SampleProject)",
-        "review_trigger": "When fresh 2025.1 behavioral tests, live evidence, or policy for core.object changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note/classification reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by fresh 2025.1 copied-sandbox destructive behavior evidence with readback and cleanup assertions.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/object_create_set_delete_readback.json",
+        "review_trigger": "When the 2025.1 destructive copied-sandbox behavior contract changes or evidence is refreshed.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2025_1_project_mutation_sandbox.py."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
+      "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/object_create_set_delete_readback.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.object.delete.",
       "inventory_change": "unchanged",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "previous_2024_status": "sandbox-mutating-tested",
       "risk_level": "high",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2025_1_deferred_registry.py",
+        "route_test": "tests/destructive/test_2025_1_project_mutation_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "2024 behavior proof is recorded only as comparison metadata; fresh 2025.1 behavior evidence is required before promotion."
+        "reason": "Fresh 2025.1 destructive copied-sandbox test passed with reversible mutation, readback, cleanup, and source immutability guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.delete",
@@ -6330,11 +6348,11 @@
       "schema_status": "ok",
       "source_note_family": "object-mutation",
       "task6_classification_status": "",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.object.delete",
       "usage_guidance": {
-        "default_path": "candidate-sandbox-mutating-needs-2025-evidence",
-        "notes": "Do not use 2024 evidence or manifest reflection as 2025.1 behavior proof; keep blocked until fresh 2025.1 evidence exists."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Use only with WWISE_LIVE=1, WWISE_DESTRUCTIVE=1, exact 2025.1 installed paths, and copied-sandbox safety gates."
       },
       "version": "2025.1"
     },
@@ -7272,13 +7290,19 @@
       "behavioral_evidence": {
         "candidate_origin": "task6-classification",
         "candidate_status": "candidate-sandbox-mutating",
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "2025.1 manifest/source-note/classification reconciliation only; no behavior evidence was created in this task.",
-        "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": "Fresh 2025.1 copied-sandbox destructive behavior passed for ak.wwise.core.object.set.",
+        "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/object_create_set_delete_readback.json",
+        "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/object_create_set_delete_readback.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.object.set.",
+        "fixture_prerequisites": [
+          ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/object_create_set_delete_readback.json"
+        ],
+        "live_command_evidence": ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
         "previous_2024_status": "sandbox-mutating-tested",
         "source_note_family": "object-mutation",
         "source_paths": [
@@ -7287,38 +7311,38 @@
           "resources/semantic/2025.1/source_notes.json",
           "resources/coverage/2025.1/added-api-classification.json"
         ],
-        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+        "test": "tests/destructive/test_2025_1_project_mutation_sandbox.py"
       },
       "candidate_status": "candidate-sandbox-mutating",
       "category": "core.object",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Task 6 marked this as a candidate only; Tasks 9/11 must add fresh 2025.1 live or sandbox behavior evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2025.1/functions.json (live reflection via 2025.1 SampleProject)",
-        "review_trigger": "When fresh 2025.1 behavioral tests, live evidence, or policy for core.object changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note/classification reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by fresh 2025.1 copied-sandbox destructive behavior evidence with readback and cleanup assertions.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/object_create_set_delete_readback.json",
+        "review_trigger": "When the 2025.1 destructive copied-sandbox behavior contract changes or evidence is refreshed.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2025_1_project_mutation_sandbox.py."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
+      "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/object_create_set_delete_readback.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.object.set.",
       "inventory_change": "changed",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "previous_2024_status": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2025_1_deferred_registry.py",
+        "route_test": "tests/destructive/test_2025_1_project_mutation_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "Task 6 classified this 2025.1 inventory entry as planning-only; no 2025 behavior evidence exists yet."
+        "reason": "Fresh 2025.1 destructive copied-sandbox test passed with reversible mutation, readback, cleanup, and source immutability guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.set",
@@ -7354,11 +7378,11 @@
       "schema_status": "ok",
       "source_note_family": "object-mutation",
       "task6_classification_status": "candidate-sandbox-mutating",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.object.set",
       "usage_guidance": {
-        "default_path": "candidate-sandbox-mutating-needs-2025-evidence",
-        "notes": "Do not use 2024 evidence or manifest reflection as 2025.1 behavior proof; keep blocked until fresh 2025.1 evidence exists."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Use only with WWISE_LIVE=1, WWISE_DESTRUCTIVE=1, exact 2025.1 installed paths, and copied-sandbox safety gates."
       },
       "version": "2025.1"
     },
@@ -10641,13 +10665,19 @@
       "behavioral_evidence": {
         "candidate_origin": "2024-baseline-comparison-only",
         "candidate_status": "candidate-sandbox-mutating",
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "2025.1 manifest/source-note/classification reconciliation only; no behavior evidence was created in this task.",
-        "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": "Fresh 2025.1 copied-sandbox destructive behavior passed for ak.wwise.core.soundbank.setInclusions.",
+        "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/soundbank_inclusions_replace_read_remove_cleanup.json",
+        "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/soundbank_inclusions_replace_read_remove_cleanup.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.soundbank.setInclusions.",
+        "fixture_prerequisites": [
+          ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/soundbank_inclusions_replace_read_remove_cleanup.json"
+        ],
+        "live_command_evidence": ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
         "previous_2024_status": "sandbox-mutating-tested",
         "source_note_family": "soundbank",
         "source_paths": [
@@ -10656,38 +10686,38 @@
           "resources/semantic/2025.1/source_notes.json",
           "resources/coverage/2025.1/added-api-classification.json"
         ],
-        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+        "test": "tests/destructive/test_2025_1_soundbank_audio_sandbox.py"
       },
       "candidate_status": "candidate-sandbox-mutating",
       "category": "core.soundbank",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Previous 2024 proof is not reusable as 2025.1 proof; rerun version-specific live/sandbox evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2025.1/functions.json (live reflection via 2025.1 SampleProject)",
-        "review_trigger": "When fresh 2025.1 behavioral tests, live evidence, or policy for core.soundbank changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note/classification reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by fresh 2025.1 copied-sandbox destructive behavior evidence with readback and cleanup assertions.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/soundbank_inclusions_replace_read_remove_cleanup.json",
+        "review_trigger": "When the 2025.1 destructive copied-sandbox behavior contract changes or evidence is refreshed.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2025_1_soundbank_audio_sandbox.py."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
+      "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/soundbank_inclusions_replace_read_remove_cleanup.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.soundbank.setInclusions.",
       "inventory_change": "unchanged",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "previous_2024_status": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2025_1_deferred_registry.py",
+        "route_test": "tests/destructive/test_2025_1_soundbank_audio_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "2024 behavior proof is recorded only as comparison metadata; fresh 2025.1 behavior evidence is required before promotion."
+        "reason": "Fresh 2025.1 destructive copied-sandbox test passed with reversible mutation, readback, cleanup, and source immutability guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.soundbank.setInclusions",
@@ -10721,11 +10751,11 @@
       "schema_status": "ok",
       "source_note_family": "soundbank",
       "task6_classification_status": "",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.soundbank.setInclusions",
       "usage_guidance": {
-        "default_path": "candidate-sandbox-mutating-needs-2025-evidence",
-        "notes": "Do not use 2024 evidence or manifest reflection as 2025.1 behavior proof; keep blocked until fresh 2025.1 evidence exists."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Use only with WWISE_LIVE=1, WWISE_DESTRUCTIVE=1, exact 2025.1 installed paths, and copied-sandbox safety gates."
       },
       "version": "2025.1"
     },
@@ -11576,13 +11606,19 @@
       "behavioral_evidence": {
         "candidate_origin": "2024-baseline-comparison-only",
         "candidate_status": "candidate-sandbox-mutating",
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "2025.1 manifest/source-note/classification reconciliation only; no behavior evidence was created in this task.",
-        "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": "Fresh 2025.1 copied-sandbox destructive behavior passed for ak.wwise.core.switchContainer.addAssignment.",
+        "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/switchcontainer_assignment_add_get_remove_cleanup.json",
+        "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/switchcontainer_assignment_add_get_remove_cleanup.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.switchContainer.addAssignment.",
+        "fixture_prerequisites": [
+          ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/switchcontainer_assignment_add_get_remove_cleanup.json"
+        ],
+        "live_command_evidence": ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
         "previous_2024_status": "sandbox-mutating-tested",
         "source_note_family": "switchcontainer",
         "source_paths": [
@@ -11591,38 +11627,38 @@
           "resources/semantic/2025.1/source_notes.json",
           "resources/coverage/2025.1/added-api-classification.json"
         ],
-        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+        "test": "tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py"
       },
       "candidate_status": "candidate-sandbox-mutating",
       "category": "core.switchContainer",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Previous 2024 proof is not reusable as 2025.1 proof; rerun version-specific live/sandbox evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2025.1/functions.json (live reflection via 2025.1 SampleProject)",
-        "review_trigger": "When fresh 2025.1 behavioral tests, live evidence, or policy for core.switchContainer changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note/classification reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by fresh 2025.1 copied-sandbox destructive behavior evidence with readback and cleanup assertions.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/switchcontainer_assignment_add_get_remove_cleanup.json",
+        "review_trigger": "When the 2025.1 destructive copied-sandbox behavior contract changes or evidence is refreshed.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
+      "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/switchcontainer_assignment_add_get_remove_cleanup.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.switchContainer.addAssignment.",
       "inventory_change": "unchanged",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "previous_2024_status": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2025_1_deferred_registry.py",
+        "route_test": "tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "2024 behavior proof is recorded only as comparison metadata; fresh 2025.1 behavior evidence is required before promotion."
+        "reason": "Fresh 2025.1 destructive copied-sandbox test passed with reversible mutation, readback, cleanup, and source immutability guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.switchContainer.addAssignment",
@@ -11654,11 +11690,11 @@
       "schema_status": "ok",
       "source_note_family": "switchcontainer",
       "task6_classification_status": "",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.switchContainer.addAssignment",
       "usage_guidance": {
-        "default_path": "candidate-sandbox-mutating-needs-2025-evidence",
-        "notes": "Do not use 2024 evidence or manifest reflection as 2025.1 behavior proof; keep blocked until fresh 2025.1 evidence exists."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Use only with WWISE_LIVE=1, WWISE_DESTRUCTIVE=1, exact 2025.1 installed paths, and copied-sandbox safety gates."
       },
       "version": "2025.1"
     },
@@ -11756,13 +11792,19 @@
       "behavioral_evidence": {
         "candidate_origin": "2024-baseline-comparison-only",
         "candidate_status": "candidate-sandbox-mutating",
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "2025.1 manifest/source-note/classification reconciliation only; no behavior evidence was created in this task.",
-        "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": "Fresh 2025.1 copied-sandbox destructive behavior passed for ak.wwise.core.switchContainer.removeAssignment.",
+        "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/switchcontainer_assignment_add_get_remove_cleanup.json",
+        "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/switchcontainer_assignment_add_get_remove_cleanup.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.switchContainer.removeAssignment.",
+        "fixture_prerequisites": [
+          ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/switchcontainer_assignment_add_get_remove_cleanup.json"
+        ],
+        "live_command_evidence": ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
         "previous_2024_status": "sandbox-mutating-tested",
         "source_note_family": "switchcontainer",
         "source_paths": [
@@ -11771,38 +11813,38 @@
           "resources/semantic/2025.1/source_notes.json",
           "resources/coverage/2025.1/added-api-classification.json"
         ],
-        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+        "test": "tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py"
       },
       "candidate_status": "candidate-sandbox-mutating",
       "category": "core.switchContainer",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Previous 2024 proof is not reusable as 2025.1 proof; rerun version-specific live/sandbox evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2025.1/functions.json (live reflection via 2025.1 SampleProject)",
-        "review_trigger": "When fresh 2025.1 behavioral tests, live evidence, or policy for core.switchContainer changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note/classification reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by fresh 2025.1 copied-sandbox destructive behavior evidence with readback and cleanup assertions.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/switchcontainer_assignment_add_get_remove_cleanup.json",
+        "review_trigger": "When the 2025.1 destructive copied-sandbox behavior contract changes or evidence is refreshed.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
+      "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/switchcontainer_assignment_add_get_remove_cleanup.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.switchContainer.removeAssignment.",
       "inventory_change": "unchanged",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "previous_2024_status": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2025_1_deferred_registry.py",
+        "route_test": "tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "2024 behavior proof is recorded only as comparison metadata; fresh 2025.1 behavior evidence is required before promotion."
+        "reason": "Fresh 2025.1 destructive copied-sandbox test passed with reversible mutation, readback, cleanup, and source immutability guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.switchContainer.removeAssignment",
@@ -11834,11 +11876,11 @@
       "schema_status": "ok",
       "source_note_family": "switchcontainer",
       "task6_classification_status": "",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.switchContainer.removeAssignment",
       "usage_guidance": {
-        "default_path": "candidate-sandbox-mutating-needs-2025-evidence",
-        "notes": "Do not use 2024 evidence or manifest reflection as 2025.1 behavior proof; keep blocked until fresh 2025.1 evidence exists."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Use only with WWISE_LIVE=1, WWISE_DESTRUCTIVE=1, exact 2025.1 installed paths, and copied-sandbox safety gates."
       },
       "version": "2025.1"
     },
@@ -12468,13 +12510,19 @@
       "behavioral_evidence": {
         "candidate_origin": "2024-baseline-comparison-only",
         "candidate_status": "candidate-sandbox-mutating",
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "2025.1 manifest/source-note/classification reconciliation only; no behavior evidence was created in this task.",
-        "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": "Fresh 2025.1 copied-sandbox destructive behavior passed for ak.wwise.core.undo.beginGroup.",
+        "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json",
+        "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.undo.beginGroup.",
+        "fixture_prerequisites": [
+          ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json"
+        ],
+        "live_command_evidence": ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
         "previous_2024_status": "sandbox-mutating-tested",
         "source_note_family": "object-mutation",
         "source_paths": [
@@ -12483,38 +12531,38 @@
           "resources/semantic/2025.1/source_notes.json",
           "resources/coverage/2025.1/added-api-classification.json"
         ],
-        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+        "test": "tests/destructive/test_2025_1_project_mutation_sandbox.py"
       },
       "candidate_status": "candidate-sandbox-mutating",
       "category": "core.undo",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Previous 2024 proof is not reusable as 2025.1 proof; rerun version-specific live/sandbox evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2025.1/functions.json (live reflection via 2025.1 SampleProject)",
-        "review_trigger": "When fresh 2025.1 behavioral tests, live evidence, or policy for core.undo changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note/classification reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by fresh 2025.1 copied-sandbox destructive behavior evidence with readback and cleanup assertions.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json",
+        "review_trigger": "When the 2025.1 destructive copied-sandbox behavior contract changes or evidence is refreshed.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2025_1_project_mutation_sandbox.py."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
+      "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.undo.beginGroup.",
       "inventory_change": "unchanged",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "previous_2024_status": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2025_1_deferred_registry.py",
+        "route_test": "tests/destructive/test_2025_1_project_mutation_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "2024 behavior proof is recorded only as comparison metadata; fresh 2025.1 behavior evidence is required before promotion."
+        "reason": "Fresh 2025.1 destructive copied-sandbox test passed with reversible mutation, readback, cleanup, and source immutability guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.undo.beginGroup",
@@ -12540,11 +12588,11 @@
       "schema_status": "ok",
       "source_note_family": "object-mutation",
       "task6_classification_status": "",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.undo.beginGroup",
       "usage_guidance": {
-        "default_path": "candidate-sandbox-mutating-needs-2025-evidence",
-        "notes": "Do not use 2024 evidence or manifest reflection as 2025.1 behavior proof; keep blocked until fresh 2025.1 evidence exists."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Use only with WWISE_LIVE=1, WWISE_DESTRUCTIVE=1, exact 2025.1 installed paths, and copied-sandbox safety gates."
       },
       "version": "2025.1"
     },
@@ -12638,13 +12686,19 @@
       "behavioral_evidence": {
         "candidate_origin": "2024-baseline-comparison-only",
         "candidate_status": "candidate-sandbox-mutating",
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "2025.1 manifest/source-note/classification reconciliation only; no behavior evidence was created in this task.",
-        "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": "Fresh 2025.1 copied-sandbox destructive behavior passed for ak.wwise.core.undo.endGroup.",
+        "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json",
+        "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.undo.endGroup.",
+        "fixture_prerequisites": [
+          ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json"
+        ],
+        "live_command_evidence": ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
         "previous_2024_status": "sandbox-mutating-tested",
         "source_note_family": "object-mutation",
         "source_paths": [
@@ -12653,38 +12707,38 @@
           "resources/semantic/2025.1/source_notes.json",
           "resources/coverage/2025.1/added-api-classification.json"
         ],
-        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+        "test": "tests/destructive/test_2025_1_project_mutation_sandbox.py"
       },
       "candidate_status": "candidate-sandbox-mutating",
       "category": "core.undo",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Previous 2024 proof is not reusable as 2025.1 proof; rerun version-specific live/sandbox evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2025.1/functions.json (live reflection via 2025.1 SampleProject)",
-        "review_trigger": "When fresh 2025.1 behavioral tests, live evidence, or policy for core.undo changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note/classification reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by fresh 2025.1 copied-sandbox destructive behavior evidence with readback and cleanup assertions.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json",
+        "review_trigger": "When the 2025.1 destructive copied-sandbox behavior contract changes or evidence is refreshed.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2025_1_project_mutation_sandbox.py."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
+      "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.undo.endGroup.",
       "inventory_change": "unchanged",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "previous_2024_status": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2025_1_deferred_registry.py",
+        "route_test": "tests/destructive/test_2025_1_project_mutation_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "2024 behavior proof is recorded only as comparison metadata; fresh 2025.1 behavior evidence is required before promotion."
+        "reason": "Fresh 2025.1 destructive copied-sandbox test passed with reversible mutation, readback, cleanup, and source immutability guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.undo.endGroup",
@@ -12714,11 +12768,11 @@
       "schema_status": "ok",
       "source_note_family": "object-mutation",
       "task6_classification_status": "",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.undo.endGroup",
       "usage_guidance": {
-        "default_path": "candidate-sandbox-mutating-needs-2025-evidence",
-        "notes": "Do not use 2024 evidence or manifest reflection as 2025.1 behavior proof; keep blocked until fresh 2025.1 evidence exists."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Use only with WWISE_LIVE=1, WWISE_DESTRUCTIVE=1, exact 2025.1 installed paths, and copied-sandbox safety gates."
       },
       "version": "2025.1"
     },
@@ -12810,13 +12864,19 @@
       "behavioral_evidence": {
         "candidate_origin": "2024-baseline-comparison-only",
         "candidate_status": "candidate-sandbox-mutating",
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "2025.1 manifest/source-note/classification reconciliation only; no behavior evidence was created in this task.",
-        "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": "Fresh 2025.1 copied-sandbox destructive behavior passed for ak.wwise.core.undo.undo.",
+        "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json",
+        "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.undo.undo.",
+        "fixture_prerequisites": [
+          ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json"
+        ],
+        "live_command_evidence": ".sisyphus/evidence/task-2025-11-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
         "previous_2024_status": "sandbox-mutating-tested",
         "source_note_family": "object-mutation",
         "source_paths": [
@@ -12825,38 +12885,38 @@
           "resources/semantic/2025.1/source_notes.json",
           "resources/coverage/2025.1/added-api-classification.json"
         ],
-        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+        "test": "tests/destructive/test_2025_1_project_mutation_sandbox.py"
       },
       "candidate_status": "candidate-sandbox-mutating",
       "category": "core.undo",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Previous 2024 proof is not reusable as 2025.1 proof; rerun version-specific live/sandbox evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2025.1/functions.json (live reflection via 2025.1 SampleProject)",
-        "review_trigger": "When fresh 2025.1 behavioral tests, live evidence, or policy for core.undo changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note/classification reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by fresh 2025.1 copied-sandbox destructive behavior evidence with readback and cleanup assertions.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json",
+        "review_trigger": "When the 2025.1 destructive copied-sandbox behavior contract changes or evidence is refreshed.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2025_1_project_mutation_sandbox.py."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
+      "evidence_standard": "Fresh 2025.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json plus .sisyphus/evidence/task-2025-11-destructive-sandbox.txt counts as behavioral/live proof for ak.wwise.core.undo.undo.",
       "inventory_change": "unchanged",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "previous_2024_status": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2025_1_deferred_registry.py",
+        "route_test": "tests/destructive/test_2025_1_project_mutation_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "2024 behavior proof is recorded only as comparison metadata; fresh 2025.1 behavior evidence is required before promotion."
+        "reason": "Fresh 2025.1 destructive copied-sandbox test passed with reversible mutation, readback, cleanup, and source immutability guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.undo.undo",
@@ -12882,11 +12942,11 @@
       "schema_status": "ok",
       "source_note_family": "object-mutation",
       "task6_classification_status": "",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.undo.undo",
       "usage_guidance": {
-        "default_path": "candidate-sandbox-mutating-needs-2025-evidence",
-        "notes": "Do not use 2024 evidence or manifest reflection as 2025.1 behavior proof; keep blocked until fresh 2025.1 evidence exists."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Use only with WWISE_LIVE=1, WWISE_DESTRUCTIVE=1, exact 2025.1 installed paths, and copied-sandbox safety gates."
       },
       "version": "2025.1"
     },
@@ -14199,7 +14259,7 @@
     "version": "2025.1"
   },
   "summary": {
-    "behavioral_supported": 1,
+    "behavioral_supported": 11,
     "candidate_status_counts": {
       "candidate-live-read-only": 4,
       "candidate-sandbox-mutating": 21
@@ -14208,7 +14268,7 @@
     "excluded": 48,
     "forbidden_promoted_counts": {
       "live-tested": 1,
-      "sandbox-mutating-tested": 0
+      "sandbox-mutating-tested": 10
     },
     "implemented": 154,
     "inventory_change_counts": {
@@ -14217,13 +14277,13 @@
       "unchanged": 95
     },
     "live_tested": 1,
-    "manifest_only": 153,
+    "manifest_only": 143,
     "parity_bucket_counts": {
-      "deferred": 105,
+      "deferred": 95,
       "excluded": 48,
       "live-tested": 1,
       "manifest-only": 0,
-      "sandbox-mutating-tested": 0
+      "sandbox-mutating-tested": 10
     },
     "parity_bucket_total": 154,
     "reflected_count": 154,
@@ -14236,10 +14296,10 @@
       "switchcontainer": 3
     },
     "status_counts": {
-      "deferred": 105,
+      "deferred": 95,
       "excluded": 48,
       "live-tested": 1,
-      "sandbox-mutating-tested": 0
+      "sandbox-mutating-tested": 10
     },
     "total_functions": 154,
     "version": "2025.1"

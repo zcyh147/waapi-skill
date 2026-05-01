@@ -22,6 +22,18 @@ ALLOWED_BLOCKED_STATUSES = {"deferred", "excluded"}
 FORBIDDEN_PROMOTED_STATUSES = {"live-tested", "sandbox-mutating-tested"}
 CANDIDATE_STATUSES = {"candidate-live-read-only", "candidate-sandbox-mutating"}
 LIVE_TESTED_URI = "ak.wwise.core.object.get"
+SANDBOX_MUTATING_TESTED_URIS = {
+    "ak.wwise.core.audio.import",
+    "ak.wwise.core.object.create",
+    "ak.wwise.core.object.delete",
+    "ak.wwise.core.object.set",
+    "ak.wwise.core.soundbank.setInclusions",
+    "ak.wwise.core.switchContainer.addAssignment",
+    "ak.wwise.core.switchContainer.removeAssignment",
+    "ak.wwise.core.undo.beginGroup",
+    "ak.wwise.core.undo.endGroup",
+    "ak.wwise.core.undo.undo",
+}
 
 
 def test_2025_resource_covers_every_reflected_function_once_with_2025_paths() -> None:
@@ -65,6 +77,16 @@ def test_2025_coverage_entries_are_blocked_until_fresh_2025_evidence_exists() ->
             assert evidence["counts_as_live_behavioral"] is True, entry["uri"]
             assert "Fresh 2025.1 live sandbox behavior evidence" in evidence["evidence_standard"]
             continue
+        if entry["uri"] in SANDBOX_MUTATING_TESTED_URIS:
+            assert entry["coverage_status"] == "sandbox-mutating-tested", entry["uri"]
+            assert entry["test_status"] == "sandbox-mutating-tested", entry["uri"]
+            assert entry["parity_bucket"] == "sandbox-mutating-tested", entry["uri"]
+            assert entry["deferred"]["status"] is False, entry["uri"]
+            assert evidence["manifest_reflection_only"] is False, entry["uri"]
+            assert evidence["counts_as_behavioral"] is True, entry["uri"]
+            assert evidence["counts_as_live_behavioral"] is True, entry["uri"]
+            assert "Fresh 2025.1 copied-sandbox destructive behavior evidence" in evidence["evidence_standard"]
+            continue
 
         assert entry["coverage_status"] in ALLOWED_BLOCKED_STATUSES, entry["uri"]
         assert entry["test_status"] == entry["coverage_status"], entry["uri"]
@@ -90,6 +112,11 @@ def test_2025_task6_classifications_remain_planning_only_in_coverage() -> None:
         assert entry["task6_classification_status"] == classification["status"], entry["uri"]
         if entry["uri"] == LIVE_TESTED_URI:
             assert entry["coverage_status"] == "live-tested", entry["uri"]
+            assert entry["candidate_status"] == classification["status"], entry["uri"]
+            assert entry["behavioral_evidence"]["counts_as_behavioral"] is True, entry["uri"]
+            continue
+        if entry["uri"] in SANDBOX_MUTATING_TESTED_URIS:
+            assert entry["coverage_status"] == "sandbox-mutating-tested", entry["uri"]
             assert entry["candidate_status"] == classification["status"], entry["uri"]
             assert entry["behavioral_evidence"]["counts_as_behavioral"] is True, entry["uri"]
             continue
@@ -119,13 +146,13 @@ def test_2025_status_totals_record_zero_accidental_promotion_and_2024_comparison
     assert sum(status_counts.values()) == len(coverage) == 154
     assert payload["summary"]["total_functions"] == 154
     assert payload["summary"]["implemented"] == 154
-    assert payload["summary"]["manifest_only"] == 153
-    assert payload["summary"]["behavioral_supported"] == 1
+    assert payload["summary"]["manifest_only"] == 153 - len(SANDBOX_MUTATING_TESTED_URIS)
+    assert payload["summary"]["behavioral_supported"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
     assert payload["summary"]["live_tested"] == 1
     assert status_counts["live-tested"] == 1
-    assert status_counts["sandbox-mutating-tested"] == 0
+    assert status_counts["sandbox-mutating-tested"] == len(SANDBOX_MUTATING_TESTED_URIS)
     assert parity_counts["live-tested"] == 1
-    assert parity_counts["sandbox-mutating-tested"] == 0
+    assert parity_counts["sandbox-mutating-tested"] == len(SANDBOX_MUTATING_TESTED_URIS)
     assert baseline["baseline_version"] == BASELINE_VERSION
     assert baseline["baseline_reflected_count"] == len(_baseline_payload()["coverage"]) == 148
     assert baseline["common_function_count"] == len({entry["uri"] for entry in coverage} & {entry["uri"] for entry in _baseline_payload()["coverage"]})
@@ -145,6 +172,9 @@ def test_2025_source_notes_are_context_not_behavior_proof() -> None:
         assert entry["behavioral_evidence"]["source_note_family"] == entry["source_note_family"], uri
         if uri == LIVE_TESTED_URI:
             assert entry["coverage_status"] == "live-tested", uri
+            assert entry["behavioral_evidence"]["counts_as_behavioral"] is True, uri
+        elif uri in SANDBOX_MUTATING_TESTED_URIS:
+            assert entry["coverage_status"] == "sandbox-mutating-tested", uri
             assert entry["behavioral_evidence"]["counts_as_behavioral"] is True, uri
         else:
             assert entry["coverage_status"] in ALLOWED_BLOCKED_STATUSES, uri
@@ -168,6 +198,12 @@ def test_2025_does_not_reuse_2024_live_or_sandbox_proof() -> None:
             assert entry["coverage_status"] == "live-tested", uri
             assert entry["behavioral_evidence"]["counts_as_behavioral"] is True, uri
             assert "Fresh 2025.1 live sandbox behavior evidence" in entry["behavioral_evidence"]["evidence_standard"]
+            continue
+
+        if uri in SANDBOX_MUTATING_TESTED_URIS:
+            assert entry["coverage_status"] == "sandbox-mutating-tested", uri
+            assert entry["behavioral_evidence"]["counts_as_behavioral"] is True
+            assert "Fresh 2025.1 copied-sandbox destructive behavior evidence" in entry["behavioral_evidence"]["evidence_standard"]
             continue
 
         assert entry["coverage_status"] in ALLOWED_BLOCKED_STATUSES, uri

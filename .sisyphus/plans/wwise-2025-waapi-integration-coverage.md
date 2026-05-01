@@ -524,7 +524,7 @@ Wave 5: F1-F4 final review agents.
 
   **Commit**: YES | Message: `test(destructive): harden 2025 sandbox gates` | Files: `wwise_waapi/destructive_2025_sandbox.py` if needed, `tests/unit/test_2025_1_destructive_safety.py`, `.sisyphus/evidence/task-2025-10-*.txt`
 
-- [ ] 11. Add 2025.1 copied-sandbox destructive parity evidence
+- [x] 11. Add 2025.1 copied-sandbox destructive parity evidence
 
   **What to do**: Port 2024 destructive tests to `tests/destructive/test_2025_1_project_mutation_sandbox.py`, `tests/destructive/test_2025_1_soundbank_audio_sandbox.py`, and `tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py`. Attempt 2024 candidate mutating APIs (`object.create/set/delete`, `undo.beginGroup/endGroup/undo`, `audio.import`, `soundbank.setInclusions`, `switchContainer.addAssignment/removeAssignment`) and safe 2025-only mutating candidates from Task 6 only when reversible and docs/reflection support them. Use unique object names, copied sandbox projects, readback/cleanup, and source immutability checks. Keep helper readbacks unpromoted unless independently tested.
   **Must NOT do**: Do not mutate installed SampleProject or `tests/_org/2025.1`. Do not promote helper-only readbacks as behavior.

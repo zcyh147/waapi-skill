@@ -34,3 +34,6 @@
 - Task 9 verification note: JSON LSP diagnostics still cannot run because the configured `biome` server is not installed; modified JSON resources were validated with `python -m json.tool`, focused 2025 pytest, exact live pytest, and the full default pytest suite.
 
 - Task 10 verification note: no typecheck/build command is configured in `pyproject.toml`; Python LSP diagnostics were clean for the new module and test, and pytest covered the required 2025.1 destructive gates plus the 2024 safety regression.
+
+- Resolved during Task 11: default 60s WAAPI readiness caused skipped destructive launches after copied-sandbox prep; rerunning with `WWISE_READINESS_TIMEOUT=180` produced fresh all-passed 2025.1 destructive behavior evidence (`5 passed`).
+- Task 11 verification note: JSON LSP diagnostics remain unavailable for JSON resources, so changed coverage/deferred JSON was validated with `python -m json.tool`; Python LSP diagnostics were clean and focused 2025 coverage/audit pytest passed.

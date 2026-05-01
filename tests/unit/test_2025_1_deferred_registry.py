@@ -22,7 +22,7 @@ def test_2025_deferred_registry_loads_and_matches_all_blocked_coverage() -> None
     blocked = {entry["uri"] for entry in coverage if entry["coverage_status"] in {"deferred", "excluded"}}
 
     assert set(registry.entries) == blocked
-    assert len(registry.entries) == len(blocked) == 153
+    assert len(registry.entries) == len(blocked) == 143
     for uri, deferred in registry.entries.items():
         source = next(entry for entry in coverage if entry["uri"] == uri)
         assert deferred.version == VERSION
@@ -75,11 +75,11 @@ def test_2025_deferred_summary_reconciles_deferred_and_excluded_counts() -> None
     excluded_entries = [entry for entry in payload["deferred"] if entry["coverage_status"] == "excluded"]
     status_counts = dict(sorted(Counter(entry["coverage_status"] for entry in payload["deferred"]).items()))
 
-    assert payload["summary"]["total"] == 153
+    assert payload["summary"]["total"] == 143
     assert payload["summary"]["deferred_count"] == len(deferred_entries)
     assert payload["summary"]["excluded_count"] == len(excluded_entries)
     assert payload["summary"]["status_counts"] == status_counts
-    assert status_counts["deferred"] + status_counts["excluded"] == 153
+    assert status_counts["deferred"] + status_counts["excluded"] == 143
     assert payload["metadata"]["baseline_comparison"]["policy"] == "2024.1 evidence is comparison metadata only and never counts as 2025.1 proof."
 
 
