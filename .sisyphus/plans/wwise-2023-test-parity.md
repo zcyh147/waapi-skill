@@ -316,7 +316,7 @@ Wave 4: Final Verification Wave F1-F4.
 
   **Commit**: YES | Message: `test(coverage): preserve 2023 risky api deferrals` | Files: `resources/deferred/2023.1.json`, `resources/coverage/2023.1/wrapper-only-category-policy.json`, `resources/coverage/2023.1/*.json`, `tests/unit/test_2023_deferred_registry.py`
 
-- [ ] 6. Strengthen destructive fail-closed and immutability tests
+- [x] 6. Strengthen destructive fail-closed and immutability tests
 
   **What to do**: Add unit or destructive-gate tests proving missing `WWISE_LIVE`, missing `WWISE_DESTRUCTIVE`, missing/unsafe `WWISE_SANDBOX_ROOT`, installed SampleProject targets, and `tests/_org/2023.1` targets are rejected or skipped before mutation. Preserve `Destructive2023SandboxRuntime` behavior and add tests around `require_2023_live_destructive_prerequisites` and `require_2023_sandbox_copy_target` as needed.
   **Must NOT do**: Do not weaken `LiveEnvironmentError`/`SandboxFixtureError` messages. Do not allow destructive tests to use default SampleProject directly.
