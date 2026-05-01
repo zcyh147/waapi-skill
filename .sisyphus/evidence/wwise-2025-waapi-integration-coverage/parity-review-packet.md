@@ -1,6 +1,6 @@
 # Wwise 2025.1 parity review packet
 
-Use this packet for Task 12 review of the 2025.1 parity evidence. The 2025.1 reflected function inventory and parity classification reconcile to 154 functions. Behavior evidence is intentionally narrower: one live read-only URI and ten copied-sandbox mutating URIs have explicit fresh 2025.1 evidence. Manifest reflection proves inventory only. Manifest reflection, 2024 comparison metadata, skipped live tests, skipped destructive tests, helper-only readbacks, and NotebookLM-only notes are not 2025.1 behavior proof.
+Use this packet for final Task 14 review of the 2025.1 parity evidence. The 2025.1 reflected function inventory and parity classification reconcile to 154 functions. Behavior evidence is intentionally narrower: one live read-only URI and ten copied-sandbox mutating URIs have explicit fresh 2025.1 evidence. Manifest reflection proves inventory only. Manifest reflection, 2024 comparison metadata, skipped live tests, skipped destructive tests, helper-only readbacks, and NotebookLM-only notes are not 2025.1 behavior proof.
 
 ## Promoted Evidence
 
@@ -70,6 +70,20 @@ python -m pytest tests/unit/test_2025_1_docs_contract.py tests/unit/test_eval_me
 Task 9 live read-only result: fresh 2025.1 `ak.wwise.core.object.get` evidence recorded in `.sisyphus/evidence/task-2025-9-live-read-only.txt` and `.sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/`.
 
 Task 11 destructive result: `5 passed in 344.82s (0:05:44)`, with fresh copied-sandbox evidence recorded in `.sisyphus/evidence/task-2025-11-destructive-sandbox.txt` and `.sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/`.
+
+## Task 14 Final Reconciliation
+
+Task 14 reran the final 2025.1 reconciliation commands and retained the scoped evidence model:
+
+- Focused 2025 audit: `48 passed in 0.23s`.
+- Exact 2025 live command: `12 passed in 170.38s (0:02:50)`.
+- Exact 2025 destructive command: `5 passed in 400.56s (0:06:40)`.
+- 2024 regression command: `26 passed in 0.11s`.
+- Default Wwise-free suite: `646 passed, 57 skipped in 1.79s`.
+- JSON resources validated by Python parsing: coverage, live matrix, phase2 summary, phase21 policy, deferred registry, added-api classification, WAQL matrix, and eval metadata.
+- Final counts: 154 reflected functions; 154 coverage entries; 154 live-matrix entries; 154 phase2 summary entries; 143 deferred/excluded entries; status split `excluded=48`, `deferred=95`, `sandbox-mutating-tested=10`, `live-tested=1`.
+- Promoted evidence remains limited to `ak.wwise.core.object.get` plus the ten copied-sandbox mutating URIs listed above. `ak.wwise.core.soundbank.getInclusions` and `ak.wwise.core.switchContainer.getAssignments` remain deferred helper readbacks.
+- Runtime artifact checks found no tracked or staged `.sisyphus/runtime` files; details are recorded in `.sisyphus/evidence/task-2025-14-no-runtime-artifacts.txt`.
 
 ## Source Immutability
 

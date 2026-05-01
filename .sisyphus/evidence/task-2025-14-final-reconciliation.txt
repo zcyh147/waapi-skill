@@ -1,0 +1,76 @@
+Task 14 final 2025.1 resource, evidence, and artifact reconciliation
+Date: 2026-05-02
+
+Focused 2025 audit command:
+python -m pytest tests/unit/test_2025_1_api_resource_coverage.py tests/unit/test_2025_1_deferred_registry.py tests/unit/test_2025_1_live_coverage_matrix.py tests/unit/test_2025_1_cross_version_audit.py tests/unit/test_2025_1_docs_contract.py tests/unit/test_2025_1_added_api_classification.py tests/unit/test_eval_metadata.py -q
+
+Result before packet update:
+................................................                         [100%]
+48 passed in 0.24s
+
+Result after packet update:
+................................................                         [100%]
+48 passed in 0.22s
+
+Final focused rerun after evidence update:
+................................................                         [100%]
+48 passed in 0.23s
+
+Exact 2025 live command:
+WWISE_VERSION=2025.1 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2025.1.7.9143/Wwise.app/Contents/Tools/WwiseConsole.sh" WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2025.1.7.9143/SampleProject/SampleProject.wproj" WWISE_READINESS_TIMEOUT=180 WWISE_LIVE=1 python -m pytest tests/live/test_2025_1_live_prerequisites.py tests/live/test_2025_1_reflection_inventory.py tests/live/test_2025_1_waql_live_matrix.py -q
+
+Result:
+............                                                             [100%]
+12 passed in 170.38s (0:02:50)
+
+Exact 2025 destructive command:
+WWISE_VERSION=2025.1 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2025.1.7.9143/Wwise.app/Contents/Tools/WwiseConsole.sh" WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2025.1.7.9143/SampleProject/SampleProject.wproj" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_READINESS_TIMEOUT=180 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2025_1_project_mutation_sandbox.py tests/destructive/test_2025_1_soundbank_audio_sandbox.py tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py -q
+
+Result:
+.....                                                                    [100%]
+5 passed in 400.56s (0:06:40)
+
+2024 regression command:
+python -m pytest tests/unit/test_2024_api_resource_coverage.py tests/unit/test_2024_deferred_registry.py tests/unit/test_2024_live_coverage_matrix.py tests/unit/test_2024_cross_version_audit.py tests/unit/test_2024_docs_contract.py -q
+
+Result:
+..........................                                               [100%]
+26 passed in 0.11s
+
+Default full suite command:
+python -m pytest -q
+
+Result:
+646 passed, 57 skipped in 1.79s
+
+JSON validation command:
+Python json.loads over resources/coverage/2025.1/api-coverage.json, resources/coverage/2025.1/live-coverage-matrix.json, resources/coverage/2025.1/phase2-coverage-summary.json, resources/coverage/2025.1/phase21-uri-policy.json, resources/coverage/2025.1/added-api-classification.json, resources/deferred/2025.1.json, resources/waql/2025.1/object-get-live-matrix.json, and evals/evals.json.
+
+Result:
+validated 8 JSON files
+
+Resource/evidence reconciliation:
+- manifest_functions=154
+- coverage_entries=154
+- matrix_entries=154
+- summary_entries=154
+- deferred_entries=143
+- coverage_status_counts={'excluded': 48, 'deferred': 95, 'sandbox-mutating-tested': 10, 'live-tested': 1}
+- classification_counts={'deferred': 33, 'excluded': 16, 'candidate-sandbox-mutating': 14, 'candidate-live-read-only': 7}
+- classification_item_type={'function': 59, 'topic': 11}
+- classification_inventory_change={'added': 7, 'changed': 63}
+- coverage_exact_once=True
+- matrix_exact_once=True
+- summary_exact_once=True
+- promoted_live=['ak.wwise.core.object.get']
+- promoted_sandbox=['ak.wwise.core.audio.import', 'ak.wwise.core.object.create', 'ak.wwise.core.object.delete', 'ak.wwise.core.object.set', 'ak.wwise.core.soundbank.setInclusions', 'ak.wwise.core.switchContainer.addAssignment', 'ak.wwise.core.switchContainer.removeAssignment', 'ak.wwise.core.undo.beginGroup', 'ak.wwise.core.undo.endGroup', 'ak.wwise.core.undo.undo']
+- readback_helper_statuses={'ak.wwise.core.object.get': ['live-tested'], 'ak.wwise.core.soundbank.getInclusions': ['deferred'], 'ak.wwise.core.switchContainer.getAssignments': ['deferred']}
+- missing_promoted_evidence=[]
+- risky_promoted=[]
+- stale_promoted_evidence=[]
+
+Final interpretation:
+- Every 2025.1 reflected function is classified exactly once across coverage, live matrix, phase2 summary, policy, and deferred resources.
+- No promoted entry relies on stale 2022/2023/2024 proof, skipped tests, manifest-only proof, NotebookLM-only proof, or helper-only readbacks.
+- 2025-only added/changed APIs remain classified as planning classifications only unless separately behavior-tested.
+- Docs/eval/review-packet surfaces keep claims scoped to reflected inventory plus one live read-only URI and ten copied-sandbox mutating URIs; Windows remains a caveat.

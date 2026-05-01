@@ -45,3 +45,7 @@
 - Resolved during Task 12 residual cleanup: full pytest exposed stale 2023 docs-contract wording that expected 2025 to remain future-only; updated the regression to assert scoped 2025.1 support instead.
 
 - Task 13 had no new blockers; the only noteworthy outcome was that live/destructive 2025.1 selections failed closed exactly as intended when opt-in env vars were absent.
+
+- Task 14 note: JSON LSP diagnostics are still unavailable for resource payloads in this environment, so final JSON validity was verified with Python `json.loads` plus focused pytest.
+- Task 14 note: destructive verification can leave ignored local sandbox runtime folders; `git status --short -- .sisyphus/runtime` and `git ls-files .sisyphus/runtime` remained empty, which is the tracked/staged artifact contract.
+- Task 14 note: `.txt` evidence files have no configured LSP server; they were validated by readback/content, focused docs-contract pytest, and final command evidence instead.

@@ -646,7 +646,7 @@ Wave 5: F1-F4 final review agents.
 
   **Commit**: YES | Message: `test(wwise): verify 2025 opt-in gates` | Files: `tests/unit/test_2025_1_*.py` if updated, `.sisyphus/evidence/task-2025-13-*.txt`
 
-- [ ] 14. Final 2025 resource, evidence, and artifact reconciliation
+- [x] 14. Final 2025 resource, evidence, and artifact reconciliation
 
   **What to do**: Reconcile all 2025 resources and evidence after Tasks 1-13. Confirm no orphan APIs, no stale 2022/2023/2024 proof in explicit 2025 resources, no missing evidence files for promoted entries, no risky accidental promotions, no docs contradictions, no runtime artifacts staged/tracked, and no 2025-only API left unclassified. Update 2025 parity review packet with final command results and counts.
   **Must NOT do**: Do not silently drop APIs to make counts pass; do not run unplanned 2026/generalized work.

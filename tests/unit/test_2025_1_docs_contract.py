@@ -210,6 +210,7 @@ def test_task12_review_packet_has_required_sections_counts_and_limited_claims() 
         "2025-Only Classification",
         "NotebookLM and Docs Caveats",
         "Commands Run",
+        "Task 14 Final Reconciliation",
         "Source Immutability",
         "Windows Caveat",
         "Known Non-Goals",
@@ -230,6 +231,11 @@ def test_task12_review_packet_has_required_sections_counts_and_limited_claims() 
     assert "URL candidates are not fetched proof" in packet
     assert "Windows validation is a caveat and follow-up" in packet
     assert "not Windows-host validation" in packet
+    assert "Task 14 reran the final 2025.1 reconciliation commands" in packet
+    assert "48 passed in 0.23s" in packet
+    assert "12 passed in 170.38s" in packet
+    assert "5 passed in 400.56s" in packet
+    assert "26 passed in 0.11s" in packet
     assert WWISE_2025_CONSOLE in packet
     assert WWISE_2025_SAMPLE_PROJECT in packet
     assert _squash_command(LIVE_2025_READ_ONLY_COMMAND) in _squash_command(packet)

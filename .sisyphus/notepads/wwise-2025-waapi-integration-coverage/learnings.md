@@ -44,3 +44,6 @@
 
 - Task 13 confirmed the default suite stays Wwise-free: `python -m pytest -q` passed with live/destructive tests skipped only through the `WWISE_LIVE` / `WWISE_DESTRUCTIVE` opt-in gates.
 - Task 13 confirmed 2025.1 gate behavior without opt-in: live suites skipped before Wwise launch and destructive suites skipped before sandbox mutation, while the 2024 regression slice still passed unchanged.
+
+- Task 14 final reconciliation confirmed the 2025.1 scoped evidence model without changing coverage classifications: 154 reflected functions, 95 deferred, 48 excluded, one live-tested read-only URI, and ten copied-sandbox mutating URIs.
+- Task 14 exact live and destructive verification both passed with `WWISE_READINESS_TIMEOUT=180`; final docs evidence should record the fresh command results instead of relying only on Task 9/11 summaries.
