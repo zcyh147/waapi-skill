@@ -8,3 +8,8 @@
 
 - Task 3 live read-only parity: `ak.wwise.core.object.get` is the only live-tested 2023.1 URI after read-only WAQL expansion; eight sandboxed live cases write per-case JSON under `.sisyphus/evidence/wwise-2023-test-parity/live-read-only/` and keep source hash/mtime unchanged.
 - Task 3 validation gotcha: direct Glob did not list hidden `.sisyphus` evidence files, but `Read` on `.sisyphus/evidence/wwise-2023-test-parity/live-read-only/` confirmed all eight JSON files exist after the exact live command.
+
+- Task 3 live read-only promotion: the exact 2023.1 sandbox command passed after moving the fake-client mutation guard to `tests/unit/test_2023_waql_live_matrix.py`; final live command result was 10 passed, and the focused unit suite for 2023 WAQL/coverage was 16 passed.
+- Task 3 coverage promotion rule: only `ak.wwise.core.object.get` moved to `live-tested`; coverage summaries/policy now have live-tested=1 and evidence-only=0 for the 2023.1 parity bucket/status counts.
+- Task 3 test-quality gotcha: guard tests placed under `tests/live/` are skipped by default because `tests/conftest.py` treats the live path as a live keyword; keep helper-only guard tests in `tests/unit/`.
+- Task 3 WAQL assertion gotcha: `allow_empty` matrix cases with identity expectations must skip identity checks when rows are empty; identity applies only to returned rows.
