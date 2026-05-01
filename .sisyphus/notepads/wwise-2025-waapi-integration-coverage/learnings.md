@@ -35,3 +35,7 @@
 
 - Task 11 promoted ten fresh 2025.1 copied-sandbox destructive mutators: audio.import; object.create/delete/set; soundbank.setInclusions; switchContainer.add/removeAssignment; undo.begin/end/undo. Helper readbacks (`object.get`, `soundbank.getInclusions`, `switchContainer.getAssignments`) remain unpromoted unless separately behavior-tested.
 - 2025.1 object creation under `\\Containers\\Default Work Unit` reads back `ActorMixer` creations as `PropertyContainer`, so destructive parity assertions must use 2025 readback semantics rather than 2024 `ActorMixer` type expectations.
+
+- Task 12 docs contract now verifies 2025.1 parity wording from live resources: 154 reflected functions, one live-tested read-only URI, ten sandbox-mutating-tested URIs, and 143 deferred/excluded entries split as 95 deferred and 48 excluded.
+- The 2025.1 review packet must keep Task 6 classification separate from behavior evidence: 70 added/changed entries, 59 functions, 11 topics, 7 added, 63 changed, with candidate statuses treated as review hints only.
+- Docs/evals no-overclaim guards should avoid repeating forbidden Windows or support claims verbatim, even inside warning text or eval forbidden terms, because the contract scans user-facing surfaces as plain text.

@@ -1,0 +1,16 @@
+Task 2025-12 review packet resource comparison
+command: python compare packet counts against resources/coverage/2025.1 and resources/deferred/2025.1.json
+coverage_total: 154
+live_matrix_total: 154
+deferred_registry_total: 143
+coverage_status: {"deferred": 95, "excluded": 48, "live-tested": 1, "sandbox-mutating-tested": 10}
+classification_total: 70
+classification_item_type: {"function": 59, "topic": 11}
+classification_inventory_change: {"added": 7, "changed": 63}
+classification_status: {"candidate-live-read-only": 7, "candidate-sandbox-mutating": 14, "deferred": 33, "excluded": 16}
+packet_terms: all required count and caveat terms present
+status: passed
+
+Pytest confirmation:
+..........                                                               [100%]
+10 passed in 0.03s

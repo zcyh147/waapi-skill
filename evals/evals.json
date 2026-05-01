@@ -701,6 +701,108 @@
           ]
         }
       ]
+    },
+    {
+      "id": "2025-parity-review-version-scoped-summary",
+      "category": "2025.1 parity review",
+      "prompt": "Summarize the accepted Wwise 2025.1 support scope for a reviewer. Include exact evidence limits, NotebookLM caveats, and avoid overclaiming behavior support.",
+      "expected_output": "Explains that 2025.1 has complete reflected inventory and parity classification for 154 functions, one live read-only URI, ten copied-sandbox mutating URIs, and 143 remaining deferred or excluded entries. It states that 2024 evidence is comparison metadata only, skipped live or destructive tests are opt-in gates rather than proof, NotebookLM-only text is not runtime proof, and Windows remains a caveat.",
+      "files": [
+        "references/semantic/2025.1/semantic-builder-protocol.md",
+        "references/semantic/2025.1/discrepancy-register.md",
+        "resources/manifest/2025.1/functions.json",
+        "resources/coverage/2025.1/api-coverage.json",
+        "resources/deferred/2025.1.json",
+        "resources/waql/2025.1/object-get-live-matrix.json"
+      ],
+      "assertions": [
+        {
+          "name": "uses_2025_version_scope",
+          "text": "Output names Wwise 2025.1 and points to versioned 2025.1 resources.",
+          "required_terms": [
+            "2025.1",
+            "resources/manifest/2025.1/",
+            "resources/coverage/2025.1/",
+            "references/semantic/2025.1/"
+          ]
+        },
+        {
+          "name": "limited_promoted_evidence",
+          "text": "Output limits promoted evidence to one live read-only URI and ten copied-sandbox mutating URIs.",
+          "required_terms": [
+            "154 functions",
+            "ak.wwise.core.object.get",
+            "ten",
+            "copied-sandbox",
+            "143"
+          ],
+          "forbidden_terms": [
+            "sweeping 2025.1 live-tested claim",
+            "sweeping 2025.1 behavior-tested claim",
+            "unqualified 2025.1 support claim"
+          ]
+        },
+        {
+          "name": "keeps_nonproof_sources_out",
+          "text": "Output says comparison metadata, skipped suites, and NotebookLM-only notes are not proof.",
+          "required_terms_any": [
+            "comparison metadata only",
+            "not 2025.1 proof"
+          ],
+          "required_terms_any_secondary": [
+            "NotebookLM-only",
+            "skipped live",
+            "skipped destructive"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2025-live-and-destructive-command-review",
+      "category": "2025.1 command review",
+      "prompt": "Give the exact Wwise 2025.1 opt-in commands for default tests, live read-only validation, and destructive sandbox validation. State the Windows caveat correctly.",
+      "expected_output": "Lists the default pytest command, the 2025.1 live read-only command, and the 2025.1 destructive sandbox command with the 2025.1.7.9143 WwiseConsole and SampleProject identities. It states Windows as a caveat and follow-up, not validation from macOS evidence.",
+      "files": [
+        "references/long-run-runbook.md",
+        "references/phase2-user-review-packet.md",
+        "resources/coverage/2025.1/live-coverage-matrix.json"
+      ],
+      "assertions": [
+        {
+          "name": "uses_2025_build_and_project_identity",
+          "text": "Output includes the 2025.1 build identity plus WwiseConsole and SampleProject project names without requiring local absolute paths in eval metadata.",
+          "required_terms": [
+            "Wwise2025.1.7.9143",
+            "SampleProject2025.1.7.9143",
+            "WwiseConsole.sh",
+            "SampleProject.wproj"
+          ]
+        },
+        {
+          "name": "includes_three_command_modes",
+          "text": "Output includes default, live read-only, and destructive sandbox validation commands.",
+          "required_terms": [
+            "python -m pytest -q",
+            "tests/live/test_2025_1_live_prerequisites.py",
+            "tests/destructive/test_2025_1_project_mutation_sandbox.py",
+            "WWISE_DESTRUCTIVE=1",
+            "WWISE_READINESS_TIMEOUT=180"
+          ]
+        },
+        {
+          "name": "windows_caveat_not_validation",
+          "text": "Output states Windows validation as a caveat and follow-up, not proof from macOS evidence.",
+          "required_terms_any": [
+            "caveat",
+            "follow-up"
+          ],
+          "forbidden_terms": [
+            "Windows passed from macOS artifacts",
+            "cross-platform proof from macOS",
+            "macOS-only run is Windows proof"
+          ]
+        }
+      ]
     }
   ]
 }

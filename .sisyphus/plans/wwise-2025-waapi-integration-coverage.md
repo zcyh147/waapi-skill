@@ -565,7 +565,7 @@ Wave 5: F1-F4 final review agents.
 
   **Commit**: YES | Message: `test(destructive): add 2025 sandbox parity evidence` | Files: `tests/destructive/test_2025_1_*.py`, `resources/coverage/2025.1/*.json`, `resources/deferred/2025.1.json`, `.sisyphus/evidence/wwise-2025-waapi-integration-coverage/destructive/*`, `.sisyphus/evidence/task-2025-11-*.txt`
 
-- [ ] 12. Document 2025 parity evidence and docs/evals no-overclaim rules
+- [x] 12. Document 2025 parity evidence and docs/evals no-overclaim rules
 
   **What to do**: Add/update 2025 docs, eval metadata, and `.sisyphus/evidence/wwise-2025-waapi-integration-coverage/parity-review-packet.md` so user-facing text states exact reflected counts, promoted live/destructive evidence, deferred/excluded counts, 2025-only classification, NotebookLM/doc discrepancies, and Windows caveat truthfully. Add `tests/unit/test_2025_1_docs_contract.py` rejecting broad support claims and stale proof wording.
   **Must NOT do**: Do not claim complete 2025 behavioral coverage. Do not describe macOS evidence as Windows validation.

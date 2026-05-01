@@ -37,3 +37,6 @@
 
 - Resolved during Task 11: default 60s WAAPI readiness caused skipped destructive launches after copied-sandbox prep; rerunning with `WWISE_READINESS_TIMEOUT=180` produced fresh all-passed 2025.1 destructive behavior evidence (`5 passed`).
 - Task 11 verification note: JSON LSP diagnostics remain unavailable for JSON resources, so changed coverage/deferred JSON was validated with `python -m json.tool`; Python LSP diagnostics were clean and focused 2025 coverage/audit pytest passed.
+
+- Resolved during Task 12: the initial docs contract failed because an eval forbidden term and a runbook warning repeated Windows-overclaim phrases verbatim. Reworded both to reject the claim without embedding the exact forbidden language.
+- Task 12 verification note: JSON resources and eval metadata were validated through Python JSON loading plus `python -m pytest tests/unit/test_2025_1_docs_contract.py tests/unit/test_eval_metadata.py -q`; Python LSP diagnostics were clean for the new test.

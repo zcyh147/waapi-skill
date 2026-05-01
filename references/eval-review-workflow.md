@@ -17,7 +17,7 @@ Additional 2023.1 eval examples are version-scoped. They must point to versioned
 
 Additional 2024.1 eval examples are version-scoped. They must point to versioned resources such as `resources/manifest/2024.1/`, `resources/semantic/2024.1/source_notes.json`, `resources/coverage/2024.1/`, `resources/deferred/2024.1.json`, `resources/waql/2024.1/`, and `references/semantic/2024.1/`. They must keep 2024.1 claims limited to complete reflected inventory and parity classification, one live read-only URI, ten copied-sandbox mutating URIs, and remaining deferred or excluded entries. They must not claim broad 2024.1 WAAPI behavioral coverage.
 
-2025 is a future sequential follow-up. Do not grade an answer as if that version is implemented here.
+Additional 2025.1 eval examples are version-scoped. They must point to versioned resources such as `resources/manifest/2025.1/`, `resources/semantic/2025.1/source_notes.json`, `resources/coverage/2025.1/`, `resources/deferred/2025.1.json`, `resources/waql/2025.1/`, and `references/semantic/2025.1/`. They must keep 2025.1 claims limited to complete reflected inventory and parity classification for 154 functions, one live read-only URI, ten copied-sandbox mutating URIs, and 143 remaining deferred or excluded entries. They must not claim broad 2025.1 WAAPI behavioral coverage, must not count 2024 comparison metadata as 2025.1 proof, must not treat skipped live or destructive tests as proof, and must not describe macOS evidence as Windows-host validation.
 
 ## Prepare a review workspace
 
@@ -72,6 +72,8 @@ The assertions in `evals/evals.json` are objective checks for reviewing model ou
 For 2023.1 prompts, treat NotebookLM as source evidence generation or refresh only. Runtime examples should read local persisted evidence and source-note resources, not query NotebookLM while constructing builders or dispatcher requests.
 
 For 2024.1 prompts, treat NotebookLM as source evidence generation or refresh only. Runtime examples should read local persisted evidence and source-note resources, not query NotebookLM while constructing builders or dispatcher requests. Keep readback helpers such as `ak.wwise.core.soundbank.getInclusions` and `ak.wwise.core.switchContainer.getAssignments` unpromoted unless a later plan changes the coverage resources.
+
+For 2025.1 prompts, treat NotebookLM as source evidence generation or refresh only. Runtime examples should read local persisted evidence and source-note resources, not query NotebookLM while constructing builders or dispatcher requests. Keep 2025.1 NotebookLM caveats visible: URL candidates are not fetched proof, hierarchy naming changed to Containers/Busses/Devices/Property Container, and SoundBank size metadata needs generated SoundBanks before trust.
 
 Keep the normal test suite as the verification source:
 
