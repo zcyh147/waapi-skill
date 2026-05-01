@@ -1,0 +1,1070 @@
+{
+  "functions": [
+    {
+      "reflection": {
+        "uri": "ak.soundengine.executeActionOnEvent"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.executeActionOnEvent"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.getState"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.getState"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.getSwitch"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.getSwitch"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.loadBank"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.loadBank"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.postEvent"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.postEvent"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.postMsgMonitor"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.postMsgMonitor"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.postTrigger"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.postTrigger"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.registerGameObj"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.registerGameObj"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.resetRTPCValue"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.resetRTPCValue"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.seekOnEvent"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.seekOnEvent"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.setDefaultListeners"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.setDefaultListeners"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.setGameObjectAuxSendValues"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.setGameObjectAuxSendValues"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.setGameObjectOutputBusVolume"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.setGameObjectOutputBusVolume"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.setListenerSpatialization"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.setListenerSpatialization"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.setListeners"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.setListeners"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.setMultiplePositions"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.setMultiplePositions"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.setObjectObstructionAndOcclusion"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.setObjectObstructionAndOcclusion"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.setPosition"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.setPosition"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.setRTPCValue"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.setRTPCValue"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.setScalingFactor"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.setScalingFactor"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.setState"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.setState"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.setSwitch"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.setSwitch"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.stopAll"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.stopAll"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.stopPlayingID"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.stopPlayingID"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.unloadBank"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.unloadBank"
+    },
+    {
+      "reflection": {
+        "uri": "ak.soundengine.unregisterGameObj"
+      },
+      "type": "function",
+      "uri": "ak.soundengine.unregisterGameObj"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.cli.addNewPlatform"
+      },
+      "type": "function",
+      "uri": "ak.wwise.cli.addNewPlatform"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.cli.convertExternalSource"
+      },
+      "type": "function",
+      "uri": "ak.wwise.cli.convertExternalSource"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.cli.createNewProject"
+      },
+      "type": "function",
+      "uri": "ak.wwise.cli.createNewProject"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.cli.dumpObjects"
+      },
+      "type": "function",
+      "uri": "ak.wwise.cli.dumpObjects"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.cli.executeLuaScript"
+      },
+      "type": "function",
+      "uri": "ak.wwise.cli.executeLuaScript"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.cli.generateSoundbank"
+      },
+      "type": "function",
+      "uri": "ak.wwise.cli.generateSoundbank"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.cli.migrate"
+      },
+      "type": "function",
+      "uri": "ak.wwise.cli.migrate"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.cli.moveMediaIdsToSingleFile"
+      },
+      "type": "function",
+      "uri": "ak.wwise.cli.moveMediaIdsToSingleFile"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.cli.moveMediaIdsToWorkUnits"
+      },
+      "type": "function",
+      "uri": "ak.wwise.cli.moveMediaIdsToWorkUnits"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.cli.tabDelimitedImport"
+      },
+      "type": "function",
+      "uri": "ak.wwise.cli.tabDelimitedImport"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.cli.updateMediaIdsInSingleFile"
+      },
+      "type": "function",
+      "uri": "ak.wwise.cli.updateMediaIdsInSingleFile"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.cli.verify"
+      },
+      "type": "function",
+      "uri": "ak.wwise.cli.verify"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.cli.waapiServer"
+      },
+      "type": "function",
+      "uri": "ak.wwise.cli.waapiServer"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.console.project.close"
+      },
+      "type": "function",
+      "uri": "ak.wwise.console.project.close"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.console.project.create"
+      },
+      "type": "function",
+      "uri": "ak.wwise.console.project.create"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.console.project.open"
+      },
+      "type": "function",
+      "uri": "ak.wwise.console.project.open"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.audio.import"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.audio.import"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.audio.importTabDelimited"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.audio.importTabDelimited"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.audio.mute"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.audio.mute"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.audio.resetMute"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.audio.resetMute"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.audio.resetSolo"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.audio.resetSolo"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.audio.solo"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.audio.solo"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.executeLuaScript"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.executeLuaScript"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.getInfo"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.getInfo"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.getProjectInfo"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.getProjectInfo"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.log.addItem"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.log.addItem"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.log.clear"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.log.clear"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.log.get"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.log.get"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.copy"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.copy"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.create"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.create"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.delete"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.delete"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.diff"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.diff"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.get"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.getAttenuationCurve"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.getAttenuationCurve"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.getPropertyAndReferenceNames"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.getPropertyAndReferenceNames"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.getPropertyInfo"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.getPropertyInfo"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.getTypes"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.getTypes"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.isLinked"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.isLinked"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.isPropertyEnabled"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.isPropertyEnabled"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.move"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.move"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.pasteProperties"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.pasteProperties"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.set"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.set"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.setAttenuationCurve"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.setAttenuationCurve"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.setLinked"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.setLinked"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.setName"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.setName"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.setNotes"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.setNotes"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.setProperty"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.setProperty"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.setRandomizer"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.setRandomizer"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.setReference"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.setReference"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.setStateGroups"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.setStateGroups"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.setStateProperties"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.object.setStateProperties"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.enableProfilerData"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.profiler.enableProfilerData"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.getAudioObjects"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.profiler.getAudioObjects"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.getBusses"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.profiler.getBusses"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.getCpuUsage"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.profiler.getCpuUsage"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.getCursorTime"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.profiler.getCursorTime"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.getGameObjects"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.profiler.getGameObjects"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.getLoadedMedia"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.profiler.getLoadedMedia"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.getPerformanceMonitor"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.profiler.getPerformanceMonitor"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.getRTPCs"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.profiler.getRTPCs"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.getStreamedMedia"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.profiler.getStreamedMedia"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.getVoiceContributions"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.profiler.getVoiceContributions"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.getVoices"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.profiler.getVoices"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.saveCapture"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.profiler.saveCapture"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.startCapture"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.profiler.startCapture"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.stopCapture"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.profiler.stopCapture"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.project.save"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.project.save"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.remote.connect"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.remote.connect"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.remote.disconnect"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.remote.disconnect"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.remote.getAvailableConsoles"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.remote.getAvailableConsoles"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.remote.getConnectionStatus"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.remote.getConnectionStatus"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.sound.setActiveSource"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.sound.setActiveSource"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.soundbank.convertExternalSources"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.soundbank.convertExternalSources"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.soundbank.generate"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.soundbank.generate"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.soundbank.getInclusions"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.soundbank.getInclusions"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.soundbank.processDefinitionFiles"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.soundbank.processDefinitionFiles"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.soundbank.setInclusions"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.soundbank.setInclusions"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.sourceControl.add"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.sourceControl.add"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.sourceControl.checkOut"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.sourceControl.checkOut"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.sourceControl.commit"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.sourceControl.commit"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.sourceControl.delete"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.sourceControl.delete"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.sourceControl.getSourceFiles"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.sourceControl.getSourceFiles"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.sourceControl.getStatus"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.sourceControl.getStatus"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.sourceControl.move"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.sourceControl.move"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.sourceControl.revert"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.sourceControl.revert"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.sourceControl.setProvider"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.sourceControl.setProvider"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.switchContainer.addAssignment"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.switchContainer.addAssignment"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.switchContainer.getAssignments"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.switchContainer.getAssignments"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.switchContainer.removeAssignment"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.switchContainer.removeAssignment"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.transport.create"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.transport.create"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.transport.destroy"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.transport.destroy"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.transport.executeAction"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.transport.executeAction"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.transport.getList"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.transport.getList"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.transport.getState"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.transport.getState"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.transport.prepare"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.transport.prepare"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.transport.useOriginals"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.transport.useOriginals"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.undo.beginGroup"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.undo.beginGroup"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.undo.cancelGroup"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.undo.cancelGroup"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.undo.endGroup"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.undo.endGroup"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.undo.redo"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.undo.redo"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.undo.undo"
+      },
+      "type": "function",
+      "uri": "ak.wwise.core.undo.undo"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.debug.enableAsserts"
+      },
+      "type": "function",
+      "uri": "ak.wwise.debug.enableAsserts"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.debug.enableAutomationMode"
+      },
+      "type": "function",
+      "uri": "ak.wwise.debug.enableAutomationMode"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.debug.generateToneWAV"
+      },
+      "type": "function",
+      "uri": "ak.wwise.debug.generateToneWAV"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.debug.getWalTree"
+      },
+      "type": "function",
+      "uri": "ak.wwise.debug.getWalTree"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.debug.restartWaapiServers"
+      },
+      "type": "function",
+      "uri": "ak.wwise.debug.restartWaapiServers"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.debug.testAssert"
+      },
+      "type": "function",
+      "uri": "ak.wwise.debug.testAssert"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.debug.testCrash"
+      },
+      "type": "function",
+      "uri": "ak.wwise.debug.testCrash"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.ui.bringToForeground"
+      },
+      "type": "function",
+      "uri": "ak.wwise.ui.bringToForeground"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.ui.captureScreen"
+      },
+      "type": "function",
+      "uri": "ak.wwise.ui.captureScreen"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.ui.commands.execute"
+      },
+      "type": "function",
+      "uri": "ak.wwise.ui.commands.execute"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.ui.commands.getCommands"
+      },
+      "type": "function",
+      "uri": "ak.wwise.ui.commands.getCommands"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.ui.commands.register"
+      },
+      "type": "function",
+      "uri": "ak.wwise.ui.commands.register"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.ui.commands.unregister"
+      },
+      "type": "function",
+      "uri": "ak.wwise.ui.commands.unregister"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.ui.getSelectedObjects"
+      },
+      "type": "function",
+      "uri": "ak.wwise.ui.getSelectedObjects"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.ui.project.close"
+      },
+      "type": "function",
+      "uri": "ak.wwise.ui.project.close"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.ui.project.create"
+      },
+      "type": "function",
+      "uri": "ak.wwise.ui.project.create"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.ui.project.open"
+      },
+      "type": "function",
+      "uri": "ak.wwise.ui.project.open"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.waapi.getFunctions"
+      },
+      "type": "function",
+      "uri": "ak.wwise.waapi.getFunctions"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.waapi.getSchema"
+      },
+      "type": "function",
+      "uri": "ak.wwise.waapi.getSchema"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.waapi.getTopics"
+      },
+      "type": "function",
+      "uri": "ak.wwise.waapi.getTopics"
+    }
+  ],
+  "metadata": {
+    "generator": "wwise_waapi.manifest.ReflectionManifestBuilder",
+    "inventory_source": "live-reflection:SampleProject",
+    "provenance": {
+      "sample_project": {
+        "name": "SampleProject",
+        "path": "/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj"
+      }
+    },
+    "schema_source_uri": "ak.wwise.waapi.getSchema",
+    "schema_source_uris": [
+      "ak.wwise.waapi.getSchema"
+    ],
+    "source_uris": [
+      "ak.wwise.waapi.getFunctions",
+      "ak.wwise.waapi.getTopics",
+      "ak.wwise.waapi.getSchema"
+    ],
+    "version_key": "2023.1",
+    "wwise_build": "2023.1.19.8928",
+    "wwise_console_path": "/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh",
+    "wwise_version_target": "2023.1"
+  }
+}
