@@ -137,7 +137,7 @@ Support Wwise 2024.1.13 WAAPI resources and tests as an explicit opt-in version 
 
   **Commit**: YES | Message: `feat(wwise): add 2024 version contracts` | Files: `wwise_waapi/versions.py`, `wwise_waapi/live_environment.py`, `tests/unit/test_2024_*.py`
 
-- [ ] 2. Create immutable 2024.1 fixture source from installed SampleProject
+- [x] 2. Create immutable 2024.1 fixture source from installed SampleProject
 
   **What to do**: Copy `/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject/SampleProject.wproj` and required `.wwu` project files into `tests/_org/2024.1/`. Generate `fixture-metadata.json`, `fixture-manifest.json`, and `README.md` matching 2023.1 fixture conventions. Exclude generated banks, logs, caches, audio outputs, and runtime files.
   **Must NOT do**: Do not mutate or commit the installed SampleProject; do not copy generated artifacts.

@@ -1,0 +1,64 @@
+{
+  "allowed_committed_file_patterns": [
+    "*.wproj",
+    "**/*.wwu",
+    "fixture-metadata.json",
+    "fixture-manifest.json",
+    "README.md"
+  ],
+  "excluded_generated_file_patterns": [
+    "*.akd",
+    "*.bnk",
+    "*.wem",
+    "*.prof",
+    "*.profraw",
+    "*.validationcache",
+    "*.wsettings",
+    "IncrementalSoundBankData.xml",
+    "*.log",
+    ".DS_Store"
+  ],
+  "excluded_generated_folders": [
+    ".backup/",
+    ".cache/",
+    ".pytest_cache/",
+    ".claude/",
+    "GeneratedSoundBanks/",
+    "**/GeneratedSoundBanks/",
+    "Logs/",
+    "Profiler/",
+    "Temp/",
+    "WwiseAudioCache/"
+  ],
+  "fixture_root": "tests/_org/2024.1",
+  "fixture_update_procedure": [
+    "Refresh from installed Wwise 2024.1.13.9056 SampleProject at /Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject/SampleProject.wproj.",
+    "Copy only source-control-safe authored project files (.wproj/.wwu) unless media is explicitly reviewed.",
+    "Regenerate fixture-manifest.json and fixture-metadata.json hashes.",
+    "Run python -m pytest tests/unit/test_2024_fixture_inventory.py -q."
+  ],
+  "hash_strategy": {
+    "algorithm": "sha256",
+    "file_count": 65,
+    "manifest_digest": "4ed4e5e6c7c7afe8036a57dbdbba33481c0b56bbc085edbfad1bbd919dc2811e",
+    "mode": "path-plus-content over committed fixture payload files; excludes fixture-metadata.json and fixture-manifest.json bookkeeping files to avoid circular hashes"
+  },
+  "immutability": {
+    "mutation_policy": "Never pass this directory or any descendant as WWISE_SANDBOX_ROOT or WWISE_FIXTURE_PROJECT for destructive tests; copy it to a per-test sandbox before mutation.",
+    "role": "committed immutable source fixture"
+  },
+  "provenance": {
+    "copied_policy": "Authored .wproj/.wwu project source files only. Generated outputs, caches, local settings, validation caches, logs, profiler captures, runtime sandboxes, and bulk media are intentionally excluded.",
+    "source_build": "2024.1.13.9056",
+    "source_path": "/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject/SampleProject.wproj",
+    "source_root": "/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject",
+    "type": "curated copy from local Audiokinetic SampleProject"
+  },
+  "schema_version": 1,
+  "wwise": {
+    "build": "2024.1.13.9056",
+    "source_build": "9056",
+    "source_version": "v2024.1.13",
+    "version": "2024.1"
+  }
+}

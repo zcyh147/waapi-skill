@@ -1,0 +1,340 @@
+{
+  "algorithm": "sha256",
+  "digest": "4ed4e5e6c7c7afe8036a57dbdbba33481c0b56bbc085edbfad1bbd919dc2811e",
+  "file_count": 65,
+  "files": [
+    {
+      "bytes": 98699,
+      "path": "Actor-Mixer Hierarchy/Ambisonics.wwu",
+      "sha256": "8a5180d5e6125a02f7033cf149463078c498b8e21bce7f9958566664142047a3"
+    },
+    {
+      "bytes": 82484,
+      "path": "Actor-Mixer Hierarchy/Car Engine.wwu",
+      "sha256": "e6984d157c7b6418a3d9729fdf7d3ff295d551314656ce76e985185dda6257cc"
+    },
+    {
+      "bytes": 299,
+      "path": "Actor-Mixer Hierarchy/Default Work Unit.wwu",
+      "sha256": "4d18ff1a8043a1deb7002fcd5330c03f61e7f60ef43952b494af3abe60f7cbf1"
+    },
+    {
+      "bytes": 130107,
+      "path": "Actor-Mixer Hierarchy/Dialogues.wwu",
+      "sha256": "aacaaba8b62ebf01b7316368eef9c3bd5c5e671a50f093a96ba2e73fc2e80b97"
+    },
+    {
+      "bytes": 240321,
+      "path": "Actor-Mixer Hierarchy/Footsteps.wwu",
+      "sha256": "30493a7b054c49ab11e40f7abc242c7475198fa0d59a5881f63f3ed75cf706c7"
+    },
+    {
+      "bytes": 755821,
+      "path": "Actor-Mixer Hierarchy/MIDI.wwu",
+      "sha256": "9a00fda73b8d9a10e96968f8b10169c91b57051a24c43226e267444b2bd1b0a3"
+    },
+    {
+      "bytes": 104611,
+      "path": "Actor-Mixer Hierarchy/Minigun.wwu",
+      "sha256": "a4cd33814d423f7f2c1067714fe28a7d18f7c95930bdfe7de2679b96b0c52e66"
+    },
+    {
+      "bytes": 295270,
+      "path": "Actor-Mixer Hierarchy/NYC Ambience.wwu",
+      "sha256": "353b6863068a046e58550e812fcc71b5222712937a3c734472a2c45b542a75af"
+    },
+    {
+      "bytes": 11014,
+      "path": "Attenuations/Ambience.wwu",
+      "sha256": "7d7eb67360c38146bd41e90582ba8ca8b54e55a65d2abe4157fbf6f5dd673782"
+    },
+    {
+      "bytes": 299,
+      "path": "Attenuations/Default Work Unit.wwu",
+      "sha256": "3c06f962fac3a5ea7b6f9ffe095bea6e099595417af448ee0fa4493137e3e375"
+    },
+    {
+      "bytes": 3630,
+      "path": "Attenuations/Footsteps.wwu",
+      "sha256": "bd1cadb1711164c058c55f7d4eb63b192376a72eed2a8bdbec29eb2064cc0912"
+    },
+    {
+      "bytes": 4074,
+      "path": "Attenuations/Minigun.wwu",
+      "sha256": "e0b3d4b566978781434064cb910f54c5c4a249dcdd668762d87bf02df9c15a60"
+    },
+    {
+      "bytes": 642,
+      "path": "Audio Devices/Default Work Unit.wwu",
+      "sha256": "4b146a3b1c52dd9b3a7c117ecc71f1964714077c68a93c18f7b0bef95cfda582"
+    },
+    {
+      "bytes": 1510,
+      "path": "Control Surface Sessions/Default Work Unit.wwu",
+      "sha256": "411b12f4e5fc5aeb00b3a2fe11c628a6cb155abea19825a7b41d361cdef3d58d"
+    },
+    {
+      "bytes": 1470,
+      "path": "Control Surface Sessions/MIDI.wwu",
+      "sha256": "c58d9c832dc1603803b3029e090d1c4af6676704f08ee051b817a11ae89459ea"
+    },
+    {
+      "bytes": 5795,
+      "path": "Conversion Settings/Default Work Unit.wwu",
+      "sha256": "92aa0009ee9ff43af3363e78da2764dbef3142c7b49b5388afeae3155d8e0c21"
+    },
+    {
+      "bytes": 4261,
+      "path": "Conversion Settings/MIDI.wwu",
+      "sha256": "ca241978966b8e6df8d75be32d6bbd247114635be9e0157799806c70391db585"
+    },
+    {
+      "bytes": 305,
+      "path": "Dynamic Dialogue/Default Work Unit.wwu",
+      "sha256": "fae77899d25a83d7a9d920e2e6580b606091111947a0538a05af2ca7465e2079"
+    },
+    {
+      "bytes": 66423,
+      "path": "Dynamic Dialogue/Dialogue.wwu",
+      "sha256": "713aad4beb99894f9d9de5302d9332ac967c95829f75257058273426bcb6fdc7"
+    },
+    {
+      "bytes": 2680,
+      "path": "Effects/Ambisonics.wwu",
+      "sha256": "80bb5ecdb73ef4b158e2f8b174e12f97818a821ba80dc37dd869be10d0ed1052"
+    },
+    {
+      "bytes": 289,
+      "path": "Effects/Default Work Unit.wwu",
+      "sha256": "66279724479ccb95ecaa341845ade21eb3bf0704c88ec90399f96bee6be2f2d6"
+    },
+    {
+      "bytes": 6786,
+      "path": "Effects/Environments.wwu",
+      "sha256": "c19ed1256d47faa68d729bc1dde2922fa2b615a0c746554e56150938b114a71e"
+    },
+    {
+      "bytes": 70679,
+      "path": "Effects/Factory Effects.wwu",
+      "sha256": "e2280ed761ccf136c7c1dc3d72a4ebf04d279de6c2e55175c302e337cffaabba"
+    },
+    {
+      "bytes": 137410,
+      "path": "Effects/Factory McDSP Effects.wwu",
+      "sha256": "d1eb323eff5747cdf8cd35a4302c523029f75e445cd96f2a4672d5c16a1547e5"
+    },
+    {
+      "bytes": 1866,
+      "path": "Effects/MIDI.wwu",
+      "sha256": "5f78fd10c630a38f8200b55be9f36c4dec4324a718ac23325c2822665f0bfb9d"
+    },
+    {
+      "bytes": 1804,
+      "path": "Events/Ambience.wwu",
+      "sha256": "ecc738a971946a114c2331005da7b62bd4fc04a656a630f8d6a716daacaa0757"
+    },
+    {
+      "bytes": 1723,
+      "path": "Events/Car Engine.wwu",
+      "sha256": "5b3fb609ccb63cebb237caaed6f39c3c5a5b0bc41bab2e6f904566b55721a8b7"
+    },
+    {
+      "bytes": 287,
+      "path": "Events/Default Work Unit.wwu",
+      "sha256": "b1335452b1eb41c07133ec3bae256542fe28810538d25da636fd99fc9868f21e"
+    },
+    {
+      "bytes": 978,
+      "path": "Events/Footsteps.wwu",
+      "sha256": "e79bffe8cea6907f85549f8b7efe5ad813c40a5883aa584a1a42c1b5cfa9f4c9"
+    },
+    {
+      "bytes": 5679,
+      "path": "Events/MIDI.wwu",
+      "sha256": "9055f93761adc6f58095e66165aac821a8facf2053d4a476c0906559a6eb426a"
+    },
+    {
+      "bytes": 4526,
+      "path": "Events/Minigun.wwu",
+      "sha256": "f97a6074ebc7de0b146f3d2ad3a68a7b00ffbc8a49575102dff8e9d7571b7e8f"
+    },
+    {
+      "bytes": 4042,
+      "path": "Events/Music.wwu",
+      "sha256": "5f0988e41fb68b22ca1633bc922dc27c959f182cc90839c332a03383c7218c96"
+    },
+    {
+      "bytes": 698,
+      "path": "Game Parameters/Ambience.wwu",
+      "sha256": "68961513054823702f33b1267244d837c5f9cb82bb4b013a913f504527ed8a19"
+    },
+    {
+      "bytes": 934,
+      "path": "Game Parameters/Car Engine.wwu",
+      "sha256": "dad1ada0fa79a8b786044cdcb3dd30cebe8d127c8dd9fda897973bba7dbf9612"
+    },
+    {
+      "bytes": 303,
+      "path": "Game Parameters/Default Work Unit.wwu",
+      "sha256": "e7abd9f0cb467abf4b830bd82f5b73e43d73db06c79b9cc5f0e9854a9fb39a3d"
+    },
+    {
+      "bytes": 432,
+      "path": "Game Parameters/Music.wwu",
+      "sha256": "18cd16810bdf6af2d5a67a6cf00c90ce83818b584758c59262b9a872e39d0e13"
+    },
+    {
+      "bytes": 2904,
+      "path": "Game Parameters/SoundSeed Impact.wwu",
+      "sha256": "f3f7dbc2f460b30f8f51a0a0149f6d2613e0bb4c216a998a287e7e6e90965288"
+    },
+    {
+      "bytes": 307,
+      "path": "Interactive Music Hierarchy/Default Work Unit.wwu",
+      "sha256": "3b75b13c586dc9bf40dfa100d2213febf87e5275789f9865969e7d79ccd880b0"
+    },
+    {
+      "bytes": 168105,
+      "path": "Interactive Music Hierarchy/MIDI.wwu",
+      "sha256": "c647f3c10b50f166108121e6ae2300d8484f99879dbd28b9b09890d6a99cd456"
+    },
+    {
+      "bytes": 920329,
+      "path": "Interactive Music Hierarchy/Music.wwu",
+      "sha256": "8f4c14b6e986105a0264cef04c333a9e09fdce999615d7de7a79d1124399d075"
+    },
+    {
+      "bytes": 19143,
+      "path": "Master-Mixer Hierarchy/Default Work Unit.wwu",
+      "sha256": "2c692bc9119ce954f2317b43e9c25997d678b566bc99f84a105dacbbbde4f2b5"
+    },
+    {
+      "bytes": 293,
+      "path": "Metadata/Default Work Unit.wwu",
+      "sha256": "25466934496f81ec3b9968d43c03f8abcb54fda3d5ca859c0438b5adbe4bb405"
+    },
+    {
+      "bytes": 303,
+      "path": "Mixing Sessions/Default Work Unit.wwu",
+      "sha256": "0060fc079dfb6aac920c56d2dc3da8451134707ed35375aa55619512d0aff453"
+    },
+    {
+      "bytes": 295,
+      "path": "Modulators/Default Work Unit.wwu",
+      "sha256": "588ef33111f525974a426e504f555b130bbaab610a0a61afa382faa61991c921"
+    },
+    {
+      "bytes": 723,
+      "path": "Modulators/MIDI.wwu",
+      "sha256": "f2267aa83bf9e3acfb6b1d83468d08340bad0d3b235e2c7bf31962e41d3e1c3b"
+    },
+    {
+      "bytes": 289,
+      "path": "Presets/Default Work Unit.wwu",
+      "sha256": "57599ef51e9122c7f409359af3c2f18025ace7521dc963caf342db61c0a556fb"
+    },
+    {
+      "bytes": 289,
+      "path": "Queries/Default Work Unit.wwu",
+      "sha256": "d27caa235f5ca8fef9de6a5193cf307d77e5e1192cc68a6fce85ea0507c8dd1f"
+    },
+    {
+      "bytes": 30867,
+      "path": "Queries/Factory Queries.wwu",
+      "sha256": "26ebd05ddba4b20cc045285ea8b4441992625363031763b375666f0ad479fb5f"
+    },
+    {
+      "bytes": 612,
+      "path": "README.md",
+      "sha256": "f9c03356cca3c505aadc4a11e1e7c2daea408097446ad8dc4be9ff50f281c662"
+    },
+    {
+      "bytes": 475079,
+      "path": "SampleProject.wproj",
+      "sha256": "ac6a110896118c875d39b5efc55050eb65eaf983643e76a4559a209530420b7b"
+    },
+    {
+      "bytes": 295,
+      "path": "SoundBanks/Default Work Unit.wwu",
+      "sha256": "a4acaa4a994e99fbc96de79e6c1390e7d6610237bc2b2d1ef37a926ac4f86c81"
+    },
+    {
+      "bytes": 313,
+      "path": "Soundcaster Sessions/Default Work Unit.wwu",
+      "sha256": "38216fa07811c36085b7010c8845539657eca9c1b246360501f6c3066540d93b"
+    },
+    {
+      "bytes": 6743,
+      "path": "Soundcaster Sessions/MIDI.wwu",
+      "sha256": "147d2ec1db1fc466c7223d258d61e7811592b3d149adbb478a229155e71feb20"
+    },
+    {
+      "bytes": 5783,
+      "path": "Soundcaster Sessions/Minigun.wwu",
+      "sha256": "f20e0b89d3607bbd62e889d397e9e1fb1d81fca84e56a9c4e5b5a8d2d1b24507"
+    },
+    {
+      "bytes": 6452,
+      "path": "Soundcaster Sessions/Music.wwu",
+      "sha256": "06cb69d5e1069c8e8b9633bbd312781a8337fcd4367d9721dc44898b6d6137f7"
+    },
+    {
+      "bytes": 287,
+      "path": "States/Default Work Unit.wwu",
+      "sha256": "fe13755c398ca9baeec1afafb34c6cb32f9896e8907b92ebcf81e68234e89b74"
+    },
+    {
+      "bytes": 2309,
+      "path": "States/Dynamic Dialogue.wwu",
+      "sha256": "7b59ed2b2594daa870107e64b20e9fd44b76e980595abf58741d2df0ca5ecb58"
+    },
+    {
+      "bytes": 1030,
+      "path": "States/MIDI.wwu",
+      "sha256": "836d24a8a76eefabb7642b18378260e087f9e3538f8c49c5a5c810562f032cfd"
+    },
+    {
+      "bytes": 2595,
+      "path": "States/Music.wwu",
+      "sha256": "806d012634e2241872386ddaa8dc1432458a522d594db8671ee6e631458b480d"
+    },
+    {
+      "bytes": 291,
+      "path": "Switches/Default Work Unit.wwu",
+      "sha256": "16a49bbe53259ca48ff7edfe6ed739fd44cfa87884514c63eb25627ea72a5a66"
+    },
+    {
+      "bytes": 1233,
+      "path": "Switches/Footsteps.wwu",
+      "sha256": "515d976954f6415fed57385655d976467ea7388746cf4a896c0e8b0990c28658"
+    },
+    {
+      "bytes": 1689,
+      "path": "Switches/SS_Impact.wwu",
+      "sha256": "3feff60aabe4a156445a3e98ef49baa71864046834bcc34e7937914cd7ac91fc"
+    },
+    {
+      "bytes": 291,
+      "path": "Triggers/Default Work Unit.wwu",
+      "sha256": "281234ba2f5f7dc61845367d13e762b6ce0871d788da69d25ef24b21140fc2dc"
+    },
+    {
+      "bytes": 492,
+      "path": "Triggers/Music.wwu",
+      "sha256": "8ede275e9e115f52c04e6fd9a4415e53fb98e297b48b52444f44c51eccd05bc8"
+    },
+    {
+      "bytes": 307,
+      "path": "Virtual Acoustics/Default Work Unit.wwu",
+      "sha256": "da4c36436337f1efdcb19c2810b9f3852d9de51911c47aac25e5f52b9a427e74"
+    }
+  ],
+  "root": "tests/_org/2024.1",
+  "schema_version": 1,
+  "source": {
+    "build": "2024.1.13.9056",
+    "path": "/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject/SampleProject.wproj",
+    "root": "/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject"
+  },
+  "strategy": "path-plus-content excluding fixture metadata/manifest bookkeeping files"
+}
