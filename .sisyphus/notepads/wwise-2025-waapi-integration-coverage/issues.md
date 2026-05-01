@@ -32,3 +32,5 @@
 
 - Resolved during Task 9: the first exact 2025.1 WAQL live run failed because the matrix reused the 2024 Actor-Mixer Hierarchy path; updated the 2025-only matrix to the live SampleProject `Containers` root and reran the exact command successfully.
 - Task 9 verification note: JSON LSP diagnostics still cannot run because the configured `biome` server is not installed; modified JSON resources were validated with `python -m json.tool`, focused 2025 pytest, exact live pytest, and the full default pytest suite.
+
+- Task 10 verification note: no typecheck/build command is configured in `pyproject.toml`; Python LSP diagnostics were clean for the new module and test, and pytest covered the required 2025.1 destructive gates plus the 2024 safety regression.

@@ -1,0 +1,19 @@
+Task 10: 2025.1 destructive sandbox safety gates
+
+Command: python -m pytest tests/unit/test_2025_1_destructive_safety.py -q
+Exit status: 0
+Pytest summary: 18 passed in 0.06s
+
+Additional focused regression:
+Command: python -m pytest tests/unit/test_2025_1_live_environment_contract.py tests/unit/test_2025_1_fixture_inventory.py -q
+Exit status: 0
+Result: 10 passed in 0.07s
+
+Diagnostics:
+- lsp_diagnostics wwise_waapi/destructive_2025_sandbox.py: no diagnostics found
+- lsp_diagnostics tests/unit/test_2025_1_destructive_safety.py: no diagnostics found
+
+Coverage summary: missing WWISE_LIVE, missing WWISE_DESTRUCTIVE, wrong WWISE_VERSION,
+wrong exact 2025.1 console/sample paths, installed SampleProject targets, tests/_org/2025.1
+targets, missing sandbox root, unsafe sandbox roots, non-exact source copies, and source
+immutability mutations are covered by fail-closed unit tests before Wwise launch.

@@ -29,3 +29,6 @@
 
 - Task 9 exact 2025.1 live read-only command passed with `WWISE_READINESS_TIMEOUT=180`; `ak.wwise.core.object.get` is now the only 2025.1 live-tested promotion, backed by `resources/waql/2025.1/object-get-live-matrix.json` plus eight per-case JSON evidence files under `.sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/`.
 - 2025.1 WAQL hierarchy readback uses `\\Containers` rather than the 2024 `\\Actor-Mixer Hierarchy`; the 2025 matrix must use Containers for path, GUID placeholder, descendant, property, and return-option assertions.
+
+- Task 10 added a separate 2025.1 destructive sandbox wrapper instead of changing the default dispatcher/runtime: opt-in/version/exact-path gates run before lock/prep, copied-sandbox target checks run before source hashing or launch, and immutable installed/tests/_org targets fail closed.
+- Task 10 verification passed with `python -m pytest tests/unit/test_2025_1_destructive_safety.py -q`, the 2024 regression command, and focused 2025.1 live-environment/fixture regressions; evidence is saved under `.sisyphus/evidence/task-2025-10-*.txt`.

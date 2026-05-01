@@ -485,7 +485,7 @@ Wave 5: F1-F4 final review agents.
 
   **Commit**: YES | Message: `test(live): add 2025 read-only parity evidence` | Files: `tests/live/test_2025_1_*.py`, `resources/waql/2025.1/*.json`, `resources/coverage/2025.1/*.json`, `resources/deferred/2025.1.json`, `.sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/*`, `.sisyphus/evidence/task-2025-9-*.txt`
 
-- [ ] 10. Add 2025.1 destructive sandbox safety gates
+- [x] 10. Add 2025.1 destructive sandbox safety gates
 
   **What to do**: Add `wwise_waapi/destructive_2025_sandbox.py` if a version-specific runtime is needed, or extend reusable sandbox helpers with 2025.1 exact-path guards. Add `tests/unit/test_2025_1_destructive_safety.py` asserting missing opt-ins, wrong version, wrong paths, installed SampleProject target, `tests/_org/2025.1` target, missing sandbox root, and source immutability all fail before mutation/launch. Keep default dispatcher unchanged.
   **Must NOT do**: Do not run destructive Wwise calls in this task. Do not weaken 2024 destructive runtime.
