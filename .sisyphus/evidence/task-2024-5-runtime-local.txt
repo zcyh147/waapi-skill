@@ -1,0 +1,15 @@
+# Task 2024-5 runtime local evidence
+
+## Command
+python -m pytest tests/unit/test_2024_reference_layout.py tests/unit/test_2024_cross_version_audit.py -q
+
+## Exit code
+0
+
+## Output
+.........                                                                [100%]
+9 passed in 0.04s
+
+
+## Local-runtime assertion scope
+The passing tests read `resources/semantic/2024.1/source_notes.json` and `references/semantic/2024.1/*.md` only. They reject `wwise-2022.1-docs`, `wwise-2023.1-docs`, global `references/semantic-builder-` paths, bare `resources/semantic/2024/`, and non-2024 semantic paths as 2024 proof. They also assert runtime/layout checks do not read `.agents/skills/notebooklm` or `scripts/run.py`.

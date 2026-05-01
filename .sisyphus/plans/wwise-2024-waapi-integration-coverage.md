@@ -254,7 +254,7 @@ Support Wwise 2024.1.13 WAAPI resources and tests as an explicit opt-in version 
 
   **Commit**: YES | Message: `test(wwise): isolate 2024 version resources` | Files: `tests/unit/test_2024_cross_version_audit.py`
 
-- [ ] 5. Create 2024 semantic references and NotebookLM source notes
+- [x] 5. Create 2024 semantic references and NotebookLM source notes
 
   **What to do**: Use NotebookLM active library `wwise-2024.1-docs` to ground semantic builder families `query`, `object-mutation`, `property-reference`, `import`, `soundbank`, and `switchcontainer`. Create `references/semantic/2024.1/*.md`, `references/semantic/2024.1/semantic-builder-notebooklm-gate.md`, and `resources/semantic/2024.1/source_notes.json` with version target, notebook id, required fields, source URLs, and gate evidence path.
   **Must NOT do**: Do not let runtime builders call NotebookLM; do not cite 2022/2023 notebooks as 2024 evidence.
