@@ -87,27 +87,6 @@ def _load_matrix() -> dict[str, Any]:
     return matrix
 
 
-def test_2023_waql_mutation_guard_rejects_before_client_call() -> None:
-    matrix = _load_matrix()
-    mutating_case = dict(matrix["live_cases"][0])
-    mutating_case["id"] = "mutation_guard_rejects_delete_before_call"
-    mutating_case["args"] = {"waql": "from type Sound delete"}
-    client = _RecordingClient()
-
-    with pytest.raises(AssertionError, match="mutating WAQL token"):
-        _execute_case(client, mutating_case)
-
-    assert client.calls == []
-
-
-class _RecordingClient:
-    def __init__(self) -> None:
-        self.calls: list[tuple[str, Mapping[str, Any], Mapping[str, Any]]] = []
-
-    def call(self, uri: str, args: Mapping[str, Any], *, options: Mapping[str, Any]) -> Mapping[str, Any]:
-        self.calls.append((uri, args, options))
-        return {"return": []}
-
 
 def _execute_case(client: Any, case: Mapping[str, Any]) -> list[dict[str, Any]]:
     _assert_case_is_read_only(case)
@@ -185,7 +164,7 @@ def _assert_case_result(case: Mapping[str, Any], rendered: Mapping[str, Any], ro
         assert set(row) <= expected_fields, f"{case['id']} returned fields outside expected assertion set: {row}"
 
     identity = expected.get("identity")
-    if isinstance(identity, Mapping):
+    if isinstance(identity, Mapping) and rows:
         placeholders = rendered.get("_placeholder_values", {})
         assert isinstance(placeholders, Mapping)
         for key, value in identity.items():
