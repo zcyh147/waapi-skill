@@ -354,6 +354,7 @@ def test_2024_coverage_policy_deferred_and_source_notes_reconcile_without_manife
         if is_promoted:
             assert evidence["manifest_reflection_only"] is False, uri
             assert _has_approved_2024_promotion_evidence(entry, matrix_entry, summary_entry), uri
+            assert not _has_forbidden_2024_promotion_evidence(entry, matrix_entry, summary_entry), uri
         elif evidence.get("manifest_reflection_only") is True:
             assert entry["coverage_status"] not in PROMOTED_2024_STATUSES, uri
             assert entry["parity_bucket"] not in PROMOTED_2024_STATUSES, uri
@@ -388,4 +389,9 @@ def _counts_with_summary_zeroes(counts: dict[str, int], summary_counts: dict[str
 def _has_approved_2024_promotion_evidence(*objects: dict[str, Any]) -> bool:
     encoded = json.dumps(objects, sort_keys=True)
     return any(root in encoded for root in APPROVED_2024_PROMOTION_EVIDENCE)
+
+
+def _has_forbidden_2024_promotion_evidence(*objects: dict[str, Any]) -> bool:
+    encoded = json.dumps(objects, sort_keys=True)
+    return any(fragment in encoded for fragment in FORBIDDEN_2024_FALLBACK_FRAGMENTS)
 

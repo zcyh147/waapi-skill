@@ -1,0 +1,44 @@
+{
+  "actual": {
+    "result_count": 0,
+    "returned_fields": [],
+    "rows": []
+  },
+  "assertions": [
+    "deliberately absent object name returns an empty result array without relying on error payloads"
+  ],
+  "case_id": "empty_results_missing_name_2024_contract",
+  "evidence_path": ".sisyphus/evidence/wwise-2024-waapi-integration-coverage/live-read-only/empty_results_missing_name_2024_contract.json",
+  "expected": {
+    "fields": [
+      "id",
+      "name"
+    ],
+    "result_count": {
+      "count": 0,
+      "policy": "exact"
+    }
+  },
+  "no_mutation": true,
+  "options": {
+    "return": [
+      "id",
+      "name"
+    ]
+  },
+  "query": "from project where name = \"__waapi_skills_missing_object__\"",
+  "recorded_at_unix": 1777633771,
+  "result_count": 0,
+  "result_count_policy": {
+    "count": 0,
+    "policy": "exact"
+  },
+  "sources": [
+    "resources/waql/2023.1/object-get-live-matrix.json format comparison only; no 2023 evidence paths are reused as 2024 proof.",
+    "resources/manifest/2024.1/schemas.json#ak.wwise.core.object.get",
+    "2024.1 read-only live sandbox execution writes per-case evidence before promotion."
+  ],
+  "status": "passed",
+  "uri": "ak.wwise.core.object.get",
+  "wwise_version": "2024.1"
+}

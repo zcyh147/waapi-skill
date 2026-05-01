@@ -1217,24 +1217,6 @@
       "inventory_coverage": "reflected-manifest-only",
       "item_type": "function",
       "owner_follow_up": "Add fresh 2024.1 behavior-backed coverage or explicit policy review before promotion.",
-      "reason": "Reflected in 2024.1 manifest and source-note family 'query', but no 2024.1 behavioral execution is claimed.",
-      "review_trigger": "When 2024.1 behavioral tests or semantic policy for source-note family query changes.",
-      "risk_level": "low",
-      "substitute_test": "Manifest/source-note reconciliation only; not behavioral coverage.",
-      "uri": "ak.wwise.core.object.get",
-      "version": "2024.1"
-    },
-    {
-      "behavioral_coverage": "deferred",
-      "blocking_condition": "Source notes describe semantic contracts only; Task 6 requires fresh behavior evidence before promotion.",
-      "category": "core.object",
-      "coverage_status": "deferred",
-      "date": "2026-05-01",
-      "evidence_source": "resources/manifest/2024.1/functions.json (live reflection via 2024.1 SampleProject)",
-      "excluded_family": "",
-      "inventory_coverage": "reflected-manifest-only",
-      "item_type": "function",
-      "owner_follow_up": "Add fresh 2024.1 behavior-backed coverage or explicit policy review before promotion.",
       "reason": "Reflected in 2024.1 manifest and source-note family 'property-reference', but no 2024.1 behavioral execution is claimed.",
       "review_trigger": "When 2024.1 behavioral tests or semantic policy for source-note family property-reference changes.",
       "risk_level": "low",
@@ -2668,7 +2650,7 @@
   "metadata": {
     "coverage_model": {
       "behavioral_coverage": "Always deferred for Task 6; manifest/source-note reconciliation is not behavioral coverage.",
-      "coverage_status": "Either deferred or excluded, matching api-coverage.json exactly.",
+      "coverage_status": "Either deferred or excluded, matching blocked api-coverage.json entries after read-only live promotions are removed.",
       "inventory_coverage": "reflected-manifest-only"
     },
     "excluded_families": [
@@ -2680,7 +2662,7 @@
       "remote",
       "debug"
     ],
-    "generator": "task-6 2024.1 deferred registry generator",
+    "generator": "task-8 2024.1 deferred registry promotion",
     "manifest_source": "resources/manifest/2024.1",
     "required_fields": [
       "uri",
@@ -2710,7 +2692,7 @@
       "core.blendContainer": 4,
       "core.gameParameter": 1,
       "core.log": 3,
-      "core.object": 23,
+      "core.object": 22,
       "core.project": 1,
       "core.sound": 1,
       "core.soundbank": 5,
@@ -2719,7 +2701,7 @@
       "core.undo": 5,
       "waapi": 3
     },
-    "deferred_count": 75,
+    "deferred_count": 74,
     "excluded_category_counts": {
       "cli": 13,
       "core.profiler": 18,
@@ -2730,10 +2712,10 @@
     },
     "excluded_count": 73,
     "status_counts": {
-      "deferred": 75,
+      "deferred": 74,
       "excluded": 73
     },
-    "total": 148,
+    "total": 147,
     "version": "2024.1"
   }
 }

@@ -13,7 +13,9 @@ VERSION = "2024.1"
 FUNCTIONS_MANIFEST = REPO_ROOT / "resources" / "manifest" / VERSION / "functions.json"
 COVERAGE_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "api-coverage.json"
 SOURCE_NOTES_RESOURCE = REPO_ROOT / "resources" / "semantic" / VERSION / "source_notes.json"
-ALLOWED_STATUSES = {"deferred", "excluded"}
+PROMOTED_READ_ONLY_URI = "ak.wwise.core.object.get"
+PROMOTED_READ_ONLY_URIS = {PROMOTED_READ_ONLY_URI}
+ALLOWED_STATUSES = {"deferred", "excluded", "live-tested"}
 ALLOWED_PARITY_BUCKETS = {"manifest-only", "deferred", "excluded", "live-tested", "sandbox-mutating-tested"}
 RISKY_CATEGORY_PREFIXES = (
     "soundengine",
@@ -62,38 +64,53 @@ def test_2024_coverage_entries_have_required_versioned_metadata() -> None:
         assert entry["risk_level"] == expected.risk_level
         assert entry["parity_bucket"] == entry["coverage_status"]
         assert entry["parity_bucket"] in ALLOWED_PARITY_BUCKETS, entry["uri"]
-        assert entry["deferred"]["status"] is True
         assert entry["deferred"]["coverage_status"] == entry["coverage_status"]
         assert evidence["coverage"] == entry["coverage_status"]
         assert evidence["parity_bucket"] == entry["parity_bucket"]
-        assert evidence["manifest_reflection_only"] is True
-        assert evidence["counts_as_behavioral"] is False
-        assert evidence["counts_as_live_behavioral"] is False
-        assert "behavioral proof" in evidence["evidence_standard"]
+
+        if entry["uri"] in PROMOTED_READ_ONLY_URIS:
+            assert entry["coverage_status"] == "live-tested"
+            assert entry["deferred"]["status"] is False
+            assert evidence["manifest_reflection_only"] is False
+            assert evidence["counts_as_behavioral"] is True
+            assert evidence["counts_as_live_behavioral"] is True
+            assert evidence["evidence_path"] == "resources/waql/2024.1/object-get-live-matrix.json"
+            assert ".sisyphus/evidence/wwise-2024-waapi-integration-coverage/" in json.dumps(evidence)
+        else:
+            assert entry["coverage_status"] in {"deferred", "excluded"}, entry["uri"]
+            assert entry["deferred"]["status"] is True
+            assert evidence["manifest_reflection_only"] is True
+            assert evidence["counts_as_behavioral"] is False
+            assert evidence["counts_as_live_behavioral"] is False
+            assert "behavioral proof" in evidence["evidence_standard"]
 
 
-def test_2024_statuses_are_conservative_manifest_only_claims() -> None:
+def test_2024_statuses_promote_only_object_get_from_live_read_only_evidence() -> None:
     payload = _coverage_payload()
+    coverage = payload["coverage"]
     status_counts = payload["summary"]["status_counts"]
     parity_counts = payload["summary"]["parity_bucket_counts"]
+    promoted = {entry["uri"] for entry in coverage if entry["coverage_status"] == "live-tested"}
 
     assert set(payload["metadata"]["status_model"]) == ALLOWED_STATUSES
     assert set(status_counts) == ALLOWED_STATUSES
     assert set(payload["metadata"]["parity_bucket_model"]) == ALLOWED_PARITY_BUCKETS
     assert set(parity_counts) == ALLOWED_PARITY_BUCKETS
-    assert sum(status_counts.values()) == len(payload["coverage"]) == 148
-    assert sum(parity_counts.values()) == len(payload["coverage"]) == 148
+    assert sum(status_counts.values()) == len(coverage) == 148
+    assert sum(parity_counts.values()) == len(coverage) == 148
     assert payload["summary"]["total_functions"] == 148
     assert payload["summary"]["implemented"] == 148
-    assert payload["summary"]["manifest_only"] == 148
-    assert payload["summary"]["live_tested"] == 0
-    assert payload["summary"]["behavioral_supported"] == 0
-    assert status_counts == dict(sorted(Counter(entry["coverage_status"] for entry in payload["coverage"]).items()))
-    assert parity_counts["live-tested"] == 0
+    assert payload["summary"]["manifest_only"] == 147
+    assert payload["summary"]["live_tested"] == 1
+    assert payload["summary"]["behavioral_supported"] == 1
+    assert status_counts == _counts_with_zeroes(Counter(entry["coverage_status"] for entry in coverage), status_counts)
+    assert parity_counts == _counts_with_zeroes(Counter(entry["parity_bucket"] for entry in coverage), parity_counts)
+    assert parity_counts["live-tested"] == 1
     assert parity_counts["sandbox-mutating-tested"] == 0
+    assert promoted == PROMOTED_READ_ONLY_URIS
 
 
-def test_2024_source_note_families_are_context_not_behavioral_promotion() -> None:
+def test_2024_source_note_families_are_context_except_promoted_object_get() -> None:
     source_notes = json.loads(SOURCE_NOTES_RESOURCE.read_text(encoding="utf-8"))["notes"]
     expected_families = {"query", "object-mutation", "property-reference", "import", "soundbank", "switchcontainer"}
     source_uris = {
@@ -110,9 +127,14 @@ def test_2024_source_note_families_are_context_not_behavioral_promotion() -> Non
     for uri in covered_source_uris:
         entry = coverage_by_uri[uri]
         assert entry["source_note_family"] in expected_families
-        assert entry["coverage_status"] == "deferred"
-        assert entry["behavioral_evidence"]["manifest_reflection_only"] is True
-        assert entry["behavioral_evidence"]["counts_as_behavioral"] is False
+        if uri == PROMOTED_READ_ONLY_URI:
+            assert entry["coverage_status"] == "live-tested"
+            assert entry["behavioral_evidence"]["manifest_reflection_only"] is False
+            assert entry["behavioral_evidence"]["counts_as_behavioral"] is True
+        else:
+            assert entry["coverage_status"] == "deferred"
+            assert entry["behavioral_evidence"]["manifest_reflection_only"] is True
+            assert entry["behavioral_evidence"]["counts_as_behavioral"] is False
 
 
 def test_2024_risky_families_are_not_promoted() -> None:
@@ -135,3 +157,7 @@ def _uris(path: Path, section: str) -> list[str]:
 
 def _is_risky_category(category: str) -> bool:
     return any(category == prefix or category.startswith(prefix + ".") for prefix in RISKY_CATEGORY_PREFIXES)
+
+
+def _counts_with_zeroes(counts: Counter[str], summary_counts: dict[str, int]) -> dict[str, int]:
+    return {key: counts.get(key, 0) for key in summary_counts}

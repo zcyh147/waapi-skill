@@ -371,7 +371,7 @@ Support Wwise 2024.1.13 WAAPI resources and tests as an explicit opt-in version 
 
   **Commit**: YES | Message: `test(wwise): enforce 2024 parity audits` | Files: `tests/unit/test_2024_*.py`
 
-- [ ] 8. Add 2024 read-only live smoke and WAQL matrix evidence
+- [x] 8. Add 2024 read-only live smoke and WAQL matrix evidence
 
   **What to do**: Port 2023 live prerequisite/reflection/WAQL read-only tests to 2024. Use sandbox copy launch, no mutation, source hash/mtime invariance, and per-case evidence under `.sisyphus/evidence/wwise-2024-waapi-integration-coverage/live-read-only/`. Create `resources/waql/2024.1/object-get-live-matrix.json` from 2024 reflection and promote only `ak.wwise.core.object.get` if all cases pass.
   **Must NOT do**: Do not run against installed SampleProject directly; do not reuse 2023 evidence paths as 2024 proof.

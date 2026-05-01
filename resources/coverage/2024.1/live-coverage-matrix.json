@@ -1676,27 +1676,30 @@
       "version": "2024.1"
     },
     {
-      "achieved_status": "deferred",
-      "allowed_test_tier": "deferred-registry-required",
+      "achieved_status": "live-tested",
+      "allowed_test_tier": "read-only-live-sandbox",
       "category": "core.object",
-      "counts_as_behavioral": false,
-      "counts_as_live_behavioral": false,
-      "coverage_status": "deferred",
-      "current_status": "deferred",
+      "counts_as_behavioral": true,
+      "counts_as_live_behavioral": true,
+      "coverage_status": "live-tested",
+      "current_status": "live-tested",
       "destructive_risk": {
         "destructive_opt_in": false,
         "risk_level": "low"
       },
-      "evidence_path": "resources/deferred/2024.1.json",
-      "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
-      "fixture_prerequisites": [],
+      "evidence_path": "resources/waql/2024.1/object-get-live-matrix.json",
+      "evidence_standard": "2024.1 read-only live sandbox evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/ plus resources/waql/2024.1/object-get-live-matrix.json counts as behavioral/live proof for ak.wwise.core.object.get only.",
+      "fixture_prerequisites": [
+        ".sisyphus/evidence/task-2024-8-live-read-only.txt",
+        ".sisyphus/evidence/task-2024-8-read-only-guard.txt"
+      ],
       "item_type": "function",
       "manifest_source_uri": "resources/manifest/2024.1/schemas.json#ak.wwise.core.object.get",
-      "parity_bucket": "deferred",
+      "parity_bucket": "live-tested",
       "phase1_inventory_status": "reflected-manifest-only",
       "source_coverage_uri": "resources/coverage/2024.1/api-coverage.json",
       "source_note_family": "query",
-      "target_status": "deferred",
+      "target_status": "live-tested",
       "uri": "ak.wwise.core.object.get",
       "version": "2024.1"
     },
@@ -3713,7 +3716,7 @@
       "remote",
       "debug"
     ],
-    "generator": "task-6 2024.1 conservative coverage generator",
+    "generator": "task-8 2024.1 read-only live coverage promotion",
     "manifest_source": "resources/manifest/2024.1",
     "no_promotion_from_manifest_only": true,
     "parity_bucket_model": {
@@ -3726,24 +3729,25 @@
     "source_notes": "resources/semantic/2024.1/source_notes.json",
     "status_model": {
       "deferred": "Reflected in the 2024.1 manifest and kept out of behavior/live support until fresh 2024.1 evidence exists.",
-      "excluded": "Reflected in the 2024.1 manifest but blocked by risky-family policy; no behavior/live support is claimed."
+      "excluded": "Reflected in the 2024.1 manifest but blocked by risky-family policy; no behavior/live support is claimed.",
+      "live-tested": "Fresh 2024.1 read-only live sandbox evidence exists; Task 8 promotes only ak.wwise.core.object.get."
     },
-    "status_policy": "2024.1 manifest reflection alone is never behavioral support; source notes are semantic contracts only; Task 6 assigns no promoted URIs.",
+    "status_policy": "2024.1 manifest reflection alone is never behavioral support; Task 8 promotes only ak.wwise.core.object.get using read-only live sandbox evidence.",
     "version": "2024.1"
   },
   "summary": {
-    "behavioral_covered_count": 0,
-    "behavioral_supported": 0,
-    "deferred": 75,
+    "behavioral_covered_count": 1,
+    "behavioral_supported": 1,
+    "deferred": 74,
     "excluded": 73,
     "implemented": 148,
-    "live_behavioral_covered_count": 0,
-    "live_tested": 0,
-    "manifest_only": 148,
+    "live_behavioral_covered_count": 1,
+    "live_tested": 1,
+    "manifest_only": 147,
     "parity_bucket_counts": {
-      "deferred": 75,
+      "deferred": 74,
       "excluded": 73,
-      "live-tested": 0,
+      "live-tested": 1,
       "manifest-only": 0,
       "sandbox-mutating-tested": 0
     },
@@ -3758,8 +3762,9 @@
       "switchcontainer": 3
     },
     "status_counts": {
-      "deferred": 75,
-      "excluded": 73
+      "deferred": 74,
+      "excluded": 73,
+      "live-tested": 1
     },
     "total_functions": 148,
     "version": "2024.1"

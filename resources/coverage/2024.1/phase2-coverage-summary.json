@@ -1207,18 +1207,18 @@
       "version": "2024.1"
     },
     {
-      "achieved_status": "deferred",
+      "achieved_status": "live-tested",
       "category": "core.object",
-      "counts_as_behavioral": false,
-      "counts_as_live_behavioral": false,
-      "coverage_status": "deferred",
-      "evidence_path": "resources/manifest/2024.1/functions.json (live reflection via 2024.1 SampleProject)",
-      "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
-      "future_review_trigger": "When 2024.1 behavioral tests or semantic policy for source-note family query changes.",
+      "counts_as_behavioral": true,
+      "counts_as_live_behavioral": true,
+      "coverage_status": "live-tested",
+      "evidence_path": "resources/waql/2024.1/object-get-live-matrix.json",
+      "evidence_standard": "2024.1 read-only live sandbox evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/ plus resources/waql/2024.1/object-get-live-matrix.json counts as behavioral/live proof for ak.wwise.core.object.get only.",
+      "future_review_trigger": "When object.get WAQL read-only contract behavior changes or 2024.1 evidence is refreshed.",
       "inventory_coverage": "reflected-manifest-only",
       "item_type": "function",
-      "manifest_reflection_only": true,
-      "parity_bucket": "deferred",
+      "manifest_reflection_only": false,
+      "parity_bucket": "live-tested",
       "source_coverage_uri": "resources/coverage/2024.1/api-coverage.json",
       "source_note_family": "query",
       "uri": "ak.wwise.core.object.get",
@@ -2677,7 +2677,7 @@
       "remote",
       "debug"
     ],
-    "generator": "task-6 2024.1 conservative coverage generator",
+    "generator": "task-8 2024.1 read-only live coverage promotion",
     "live_matrix_resource": "resources/coverage/2024.1/live-coverage-matrix.json",
     "manifest_source": "resources/manifest/2024.1",
     "no_promotion_from_manifest_only": true,
@@ -2691,24 +2691,25 @@
     "source_notes": "resources/semantic/2024.1/source_notes.json",
     "status_model": {
       "deferred": "Reflected in the 2024.1 manifest and kept out of behavior/live support until fresh 2024.1 evidence exists.",
-      "excluded": "Reflected in the 2024.1 manifest but blocked by risky-family policy; no behavior/live support is claimed."
+      "excluded": "Reflected in the 2024.1 manifest but blocked by risky-family policy; no behavior/live support is claimed.",
+      "live-tested": "Fresh 2024.1 read-only live sandbox evidence exists; Task 8 promotes only ak.wwise.core.object.get."
     },
-    "status_policy": "Manifest reflection and source notes alone are never behavioral support; Task 6 assigns no live-tested or sandbox-mutating-tested 2024.1 functions.",
+    "status_policy": "Manifest reflection and source notes alone are never behavioral support; Task 8 promotes only ak.wwise.core.object.get with exact 2024.1 read-only live sandbox evidence.",
     "version": "2024.1"
   },
   "summary": {
-    "behavioral_covered_count": 0,
-    "behavioral_supported": 0,
-    "deferred": 75,
+    "behavioral_covered_count": 1,
+    "behavioral_supported": 1,
+    "deferred": 74,
     "excluded": 73,
     "implemented": 148,
-    "live_behavioral_covered_count": 0,
-    "live_tested": 0,
-    "manifest_only": 148,
+    "live_behavioral_covered_count": 1,
+    "live_tested": 1,
+    "manifest_only": 147,
     "parity_bucket_counts": {
-      "deferred": 75,
+      "deferred": 74,
       "excluded": 73,
-      "live-tested": 0,
+      "live-tested": 1,
       "manifest-only": 0,
       "sandbox-mutating-tested": 0
     },
@@ -2723,8 +2724,9 @@
       "switchcontainer": 3
     },
     "status_counts": {
-      "deferred": 75,
-      "excluded": 73
+      "deferred": 74,
+      "excluded": 73,
+      "live-tested": 1
     },
     "total_functions": 148,
     "version": "2024.1"

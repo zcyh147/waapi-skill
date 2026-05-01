@@ -1,0 +1,59 @@
+{
+  "actual": {
+    "result_count": 1,
+    "returned_fields": [
+      "id",
+      "name",
+      "path"
+    ],
+    "rows": [
+      {
+        "id": "{49864E97-66C8-41F1-ACA5-15D74507B07F}",
+        "name": "Ambisonics",
+        "path": "\\Actor-Mixer Hierarchy\\Ambisonics"
+      }
+    ]
+  },
+  "assertions": [
+    "descendant rows, when present, remain under the Actor-Mixer Hierarchy path"
+  ],
+  "case_id": "descendant_traversal_actor_mixer_2024_contract",
+  "evidence_path": ".sisyphus/evidence/wwise-2024-waapi-integration-coverage/live-read-only/descendant_traversal_actor_mixer_2024_contract.json",
+  "expected": {
+    "fields": [
+      "id",
+      "name",
+      "path"
+    ],
+    "path_prefix": "\\Actor-Mixer Hierarchy\\",
+    "result_count": {
+      "allow_empty": true,
+      "count": 1,
+      "policy": "at_most"
+    }
+  },
+  "no_mutation": true,
+  "options": {
+    "return": [
+      "id",
+      "name",
+      "path"
+    ]
+  },
+  "query": "\"\\Actor-Mixer Hierarchy\" select descendants take 1",
+  "recorded_at_unix": 1777633771,
+  "result_count": 1,
+  "result_count_policy": {
+    "allow_empty": true,
+    "count": 1,
+    "policy": "at_most"
+  },
+  "sources": [
+    "resources/waql/2023.1/object-get-live-matrix.json format comparison only; no 2023 evidence paths are reused as 2024 proof.",
+    "resources/manifest/2024.1/schemas.json#ak.wwise.core.object.get",
+    "2024.1 read-only live sandbox execution writes per-case evidence before promotion."
+  ],
+  "status": "passed",
+  "uri": "ak.wwise.core.object.get",
+  "wwise_version": "2024.1"
+}
