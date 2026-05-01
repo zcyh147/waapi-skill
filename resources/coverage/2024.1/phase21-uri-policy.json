@@ -10,7 +10,7 @@
       "remote",
       "debug"
     ],
-    "generator": "task-8 2024.1 read-only live coverage promotion",
+    "generator": "task-10 2024.1 destructive sandbox promotion",
     "manifest_source": "resources/manifest/2024.1",
     "no_promotion_from_manifest_only": true,
     "parity_bucket_model": {
@@ -18,15 +18,16 @@
       "excluded": "Risky-family policy block; requires deferred registry coverage and explicit policy review before promotion.",
       "live-tested": "Reserved for future fresh 2024.1 live read-only evidence; Task 6 assigns none.",
       "manifest-only": "Inventory-only reflection metadata; never behavior or live evidence.",
-      "sandbox-mutating-tested": "Reserved for future fresh 2024.1 copied-sandbox evidence; Task 6 assigns none."
+      "sandbox-mutating-tested": "Fresh 2024.1 copied-sandbox destructive evidence exists; Task 10 promotes only covered mutating APIs."
     },
     "source_notes": "resources/semantic/2024.1/source_notes.json",
     "status_model": {
       "deferred": "Reflected in the 2024.1 manifest and kept out of behavior/live support until fresh 2024.1 evidence exists.",
       "excluded": "Reflected in the 2024.1 manifest but blocked by risky-family policy; no behavior/live support is claimed.",
-      "live-tested": "Fresh 2024.1 read-only live sandbox evidence exists; Task 8 promotes only ak.wwise.core.object.get."
+      "live-tested": "Fresh 2024.1 read-only live sandbox evidence exists; Task 8 promotes only ak.wwise.core.object.get.",
+      "sandbox-mutating-tested": "Fresh 2024.1 copied-sandbox destructive evidence exists for safe mutating APIs; readback helpers remain deferred."
     },
-    "status_policy": "Manifest reflection and source notes alone are never behavioral support; Task 8 promotes only ak.wwise.core.object.get with exact 2024.1 read-only live sandbox evidence.",
+    "status_policy": "Manifest reflection and source notes alone are never behavioral support; Task 8 promotes only ak.wwise.core.object.get with read-only live evidence and Task 10 promotes only safe mutating APIs with exact 2024.1 copied-sandbox destructive evidence.",
     "version": "2024.1"
   },
   "policy": {
@@ -35,7 +36,6 @@
       "ak.wwise.console.project.create",
       "ak.wwise.console.project.open",
       "ak.wwise.core.audio.convert",
-      "ak.wwise.core.audio.import",
       "ak.wwise.core.audio.importTabDelimited",
       "ak.wwise.core.audio.mute",
       "ak.wwise.core.audio.resetMute",
@@ -56,8 +56,6 @@
       "ak.wwise.core.log.clear",
       "ak.wwise.core.log.get",
       "ak.wwise.core.object.copy",
-      "ak.wwise.core.object.create",
-      "ak.wwise.core.object.delete",
       "ak.wwise.core.object.diff",
       "ak.wwise.core.object.getAttenuationCurve",
       "ak.wwise.core.object.getPropertyAndReferenceNames",
@@ -67,7 +65,6 @@
       "ak.wwise.core.object.isPropertyEnabled",
       "ak.wwise.core.object.move",
       "ak.wwise.core.object.pasteProperties",
-      "ak.wwise.core.object.set",
       "ak.wwise.core.object.setAttenuationCurve",
       "ak.wwise.core.object.setLinked",
       "ak.wwise.core.object.setName",
@@ -84,7 +81,6 @@
       "ak.wwise.core.soundbank.generate",
       "ak.wwise.core.soundbank.getInclusions",
       "ak.wwise.core.soundbank.processDefinitionFiles",
-      "ak.wwise.core.soundbank.setInclusions",
       "ak.wwise.core.sourceControl.add",
       "ak.wwise.core.sourceControl.checkOut",
       "ak.wwise.core.sourceControl.commit",
@@ -94,14 +90,9 @@
       "ak.wwise.core.sourceControl.move",
       "ak.wwise.core.sourceControl.revert",
       "ak.wwise.core.sourceControl.setProvider",
-      "ak.wwise.core.switchContainer.addAssignment",
       "ak.wwise.core.switchContainer.getAssignments",
-      "ak.wwise.core.switchContainer.removeAssignment",
-      "ak.wwise.core.undo.beginGroup",
       "ak.wwise.core.undo.cancelGroup",
-      "ak.wwise.core.undo.endGroup",
       "ak.wwise.core.undo.redo",
-      "ak.wwise.core.undo.undo",
       "ak.wwise.waapi.getFunctions",
       "ak.wwise.waapi.getSchema",
       "ak.wwise.waapi.getTopics"
@@ -228,7 +219,6 @@
       "ak.wwise.console.project.create",
       "ak.wwise.console.project.open",
       "ak.wwise.core.audio.convert",
-      "ak.wwise.core.audio.import",
       "ak.wwise.core.audio.importTabDelimited",
       "ak.wwise.core.audio.mute",
       "ak.wwise.core.audio.resetMute",
@@ -249,8 +239,6 @@
       "ak.wwise.core.log.clear",
       "ak.wwise.core.log.get",
       "ak.wwise.core.object.copy",
-      "ak.wwise.core.object.create",
-      "ak.wwise.core.object.delete",
       "ak.wwise.core.object.diff",
       "ak.wwise.core.object.getAttenuationCurve",
       "ak.wwise.core.object.getPropertyAndReferenceNames",
@@ -260,7 +248,6 @@
       "ak.wwise.core.object.isPropertyEnabled",
       "ak.wwise.core.object.move",
       "ak.wwise.core.object.pasteProperties",
-      "ak.wwise.core.object.set",
       "ak.wwise.core.object.setAttenuationCurve",
       "ak.wwise.core.object.setLinked",
       "ak.wwise.core.object.setName",
@@ -295,7 +282,6 @@
       "ak.wwise.core.soundbank.generate",
       "ak.wwise.core.soundbank.getInclusions",
       "ak.wwise.core.soundbank.processDefinitionFiles",
-      "ak.wwise.core.soundbank.setInclusions",
       "ak.wwise.core.sourceControl.add",
       "ak.wwise.core.sourceControl.checkOut",
       "ak.wwise.core.sourceControl.commit",
@@ -305,9 +291,7 @@
       "ak.wwise.core.sourceControl.move",
       "ak.wwise.core.sourceControl.revert",
       "ak.wwise.core.sourceControl.setProvider",
-      "ak.wwise.core.switchContainer.addAssignment",
       "ak.wwise.core.switchContainer.getAssignments",
-      "ak.wwise.core.switchContainer.removeAssignment",
       "ak.wwise.core.transport.create",
       "ak.wwise.core.transport.destroy",
       "ak.wwise.core.transport.executeAction",
@@ -315,11 +299,8 @@
       "ak.wwise.core.transport.getState",
       "ak.wwise.core.transport.prepare",
       "ak.wwise.core.transport.useOriginals",
-      "ak.wwise.core.undo.beginGroup",
       "ak.wwise.core.undo.cancelGroup",
-      "ak.wwise.core.undo.endGroup",
       "ak.wwise.core.undo.redo",
-      "ak.wwise.core.undo.undo",
       "ak.wwise.debug.enableAsserts",
       "ak.wwise.debug.enableAutomationMode",
       "ak.wwise.debug.generateToneWAV",
@@ -339,7 +320,6 @@
         "ak.wwise.console.project.create",
         "ak.wwise.console.project.open",
         "ak.wwise.core.audio.convert",
-        "ak.wwise.core.audio.import",
         "ak.wwise.core.audio.importTabDelimited",
         "ak.wwise.core.audio.mute",
         "ak.wwise.core.audio.resetMute",
@@ -360,8 +340,6 @@
         "ak.wwise.core.log.clear",
         "ak.wwise.core.log.get",
         "ak.wwise.core.object.copy",
-        "ak.wwise.core.object.create",
-        "ak.wwise.core.object.delete",
         "ak.wwise.core.object.diff",
         "ak.wwise.core.object.getAttenuationCurve",
         "ak.wwise.core.object.getPropertyAndReferenceNames",
@@ -371,7 +349,6 @@
         "ak.wwise.core.object.isPropertyEnabled",
         "ak.wwise.core.object.move",
         "ak.wwise.core.object.pasteProperties",
-        "ak.wwise.core.object.set",
         "ak.wwise.core.object.setAttenuationCurve",
         "ak.wwise.core.object.setLinked",
         "ak.wwise.core.object.setName",
@@ -388,7 +365,6 @@
         "ak.wwise.core.soundbank.generate",
         "ak.wwise.core.soundbank.getInclusions",
         "ak.wwise.core.soundbank.processDefinitionFiles",
-        "ak.wwise.core.soundbank.setInclusions",
         "ak.wwise.core.sourceControl.add",
         "ak.wwise.core.sourceControl.checkOut",
         "ak.wwise.core.sourceControl.commit",
@@ -398,14 +374,9 @@
         "ak.wwise.core.sourceControl.move",
         "ak.wwise.core.sourceControl.revert",
         "ak.wwise.core.sourceControl.setProvider",
-        "ak.wwise.core.switchContainer.addAssignment",
         "ak.wwise.core.switchContainer.getAssignments",
-        "ak.wwise.core.switchContainer.removeAssignment",
-        "ak.wwise.core.undo.beginGroup",
         "ak.wwise.core.undo.cancelGroup",
-        "ak.wwise.core.undo.endGroup",
         "ak.wwise.core.undo.redo",
-        "ak.wwise.core.undo.undo",
         "ak.wwise.waapi.getFunctions",
         "ak.wwise.waapi.getSchema",
         "ak.wwise.waapi.getTopics"
@@ -489,7 +460,18 @@
         "ak.wwise.core.object.get"
       ],
       "manifest-only": [],
-      "sandbox-mutating-tested": []
+      "sandbox-mutating-tested": [
+        "ak.wwise.core.audio.import",
+        "ak.wwise.core.object.create",
+        "ak.wwise.core.object.delete",
+        "ak.wwise.core.object.set",
+        "ak.wwise.core.soundbank.setInclusions",
+        "ak.wwise.core.switchContainer.addAssignment",
+        "ak.wwise.core.switchContainer.removeAssignment",
+        "ak.wwise.core.undo.beginGroup",
+        "ak.wwise.core.undo.endGroup",
+        "ak.wwise.core.undo.undo"
+      ]
     },
     "risky_family_uris": {
       "CLI": [
@@ -579,7 +561,18 @@
         "ak.wwise.core.transport.useOriginals"
       ]
     },
-    "sandbox_mutating_tested_uris": [],
+    "sandbox_mutating_tested_uris": [
+      "ak.wwise.core.audio.import",
+      "ak.wwise.core.object.create",
+      "ak.wwise.core.object.delete",
+      "ak.wwise.core.object.set",
+      "ak.wwise.core.soundbank.setInclusions",
+      "ak.wwise.core.switchContainer.addAssignment",
+      "ak.wwise.core.switchContainer.removeAssignment",
+      "ak.wwise.core.undo.beginGroup",
+      "ak.wwise.core.undo.endGroup",
+      "ak.wwise.core.undo.undo"
+    ],
     "source_note_family_uris": {
       "import": [
         "ak.wwise.core.audio.import",
@@ -629,18 +622,18 @@
     }
   },
   "summary": {
-    "behavioral_supported": 1,
-    "deferred": 74,
+    "behavioral_supported": 11,
+    "deferred": 64,
     "excluded": 73,
     "implemented": 148,
     "live_tested": 1,
-    "manifest_only": 147,
+    "manifest_only": 137,
     "parity_bucket_counts": {
-      "deferred": 74,
+      "deferred": 64,
       "excluded": 73,
       "live-tested": 1,
       "manifest-only": 0,
-      "sandbox-mutating-tested": 0
+      "sandbox-mutating-tested": 10
     },
     "parity_bucket_total": 148,
     "reflected_count": 148,
@@ -653,9 +646,10 @@
       "switchcontainer": 3
     },
     "status_counts": {
-      "deferred": 74,
+      "deferred": 64,
       "excluded": 73,
-      "live-tested": 1
+      "live-tested": 1,
+      "sandbox-mutating-tested": 10
     },
     "total_functions": 148,
     "version": "2024.1"

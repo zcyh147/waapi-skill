@@ -449,7 +449,7 @@ Support Wwise 2024.1.13 WAAPI resources and tests as an explicit opt-in version 
 
   **Commit**: YES | Message: `test(destructive): harden 2024 sandbox gates` | Files: `wwise_waapi/destructive_2024_sandbox.py`, `tests/unit/test_2024_destructive_safety.py`
 
-- [ ] 10. Add 2024 sandbox-mutating destructive evidence and promotion updates
+- [x] 10. Add 2024 sandbox-mutating destructive evidence and promotion updates
 
   **What to do**: Port safe 2023 destructive cases to 2024 for object create/set/delete, undo begin/end/undo, audio.import, soundbank.setInclusions, and switchContainer assignment add/remove. Write per-case evidence under `.sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/`. Promote only APIs with passing 2024 destructive evidence to `sandbox-mutating-tested` in 2024 coverage/matrix/summary/policy resources.
   **Must NOT do**: Do not promote readback-only helper APIs; do not promote risky families.

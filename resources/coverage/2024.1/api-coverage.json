@@ -2367,43 +2367,47 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "Reflected in 2024.1 manifest and source-note family 'import', but no 2024.1 behavioral execution is claimed.",
-        "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "destructive_case_evidence": ".sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/audio_import_generated_wav_readback_cleanup.json",
+        "evidence": "Exact 2024.1 copied-sandbox destructive case audio_import_generated_wav_readback_cleanup passed, including readback assertions, cleanup, and source SampleProject immutability guard.",
+        "evidence_path": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
+        "live_command_evidence": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "mutation_guard_evidence": ".sisyphus/evidence/task-2024-10-no-accidental-promotion.txt",
+        "parity_bucket": "sandbox-mutating-tested",
         "source_note_family": "import",
-        "test": "tests/unit/test_2024_api_resource_coverage.py"
+        "test": "tests/destructive/test_2024_soundbank_audio_sandbox.py"
       },
       "category": "core.audio",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Source notes describe semantic contracts only; Task 6 requires fresh behavior evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2024.1/functions.json (live reflection via 2024.1 SampleProject)",
-        "review_trigger": "When 2024.1 behavioral tests or semantic policy for source-note family import changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by exact 2024.1 copied-sandbox destructive evidence for ak.wwise.core.audio.import.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "review_trigger": "When the 2024.1 destructive sandbox evidence is refreshed or mutation semantics change.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2024_soundbank_audio_sandbox.py case audio_import_generated_wav_readback_cleanup."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
+      "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2024_deferred_registry.py",
+        "route_test": "tests/destructive/test_2024_soundbank_audio_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "Reflected in 2024.1 manifest and source-note family 'import', but no 2024.1 behavioral execution is claimed."
+        "reason": "Exact 2024.1 copied-sandbox destructive test audio_import_generated_wav_readback_cleanup passed with source immutability and cleanup guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2024.1/schemas.json#ak.wwise.core.audio.import",
@@ -2412,11 +2416,11 @@
       },
       "schema_status": "ok",
       "source_note_family": "import",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.audio.import",
       "usage_guidance": {
-        "default_path": "deferred-pending-fresh-2024-evidence",
-        "notes": "Manifest reflection and source notes alone are inventory/contract evidence; do not count them as 2024.1 behavioral support."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Safe only through explicit destructive opt-in against a copied 2024.1 SampleProject sandbox; do not target installed SampleProject sources."
       },
       "version": "2024.1"
     },
@@ -3522,43 +3526,47 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "Reflected in 2024.1 manifest and source-note family 'object-mutation', but no 2024.1 behavioral execution is claimed.",
-        "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "destructive_case_evidence": ".sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/object_create_set_delete_readback.json",
+        "evidence": "Exact 2024.1 copied-sandbox destructive case object_create_set_delete_readback passed, including readback assertions, cleanup, and source SampleProject immutability guard.",
+        "evidence_path": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
+        "live_command_evidence": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "mutation_guard_evidence": ".sisyphus/evidence/task-2024-10-no-accidental-promotion.txt",
+        "parity_bucket": "sandbox-mutating-tested",
         "source_note_family": "object-mutation",
-        "test": "tests/unit/test_2024_api_resource_coverage.py"
+        "test": "tests/destructive/test_2024_project_mutation_sandbox.py"
       },
       "category": "core.object",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Source notes describe semantic contracts only; Task 6 requires fresh behavior evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2024.1/functions.json (live reflection via 2024.1 SampleProject)",
-        "review_trigger": "When 2024.1 behavioral tests or semantic policy for source-note family object-mutation changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by exact 2024.1 copied-sandbox destructive evidence for ak.wwise.core.object.create.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "review_trigger": "When the 2024.1 destructive sandbox evidence is refreshed or mutation semantics change.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2024_project_mutation_sandbox.py case object_create_set_delete_readback."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
+      "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2024_deferred_registry.py",
+        "route_test": "tests/destructive/test_2024_project_mutation_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "Reflected in 2024.1 manifest and source-note family 'object-mutation', but no 2024.1 behavioral execution is claimed."
+        "reason": "Exact 2024.1 copied-sandbox destructive test object_create_set_delete_readback passed with source immutability and cleanup guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2024.1/schemas.json#ak.wwise.core.object.create",
@@ -3567,53 +3575,57 @@
       },
       "schema_status": "ok",
       "source_note_family": "object-mutation",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.object.create",
       "usage_guidance": {
-        "default_path": "deferred-pending-fresh-2024-evidence",
-        "notes": "Manifest reflection and source notes alone are inventory/contract evidence; do not count them as 2024.1 behavioral support."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Safe only through explicit destructive opt-in against a copied 2024.1 SampleProject sandbox; do not target installed SampleProject sources."
       },
       "version": "2024.1"
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "Reflected in 2024.1 manifest and source-note family 'object-mutation', but no 2024.1 behavioral execution is claimed.",
-        "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "destructive_case_evidence": ".sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/object_create_set_delete_readback.json",
+        "evidence": "Exact 2024.1 copied-sandbox destructive case object_create_set_delete_readback passed, including readback assertions, cleanup, and source SampleProject immutability guard.",
+        "evidence_path": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
+        "live_command_evidence": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "mutation_guard_evidence": ".sisyphus/evidence/task-2024-10-no-accidental-promotion.txt",
+        "parity_bucket": "sandbox-mutating-tested",
         "source_note_family": "object-mutation",
-        "test": "tests/unit/test_2024_api_resource_coverage.py"
+        "test": "tests/destructive/test_2024_project_mutation_sandbox.py"
       },
       "category": "core.object",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Source notes describe semantic contracts only; Task 6 requires fresh behavior evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2024.1/functions.json (live reflection via 2024.1 SampleProject)",
-        "review_trigger": "When 2024.1 behavioral tests or semantic policy for source-note family object-mutation changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by exact 2024.1 copied-sandbox destructive evidence for ak.wwise.core.object.delete.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "review_trigger": "When the 2024.1 destructive sandbox evidence is refreshed or mutation semantics change.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2024_project_mutation_sandbox.py case object_create_set_delete_readback."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
+      "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "high",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2024_deferred_registry.py",
+        "route_test": "tests/destructive/test_2024_project_mutation_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "Reflected in 2024.1 manifest and source-note family 'object-mutation', but no 2024.1 behavioral execution is claimed."
+        "reason": "Exact 2024.1 copied-sandbox destructive test object_create_set_delete_readback passed with source immutability and cleanup guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2024.1/schemas.json#ak.wwise.core.object.delete",
@@ -3622,11 +3634,11 @@
       },
       "schema_status": "ok",
       "source_note_family": "object-mutation",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.object.delete",
       "usage_guidance": {
-        "default_path": "deferred-pending-fresh-2024-evidence",
-        "notes": "Manifest reflection and source notes alone are inventory/contract evidence; do not count them as 2024.1 behavioral support."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Safe only through explicit destructive opt-in against a copied 2024.1 SampleProject sandbox; do not target installed SampleProject sources."
       },
       "version": "2024.1"
     },
@@ -4185,43 +4197,47 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "Reflected in 2024.1 manifest and source-note family 'object-mutation', but no 2024.1 behavioral execution is claimed.",
-        "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "destructive_case_evidence": ".sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/object_create_set_delete_readback.json",
+        "evidence": "Exact 2024.1 copied-sandbox destructive case object_create_set_delete_readback passed, including readback assertions, cleanup, and source SampleProject immutability guard.",
+        "evidence_path": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
+        "live_command_evidence": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "mutation_guard_evidence": ".sisyphus/evidence/task-2024-10-no-accidental-promotion.txt",
+        "parity_bucket": "sandbox-mutating-tested",
         "source_note_family": "object-mutation",
-        "test": "tests/unit/test_2024_api_resource_coverage.py"
+        "test": "tests/destructive/test_2024_project_mutation_sandbox.py"
       },
       "category": "core.object",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Source notes describe semantic contracts only; Task 6 requires fresh behavior evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2024.1/functions.json (live reflection via 2024.1 SampleProject)",
-        "review_trigger": "When 2024.1 behavioral tests or semantic policy for source-note family object-mutation changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by exact 2024.1 copied-sandbox destructive evidence for ak.wwise.core.object.set.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "review_trigger": "When the 2024.1 destructive sandbox evidence is refreshed or mutation semantics change.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2024_project_mutation_sandbox.py case object_create_set_delete_readback."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
+      "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2024_deferred_registry.py",
+        "route_test": "tests/destructive/test_2024_project_mutation_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "Reflected in 2024.1 manifest and source-note family 'object-mutation', but no 2024.1 behavioral execution is claimed."
+        "reason": "Exact 2024.1 copied-sandbox destructive test object_create_set_delete_readback passed with source immutability and cleanup guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2024.1/schemas.json#ak.wwise.core.object.set",
@@ -4230,11 +4246,11 @@
       },
       "schema_status": "ok",
       "source_note_family": "object-mutation",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.object.set",
       "usage_guidance": {
-        "default_path": "deferred-pending-fresh-2024-evidence",
-        "notes": "Manifest reflection and source notes alone are inventory/contract evidence; do not count them as 2024.1 behavioral support."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Safe only through explicit destructive opt-in against a copied 2024.1 SampleProject sandbox; do not target installed SampleProject sources."
       },
       "version": "2024.1"
     },
@@ -6003,7 +6019,7 @@
         "counts_as_behavioral": false,
         "counts_as_live_behavioral": false,
         "coverage": "deferred",
-        "evidence": "Reflected in 2024.1 manifest and source-note family 'soundbank', but no 2024.1 behavioral execution is claimed.",
+        "evidence": "Reflected in 2024.1 manifest and source-note family 'soundbank', but no 2024.1 behavioral execution is claimed. Task 10 may use this URI as a readback assertion helper, but helper usage is not promotion evidence.",
         "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
@@ -6110,43 +6126,47 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "Reflected in 2024.1 manifest and source-note family 'soundbank', but no 2024.1 behavioral execution is claimed.",
-        "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "destructive_case_evidence": ".sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/soundbank_inclusions_replace_read_remove_cleanup.json",
+        "evidence": "Exact 2024.1 copied-sandbox destructive case soundbank_inclusions_replace_read_remove_cleanup passed, including readback assertions, cleanup, and source SampleProject immutability guard.",
+        "evidence_path": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
+        "live_command_evidence": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "mutation_guard_evidence": ".sisyphus/evidence/task-2024-10-no-accidental-promotion.txt",
+        "parity_bucket": "sandbox-mutating-tested",
         "source_note_family": "soundbank",
-        "test": "tests/unit/test_2024_api_resource_coverage.py"
+        "test": "tests/destructive/test_2024_soundbank_audio_sandbox.py"
       },
       "category": "core.soundbank",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Source notes describe semantic contracts only; Task 6 requires fresh behavior evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2024.1/functions.json (live reflection via 2024.1 SampleProject)",
-        "review_trigger": "When 2024.1 behavioral tests or semantic policy for source-note family soundbank changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by exact 2024.1 copied-sandbox destructive evidence for ak.wwise.core.soundbank.setInclusions.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "review_trigger": "When the 2024.1 destructive sandbox evidence is refreshed or mutation semantics change.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2024_soundbank_audio_sandbox.py case soundbank_inclusions_replace_read_remove_cleanup."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
+      "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2024_deferred_registry.py",
+        "route_test": "tests/destructive/test_2024_soundbank_audio_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "Reflected in 2024.1 manifest and source-note family 'soundbank', but no 2024.1 behavioral execution is claimed."
+        "reason": "Exact 2024.1 copied-sandbox destructive test soundbank_inclusions_replace_read_remove_cleanup passed with source immutability and cleanup guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2024.1/schemas.json#ak.wwise.core.soundbank.setInclusions",
@@ -6155,11 +6175,11 @@
       },
       "schema_status": "ok",
       "source_note_family": "soundbank",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.soundbank.setInclusions",
       "usage_guidance": {
-        "default_path": "deferred-pending-fresh-2024-evidence",
-        "notes": "Manifest reflection and source notes alone are inventory/contract evidence; do not count them as 2024.1 behavioral support."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Safe only through explicit destructive opt-in against a copied 2024.1 SampleProject sandbox; do not target installed SampleProject sources."
       },
       "version": "2024.1"
     },
@@ -6660,43 +6680,47 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "Reflected in 2024.1 manifest and source-note family 'switchcontainer', but no 2024.1 behavioral execution is claimed.",
-        "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "destructive_case_evidence": ".sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/switchcontainer_assignment_add_get_remove_cleanup.json",
+        "evidence": "Exact 2024.1 copied-sandbox destructive case switchcontainer_assignment_add_get_remove_cleanup passed, including readback assertions, cleanup, and source SampleProject immutability guard.",
+        "evidence_path": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
+        "live_command_evidence": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "mutation_guard_evidence": ".sisyphus/evidence/task-2024-10-no-accidental-promotion.txt",
+        "parity_bucket": "sandbox-mutating-tested",
         "source_note_family": "switchcontainer",
-        "test": "tests/unit/test_2024_api_resource_coverage.py"
+        "test": "tests/destructive/test_2024_switchcontainer_assignment_sandbox.py"
       },
       "category": "core.switchContainer",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Source notes describe semantic contracts only; Task 6 requires fresh behavior evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2024.1/functions.json (live reflection via 2024.1 SampleProject)",
-        "review_trigger": "When 2024.1 behavioral tests or semantic policy for source-note family switchcontainer changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by exact 2024.1 copied-sandbox destructive evidence for ak.wwise.core.switchContainer.addAssignment.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "review_trigger": "When the 2024.1 destructive sandbox evidence is refreshed or mutation semantics change.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2024_switchcontainer_assignment_sandbox.py case switchcontainer_assignment_add_get_remove_cleanup."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
+      "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2024_deferred_registry.py",
+        "route_test": "tests/destructive/test_2024_switchcontainer_assignment_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "Reflected in 2024.1 manifest and source-note family 'switchcontainer', but no 2024.1 behavioral execution is claimed."
+        "reason": "Exact 2024.1 copied-sandbox destructive test switchcontainer_assignment_add_get_remove_cleanup passed with source immutability and cleanup guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2024.1/schemas.json#ak.wwise.core.switchContainer.addAssignment",
@@ -6705,11 +6729,11 @@
       },
       "schema_status": "ok",
       "source_note_family": "switchcontainer",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.switchContainer.addAssignment",
       "usage_guidance": {
-        "default_path": "deferred-pending-fresh-2024-evidence",
-        "notes": "Manifest reflection and source notes alone are inventory/contract evidence; do not count them as 2024.1 behavioral support."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Safe only through explicit destructive opt-in against a copied 2024.1 SampleProject sandbox; do not target installed SampleProject sources."
       },
       "version": "2024.1"
     },
@@ -6718,7 +6742,7 @@
         "counts_as_behavioral": false,
         "counts_as_live_behavioral": false,
         "coverage": "deferred",
-        "evidence": "Reflected in 2024.1 manifest and source-note family 'switchcontainer', but no 2024.1 behavioral execution is claimed.",
+        "evidence": "Reflected in 2024.1 manifest and source-note family 'switchcontainer', but no 2024.1 behavioral execution is claimed. Task 10 may use this URI as a readback assertion helper, but helper usage is not promotion evidence.",
         "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
@@ -6770,43 +6794,47 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "Reflected in 2024.1 manifest and source-note family 'switchcontainer', but no 2024.1 behavioral execution is claimed.",
-        "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "destructive_case_evidence": ".sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/switchcontainer_assignment_add_get_remove_cleanup.json",
+        "evidence": "Exact 2024.1 copied-sandbox destructive case switchcontainer_assignment_add_get_remove_cleanup passed, including readback assertions, cleanup, and source SampleProject immutability guard.",
+        "evidence_path": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
+        "live_command_evidence": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "mutation_guard_evidence": ".sisyphus/evidence/task-2024-10-no-accidental-promotion.txt",
+        "parity_bucket": "sandbox-mutating-tested",
         "source_note_family": "switchcontainer",
-        "test": "tests/unit/test_2024_api_resource_coverage.py"
+        "test": "tests/destructive/test_2024_switchcontainer_assignment_sandbox.py"
       },
       "category": "core.switchContainer",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Source notes describe semantic contracts only; Task 6 requires fresh behavior evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2024.1/functions.json (live reflection via 2024.1 SampleProject)",
-        "review_trigger": "When 2024.1 behavioral tests or semantic policy for source-note family switchcontainer changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by exact 2024.1 copied-sandbox destructive evidence for ak.wwise.core.switchContainer.removeAssignment.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "review_trigger": "When the 2024.1 destructive sandbox evidence is refreshed or mutation semantics change.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2024_switchcontainer_assignment_sandbox.py case switchcontainer_assignment_add_get_remove_cleanup."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
+      "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2024_deferred_registry.py",
+        "route_test": "tests/destructive/test_2024_switchcontainer_assignment_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "Reflected in 2024.1 manifest and source-note family 'switchcontainer', but no 2024.1 behavioral execution is claimed."
+        "reason": "Exact 2024.1 copied-sandbox destructive test switchcontainer_assignment_add_get_remove_cleanup passed with source immutability and cleanup guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2024.1/schemas.json#ak.wwise.core.switchContainer.removeAssignment",
@@ -6815,11 +6843,11 @@
       },
       "schema_status": "ok",
       "source_note_family": "switchcontainer",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.switchContainer.removeAssignment",
       "usage_guidance": {
-        "default_path": "deferred-pending-fresh-2024-evidence",
-        "notes": "Manifest reflection and source notes alone are inventory/contract evidence; do not count them as 2024.1 behavioral support."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Safe only through explicit destructive opt-in against a copied 2024.1 SampleProject sandbox; do not target installed SampleProject sources."
       },
       "version": "2024.1"
     },
@@ -7210,43 +7238,47 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "Reflected in 2024.1 manifest and source-note family 'object-mutation', but no 2024.1 behavioral execution is claimed.",
-        "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "destructive_case_evidence": ".sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json",
+        "evidence": "Exact 2024.1 copied-sandbox destructive case undo_group_create_then_undo_readback passed, including readback assertions, cleanup, and source SampleProject immutability guard.",
+        "evidence_path": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
+        "live_command_evidence": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "mutation_guard_evidence": ".sisyphus/evidence/task-2024-10-no-accidental-promotion.txt",
+        "parity_bucket": "sandbox-mutating-tested",
         "source_note_family": "object-mutation",
-        "test": "tests/unit/test_2024_api_resource_coverage.py"
+        "test": "tests/destructive/test_2024_project_mutation_sandbox.py"
       },
       "category": "core.undo",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Source notes describe semantic contracts only; Task 6 requires fresh behavior evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2024.1/functions.json (live reflection via 2024.1 SampleProject)",
-        "review_trigger": "When 2024.1 behavioral tests or semantic policy for source-note family object-mutation changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by exact 2024.1 copied-sandbox destructive evidence for ak.wwise.core.undo.beginGroup.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "review_trigger": "When the 2024.1 destructive sandbox evidence is refreshed or mutation semantics change.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2024_project_mutation_sandbox.py case undo_group_create_then_undo_readback."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
+      "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2024_deferred_registry.py",
+        "route_test": "tests/destructive/test_2024_project_mutation_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "Reflected in 2024.1 manifest and source-note family 'object-mutation', but no 2024.1 behavioral execution is claimed."
+        "reason": "Exact 2024.1 copied-sandbox destructive test undo_group_create_then_undo_readback passed with source immutability and cleanup guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2024.1/schemas.json#ak.wwise.core.undo.beginGroup",
@@ -7255,11 +7287,11 @@
       },
       "schema_status": "ok",
       "source_note_family": "object-mutation",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.undo.beginGroup",
       "usage_guidance": {
-        "default_path": "deferred-pending-fresh-2024-evidence",
-        "notes": "Manifest reflection and source notes alone are inventory/contract evidence; do not count them as 2024.1 behavioral support."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Safe only through explicit destructive opt-in against a copied 2024.1 SampleProject sandbox; do not target installed SampleProject sources."
       },
       "version": "2024.1"
     },
@@ -7320,43 +7352,47 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "Reflected in 2024.1 manifest and source-note family 'object-mutation', but no 2024.1 behavioral execution is claimed.",
-        "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "destructive_case_evidence": ".sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json",
+        "evidence": "Exact 2024.1 copied-sandbox destructive case undo_group_create_then_undo_readback passed, including readback assertions, cleanup, and source SampleProject immutability guard.",
+        "evidence_path": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
+        "live_command_evidence": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "mutation_guard_evidence": ".sisyphus/evidence/task-2024-10-no-accidental-promotion.txt",
+        "parity_bucket": "sandbox-mutating-tested",
         "source_note_family": "object-mutation",
-        "test": "tests/unit/test_2024_api_resource_coverage.py"
+        "test": "tests/destructive/test_2024_project_mutation_sandbox.py"
       },
       "category": "core.undo",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Source notes describe semantic contracts only; Task 6 requires fresh behavior evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2024.1/functions.json (live reflection via 2024.1 SampleProject)",
-        "review_trigger": "When 2024.1 behavioral tests or semantic policy for source-note family object-mutation changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by exact 2024.1 copied-sandbox destructive evidence for ak.wwise.core.undo.endGroup.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "review_trigger": "When the 2024.1 destructive sandbox evidence is refreshed or mutation semantics change.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2024_project_mutation_sandbox.py case undo_group_create_then_undo_readback."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
+      "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2024_deferred_registry.py",
+        "route_test": "tests/destructive/test_2024_project_mutation_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "Reflected in 2024.1 manifest and source-note family 'object-mutation', but no 2024.1 behavioral execution is claimed."
+        "reason": "Exact 2024.1 copied-sandbox destructive test undo_group_create_then_undo_readback passed with source immutability and cleanup guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2024.1/schemas.json#ak.wwise.core.undo.endGroup",
@@ -7365,11 +7401,11 @@
       },
       "schema_status": "ok",
       "source_note_family": "object-mutation",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.undo.endGroup",
       "usage_guidance": {
-        "default_path": "deferred-pending-fresh-2024-evidence",
-        "notes": "Manifest reflection and source notes alone are inventory/contract evidence; do not count them as 2024.1 behavioral support."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Safe only through explicit destructive opt-in against a copied 2024.1 SampleProject sandbox; do not target installed SampleProject sources."
       },
       "version": "2024.1"
     },
@@ -7430,43 +7466,47 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "Reflected in 2024.1 manifest and source-note family 'object-mutation', but no 2024.1 behavioral execution is claimed.",
-        "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "destructive_case_evidence": ".sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/undo_group_create_then_undo_readback.json",
+        "evidence": "Exact 2024.1 copied-sandbox destructive case undo_group_create_then_undo_readback passed, including readback assertions, cleanup, and source SampleProject immutability guard.",
+        "evidence_path": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
+        "live_command_evidence": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "manifest_reflection_only": false,
+        "mutation_guard_evidence": ".sisyphus/evidence/task-2024-10-no-accidental-promotion.txt",
+        "parity_bucket": "sandbox-mutating-tested",
         "source_note_family": "object-mutation",
-        "test": "tests/unit/test_2024_api_resource_coverage.py"
+        "test": "tests/destructive/test_2024_project_mutation_sandbox.py"
       },
       "category": "core.undo",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Source notes describe semantic contracts only; Task 6 requires fresh behavior evidence before promotion.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2024.1/functions.json (live reflection via 2024.1 SampleProject)",
-        "review_trigger": "When 2024.1 behavioral tests or semantic policy for source-note family object-mutation changes.",
-        "status": true,
-        "substitute_test": "Manifest/source-note reconciliation only; not behavioral coverage."
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocking_condition": "Cleared by exact 2024.1 copied-sandbox destructive evidence for ak.wwise.core.undo.undo.",
+        "coverage_status": "sandbox-mutating-tested",
+        "evidence_source": ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt",
+        "review_trigger": "When the 2024.1 destructive sandbox evidence is refreshed or mutation semantics change.",
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2024_project_mutation_sandbox.py case undo_group_create_then_undo_readback."
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2024.1 manifest/source-note inventory is reflected, but substitute or manifest evidence is not behavioral proof.",
+      "evidence_standard": "2024.1 copied-sandbox destructive evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/ plus .sisyphus/evidence/task-2024-10-destructive-sandbox.txt counts as behavioral/live proof only for the mutating APIs executed by Task 10; readback helpers remain unpromoted.",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2024_deferred_registry.py",
+        "route_test": "tests/destructive/test_2024_project_mutation_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "Reflected in 2024.1 manifest and source-note family 'object-mutation', but no 2024.1 behavioral execution is claimed."
+        "reason": "Exact 2024.1 copied-sandbox destructive test undo_group_create_then_undo_readback passed with source immutability and cleanup guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2024.1/schemas.json#ak.wwise.core.undo.undo",
@@ -7475,11 +7515,11 @@
       },
       "schema_status": "ok",
       "source_note_family": "object-mutation",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.undo.undo",
       "usage_guidance": {
-        "default_path": "deferred-pending-fresh-2024-evidence",
-        "notes": "Manifest reflection and source notes alone are inventory/contract evidence; do not count them as 2024.1 behavioral support."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Safe only through explicit destructive opt-in against a copied 2024.1 SampleProject sandbox; do not target installed SampleProject sources."
       },
       "version": "2024.1"
     },
@@ -8155,7 +8195,7 @@
       "remote",
       "debug"
     ],
-    "generator": "task-8 2024.1 read-only live coverage promotion",
+    "generator": "task-10 2024.1 destructive sandbox promotion",
     "manifest_source": "resources/manifest/2024.1",
     "no_promotion_from_manifest_only": true,
     "parity_bucket_model": {
@@ -8163,30 +8203,31 @@
       "excluded": "Risky-family policy block; requires deferred registry coverage and explicit policy review before promotion.",
       "live-tested": "Reserved for future fresh 2024.1 live read-only evidence; Task 6 assigns none.",
       "manifest-only": "Inventory-only reflection metadata; never behavior or live evidence.",
-      "sandbox-mutating-tested": "Reserved for future fresh 2024.1 copied-sandbox evidence; Task 6 assigns none."
+      "sandbox-mutating-tested": "Fresh 2024.1 copied-sandbox destructive evidence exists; Task 10 promotes only covered mutating APIs."
     },
     "source_notes": "resources/semantic/2024.1/source_notes.json",
     "status_model": {
       "deferred": "Reflected in the 2024.1 manifest and kept out of behavior/live support until fresh 2024.1 evidence exists.",
       "excluded": "Reflected in the 2024.1 manifest but blocked by risky-family policy; no behavior/live support is claimed.",
-      "live-tested": "Fresh 2024.1 read-only live sandbox evidence exists; Task 8 promotes only ak.wwise.core.object.get."
+      "live-tested": "Fresh 2024.1 read-only live sandbox evidence exists; Task 8 promotes only ak.wwise.core.object.get.",
+      "sandbox-mutating-tested": "Fresh 2024.1 copied-sandbox destructive evidence exists for safe mutating APIs; readback helpers remain deferred."
     },
-    "status_policy": "Manifest reflection and source notes alone are never behavioral support; Task 8 promotes only ak.wwise.core.object.get with exact 2024.1 read-only live sandbox evidence.",
+    "status_policy": "Manifest reflection and source notes alone are never behavioral support; Task 8 promotes only ak.wwise.core.object.get with read-only live evidence and Task 10 promotes only safe mutating APIs with exact 2024.1 copied-sandbox destructive evidence.",
     "version": "2024.1"
   },
   "summary": {
-    "behavioral_supported": 1,
+    "behavioral_supported": 11,
     "deferred": 74,
     "excluded": 73,
     "implemented": 148,
     "live_tested": 1,
-    "manifest_only": 147,
+    "manifest_only": 137,
     "parity_bucket_counts": {
-      "deferred": 74,
+      "deferred": 64,
       "excluded": 73,
       "live-tested": 1,
       "manifest-only": 0,
-      "sandbox-mutating-tested": 0
+      "sandbox-mutating-tested": 10
     },
     "parity_bucket_total": 148,
     "reflected_count": 148,
@@ -8199,9 +8240,10 @@
       "switchcontainer": 3
     },
     "status_counts": {
-      "deferred": 74,
+      "deferred": 64,
       "excluded": 73,
-      "live-tested": 1
+      "live-tested": 1,
+      "sandbox-mutating-tested": 10
     },
     "total_functions": 148,
     "version": "2024.1"

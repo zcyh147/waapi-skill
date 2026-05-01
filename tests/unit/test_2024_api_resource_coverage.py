@@ -15,7 +15,23 @@ COVERAGE_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "api-covera
 SOURCE_NOTES_RESOURCE = REPO_ROOT / "resources" / "semantic" / VERSION / "source_notes.json"
 PROMOTED_READ_ONLY_URI = "ak.wwise.core.object.get"
 PROMOTED_READ_ONLY_URIS = {PROMOTED_READ_ONLY_URI}
-ALLOWED_STATUSES = {"deferred", "excluded", "live-tested"}
+SANDBOX_MUTATING_TESTED_URIS = {
+    "ak.wwise.core.audio.import",
+    "ak.wwise.core.object.create",
+    "ak.wwise.core.object.delete",
+    "ak.wwise.core.object.set",
+    "ak.wwise.core.soundbank.setInclusions",
+    "ak.wwise.core.switchContainer.addAssignment",
+    "ak.wwise.core.switchContainer.removeAssignment",
+    "ak.wwise.core.undo.beginGroup",
+    "ak.wwise.core.undo.endGroup",
+    "ak.wwise.core.undo.undo",
+}
+READBACK_HELPER_URIS = {
+    "ak.wwise.core.soundbank.getInclusions",
+    "ak.wwise.core.switchContainer.getAssignments",
+}
+ALLOWED_STATUSES = {"deferred", "excluded", "live-tested", "sandbox-mutating-tested"}
 ALLOWED_PARITY_BUCKETS = {"manifest-only", "deferred", "excluded", "live-tested", "sandbox-mutating-tested"}
 RISKY_CATEGORY_PREFIXES = (
     "soundengine",
@@ -76,6 +92,16 @@ def test_2024_coverage_entries_have_required_versioned_metadata() -> None:
             assert evidence["counts_as_live_behavioral"] is True
             assert evidence["evidence_path"] == "resources/waql/2024.1/object-get-live-matrix.json"
             assert ".sisyphus/evidence/wwise-2024-waapi-integration-coverage/" in json.dumps(evidence)
+        elif entry["uri"] in SANDBOX_MUTATING_TESTED_URIS:
+            assert entry["coverage_status"] == "sandbox-mutating-tested"
+            assert entry["deferred"]["status"] is False
+            assert evidence["manifest_reflection_only"] is False
+            assert evidence["counts_as_behavioral"] is True
+            assert evidence["counts_as_live_behavioral"] is True
+            assert evidence["evidence_path"] == ".sisyphus/evidence/task-2024-10-destructive-sandbox.txt"
+            assert evidence["destructive_case_evidence"].startswith(
+                ".sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/"
+            )
         else:
             assert entry["coverage_status"] in {"deferred", "excluded"}, entry["uri"]
             assert entry["deferred"]["status"] is True
@@ -85,12 +111,13 @@ def test_2024_coverage_entries_have_required_versioned_metadata() -> None:
             assert "behavioral proof" in evidence["evidence_standard"]
 
 
-def test_2024_statuses_promote_only_object_get_from_live_read_only_evidence() -> None:
+def test_2024_statuses_promote_only_fresh_2024_live_and_destructive_evidence() -> None:
     payload = _coverage_payload()
     coverage = payload["coverage"]
     status_counts = payload["summary"]["status_counts"]
     parity_counts = payload["summary"]["parity_bucket_counts"]
-    promoted = {entry["uri"] for entry in coverage if entry["coverage_status"] == "live-tested"}
+    live_promoted = {entry["uri"] for entry in coverage if entry["coverage_status"] == "live-tested"}
+    sandbox_promoted = {entry["uri"] for entry in coverage if entry["coverage_status"] == "sandbox-mutating-tested"}
 
     assert set(payload["metadata"]["status_model"]) == ALLOWED_STATUSES
     assert set(status_counts) == ALLOWED_STATUSES
@@ -100,14 +127,15 @@ def test_2024_statuses_promote_only_object_get_from_live_read_only_evidence() ->
     assert sum(parity_counts.values()) == len(coverage) == 148
     assert payload["summary"]["total_functions"] == 148
     assert payload["summary"]["implemented"] == 148
-    assert payload["summary"]["manifest_only"] == 147
+    assert payload["summary"]["manifest_only"] == 137
     assert payload["summary"]["live_tested"] == 1
-    assert payload["summary"]["behavioral_supported"] == 1
+    assert payload["summary"]["behavioral_supported"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
     assert status_counts == _counts_with_zeroes(Counter(entry["coverage_status"] for entry in coverage), status_counts)
     assert parity_counts == _counts_with_zeroes(Counter(entry["parity_bucket"] for entry in coverage), parity_counts)
     assert parity_counts["live-tested"] == 1
-    assert parity_counts["sandbox-mutating-tested"] == 0
-    assert promoted == PROMOTED_READ_ONLY_URIS
+    assert parity_counts["sandbox-mutating-tested"] == len(SANDBOX_MUTATING_TESTED_URIS)
+    assert live_promoted == PROMOTED_READ_ONLY_URIS
+    assert sandbox_promoted == SANDBOX_MUTATING_TESTED_URIS
 
 
 def test_2024_source_note_families_are_context_except_promoted_object_get() -> None:
@@ -129,6 +157,10 @@ def test_2024_source_note_families_are_context_except_promoted_object_get() -> N
         assert entry["source_note_family"] in expected_families
         if uri == PROMOTED_READ_ONLY_URI:
             assert entry["coverage_status"] == "live-tested"
+            assert entry["behavioral_evidence"]["manifest_reflection_only"] is False
+            assert entry["behavioral_evidence"]["counts_as_behavioral"] is True
+        elif uri in SANDBOX_MUTATING_TESTED_URIS:
+            assert entry["coverage_status"] == "sandbox-mutating-tested"
             assert entry["behavioral_evidence"]["manifest_reflection_only"] is False
             assert entry["behavioral_evidence"]["counts_as_behavioral"] is True
         else:

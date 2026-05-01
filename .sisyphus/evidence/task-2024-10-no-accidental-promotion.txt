@@ -1,0 +1,15 @@
+COMMAND: python -m pytest tests/unit/test_2024_api_resource_coverage.py tests/unit/test_2024_deferred_registry.py tests/unit/test_2024_live_coverage_matrix.py tests/unit/test_2024_cross_version_audit.py -q
+
+....................                                                     [100%]
+20 passed in 0.13s
+
+POST-PROMOTION SAFETY AUDIT: PASS
+stale_2023_promotion_references: none in 2024 coverage/deferred resources
+sandbox_mutating_tested_uris: ak.wwise.core.audio.import, ak.wwise.core.object.create, ak.wwise.core.object.delete, ak.wwise.core.object.set, ak.wwise.core.soundbank.setInclusions, ak.wwise.core.switchContainer.addAssignment, ak.wwise.core.switchContainer.removeAssignment, ak.wwise.core.undo.beginGroup, ak.wwise.core.undo.endGroup, ak.wwise.core.undo.undo
+readback_helpers_unpromoted: ak.wwise.core.soundbank.getInclusions, ak.wwise.core.switchContainer.getAssignments
+risky_family_promotions: none; all policy risky family URIs remain excluded
+destructive_case_evidence_files: audio_import_generated_wav_readback_cleanup.json, object_create_set_delete_readback.json, soundbank_inclusions_replace_read_remove_cleanup.json, switchcontainer_assignment_add_get_remove_cleanup.json, undo_group_create_then_undo_readback.json
+runtime_root_entries: ['.wwise-live-sandbox.lock']
+source_sample_project_mtime: 1777575625.1790097
+source_mutation_bearing_project_hash: a93a717310ece80de3cbd56527852465e1cc072b7a27006a027b43a8cef1b1b9 files: 64 bytes: 3697187
+source_immutability_confirmation: Destructive2024SandboxRuntime.assert_source_unchanged passed on each destructive test exit

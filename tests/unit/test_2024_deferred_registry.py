@@ -13,6 +13,18 @@ DEFERRED_RESOURCE = REPO_ROOT / "resources" / "deferred" / f"{VERSION}.json"
 COVERAGE_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "api-coverage.json"
 REQUIRED_EXCLUDED_FAMILIES = {"profiler", "transport", "soundengine", "UI", "CLI", "remote", "debug"}
 PROMOTED_READ_ONLY_URI = "ak.wwise.core.object.get"
+SANDBOX_MUTATING_TESTED_URIS = {
+    "ak.wwise.core.audio.import",
+    "ak.wwise.core.object.create",
+    "ak.wwise.core.object.delete",
+    "ak.wwise.core.object.set",
+    "ak.wwise.core.soundbank.setInclusions",
+    "ak.wwise.core.switchContainer.addAssignment",
+    "ak.wwise.core.switchContainer.removeAssignment",
+    "ak.wwise.core.undo.beginGroup",
+    "ak.wwise.core.undo.endGroup",
+    "ak.wwise.core.undo.undo",
+}
 
 
 def test_2024_deferred_registry_loads_and_matches_blocked_coverage() -> None:
@@ -22,7 +34,8 @@ def test_2024_deferred_registry_loads_and_matches_blocked_coverage() -> None:
 
     assert set(registry.entries) == blocked
     assert PROMOTED_READ_ONLY_URI not in registry.entries
-    assert len(registry.entries) == len(blocked) == 147
+    assert not (SANDBOX_MUTATING_TESTED_URIS & set(registry.entries))
+    assert len(registry.entries) == len(blocked) == 137
     for uri, deferred in registry.entries.items():
         source = next(entry for entry in coverage if entry["uri"] == uri)
         assert deferred.version == VERSION
@@ -48,6 +61,7 @@ def test_2024_deferred_resource_declares_blocked_status_model() -> None:
     assert {entry["coverage_status"] for entry in payload["deferred"]} == {"deferred", "excluded"}
     assert {entry["uri"] for entry in payload["deferred"]} == {entry["uri"] for entry in blocked}
     assert PROMOTED_READ_ONLY_URI not in {entry["uri"] for entry in payload["deferred"]}
+    assert not (SANDBOX_MUTATING_TESTED_URIS & {entry["uri"] for entry in payload["deferred"]})
 
 
 def test_2024_deferred_registry_exactly_matches_deferred_and_excluded_entries() -> None:
@@ -85,8 +99,8 @@ def test_2024_excluded_families_are_explicit_and_not_promoted() -> None:
     assert "debug" in excluded_categories
     assert any(category.startswith("ui") for category in excluded_categories)
     assert payload["summary"]["excluded_count"] == len(excluded_entries) == 73
-    assert payload["summary"]["deferred_count"] == len(deferred_entries) == 74
-    assert payload["summary"]["status_counts"] == status_counts == {"deferred": 74, "excluded": 73}
+    assert payload["summary"]["deferred_count"] == len(deferred_entries) == 64
+    assert payload["summary"]["status_counts"] == status_counts == {"deferred": 64, "excluded": 73}
 
 
 def _deferred_payload() -> dict:
