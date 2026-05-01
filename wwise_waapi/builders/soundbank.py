@@ -431,31 +431,38 @@ class SoundBankBuilder:
 
 
 def build_get_inclusions_preview(**kwargs: Any) -> SemanticPreview:
-    return SoundBankBuilder(source_note_checker=kwargs.pop("source_note_checker", None)).get_inclusions(**kwargs)
+    return _builder_from_kwargs(kwargs).get_inclusions(**kwargs)
 
 
 def build_set_inclusions_preview(**kwargs: Any) -> SemanticPreview:
-    return SoundBankBuilder(source_note_checker=kwargs.pop("source_note_checker", None)).set_inclusions(**kwargs)
+    return _builder_from_kwargs(kwargs).set_inclusions(**kwargs)
 
 
 def build_generate_preview(**kwargs: Any) -> SemanticPreview:
-    return SoundBankBuilder(source_note_checker=kwargs.pop("source_note_checker", None)).generate(**kwargs)
+    return _builder_from_kwargs(kwargs).generate(**kwargs)
 
 
 def build_convert_external_sources_preview(**kwargs: Any) -> SemanticPreview:
-    return SoundBankBuilder(source_note_checker=kwargs.pop("source_note_checker", None)).convert_external_sources(**kwargs)
+    return _builder_from_kwargs(kwargs).convert_external_sources(**kwargs)
 
 
 def build_process_definition_files_preview(**kwargs: Any) -> SemanticPreview:
-    return SoundBankBuilder(source_note_checker=kwargs.pop("source_note_checker", None)).process_definition_files(**kwargs)
+    return _builder_from_kwargs(kwargs).process_definition_files(**kwargs)
 
 
 def build_generated_expectation(**kwargs: Any) -> SoundBankTopicExpectation:
-    return SoundBankBuilder(source_note_checker=kwargs.pop("source_note_checker", None)).generated_expectation(**kwargs)
+    return _builder_from_kwargs(kwargs).generated_expectation(**kwargs)
 
 
 def build_generation_done_expectation(**kwargs: Any) -> SoundBankTopicExpectation:
-    return SoundBankBuilder(source_note_checker=kwargs.pop("source_note_checker", None)).generation_done_expectation(**kwargs)
+    return _builder_from_kwargs(kwargs).generation_done_expectation(**kwargs)
+
+
+def _builder_from_kwargs(kwargs: dict[str, Any]) -> SoundBankBuilder:
+    return SoundBankBuilder(
+        version=kwargs.pop("version", DEFAULT_WWISE_VERSION),
+        source_note_checker=kwargs.pop("source_note_checker", None),
+    )
 
 
 def _coerce_set_inclusion(item: SoundBankInclusion | Mapping[str, Any]) -> dict[str, Any]:

@@ -233,15 +233,22 @@ class ImportBuilder:
 
 
 def build_audio_import_preview(imports: Sequence[ImportItem | Mapping[str, Any]], **kwargs: Any) -> SemanticPreview:
-    return ImportBuilder().audio_import(imports, **kwargs)
+    return _builder_from_kwargs(kwargs).audio_import(imports, **kwargs)
 
 
 def build_import_tab_delimited_preview(**kwargs: Any) -> SemanticPreview:
-    return ImportBuilder().import_tab_delimited(**kwargs)
+    return _builder_from_kwargs(kwargs).import_tab_delimited(**kwargs)
 
 
 def expect_audio_imported_topic(**kwargs: Any) -> SemanticPreview:
-    return ImportBuilder().imported_topic(**kwargs)
+    return _builder_from_kwargs(kwargs).imported_topic(**kwargs)
+
+
+def _builder_from_kwargs(kwargs: dict[str, Any]) -> ImportBuilder:
+    return ImportBuilder(
+        version=kwargs.pop("version", DEFAULT_WWISE_VERSION),
+        source_note_checker=kwargs.pop("source_note_checker", None),
+    )
 
 
 def build_object_path(root: str, *segments: str | tuple[str, str]) -> str:

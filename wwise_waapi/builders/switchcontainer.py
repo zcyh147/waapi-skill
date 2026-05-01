@@ -292,23 +292,30 @@ class SwitchContainerAssignmentBuilder:
 
 
 def build_get_assignments_preview(**kwargs: Any) -> SemanticPreview:
-    return SwitchContainerAssignmentBuilder(source_note_checker=kwargs.pop("source_note_checker", None)).get_assignments(**kwargs)
+    return _builder_from_kwargs(kwargs).get_assignments(**kwargs)
 
 
 def build_add_assignment_preview(**kwargs: Any) -> SemanticPreview:
-    return SwitchContainerAssignmentBuilder(source_note_checker=kwargs.pop("source_note_checker", None)).add_assignment(**kwargs)
+    return _builder_from_kwargs(kwargs).add_assignment(**kwargs)
 
 
 def build_remove_assignment_preview(**kwargs: Any) -> SemanticPreview:
-    return SwitchContainerAssignmentBuilder(source_note_checker=kwargs.pop("source_note_checker", None)).remove_assignment(**kwargs)
+    return _builder_from_kwargs(kwargs).remove_assignment(**kwargs)
 
 
 def build_assignment_added_expectation(**kwargs: Any) -> TopicExpectation:
-    return SwitchContainerAssignmentBuilder(source_note_checker=kwargs.pop("source_note_checker", None)).assignment_added_expectation(**kwargs)
+    return _builder_from_kwargs(kwargs).assignment_added_expectation(**kwargs)
 
 
 def build_assignment_removed_expectation(**kwargs: Any) -> TopicExpectation:
-    return SwitchContainerAssignmentBuilder(source_note_checker=kwargs.pop("source_note_checker", None)).assignment_removed_expectation(**kwargs)
+    return _builder_from_kwargs(kwargs).assignment_removed_expectation(**kwargs)
+
+
+def _builder_from_kwargs(kwargs: dict[str, Any]) -> SwitchContainerAssignmentBuilder:
+    return SwitchContainerAssignmentBuilder(
+        version=kwargs.pop("version", DEFAULT_WWISE_VERSION),
+        source_note_checker=kwargs.pop("source_note_checker", None),
+    )
 
 
 def parse_get_assignments_result(payload: Sequence[Mapping[str, Any]] | Mapping[str, Any] | None) -> tuple[AssignmentPair, ...]:

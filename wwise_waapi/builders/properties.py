@@ -308,27 +308,34 @@ class PropertyReferenceBuilder:
 
 
 def build_set_name_preview(**kwargs: Any) -> SemanticPreview:
-    return PropertyReferenceBuilder().set_name(**kwargs)
+    return _builder_from_kwargs(kwargs).set_name(**kwargs)
 
 
 def build_set_notes_preview(**kwargs: Any) -> SemanticPreview:
-    return PropertyReferenceBuilder().set_notes(**kwargs)
+    return _builder_from_kwargs(kwargs).set_notes(**kwargs)
 
 
 def build_set_property_preview(**kwargs: Any) -> SemanticPreview:
-    return PropertyReferenceBuilder().set_property(**kwargs)
+    return _builder_from_kwargs(kwargs).set_property(**kwargs)
 
 
 def build_set_reference_preview(**kwargs: Any) -> SemanticPreview:
-    return PropertyReferenceBuilder().set_reference(**kwargs)
+    return _builder_from_kwargs(kwargs).set_reference(**kwargs)
 
 
 def build_set_randomizer_preview(**kwargs: Any) -> SemanticPreview:
-    return PropertyReferenceBuilder().set_randomizer(**kwargs)
+    return _builder_from_kwargs(kwargs).set_randomizer(**kwargs)
 
 
 def build_set_attenuation_curve_preview(**kwargs: Any) -> SemanticPreview:
-    return PropertyReferenceBuilder().set_attenuation_curve(**kwargs)
+    return _builder_from_kwargs(kwargs).set_attenuation_curve(**kwargs)
+
+
+def _builder_from_kwargs(kwargs: dict[str, Any]) -> PropertyReferenceBuilder:
+    return PropertyReferenceBuilder(
+        version=kwargs.pop("version", DEFAULT_WWISE_VERSION),
+        source_note_checker=kwargs.pop("source_note_checker", None),
+    )
 
 
 def name_changed_topic_expectation(object: ResolvedObject, value: str) -> TopicExpectationPlan:
@@ -366,6 +373,7 @@ def _preview_metadata(
         "operation": operation.value,
         "uri": SUPPORTED_PROPERTY_REFERENCE_URIS[operation],
         "read_only": False,
+        "destructive_gate": {"required": True, "reason": "property/reference setter previews must be reviewed before dispatch"},
         "source_note": dict(source_note),
         "schema_validation": schema_validation.as_dict(),
         "applicability": dict(operation_metadata),
