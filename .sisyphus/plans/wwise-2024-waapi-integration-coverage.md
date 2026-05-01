@@ -528,7 +528,7 @@ Support Wwise 2024.1.13 WAAPI resources and tests as an explicit opt-in version 
 
   **Commit**: YES | Message: `docs(wwise): document 2024 parity evidence` | Files: `SKILL.md`, `references/*.md`, `evals/evals.json`, `tests/unit/test_2024_docs_contract.py`, `.sisyphus/evidence/wwise-2024-waapi-integration-coverage/parity-review-packet.md`
 
-- [ ] 12. Verify default Wwise-free behavior and 2024 explicit opt-in gates
+- [x] 12. Verify default Wwise-free behavior and 2024 explicit opt-in gates
 
   **What to do**: Prove default tests do not require Wwise and default dispatch remains 2022.1. Prove 2024 live/destructive tests skip/fail safely unless explicitly opted in. Record command outputs.
   **Must NOT do**: Do not set repo-global default `WWISE_VERSION=2024.1`.
