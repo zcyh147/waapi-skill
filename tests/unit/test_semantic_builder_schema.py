@@ -89,10 +89,10 @@ def test_schema_validator_loads_supported_uri_from_manifest_resources() -> None:
 
 def test_unsupported_version_rejected() -> None:
     with pytest.raises(SemanticValidationError) as exc:
-        validate_semantic_payload("ak.wwise.core.object.get", version="2023.1")
+        validate_semantic_payload("ak.wwise.core.object.get", version="2024")
 
     assert exc.value.error_code == SemanticErrorCode.UNSUPPORTED_WWISE_VERSION
-    assert exc.value.details["version"] == "2023.1"
+    assert exc.value.details["version"] == "2024"
 
 
 def test_schema_invalid_uri_rejected_with_typed_code() -> None:

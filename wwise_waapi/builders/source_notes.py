@@ -9,14 +9,14 @@ from typing import Any, Mapping
 
 from wwise_waapi.dispatcher import DEFAULT_WWISE_VERSION
 from wwise_waapi.notebooklm_gate import EXPECTED_NOTEBOOK_ID, NotebookLMGate
+from wwise_waapi.versions import is_explicit_fail_closed_version  # pyright: ignore[reportMissingImports]
 
 from .common import BuilderFamily, SemanticErrorCode, SemanticValidationError, SourceNoteCheck
 
 
-DEFAULT_SEMANTIC_SOURCE_NOTES = (
-    Path(__file__).resolve().parents[2] / "resources" / "semantic" / DEFAULT_WWISE_VERSION / "source_notes.json"
-)
 REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_SEMANTIC_SOURCE_ROOT = REPO_ROOT / "resources" / "semantic"
+DEFAULT_SEMANTIC_SOURCE_NOTES = DEFAULT_SEMANTIC_SOURCE_ROOT / DEFAULT_WWISE_VERSION / "source_notes.json"
 
 EXPECTED_SOURCE_NOTE_URI_INVENTORY: dict[str, tuple[str, ...]] = {
     BuilderFamily.QUERY.value: ("ak.wwise.core.object.get",),
@@ -105,7 +105,7 @@ class SemanticSourceNoteChecker:
 
     def __init__(
         self,
-        resource_path: Path = DEFAULT_SEMANTIC_SOURCE_NOTES,
+        resource_path: Path | None = None,
         notebook_id: str = EXPECTED_NOTEBOOK_ID,
     ) -> None:
         self.resource_path = resource_path
@@ -124,7 +124,7 @@ class SemanticSourceNoteChecker:
             )
 
         try:
-            resource = load_semantic_source_notes(self.resource_path)
+            resource = load_semantic_source_notes(self._resource_path_for(version), expected_version=version)
         except SemanticValidationError as exc:
             return SourceNoteCheck(
                 False,
@@ -237,14 +237,29 @@ class SemanticSourceNoteChecker:
             reason="Semantic source note is grounded.",
         )
 
+    def _resource_path_for(self, version: str) -> Path:
+        if self.resource_path is not None:
+            return self.resource_path
+        if is_explicit_fail_closed_version(version):
+            return DEFAULT_SEMANTIC_SOURCE_ROOT / version / "source_notes.json"
+        return DEFAULT_SEMANTIC_SOURCE_NOTES
 
-def load_semantic_source_notes(resource_path: Path = DEFAULT_SEMANTIC_SOURCE_NOTES) -> SemanticSourceNoteResource:
+
+def load_semantic_source_notes(
+    resource_path: Path = DEFAULT_SEMANTIC_SOURCE_NOTES,
+    *,
+    expected_version: str | None = None,
+) -> SemanticSourceNoteResource:
     """Load the semantic source-note resource or raise a typed validation error."""
 
     if not resource_path.exists():
+        details = {"resource_path": str(resource_path)}
+        if expected_version is not None:
+            details["version"] = expected_version
         raise SemanticValidationError(
             SemanticErrorCode.MISSING_SOURCE_NOTE,
             f"Semantic source-note resource is missing: {resource_path}",
+            details=details,
         )
     try:
         data = json.loads(resource_path.read_text(encoding="utf-8"))

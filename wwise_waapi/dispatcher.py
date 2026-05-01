@@ -17,7 +17,7 @@ from .category_policy import (  # pyright: ignore[reportMissingImports]
     unsupported_live_behavior_message,
 )
 from .deferred_registry import ApiClassifier
-from .manifest import ManifestStore
+from .manifest import ManifestResourceMissingError, ManifestStore
 from .subscriptions import SubscriptionManager, SubscriptionTimeout, SubscriptionUnavailable
 
 DEFAULT_WWISE_VERSION = "2022.1"
@@ -315,6 +315,8 @@ class WwiseDispatcher:
         return request.live_behavior and is_policy_exempt_category(entry.category)
 
     def _error_code(self, exc: Exception) -> str:
+        if isinstance(exc, ManifestResourceMissingError):
+            return "MANIFEST_NOT_FOUND"
         if isinstance(exc, TimeoutError):
             return "TIMEOUT"
         if isinstance(exc, ValueError):

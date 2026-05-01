@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Mapping, Protocol
 
 from wwise_waapi.dispatcher import DEFAULT_WWISE_VERSION, DispatcherRequest
-from wwise_waapi.manifest import ManifestStore
+from wwise_waapi.manifest import ManifestResourceMissingError, ManifestStore
 
 
 DEFAULT_MANIFEST_ROOT = Path(__file__).resolve().parents[2] / "resources" / "manifest"
@@ -187,7 +187,14 @@ class ManifestSchemaLoader:
     manifest_store: ManifestStore = field(default_factory=lambda: ManifestStore(root=DEFAULT_MANIFEST_ROOT))
 
     def load_manifest(self, version: str = DEFAULT_WWISE_VERSION) -> dict[str, Any]:
-        manifest = self.manifest_store.load(version)
+        try:
+            manifest = self.manifest_store.load(version)
+        except ManifestResourceMissingError as exc:
+            raise SemanticValidationError(
+                SemanticErrorCode.UNSUPPORTED_WWISE_VERSION,
+                f"Unsupported Wwise version for semantic builders: {version}",
+                details={"version": version, "resource_path": str(exc.path)},
+            ) from exc
         if not manifest:
             raise SemanticValidationError(
                 SemanticErrorCode.UNSUPPORTED_WWISE_VERSION,

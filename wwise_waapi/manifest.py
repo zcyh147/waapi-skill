@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 
+from .versions import is_explicit_fail_closed_version  # pyright: ignore[reportMissingImports]
+
 
 GET_FUNCTIONS_URI = "ak.wwise.waapi.getFunctions"
 GET_TOPICS_URI = "ak.wwise.waapi.getTopics"
@@ -216,6 +218,15 @@ class DeterministicJsonWriter:
         path.write_text(self.dumps(payload), encoding="utf-8")
 
 
+class ManifestResourceMissingError(FileNotFoundError):
+    """Raised when an explicit version resource is missing and fallback is forbidden."""
+
+    def __init__(self, version: str, path: Path) -> None:
+        self.version = version
+        self.path = path
+        super().__init__(f"Manifest resource is missing for Wwise {version}: {path}")
+
+
 @dataclass(slots=True)
 class ManifestStore:
     """Filesystem-backed manifest store with legacy in-memory helpers."""
@@ -230,12 +241,16 @@ class ManifestStore:
         version_dir = self.root / version
         manifest_path = version_dir / "manifest.json"
         if not manifest_path.exists():
+            if is_explicit_fail_closed_version(version):
+                raise ManifestResourceMissingError(version, manifest_path)
             return self.versions.get(version, {})
         manifest = _read_json(manifest_path)
         for name, key in (("functions.json", "functions"), ("topics.json", "topics"), ("schemas.json", "schemas")):
             path = version_dir / name
             if path.exists():
                 manifest[key] = _read_json(path).get(key, [])
+            elif is_explicit_fail_closed_version(version):
+                raise ManifestResourceMissingError(version, path)
         return manifest
 
     def record(self, version: str, manifest: dict[str, Any]) -> None:
