@@ -2,7 +2,7 @@
   "live_cases": [
     {
       "args": {
-        "waql": "\\\"\\\\Actor-Mixer Hierarchy\\\""
+        "waql": "\"\\Actor-Mixer Hierarchy\""
       },
       "category": "path queries",
       "coverage_status": "evidence-only",
@@ -10,7 +10,7 @@
       "expected": {
         "identity": {
           "name": "Actor-Mixer Hierarchy",
-          "path": "\\\\Actor-Mixer Hierarchy"
+          "path": "\\Actor-Mixer Hierarchy"
         },
         "result_count": {
           "count": 1,
@@ -32,7 +32,7 @@
     },
     {
       "args": {
-        "waql": "from type Sound where type = \\\"Sound\\\" take 1"
+        "waql": "from type Sound where type = \"Sound\" take 1"
       },
       "category": "type filters",
       "coverage_status": "evidence-only",

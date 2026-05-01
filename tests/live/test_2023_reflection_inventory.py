@@ -29,6 +29,17 @@ SANDBOX_ROOT = REPO_ROOT / ".sisyphus" / "runtime" / "wwise-2023-live-smoke-sand
 WWISE_BUILD = "2023.1.19.8928"
 
 
+@pytest.mark.parametrize("display_name", ["2023.1", "2023.1.19", "v2023.1.19"])
+def test_2023_version_display_name_accepts_expected_2023_1_shapes(display_name: str) -> None:
+    _assert_2023_version_display_name(display_name)
+
+
+@pytest.mark.parametrize("display_name", ["2022.1.14", "v2022.1.14", "2023.2.0", "v2023.2.0"])
+def test_2023_version_display_name_rejects_wrong_major_minor(display_name: str) -> None:
+    with pytest.raises(AssertionError):
+        _assert_2023_version_display_name(display_name)
+
+
 @pytest.mark.live
 def test_2023_live_reflection_inventory_runs_against_sandbox(tmp_path: Path) -> None:
     contract = require_2023_live_environment()
@@ -51,7 +62,7 @@ def test_2023_live_reflection_inventory_runs_against_sandbox(tmp_path: Path) -> 
 
             client = default_waapi_client_factory(lifecycle.waapi_url)
             info = _metadata(client.call("ak.wwise.core.getInfo"))
-            assert info["version"]["displayName"].startswith(EXPECTED_WWISE_VERSION)
+            _assert_2023_version_display_name(info["version"]["displayName"])
             assert info["isCommandLine"] is True
 
             manifest = build_manifest_from_caller(
@@ -90,3 +101,11 @@ def _metadata(result: Any) -> Mapping[str, Any]:
     version = result.get("version")
     assert isinstance(version, Mapping), f"getInfo result must include version mapping, got {result!r}"
     return result
+
+
+def _assert_2023_version_display_name(display_name: Any) -> None:
+    assert isinstance(display_name, str), f"version displayName must be a string, got {type(display_name).__name__}"
+    normalized = display_name.removeprefix("v")
+    assert normalized == EXPECTED_WWISE_VERSION or normalized.startswith(f"{EXPECTED_WWISE_VERSION}."), (
+        f"version displayName {display_name!r} must target {EXPECTED_WWISE_VERSION}"
+    )
