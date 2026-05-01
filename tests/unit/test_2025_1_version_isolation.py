@@ -5,7 +5,7 @@ from typing import Any, Callable
 
 import pytest  # pyright: ignore[reportMissingImports]
 
-from wwise_waapi.builders.common import BuilderFamily, SemanticErrorCode  # pyright: ignore[reportMissingImports]
+from wwise_waapi.builders.common import BuilderFamily  # pyright: ignore[reportMissingImports]
 from wwise_waapi.builders.source_notes import SemanticSourceNoteChecker  # pyright: ignore[reportMissingImports]
 from wwise_waapi.dispatcher import WwiseDispatcher  # pyright: ignore[reportMissingImports]
 from wwise_waapi.manifest import ManifestResourceMissingError, ManifestStore  # pyright: ignore[reportMissingImports]
@@ -127,10 +127,10 @@ def test_semantic_source_note_checker_explicit_2025_1_uses_2025_1_resource_path_
         version=VERSION_2025,
     )
 
-    assert status.allowed is False
+    assert status.allowed is True
     assert status.version == VERSION_2025
-    assert status.error_code == SemanticErrorCode.MISSING_SOURCE_NOTE
-    assert "resources/semantic/2025.1/source_notes.json" in status.reason
+    assert status.error_code is None
+    assert status.reason == "Semantic source note is grounded."
     assert any("resources/semantic/2025.1/source_notes.json" in path for path in touched)
     assert not any(any(token in path for token in FORBIDDEN_2025_FALLBACK_TOKENS) for path in touched)
 

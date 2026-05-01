@@ -6,7 +6,7 @@ from typing import Any, Callable
 
 import pytest  # pyright: ignore[reportMissingImports]
 
-from wwise_waapi.builders.common import BuilderFamily, SemanticErrorCode  # pyright: ignore[reportMissingImports]
+from wwise_waapi.builders.common import BuilderFamily  # pyright: ignore[reportMissingImports]
 from wwise_waapi.builders.source_notes import SemanticSourceNoteChecker  # pyright: ignore[reportMissingImports]
 from wwise_waapi.dispatcher import DEFAULT_WWISE_VERSION, WwiseDispatcher  # pyright: ignore[reportMissingImports]
 from wwise_waapi.manifest import ManifestStore, audit_manifest  # pyright: ignore[reportMissingImports]
@@ -116,10 +116,10 @@ def test_explicit_2025_1_resource_lookups_never_read_prior_bare_or_global_paths(
     assert dispatch_result["ok"] is True
     assert dispatch_result["version"] == VERSION_2025
     assert added_inventory["metadata"]["target_version"] == VERSION_2025
-    assert source_note_status.allowed is False
+    assert source_note_status.allowed is True
     assert source_note_status.version == VERSION_2025
-    assert source_note_status.error_code == SemanticErrorCode.MISSING_SOURCE_NOTE
-    assert "resources/semantic/2025.1/source_notes.json" in source_note_status.reason
+    assert source_note_status.error_code is None
+    assert source_note_status.reason == "Semantic source note is grounded."
     assert any("resources/manifest/2025.1/manifest.json" in path for path in touched)
     assert any("resources/manifest/2025.1/functions.json" in path for path in touched)
     assert any("resources/manifest/2025.1/topics.json" in path for path in touched)

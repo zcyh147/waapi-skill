@@ -283,7 +283,7 @@ Wave 5: F1-F4 final review agents.
 
   **Commit**: YES | Message: `test(wwise): isolate 2025 version resources` | Files: `tests/unit/test_2025_1_*.py`, shared version/resource code only if required
 
-- [ ] 5. Ground 2025.1 semantic source notes with NotebookLM
+- [x] 5. Ground 2025.1 semantic source notes with NotebookLM
 
   **What to do**: Query active NotebookLM library `wwise-2025.1-docs` for 2025.1 source evidence. The query set must cover Wwise Authoring API Reference, Wwise Objects Reference, WAQL Reference, Command Identifiers, View Identifiers, Performance Monitor Counter Identifiers, and public-library endpoint/topic pages for each planned family. Create `references/semantic/2025.1/semantic-builder-notebooklm-gate.md`, family notes for `query`, `object-mutation`, `property-reference`, `import`, `soundbank`, `switchcontainer`, and `semantic-builder-protocol.md`. Create `resources/semantic/2025.1/source_notes.json`. Capture docs discrepancies in `references/semantic/2025.1/discrepancy-register.md`.
   **Must NOT do**: Do not let runtime builders call NotebookLM. Do not infer 2025 semantics from 2024 docs without 2025 evidence.

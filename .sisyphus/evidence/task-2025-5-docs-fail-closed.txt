@@ -1,0 +1,6 @@
+Task 5 docs fail-closed evidence
+
+- Semantic source notes are grounded only when the local 2025.1 gate file is present.
+- Planned 2025.1 semantic resources live under references/semantic/2025.1/ and resources/semantic/2025.1/.
+- Validation passed with the 2024 audit allowlist fix in place.
+- No auth artifacts or .sisyphus/runtime paths are included.

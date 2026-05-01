@@ -1,0 +1,9 @@
+Task 5 NotebookLM gate evidence
+
+- Notebook id: wwise-2025.1-docs
+- Gate status: open
+- Auth result: success
+- List result: success
+- Query result: success
+- Evidence note: source-grounded answers were captured for the 2025.1 semantic builder families; runtime builders must not query NotebookLM.
+- Evidence note: no browser profile, cookies, state file, or private notebook URL paths are recorded here.
