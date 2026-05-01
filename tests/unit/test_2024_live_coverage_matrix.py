@@ -19,7 +19,7 @@ def test_2024_live_matrix_covers_every_reflected_function_once() -> None:
     matrix = _matrix_payload()["matrix"]
     reflected = sorted(_uris(FUNCTIONS_MANIFEST, "functions"))
 
-    assert len(matrix) == 148
+    assert len(matrix) == len(reflected)
     assert [entry["uri"] for entry in matrix] == reflected
     assert len({entry["uri"] for entry in matrix}) == len(matrix)
     assert {entry["version"] for entry in matrix} == {VERSION}
@@ -61,8 +61,10 @@ def test_2024_phase2_summary_matches_matrix_without_behavioral_overclaim() -> No
     assert summary["summary"]["status_counts"] == matrix["summary"]["status_counts"] == coverage["summary"]["status_counts"]
     assert summary["summary"]["parity_bucket_counts"] == matrix["summary"]["parity_bucket_counts"] == coverage["summary"]["parity_bucket_counts"]
     assert set(summary["summary"]["parity_bucket_counts"]) == ALLOWED_PARITY_BUCKETS
-    assert summary["summary"]["parity_bucket_total"] == matrix["summary"]["parity_bucket_total"] == 148
-    assert coverage["summary"]["parity_bucket_total"] == 148
+    expected_total = len(_uris(FUNCTIONS_MANIFEST, "functions"))
+
+    assert summary["summary"]["parity_bucket_total"] == matrix["summary"]["parity_bucket_total"] == expected_total
+    assert coverage["summary"]["parity_bucket_total"] == expected_total
     assert summary["summary"]["behavioral_covered_count"] == 0
     assert summary["summary"]["live_behavioral_covered_count"] == 0
     assert [entry["uri"] for entry in summary["entries"]] == [entry["uri"] for entry in matrix_entries] == [entry["uri"] for entry in coverage_entries]
@@ -76,12 +78,14 @@ def test_2024_phase21_policy_reconciles_parity_buckets_and_blocked_lists() -> No
     parity_buckets = policy["policy"]["parity_buckets"]
 
     assert set(parity_buckets) == ALLOWED_PARITY_BUCKETS
-    assert policy["summary"]["parity_bucket_total"] == 148
-    assert sum(policy["summary"]["parity_bucket_counts"].values()) == 148
+    expected_total = len(_uris(FUNCTIONS_MANIFEST, "functions"))
+
+    assert policy["summary"]["parity_bucket_total"] == expected_total
+    assert sum(policy["summary"]["parity_bucket_counts"].values()) == expected_total
 
     assigned = [uri for uris in parity_buckets.values() for uri in uris]
     assert sorted(assigned) == sorted(coverage_by_uri)
-    assert len(assigned) == len(set(assigned)) == 148
+    assert len(assigned) == len(set(assigned)) == expected_total
     for bucket, uris in parity_buckets.items():
         assert policy["summary"]["parity_bucket_counts"][bucket] == len(uris)
         assert all(coverage_by_uri[uri]["parity_bucket"] == bucket for uri in uris)

@@ -332,7 +332,7 @@ Support Wwise 2024.1.13 WAAPI resources and tests as an explicit opt-in version 
 
   **Commit**: YES | Message: `test(coverage): classify 2024 parity resources` | Files: `resources/coverage/2024.1/*.json`, `resources/deferred/2024.1.json`, `tests/unit/test_2024_*.py`
 
-- [ ] 7. Add 2024 parity audit and no-overclaim unit tests
+- [x] 7. Add 2024 parity audit and no-overclaim unit tests
 
   **What to do**: Add focused audits that lock discovered 2024 reflected counts, no fallback, source-note versioning, coverage/matrix/summary/deferred reconciliation, approved evidence roots, and docs/eval claim limits. Tests must permit future evidence-backed promotions but reject manifest-only live/sandbox claims.
   **Must NOT do**: Do not hardcode 2023 counts for 2024; derive expected totals from 2024 manifest/resources.

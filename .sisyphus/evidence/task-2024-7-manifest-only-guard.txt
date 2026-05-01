@@ -1,0 +1,8 @@
+# Manifest-only promotion guard scenario
+
+Command: python -m pytest tests/unit/test_2024_cross_version_audit.py::test_2024_coverage_policy_deferred_and_source_notes_reconcile_without_manifest_only_promotions tests/unit/test_2024_live_coverage_matrix.py::test_2024_live_matrix_has_no_manifest_or_source_note_live_claims -q
+Exit code: 0
+
+Output:
+..                                                                       [100%]
+2 passed in 0.03s
