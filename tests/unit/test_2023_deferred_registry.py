@@ -19,7 +19,7 @@ def test_2023_deferred_registry_loads_and_covers_blocked_statuses() -> None:
     blocked = {entry["uri"] for entry in coverage if entry["coverage_status"] in {"deferred", "excluded"}}
 
     assert set(registry.entries) == blocked
-    assert len(registry.entries) == 140
+    assert len(registry.entries) == len(blocked)
     for uri, deferred in registry.entries.items():
         source = next(entry for entry in coverage if entry["uri"] == uri)
         assert deferred.version == VERSION

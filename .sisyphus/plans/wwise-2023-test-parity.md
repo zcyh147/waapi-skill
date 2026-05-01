@@ -232,7 +232,7 @@ Wave 4: Final Verification Wave F1-F4.
 
   **Commit**: YES | Message: `test(live): expand 2023 read-only parity evidence` | Files: `tests/live/test_2023_waql_live_matrix.py`, `resources/waql/2023.1/object-get-live-matrix.json`, `resources/coverage/2023.1/*.json`, `.sisyphus/evidence/wwise-2023-test-parity/live-read-only/*`
 
-- [ ] 4. Expand 2023.1 destructive sandbox parity for safe mutating families
+- [x] 4. Expand 2023.1 destructive sandbox parity for safe mutating families
 
   **What to do**: Add/extend destructive sandbox tests for safe mutating families already represented in 2023.1 support: object create/set/delete, audio import, soundbank inclusions, switchContainer assignment, and any additional 2022.1 safe sandbox-mutating family identified by Task 1 that does not fall into risky excluded families. Each test must create unique names, read back state, remove/cleanup objects, and rely on `Destructive2023SandboxRuntime` source-immutability proof.
   **Must NOT do**: Do not run profiler, transport, soundengine, UI, CLI, remote, or debug mutation probes. Do not target installed SampleProject or `tests/_org/2023.1`.

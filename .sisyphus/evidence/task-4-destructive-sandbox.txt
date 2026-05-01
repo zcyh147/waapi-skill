@@ -1,0 +1,20 @@
+Task 4 destructive sandbox evidence
+
+Command:
+WWISE_VERSION=2023.1 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh" WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q
+
+Exit code: 0
+Result: 5 passed in 97.85s
+
+Per-case destructive evidence written:
+- .sisyphus/evidence/wwise-2023-test-parity/destructive/object_create_set_delete_readback.json
+- .sisyphus/evidence/wwise-2023-test-parity/destructive/undo_group_create_then_undo_readback.json
+- .sisyphus/evidence/wwise-2023-test-parity/destructive/audio_import_generated_wav_readback_cleanup.json
+- .sisyphus/evidence/wwise-2023-test-parity/destructive/soundbank_inclusions_replace_read_remove_cleanup.json
+- .sisyphus/evidence/wwise-2023-test-parity/destructive/switchcontainer_assignment_add_get_remove_cleanup.json
+
+Cleanup/source immutability summary:
+- All tests ran through Destructive2023SandboxRuntime, which asserts source SampleProject .wproj/.wwu hash and mtime invariance during __exit__ before cleanup.
+- Each mutating test used a copied 2023.1 SampleProject sandbox under WWISE_SANDBOX_ROOT, unique WAAPI names, readback/state assertions, and cleanup/read-after-delete or read-after-remove assertions.
+- Before rerun, a stale interrupted runtime copy with `keep_decision: pending` was removed from .sisyphus/runtime/wwise-waapi-sandboxes after confirming its metadata pointed at the installed 2023.1 SampleProject source and runtime sandbox root.
+- After the rerun, .sisyphus/runtime/wwise-waapi-sandboxes contained only .wwise-live-sandbox.lock; no sample-project sandbox directory remained.

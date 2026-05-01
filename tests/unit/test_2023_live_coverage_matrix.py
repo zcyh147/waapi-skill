@@ -23,6 +23,18 @@ ALLOWED_PARITY_BUCKETS = {
     "deferred",
     "excluded",
 }
+SANDBOX_MUTATING_TESTED_URIS = {
+    "ak.wwise.core.audio.import",
+    "ak.wwise.core.object.create",
+    "ak.wwise.core.object.delete",
+    "ak.wwise.core.object.set",
+    "ak.wwise.core.soundbank.setInclusions",
+    "ak.wwise.core.switchContainer.addAssignment",
+    "ak.wwise.core.switchContainer.removeAssignment",
+    "ak.wwise.core.undo.beginGroup",
+    "ak.wwise.core.undo.endGroup",
+    "ak.wwise.core.undo.undo",
+}
 
 
 def test_2023_live_matrix_covers_every_reflected_api_once() -> None:
@@ -52,6 +64,11 @@ def test_2023_live_matrix_has_no_manifest_only_live_claims() -> None:
             assert entry["counts_as_live_behavioral"] is True, entry["uri"]
             assert entry["achieved_status"] == "live-tested", entry["uri"]
             assert entry["evidence_path"] == ".sisyphus/evidence/task-3-live-read-only.txt"
+        elif entry["uri"] in SANDBOX_MUTATING_TESTED_URIS:
+            assert entry["counts_as_behavioral"] is True, entry["uri"]
+            assert entry["counts_as_live_behavioral"] is True, entry["uri"]
+            assert entry["achieved_status"] == "sandbox-mutating-tested", entry["uri"]
+            assert entry["evidence_path"] == ".sisyphus/evidence/task-4-destructive-sandbox.txt"
         else:
             assert entry["counts_as_behavioral"] is False, entry["uri"]
             assert entry["counts_as_live_behavioral"] is False, entry["uri"]
@@ -69,8 +86,8 @@ def test_2023_phase2_summary_matches_matrix_without_behavioral_overclaim() -> No
     assert summary["summary"]["parity_bucket_counts"] == matrix["summary"]["parity_bucket_counts"]
     assert set(summary["summary"]["parity_bucket_counts"]) == ALLOWED_PARITY_BUCKETS
     assert summary["summary"]["parity_bucket_total"] == matrix["summary"]["parity_bucket_total"] == 181
-    assert summary["summary"]["behavioral_covered_count"] == 1
-    assert summary["summary"]["live_behavioral_covered_count"] == 1
+    assert summary["summary"]["behavioral_covered_count"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
+    assert summary["summary"]["live_behavioral_covered_count"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
     assert all(entry["version"] == VERSION for entry in summary["entries"])
     assert all(entry["parity_bucket"] in ALLOWED_PARITY_BUCKETS for entry in summary["entries"])
     assert all(entry["evidence_standard"] for entry in summary["entries"])

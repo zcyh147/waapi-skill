@@ -3255,42 +3255,45 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "resources/deferred/2023.1.json plus 2023.1 manifest inventory; substitute evidence is not behavioral coverage.",
-        "evidence_standard": "2023.1 inventory is reflected with either an explicit blocker or pending evidence; substitute or manifest evidence is not behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
-        "test": "tests/unit/test_2023_deferred_registry.py::test_2023_deferred_registry_loads_and_covers_blocked_statuses"
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": ".sisyphus/evidence/task-4-destructive-sandbox.txt; .sisyphus/evidence/wwise-2023-test-parity/destructive/audio_import_generated_wav_readback_cleanup.json",
+        "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+        "evidence_class": "live_behavioral_waapi",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+        "evidence_paths": [
+          ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2023-test-parity/destructive/audio_import_generated_wav_readback_cleanup.json"
+        ],
+        "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
+        "per_case_evidence_root": ".sisyphus/evidence/wwise-2023-test-parity/destructive/",
+        "test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py"
       },
       "category": "core.audio",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Requires a dedicated 2023.1 live fixture with bounded side-effect assertions before behavioral execution can be asserted.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2023.1/functions.json + resources/manifest/2023.1/topics.json + resources/manifest/2023.1/schemas.json (live reflection via 2023.1 SampleProject)",
-        "review_trigger": "When 2023.1 behavioral tests, live evidence, or policy for core.audio changes.",
-        "status": true,
-        "substitute_test": "Inventory/schema/deferred-registry validation only; not behavioral coverage."
+        "coverage_status": "sandbox-mutating-tested",
+        "status": false
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2023.1 inventory is reflected with either an explicit blocker or pending evidence; substitute or manifest evidence is not behavioral proof.",
+      "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2023_deferred_registry.py::test_2023_deferred_registry_loads_and_covers_blocked_statuses",
+        "route_test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "resources/deferred/2023.1.json plus 2023.1 manifest inventory; substitute evidence is not behavioral coverage."
+        "reason": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.audio.import",
@@ -3330,11 +3333,12 @@
         "source_status": "ok"
       },
       "schema_status": "ok",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.audio.import",
       "usage_guidance": {
-        "default_path": "deferred-registry-required",
-        "notes": "Manifest reflection alone is inventory evidence; do not count it as 2023.1 behavioral support."
+        "default_path": "destructive-sandbox-only",
+        "notes": "Requires copied 2023.1 SampleProject sandbox plus WWISE_LIVE=1 and WWISE_DESTRUCTIVE=1; do not run against installed SampleProject sources.",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt"
       },
       "version": "2023.1"
     },
@@ -4829,42 +4833,45 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "resources/deferred/2023.1.json plus 2023.1 manifest inventory; substitute evidence is not behavioral coverage.",
-        "evidence_standard": "2023.1 inventory is reflected with either an explicit blocker or pending evidence; substitute or manifest evidence is not behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
-        "test": "tests/unit/test_2023_deferred_registry.py::test_2023_deferred_registry_loads_and_covers_blocked_statuses"
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": ".sisyphus/evidence/task-4-destructive-sandbox.txt; .sisyphus/evidence/wwise-2023-test-parity/destructive/object_create_set_delete_readback.json",
+        "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+        "evidence_class": "live_behavioral_waapi",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+        "evidence_paths": [
+          ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2023-test-parity/destructive/object_create_set_delete_readback.json"
+        ],
+        "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
+        "per_case_evidence_root": ".sisyphus/evidence/wwise-2023-test-parity/destructive/",
+        "test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py"
       },
       "category": "core.object",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Requires a dedicated 2023.1 live fixture with bounded side-effect assertions before behavioral execution can be asserted.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2023.1/functions.json + resources/manifest/2023.1/topics.json + resources/manifest/2023.1/schemas.json (live reflection via 2023.1 SampleProject)",
-        "review_trigger": "When 2023.1 behavioral tests, live evidence, or policy for core.object changes.",
-        "status": true,
-        "substitute_test": "Inventory/schema/deferred-registry validation only; not behavioral coverage."
+        "coverage_status": "sandbox-mutating-tested",
+        "status": false
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2023.1 inventory is reflected with either an explicit blocker or pending evidence; substitute or manifest evidence is not behavioral proof.",
+      "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2023_deferred_registry.py::test_2023_deferred_registry_loads_and_covers_blocked_statuses",
+        "route_test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "resources/deferred/2023.1.json plus 2023.1 manifest inventory; substitute evidence is not behavioral coverage."
+        "reason": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.create",
@@ -4906,11 +4913,12 @@
         "source_status": "ok"
       },
       "schema_status": "ok",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.object.create",
       "usage_guidance": {
-        "default_path": "deferred-registry-required",
-        "notes": "Manifest reflection alone is inventory evidence; do not count it as 2023.1 behavioral support."
+        "default_path": "destructive-sandbox-only",
+        "notes": "Requires copied 2023.1 SampleProject sandbox plus WWISE_LIVE=1 and WWISE_DESTRUCTIVE=1; do not run against installed SampleProject sources.",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt"
       },
       "version": "2023.1"
     },
@@ -5060,42 +5068,45 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "resources/deferred/2023.1.json plus 2023.1 manifest inventory; substitute evidence is not behavioral coverage.",
-        "evidence_standard": "2023.1 inventory is reflected with either an explicit blocker or pending evidence; substitute or manifest evidence is not behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
-        "test": "tests/unit/test_2023_deferred_registry.py::test_2023_deferred_registry_loads_and_covers_blocked_statuses"
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": ".sisyphus/evidence/task-4-destructive-sandbox.txt; .sisyphus/evidence/wwise-2023-test-parity/destructive/object_create_set_delete_readback.json",
+        "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+        "evidence_class": "live_behavioral_waapi",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+        "evidence_paths": [
+          ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2023-test-parity/destructive/object_create_set_delete_readback.json"
+        ],
+        "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
+        "per_case_evidence_root": ".sisyphus/evidence/wwise-2023-test-parity/destructive/",
+        "test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py"
       },
       "category": "core.object",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Requires a dedicated 2023.1 live fixture with bounded side-effect assertions before behavioral execution can be asserted.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2023.1/functions.json + resources/manifest/2023.1/topics.json + resources/manifest/2023.1/schemas.json (live reflection via 2023.1 SampleProject)",
-        "review_trigger": "When 2023.1 behavioral tests, live evidence, or policy for core.object changes.",
-        "status": true,
-        "substitute_test": "Inventory/schema/deferred-registry validation only; not behavioral coverage."
+        "coverage_status": "sandbox-mutating-tested",
+        "status": false
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2023.1 inventory is reflected with either an explicit blocker or pending evidence; substitute or manifest evidence is not behavioral proof.",
+      "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "high",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2023_deferred_registry.py::test_2023_deferred_registry_loads_and_covers_blocked_statuses",
+        "route_test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "resources/deferred/2023.1.json plus 2023.1 manifest inventory; substitute evidence is not behavioral coverage."
+        "reason": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.delete",
@@ -5124,11 +5135,12 @@
         "source_status": "ok"
       },
       "schema_status": "ok",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.object.delete",
       "usage_guidance": {
-        "default_path": "deferred-registry-required",
-        "notes": "Manifest reflection alone is inventory evidence; do not count it as 2023.1 behavioral support."
+        "default_path": "destructive-sandbox-only",
+        "notes": "Requires copied 2023.1 SampleProject sandbox plus WWISE_LIVE=1 and WWISE_DESTRUCTIVE=1; do not run against installed SampleProject sources.",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt"
       },
       "version": "2023.1"
     },
@@ -6305,42 +6317,45 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "resources/deferred/2023.1.json plus 2023.1 manifest inventory; substitute evidence is not behavioral coverage.",
-        "evidence_standard": "2023.1 inventory is reflected with either an explicit blocker or pending evidence; substitute or manifest evidence is not behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
-        "test": "tests/unit/test_2023_deferred_registry.py::test_2023_deferred_registry_loads_and_covers_blocked_statuses"
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": ".sisyphus/evidence/task-4-destructive-sandbox.txt; .sisyphus/evidence/wwise-2023-test-parity/destructive/object_create_set_delete_readback.json",
+        "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+        "evidence_class": "live_behavioral_waapi",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+        "evidence_paths": [
+          ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2023-test-parity/destructive/object_create_set_delete_readback.json"
+        ],
+        "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
+        "per_case_evidence_root": ".sisyphus/evidence/wwise-2023-test-parity/destructive/",
+        "test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py"
       },
       "category": "core.object",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Requires a dedicated 2023.1 live fixture with bounded side-effect assertions before behavioral execution can be asserted.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2023.1/functions.json + resources/manifest/2023.1/topics.json + resources/manifest/2023.1/schemas.json (live reflection via 2023.1 SampleProject)",
-        "review_trigger": "When 2023.1 behavioral tests, live evidence, or policy for core.object changes.",
-        "status": true,
-        "substitute_test": "Inventory/schema/deferred-registry validation only; not behavioral coverage."
+        "coverage_status": "sandbox-mutating-tested",
+        "status": false
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2023.1 inventory is reflected with either an explicit blocker or pending evidence; substitute or manifest evidence is not behavioral proof.",
+      "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2023_deferred_registry.py::test_2023_deferred_registry_loads_and_covers_blocked_statuses",
+        "route_test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "resources/deferred/2023.1.json plus 2023.1 manifest inventory; substitute evidence is not behavioral coverage."
+        "reason": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.set",
@@ -6374,11 +6389,12 @@
         "source_status": "ok"
       },
       "schema_status": "ok",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.object.set",
       "usage_guidance": {
-        "default_path": "deferred-registry-required",
-        "notes": "Manifest reflection alone is inventory evidence; do not count it as 2023.1 behavioral support."
+        "default_path": "destructive-sandbox-only",
+        "notes": "Requires copied 2023.1 SampleProject sandbox plus WWISE_LIVE=1 and WWISE_DESTRUCTIVE=1; do not run against installed SampleProject sources.",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt"
       },
       "version": "2023.1"
     },
@@ -9778,42 +9794,45 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "resources/deferred/2023.1.json plus 2023.1 manifest inventory; substitute evidence is not behavioral coverage.",
-        "evidence_standard": "2023.1 inventory is reflected with either an explicit blocker or pending evidence; substitute or manifest evidence is not behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
-        "test": "tests/unit/test_2023_deferred_registry.py::test_2023_deferred_registry_loads_and_covers_blocked_statuses"
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": ".sisyphus/evidence/task-4-destructive-sandbox.txt; .sisyphus/evidence/wwise-2023-test-parity/destructive/soundbank_inclusions_replace_read_remove_cleanup.json",
+        "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+        "evidence_class": "live_behavioral_waapi",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+        "evidence_paths": [
+          ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2023-test-parity/destructive/soundbank_inclusions_replace_read_remove_cleanup.json"
+        ],
+        "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
+        "per_case_evidence_root": ".sisyphus/evidence/wwise-2023-test-parity/destructive/",
+        "test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py"
       },
       "category": "core.soundbank",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocking_condition": "Requires a dedicated 2023.1 live fixture with bounded side-effect assertions before behavioral execution can be asserted.",
-        "coverage_status": "deferred",
-        "evidence_source": "resources/manifest/2023.1/functions.json + resources/manifest/2023.1/topics.json + resources/manifest/2023.1/schemas.json (live reflection via 2023.1 SampleProject)",
-        "review_trigger": "When 2023.1 behavioral tests, live evidence, or policy for core.soundbank changes.",
-        "status": true,
-        "substitute_test": "Inventory/schema/deferred-registry validation only; not behavioral coverage."
+        "coverage_status": "sandbox-mutating-tested",
+        "status": false
       },
       "destructive_opt_in": true,
-      "evidence_standard": "2023.1 inventory is reflected with either an explicit blocker or pending evidence; substitute or manifest evidence is not behavioral proof.",
+      "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
-        "deferred_registry_required": true,
+        "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2023_deferred_registry.py::test_2023_deferred_registry_loads_and_covers_blocked_statuses",
+        "route_test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "resources/deferred/2023.1.json plus 2023.1 manifest inventory; substitute evidence is not behavioral coverage."
+        "reason": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.soundbank.setInclusions",
@@ -9845,11 +9864,12 @@
         "source_status": "ok"
       },
       "schema_status": "ok",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.soundbank.setInclusions",
       "usage_guidance": {
-        "default_path": "deferred-registry-required",
-        "notes": "Manifest reflection alone is inventory evidence; do not count it as 2023.1 behavioral support."
+        "default_path": "destructive-sandbox-only",
+        "notes": "Requires copied 2023.1 SampleProject sandbox plus WWISE_LIVE=1 and WWISE_DESTRUCTIVE=1; do not run against installed SampleProject sources.",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt"
       },
       "version": "2023.1"
     },
@@ -10533,37 +10553,45 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "supported",
-        "evidence": "2023.1 semantic reference contract plus manifest schema; no 2023.1 behavioral execution is claimed.",
-        "evidence_standard": "2023.1 schema/semantic contract is represented, but lifecycle/state-transition behavior is not asserted and does not count as behavioral support.",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": ".sisyphus/evidence/task-4-destructive-sandbox.txt; .sisyphus/evidence/wwise-2023-test-parity/destructive/switchcontainer_assignment_add_get_remove_cleanup.json",
+        "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+        "evidence_class": "live_behavioral_waapi",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+        "evidence_paths": [
+          ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2023-test-parity/destructive/switchcontainer_assignment_add_get_remove_cleanup.json"
+        ],
+        "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
         "manifest_reflection_only": false,
-        "parity_bucket": "conformance-only",
-        "test": "tests/unit/test_2023_api_resource_coverage.py::test_2023_coverage_statuses_are_not_manifest_only_claims"
+        "parity_bucket": "sandbox-mutating-tested",
+        "per_case_evidence_root": ".sisyphus/evidence/wwise-2023-test-parity/destructive/",
+        "test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py"
       },
       "category": "core.switchContainer",
-      "coverage_status": "supported",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "coverage_status": "supported",
+        "coverage_status": "sandbox-mutating-tested",
         "status": false
       },
       "destructive_opt_in": false,
-      "evidence_standard": "2023.1 schema/semantic contract is represented, but lifecycle/state-transition behavior is not asserted and does not count as behavioral support.",
+      "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
       "item_type": "function",
-      "parity_bucket": "conformance-only",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
         "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2023_api_resource_coverage.py::test_2023_coverage_statuses_are_not_manifest_only_claims",
+        "route_test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "supported",
-        "deterministic_default": true,
-        "reason": "2023.1 semantic reference contract plus manifest schema; no 2023.1 behavioral execution is claimed."
+        "classification": "sandbox-mutating-tested",
+        "deterministic_default": false,
+        "reason": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.switchContainer.addAssignment",
@@ -10593,11 +10621,12 @@
         "source_status": "ok"
       },
       "schema_status": "ok",
-      "test_status": "supported",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.switchContainer.addAssignment",
       "usage_guidance": {
-        "default_path": "schema-and-semantic-contract",
-        "notes": "Manifest reflection alone is inventory evidence; do not count it as 2023.1 behavioral support."
+        "default_path": "destructive-sandbox-only",
+        "notes": "Requires copied 2023.1 SampleProject sandbox plus WWISE_LIVE=1 and WWISE_DESTRUCTIVE=1; do not run against installed SampleProject sources.",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt"
       },
       "version": "2023.1"
     },
@@ -10815,37 +10844,45 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "supported",
-        "evidence": "2023.1 semantic reference contract plus manifest schema; no 2023.1 behavioral execution is claimed.",
-        "evidence_standard": "2023.1 schema/semantic contract is represented, but lifecycle/state-transition behavior is not asserted and does not count as behavioral support.",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": ".sisyphus/evidence/task-4-destructive-sandbox.txt; .sisyphus/evidence/wwise-2023-test-parity/destructive/switchcontainer_assignment_add_get_remove_cleanup.json",
+        "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+        "evidence_class": "live_behavioral_waapi",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+        "evidence_paths": [
+          ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2023-test-parity/destructive/switchcontainer_assignment_add_get_remove_cleanup.json"
+        ],
+        "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
         "manifest_reflection_only": false,
-        "parity_bucket": "conformance-only",
-        "test": "tests/unit/test_2023_api_resource_coverage.py::test_2023_coverage_statuses_are_not_manifest_only_claims"
+        "parity_bucket": "sandbox-mutating-tested",
+        "per_case_evidence_root": ".sisyphus/evidence/wwise-2023-test-parity/destructive/",
+        "test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py"
       },
       "category": "core.switchContainer",
-      "coverage_status": "supported",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "coverage_status": "supported",
+        "coverage_status": "sandbox-mutating-tested",
         "status": false
       },
       "destructive_opt_in": false,
-      "evidence_standard": "2023.1 schema/semantic contract is represented, but lifecycle/state-transition behavior is not asserted and does not count as behavioral support.",
+      "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
       "item_type": "function",
-      "parity_bucket": "conformance-only",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
         "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2023_api_resource_coverage.py::test_2023_coverage_statuses_are_not_manifest_only_claims",
+        "route_test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "supported",
-        "deterministic_default": true,
-        "reason": "2023.1 semantic reference contract plus manifest schema; no 2023.1 behavioral execution is claimed."
+        "classification": "sandbox-mutating-tested",
+        "deterministic_default": false,
+        "reason": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.switchContainer.removeAssignment",
@@ -10875,11 +10912,12 @@
         "source_status": "ok"
       },
       "schema_status": "ok",
-      "test_status": "supported",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.switchContainer.removeAssignment",
       "usage_guidance": {
-        "default_path": "schema-and-semantic-contract",
-        "notes": "Manifest reflection alone is inventory evidence; do not count it as 2023.1 behavioral support."
+        "default_path": "destructive-sandbox-only",
+        "notes": "Requires copied 2023.1 SampleProject sandbox plus WWISE_LIVE=1 and WWISE_DESTRUCTIVE=1; do not run against installed SampleProject sources.",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt"
       },
       "version": "2023.1"
     },
@@ -11473,37 +11511,45 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "untested",
-        "evidence": "resources/manifest/2023.1/schemas.json#ak.wwise.core.undo.beginGroup inventory only; no behavior or semantic support is claimed.",
-        "evidence_standard": "2023.1 inventory is reflected with either an explicit blocker or pending evidence; substitute or manifest evidence is not behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
-        "test": "tests/unit/test_2023_api_resource_coverage.py::test_2023_coverage_statuses_are_not_manifest_only_claims"
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": ".sisyphus/evidence/task-4-destructive-sandbox.txt; .sisyphus/evidence/wwise-2023-test-parity/destructive/undo_group_create_then_undo_readback.json",
+        "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+        "evidence_class": "live_behavioral_waapi",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+        "evidence_paths": [
+          ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2023-test-parity/destructive/undo_group_create_then_undo_readback.json"
+        ],
+        "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
+        "per_case_evidence_root": ".sisyphus/evidence/wwise-2023-test-parity/destructive/",
+        "test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py"
       },
       "category": "core.undo",
-      "coverage_status": "untested",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "coverage_status": "untested",
+        "coverage_status": "sandbox-mutating-tested",
         "status": false
       },
       "destructive_opt_in": false,
-      "evidence_standard": "2023.1 inventory is reflected with either an explicit blocker or pending evidence; substitute or manifest evidence is not behavioral proof.",
+      "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
         "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2023_api_resource_coverage.py::test_2023_coverage_statuses_are_not_manifest_only_claims",
+        "route_test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "untested",
-        "deterministic_default": true,
-        "reason": "resources/manifest/2023.1/schemas.json#ak.wwise.core.undo.beginGroup inventory only; no behavior or semantic support is claimed."
+        "classification": "sandbox-mutating-tested",
+        "deterministic_default": false,
+        "reason": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.undo.beginGroup",
@@ -11527,11 +11573,12 @@
         "source_status": "ok"
       },
       "schema_status": "ok",
-      "test_status": "untested",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.undo.beginGroup",
       "usage_guidance": {
-        "default_path": "manifest-inventory-only",
-        "notes": "Manifest reflection alone is inventory evidence; do not count it as 2023.1 behavioral support."
+        "default_path": "destructive-sandbox-only",
+        "notes": "Requires copied 2023.1 SampleProject sandbox plus WWISE_LIVE=1 and WWISE_DESTRUCTIVE=1; do not run against installed SampleProject sources.",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt"
       },
       "version": "2023.1"
     },
@@ -11603,37 +11650,45 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "untested",
-        "evidence": "resources/manifest/2023.1/schemas.json#ak.wwise.core.undo.endGroup inventory only; no behavior or semantic support is claimed.",
-        "evidence_standard": "2023.1 inventory is reflected with either an explicit blocker or pending evidence; substitute or manifest evidence is not behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
-        "test": "tests/unit/test_2023_api_resource_coverage.py::test_2023_coverage_statuses_are_not_manifest_only_claims"
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": ".sisyphus/evidence/task-4-destructive-sandbox.txt; .sisyphus/evidence/wwise-2023-test-parity/destructive/undo_group_create_then_undo_readback.json",
+        "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+        "evidence_class": "live_behavioral_waapi",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+        "evidence_paths": [
+          ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2023-test-parity/destructive/undo_group_create_then_undo_readback.json"
+        ],
+        "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
+        "per_case_evidence_root": ".sisyphus/evidence/wwise-2023-test-parity/destructive/",
+        "test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py"
       },
       "category": "core.undo",
-      "coverage_status": "untested",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "coverage_status": "untested",
+        "coverage_status": "sandbox-mutating-tested",
         "status": false
       },
       "destructive_opt_in": false,
-      "evidence_standard": "2023.1 inventory is reflected with either an explicit blocker or pending evidence; substitute or manifest evidence is not behavioral proof.",
+      "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
         "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2023_api_resource_coverage.py::test_2023_coverage_statuses_are_not_manifest_only_claims",
+        "route_test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "untested",
-        "deterministic_default": true,
-        "reason": "resources/manifest/2023.1/schemas.json#ak.wwise.core.undo.endGroup inventory only; no behavior or semantic support is claimed."
+        "classification": "sandbox-mutating-tested",
+        "deterministic_default": false,
+        "reason": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.undo.endGroup",
@@ -11661,11 +11716,12 @@
         "source_status": "ok"
       },
       "schema_status": "ok",
-      "test_status": "untested",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.undo.endGroup",
       "usage_guidance": {
-        "default_path": "manifest-inventory-only",
-        "notes": "Manifest reflection alone is inventory evidence; do not count it as 2023.1 behavioral support."
+        "default_path": "destructive-sandbox-only",
+        "notes": "Requires copied 2023.1 SampleProject sandbox plus WWISE_LIVE=1 and WWISE_DESTRUCTIVE=1; do not run against installed SampleProject sources.",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt"
       },
       "version": "2023.1"
     },
@@ -11735,37 +11791,45 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "untested",
-        "evidence": "resources/manifest/2023.1/schemas.json#ak.wwise.core.undo.undo inventory only; no behavior or semantic support is claimed.",
-        "evidence_standard": "2023.1 inventory is reflected with either an explicit blocker or pending evidence; substitute or manifest evidence is not behavioral proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
-        "test": "tests/unit/test_2023_api_resource_coverage.py::test_2023_coverage_statuses_are_not_manifest_only_claims"
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": ".sisyphus/evidence/task-4-destructive-sandbox.txt; .sisyphus/evidence/wwise-2023-test-parity/destructive/undo_group_create_then_undo_readback.json",
+        "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+        "evidence_class": "live_behavioral_waapi",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+        "evidence_paths": [
+          ".sisyphus/evidence/task-4-destructive-sandbox.txt",
+          ".sisyphus/evidence/wwise-2023-test-parity/destructive/undo_group_create_then_undo_readback.json"
+        ],
+        "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
+        "per_case_evidence_root": ".sisyphus/evidence/wwise-2023-test-parity/destructive/",
+        "test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py"
       },
       "category": "core.undo",
-      "coverage_status": "untested",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "coverage_status": "untested",
+        "coverage_status": "sandbox-mutating-tested",
         "status": false
       },
       "destructive_opt_in": false,
-      "evidence_standard": "2023.1 inventory is reflected with either an explicit blocker or pending evidence; substitute or manifest evidence is not behavioral proof.",
+      "evidence_standard": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON.",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
         "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2023_api_resource_coverage.py::test_2023_coverage_statuses_are_not_manifest_only_claims",
+        "route_test": "tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "untested",
-        "deterministic_default": true,
-        "reason": "resources/manifest/2023.1/schemas.json#ak.wwise.core.undo.undo inventory only; no behavior or semantic support is claimed."
+        "classification": "sandbox-mutating-tested",
+        "deterministic_default": false,
+        "reason": "2023.1 destructive copied-sandbox tests passed with unique object names, readback/state assertions, cleanup proof, source hash/mtime immutability guard, and per-case evidence JSON."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.undo.undo",
@@ -11789,11 +11853,12 @@
         "source_status": "ok"
       },
       "schema_status": "ok",
-      "test_status": "untested",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.undo.undo",
       "usage_guidance": {
-        "default_path": "manifest-inventory-only",
-        "notes": "Manifest reflection alone is inventory evidence; do not count it as 2023.1 behavioral support."
+        "default_path": "destructive-sandbox-only",
+        "notes": "Requires copied 2023.1 SampleProject sandbox plus WWISE_LIVE=1 and WWISE_DESTRUCTIVE=1; do not run against installed SampleProject sources.",
+        "evidence_path": ".sisyphus/evidence/task-4-destructive-sandbox.txt"
       },
       "version": "2023.1"
     },
@@ -13493,13 +13558,14 @@
       "excluded": "Policy-excluded family; not semantic builder or live behavior support.",
       "live-tested": "Reserved for asserted 2023.1 live evidence; no URI is promoted by manifest reflection alone.",
       "supported": "2023.1 semantic/schema contract exists; not live behavioral proof.",
-      "untested": "Manifest/schema inventory only."
+      "untested": "Manifest/schema inventory only.",
+      "sandbox-mutating-tested": "Copied-sandbox destructive behavior evidence with readback assertions and cleanup proof."
     },
     "version": "2023.1",
     "wwise_build": "2023.1.19.8928"
   },
   "summary": {
-    "behavioral_supported": 1,
+    "behavioral_supported": 11,
     "excluded_families": [
       "cli",
       "core.profiler",
@@ -13511,25 +13577,26 @@
     ],
     "implemented": 181,
     "live_tested": 1,
-    "manifest_only_not_behavioral": 162,
+    "manifest_only_not_behavioral": 154,
     "parity_bucket_counts": {
-      "conformance-only": 18,
-      "deferred": 70,
+      "conformance-only": 16,
+      "deferred": 62,
       "evidence-only": 0,
       "excluded": 80,
       "fake-route-tested": 0,
       "live-tested": 1,
-      "sandbox-mutating-tested": 0,
+      "sandbox-mutating-tested": 10,
       "wrapper-only": 12
     },
     "parity_bucket_total": 181,
     "status_counts": {
-      "deferred": 48,
+      "deferred": 43,
       "evidence-only": 0,
       "excluded": 92,
-      "supported": 18,
-      "untested": 22,
-      "live-tested": 1
+      "supported": 16,
+      "untested": 19,
+      "live-tested": 1,
+      "sandbox-mutating-tested": 10
     },
     "total_functions": 149,
     "total_topics": 32,

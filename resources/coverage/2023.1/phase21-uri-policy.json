@@ -19,7 +19,6 @@
       "ak.wwise.console.project.close",
       "ak.wwise.console.project.create",
       "ak.wwise.console.project.open",
-      "ak.wwise.core.audio.import",
       "ak.wwise.core.audio.importTabDelimited",
       "ak.wwise.core.audio.imported",
       "ak.wwise.core.audio.resetMute",
@@ -30,10 +29,8 @@
       "ak.wwise.core.object.attenuationCurveLinkChanged",
       "ak.wwise.core.object.childAdded",
       "ak.wwise.core.object.childRemoved",
-      "ak.wwise.core.object.create",
       "ak.wwise.core.object.created",
       "ak.wwise.core.object.curveChanged",
-      "ak.wwise.core.object.delete",
       "ak.wwise.core.object.move",
       "ak.wwise.core.object.nameChanged",
       "ak.wwise.core.object.notesChanged",
@@ -41,7 +38,6 @@
       "ak.wwise.core.object.preDeleted",
       "ak.wwise.core.object.propertyChanged",
       "ak.wwise.core.object.referenceChanged",
-      "ak.wwise.core.object.set",
       "ak.wwise.core.object.setAttenuationCurve",
       "ak.wwise.core.object.setLinked",
       "ak.wwise.core.object.setName",
@@ -58,7 +54,6 @@
       "ak.wwise.core.sound.setActiveSource",
       "ak.wwise.core.soundbank.generated",
       "ak.wwise.core.soundbank.generationDone",
-      "ak.wwise.core.soundbank.setInclusions",
       "ak.wwise.core.sourceControl.delete",
       "ak.wwise.core.sourceControl.move",
       "ak.wwise.core.sourceControl.setProvider",
@@ -180,15 +175,12 @@
         "ak.wwise.core.soundbank.generate",
         "ak.wwise.core.soundbank.getInclusions",
         "ak.wwise.core.soundbank.processDefinitionFiles",
-        "ak.wwise.core.switchContainer.addAssignment",
-        "ak.wwise.core.switchContainer.getAssignments",
-        "ak.wwise.core.switchContainer.removeAssignment"
+        "ak.wwise.core.switchContainer.getAssignments"
       ],
       "deferred": [
         "ak.wwise.console.project.close",
         "ak.wwise.console.project.create",
         "ak.wwise.console.project.open",
-        "ak.wwise.core.audio.import",
         "ak.wwise.core.audio.importTabDelimited",
         "ak.wwise.core.audio.imported",
         "ak.wwise.core.audio.resetMute",
@@ -206,10 +198,8 @@
         "ak.wwise.core.object.attenuationCurveLinkChanged",
         "ak.wwise.core.object.childAdded",
         "ak.wwise.core.object.childRemoved",
-        "ak.wwise.core.object.create",
         "ak.wwise.core.object.created",
         "ak.wwise.core.object.curveChanged",
-        "ak.wwise.core.object.delete",
         "ak.wwise.core.object.move",
         "ak.wwise.core.object.nameChanged",
         "ak.wwise.core.object.notesChanged",
@@ -217,7 +207,6 @@
         "ak.wwise.core.object.preDeleted",
         "ak.wwise.core.object.propertyChanged",
         "ak.wwise.core.object.referenceChanged",
-        "ak.wwise.core.object.set",
         "ak.wwise.core.object.setAttenuationCurve",
         "ak.wwise.core.object.setLinked",
         "ak.wwise.core.object.setName",
@@ -235,7 +224,6 @@
         "ak.wwise.core.sound.setActiveSource",
         "ak.wwise.core.soundbank.generated",
         "ak.wwise.core.soundbank.generationDone",
-        "ak.wwise.core.soundbank.setInclusions",
         "ak.wwise.core.sourceControl.add",
         "ak.wwise.core.sourceControl.checkOut",
         "ak.wwise.core.sourceControl.commit",
@@ -247,11 +235,8 @@
         "ak.wwise.core.sourceControl.setProvider",
         "ak.wwise.core.switchContainer.assignmentAdded",
         "ak.wwise.core.switchContainer.assignmentRemoved",
-        "ak.wwise.core.undo.beginGroup",
         "ak.wwise.core.undo.cancelGroup",
-        "ak.wwise.core.undo.endGroup",
         "ak.wwise.core.undo.redo",
-        "ak.wwise.core.undo.undo",
         "ak.wwise.waapi.getFunctions",
         "ak.wwise.waapi.getSchema",
         "ak.wwise.waapi.getTopics"
@@ -343,7 +328,18 @@
       "live-tested": [
         "ak.wwise.core.object.get"
       ],
-      "sandbox-mutating-tested": [],
+      "sandbox-mutating-tested": [
+        "ak.wwise.core.audio.import",
+        "ak.wwise.core.object.create",
+        "ak.wwise.core.object.delete",
+        "ak.wwise.core.object.set",
+        "ak.wwise.core.soundbank.setInclusions",
+        "ak.wwise.core.switchContainer.addAssignment",
+        "ak.wwise.core.switchContainer.removeAssignment",
+        "ak.wwise.core.undo.beginGroup",
+        "ak.wwise.core.undo.endGroup",
+        "ak.wwise.core.undo.undo"
+      ],
       "wrapper-only": [
         "ak.wwise.ui.bringToForeground",
         "ak.wwise.ui.captureScreen",
@@ -362,23 +358,24 @@
   },
   "summary": {
     "parity_bucket_counts": {
-      "conformance-only": 18,
-      "deferred": 70,
+      "conformance-only": 16,
+      "deferred": 62,
       "evidence-only": 0,
       "excluded": 80,
       "fake-route-tested": 0,
       "live-tested": 1,
-      "sandbox-mutating-tested": 0,
+      "sandbox-mutating-tested": 10,
       "wrapper-only": 12
     },
     "parity_bucket_total": 181,
     "status_counts": {
-      "deferred": 48,
+      "deferred": 43,
       "evidence-only": 0,
       "excluded": 92,
-      "supported": 18,
-      "untested": 22,
-      "live-tested": 1
+      "supported": 16,
+      "untested": 19,
+      "live-tested": 1,
+      "sandbox-mutating-tested": 10
     },
     "version": "2023.1"
   }

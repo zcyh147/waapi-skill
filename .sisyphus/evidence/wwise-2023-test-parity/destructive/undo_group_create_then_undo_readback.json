@@ -1,0 +1,21 @@
+{
+  "case_id": "undo_group_create_then_undo_readback",
+  "cleanup": "objects are removed and read back absent before test exit",
+  "details": {
+    "active_destructive_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/sample-project-53956515026c4934b45341fc651731ad/SampleProject.wproj",
+    "created_id": "{EFD93F0E-39CC-4521-9945-C10FCDFD06DA}",
+    "created_name": "WAAPI_2023_UNDO_actor_37849861122a",
+    "read_after_undo": [],
+    "sandbox_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/sample-project-53956515026c4934b45341fc651731ad/SampleProject.wproj",
+    "source_immutability_guard": "Destructive2023SandboxRuntime.assert_source_unchanged runs on exit"
+  },
+  "recorded_at_unix": 1777620589,
+  "sandbox_required": true,
+  "source_project_mutation_allowed": false,
+  "status": "passed",
+  "uris": [
+    "ak.wwise.core.undo.beginGroup",
+    "ak.wwise.core.undo.endGroup",
+    "ak.wwise.core.undo.undo"
+  ]
+}

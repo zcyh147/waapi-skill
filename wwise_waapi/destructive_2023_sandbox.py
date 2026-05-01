@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
+import shutil
 import uuid
 from pathlib import Path
 from types import TracebackType
@@ -74,6 +76,7 @@ class Destructive2023SandboxRuntime:
             require_2023_live_destructive_prerequisites(self.env)
             self.lock = LiveSandboxLock(_safe_lock_root(self.env))
             self.lock.__enter__()
+            cleanup_stale_2023_destructive_sandboxes(_configured_sandbox_root(self.env))
             self.sandbox = prepare_sample_project_sandbox(
                 self.env,
                 sandbox_root=_configured_sandbox_root(self.env),
@@ -229,6 +232,38 @@ def generated_output_snapshot(root: Path) -> tuple[str, ...]:
     return tuple(paths)
 
 
+def cleanup_stale_2023_destructive_sandboxes(root: Path) -> None:
+    """Remove interrupted 2023.1 destructive sandbox copies from the locked runtime root."""
+
+    resolved_root = root.resolve(strict=False)
+    if not resolved_root.exists():
+        return
+    for candidate in resolved_root.iterdir():
+        if not candidate.is_dir() or not candidate.name.startswith("sample-project-"):
+            continue
+        metadata_path = candidate / "sandbox-metadata.json"
+        if _is_stale_2023_destructive_sandbox(candidate, metadata_path):
+            shutil.rmtree(candidate)
+
+
+def _is_stale_2023_destructive_sandbox(candidate: Path, metadata_path: Path) -> bool:
+    if not metadata_path.is_file():
+        return False
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if metadata.get("keep_decision", "pending").startswith("kept:"):
+        return False
+    sandbox_path = Path(str(metadata.get("sandbox_path", ""))).resolve(strict=False)
+    source_path = Path(str(metadata.get("source_path", ""))).resolve(strict=False)
+    return (
+        sandbox_path == candidate.resolve(strict=False)
+        and source_path == WWISE_2023_1_SAMPLE_PROJECT_PATH.resolve(strict=False)
+        and path_is_under(candidate.resolve(strict=False), candidate.parent.resolve(strict=False))
+    )
+
+
 def unique_2023_name(prefix: str, label: str) -> str:
     safe_label = "".join(character if character.isalnum() else "_" for character in label)
     return f"{prefix}{safe_label}_{uuid.uuid4().hex[:12]}"
@@ -259,6 +294,7 @@ __all__ = [
     "DEFAULT_2023_DESTRUCTIVE_SANDBOX_ROOT",
     "Destructive2023SandboxRuntime",
     "DestructiveSandboxUnavailable",
+    "cleanup_stale_2023_destructive_sandboxes",
     "generated_output_snapshot",
     "hash_mutation_bearing_project_files",
     "require_2023_live_destructive_prerequisites",

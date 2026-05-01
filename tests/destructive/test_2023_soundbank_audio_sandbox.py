@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import math
 import os
+import json
+import time
 import wave
 from contextlib import contextmanager
 from pathlib import Path
@@ -25,6 +27,8 @@ from wwise_waapi.destructive_2023_sandbox import (  # pyright: ignore[reportMiss
 
 ACTOR_PARENT = r"\Actor-Mixer Hierarchy\Default Work Unit"
 READBACK_FIELDS = ["id", "name", "type", "path", "notes"]
+REPO_ROOT = Path(__file__).resolve().parents[2]
+EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-2023-test-parity" / "destructive"
 
 
 @contextmanager
@@ -109,6 +113,19 @@ def test_2023_audio_import_generated_wav_readback_cleanup() -> None:
             assert readback["type"] == "Sound"
             assert str(readback["path"]).endswith(f"\\{name}")
             assert audio_file.exists()
+            _write_destructive_evidence(
+                "audio_import_generated_wav_readback_cleanup",
+                ["ak.wwise.core.audio.import"],
+                {
+                    "imported_name": name,
+                    "sound_id": sound_id,
+                    "readback": readback,
+                    "audio_file": _relative_to_sandbox(audio_file, sandbox.sandbox_path),
+                    "active_destructive_project": str(runtime.destructive_contract.active_destructive_project),
+                    "sandbox_project": str(sandbox.sandbox_project),
+                    "source_immutability_guard": "Destructive2023SandboxRuntime.assert_source_unchanged runs on exit",
+                },
+            )
         finally:
             if sound_id is not None:
                 _delete_if_present(client, sound_id)
@@ -132,7 +149,24 @@ def test_2023_soundbank_inclusions_replace_read_remove_cleanup() -> None:
             assert any(row.get("object") == sound_id for row in inclusions), inclusions
 
             _remove_inclusion_if_possible(client, soundbank_id, sound_id)
-            assert not any(row.get("object") == sound_id for row in _soundbank_inclusions(client, soundbank_id))
+            inclusions_after_remove = _soundbank_inclusions(client, soundbank_id)
+            assert not any(row.get("object") == sound_id for row in inclusions_after_remove)
+            _write_destructive_evidence(
+                "soundbank_inclusions_replace_read_remove_cleanup",
+                [
+                    "ak.wwise.core.soundbank.setInclusions",
+                    "ak.wwise.core.soundbank.getInclusions",
+                ],
+                {
+                    "soundbank_id": soundbank_id,
+                    "sound_id": sound_id,
+                    "inclusions_after_replace": inclusions,
+                    "inclusions_after_remove": inclusions_after_remove,
+                    "active_destructive_project": str(runtime.destructive_contract.active_destructive_project),
+                    "sandbox_project": str(sandbox.sandbox_project),
+                    "source_immutability_guard": "Destructive2023SandboxRuntime.assert_source_unchanged runs on exit",
+                },
+            )
         finally:
             if soundbank_id is not None and sound_id is not None:
                 _remove_inclusion_if_possible(client, soundbank_id, sound_id)
@@ -220,3 +254,34 @@ def _path_is_under(path: Path, root: Path) -> bool:
     resolved_path = path.resolve(strict=False)
     resolved_root = root.resolve(strict=False)
     return resolved_path == resolved_root or resolved_root in resolved_path.parents
+
+
+def _relative_to_sandbox(path: Path, sandbox_path: Path) -> str:
+    return path.resolve(strict=False).relative_to(sandbox_path.resolve(strict=False)).as_posix()
+
+
+def _write_destructive_evidence(case_id: str, uris: list[str], details: Mapping[str, Any]) -> None:
+    path = EVIDENCE_ROOT / f"{case_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "case_id": case_id,
+                "status": "passed",
+                "uris": uris,
+                "details": _json_safe(details),
+                "cleanup": "objects are removed and read back absent before test exit",
+                "source_project_mutation_allowed": False,
+                "sandbox_required": True,
+                "recorded_at_unix": int(time.time()),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _json_safe(value: Any) -> Any:
+    return json.loads(json.dumps(value, default=str))

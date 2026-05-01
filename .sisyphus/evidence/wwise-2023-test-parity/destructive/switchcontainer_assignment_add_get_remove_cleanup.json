@@ -1,0 +1,31 @@
+{
+  "case_id": "switchcontainer_assignment_add_get_remove_cleanup",
+  "cleanup": "assignment is removed and disposable objects are deleted before test exit",
+  "details": {
+    "active_destructive_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/sample-project-5712b9520aa446cd95a8ed78eec7e1ca/SampleProject.wproj",
+    "assignments_after_add": [
+      {
+        "child": "{82C50EC0-128B-44BB-8052-83620B991827}",
+        "stateOrSwitch": "{60C9A471-6D0B-4405-A0F3-00FED2C62997}"
+      }
+    ],
+    "assignments_after_remove": [],
+    "assignments_before": [],
+    "read_after_target_delete": [],
+    "sandbox_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/sample-project-5712b9520aa446cd95a8ed78eec7e1ca/SampleProject.wproj",
+    "source_immutability_guard": "Destructive2023SandboxRuntime.assert_source_unchanged runs on exit",
+    "switch_container_id": "{A7572F42-149E-4EB6-B2AF-1BE9865FC48C}",
+    "switch_group_id": "{347B9760-AE55-4EA5-A4BD-4B68E9B6A91E}",
+    "switch_id": "{60C9A471-6D0B-4405-A0F3-00FED2C62997}",
+    "target_id": "{82C50EC0-128B-44BB-8052-83620B991827}"
+  },
+  "recorded_at_unix": 1777620659,
+  "sandbox_required": true,
+  "source_project_mutation_allowed": false,
+  "status": "passed",
+  "uris": [
+    "ak.wwise.core.switchContainer.addAssignment",
+    "ak.wwise.core.switchContainer.getAssignments",
+    "ak.wwise.core.switchContainer.removeAssignment"
+  ]
+}

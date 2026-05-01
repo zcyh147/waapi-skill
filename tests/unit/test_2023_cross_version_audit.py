@@ -15,6 +15,18 @@ from wwise_waapi.manifest import ManifestStore  # pyright: ignore[reportMissingI
 ROOT = Path(__file__).resolve().parents[2]
 VERSION_2022 = "2022.1"
 VERSION_2023 = "2023.1"
+SANDBOX_MUTATING_TESTED_2023_URIS = {
+    "ak.wwise.core.audio.import",
+    "ak.wwise.core.object.create",
+    "ak.wwise.core.object.delete",
+    "ak.wwise.core.object.set",
+    "ak.wwise.core.soundbank.setInclusions",
+    "ak.wwise.core.switchContainer.addAssignment",
+    "ak.wwise.core.switchContainer.removeAssignment",
+    "ak.wwise.core.undo.beginGroup",
+    "ak.wwise.core.undo.endGroup",
+    "ak.wwise.core.undo.undo",
+}
 NOTEBOOK_2023 = "wwise-2023.1-docs"
 MANIFEST_ROOT = ROOT / "resources" / "manifest"
 SEMANTIC_2023 = ROOT / "resources" / "semantic" / VERSION_2023 / "source_notes.json"
@@ -146,7 +158,7 @@ def test_2023_coverage_deferred_and_waql_counts_are_version_separated() -> None:
     assert coverage["summary"]["total_topics"] == 32
     assert sum(coverage["summary"]["status_counts"].values()) == 181
     assert coverage["summary"]["live_tested"] == 1
-    assert coverage["summary"]["behavioral_supported"] == 1
+    assert coverage["summary"]["behavioral_supported"] == 1 + len(SANDBOX_MUTATING_TESTED_2023_URIS)
     assert {entry["version"] for entry in coverage["coverage"]} == {VERSION_2023}
     assert all(entry["schema_mapping"]["manifest_uri"].startswith("resources/manifest/2023.1/") for entry in coverage["coverage"])
 
@@ -158,14 +170,21 @@ def test_2023_coverage_deferred_and_waql_counts_are_version_separated() -> None:
     assert all(entry["source_coverage_uri"] == "resources/coverage/2023.1/api-coverage.json" for entry in live_matrix["matrix"])
     assert phase2_summary["metadata"]["baseline_resource"] == "resources/coverage/2023.1/api-coverage.json"
     assert phase2_summary["metadata"]["live_matrix_resource"] == "resources/coverage/2023.1/live-coverage-matrix.json"
-    assert phase2_summary["summary"]["behavioral_covered_count"] == 1
-    assert phase2_summary["summary"]["live_behavioral_covered_count"] == 1
+    assert phase2_summary["summary"]["behavioral_covered_count"] == 1 + len(SANDBOX_MUTATING_TESTED_2023_URIS)
+    assert phase2_summary["summary"]["live_behavioral_covered_count"] == 1 + len(SANDBOX_MUTATING_TESTED_2023_URIS)
     coverage_status_counts = coverage["summary"]["status_counts"]
-    deferred_status_counts = _count_by_key(deferred["deferred"], "coverage_status")
+    coverage_by_uri = {entry["uri"]: entry for entry in coverage["coverage"]}
+    active_deferred_entries = [
+        entry
+        for entry in deferred["deferred"]
+        if coverage_by_uri[entry["uri"]]["coverage_status"] in {"deferred", "excluded"}
+    ]
+    deferred_status_counts = _count_by_key(active_deferred_entries, "coverage_status")
     assert deferred_status_counts == {
         "deferred": coverage_status_counts["deferred"],
         "excluded": coverage_status_counts["excluded"],
     }
+    assert {entry["uri"] for entry in coverage["coverage"] if entry["coverage_status"] == "sandbox-mutating-tested"} == SANDBOX_MUTATING_TESTED_2023_URIS
     assert coverage_status_counts["untested"] > 0
     assert {entry["version"] for entry in deferred["deferred"]} == {VERSION_2023}
     assert all("resources/manifest/2023.1" in entry["evidence_source"] for entry in deferred["deferred"])

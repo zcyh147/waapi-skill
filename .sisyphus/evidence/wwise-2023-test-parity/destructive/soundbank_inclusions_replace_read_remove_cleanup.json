@@ -1,0 +1,29 @@
+{
+  "case_id": "soundbank_inclusions_replace_read_remove_cleanup",
+  "cleanup": "objects are removed and read back absent before test exit",
+  "details": {
+    "active_destructive_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/sample-project-52ea0b45613d41bea09dd4333fe23f7a/SampleProject.wproj",
+    "inclusions_after_remove": [],
+    "inclusions_after_replace": [
+      {
+        "filter": [
+          "structures",
+          "media"
+        ],
+        "object": "{5CCC9AB0-4793-4E47-8A30-75E316933EAB}"
+      }
+    ],
+    "sandbox_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/sample-project-52ea0b45613d41bea09dd4333fe23f7a/SampleProject.wproj",
+    "sound_id": "{5CCC9AB0-4793-4E47-8A30-75E316933EAB}",
+    "soundbank_id": "{E2D3CD61-DA94-4530-9C3E-C342BC9C49E1}",
+    "source_immutability_guard": "Destructive2023SandboxRuntime.assert_source_unchanged runs on exit"
+  },
+  "recorded_at_unix": 1777620634,
+  "sandbox_required": true,
+  "source_project_mutation_allowed": false,
+  "status": "passed",
+  "uris": [
+    "ak.wwise.core.soundbank.setInclusions",
+    "ak.wwise.core.soundbank.getInclusions"
+  ]
+}

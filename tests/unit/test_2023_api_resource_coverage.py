@@ -12,7 +12,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2023.1"
 MANIFEST_ROOT = REPO_ROOT / "resources" / "manifest"
 COVERAGE_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "api-coverage.json"
-ALLOWED_STATUSES = {"supported", "deferred", "excluded", "untested", "evidence-only", "live-tested"}
+ALLOWED_STATUSES = {
+    "supported",
+    "deferred",
+    "excluded",
+    "untested",
+    "evidence-only",
+    "live-tested",
+    "sandbox-mutating-tested",
+}
 ALLOWED_PARITY_BUCKETS = {
     "live-tested",
     "sandbox-mutating-tested",
@@ -32,6 +40,18 @@ EXCLUDED_CATEGORY_PREFIXES = (
     "core.remote",
     "debug",
 )
+SANDBOX_MUTATING_TESTED_URIS = {
+    "ak.wwise.core.audio.import",
+    "ak.wwise.core.object.create",
+    "ak.wwise.core.object.delete",
+    "ak.wwise.core.object.set",
+    "ak.wwise.core.soundbank.setInclusions",
+    "ak.wwise.core.switchContainer.addAssignment",
+    "ak.wwise.core.switchContainer.removeAssignment",
+    "ak.wwise.core.undo.beginGroup",
+    "ak.wwise.core.undo.endGroup",
+    "ak.wwise.core.undo.undo",
+}
 
 
 def test_2023_resource_covers_every_reflected_api_once_with_2023_paths() -> None:
@@ -73,6 +93,12 @@ def test_2023_coverage_entries_have_required_versioned_metadata() -> None:
             assert entry["behavioral_evidence"]["counts_as_live_behavioral"] is True
             assert entry["coverage_status"] == "live-tested"
             assert entry["parity_bucket"] == "live-tested"
+        elif entry["uri"] in SANDBOX_MUTATING_TESTED_URIS:
+            assert entry["behavioral_evidence"]["counts_as_behavioral"] is True
+            assert entry["behavioral_evidence"]["counts_as_live_behavioral"] is True
+            assert entry["coverage_status"] == "sandbox-mutating-tested"
+            assert entry["parity_bucket"] == "sandbox-mutating-tested"
+            assert entry["behavioral_evidence"]["evidence_path"] == ".sisyphus/evidence/task-4-destructive-sandbox.txt"
         else:
             assert entry["behavioral_evidence"]["counts_as_behavioral"] is False
             assert entry["behavioral_evidence"]["counts_as_live_behavioral"] is False
@@ -96,8 +122,9 @@ def test_2023_coverage_statuses_are_not_manifest_only_claims() -> None:
     assert status_counts["untested"] > 0
     assert status_counts["evidence-only"] == 0
     assert status_counts["live-tested"] == 1
+    assert status_counts["sandbox-mutating-tested"] == len(SANDBOX_MUTATING_TESTED_URIS)
     assert payload["summary"]["live_tested"] == 1
-    assert payload["summary"]["behavioral_supported"] == 1
+    assert payload["summary"]["behavioral_supported"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
 
     for entry in payload["coverage"]:
         evidence = entry["behavioral_evidence"]

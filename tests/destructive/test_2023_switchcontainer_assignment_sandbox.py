@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import os
+import json
+import time
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Iterator, Mapping, Sequence
 
 import pytest  # pyright: ignore[reportMissingImports]
@@ -22,6 +25,8 @@ from wwise_waapi.destructive_2023_sandbox import (  # pyright: ignore[reportMiss
 
 ACTOR_PARENT = r"\Actor-Mixer Hierarchy\Default Work Unit"
 READBACK_FIELDS = ["id", "name", "type", "path", "notes"]
+REPO_ROOT = Path(__file__).resolve().parents[2]
+EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-2023-test-parity" / "destructive"
 
 
 @contextmanager
@@ -117,7 +122,29 @@ def test_2023_switchcontainer_assignment_add_get_remove_uses_copied_sandbox_fixt
             assert not _contains_pair(assignments_after_remove, target_id, switch_id), assignments_after_remove
 
             _delete_if_present(client, target_id)
-            assert _read_rows(client, target_id) == []
+            read_after_delete = _read_rows(client, target_id)
+            assert read_after_delete == []
+            _write_destructive_evidence(
+                "switchcontainer_assignment_add_get_remove_cleanup",
+                [
+                    "ak.wwise.core.switchContainer.addAssignment",
+                    "ak.wwise.core.switchContainer.getAssignments",
+                    "ak.wwise.core.switchContainer.removeAssignment",
+                ],
+                {
+                    "switch_container_id": switch_container_id,
+                    "switch_group_id": switch_group_id,
+                    "switch_id": switch_id,
+                    "target_id": target_id,
+                    "assignments_before": assignments_before,
+                    "assignments_after_add": assignments_after_add,
+                    "assignments_after_remove": assignments_after_remove,
+                    "read_after_target_delete": read_after_delete,
+                    "active_destructive_project": str(runtime.destructive_contract.active_destructive_project),
+                    "sandbox_project": str(sandbox.sandbox_project),
+                    "source_immutability_guard": "Destructive2023SandboxRuntime.assert_source_unchanged runs on exit",
+                },
+            )
             target_id = None
         finally:
             if target_id is not None:
@@ -166,3 +193,29 @@ def _remove_assignment_if_present(client: Any, container_id: str, child_id: str,
             options={},
         )
 
+
+def _write_destructive_evidence(case_id: str, uris: list[str], details: Mapping[str, Any]) -> None:
+    path = EVIDENCE_ROOT / f"{case_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "case_id": case_id,
+                "status": "passed",
+                "uris": uris,
+                "details": _json_safe(details),
+                "cleanup": "assignment is removed and disposable objects are deleted before test exit",
+                "source_project_mutation_allowed": False,
+                "sandbox_required": True,
+                "recorded_at_unix": int(time.time()),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _json_safe(value: Any) -> Any:
+    return json.loads(json.dumps(value, default=str))
