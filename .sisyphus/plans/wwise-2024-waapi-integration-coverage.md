@@ -410,7 +410,7 @@ Support Wwise 2024.1.13 WAAPI resources and tests as an explicit opt-in version 
 
   **Commit**: YES | Message: `test(live): add 2024 read-only parity evidence` | Files: `tests/live/test_2024_*.py`, `tests/unit/test_2024_waql_mutation_guard.py`, `resources/waql/2024.1/*.json`, `resources/coverage/2024.1/*.json`, `.sisyphus/evidence/wwise-2024-waapi-integration-coverage/live-read-only/*`
 
-- [ ] 9. Add 2024 destructive sandbox runtime and fail-closed tests
+- [x] 9. Add 2024 destructive sandbox runtime and fail-closed tests
 
   **What to do**: Add `wwise_waapi/destructive_2024_sandbox.py` by copying the 2023 pattern with 2024 constants, lock root, stale-sandbox cleanup, exact path checks, source immutability checks, and sandbox-copy proof. Add fail-closed tests for missing gates, wrong version, wrong paths, installed SampleProject target, `tests/_org/2024.1` target, and unsafe sandbox root.
   **Must NOT do**: Do not generalize 2023/2024 runtime broadly unless required by failing tests.
