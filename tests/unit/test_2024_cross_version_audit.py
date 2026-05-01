@@ -62,6 +62,7 @@ NO_2025_RESOURCE_ROOTS = (
 )
 PLANNED_2025_RESOURCE_DIRS = {
     ROOT / "resources" / "manifest" / "2025.1",
+    ROOT / "resources" / "coverage" / "2025.1",
     ROOT / "resources" / "semantic" / "2025.1",
     ROOT / "references" / "semantic" / "2025.1",
 }

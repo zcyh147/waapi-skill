@@ -1,0 +1,18 @@
+Task 2025-6 defer-on-mismatch evidence
+
+Conservative mismatch policy is encoded in resources/coverage/2025.1/added-api-classification.json:
+- metadata.policy.docs_reflection_mismatch_default_status = deferred
+- docs_reflection_mismatch is listed under defer_by_default_reason_codes
+
+Unit proof:
+- tests/unit/test_2025_1_added_api_classification.py::test_2025_docs_reflection_mismatch_local_mutation_defers mutates a candidate-live-read-only entry by adding docs_reflection_mismatch and applies the local policy helper.
+- The mutated entry resolves to deferred, proving unclear docs/reflection mismatch cannot remain a read-only candidate in this classification contract.
+
+Recorded static mismatch/caveat examples:
+- Legacy granular object hierarchy topics childAdded, childRemoved, created, postDeleted, and preDeleted are deferred with docs_reflection_mismatch because references/semantic/2025.1/discrepancy-register.md prefers ak.wwise.core.object.structureChanged as the 2025.1 hierarchy-change proof.
+- ak.wwise.core.object.set remains only a candidate-sandbox-mutating item and carries slot_wrapper_required; it is not behavior-tested or promoted.
+
+Verification:
+- python -m pytest tests/unit/test_2025_1_added_api_classification.py -q
+  .....                                                                    [100%]
+  5 passed in 0.01s

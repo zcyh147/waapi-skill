@@ -1,0 +1,1584 @@
+{
+  "classifications": [
+    {
+      "behavior_tested": false,
+      "family": "media-pool",
+      "inventory_change": "added",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "missing_source_evidence",
+        "fixture_state_gap"
+      ],
+      "reflection_changed": true,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.mediaPool.get",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "media-pool",
+      "inventory_change": "added",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "missing_source_evidence"
+      ],
+      "reflection_changed": true,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.mediaPool.getFields",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "profiler",
+      "inventory_change": "added",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "profiler_session_required",
+        "missing_source_evidence"
+      ],
+      "reflection_changed": true,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.profiler.moveCursor",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "profiler",
+      "inventory_change": "added",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "profiler_session_required",
+        "missing_source_evidence"
+      ],
+      "reflection_changed": true,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.profiler.setCursorTime",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "work-unit",
+      "inventory_change": "added",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "missing_source_evidence",
+        "unsafe_state"
+      ],
+      "reflection_changed": true,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.workUnit.load",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "work-unit",
+      "inventory_change": "added",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "missing_source_evidence",
+        "unsafe_state"
+      ],
+      "reflection_changed": true,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.workUnit.unload",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "soundengine",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "unsupported_semantics",
+        "risky_family_policy"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "excluded",
+      "uri": "ak.soundengine.getSwitch",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "soundengine",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "unsupported_semantics",
+        "risky_family_policy"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "excluded",
+      "uri": "ak.soundengine.postEvent",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "soundengine",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "unsupported_semantics",
+        "risky_family_policy"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "excluded",
+      "uri": "ak.soundengine.seekOnEvent",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "soundengine",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "unsupported_semantics",
+        "risky_family_policy"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "excluded",
+      "uri": "ak.soundengine.setMultiplePositions",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "soundengine",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "unsupported_semantics",
+        "risky_family_policy"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "excluded",
+      "uri": "ak.soundengine.setObjectObstructionAndOcclusion",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "soundengine",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "unsupported_semantics",
+        "risky_family_policy"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "excluded",
+      "uri": "ak.soundengine.setPosition",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "soundengine",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "unsupported_semantics",
+        "risky_family_policy"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "excluded",
+      "uri": "ak.soundengine.setRTPCValue",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "soundengine",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "unsupported_semantics",
+        "risky_family_policy"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "excluded",
+      "uri": "ak.soundengine.stopAll",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "cli",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "unsupported_semantics",
+        "risky_family_policy"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "excluded",
+      "uri": "ak.wwise.cli.addNewPlatform",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "cli",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "unsupported_semantics",
+        "risky_family_policy"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "excluded",
+      "uri": "ak.wwise.cli.convertExternalSource",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "cli",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "unsupported_semantics",
+        "risky_family_policy"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "excluded",
+      "uri": "ak.wwise.cli.dumpObjects",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "cli",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "unsupported_semantics",
+        "risky_family_policy"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "excluded",
+      "uri": "ak.wwise.cli.executeLuaScript",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "cli",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "unsupported_semantics",
+        "risky_family_policy"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "excluded",
+      "uri": "ak.wwise.cli.generateSoundbank",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "cli",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "unsupported_semantics",
+        "risky_family_policy"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "excluded",
+      "uri": "ak.wwise.cli.waapiServer",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "console-project",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "missing_source_evidence",
+        "unsafe_state"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.console.project.open",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "import",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded",
+        "sandbox_fixture_required"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-import.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-sandbox-mutating",
+      "uri": "ak.wwise.core.audio.import",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "import",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded",
+        "sandbox_fixture_required"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-import.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-sandbox-mutating",
+      "uri": "ak.wwise.core.audio.importTabDelimited",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "audio-conversion",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "missing_source_evidence",
+        "unsafe_state"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.audio.setConversionPlugin",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "audio-source-peaks",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "missing_source_evidence",
+        "fixture_state_gap"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "audio-source-peaks",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "missing_source_evidence",
+        "fixture_state_gap"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "blend-container",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "missing_source_evidence",
+        "unsafe_state"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.blendContainer.addTrack",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "lua-script",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "missing_source_evidence",
+        "unsafe_state",
+        "unsupported_semantics"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.executeLuaScript",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "core-info",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "missing_source_evidence"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.getInfo",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "core-info",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "missing_source_evidence"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.getProjectInfo",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "log",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "missing_source_evidence"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.log.get",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "object-mutation",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded",
+        "sandbox_fixture_required"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-sandbox-mutating",
+      "uri": "ak.wwise.core.object.create",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "object-mutation",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded",
+        "readback_fixture_required"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-sandbox-mutating",
+      "uri": "ak.wwise.core.object.diff",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "query",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-query.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-live-read-only",
+      "uri": "ak.wwise.core.object.get",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "property-reference",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-property-reference.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-live-read-only",
+      "uri": "ak.wwise.core.object.getAttenuationCurve",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "property-reference",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-property-reference.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-live-read-only",
+      "uri": "ak.wwise.core.object.getPropertyInfo",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "property-reference",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-property-reference.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-live-read-only",
+      "uri": "ak.wwise.core.object.getTypes",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "object-mutation",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded",
+        "sandbox_fixture_required"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-sandbox-mutating",
+      "uri": "ak.wwise.core.object.move",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "object-mutation",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded",
+        "sandbox_fixture_required"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-sandbox-mutating",
+      "uri": "ak.wwise.core.object.pasteProperties",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "object-mutation",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded",
+        "slot_wrapper_required"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-sandbox-mutating",
+      "uri": "ak.wwise.core.object.set",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "property-reference",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded",
+        "sandbox_fixture_required"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-property-reference.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-sandbox-mutating",
+      "uri": "ak.wwise.core.object.setAttenuationCurve",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "property-reference",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded",
+        "sandbox_fixture_required"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-property-reference.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-sandbox-mutating",
+      "uri": "ak.wwise.core.object.setProperty",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "property-reference",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded",
+        "sandbox_fixture_required"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-property-reference.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-sandbox-mutating",
+      "uri": "ak.wwise.core.object.setRandomizer",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "property-reference",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded",
+        "sandbox_fixture_required"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-property-reference.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-sandbox-mutating",
+      "uri": "ak.wwise.core.object.setReference",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "profiler",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "profiler_session_required",
+        "missing_source_evidence"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.profiler.getCpuUsage",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "profiler",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "profiler_session_required",
+        "missing_source_evidence"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.profiler.getLoadedMedia",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "profiler",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "profiler_session_required",
+        "missing_source_evidence"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.profiler.getMeters",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "profiler",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "profiler_session_required",
+        "missing_source_evidence"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.profiler.getPerformanceMonitor",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "profiler",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "profiler_session_required",
+        "missing_source_evidence"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.profiler.getRTPCs",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "profiler",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "profiler_session_required",
+        "missing_source_evidence"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.profiler.getStreamedMedia",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "profiler",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "profiler_session_required",
+        "missing_source_evidence"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.profiler.getVoiceContributions",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "profiler",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "profiler_session_required",
+        "missing_source_evidence"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.profiler.registerMeter",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "soundbank",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded",
+        "sandbox_fixture_required"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-soundbank.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-sandbox-mutating",
+      "uri": "ak.wwise.core.soundbank.convertExternalSources",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "soundbank",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded",
+        "sandbox_fixture_required",
+        "generated_soundbank_fixture_required"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-soundbank.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-sandbox-mutating",
+      "uri": "ak.wwise.core.soundbank.generate",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "soundbank",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded",
+        "sandbox_fixture_required"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-soundbank.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-sandbox-mutating",
+      "uri": "ak.wwise.core.soundbank.processDefinitionFiles",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "source-control",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "missing_source_evidence",
+        "fixture_state_gap"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.sourceControl.getSourceFiles",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "debug",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "unsupported_semantics",
+        "risky_family_policy"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "excluded",
+      "uri": "ak.wwise.debug.generateToneWAV",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "debug",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "unsupported_semantics",
+        "risky_family_policy"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "excluded",
+      "uri": "ak.wwise.debug.getWalTree",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "waapi-schema",
+      "inventory_change": "changed",
+      "item_type": "function",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "missing_source_evidence"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.waapi.getSchema",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "object-mutation",
+      "inventory_change": "added",
+      "item_type": "topic",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded",
+        "preferred_2025_hierarchy_topic"
+      ],
+      "reflection_changed": true,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-live-read-only",
+      "uri": "ak.wwise.core.object.structureChanged",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "log-topic",
+      "inventory_change": "changed",
+      "item_type": "topic",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "missing_source_evidence"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.log.itemAdded",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "object-mutation",
+      "inventory_change": "changed",
+      "item_type": "topic",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "docs_reflection_mismatch",
+        "preferred_2025_hierarchy_topic"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.object.childAdded",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "object-mutation",
+      "inventory_change": "changed",
+      "item_type": "topic",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "docs_reflection_mismatch",
+        "preferred_2025_hierarchy_topic"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.object.childRemoved",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "object-mutation",
+      "inventory_change": "changed",
+      "item_type": "topic",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "docs_reflection_mismatch",
+        "preferred_2025_hierarchy_topic"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.object.created",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "object-mutation",
+      "inventory_change": "changed",
+      "item_type": "topic",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "docs_reflection_mismatch",
+        "preferred_2025_hierarchy_topic"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.object.nameChanged",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "object-mutation",
+      "inventory_change": "changed",
+      "item_type": "topic",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "docs_reflection_mismatch",
+        "preferred_2025_hierarchy_topic"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.object.postDeleted",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "object-mutation",
+      "inventory_change": "changed",
+      "item_type": "topic",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "docs_reflection_mismatch",
+        "preferred_2025_hierarchy_topic"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.object.preDeleted",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "property-reference",
+      "inventory_change": "changed",
+      "item_type": "topic",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-property-reference.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-live-read-only",
+      "uri": "ak.wwise.core.object.propertyChanged",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "profiler",
+      "inventory_change": "changed",
+      "item_type": "topic",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "profiler_session_required",
+        "missing_source_evidence"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "deferred",
+      "uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+      "version": "2025.1"
+    },
+    {
+      "behavior_tested": false,
+      "family": "soundbank",
+      "inventory_change": "changed",
+      "item_type": "topic",
+      "notes": "Inventory/source-note classification only; no 2025 behavior-tested promotion is claimed.",
+      "reason_codes": [
+        "source_note_grounded"
+      ],
+      "reflection_changed": false,
+      "schema_changed": true,
+      "source_evidence": [
+        "resources/manifest/2025.1/added-since-2024.1.json",
+        "resources/semantic/2025.1/source_notes.json",
+        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2025.1/semantic-builder-soundbank.md",
+        "references/semantic/2025.1/discrepancy-register.md"
+      ],
+      "status": "candidate-live-read-only",
+      "uri": "ak.wwise.core.soundbank.generated",
+      "version": "2025.1"
+    }
+  ],
+  "metadata": {
+    "discrepancy_register": "references/semantic/2025.1/discrepancy-register.md",
+    "generator": "task-2025-6-added-api-classification",
+    "inventory_source": "resources/manifest/2025.1/added-since-2024.1.json",
+    "policy": {
+      "behavior_tested_statuses_forbidden": [
+        "live-tested",
+        "sandbox-mutating-tested"
+      ],
+      "candidate_status_means": "Planning candidate only; later live/destructive tasks must add behavior evidence before promotion.",
+      "defer_by_default_reason_codes": [
+        "docs_reflection_mismatch",
+        "fixture_state_gap",
+        "generated_soundbank_required",
+        "missing_source_evidence",
+        "profiler_session_required",
+        "unsafe_state",
+        "unsupported_semantics"
+      ],
+      "docs_reflection_mismatch_default_status": "deferred"
+    },
+    "source_notes": "resources/semantic/2025.1/source_notes.json",
+    "status_model": [
+      "candidate-live-read-only",
+      "candidate-sandbox-mutating",
+      "deferred",
+      "excluded"
+    ],
+    "version": "2025.1"
+  },
+  "summary": {
+    "family_counts": {
+      "audio-conversion": 1,
+      "audio-source-peaks": 2,
+      "blend-container": 1,
+      "cli": 6,
+      "console-project": 1,
+      "core-info": 2,
+      "debug": 2,
+      "import": 2,
+      "log": 1,
+      "log-topic": 1,
+      "lua-script": 1,
+      "media-pool": 2,
+      "object-mutation": 12,
+      "profiler": 11,
+      "property-reference": 8,
+      "query": 1,
+      "soundbank": 4,
+      "soundengine": 8,
+      "source-control": 1,
+      "waapi-schema": 1,
+      "work-unit": 2
+    },
+    "function_added_count": 6,
+    "function_changed_count": 53,
+    "inventory_total": 70,
+    "status_counts": {
+      "candidate-live-read-only": 7,
+      "candidate-sandbox-mutating": 14,
+      "deferred": 33,
+      "excluded": 16
+    },
+    "topic_added_count": 1,
+    "topic_changed_count": 10
+  }
+}

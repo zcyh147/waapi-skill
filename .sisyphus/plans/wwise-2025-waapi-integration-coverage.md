@@ -325,7 +325,7 @@ Wave 5: F1-F4 final review agents.
 
   **Commit**: YES | Message: `docs(wwise): ground 2025 semantic sources` | Files: `references/semantic/2025.1/*.md`, `resources/semantic/2025.1/source_notes.json`, `tests/unit/test_2025_1_reference_layout.py`, `.sisyphus/evidence/task-2025-5-*.txt`
 
-- [ ] 6. Classify 2025-only APIs and semantic deltas
+- [x] 6. Classify 2025-only APIs and semantic deltas
 
   **What to do**: Build `resources/coverage/2025.1/added-api-classification.json` from `resources/manifest/2025.1/added-since-2024.1.json` plus 2025 source notes. Classify each 2025-only or changed API into existing 2024 families where semantics match, or explicit 2025-only family buckets. For each item choose one status: `candidate-live-read-only`, `candidate-sandbox-mutating`, `deferred`, or `excluded`. Defer by default on docs/reflection mismatch, unsafe state requirements, missing SampleProject fixture state, profiler/session requirements, or unsupported/unclear semantics.
   **Must NOT do**: Do not promote any 2025-only API to behavior-tested in this task.
