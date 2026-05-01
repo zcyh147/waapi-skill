@@ -480,7 +480,7 @@ Wave 4: Final Verification Wave F1-F4.
 
   **Commit**: YES | Message: `test(wwise): verify 2023 opt-in gates` | Files: `tests/unit/*`, `tests/live/*`, `tests/destructive/*`, `.sisyphus/evidence/task-9-*.txt`
 
-- [ ] 10. Final resource/evidence reconciliation pass
+- [x] 10. Final resource/evidence reconciliation pass
 
   **What to do**: Reconcile all resources after Tasks 2-9. Confirm no orphan 2023.1 APIs, no stale `live_tested == 0` assertions if evidence exists, no missing evidence files, no `.sisyphus/runtime` artifacts staged, and no docs contradict the risky-family/Windows decisions. Update `.sisyphus/evidence/wwise-2023-test-parity/parity-review-packet.md` with final command results.
   **Must NOT do**: Do not introduce new feature scope. Do not silently drop APIs to make counts pass.

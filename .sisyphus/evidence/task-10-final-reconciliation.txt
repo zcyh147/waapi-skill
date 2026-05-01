@@ -1,0 +1,71 @@
+Task 10 final resource/evidence reconciliation
+Date: 2026-05-01
+
+Commands run
+============
+
+1. Focused 2023.1 unit audit
+
+Command:
+python -m pytest tests/unit/test_2023_api_resource_coverage.py tests/unit/test_2023_live_coverage_matrix.py tests/unit/test_2023_deferred_registry.py tests/unit/test_2023_cross_version_audit.py tests/unit/test_2023_docs_contract.py -q
+
+Output:
+....................                                                     [100%]
+20 passed in 0.10s
+
+Result: exit code 0.
+
+2. Exact 2023.1 live command
+
+Command:
+WWISE_VERSION=2023.1 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh" WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj" WWISE_LIVE=1 python -m pytest tests/live/test_2023_live_prerequisites.py tests/live/test_2023_reflection_inventory.py tests/live/test_2023_waql_live_matrix.py -q
+
+Output:
+..........                                                               [100%]
+10 passed in 51.54s
+
+Result: exit code 0.
+
+3. Exact 2023.1 destructive command
+
+Command:
+WWISE_VERSION=2023.1 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh" WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q
+
+Output:
+.....                                                                    [100%]
+5 passed in 128.14s (0:02:08)
+
+Result: exit code 0.
+
+4. Default suite
+
+Command:
+python -m pytest -q
+
+Output summary:
+486 passed, 29 skipped in 1.36s
+
+Result: exit code 0.
+
+Reconciliation findings
+=======================
+
+- 2023.1 manifest reflection remains 181 APIs: 149 functions and 32 topics.
+- `resources/coverage/2023.1/api-coverage.json` has 181 entries, sorted one-for-one with the reflected 2023.1 APIs.
+- `resources/coverage/2023.1/live-coverage-matrix.json` has 181 entries, sorted one-for-one with the reflected 2023.1 APIs.
+- `resources/coverage/2023.1/phase2-coverage-summary.json` has 181 entries, sorted one-for-one with the reflected 2023.1 APIs.
+- `resources/coverage/2023.1/phase21-uri-policy.json` assigns 181 unique URIs across parity buckets, matching the reflected API set with no duplicates or orphans.
+- `resources/deferred/2023.1.json` has 135 entries, matching the coverage entries whose status is `deferred` or `excluded`.
+- Final status counts from coverage entries: `excluded=92`, `deferred=43`, `sandbox-mutating-tested=10`, `supported=16`, `untested=19`, `live-tested=1`, `evidence-only=0`.
+- Final parity bucket counts from coverage entries: `excluded=80`, `deferred=62`, `sandbox-mutating-tested=10`, `conformance-only=16`, `live-tested=1`, `wrapper-only=12`, `evidence-only=0`, `fake-route-tested=0`.
+- Promoted set remains exactly 11 APIs: one live read-only URI (`ak.wwise.core.object.get`) and ten sandbox-mutating URIs (`ak.wwise.core.audio.import`, `ak.wwise.core.object.create`, `ak.wwise.core.object.delete`, `ak.wwise.core.object.set`, `ak.wwise.core.soundbank.setInclusions`, `ak.wwise.core.switchContainer.addAssignment`, `ak.wwise.core.switchContainer.removeAssignment`, `ak.wwise.core.undo.beginGroup`, `ak.wwise.core.undo.endGroup`, `ak.wwise.core.undo.undo`).
+- Every promoted entry has an explicit approved 2023.1 evidence root under `.sisyphus/evidence/wwise-2023-test-parity/` or `resources/waql/2023.1/`.
+- Risky-family policy remains locked: 92 risky-family entries are excluded and risky-family accidental promotions are zero.
+- Readback helpers `ak.wwise.core.soundbank.getInclusions` and `ak.wwise.core.switchContainer.getAssignments` remain `supported`/`conformance-only`, not promoted behavioral coverage.
+- No stale `live_tested == 0` assertion was found in active tests or docs; final summaries correctly keep `live_tested=1`.
+- Review packet and docs continue to avoid full behavioral/live support claims and keep Windows validation as a caveat, not a hard gate.
+
+Conclusion
+==========
+
+No resource, test, docs, reference, or eval defect was found during Task 10. No coverage/deferred/test/reference/eval changes were required.
