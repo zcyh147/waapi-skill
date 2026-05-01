@@ -1,0 +1,29 @@
+
+- Background exploration unexpectedly modified `references/wwise-version-upgrade-2023-first.md`; I restored it to HEAD before implementation.
+
+- No new blockers for the 2025.1 version/live-environment contract task; no live or destructive Wwise calls were needed.
+
+- Resolved during Task 2: the first 2025.1 fixture inventory run failed because the destructive guard test used a temporary console without patching the exact 2025.1 console contract; patched the test contract and reran targeted/regression pytest successfully.
+
+- Resolved review blocker: code review flagged the destructive guard test as non-hermetic when the real 2025.1 SampleProject is absent. Fixed with a `tmp_path` installed project and reran `test_2025_1_fixture_inventory.py` plus 2023/2024 fixture regressions successfully.
+
+- Resolved during Task 3: the first 2025.1 WwiseConsole launch did not expose WAAPI before the default 60s readiness timeout; reran through the same lifecycle with `WWISE_READINESS_TIMEOUT=180` and captured successful live reflection evidence.
+- JSON LSP diagnostics were unavailable because the configured `biome` server is not installed; generated JSON was validated with `json.loads`, Python test diagnostics were clean, and targeted/regression pytest passed.
+
+- Resolved Task 3 full-suite regression: `test_no_2025_resource_payloads_were_introduced` predated planned explicit `resources/manifest/2025.1/` payloads. Narrowed the audit to allow only `resources/manifest/2025.1` while continuing to reject bare `resources/manifest/2025/` payloads and preserving 2024 no-fallback guards; exact focused pytest and full pytest now pass.
+
+- No new blockers in Task 4: 2025.1 isolation tests and 2024 regression audits passed, with evidence saved under `.sisyphus/evidence/task-2025-4-isolation.txt` and `.sisyphus/evidence/task-2025-4-2024-regression.txt`.
+
+- Resolved during Task 5: a concurrent NotebookLM query failed because Chromium profile locking prevents parallel browser sessions. Sequential follow-up queries against `wwise-2025.1-docs` succeeded and supplied the missing family evidence.
+- JSON LSP diagnostics were still unavailable because the configured `biome` server is not installed; `resources/semantic/2025.1/source_notes.json` was validated with `python -m json.tool` and the targeted pytest gates.
+- NotebookLM did not provide exact public-library URL prefixes/page ids, only source-grounded headings and a `2025.1.7_6590` URL candidate. The discrepancy register records this caveat instead of treating URL candidates as fetched proof; the live manifest build remains `2025.1.7.9143`.
+
+- Resolved Task 5 full-suite regression: `test_no_2025_resource_payloads_were_introduced` now allows the planned explicit 2025.1 semantic directories (`resources/semantic/2025.1` and `references/semantic/2025.1`) alongside the existing manifest allowlist, while bare `2025` and unplanned 2025 payloads remain rejected.
+
+- Task 6 verification note: JSON LSP diagnostics still cannot run because the configured `biome` server is not installed; `python -m json.tool` validated `resources/coverage/2025.1/added-api-classification.json`, Python LSP diagnostics were clean for the new test, and focused pytest passed.
+
+- Resolved Task 6 acceptance regression: the 2024 unplanned-payload audit needed the planned `resources/coverage/2025.1` allowlist entry, and the tracked Task 5 NotebookLM evidence had been shortened below the reference-layout contract. Restored required safe strings without recording auth artifacts.
+
+- Task 7 verification note: JSON LSP diagnostics still cannot run because the configured `biome` server is not installed; generated JSON was validated with `python -m json.tool`, Python LSP diagnostics were clean for new tests, and focused/regression pytest passed.
+
+- Task 7 commit note: no additional blockers were found while staging the baseline resources; the only tracked plan change was the Task 7 checkbox flip already present in the working tree.

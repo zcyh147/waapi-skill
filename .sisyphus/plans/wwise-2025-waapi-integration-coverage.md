@@ -365,7 +365,7 @@ Wave 5: F1-F4 final review agents.
 
   **Commit**: YES | Message: `test(coverage): classify 2025 api deltas` | Files: `resources/coverage/2025.1/added-api-classification.json`, `tests/unit/test_2025_1_added_api_classification.py`, `.sisyphus/evidence/task-2025-6-*.txt`
 
-- [ ] 7. Generate 2025.1 coverage, deferred, and policy baseline
+- [x] 7. Generate 2025.1 coverage, deferred, and policy baseline
 
   **What to do**: Generate `resources/coverage/2025.1/api-coverage.json`, `live-coverage-matrix.json`, `phase2-coverage-summary.json`, `phase21-uri-policy.json`, and `resources/deferred/2025.1.json` from 2025 manifest, 2025 source notes, and Task 6 classification. Derive 2024 baseline counts from existing 2024 resources during execution and record comparison, but do not force 2025 counts to match 2024. Initially treat 2024 candidate promoted families as candidates only; all non-evidenced 2025 entries remain deferred/excluded.
   **Must NOT do**: Do not mark support as `live-tested` or `sandbox-mutating-tested` before Tasks 9 and 11 evidence exists.

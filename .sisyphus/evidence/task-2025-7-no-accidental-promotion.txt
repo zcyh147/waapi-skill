@@ -1,0 +1,9 @@
+Task 2025-7 no accidental promotion guard
+Forbidden statuses: ['live-tested', 'sandbox-mutating-tested']
+Coverage live-tested count: 0
+Coverage sandbox-mutating-tested count: 0
+Matrix live-tested entries: 0
+Matrix sandbox-mutating-tested entries: 0
+Policy live_tested_uris: []
+Policy sandbox_mutating_tested_uris: []
+2024 promoted statuses are retained only in previous_2024_status/candidate_status comparison metadata.
