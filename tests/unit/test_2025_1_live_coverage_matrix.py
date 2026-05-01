@@ -15,6 +15,7 @@ FUNCTIONS_MANIFEST = REPO_ROOT / "resources" / "manifest" / VERSION / "functions
 ALLOWED_PARITY_BUCKETS = {"deferred", "excluded", "live-tested", "manifest-only", "sandbox-mutating-tested"}
 FORBIDDEN_PROMOTED_STATUSES = {"live-tested", "sandbox-mutating-tested"}
 CANDIDATE_STATUSES = {"candidate-live-read-only", "candidate-sandbox-mutating"}
+LIVE_TESTED_URI = "ak.wwise.core.object.get"
 
 
 def test_2025_live_matrix_covers_every_reflected_function_once() -> None:
@@ -27,14 +28,14 @@ def test_2025_live_matrix_covers_every_reflected_function_once() -> None:
     assert {entry["version"] for entry in matrix} == {VERSION}
 
 
-def test_2025_live_matrix_has_no_live_or_sandbox_promotion() -> None:
+def test_2025_live_matrix_promotes_only_fresh_object_get_evidence() -> None:
     matrix_payload = _matrix_payload()
     coverage_by_uri = {entry["uri"]: entry for entry in _coverage_payload()["coverage"]}
 
-    assert matrix_payload["summary"]["live_tested"] == 0
-    assert matrix_payload["summary"]["behavioral_supported"] == 0
-    assert matrix_payload["summary"]["behavioral_covered_count"] == 0
-    assert matrix_payload["summary"]["live_behavioral_covered_count"] == 0
+    assert matrix_payload["summary"]["live_tested"] == 1
+    assert matrix_payload["summary"]["behavioral_supported"] == 1
+    assert matrix_payload["summary"]["behavioral_covered_count"] == 1
+    assert matrix_payload["summary"]["live_behavioral_covered_count"] == 1
     assert "fresh 2025.1 live/destructive evidence" in matrix_payload["metadata"]["status_policy"]
 
     for entry in matrix_payload["matrix"]:
@@ -43,6 +44,13 @@ def test_2025_live_matrix_has_no_live_or_sandbox_promotion() -> None:
         assert entry["coverage_status"] == source["coverage_status"], entry["uri"]
         assert entry["parity_bucket"] == source["parity_bucket"], entry["uri"]
         assert entry["evidence_standard"] == source["evidence_standard"], entry["uri"]
+        if entry["uri"] == LIVE_TESTED_URI:
+            assert entry["counts_as_behavioral"] == evidence["counts_as_behavioral"] is True, entry["uri"]
+            assert entry["counts_as_live_behavioral"] == evidence["counts_as_live_behavioral"] is True, entry["uri"]
+            assert entry["achieved_status"] == "live-tested", entry["uri"]
+            assert entry["evidence_path"] == "resources/waql/2025.1/object-get-live-matrix.json", entry["uri"]
+            continue
+
         assert entry["counts_as_behavioral"] == evidence["counts_as_behavioral"] is False, entry["uri"]
         assert entry["counts_as_live_behavioral"] == evidence["counts_as_live_behavioral"] is False, entry["uri"]
         assert entry["manifest_source_uri"].startswith("resources/manifest/2025.1/"), entry["uri"]
@@ -68,11 +76,14 @@ def test_2025_phase2_summary_matches_matrix_and_coverage_accounting() -> None:
 
     assert summary["summary"]["parity_bucket_total"] == matrix["summary"]["parity_bucket_total"] == expected_total
     assert coverage["summary"]["parity_bucket_total"] == expected_total
-    assert summary["summary"]["behavioral_covered_count"] == 0
-    assert summary["summary"]["live_behavioral_covered_count"] == 0
+    assert summary["summary"]["behavioral_covered_count"] == 1
+    assert summary["summary"]["live_behavioral_covered_count"] == 1
     assert [entry["uri"] for entry in summary["entries"]] == [entry["uri"] for entry in matrix_entries] == [entry["uri"] for entry in coverage_entries]
     assert all(entry["version"] == VERSION for entry in summary["entries"])
-    assert all(entry["manifest_reflection_only"] is True for entry in summary["entries"])
+    assert all(
+        entry["manifest_reflection_only"] is (entry["uri"] != LIVE_TESTED_URI)
+        for entry in summary["entries"]
+    )
 
 
 def test_2025_phase21_policy_reconciles_parity_buckets_candidates_and_blocked_lists() -> None:
@@ -93,25 +104,29 @@ def test_2025_phase21_policy_reconciles_parity_buckets_candidates_and_blocked_li
         assert policy["summary"]["parity_bucket_counts"][bucket] == len(uris)
         assert all(coverage_by_uri[uri]["parity_bucket"] == bucket for uri in uris)
 
-    assert policy["policy"]["live_tested_uris"] == []
+    assert policy["policy"]["live_tested_uris"] == [LIVE_TESTED_URI]
     assert policy["policy"]["sandbox_mutating_tested_uris"] == []
-    assert policy["policy"]["manifest_only_uris"] == sorted(coverage_by_uri)
-    assert sorted(policy["policy"]["deferred_uris"] + policy["policy"]["excluded_uris"]) == sorted(coverage_by_uri)
+    assert policy["policy"]["manifest_only_uris"] == sorted(set(coverage_by_uri) - {LIVE_TESTED_URI})
+    assert sorted(policy["policy"]["deferred_uris"] + policy["policy"]["excluded_uris"]) == sorted(set(coverage_by_uri) - {LIVE_TESTED_URI})
     assert sorted(policy["policy"]["manifest_only_uris"] + policy["policy"]["live_tested_uris"] + policy["policy"]["sandbox_mutating_tested_uris"]) == sorted(coverage_by_uri)
 
     candidate_uris = policy["policy"]["candidate_live_read_only_uris"] + policy["policy"]["candidate_sandbox_mutating_uris"]
     assert candidate_uris
     assert all(coverage_by_uri[uri]["candidate_status"] in CANDIDATE_STATUSES for uri in candidate_uris)
-    assert all(coverage_by_uri[uri]["coverage_status"] in {"deferred", "excluded"} for uri in candidate_uris)
+    assert all(
+        coverage_by_uri[uri]["coverage_status"] in {"deferred", "excluded", "live-tested"}
+        for uri in candidate_uris
+    )
+    assert [uri for uri in candidate_uris if coverage_by_uri[uri]["coverage_status"] == "live-tested"] == [LIVE_TESTED_URI]
 
 
 def test_2025_no_accidental_promotion_policy_is_tracked_json_only() -> None:
     policy = json.loads(POLICY_RESOURCE.read_text(encoding="utf-8"))
 
-    assert policy["summary"]["status_counts"]["live-tested"] == 0
+    assert policy["summary"]["status_counts"]["live-tested"] == 1
     assert policy["summary"]["status_counts"]["sandbox-mutating-tested"] == 0
-    assert policy["summary"]["forbidden_promoted_counts"] == {"live-tested": 0, "sandbox-mutating-tested": 0}
-    assert policy["policy"]["live_tested_uris"] == []
+    assert policy["summary"]["forbidden_promoted_counts"] == {"live-tested": 1, "sandbox-mutating-tested": 0}
+    assert policy["policy"]["live_tested_uris"] == [LIVE_TESTED_URI]
     assert policy["policy"]["sandbox_mutating_tested_uris"] == []
 
 

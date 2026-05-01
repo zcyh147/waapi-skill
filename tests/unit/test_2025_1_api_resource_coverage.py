@@ -21,6 +21,7 @@ ALLOWED_STATUSES = {"deferred", "excluded", "live-tested", "sandbox-mutating-tes
 ALLOWED_BLOCKED_STATUSES = {"deferred", "excluded"}
 FORBIDDEN_PROMOTED_STATUSES = {"live-tested", "sandbox-mutating-tested"}
 CANDIDATE_STATUSES = {"candidate-live-read-only", "candidate-sandbox-mutating"}
+LIVE_TESTED_URI = "ak.wwise.core.object.get"
 
 
 def test_2025_resource_covers_every_reflected_function_once_with_2025_paths() -> None:
@@ -54,6 +55,17 @@ def test_2025_coverage_entries_are_blocked_until_fresh_2025_evidence_exists() ->
         assert entry["risk_level"] == expected.risk_level
         assert entry["schema_status"] == "ok", entry["uri"]
         assert entry["schema_mapping"]["manifest_uri"] == f"resources/manifest/2025.1/schemas.json#{entry['uri']}"
+        if entry["uri"] == LIVE_TESTED_URI:
+            assert entry["coverage_status"] == "live-tested", entry["uri"]
+            assert entry["test_status"] == "live-tested", entry["uri"]
+            assert entry["parity_bucket"] == "live-tested", entry["uri"]
+            assert entry["deferred"]["status"] is False, entry["uri"]
+            assert evidence["manifest_reflection_only"] is False, entry["uri"]
+            assert evidence["counts_as_behavioral"] is True, entry["uri"]
+            assert evidence["counts_as_live_behavioral"] is True, entry["uri"]
+            assert "Fresh 2025.1 live sandbox behavior evidence" in evidence["evidence_standard"]
+            continue
+
         assert entry["coverage_status"] in ALLOWED_BLOCKED_STATUSES, entry["uri"]
         assert entry["test_status"] == entry["coverage_status"], entry["uri"]
         assert entry["parity_bucket"] == entry["coverage_status"], entry["uri"]
@@ -76,6 +88,12 @@ def test_2025_task6_classifications_remain_planning_only_in_coverage() -> None:
     for classification in classifications:
         entry = coverage_by_uri[classification["uri"]]
         assert entry["task6_classification_status"] == classification["status"], entry["uri"]
+        if entry["uri"] == LIVE_TESTED_URI:
+            assert entry["coverage_status"] == "live-tested", entry["uri"]
+            assert entry["candidate_status"] == classification["status"], entry["uri"]
+            assert entry["behavioral_evidence"]["counts_as_behavioral"] is True, entry["uri"]
+            continue
+
         assert entry["behavioral_evidence"]["counts_as_behavioral"] is False, entry["uri"]
         if classification["status"] in CANDIDATE_STATUSES:
             assert entry["coverage_status"] == "deferred", entry["uri"]
@@ -101,12 +119,12 @@ def test_2025_status_totals_record_zero_accidental_promotion_and_2024_comparison
     assert sum(status_counts.values()) == len(coverage) == 154
     assert payload["summary"]["total_functions"] == 154
     assert payload["summary"]["implemented"] == 154
-    assert payload["summary"]["manifest_only"] == 154
-    assert payload["summary"]["behavioral_supported"] == 0
-    assert payload["summary"]["live_tested"] == 0
-    assert status_counts["live-tested"] == 0
+    assert payload["summary"]["manifest_only"] == 153
+    assert payload["summary"]["behavioral_supported"] == 1
+    assert payload["summary"]["live_tested"] == 1
+    assert status_counts["live-tested"] == 1
     assert status_counts["sandbox-mutating-tested"] == 0
-    assert parity_counts["live-tested"] == 0
+    assert parity_counts["live-tested"] == 1
     assert parity_counts["sandbox-mutating-tested"] == 0
     assert baseline["baseline_version"] == BASELINE_VERSION
     assert baseline["baseline_reflected_count"] == len(_baseline_payload()["coverage"]) == 148
@@ -125,8 +143,12 @@ def test_2025_source_notes_are_context_not_behavior_proof() -> None:
         entry = coverage_by_uri[uri]
         assert entry["source_note_family"] in source_notes, uri
         assert entry["behavioral_evidence"]["source_note_family"] == entry["source_note_family"], uri
-        assert entry["coverage_status"] in ALLOWED_BLOCKED_STATUSES, uri
-        assert entry["behavioral_evidence"]["counts_as_behavioral"] is False, uri
+        if uri == LIVE_TESTED_URI:
+            assert entry["coverage_status"] == "live-tested", uri
+            assert entry["behavioral_evidence"]["counts_as_behavioral"] is True, uri
+        else:
+            assert entry["coverage_status"] in ALLOWED_BLOCKED_STATUSES, uri
+            assert entry["behavioral_evidence"]["counts_as_behavioral"] is False, uri
 
 
 def test_2025_does_not_reuse_2024_live_or_sandbox_proof() -> None:
@@ -142,6 +164,12 @@ def test_2025_does_not_reuse_2024_live_or_sandbox_proof() -> None:
     for uri, previous_status in previously_promoted.items():
         entry = coverage_by_uri[uri]
         assert entry["previous_2024_status"] == previous_status, uri
+        if uri == LIVE_TESTED_URI:
+            assert entry["coverage_status"] == "live-tested", uri
+            assert entry["behavioral_evidence"]["counts_as_behavioral"] is True, uri
+            assert "Fresh 2025.1 live sandbox behavior evidence" in entry["behavioral_evidence"]["evidence_standard"]
+            continue
+
         assert entry["coverage_status"] in ALLOWED_BLOCKED_STATUSES, uri
         assert entry["candidate_status"] in CANDIDATE_STATUSES, uri
         assert entry["behavioral_evidence"]["candidate_origin"] in {

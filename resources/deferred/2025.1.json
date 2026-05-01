@@ -1257,24 +1257,6 @@
       "review_trigger": "When fresh 2025.1 behavioral tests, live evidence, or policy for core.object changes.",
       "risk_level": "low",
       "substitute_test": "Manifest/source-note/classification reconciliation only; not behavioral coverage.",
-      "uri": "ak.wwise.core.object.get",
-      "version": "2025.1"
-    },
-    {
-      "behavioral_coverage": "deferred",
-      "blocking_condition": "Task 6 marked this as a candidate only; Tasks 9/11 must add fresh 2025.1 live or sandbox behavior evidence before promotion.",
-      "category": "core.object",
-      "coverage_status": "deferred",
-      "date": "2026-05-02",
-      "evidence_source": "resources/manifest/2025.1/functions.json (live reflection via 2025.1 SampleProject)",
-      "excluded_family": "",
-      "inventory_coverage": "reflected-manifest-only",
-      "item_type": "function",
-      "owner_follow_up": "Add fresh 2025.1 behavior-backed coverage or explicit policy review before promotion.",
-      "reason": "Task 6 classified this 2025.1 inventory entry as planning-only; no 2025 behavior evidence exists yet.",
-      "review_trigger": "When fresh 2025.1 behavioral tests, live evidence, or policy for core.object changes.",
-      "risk_level": "low",
-      "substitute_test": "Manifest/source-note/classification reconciliation only; not behavioral coverage.",
       "uri": "ak.wwise.core.object.getAttenuationCurve",
       "version": "2025.1"
     },
@@ -2863,7 +2845,7 @@
       "core.workUnit": 2,
       "waapi": 3
     },
-    "deferred_count": 106,
+    "deferred_count": 105,
     "excluded_category_counts": {
       "cli": 13,
       "debug": 8,
@@ -2872,10 +2854,10 @@
     },
     "excluded_count": 48,
     "status_counts": {
-      "deferred": 106,
+      "deferred": 105,
       "excluded": 48
     },
-    "total": 154,
+    "total": 153,
     "version": "2025.1"
   }
 }

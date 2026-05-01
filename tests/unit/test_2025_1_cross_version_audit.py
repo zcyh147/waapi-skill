@@ -570,12 +570,10 @@ def _promote_local_fixture(
         coverage_entry["behavioral_evidence"]["evidence"] = evidence_update["evidence_standard"]
     coverage_entry["behavioral_evidence"].update(deepcopy(evidence_update))
     summary_entry["manifest_reflection_only"] = False
-    if uri in policy["policy"]["deferred_uris"]:
-        policy["policy"]["deferred_uris"].remove(uri)
-    if uri in policy["policy"]["manifest_only_uris"]:
-        policy["policy"]["manifest_only_uris"].remove(uri)
-    if uri in policy["policy"]["parity_buckets"]["deferred"]:
-        policy["policy"]["parity_buckets"]["deferred"].remove(uri)
+    for list_name in ("deferred_uris", "excluded_uris", "manifest_only_uris", "live_tested_uris", "sandbox_mutating_tested_uris"):
+        policy["policy"][list_name] = [item for item in policy["policy"][list_name] if item != uri]
+    for bucket in policy["policy"]["parity_buckets"].values():
+        bucket[:] = [item for item in bucket if item != uri]
     policy["policy"]["live_tested_uris"].append(uri)
     policy["policy"]["parity_buckets"][status].append(uri)
     deferred["deferred"] = [entry for entry in deferred["deferred"] if entry["uri"] != uri]

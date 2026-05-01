@@ -1450,20 +1450,20 @@
       "version": "2025.1"
     },
     {
-      "achieved_status": "deferred",
+      "achieved_status": "live-tested",
       "candidate_status": "candidate-live-read-only",
       "category": "core.object",
-      "counts_as_behavioral": false,
-      "counts_as_live_behavioral": false,
-      "coverage_status": "deferred",
-      "evidence_path": "resources/manifest/2025.1/functions.json (live reflection via 2025.1 SampleProject)",
-      "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
-      "future_review_trigger": "When fresh 2025.1 behavioral tests, live evidence, or policy for core.object changes.",
+      "counts_as_behavioral": true,
+      "counts_as_live_behavioral": true,
+      "coverage_status": "live-tested",
+      "evidence_path": "resources/waql/2025.1/object-get-live-matrix.json",
+      "evidence_standard": "Fresh 2025.1 live sandbox behavior evidence under .sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/ plus resources/waql/2025.1/object-get-live-matrix.json counts as behavioral/live proof for ak.wwise.core.object.get only.",
+      "future_review_trigger": "When object.get WAQL read-only contract behavior changes or 2025.1 evidence is refreshed.",
       "inventory_change": "changed",
       "inventory_coverage": "reflected-manifest-only",
       "item_type": "function",
-      "manifest_reflection_only": true,
-      "parity_bucket": "deferred",
+      "manifest_reflection_only": false,
+      "parity_bucket": "live-tested",
       "previous_2024_status": "live-tested",
       "source_coverage_uri": "resources/coverage/2025.1/api-coverage.json",
       "source_note_family": "query",
@@ -3303,16 +3303,16 @@
     "version": "2025.1"
   },
   "summary": {
-    "behavioral_covered_count": 0,
-    "behavioral_supported": 0,
+    "behavioral_covered_count": 1,
+    "behavioral_supported": 1,
     "candidate_status_counts": {
       "candidate-live-read-only": 4,
       "candidate-sandbox-mutating": 21
     },
-    "deferred": 154,
+    "deferred": 153,
     "excluded": 48,
     "forbidden_promoted_counts": {
-      "live-tested": 0,
+      "live-tested": 1,
       "sandbox-mutating-tested": 0
     },
     "implemented": 154,
@@ -3321,13 +3321,13 @@
       "changed": 53,
       "unchanged": 95
     },
-    "live_behavioral_covered_count": 0,
-    "live_tested": 0,
-    "manifest_only": 154,
+    "live_behavioral_covered_count": 1,
+    "live_tested": 1,
+    "manifest_only": 153,
     "parity_bucket_counts": {
-      "deferred": 106,
+      "deferred": 105,
       "excluded": 48,
-      "live-tested": 0,
+      "live-tested": 1,
       "manifest-only": 0,
       "sandbox-mutating-tested": 0
     },
@@ -3342,9 +3342,9 @@
       "switchcontainer": 3
     },
     "status_counts": {
-      "deferred": 106,
+      "deferred": 105,
       "excluded": 48,
-      "live-tested": 0,
+      "live-tested": 1,
       "sandbox-mutating-tested": 0
     },
     "total_functions": 154,

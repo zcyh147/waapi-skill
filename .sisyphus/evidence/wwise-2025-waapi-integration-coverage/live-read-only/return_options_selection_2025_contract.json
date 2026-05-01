@@ -1,0 +1,61 @@
+{
+  "actual": {
+    "result_count": 1,
+    "returned_fields": [
+      "id",
+      "name"
+    ],
+    "rows": [
+      {
+        "id": "{5EA7BBF8-64C0-4A50-8821-A07E8BE21D68}",
+        "name": "Containers"
+      }
+    ]
+  },
+  "assertions": [
+    "returned row is constrained to the requested return fields",
+    "forbidden fields are absent from the readback payload"
+  ],
+  "case_id": "return_options_selection_2025_contract",
+  "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/return_options_selection_2025_contract.json",
+  "expected": {
+    "fields": [
+      "id",
+      "name"
+    ],
+    "forbidden_fields": [
+      "path",
+      "childrenCount"
+    ],
+    "identity": {
+      "name": "Containers"
+    },
+    "result_count": {
+      "count": 1,
+      "policy": "exact"
+    }
+  },
+  "no_mutation": true,
+  "options": {
+    "return": [
+      "id",
+      "name"
+    ]
+  },
+  "query": "\"\\Containers\"",
+  "recorded_at_unix": 1777656285,
+  "result_count": 1,
+  "result_count_policy": {
+    "count": 1,
+    "policy": "exact"
+  },
+  "sources": [
+    "Prior-version WAQL matrix format comparison only; no prior-version evidence paths are reused as 2025.1 proof.",
+    "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.get",
+    "resources/semantic/2025.1/source_notes.json#query",
+    "2025.1 read-only live sandbox execution writes per-case behavior evidence before promotion."
+  ],
+  "status": "passed",
+  "uri": "ak.wwise.core.object.get",
+  "wwise_version": "2025.1"
+}

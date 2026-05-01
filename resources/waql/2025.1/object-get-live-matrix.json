@@ -1,0 +1,390 @@
+{
+  "live_cases": [
+    {
+      "args": {
+        "waql": "\"\\Containers\""
+      },
+      "assertions": [
+        "returned object identity matches the Containers path",
+        "returned fields stay within the requested return option set"
+      ],
+      "category": "path queries",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/path_containers_root_2025_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "identity": {
+          "name": "Containers",
+          "path": "\\Containers"
+        },
+        "result_count": {
+          "count": 1,
+          "policy": "exact"
+        }
+      },
+      "id": "path_containers_root_2025_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/path_containers_root_2025_contract.json",
+      "promotion_required_evidence": "2025.1 live sandbox JSON with read-only object.get behavior assertions for this case.",
+      "sources": [
+        "Prior-version WAQL matrix format comparison only; no prior-version evidence paths are reused as 2025.1 proof.",
+        "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.get",
+        "resources/semantic/2025.1/source_notes.json#query",
+        "2025.1 read-only live sandbox execution writes per-case behavior evidence before promotion."
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from object \"{containers_root_id}\""
+      },
+      "assertions": [
+        "returned object id equals the root GUID discovered earlier in the same sandbox run"
+      ],
+      "category": "GUID queries",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/guid_containers_root_2025_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "identity": {
+          "id": "{containers_root_id}",
+          "name": "Containers"
+        },
+        "result_count": {
+          "count": 1,
+          "policy": "exact"
+        }
+      },
+      "id": "guid_containers_root_2025_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ]
+      },
+      "placeholders": {
+        "containers_root_id": "path_containers_root_2025_contract.return[0].id"
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/guid_containers_root_2025_contract.json",
+      "promotion_required_evidence": "2025.1 live sandbox JSON with read-only object.get behavior assertions for this case.",
+      "sources": [
+        "Prior-version WAQL matrix format comparison only; no prior-version evidence paths are reused as 2025.1 proof.",
+        "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.get",
+        "resources/semantic/2025.1/source_notes.json#query",
+        "2025.1 read-only live sandbox execution writes per-case behavior evidence before promotion."
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from type Sound where type = \"Sound\" take 1"
+      },
+      "assertions": [
+        "non-empty results, when present, have type Sound",
+        "schema-safe empty results are allowed for SampleProject variance"
+      ],
+      "category": "type filters",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/type_sound_filter_2025_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "type"
+        ],
+        "result_count": {
+          "allow_empty": true,
+          "count": 1,
+          "policy": "at_most"
+        },
+        "type": "Sound"
+      },
+      "id": "type_sound_filter_2025_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/type_sound_filter_2025_contract.json",
+      "promotion_required_evidence": "2025.1 live sandbox JSON with read-only object.get behavior assertions for this case.",
+      "sources": [
+        "Prior-version WAQL matrix format comparison only; no prior-version evidence paths are reused as 2025.1 proof.",
+        "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.get",
+        "resources/semantic/2025.1/source_notes.json#query",
+        "2025.1 read-only live sandbox execution writes per-case behavior evidence before promotion."
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from search \"Default Work Unit\" where name = \"Default Work Unit\" take 1"
+      },
+      "assertions": [
+        "JSON-escaped WAQL string literal is accepted",
+        "any returned row has the expected name"
+      ],
+      "category": "quoted strings and JSON escaping",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/quoted_search_default_work_unit_2025_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "path"
+        ],
+        "identity": {
+          "name": "Default Work Unit"
+        },
+        "result_count": {
+          "allow_empty": true,
+          "count": 1,
+          "policy": "at_most"
+        }
+      },
+      "id": "quoted_search_default_work_unit_2025_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "path"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/quoted_search_default_work_unit_2025_contract.json",
+      "promotion_required_evidence": "2025.1 live sandbox JSON with read-only object.get behavior assertions for this case.",
+      "sources": [
+        "Prior-version WAQL matrix format comparison only; no prior-version evidence paths are reused as 2025.1 proof.",
+        "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.get",
+        "resources/semantic/2025.1/source_notes.json#query",
+        "2025.1 read-only live sandbox execution writes per-case behavior evidence before promotion."
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Containers\" select descendants take 1"
+      },
+      "assertions": [
+        "descendant rows, when present, remain under the Containers path"
+      ],
+      "category": "descendant traversal",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/descendant_traversal_containers_2025_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "path"
+        ],
+        "path_prefix": "\\Containers\\",
+        "result_count": {
+          "allow_empty": true,
+          "count": 1,
+          "policy": "at_most"
+        }
+      },
+      "id": "descendant_traversal_containers_2025_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "path"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/descendant_traversal_containers_2025_contract.json",
+      "promotion_required_evidence": "2025.1 live sandbox JSON with read-only object.get behavior assertions for this case.",
+      "sources": [
+        "Prior-version WAQL matrix format comparison only; no prior-version evidence paths are reused as 2025.1 proof.",
+        "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.get",
+        "resources/semantic/2025.1/source_notes.json#query",
+        "2025.1 read-only live sandbox execution writes per-case behavior evidence before promotion."
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Containers\" where childrenCount >= 0"
+      },
+      "assertions": [
+        "childrenCount is returned and satisfies the numeric comparison"
+      ],
+      "category": "property comparisons",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/children_count_property_comparison_2025_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "childrenCount"
+        ],
+        "identity": {
+          "name": "Containers"
+        },
+        "property": {
+          "comparison": ">=",
+          "name": "childrenCount",
+          "value": 0
+        },
+        "result_count": {
+          "count": 1,
+          "policy": "exact"
+        }
+      },
+      "id": "children_count_property_comparison_2025_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "childrenCount"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/children_count_property_comparison_2025_contract.json",
+      "promotion_required_evidence": "2025.1 live sandbox JSON with read-only object.get behavior assertions for this case.",
+      "sources": [
+        "Prior-version WAQL matrix format comparison only; no prior-version evidence paths are reused as 2025.1 proof.",
+        "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.get",
+        "resources/semantic/2025.1/source_notes.json#query",
+        "2025.1 read-only live sandbox execution writes per-case behavior evidence before promotion."
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Containers\""
+      },
+      "assertions": [
+        "returned row is constrained to the requested return fields",
+        "forbidden fields are absent from the readback payload"
+      ],
+      "category": "return/options selection",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/return_options_selection_2025_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name"
+        ],
+        "forbidden_fields": [
+          "path",
+          "childrenCount"
+        ],
+        "identity": {
+          "name": "Containers"
+        },
+        "result_count": {
+          "count": 1,
+          "policy": "exact"
+        }
+      },
+      "id": "return_options_selection_2025_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/return_options_selection_2025_contract.json",
+      "promotion_required_evidence": "2025.1 live sandbox JSON with read-only object.get behavior assertions for this case.",
+      "sources": [
+        "Prior-version WAQL matrix format comparison only; no prior-version evidence paths are reused as 2025.1 proof.",
+        "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.get",
+        "resources/semantic/2025.1/source_notes.json#query",
+        "2025.1 read-only live sandbox execution writes per-case behavior evidence before promotion."
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from project where name = \"__waapi_skills_missing_object__\""
+      },
+      "assertions": [
+        "deliberately absent object name returns an empty result array without relying on error payloads"
+      ],
+      "category": "empty results",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/empty_results_missing_name_2025_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name"
+        ],
+        "result_count": {
+          "count": 0,
+          "policy": "exact"
+        }
+      },
+      "id": "empty_results_missing_name_2025_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/empty_results_missing_name_2025_contract.json",
+      "promotion_required_evidence": "2025.1 live sandbox JSON with read-only object.get behavior assertions for this case.",
+      "sources": [
+        "Prior-version WAQL matrix format comparison only; no prior-version evidence paths are reused as 2025.1 proof.",
+        "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.get",
+        "resources/semantic/2025.1/source_notes.json#query",
+        "2025.1 read-only live sandbox execution writes per-case behavior evidence before promotion."
+      ],
+      "uri": "ak.wwise.core.object.get"
+    }
+  ],
+  "metadata": {
+    "comparison_only_sources": [
+      "Prior-version WAQL matrix format only",
+      "No 2024.1 evidence paths are reused as 2025.1 proof."
+    ],
+    "default_live": false,
+    "live_command_evidence": ".sisyphus/evidence/task-2025-9-live-read-only.txt",
+    "name": "WAQL 2025.1 object.get contract matrix",
+    "notes": [
+      "Manifest/schema presence for ak.wwise.core.object.get is not behavioral WAQL support.",
+      "Live evidence is written only by the exact 2025.1 sandbox command under .sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/.",
+      "No profiler, transport, soundengine, UI, CLI, remote, debug, destructive, or environment-sensitive event topics are subscribed by these read-only cases."
+    ],
+    "prerequisite_blocker_evidence": ".sisyphus/evidence/task-2025-9-live-prereq-blocker.txt",
+    "sandbox_required": true,
+    "schema_source": "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.get",
+    "source_project_mutation_allowed": false,
+    "status_policy": "Live-tested only after the exact 2025.1 live sandbox command passes and records read-only behavior assertion JSON for each case.",
+    "uri": "ak.wwise.core.object.get",
+    "wwise_build": "2025.1.7.9143",
+    "wwise_version_target": "2025.1"
+  },
+  "summary": {
+    "case_count": 8,
+    "coverage_status": "live-tested",
+    "live_tested_cases": 8,
+    "version": "2025.1"
+  }
+}

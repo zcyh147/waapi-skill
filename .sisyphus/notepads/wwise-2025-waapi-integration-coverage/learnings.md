@@ -26,3 +26,6 @@
 
 - Task 8 hardened `tests/unit/test_2025_1_cross_version_audit.py` into the full 2025.1 parity guard: manifest, coverage, live matrix, phase2 summary, phase21 policy, deferred registry, source notes, versioned reference docs, and optional `resources/waql/2025.1/` resources now reconcile against the same 154 reflected functions.
 - Fresh behavior promotion for 2025.1 now requires an approved 2025.1 root plus explicit fresh behavior text; local mutation tests reject stale 2022/2023/2024 proof, bare `2025` paths, manifest-only, skipped-test, helper-only, and NotebookLM-only evidence.
+
+- Task 9 exact 2025.1 live read-only command passed with `WWISE_READINESS_TIMEOUT=180`; `ak.wwise.core.object.get` is now the only 2025.1 live-tested promotion, backed by `resources/waql/2025.1/object-get-live-matrix.json` plus eight per-case JSON evidence files under `.sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/`.
+- 2025.1 WAQL hierarchy readback uses `\\Containers` rather than the 2024 `\\Actor-Mixer Hierarchy`; the 2025 matrix must use Containers for path, GUID placeholder, descendant, property, and return-option assertions.

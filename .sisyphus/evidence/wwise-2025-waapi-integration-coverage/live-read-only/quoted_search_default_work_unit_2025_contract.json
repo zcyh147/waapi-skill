@@ -1,0 +1,63 @@
+{
+  "actual": {
+    "result_count": 1,
+    "returned_fields": [
+      "id",
+      "name",
+      "path"
+    ],
+    "rows": [
+      {
+        "id": "{B231292D-F96D-4EDC-AE14-D62DE1E07EDD}",
+        "name": "Default Work Unit",
+        "path": "\\Devices\\Default Work Unit"
+      }
+    ]
+  },
+  "assertions": [
+    "JSON-escaped WAQL string literal is accepted",
+    "any returned row has the expected name"
+  ],
+  "case_id": "quoted_search_default_work_unit_2025_contract",
+  "evidence_path": ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/quoted_search_default_work_unit_2025_contract.json",
+  "expected": {
+    "fields": [
+      "id",
+      "name",
+      "path"
+    ],
+    "identity": {
+      "name": "Default Work Unit"
+    },
+    "result_count": {
+      "allow_empty": true,
+      "count": 1,
+      "policy": "at_most"
+    }
+  },
+  "no_mutation": true,
+  "options": {
+    "return": [
+      "id",
+      "name",
+      "path"
+    ]
+  },
+  "query": "from search \"Default Work Unit\" where name = \"Default Work Unit\" take 1",
+  "recorded_at_unix": 1777656285,
+  "result_count": 1,
+  "result_count_policy": {
+    "allow_empty": true,
+    "count": 1,
+    "policy": "at_most"
+  },
+  "sources": [
+    "Prior-version WAQL matrix format comparison only; no prior-version evidence paths are reused as 2025.1 proof.",
+    "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.get",
+    "resources/semantic/2025.1/source_notes.json#query",
+    "2025.1 read-only live sandbox execution writes per-case behavior evidence before promotion."
+  ],
+  "status": "passed",
+  "uri": "ak.wwise.core.object.get",
+  "wwise_version": "2025.1"
+}

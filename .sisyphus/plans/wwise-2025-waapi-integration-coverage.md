@@ -445,7 +445,7 @@ Wave 5: F1-F4 final review agents.
 
   **Commit**: YES | Message: `test(wwise): enforce 2025 parity audits` | Files: `tests/unit/test_2025_1_*.py`, resources only if audit-driven fixes are required, `.sisyphus/evidence/task-2025-8-*.txt`
 
-- [ ] 9. Add 2025.1 live read-only WAQL and safe 2025-only evidence
+- [x] 9. Add 2025.1 live read-only WAQL and safe 2025-only evidence
 
   **What to do**: Port 2024 live read-only tests to `tests/live/test_2025_1_live_prerequisites.py`, `tests/live/test_2025_1_reflection_inventory.py`, and `tests/live/test_2025_1_waql_live_matrix.py`. Use `ak.wwise.core.object.get` as the required read-only candidate and add safe 2025-only read-only candidates from Task 6 only when docs, reflection, and SampleProject state permit. Write `resources/waql/2025.1/object-get-live-matrix.json` and per-case JSON evidence under `.sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/`. Promote only passed fresh 2025 read-only evidence.
   **Must NOT do**: Do not mutate project state. Do not promote 2025-only candidates whose docs/reflection/live behavior disagree.

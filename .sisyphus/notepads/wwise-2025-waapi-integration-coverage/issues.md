@@ -29,3 +29,6 @@
 - Task 7 commit note: no additional blockers were found while staging the baseline resources; the only tracked plan change was the Task 7 checkbox flip already present in the working tree.
 
 - Task 8 verification note: LSP diagnostics were clean for the modified Python audit; `.txt` evidence files have no configured LSP server, so they were validated by content review and full pytest instead.
+
+- Resolved during Task 9: the first exact 2025.1 WAQL live run failed because the matrix reused the 2024 Actor-Mixer Hierarchy path; updated the 2025-only matrix to the live SampleProject `Containers` root and reran the exact command successfully.
+- Task 9 verification note: JSON LSP diagnostics still cannot run because the configured `biome` server is not installed; modified JSON resources were validated with `python -m json.tool`, focused 2025 pytest, exact live pytest, and the full default pytest suite.

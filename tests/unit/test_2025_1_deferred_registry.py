@@ -22,7 +22,7 @@ def test_2025_deferred_registry_loads_and_matches_all_blocked_coverage() -> None
     blocked = {entry["uri"] for entry in coverage if entry["coverage_status"] in {"deferred", "excluded"}}
 
     assert set(registry.entries) == blocked
-    assert len(registry.entries) == len(blocked) == 154
+    assert len(registry.entries) == len(blocked) == 153
     for uri, deferred in registry.entries.items():
         source = next(entry for entry in coverage if entry["uri"] == uri)
         assert deferred.version == VERSION
@@ -47,7 +47,8 @@ def test_2025_deferred_resource_declares_shape_and_forbidden_promotions() -> Non
     assert set(payload["metadata"]["coverage_model"]["coverage_status"]) == {"deferred", "excluded"}
     assert set(payload["metadata"]["coverage_model"]["forbidden_promoted_statuses"]) == FORBIDDEN_PROMOTED_STATUSES
     assert {entry["coverage_status"] for entry in payload["deferred"]} == {"deferred", "excluded"}
-    assert {entry["uri"] for entry in payload["deferred"]} == {entry["uri"] for entry in coverage}
+    blocked = {entry["uri"] for entry in coverage if entry["coverage_status"] in {"deferred", "excluded"}}
+    assert {entry["uri"] for entry in payload["deferred"]} == blocked
     assert not any(entry["coverage_status"] in FORBIDDEN_PROMOTED_STATUSES for entry in payload["deferred"])
 
 
@@ -56,7 +57,8 @@ def test_2025_deferred_registry_exactly_matches_coverage_entries() -> None:
     coverage = _coverage_payload()["coverage"]
     coverage_by_uri = {entry["uri"]: entry for entry in coverage}
 
-    assert [entry["uri"] for entry in deferred] == [entry["uri"] for entry in coverage]
+    blocked_coverage = [entry for entry in coverage if entry["coverage_status"] in {"deferred", "excluded"}]
+    assert [entry["uri"] for entry in deferred] == [entry["uri"] for entry in blocked_coverage]
     for entry in deferred:
         source = coverage_by_uri[entry["uri"]]
         assert entry["coverage_status"] == source["coverage_status"]
@@ -73,11 +75,11 @@ def test_2025_deferred_summary_reconciles_deferred_and_excluded_counts() -> None
     excluded_entries = [entry for entry in payload["deferred"] if entry["coverage_status"] == "excluded"]
     status_counts = dict(sorted(Counter(entry["coverage_status"] for entry in payload["deferred"]).items()))
 
-    assert payload["summary"]["total"] == 154
+    assert payload["summary"]["total"] == 153
     assert payload["summary"]["deferred_count"] == len(deferred_entries)
     assert payload["summary"]["excluded_count"] == len(excluded_entries)
     assert payload["summary"]["status_counts"] == status_counts
-    assert status_counts["deferred"] + status_counts["excluded"] == 154
+    assert status_counts["deferred"] + status_counts["excluded"] == 153
     assert payload["metadata"]["baseline_comparison"]["policy"] == "2024.1 evidence is comparison metadata only and never counts as 2025.1 proof."
 
 
