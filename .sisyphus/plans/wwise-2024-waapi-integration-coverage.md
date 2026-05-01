@@ -293,7 +293,7 @@ Support Wwise 2024.1.13 WAAPI resources and tests as an explicit opt-in version 
 
   **Commit**: YES | Message: `docs(wwise): ground 2024 semantic sources` | Files: `references/semantic/2024.1/*.md`, `resources/semantic/2024.1/source_notes.json`, `tests/unit/test_2024_reference_layout.py`
 
-- [ ] 6. Build 2024 parity coverage, policy, matrix, and deferred resources
+- [x] 6. Build 2024 parity coverage, policy, matrix, and deferred resources
 
   **What to do**: Generate `resources/coverage/2024.1/api-coverage.json`, `live-coverage-matrix.json`, `phase2-coverage-summary.json`, `phase21-uri-policy.json`, and `resources/deferred/2024.1.json` from the 2024 manifest and source notes. Start with conservative statuses: manifest-only entries are not behavioral; risky families excluded; no live/sandbox promotion until Tasks 8/10 create fresh 2024 evidence.
   **Must NOT do**: Do not copy 2023 counts or evidence as 2024 proof. Do not promote risky families by default.
