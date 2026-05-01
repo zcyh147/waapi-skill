@@ -23,3 +23,6 @@
 - 2025.1 Task 6 candidate statuses are preserved as `candidate_status`/policy lists while coverage and matrix statuses remain deferred or excluded until later fresh live/destructive evidence tasks.
 
 - Task 7 commit scope stayed clean by keeping the generated 2025.1 coverage resources, deferred registry, verification tests, evidence notes, and plan checkbox together while excluding `.sisyphus/runtime` and any auth/runtime artifacts.
+
+- Task 8 hardened `tests/unit/test_2025_1_cross_version_audit.py` into the full 2025.1 parity guard: manifest, coverage, live matrix, phase2 summary, phase21 policy, deferred registry, source notes, versioned reference docs, and optional `resources/waql/2025.1/` resources now reconcile against the same 154 reflected functions.
+- Fresh behavior promotion for 2025.1 now requires an approved 2025.1 root plus explicit fresh behavior text; local mutation tests reject stale 2022/2023/2024 proof, bare `2025` paths, manifest-only, skipped-test, helper-only, and NotebookLM-only evidence.

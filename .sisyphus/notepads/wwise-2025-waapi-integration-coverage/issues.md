@@ -27,3 +27,5 @@
 - Task 7 verification note: JSON LSP diagnostics still cannot run because the configured `biome` server is not installed; generated JSON was validated with `python -m json.tool`, Python LSP diagnostics were clean for new tests, and focused/regression pytest passed.
 
 - Task 7 commit note: no additional blockers were found while staging the baseline resources; the only tracked plan change was the Task 7 checkbox flip already present in the working tree.
+
+- Task 8 verification note: LSP diagnostics were clean for the modified Python audit; `.txt` evidence files have no configured LSP server, so they were validated by content review and full pytest instead.

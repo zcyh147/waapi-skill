@@ -406,7 +406,7 @@ Wave 5: F1-F4 final review agents.
 
   **Commit**: YES | Message: `test(coverage): classify 2025 parity resources` | Files: `resources/coverage/2025.1/*.json`, `resources/deferred/2025.1.json`, `tests/unit/test_2025_1_*coverage*.py`, `.sisyphus/evidence/task-2025-7-*.txt`
 
-- [ ] 8. Add 2025 parity audits and fresh-evidence promotion guards
+- [x] 8. Add 2025 parity audits and fresh-evidence promotion guards
 
   **What to do**: Harden `tests/unit/test_2025_1_cross_version_audit.py` and add focused audits asserting 2025 coverage, live matrix, policy, deferred registry, source notes, WAQL resources, and docs references reconcile. Add promotion guards requiring evidence paths under `.sisyphus/evidence/wwise-2025-waapi-integration-coverage/` or `resources/waql/2025.1/`, and rejecting stale 2022/2023/2024, bare 2025, skipped-test, manifest-only, helper-only, or NotebookLM-only proof as behavior evidence.
   **Must NOT do**: Do not allow approved evidence root alone; evidence must also be fresh 2025 proof and not stale proof embedded in text.
