@@ -1,0 +1,344 @@
+{
+  "version": "2023.1",
+  "notebook_id": "wwise-2023.1-docs",
+  "protocol": "references/semantic/2023.1/semantic-builder-protocol.md",
+  "notes": {
+    "query": {
+      "family": "query",
+      "status": "grounded",
+      "notebook_id": "wwise-2023.1-docs",
+      "version_target": "2023.1",
+      "gate_evidence_path": "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
+      "official_urls": [
+        "https://blog.audiokinetic.com/waapi-for-wwise-2023.1/",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=waapi.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=waql_reference.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_get.html"
+      ],
+      "source_urls": [
+        "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2023.1/semantic-builder-query.md"
+      ],
+      "endpoints": [
+        "ak.wwise.core.object.get"
+      ],
+      "required_fields": [
+        "ak.wwise.core.object.get: waql text query or deprecated from statement"
+      ],
+      "optional_fields": [
+        "options.return",
+        "options.platform",
+        "options.language"
+      ],
+      "return_shape": "Object with a return array; each returned item contains fields requested by options.return, such as id, name, or property accessors.",
+      "destructive_behavior": "Read-only. Query builders must not mutate Wwise state or dispatch automatically.",
+      "ambiguity_constraints": "Prefer WAQL because it has better error handling than legacy JSON queries; fields that do not apply to a matched object can be omitted by Wwise.",
+      "unsupported_cases": "Profiler, transport, soundengine, UI, CLI, remote, debug, and mutating operations are outside this family.",
+      "cited_required_fields": [
+        "ak.wwise.core.object.get: waql text query or deprecated from statement"
+      ]
+    },
+    "object-mutation": {
+      "family": "object-mutation",
+      "status": "grounded",
+      "notebook_id": "wwise-2023.1-docs",
+      "version_target": "2023.1",
+      "gate_evidence_path": "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
+      "official_urls": [
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=waapi_functions_index.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_create.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_set.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_delete.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_copy.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_move.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_diff.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_pasteproperties.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_undo_begingroup.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_undo_endgroup.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_undo_undo.html"
+      ],
+      "source_urls": [
+        "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2023.1/semantic-builder-object-mutation.md"
+      ],
+      "endpoints": [
+        "ak.wwise.core.object.create",
+        "ak.wwise.core.object.set",
+        "ak.wwise.core.object.delete",
+        "ak.wwise.core.object.copy",
+        "ak.wwise.core.object.move",
+        "ak.wwise.core.object.diff",
+        "ak.wwise.core.object.pasteProperties",
+        "ak.wwise.core.undo.beginGroup",
+        "ak.wwise.core.undo.endGroup",
+        "ak.wwise.core.undo.undo"
+      ],
+      "required_fields": [
+        "ak.wwise.core.object.create: parent, type, name",
+        "ak.wwise.core.object.set: objects array",
+        "ak.wwise.core.object.delete: object",
+        "ak.wwise.core.object.copy: object, parent",
+        "ak.wwise.core.object.move: object, parent",
+        "ak.wwise.core.object.diff: object, other",
+        "ak.wwise.core.object.pasteProperties: source and target or targets",
+        "ak.wwise.core.undo.beginGroup: no required fields",
+        "ak.wwise.core.undo.endGroup: displayName",
+        "ak.wwise.core.undo.undo: no required fields"
+      ],
+      "optional_fields": [
+        "onNameConflict",
+        "platform",
+        "autoAddToSourceControl",
+        "notes",
+        "children",
+        "pasteMode",
+        "inclusion",
+        "exclusion",
+        "options.return"
+      ],
+      "return_shape": "Mutation endpoints return created or modified object data when requested, often in objects or return arrays; object.diff returns property and list differences; undo actions return empty JSON objects.",
+      "destructive_behavior": "Mutating. Delete operations remove objects; onNameConflict=replace can remove an existing child before replacement; list replacement can clear existing list items.",
+      "ambiguity_constraints": "Name conflicts must be handled explicitly with onNameConflict. String object identifiers need enough scope to avoid matching the wrong object.",
+      "unsupported_cases": "Do not create Query objects or plug-in Source, Effect, or Metadata objects through generic mutation builders; do not set constraint-based Switch Container assignments through generic object mutation.",
+      "cited_required_fields": [
+        "ak.wwise.core.object.create: parent, type, name",
+        "ak.wwise.core.object.set: objects array",
+        "ak.wwise.core.object.delete: object",
+        "ak.wwise.core.object.copy: object, parent",
+        "ak.wwise.core.object.move: object, parent",
+        "ak.wwise.core.object.diff: object, other",
+        "ak.wwise.core.object.pasteProperties: source and target or targets",
+        "ak.wwise.core.undo.beginGroup: no required fields",
+        "ak.wwise.core.undo.endGroup: displayName",
+        "ak.wwise.core.undo.undo: no required fields"
+      ]
+    },
+    "property-reference": {
+      "family": "property-reference",
+      "status": "grounded",
+      "notebook_id": "wwise-2023.1-docs",
+      "version_target": "2023.1",
+      "gate_evidence_path": "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
+      "official_urls": [
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_gettypes.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_getpropertyandreferencenames.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_getpropertyinfo.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_ispropertyenabled.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_getattenuationcurve.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_setname.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_setnotes.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_setproperty.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_setreference.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_setrandomizer.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_setattenuationcurve.html"
+      ],
+      "source_urls": [
+        "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2023.1/semantic-builder-property-reference.md"
+      ],
+      "endpoints": [
+        "ak.wwise.core.object.getTypes",
+        "ak.wwise.core.object.getPropertyAndReferenceNames",
+        "ak.wwise.core.object.getPropertyInfo",
+        "ak.wwise.core.object.isPropertyEnabled",
+        "ak.wwise.core.object.getAttenuationCurve",
+        "ak.wwise.core.object.setName",
+        "ak.wwise.core.object.setNotes",
+        "ak.wwise.core.object.setProperty",
+        "ak.wwise.core.object.setReference",
+        "ak.wwise.core.object.setRandomizer",
+        "ak.wwise.core.object.setAttenuationCurve"
+      ],
+      "required_fields": [
+        "ak.wwise.core.object.getTypes: no required fields",
+        "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+        "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+        "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+        "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+        "ak.wwise.core.object.setName: object, value",
+        "ak.wwise.core.object.setNotes: object, value",
+        "ak.wwise.core.object.setProperty: object, property, value",
+        "ak.wwise.core.object.setReference: object, reference, value",
+        "ak.wwise.core.object.setRandomizer: object, property, and at least one randomizer field",
+        "ak.wwise.core.object.setAttenuationCurve: object, curveType, points, plus curve usage fields"
+      ],
+      "optional_fields": [
+        "platform",
+        "additional randomizer fields when setting a partial randomizer",
+        "property-specific fields reported by getPropertyInfo"
+      ],
+      "return_shape": "Getters return property metadata, enabled status, names, or attenuation curve data. Setters return empty JSON objects.",
+      "destructive_behavior": "Mutating setters overwrite names, notes, properties, references, randomizers, or attenuation curves. Getter endpoints are read-only.",
+      "ambiguity_constraints": "Use explicit platform values when setting unlinked properties. getPropertyInfo needs exactly one identity scope, object or classId.",
+      "unsupported_cases": "getPropertyNames is deprecated and outside this 2023.1 family. getPropertyInfo describes metadata and does not read the current object value.",
+      "cited_required_fields": [
+        "ak.wwise.core.object.getTypes: no required fields",
+        "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+        "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+        "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+        "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+        "ak.wwise.core.object.setName: object, value",
+        "ak.wwise.core.object.setNotes: object, value",
+        "ak.wwise.core.object.setProperty: object, property, value",
+        "ak.wwise.core.object.setReference: object, reference, value",
+        "ak.wwise.core.object.setRandomizer: object, property, and at least one randomizer field",
+        "ak.wwise.core.object.setAttenuationCurve: object, curveType, points, plus curve usage fields"
+      ]
+    },
+    "import": {
+      "family": "import",
+      "status": "grounded",
+      "notebook_id": "wwise-2023.1-docs",
+      "version_target": "2023.1",
+      "gate_evidence_path": "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
+      "official_urls": [
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_audio_import.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_audio_importtabdelimited.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_audio_imported.html"
+      ],
+      "source_urls": [
+        "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2023.1/semantic-builder-import.md"
+      ],
+      "endpoints": [
+        "ak.wwise.core.audio.import",
+        "ak.wwise.core.audio.importTabDelimited",
+        "ak.wwise.core.audio.imported"
+      ],
+      "required_fields": [
+        "ak.wwise.core.audio.import: importOperation and imports array",
+        "ak.wwise.core.audio.import: objectPath and audioFile or audioFileBase64 for media import items",
+        "ak.wwise.core.audio.importTabDelimited: importLanguage, importOperation, importFile",
+        "ak.wwise.core.audio.imported: topic payload only"
+      ],
+      "optional_fields": [
+        "default",
+        "originalsSubFolder",
+        "notes",
+        "switchAssignation",
+        "autoAddToSourceControl",
+        "autoCheckOutToSourceControl",
+        "options.return",
+        "per-import objectType and @PropertyName values"
+      ],
+      "return_shape": "Import returns arrays of created or changed objects and imported files, plus log entries that must be checked for warnings or failures. The imported topic reports import event payloads.",
+      "destructive_behavior": "Mutating. replaceExisting permanently destroys existing objects with matching names before replacement.",
+      "ambiguity_constraints": "Base64 audio inputs need the documented filename separator before the data stream. Import logs must be parsed because commands can report failure through log entries.",
+      "unsupported_cases": "Do not use import builders for profiler, transport, soundengine, UI, CLI, remote, or debug APIs; do not set constraint-based Switch Container associations through import.",
+      "cited_required_fields": [
+        "ak.wwise.core.audio.import: importOperation and imports array",
+        "ak.wwise.core.audio.import: objectPath and audioFile or audioFileBase64 for media import items",
+        "ak.wwise.core.audio.importTabDelimited: importLanguage, importOperation, importFile",
+        "ak.wwise.core.audio.imported: topic payload only"
+      ]
+    },
+    "soundbank": {
+      "family": "soundbank",
+      "status": "grounded",
+      "notebook_id": "wwise-2023.1-docs",
+      "version_target": "2023.1",
+      "gate_evidence_path": "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
+      "official_urls": [
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_soundbank_getinclusions.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_soundbank_setinclusions.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_soundbank_generate.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_soundbank_convertexternalsources.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_soundbank_processdefinitionfiles.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_soundbank_generated.html"
+      ],
+      "source_urls": [
+        "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2023.1/semantic-builder-soundbank.md"
+      ],
+      "endpoints": [
+        "ak.wwise.core.soundbank.getInclusions",
+        "ak.wwise.core.soundbank.setInclusions",
+        "ak.wwise.core.soundbank.generate",
+        "ak.wwise.core.soundbank.convertExternalSources",
+        "ak.wwise.core.soundbank.processDefinitionFiles",
+        "ak.wwise.core.soundbank.generated",
+        "ak.wwise.core.soundbank.generationDone"
+      ],
+      "required_fields": [
+        "ak.wwise.core.soundbank.getInclusions: soundbank",
+        "ak.wwise.core.soundbank.setInclusions: soundbank, operation, inclusions",
+        "ak.wwise.core.soundbank.generate: no required fields when generating all, otherwise identify supplied soundbanks",
+        "ak.wwise.core.soundbank.convertExternalSources: sources array with source input details",
+        "ak.wwise.core.soundbank.processDefinitionFiles: files array",
+        "ak.wwise.core.soundbank.generated: topic payload only",
+        "ak.wwise.core.soundbank.generationDone: topic payload only"
+      ],
+      "optional_fields": [
+        "platforms",
+        "languages",
+        "skipLanguages",
+        "soundbanks",
+        "rebuildSoundBanks",
+        "clearAudioFileCache",
+        "writeToDisk",
+        "rebuildInitBank",
+        "generated topic payload options"
+      ],
+      "return_shape": "getInclusions returns inclusion arrays. setInclusions returns an empty JSON object. generate and generation topics return logs or generated bank payload details depending on options.",
+      "destructive_behavior": "Mutating. setInclusions with replace semantics clears existing inclusion lists. clearAudioFileCache removes generated audio cache data.",
+      "ambiguity_constraints": "If soundbanks is omitted or empty during generation, Wwise can generate all user-defined SoundBanks. Topic notifications alone do not prove generation success.",
+      "unsupported_cases": "Do not include profiler, transport, soundengine, UI, CLI, remote, or debug APIs. Do not treat auto-defined SoundBanks as manually specified SoundBanks for WAAPI generation.",
+      "cited_required_fields": [
+        "ak.wwise.core.soundbank.getInclusions: soundbank",
+        "ak.wwise.core.soundbank.setInclusions: soundbank, operation, inclusions",
+        "ak.wwise.core.soundbank.generate: no required fields when generating all, otherwise identify supplied soundbanks",
+        "ak.wwise.core.soundbank.convertExternalSources: sources array with source input details",
+        "ak.wwise.core.soundbank.processDefinitionFiles: files array",
+        "ak.wwise.core.soundbank.generated: topic payload only",
+        "ak.wwise.core.soundbank.generationDone: topic payload only"
+      ]
+    },
+    "switchcontainer": {
+      "family": "switchcontainer",
+      "status": "grounded",
+      "notebook_id": "wwise-2023.1-docs",
+      "version_target": "2023.1",
+      "gate_evidence_path": "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
+      "official_urls": [
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_switchcontainer_addassignment.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_switchcontainer_getassignments.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_switchcontainer_removeassignment.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_switchcontainer_assignmentadded.html",
+        "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_switchcontainer_assignmentremoved.html"
+      ],
+      "source_urls": [
+        "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2023.1/semantic-builder-switchcontainer.md"
+      ],
+      "endpoints": [
+        "ak.wwise.core.switchContainer.getAssignments",
+        "ak.wwise.core.switchContainer.addAssignment",
+        "ak.wwise.core.switchContainer.removeAssignment",
+        "ak.wwise.core.switchContainer.assignmentAdded",
+        "ak.wwise.core.switchContainer.assignmentRemoved"
+      ],
+      "required_fields": [
+        "ak.wwise.core.switchContainer.addAssignment: child, stateOrSwitch",
+        "ak.wwise.core.switchContainer.getAssignments: id",
+        "ak.wwise.core.switchContainer.removeAssignment: child, stateOrSwitch",
+        "ak.wwise.core.switchContainer.assignmentAdded: topic payload only",
+        "ak.wwise.core.switchContainer.assignmentRemoved: topic payload only"
+      ],
+      "optional_fields": [
+        "options.return",
+        "topic subscription return fields"
+      ],
+      "return_shape": "getAssignments returns a return array listing child and stateOrSwitch assignment pairs. addAssignment and removeAssignment return empty JSON objects. Topics return assignment event payloads.",
+      "destructive_behavior": "Mutating for assignment changes. removeAssignment unlinks the child from the state or switch.",
+      "ambiguity_constraints": "The assigned child must belong to the Switch Container, and the state or switch must belong to the group bound to that Switch Container.",
+      "unsupported_cases": "Do not use import or generic object mutation to build Switch Container assignments when ordering constraints cannot be guaranteed. No profiler, transport, soundengine, UI, CLI, remote, or debug APIs are part of this family.",
+      "cited_required_fields": [
+        "ak.wwise.core.switchContainer.addAssignment: child, stateOrSwitch",
+        "ak.wwise.core.switchContainer.getAssignments: id",
+        "ak.wwise.core.switchContainer.removeAssignment: child, stateOrSwitch",
+        "ak.wwise.core.switchContainer.assignmentAdded: topic payload only",
+        "ak.wwise.core.switchContainer.assignmentRemoved: topic payload only"
+      ]
+    }
+  }
+}
