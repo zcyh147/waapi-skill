@@ -4,10 +4,12 @@
       "category": "cli",
       "count": 13,
       "coverage_status": "excluded",
-      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "future_review_trigger": "2023.1 policy review required. Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
       "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
       "target_status": "skipped-approved",
-      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only."
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "evidence_source": "resources/manifest/2023.1/functions.json + resources/manifest/2023.1/topics.json + resources/manifest/2023.1/schemas.json; inventory/schema reflection only, not behavioral coverage",
+      "blocking_condition": "cli remains excluded for 2023.1 risky-family policy; no default/live behavioral probe or manifest-only promotion is allowed."
     },
     {
       "category": "core.profiler",
@@ -16,7 +18,9 @@
       "future_review_trigger": "Review when 2023.1 core.profiler fixture evidence is available.",
       "risk_explanation": "Requires dedicated family-specific live fixtures and is not safe to promote from reflection.",
       "target_status": "excluded",
-      "user_approved_rationale": "core.profiler is explicitly excluded from 2023.1 semantic builder/live coverage scope for this contract."
+      "user_approved_rationale": "core.profiler is explicitly excluded from 2023.1 semantic builder/live coverage scope for this contract.",
+      "evidence_source": "resources/manifest/2023.1/functions.json + resources/manifest/2023.1/topics.json + resources/manifest/2023.1/schemas.json; inventory/schema reflection only, not behavioral coverage",
+      "blocking_condition": "core.profiler remains excluded for 2023.1 risky-family policy; no default/live behavioral probe or manifest-only promotion is allowed."
     },
     {
       "category": "core.profiler.captureLog",
@@ -25,16 +29,20 @@
       "future_review_trigger": "Review when 2023.1 core.profiler.captureLog fixture evidence is available.",
       "risk_explanation": "Requires dedicated family-specific live fixtures and is not safe to promote from reflection.",
       "target_status": "excluded",
-      "user_approved_rationale": "core.profiler.captureLog is explicitly excluded from 2023.1 semantic builder/live coverage scope for this contract."
+      "user_approved_rationale": "core.profiler.captureLog is explicitly excluded from 2023.1 semantic builder/live coverage scope for this contract.",
+      "evidence_source": "resources/manifest/2023.1/functions.json + resources/manifest/2023.1/topics.json + resources/manifest/2023.1/schemas.json; inventory/schema reflection only, not behavioral coverage",
+      "blocking_condition": "core.profiler.captureLog remains excluded for 2023.1 risky-family policy; no default/live behavioral probe or manifest-only promotion is allowed."
     },
     {
       "category": "core.remote",
       "count": 4,
       "coverage_status": "excluded",
-      "future_review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
+      "future_review_trigger": "2023.1 policy review required. Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
       "risk_explanation": "Remote connect/disconnect behavior depends on external consoles and network/session state not provided by the local sandbox.",
       "target_status": "skipped-approved",
-      "user_approved_rationale": "User guidance approves skipping remote-console behavior because a deterministic remote console environment is unavailable."
+      "user_approved_rationale": "User guidance approves skipping remote-console behavior because a deterministic remote console environment is unavailable.",
+      "evidence_source": "resources/manifest/2023.1/functions.json + resources/manifest/2023.1/topics.json + resources/manifest/2023.1/schemas.json; inventory/schema reflection only, not behavioral coverage",
+      "blocking_condition": "core.remote remains excluded for 2023.1 risky-family policy; no default/live behavioral probe or manifest-only promotion is allowed."
     },
     {
       "category": "core.transport",
@@ -43,16 +51,20 @@
       "future_review_trigger": "Review when 2023.1 core.transport fixture evidence is available.",
       "risk_explanation": "Requires dedicated family-specific live fixtures and is not safe to promote from reflection.",
       "target_status": "excluded",
-      "user_approved_rationale": "core.transport is explicitly excluded from 2023.1 semantic builder/live coverage scope for this contract."
+      "user_approved_rationale": "core.transport is explicitly excluded from 2023.1 semantic builder/live coverage scope for this contract.",
+      "evidence_source": "resources/manifest/2023.1/functions.json + resources/manifest/2023.1/topics.json + resources/manifest/2023.1/schemas.json; inventory/schema reflection only, not behavioral coverage",
+      "blocking_condition": "core.transport remains excluded for 2023.1 risky-family policy; no default/live behavioral probe or manifest-only promotion is allowed."
     },
     {
       "category": "debug",
       "count": 8,
       "coverage_status": "excluded",
-      "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
+      "future_review_trigger": "2023.1 policy review required. Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
       "risk_explanation": "Debug assert/crash APIs can intentionally fail, crash, or alter automation/assert handling in the running Wwise instance.",
       "target_status": "skipped-approved",
-      "user_approved_rationale": "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths."
+      "user_approved_rationale": "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths.",
+      "evidence_source": "resources/manifest/2023.1/functions.json + resources/manifest/2023.1/topics.json + resources/manifest/2023.1/schemas.json; inventory/schema reflection only, not behavioral coverage",
+      "blocking_condition": "debug remains excluded for 2023.1 risky-family policy; no default/live behavioral probe or manifest-only promotion is allowed."
     },
     {
       "category": "soundengine",
@@ -61,38 +73,46 @@
       "future_review_trigger": "Review when 2023.1 soundengine fixture evidence is available.",
       "risk_explanation": "Requires dedicated family-specific live fixtures and is not safe to promote from reflection.",
       "target_status": "excluded",
-      "user_approved_rationale": "soundengine is explicitly excluded from 2023.1 semantic builder/live coverage scope for this contract."
+      "user_approved_rationale": "soundengine is explicitly excluded from 2023.1 semantic builder/live coverage scope for this contract.",
+      "evidence_source": "resources/manifest/2023.1/functions.json + resources/manifest/2023.1/topics.json + resources/manifest/2023.1/schemas.json; inventory/schema reflection only, not behavioral coverage",
+      "blocking_condition": "soundengine remains excluded for 2023.1 risky-family policy; no default/live behavioral probe or manifest-only promotion is allowed."
     },
     {
       "category": "ui",
       "count": 4,
       "coverage_status": "excluded",
-      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "future_review_trigger": "2023.1 policy review required. Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
       "target_status": "wrapper-only",
-      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target."
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "evidence_source": "resources/manifest/2023.1/functions.json + resources/manifest/2023.1/topics.json + resources/manifest/2023.1/schemas.json; inventory/schema reflection only, not behavioral coverage",
+      "blocking_condition": "ui remains excluded for 2023.1 risky-family policy; no default/live behavioral probe or manifest-only promotion is allowed."
     },
     {
       "category": "ui.commands",
       "count": 5,
       "coverage_status": "excluded",
-      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "future_review_trigger": "2023.1 policy review required. Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
       "target_status": "wrapper-only",
-      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target."
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "evidence_source": "resources/manifest/2023.1/functions.json + resources/manifest/2023.1/topics.json + resources/manifest/2023.1/schemas.json; inventory/schema reflection only, not behavioral coverage",
+      "blocking_condition": "ui.commands remains excluded for 2023.1 risky-family policy; no default/live behavioral probe or manifest-only promotion is allowed."
     },
     {
       "category": "ui.project",
       "count": 3,
       "coverage_status": "excluded",
-      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "future_review_trigger": "2023.1 policy review required. Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
       "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
       "target_status": "wrapper-only",
-      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target."
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "evidence_source": "resources/manifest/2023.1/functions.json + resources/manifest/2023.1/topics.json + resources/manifest/2023.1/schemas.json; inventory/schema reflection only, not behavioral coverage",
+      "blocking_condition": "ui.project remains excluded for 2023.1 risky-family policy; no default/live behavioral probe or manifest-only promotion is allowed."
     }
   ],
   "metadata": {
-    "generator": "task-4 2023.1 excluded family policy contract generator",
+    "generator": "task-5 2023.1 risky-family deferred/excluded policy lock",
     "required_excluded_families": [
       "profiler",
       "transport",
@@ -102,7 +122,13 @@
       "remote",
       "debug"
     ],
-    "version": "2023.1"
+    "version": "2023.1",
+    "policy_lock": {
+      "date": "2026-05-01",
+      "evidence_source": "resources/coverage/2023.1/api-coverage.json + resources/deferred/2023.1.json + resources/coverage/2023.1/phase21-uri-policy.json",
+      "scope": "profiler, transport, soundengine, UI, CLI, remote, and debug category counts remain excluded with no behavioral/live promotion.",
+      "future_review_trigger": "Revisit only with explicit family-specific 2023.1 fixture approval and behavior-backed evidence."
+    }
   },
   "summary": {
     "excluded_categories": 10,

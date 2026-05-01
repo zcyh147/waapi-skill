@@ -2446,7 +2446,7 @@
       "remote",
       "debug"
     ],
-    "generator": "task-4 2023.1 deferred contract generator",
+    "generator": "task-5 2023.1 risky-family deferred/excluded policy lock",
     "manifest_source": "resources/manifest/2023.1",
     "required_fields": [
       "uri",
@@ -2465,7 +2465,14 @@
       "coverage_status"
     ],
     "version": "2023.1",
-    "wwise_build": "2023.1.19.8928"
+    "wwise_build": "2023.1.19.8928",
+    "policy_lock": {
+      "date": "2026-05-01",
+      "evidence_source": "resources/coverage/2023.1/api-coverage.json + resources/coverage/2023.1/wrapper-only-category-policy.json + resources/coverage/2023.1/phase21-uri-policy.json",
+      "scope": "profiler, transport, soundengine, UI, CLI, remote, and debug remain deferred/excluded; no manifest-only behavioral/live promotion is allowed.",
+      "promotion_rule": "Only 2023.1 behavioral execution evidence can move a URI out of deferred/excluded status; Task 4 sandbox-mutating-tested and Task 3 live-tested promotions are intentionally absent from this registry.",
+      "future_review_trigger": "Revisit only when family-specific 2023.1 fixtures, cleanup/readback evidence, and explicit policy approval exist for the risky family."
+    }
   },
   "summary": {
     "deferred_count": 43,

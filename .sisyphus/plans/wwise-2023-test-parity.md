@@ -274,7 +274,7 @@ Wave 4: Final Verification Wave F1-F4.
 
   **Commit**: YES | Message: `test(destructive): expand 2023 sandbox parity` | Files: `tests/destructive/test_2023_*.py`, `resources/coverage/2023.1/*.json`, `.sisyphus/evidence/wwise-2023-test-parity/destructive/*`
 
-- [ ] 5. Lock risky-family deferred/excluded policy with evidence
+- [x] 5. Lock risky-family deferred/excluded policy with evidence
 
   **What to do**: Update `resources/deferred/2023.1.json` and `resources/coverage/2023.1/wrapper-only-category-policy.json` so profiler, transport, soundengine, UI, CLI, remote, and debug remain deferred/excluded with explicit 2023.1 rationale, future review triggers, and no behavioral/live promotion. Incorporate Task 1 findings for any 2023-specific new APIs in these families.
   **Must NOT do**: Do not add live probes for these families except named safe probes already proven by existing tests. Do not remove excluded family assertions.
