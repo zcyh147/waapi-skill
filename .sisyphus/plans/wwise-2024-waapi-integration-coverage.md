@@ -215,7 +215,7 @@ Support Wwise 2024.1.13 WAAPI resources and tests as an explicit opt-in version 
 
   **Commit**: YES | Message: `test(wwise): reflect 2024 manifest resources` | Files: `resources/manifest/2024.1/*.json`, `tests/unit/test_2024_manifest_resources.py`, `.sisyphus/evidence/task-2024-3-*.txt`
 
-- [ ] 4. Add 2024 cross-version isolation and default-dispatch audits
+- [x] 4. Add 2024 cross-version isolation and default-dispatch audits
 
   **What to do**: Port 2023 cross-version tests to `tests/unit/test_2024_cross_version_audit.py`. Assert default remains 2022.1, explicit 2024.1 dispatch dry-run succeeds, explicit 2024.1 resource reads never touch 2022.1, 2023.1, `resources/manifest/2024`, or global semantic references, and no 2025 resources are introduced.
   **Must NOT do**: Do not make 2024.1 default; do not use broad monkeypatches that hide real fallback reads.
