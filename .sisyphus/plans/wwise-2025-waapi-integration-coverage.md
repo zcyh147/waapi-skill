@@ -244,7 +244,7 @@ Wave 5: F1-F4 final review agents.
 
   **Commit**: YES | Message: `test(wwise): reflect 2025 manifest resources` | Files: `resources/manifest/2025.1/*.json`, `tests/unit/test_2025_1_manifest_resources.py`, `.sisyphus/evidence/task-2025-3-*.txt`
 
-- [ ] 4. Add 2025 cross-version isolation and default-dispatch audits
+- [x] 4. Add 2025 cross-version isolation and default-dispatch audits
 
   **What to do**: Add `tests/unit/test_2025_1_cross_version_audit.py` and `tests/unit/test_2025_1_version_isolation.py`. Assert default remains 2022.1, explicit 2025.1 dry-run dispatch succeeds from 2025.1 manifest, explicit 2025.1 resource reads never touch 2022.1/2023.1/2024.1/bare 2025/global semantic references, and existing 2023/2024 tests still pass after shared-code changes.
   **Must NOT do**: Do not weaken 2023/2024 audits to make 2025 pass.
