@@ -1,0 +1,86 @@
+{
+  "live_cases": [
+    {
+      "args": {
+        "waql": "\\\"\\\\Actor-Mixer Hierarchy\\\""
+      },
+      "category": "path queries",
+      "coverage_status": "evidence-only",
+      "evidence_path": "",
+      "expected": {
+        "identity": {
+          "name": "Actor-Mixer Hierarchy",
+          "path": "\\\\Actor-Mixer Hierarchy"
+        },
+        "result_count": {
+          "count": 1,
+          "policy": "exact"
+        }
+      },
+      "id": "path_actor_mixer_root_2023_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ]
+      },
+      "promotion_required_evidence": "2023.1 live sandbox JSON with returned object identity/type/path assertions.",
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from type Sound where type = \\\"Sound\\\" take 1"
+      },
+      "category": "type filters",
+      "coverage_status": "evidence-only",
+      "evidence_path": "",
+      "expected": {
+        "result_count": {
+          "allow_empty": true,
+          "count": 1,
+          "policy": "at_most"
+        },
+        "type": "Sound"
+      },
+      "id": "type_sound_filter_2023_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type"
+        ]
+      },
+      "promotion_required_evidence": "2023.1 live sandbox JSON proving any returned rows have type Sound.",
+      "uri": "ak.wwise.core.object.get"
+    }
+  ],
+  "metadata": {
+    "comparison_only_sources": [
+      "resources/waql/2022.1/object-get-live-matrix.json format only",
+      "No 2022.1 evidence paths are reused as 2023.1 proof."
+    ],
+    "default_live": false,
+    "name": "WAQL 2023.1 object.get contract matrix",
+    "notes": [
+      "Manifest/schema presence for ak.wwise.core.object.get is not behavioral WAQL support.",
+      "Promote individual cases only after 2023.1 live sandbox assertions are recorded."
+    ],
+    "sandbox_required": true,
+    "schema_source": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+    "source_project_mutation_allowed": false,
+    "status_policy": "Evidence-only: cases are contractual probes derived for 2023.1; no 2023.1 live evidence is claimed.",
+    "uri": "ak.wwise.core.object.get",
+    "wwise_build": "2023.1.19.8928",
+    "wwise_version_target": "2023.1"
+  },
+  "summary": {
+    "case_count": 2,
+    "coverage_status": "evidence-only",
+    "live_tested_cases": 0,
+    "version": "2023.1"
+  }
+}

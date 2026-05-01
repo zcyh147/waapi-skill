@@ -116,7 +116,7 @@ class ApiCoverageBuilder:
         deferred = self._is_deferred(uri, item_type, classification.category, classification.risk_level)
         route = self._route(uri, item_type, deferred)
         entry: dict[str, Any] = {
-            "behavioral_evidence": self._behavioral_evidence(uri, item_type, deferred),
+            "behavioral_evidence": self._behavioral_evidence(uri, item_type, deferred, version),
             "category": classification.category,
             "deferred": self._deferred_payload(uri, deferred),
             "destructive_opt_in": self._requires_destructive_opt_in(uri, item_type, classification.risk_level),
@@ -124,11 +124,11 @@ class ApiCoverageBuilder:
             "risk_level": classification.risk_level,
             "route": route,
             "safety": self._safety(uri, item_type, classification.category, classification.risk_level, deferred),
-            "schema_mapping": self._schema_mapping(uri, schema_entry, schema),
+            "schema_mapping": self._schema_mapping(uri, schema_entry, schema, version),
             "schema_status": str(schema_entry.get("status", "missing")),
             "test_status": "deferred-with-substitute-test" if deferred else "fake-route-tested",
             "uri": uri,
-            "usage_guidance": self._usage_guidance(uri, item_type, classification.category, deferred, uri in waql_uris),
+            "usage_guidance": self._usage_guidance(uri, item_type, classification.category, deferred, uri in waql_uris, version),
             "version": version,
         }
         return entry
@@ -183,11 +183,11 @@ class ApiCoverageBuilder:
             "reason": "Low-risk reflected function can be resolved through the manifest-backed dispatcher with an injected fake WAAPI client.",
         }
 
-    def _behavioral_evidence(self, uri: str, item_type: str, deferred: bool) -> dict[str, Any]:
+    def _behavioral_evidence(self, uri: str, item_type: str, deferred: bool, version: str) -> dict[str, Any]:
         if deferred:
             return {
                 "coverage": "substitute-test",
-                "evidence": "DeferredRegistry.load_default('2022.1') plus schema/route resource validation",
+                "evidence": f"DeferredRegistry.load_default({version!r}) plus schema/route resource validation",
                 "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
             }
         if uri == WAQL_API_URI:
@@ -215,11 +215,11 @@ class ApiCoverageBuilder:
             "substitute_test": entry.substitute_test,
         }
 
-    def _schema_mapping(self, uri: str, schema_entry: Mapping[str, Any], schema: Any) -> dict[str, Any]:
+    def _schema_mapping(self, uri: str, schema_entry: Mapping[str, Any], schema: Any, version: str) -> dict[str, Any]:
         if not isinstance(schema, Mapping):
-            return {"manifest_uri": f"resources/manifest/2022.1/schemas.json#{uri}", "sections": {}}
+            return {"manifest_uri": f"resources/manifest/{version}/schemas.json#{uri}", "sections": {}}
         return {
-            "manifest_uri": f"resources/manifest/2022.1/schemas.json#{uri}",
+            "manifest_uri": f"resources/manifest/{version}/schemas.json#{uri}",
             "sections": {
                 "args": self._schema_section(schema.get("argsSchema")),
                 "options": self._schema_section(schema.get("optionsSchema")),
@@ -239,7 +239,7 @@ class ApiCoverageBuilder:
             "type": str(section.get("type", "schema-ref" if "$ref" in section else "unknown")),
         }
 
-    def _usage_guidance(self, uri: str, item_type: str, category: str, deferred: bool, is_waql: bool) -> dict[str, Any]:
+    def _usage_guidance(self, uri: str, item_type: str, category: str, deferred: bool, is_waql: bool, version: str) -> dict[str, Any]:
         guidance = {
             "default_path": "Use WwiseDispatcher with injected/fake clients in default tests; require live fixture for real WAAPI execution.",
             "notes": "Do not mutate broad user projects; use fixture projects and evidence paths for live tiers.",
@@ -249,7 +249,7 @@ class ApiCoverageBuilder:
         if deferred:
             guidance["notes"] = "Treat registry evidence as substitute coverage only; do not claim complete behavior until a live-safe behavioral test exists."
         if is_waql:
-            guidance["waql_reference"] = "references/waql-2022.1.md"
+            guidance["waql_reference"] = f"references/waql-{version}.md"
             guidance["waql_gate"] = "wwise_waapi.waql.require_waql_helper_generation"
         if category == "soundengine":
             guidance["fixture_requirement"] = "Requires initialized sound engine/game-object state before live behavioral assertions."
@@ -257,9 +257,9 @@ class ApiCoverageBuilder:
 
     def _metadata(self, version: str) -> dict[str, Any]:
         return {
-            "deferred_source": "resources/deferred/2022.1.json",
+            "deferred_source": f"resources/deferred/{version}.json",
             "generator": "wwise_waapi.api_coverage.ApiCoverageBuilder",
-            "manifest_source": "resources/manifest/2022.1",
+            "manifest_source": f"resources/manifest/{version}",
             "required_entry_fields": [
                 "uri",
                 "version",
@@ -277,7 +277,7 @@ class ApiCoverageBuilder:
             ],
             "sort_key": "uri",
             "version": version,
-            "waql_reference": "references/waql-2022.1.md",
+            "waql_reference": f"references/waql-{version}.md",
         }
 
     def _summary(self, version: str, entries: Sequence[Mapping[str, Any]], manifest: Mapping[str, Any]) -> CoverageSummary:
