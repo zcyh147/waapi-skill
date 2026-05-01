@@ -176,7 +176,7 @@ Support Wwise 2024.1.13 WAAPI resources and tests as an explicit opt-in version 
 
   **Commit**: YES | Message: `test(wwise): add 2024 fixture source` | Files: `tests/_org/2024.1/*`, `tests/unit/test_2024_fixture_inventory.py`
 
-- [ ] 3. Generate 2024.1 live reflection manifest resources
+- [x] 3. Generate 2024.1 live reflection manifest resources
 
   **What to do**: Use exact 2024 live env to reflect functions, topics, and schemas into `resources/manifest/2024.1/{manifest.json,functions.json,topics.json,schemas.json}`. Include build metadata `2024.1.13.9056`, path-scrubbed reflection data, source URIs, audit counts, and schema failure count. Record exact command output and discovered counts.
   **Must NOT do**: Do not place files under `resources/manifest/2024/`; do not reuse 2023 manifest counts.

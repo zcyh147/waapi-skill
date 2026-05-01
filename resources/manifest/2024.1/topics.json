@@ -1,0 +1,237 @@
+{
+  "metadata": {
+    "generator": "wwise_waapi.manifest.ReflectionManifestBuilder",
+    "inventory_source": "live-reflection-2024.1-sandbox-manifest",
+    "provenance": {
+      "sample_project": {
+        "name": "SampleProject",
+        "path": "/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject/SampleProject.wproj"
+      }
+    },
+    "schema_source_uri": "ak.wwise.waapi.getSchema",
+    "schema_source_uris": [
+      "ak.wwise.waapi.getSchema"
+    ],
+    "source_uris": [
+      "ak.wwise.waapi.getFunctions",
+      "ak.wwise.waapi.getTopics",
+      "ak.wwise.waapi.getSchema"
+    ],
+    "version_key": "2024.1",
+    "wwise_build": "2024.1.13.9056",
+    "wwise_console_path": "/Applications/Audiokinetic/Wwise2024.1.13.9056/Wwise.app/Contents/Tools/WwiseConsole.sh",
+    "wwise_version_target": "2024.1"
+  },
+  "topics": [
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.audio.imported"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.audio.imported"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.log.itemAdded"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.log.itemAdded"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.attenuationCurveChanged"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.object.attenuationCurveChanged"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.attenuationCurveLinkChanged"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.object.attenuationCurveLinkChanged"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.childAdded"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.object.childAdded"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.childRemoved"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.object.childRemoved"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.created"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.object.created"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.curveChanged"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.object.curveChanged"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.nameChanged"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.object.nameChanged"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.notesChanged"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.object.notesChanged"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.postDeleted"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.object.postDeleted"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.preDeleted"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.object.preDeleted"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.propertyChanged"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.object.propertyChanged"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.object.referenceChanged"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.object.referenceChanged"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.captureLog.itemAdded"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.profiler.captureLog.itemAdded"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.gameObjectRegistered"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.profiler.gameObjectRegistered"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.gameObjectReset"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.profiler.gameObjectReset"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.gameObjectUnregistered"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.profiler.gameObjectUnregistered"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.stateChanged"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.profiler.stateChanged"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.profiler.switchChanged"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.profiler.switchChanged"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.project.loaded"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.project.loaded"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.project.postClosed"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.project.postClosed"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.project.preClosed"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.project.preClosed"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.project.saved"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.project.saved"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.soundbank.generated"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.soundbank.generated"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.soundbank.generationDone"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.soundbank.generationDone"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.switchContainer.assignmentAdded"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.switchContainer.assignmentAdded"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.switchContainer.assignmentRemoved"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.switchContainer.assignmentRemoved"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.core.transport.stateChanged"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.core.transport.stateChanged"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.debug.assertFailed"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.debug.assertFailed"
+    }
+  ]
+}
