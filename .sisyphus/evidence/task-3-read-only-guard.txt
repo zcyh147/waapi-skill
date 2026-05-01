@@ -1,0 +1,5 @@
+$ WWISE_LIVE=1 python -m pytest tests/live/test_2023_waql_live_matrix.py::test_2023_waql_mutation_guard_rejects_before_client_call -q
+exit_code=0
+.                                                                        [100%]
+1 passed in 0.02s
+assertion: mutating WAQL token was rejected before client.call; test asserts client.calls == []

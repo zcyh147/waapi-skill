@@ -1,0 +1,65 @@
+{
+  "actual": {
+    "result_count": 1,
+    "returned_fields": [
+      "id",
+      "name",
+      "path",
+      "type"
+    ],
+    "rows": [
+      {
+        "id": "{5EA7BBF8-64C0-4A50-8821-A07E8BE21D68}",
+        "name": "Actor-Mixer Hierarchy",
+        "path": "\\Actor-Mixer Hierarchy",
+        "type": "WorkUnit"
+      }
+    ]
+  },
+  "assertions": [
+    "returned object identity matches the Actor-Mixer Hierarchy path",
+    "returned fields stay within the requested return option set"
+  ],
+  "case_id": "path_actor_mixer_root_2023_contract",
+  "evidence_path": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/path_actor_mixer_root_2023_contract.json",
+  "expected": {
+    "fields": [
+      "id",
+      "name",
+      "type",
+      "path"
+    ],
+    "identity": {
+      "name": "Actor-Mixer Hierarchy",
+      "path": "\\Actor-Mixer Hierarchy"
+    },
+    "result_count": {
+      "count": 1,
+      "policy": "exact"
+    }
+  },
+  "no_mutation": true,
+  "options": {
+    "return": [
+      "id",
+      "name",
+      "type",
+      "path"
+    ]
+  },
+  "query": "\"\\Actor-Mixer Hierarchy\"",
+  "recorded_at_unix": 1777618858,
+  "result_count": 1,
+  "result_count_policy": {
+    "count": 1,
+    "policy": "exact"
+  },
+  "sources": [
+    "resources/waql/2022.1/object-get-live-matrix.json format only",
+    "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+    "2022.1 WAQL path query live case"
+  ],
+  "status": "passed",
+  "uri": "ak.wwise.core.object.get",
+  "wwise_version": "2023.1"
+}

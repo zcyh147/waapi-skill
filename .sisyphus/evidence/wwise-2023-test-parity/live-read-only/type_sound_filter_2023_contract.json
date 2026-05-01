@@ -1,0 +1,60 @@
+{
+  "actual": {
+    "result_count": 1,
+    "returned_fields": [
+      "id",
+      "name",
+      "type"
+    ],
+    "rows": [
+      {
+        "id": "{4CD69CEB-521B-4C27-84DC-FFAED616E091}",
+        "name": "Camaro SS - CrankcaseAudio REV",
+        "type": "Sound"
+      }
+    ]
+  },
+  "assertions": [
+    "non-empty results, when present, have type Sound",
+    "schema-safe empty results are allowed for SampleProject variance"
+  ],
+  "case_id": "type_sound_filter_2023_contract",
+  "evidence_path": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/type_sound_filter_2023_contract.json",
+  "expected": {
+    "fields": [
+      "id",
+      "name",
+      "type"
+    ],
+    "result_count": {
+      "allow_empty": true,
+      "count": 1,
+      "policy": "at_most"
+    },
+    "type": "Sound"
+  },
+  "no_mutation": true,
+  "options": {
+    "return": [
+      "id",
+      "name",
+      "type"
+    ]
+  },
+  "query": "from type Sound where type = \"Sound\" take 1",
+  "recorded_at_unix": 1777618858,
+  "result_count": 1,
+  "result_count_policy": {
+    "allow_empty": true,
+    "count": 1,
+    "policy": "at_most"
+  },
+  "sources": [
+    "resources/waql/2022.1/object-get-live-matrix.json format only",
+    "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+    "2022.1 WAQL type filter live case"
+  ],
+  "status": "passed",
+  "uri": "ak.wwise.core.object.get",
+  "wwise_version": "2023.1"
+}

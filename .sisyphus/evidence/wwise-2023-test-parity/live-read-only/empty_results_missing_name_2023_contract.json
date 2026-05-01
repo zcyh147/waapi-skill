@@ -1,0 +1,44 @@
+{
+  "actual": {
+    "result_count": 0,
+    "returned_fields": [],
+    "rows": []
+  },
+  "assertions": [
+    "deliberately absent object name returns an empty result array without relying on error payloads"
+  ],
+  "case_id": "empty_results_missing_name_2023_contract",
+  "evidence_path": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/empty_results_missing_name_2023_contract.json",
+  "expected": {
+    "fields": [
+      "id",
+      "name"
+    ],
+    "result_count": {
+      "count": 0,
+      "policy": "exact"
+    }
+  },
+  "no_mutation": true,
+  "options": {
+    "return": [
+      "id",
+      "name"
+    ]
+  },
+  "query": "from project where name = \"__waapi_skills_missing_object__\"",
+  "recorded_at_unix": 1777618858,
+  "result_count": 0,
+  "result_count_policy": {
+    "count": 0,
+    "policy": "exact"
+  },
+  "sources": [
+    "resources/waql/2022.1/object-get-live-matrix.json format only",
+    "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+    "2022.1 WAQL empty result live case"
+  ],
+  "status": "passed",
+  "uri": "ak.wwise.core.object.get",
+  "wwise_version": "2023.1"
+}

@@ -39,7 +39,7 @@ def test_2023_live_matrix_has_no_manifest_only_live_claims() -> None:
     matrix_payload = _matrix_payload()
     coverage_by_uri = {entry["uri"]: entry for entry in _coverage_payload()["coverage"]}
 
-    assert matrix_payload["summary"]["live_tested"] == 0
+    assert matrix_payload["summary"]["live_tested"] == 1
     assert "manifest reflection alone is never behavioral support" in matrix_payload["metadata"]["status_policy"]
     for entry in matrix_payload["matrix"]:
         source = coverage_by_uri[entry["uri"]]
@@ -47,9 +47,15 @@ def test_2023_live_matrix_has_no_manifest_only_live_claims() -> None:
         assert entry["parity_bucket"] == source["parity_bucket"], entry["uri"]
         assert entry["parity_bucket"] in ALLOWED_PARITY_BUCKETS, entry["uri"]
         assert entry["evidence_standard"] == source["evidence_standard"], entry["uri"]
-        assert entry["counts_as_behavioral"] is False, entry["uri"]
-        assert entry["counts_as_live_behavioral"] is False, entry["uri"]
-        assert entry["achieved_status"] != "live-tested", entry["uri"]
+        if entry["uri"] == "ak.wwise.core.object.get":
+            assert entry["counts_as_behavioral"] is True, entry["uri"]
+            assert entry["counts_as_live_behavioral"] is True, entry["uri"]
+            assert entry["achieved_status"] == "live-tested", entry["uri"]
+            assert entry["evidence_path"] == ".sisyphus/evidence/task-3-live-read-only.txt"
+        else:
+            assert entry["counts_as_behavioral"] is False, entry["uri"]
+            assert entry["counts_as_live_behavioral"] is False, entry["uri"]
+            assert entry["achieved_status"] != "live-tested", entry["uri"]
         assert entry["manifest_source_uri"].startswith("resources/manifest/2023.1/"), entry["uri"]
 
 
@@ -63,8 +69,8 @@ def test_2023_phase2_summary_matches_matrix_without_behavioral_overclaim() -> No
     assert summary["summary"]["parity_bucket_counts"] == matrix["summary"]["parity_bucket_counts"]
     assert set(summary["summary"]["parity_bucket_counts"]) == ALLOWED_PARITY_BUCKETS
     assert summary["summary"]["parity_bucket_total"] == matrix["summary"]["parity_bucket_total"] == 181
-    assert summary["summary"]["behavioral_covered_count"] == 0
-    assert summary["summary"]["live_behavioral_covered_count"] == 0
+    assert summary["summary"]["behavioral_covered_count"] == 1
+    assert summary["summary"]["live_behavioral_covered_count"] == 1
     assert all(entry["version"] == VERSION for entry in summary["entries"])
     assert all(entry["parity_bucket"] in ALLOWED_PARITY_BUCKETS for entry in summary["entries"])
     assert all(entry["evidence_standard"] for entry in summary["entries"])
@@ -87,16 +93,19 @@ def test_2023_phase21_policy_reconciles_parity_buckets_to_reflected_apis() -> No
         assert all(coverage_by_uri[uri]["parity_bucket"] == bucket for uri in uris)
 
 
-def test_2023_waql_matrix_is_evidence_only_and_does_not_reuse_2022_evidence() -> None:
+def test_2023_waql_matrix_is_live_tested_and_does_not_reuse_2022_evidence() -> None:
     payload = json.loads(WAQL_RESOURCE.read_text(encoding="utf-8"))
     encoded = json.dumps(payload)
 
     assert payload["metadata"]["wwise_version_target"] == VERSION
     assert payload["metadata"]["schema_source"] == "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get"
-    assert payload["summary"]["coverage_status"] == "evidence-only"
-    assert payload["summary"]["live_tested_cases"] == 0
-    assert all(case["coverage_status"] == "evidence-only" for case in payload["live_cases"])
-    assert all(case["evidence_path"] == "" for case in payload["live_cases"])
+    assert payload["summary"]["coverage_status"] == "live-tested"
+    assert payload["summary"]["live_tested_cases"] == len(payload["live_cases"]) == 8
+    assert all(case["coverage_status"] == "live-tested" for case in payload["live_cases"])
+    assert all(
+        case["evidence_path"].startswith(".sisyphus/evidence/wwise-2023-test-parity/live-read-only/")
+        for case in payload["live_cases"]
+    )
     assert "resources/waql/2022.1/object-get-live-matrix.json format only" in payload["metadata"]["comparison_only_sources"]
     assert ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql" not in encoded
 

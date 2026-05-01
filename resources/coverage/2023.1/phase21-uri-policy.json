@@ -8,7 +8,7 @@
       "evidence-only": "Evidence-only parity allows schema/document/matrix proof while explicitly denying behavioral/live credit.",
       "excluded": "Excluded parity is reserved for family-policy exclusions and no behavioral/live credit.",
       "fake-route-tested": "Fake-route parity requires a 2023.1 wrapper route assertion, not schema presence alone.",
-      "live-tested": "No 2023.1 URI is live-tested by manifest reflection alone.",
+      "live-tested": "Live-tested parity requires 2023.1 execution evidence with readback assertions; manifest reflection alone is not enough.",
       "sandbox-mutating-tested": "Sandbox mutating parity requires 2023.1 execution evidence plus state/readback assertion and cleanup.",
       "wrapper-only": "Wrapper-only parity preserves schema/route diagnostics for policy-blocked families while denying behavioral/live credit."
     },
@@ -65,9 +65,7 @@
       "ak.wwise.core.switchContainer.assignmentAdded",
       "ak.wwise.core.switchContainer.assignmentRemoved"
     ],
-    "evidence_only_uris": [
-      "ak.wwise.core.object.get"
-    ],
+    "evidence_only_uris": [],
     "excluded_uris": [
       "ak.soundengine.executeActionOnEvent",
       "ak.soundengine.getState",
@@ -162,7 +160,9 @@
       "ak.wwise.ui.project.open",
       "ak.wwise.ui.selectionChanged"
     ],
-    "live_tested_uris": [],
+    "live_tested_uris": [
+      "ak.wwise.core.object.get"
+    ],
     "parity_buckets": {
       "conformance-only": [
         "ak.wwise.core.audio.mute",
@@ -256,9 +256,7 @@
         "ak.wwise.waapi.getSchema",
         "ak.wwise.waapi.getTopics"
       ],
-      "evidence-only": [
-        "ak.wwise.core.object.get"
-      ],
+      "evidence-only": [],
       "excluded": [
         "ak.soundengine.executeActionOnEvent",
         "ak.soundengine.getState",
@@ -342,7 +340,9 @@
         "ak.wwise.debug.testCrash"
       ],
       "fake-route-tested": [],
-      "live-tested": [],
+      "live-tested": [
+        "ak.wwise.core.object.get"
+      ],
       "sandbox-mutating-tested": [],
       "wrapper-only": [
         "ak.wwise.ui.bringToForeground",
@@ -364,20 +364,21 @@
     "parity_bucket_counts": {
       "conformance-only": 18,
       "deferred": 70,
-      "evidence-only": 1,
+      "evidence-only": 0,
       "excluded": 80,
       "fake-route-tested": 0,
-      "live-tested": 0,
+      "live-tested": 1,
       "sandbox-mutating-tested": 0,
       "wrapper-only": 12
     },
     "parity_bucket_total": 181,
     "status_counts": {
       "deferred": 48,
-      "evidence-only": 1,
+      "evidence-only": 0,
       "excluded": 92,
       "supported": 18,
-      "untested": 22
+      "untested": 22,
+      "live-tested": 1
     },
     "version": "2023.1"
   }

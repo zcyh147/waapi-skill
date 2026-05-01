@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any, Mapping
@@ -30,8 +31,8 @@ from tests.live.test_2023_live_prerequisites import (  # pyright: ignore[reportM
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MATRIX_PATH = REPO_ROOT / "resources" / "waql" / EXPECTED_WWISE_VERSION / "object-get-live-matrix.json"
 SANDBOX_ROOT = REPO_ROOT / ".sisyphus" / "runtime" / "wwise-2023-live-smoke-sandboxes"
-EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-2023-version-support" / "waql"
-MUTATING_TOKENS = (" set ", " delete ", " create ", " import ", " move ", " rename ")
+EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-2023-test-parity" / "live-read-only"
+MUTATING_TOKENS = ("set", "delete", "create", "import", "move", "rename")
 
 
 @pytest.mark.live
@@ -56,12 +57,13 @@ def test_2023_live_waql_object_get_matrix_runs_read_only_against_sandbox() -> No
             assert str(EXPECTED_SAMPLE_PROJECT) not in lifecycle.command
             client = default_waapi_client_factory(lifecycle.waapi_url)
 
+            context: dict[str, Any] = {}
             for case in matrix["live_cases"]:
-                _assert_case_is_read_only(case)
-                result = client.call(case["uri"], case["args"], options=case["options"])
-                rows = _rows(result)
-                _assert_case_result(case, rows)
-                _write_case_evidence(case, rows)
+                rendered = _render_case(case, context)
+                rows = _execute_case(client, rendered)
+                _assert_case_result(case, rendered, rows)
+                _write_case_evidence(case, rendered, rows)
+                context[case["id"]] = {"return": rows}
 
             failed = False
         finally:
@@ -85,11 +87,81 @@ def _load_matrix() -> dict[str, Any]:
     return matrix
 
 
+def test_2023_waql_mutation_guard_rejects_before_client_call() -> None:
+    matrix = _load_matrix()
+    mutating_case = dict(matrix["live_cases"][0])
+    mutating_case["id"] = "mutation_guard_rejects_delete_before_call"
+    mutating_case["args"] = {"waql": "from type Sound delete"}
+    client = _RecordingClient()
+
+    with pytest.raises(AssertionError, match="mutating WAQL token"):
+        _execute_case(client, mutating_case)
+
+    assert client.calls == []
+
+
+class _RecordingClient:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, Mapping[str, Any], Mapping[str, Any]]] = []
+
+    def call(self, uri: str, args: Mapping[str, Any], *, options: Mapping[str, Any]) -> Mapping[str, Any]:
+        self.calls.append((uri, args, options))
+        return {"return": []}
+
+
+def _execute_case(client: Any, case: Mapping[str, Any]) -> list[dict[str, Any]]:
+    _assert_case_is_read_only(case)
+    result = client.call(case["uri"], case["args"], options=case["options"])
+    return _rows(result)
+
+
 def _assert_case_is_read_only(case: Mapping[str, Any]) -> None:
     assert case["uri"] == WAQL_API_URI
     assert case["no_mutation"] is True
-    padded_query = f" {case['args']['waql'].lower()} "
-    assert not any(token in padded_query for token in MUTATING_TOKENS)
+    query_tokens = set(re.findall(r"[a-zA-Z_]+", str(case["args"]["waql"]).lower()))
+    blocked = sorted(token for token in MUTATING_TOKENS if token in query_tokens)
+    if blocked:
+        raise AssertionError(f"mutating WAQL token(s) not allowed: {', '.join(blocked)}")
+
+
+def _render_case(case: Mapping[str, Any], context: Mapping[str, Any]) -> dict[str, Any]:
+    rendered: dict[str, Any] = dict(case)
+    rendered["args"] = dict(case["args"])
+    rendered["options"] = dict(case["options"])
+    placeholders = case.get("placeholders", {})
+    assert isinstance(placeholders, Mapping)
+
+    values: dict[str, str] = {}
+    for name, selector in placeholders.items():
+        value = _select_placeholder(str(selector), context)
+        assert value is not None, f"placeholder {name} from {selector} was unavailable"
+        values[str(name)] = str(value)
+
+    if values:
+        rendered["args"]["waql"] = rendered["args"]["waql"].format(**values)
+        rendered["_placeholder_values"] = values
+    return rendered
+
+
+def _select_placeholder(selector: str, context: Mapping[str, Any]) -> Any:
+    case_id, _, tail = selector.partition(".")
+    current: Any = context.get(case_id)
+    if current is None:
+        return None
+    for token in tail.split("."):
+        if not token:
+            continue
+        if token.startswith("return[") and token.endswith("]"):
+            index = int(token.removeprefix("return[").removesuffix("]"))
+            rows = current.get("return") if isinstance(current, Mapping) else None
+            if not isinstance(rows, list) or len(rows) <= index:
+                return None
+            current = rows[index]
+        elif isinstance(current, Mapping):
+            current = current.get(token)
+        else:
+            return None
+    return current
 
 
 def _rows(result: Any) -> list[dict[str, Any]]:
@@ -100,23 +172,48 @@ def _rows(result: Any) -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
-def _assert_case_result(case: Mapping[str, Any], rows: list[dict[str, Any]]) -> None:
+def _assert_case_result(case: Mapping[str, Any], rendered: Mapping[str, Any], rows: list[dict[str, Any]]) -> None:
     expected = case["expected"]
     assert isinstance(expected, Mapping)
     _assert_count(case["id"], expected["result_count"], rows)
 
-    returned_fields = set(case["options"]["return"])
+    returned_fields = set(rendered["options"]["return"])
+    expected_fields = set(expected.get("fields", rendered["options"]["return"]))
+    assert expected_fields <= returned_fields, f"{case['id']} expected fields outside return options"
     for row in rows:
         assert set(row) <= returned_fields, f"{case['id']} returned unrequested fields: {row}"
+        assert set(row) <= expected_fields, f"{case['id']} returned fields outside expected assertion set: {row}"
 
     identity = expected.get("identity")
     if isinstance(identity, Mapping):
+        placeholders = rendered.get("_placeholder_values", {})
+        assert isinstance(placeholders, Mapping)
         for key, value in identity.items():
+            if isinstance(value, str) and value.startswith("{") and value.endswith("}"):
+                value = placeholders[value[1:-1]]
             assert any(row.get(key) == value for row in rows), f"{case['id']} missing identity {key}={value!r}: {rows}"
 
     expected_type = expected.get("type")
     if isinstance(expected_type, str) and rows:
         assert all(row.get("type") == expected_type for row in rows)
+
+    path_prefix = expected.get("path_prefix")
+    if isinstance(path_prefix, str) and rows:
+        assert all(str(row.get("path", "")).startswith(path_prefix) for row in rows)
+
+    prop = expected.get("property")
+    if isinstance(prop, Mapping):
+        name = prop["name"]
+        assert rows, f"{case['id']} expected a property row"
+        for row in rows:
+            assert name in row, f"{case['id']} missing property {name}: {row}"
+            if prop["comparison"] == ">=":
+                assert row[name] >= prop["value"]
+            else:
+                raise AssertionError(f"unsupported comparison: {prop['comparison']}")
+
+    for field in expected.get("forbidden_fields", []):
+        assert all(field not in row for row in rows), f"{case['id']} returned forbidden field {field}"
 
 
 def _assert_count(case_id: str, policy: Mapping[str, Any], rows: list[dict[str, Any]]) -> None:
@@ -130,22 +227,38 @@ def _assert_count(case_id: str, policy: Mapping[str, Any], rows: list[dict[str, 
         raise AssertionError(f"unsupported result count policy: {policy['policy']}")
 
 
-def _write_case_evidence(case: Mapping[str, Any], rows: list[dict[str, Any]]) -> None:
+def _write_case_evidence(case: Mapping[str, Any], rendered: Mapping[str, Any], rows: list[dict[str, Any]]) -> None:
     EVIDENCE_ROOT.mkdir(parents=True, exist_ok=True)
-    evidence_path = (EVIDENCE_ROOT / f"{case['id']}.json").resolve(strict=False)
-    if not path_is_under(evidence_path, EVIDENCE_ROOT):
-        raise AssertionError(f"case evidence path must stay under {EVIDENCE_ROOT}: {evidence_path}")
+    evidence_path = _safe_case_evidence_path(case)
+    evidence_path.parent.mkdir(parents=True, exist_ok=True)
+    actual_fields = sorted({field for row in rows for field in row})
     payload = {
         "case_id": case["id"],
         "status": "passed",
         "uri": case["uri"],
-        "query": case["args"]["waql"],
-        "options": case["options"],
+        "query": rendered["args"]["waql"],
+        "options": rendered["options"],
         "expected": case["expected"],
+        "actual": {
+            "result_count": len(rows),
+            "returned_fields": actual_fields,
+            "rows": rows,
+        },
         "result_count": len(rows),
         "result_count_policy": case["expected"]["result_count"],
+        "assertions": case["assertions"],
+        "evidence_path": case["evidence_path"],
         "no_mutation": case["no_mutation"],
+        "sources": case["sources"],
         "wwise_version": EXPECTED_WWISE_VERSION,
         "recorded_at_unix": int(time.time()),
     }
     evidence_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _safe_case_evidence_path(case: Mapping[str, Any]) -> Path:
+    evidence_path = (REPO_ROOT / str(case["evidence_path"])).resolve(strict=False)
+    evidence_root = EVIDENCE_ROOT.resolve(strict=False)
+    if not path_is_under(evidence_path, evidence_root):
+        raise AssertionError(f"case evidence path must stay under {EVIDENCE_ROOT}: {evidence_path}")
+    return evidence_path

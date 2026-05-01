@@ -191,7 +191,7 @@ Wave 4: Final Verification Wave F1-F4.
 
   **Commit**: YES | Message: `test(coverage): classify 2023 parity resources` | Files: `resources/coverage/2023.1/*.json`, `tests/unit/test_2023_api_resource_coverage.py`, `tests/unit/test_2023_live_coverage_matrix.py`
 
-- [ ] 3. Expand 2023.1 live read-only evidence without source mutation
+- [x] 3. Expand 2023.1 live read-only evidence without source mutation
 
   **What to do**: Extend `tests/live/test_2023_waql_live_matrix.py` and `resources/waql/2023.1/object-get-live-matrix.json` to cover the safe read-only 2023.1 surface comparable to 2022.1: object.get query variants, field-return assertions, stable object identity checks, schema-safe empty-result checks, and topic/resource evidence that can be validated without subscribing to environment-sensitive events. Write evidence under `.sisyphus/evidence/wwise-2023-test-parity/live-read-only/` and update coverage resources only for cases with passing readback assertions.
   **Must NOT do**: Do not include mutating WAQL tokens (`set`, `delete`, `create`, `import`, `move`, `rename`) in read-only cases. Do not launch against the installed SampleProject directly; keep sandbox launch behavior.

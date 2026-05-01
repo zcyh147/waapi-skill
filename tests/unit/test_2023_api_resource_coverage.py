@@ -68,8 +68,14 @@ def test_2023_coverage_entries_have_required_versioned_metadata() -> None:
         assert entry["evidence_standard"], entry["uri"]
         assert entry["behavioral_evidence"]["parity_bucket"] == entry["parity_bucket"], entry["uri"]
         assert entry["behavioral_evidence"]["evidence_standard"] == entry["evidence_standard"], entry["uri"]
-        assert entry["behavioral_evidence"]["counts_as_behavioral"] is False
-        assert entry["behavioral_evidence"]["counts_as_live_behavioral"] is False
+        if entry["uri"] == "ak.wwise.core.object.get":
+            assert entry["behavioral_evidence"]["counts_as_behavioral"] is True
+            assert entry["behavioral_evidence"]["counts_as_live_behavioral"] is True
+            assert entry["coverage_status"] == "live-tested"
+            assert entry["parity_bucket"] == "live-tested"
+        else:
+            assert entry["behavioral_evidence"]["counts_as_behavioral"] is False
+            assert entry["behavioral_evidence"]["counts_as_live_behavioral"] is False
 
 
 def test_2023_coverage_statuses_are_not_manifest_only_claims() -> None:
@@ -88,9 +94,10 @@ def test_2023_coverage_statuses_are_not_manifest_only_claims() -> None:
     assert status_counts["deferred"] > 0
     assert status_counts["excluded"] > 0
     assert status_counts["untested"] > 0
-    assert status_counts["evidence-only"] > 0
-    assert payload["summary"]["live_tested"] == 0
-    assert payload["summary"]["behavioral_supported"] == 0
+    assert status_counts["evidence-only"] == 0
+    assert status_counts["live-tested"] == 1
+    assert payload["summary"]["live_tested"] == 1
+    assert payload["summary"]["behavioral_supported"] == 1
 
     for entry in payload["coverage"]:
         evidence = entry["behavioral_evidence"]

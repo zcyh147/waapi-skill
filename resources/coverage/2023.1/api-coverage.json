@@ -5207,37 +5207,41 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "evidence-only",
-        "evidence": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get; WAQL live cases remain comparison-only until 2023.1 live proof exists.",
-        "evidence_standard": "Schema/document/matrix evidence exists for 2023.1, but there is no behavioral or live behavioral assertion.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "evidence-only",
-        "test": "tests/unit/test_2023_live_coverage_matrix.py::test_2023_live_matrix_has_no_manifest_only_live_claims"
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "live-tested",
+        "evidence": ".sisyphus/evidence/task-3-live-read-only.txt; .sisyphus/evidence/task-3-read-only-guard.txt; resources/waql/2023.1/object-get-live-matrix.json; per-case JSON under .sisyphus/evidence/wwise-2023-test-parity/live-read-only/",
+        "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_LIVE=1 python -m pytest tests/live/test_2023_live_prerequisites.py tests/live/test_2023_reflection_inventory.py tests/live/test_2023_waql_live_matrix.py -q",
+        "evidence_path": ".sisyphus/evidence/task-3-live-read-only.txt",
+        "evidence_standard": "2023.1 live sandbox read-only object.get WAQL cases passed with exact readback assertions, source hash/mtime guard, sandbox cleanup proof, and pre-call mutation rejection.",
+        "manifest_reflection_only": false,
+        "mutation_guard_evidence_path": ".sisyphus/evidence/task-3-read-only-guard.txt",
+        "parity_bucket": "live-tested",
+        "per_case_evidence_root": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/",
+        "test": "tests/live/test_2023_waql_live_matrix.py::test_2023_live_waql_object_get_matrix_runs_read_only_against_sandbox"
       },
       "category": "core.object",
-      "coverage_status": "evidence-only",
+      "coverage_status": "live-tested",
       "deferred": {
-        "coverage_status": "evidence-only",
+        "coverage_status": "live-tested",
         "status": false
       },
       "destructive_opt_in": false,
-      "evidence_standard": "Schema/document/matrix evidence exists for 2023.1, but there is no behavioral or live behavioral assertion.",
+      "evidence_standard": "2023.1 live sandbox read-only object.get WAQL cases passed with exact readback assertions, source hash/mtime guard, sandbox cleanup proof, and pre-call mutation rejection.",
       "item_type": "function",
-      "parity_bucket": "evidence-only",
+      "parity_bucket": "live-tested",
       "risk_level": "low",
       "route": {
         "deferred_registry_required": false,
         "dispatcher": "WwiseDispatcher.dispatch",
         "mode": "function-call",
-        "route_test": "tests/unit/test_2023_api_resource_coverage.py::test_2023_coverage_statuses_are_not_manifest_only_claims",
+        "route_test": "tests/live/test_2023_waql_live_matrix.py::test_2023_live_waql_object_get_matrix_runs_read_only_against_sandbox",
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "evidence-only",
+        "classification": "read-only-live-tested",
         "deterministic_default": true,
-        "reason": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get; WAQL live cases remain comparison-only until 2023.1 live proof exists."
+        "reason": ".sisyphus/evidence/task-3-live-read-only.txt; .sisyphus/evidence/task-3-read-only-guard.txt; resources/waql/2023.1/object-get-live-matrix.json; per-case JSON under .sisyphus/evidence/wwise-2023-test-parity/live-read-only/"
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
@@ -5267,11 +5271,11 @@
         "source_status": "ok"
       },
       "schema_status": "ok",
-      "test_status": "evidence-only",
+      "test_status": "live-tested",
       "uri": "ak.wwise.core.object.get",
       "usage_guidance": {
-        "default_path": "schema-or-document-evidence-only",
-        "notes": "Manifest reflection alone is inventory evidence; do not count it as 2023.1 behavioral support.",
+        "default_path": "live-read-only-sandbox",
+        "notes": "Use only read-only WAQL object.get calls covered by the 2023.1 sandbox matrix; mutating WAQL tokens are rejected before WAAPI calls.",
         "waql_matrix": "resources/waql/2023.1/object-get-live-matrix.json"
       },
       "version": "2023.1"
@@ -13495,7 +13499,7 @@
     "wwise_build": "2023.1.19.8928"
   },
   "summary": {
-    "behavioral_supported": 0,
+    "behavioral_supported": 1,
     "excluded_families": [
       "cli",
       "core.profiler",
@@ -13506,25 +13510,26 @@
       "ui"
     ],
     "implemented": 181,
-    "live_tested": 0,
-    "manifest_only_not_behavioral": 163,
+    "live_tested": 1,
+    "manifest_only_not_behavioral": 162,
     "parity_bucket_counts": {
       "conformance-only": 18,
       "deferred": 70,
-      "evidence-only": 1,
+      "evidence-only": 0,
       "excluded": 80,
       "fake-route-tested": 0,
-      "live-tested": 0,
+      "live-tested": 1,
       "sandbox-mutating-tested": 0,
       "wrapper-only": 12
     },
     "parity_bucket_total": 181,
     "status_counts": {
       "deferred": 48,
-      "evidence-only": 1,
+      "evidence-only": 0,
       "excluded": 92,
       "supported": 18,
-      "untested": 22
+      "untested": 22,
+      "live-tested": 1
     },
     "total_functions": 149,
     "total_topics": 32,

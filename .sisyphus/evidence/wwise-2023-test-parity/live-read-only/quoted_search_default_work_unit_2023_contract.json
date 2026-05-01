@@ -1,0 +1,62 @@
+{
+  "actual": {
+    "result_count": 1,
+    "returned_fields": [
+      "id",
+      "name",
+      "path"
+    ],
+    "rows": [
+      {
+        "id": "{B231292D-F96D-4EDC-AE14-D62DE1E07EDD}",
+        "name": "Default Work Unit",
+        "path": "\\Audio Devices\\Default Work Unit"
+      }
+    ]
+  },
+  "assertions": [
+    "JSON-escaped WAQL string literal is accepted",
+    "any returned row has the expected name"
+  ],
+  "case_id": "quoted_search_default_work_unit_2023_contract",
+  "evidence_path": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/quoted_search_default_work_unit_2023_contract.json",
+  "expected": {
+    "fields": [
+      "id",
+      "name",
+      "path"
+    ],
+    "identity": {
+      "name": "Default Work Unit"
+    },
+    "result_count": {
+      "allow_empty": true,
+      "count": 1,
+      "policy": "at_most"
+    }
+  },
+  "no_mutation": true,
+  "options": {
+    "return": [
+      "id",
+      "name",
+      "path"
+    ]
+  },
+  "query": "from search \"Default Work Unit\" where name = \"Default Work Unit\" take 1",
+  "recorded_at_unix": 1777618858,
+  "result_count": 1,
+  "result_count_policy": {
+    "allow_empty": true,
+    "count": 1,
+    "policy": "at_most"
+  },
+  "sources": [
+    "resources/waql/2022.1/object-get-live-matrix.json format only",
+    "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+    "2022.1 WAQL quoted search live case"
+  ],
+  "status": "passed",
+  "uri": "ak.wwise.core.object.get",
+  "wwise_version": "2023.1"
+}

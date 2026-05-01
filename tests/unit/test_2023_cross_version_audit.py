@@ -145,21 +145,21 @@ def test_2023_coverage_deferred_and_waql_counts_are_version_separated() -> None:
     assert coverage["summary"]["total_functions"] == 149
     assert coverage["summary"]["total_topics"] == 32
     assert sum(coverage["summary"]["status_counts"].values()) == 181
-    assert coverage["summary"]["live_tested"] == 0
-    assert coverage["summary"]["behavioral_supported"] == 0
+    assert coverage["summary"]["live_tested"] == 1
+    assert coverage["summary"]["behavioral_supported"] == 1
     assert {entry["version"] for entry in coverage["coverage"]} == {VERSION_2023}
     assert all(entry["schema_mapping"]["manifest_uri"].startswith("resources/manifest/2023.1/") for entry in coverage["coverage"])
 
     assert live_matrix["summary"]["reflected_count"] == 181
     assert len(live_matrix["matrix"]) == 181
     assert sum(live_matrix["summary"]["status_counts"].values()) == 181
-    assert live_matrix["summary"]["live_tested"] == 0
+    assert live_matrix["summary"]["live_tested"] == 1
     assert {entry["version"] for entry in live_matrix["matrix"]} == {VERSION_2023}
     assert all(entry["source_coverage_uri"] == "resources/coverage/2023.1/api-coverage.json" for entry in live_matrix["matrix"])
     assert phase2_summary["metadata"]["baseline_resource"] == "resources/coverage/2023.1/api-coverage.json"
     assert phase2_summary["metadata"]["live_matrix_resource"] == "resources/coverage/2023.1/live-coverage-matrix.json"
-    assert phase2_summary["summary"]["behavioral_covered_count"] == 0
-    assert phase2_summary["summary"]["live_behavioral_covered_count"] == 0
+    assert phase2_summary["summary"]["behavioral_covered_count"] == 1
+    assert phase2_summary["summary"]["live_behavioral_covered_count"] == 1
     coverage_status_counts = coverage["summary"]["status_counts"]
     deferred_status_counts = _count_by_key(deferred["deferred"], "coverage_status")
     assert deferred_status_counts == {
@@ -171,14 +171,18 @@ def test_2023_coverage_deferred_and_waql_counts_are_version_separated() -> None:
     assert all("resources/manifest/2023.1" in entry["evidence_source"] for entry in deferred["deferred"])
 
     assert waql["summary"]["version"] == VERSION_2023
-    assert waql["summary"]["coverage_status"] == "evidence-only"
-    assert waql["summary"]["live_tested_cases"] == 0
+    assert waql["summary"]["coverage_status"] == "live-tested"
+    assert waql["summary"]["live_tested_cases"] == 8
     assert waql["metadata"]["schema_source"] == "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get"
     assert waql["metadata"]["comparison_only_sources"] == [
         "resources/waql/2022.1/object-get-live-matrix.json format only",
         "No 2022.1 evidence paths are reused as 2023.1 proof.",
     ]
-    assert all(case["coverage_status"] == "evidence-only" and case["evidence_path"] == "" for case in waql["live_cases"])
+    assert all(
+        case["coverage_status"] == "live-tested"
+        and case["evidence_path"].startswith(".sisyphus/evidence/wwise-2023-test-parity/live-read-only/")
+        for case in waql["live_cases"]
+    )
 
 
 def test_2023_fixture_tree_is_versioned_and_contains_no_committed_runtime_artifacts() -> None:
