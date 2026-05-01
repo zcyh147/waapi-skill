@@ -5,7 +5,7 @@ description: Use this skill for Wwise WAAPI automation, dispatcher calls, genera
 
 # Wwise WAAPI Skill
 
-This skill provides one generic, manifest-backed WAAPI dispatcher for Wwise automation. The default behavior remains Wwise 2022.1. Wwise 2023.1 is supported only where versioned manifests, semantic source notes, tests, and evidence resources exist. Do not create one skill or wrapper per API: validate the requested URI against `resources/manifest/<version>/`, then dispatch functions through the WAAPI client or topics through the bounded subscription runtime.
+This skill provides one generic, manifest-backed WAAPI dispatcher for Wwise automation. The default behavior remains Wwise 2022.1. Wwise 2023.1 and 2024.1 are supported only where versioned manifests, semantic source notes, tests, and evidence resources exist. Do not create one skill or wrapper per API: validate the requested URI against `resources/manifest/<version>/`, then dispatch functions through the WAAPI client or topics through the bounded subscription runtime.
 
 ## Command templates
 
@@ -48,6 +48,24 @@ WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
 WWISE_LIVE=1 \
 WWISE_DESTRUCTIVE=1 \
 python -m pytest tests/destructive -q
+```
+
+Wwise 2024.1 live gates also require exact version and path inputs. Use these templates only for opt-in 2024.1 validation, never for default pytest:
+
+```bash
+WWISE_VERSION=2024.1 \
+WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2024.1.13.9056/Wwise.app/Contents/Tools/WwiseConsole.sh" \
+WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject/SampleProject.wproj" \
+WWISE_LIVE=1 \
+python -m pytest tests/live/test_2024_live_prerequisites.py tests/live/test_2024_reflection_inventory.py tests/live/test_2024_waql_live_matrix.py -q
+
+WWISE_VERSION=2024.1 \
+WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2024.1.13.9056/Wwise.app/Contents/Tools/WwiseConsole.sh" \
+WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject/SampleProject.wproj" \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_LIVE=1 \
+WWISE_DESTRUCTIVE=1 \
+python -m pytest tests/destructive/test_2024_project_mutation_sandbox.py tests/destructive/test_2024_soundbank_audio_sandbox.py tests/destructive/test_2024_switchcontainer_assignment_sandbox.py -q
 ```
 
 Topic waits use the same dispatcher, not a separate topic-specific skill:
@@ -150,6 +168,7 @@ Documentation-sensitive source-note generation or refresh must use the NotebookL
 
 - Wwise 2022.1 source notes use notebook id `wwise-2022.1-docs` and persisted evidence such as `references/semantic-builder-notebooklm-gate.md`.
 - Wwise 2023.1 source notes use notebook id `wwise-2023.1-docs`, versioned references under `references/semantic/2023.1/`, and local source-note resource `resources/semantic/2023.1/source_notes.json`.
+- Wwise 2024.1 source notes use notebook id `wwise-2024.1-docs`, versioned references under `references/semantic/2024.1/`, and local source-note resource `resources/semantic/2024.1/source_notes.json`.
 - If the gate evidence is missing, wrong, or fail-closed for the requested version, stop docs-dependent source-note refresh and request fresh NotebookLM evidence rather than guessing.
 
 ## Version support scope
@@ -157,7 +176,8 @@ Documentation-sensitive source-note generation or refresh must use the NotebookL
 - `2022.1` remains the default dispatcher, live environment, semantic source-note, and docs behavior.
 - `2023.1` is explicit opt-in support. It is supported only where the repo has versioned resources, source notes, tests, and evidence under paths such as `resources/manifest/2023.1/`, `resources/semantic/2023.1/source_notes.json`, `resources/coverage/2023.1/`, and `references/semantic/2023.1/`.
 - The 2023.1 coverage model separates `supported`, `deferred`, `excluded`, `untested`, `evidence-only`, and reserved `live-tested`. Manifest reflection, skipped live tests, and skipped destructive tests are not behavioral proof.
-- 2024 and 2025 are future sequential follow-ups. They are not implemented here.
+- `2024.1` is explicit opt-in support. It has complete reflected inventory and parity classification for 148 functions, backed by `resources/manifest/2024.1/`, `resources/semantic/2024.1/source_notes.json`, `resources/coverage/2024.1/`, `resources/deferred/2024.1.json`, `resources/waql/2024.1/`, and `references/semantic/2024.1/`. Behavioral evidence is limited to one live read-only URI, `ak.wwise.core.object.get`, and ten copied-sandbox mutating URIs: `ak.wwise.core.audio.import`, `ak.wwise.core.object.create`, `ak.wwise.core.object.delete`, `ak.wwise.core.object.set`, `ak.wwise.core.soundbank.setInclusions`, `ak.wwise.core.switchContainer.addAssignment`, `ak.wwise.core.switchContainer.removeAssignment`, `ak.wwise.core.undo.beginGroup`, `ak.wwise.core.undo.endGroup`, and `ak.wwise.core.undo.undo`. The remaining 137 entries are deferred or excluded. Readback helpers such as `ak.wwise.core.soundbank.getInclusions` and `ak.wwise.core.switchContainer.getAssignments` remain unpromoted.
+- 2025 is a future sequential follow-up. It is not implemented here.
 
 ## Layout
 
@@ -167,5 +187,6 @@ Documentation-sensitive source-note generation or refresh must use the NotebookL
 - `wwise_waapi/deferred_registry.py` and `api_coverage_audit.py` - evidence-backed behavioral coverage deferrals.
 - `wwise_waapi/headless.py` - headless lifecycle launch/probe/cleanup helpers for WwiseConsole WAAPI gates.
 - `resources/semantic/2023.1/source_notes.json` and `references/semantic/2023.1/` - versioned 2023.1 semantic source-note resources and audit references.
+- `resources/semantic/2024.1/source_notes.json`, `resources/coverage/2024.1/`, `resources/deferred/2024.1.json`, `resources/waql/2024.1/`, and `references/semantic/2024.1/` - versioned 2024.1 inventory, semantic, coverage, live read-only, and parity audit resources.
 - `scripts/run.py` - thin command wrapper.
 - `tests/unit/` - fast fake-client tests; live and destructive tests remain opt-in.

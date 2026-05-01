@@ -603,6 +603,104 @@
           ]
         }
       ]
+    },
+    {
+      "id": "2024-parity-review-version-scoped-summary",
+      "category": "2024.1 parity review",
+      "prompt": "Summarize the accepted Wwise 2024.1 support scope for a reviewer. Include exact evidence limits and avoid overclaiming behavior support.",
+      "expected_output": "Explains that 2024.1 has complete reflected inventory and parity classification, one live read-only URI, ten copied-sandbox mutating URIs, and remaining deferred or excluded entries. It points to versioned 2024.1 resources and avoids broad behavior-support claims.",
+      "files": [
+        "SKILL.md",
+        "references/semantic/2024.1/semantic-builder-protocol.md",
+        "resources/manifest/2024.1/functions.json",
+        "resources/coverage/2024.1/api-coverage.json",
+        "resources/deferred/2024.1.json",
+        "resources/waql/2024.1/object-get-live-matrix.json"
+      ],
+      "assertions": [
+        {
+          "name": "uses_2024_version_scope",
+          "text": "Output names Wwise 2024.1 and points to versioned 2024.1 resources.",
+          "required_terms": [
+            "2024.1",
+            "resources/manifest/2024.1/",
+            "resources/coverage/2024.1/",
+            "references/semantic/2024.1/"
+          ]
+        },
+        {
+          "name": "limited_promoted_evidence",
+          "text": "Output limits promoted evidence to one live read-only URI and ten copied-sandbox mutating URIs.",
+          "required_terms": [
+            "ak.wwise.core.object.get",
+            "ten",
+            "copied-sandbox"
+          ],
+          "forbidden_terms": [
+            "sweeping 2024.1 live-tested claim",
+            "sweeping 2024.1 behavior-tested claim",
+            "unqualified 2024.1 support claim"
+          ]
+        },
+        {
+          "name": "keeps_helpers_unpromoted",
+          "text": "Output keeps readback helpers unpromoted and mentions deferred or excluded entries.",
+          "required_terms": [
+            "getInclusions",
+            "getAssignments",
+            "unpromoted",
+            "deferred",
+            "excluded"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2024-live-and-destructive-command-review",
+      "category": "2024.1 command review",
+      "prompt": "Give the exact Wwise 2024.1 opt-in commands for default tests, live read-only validation, and destructive sandbox validation. State the Windows caveat correctly.",
+      "expected_output": "Lists the default pytest command, the 2024.1 live read-only command, and the 2024.1 destructive sandbox command with the 2024.1.13.9056 WwiseConsole and SampleProject identities. It states Windows validation as a non-blocking caveat, not a release gate.",
+      "files": [
+        "SKILL.md",
+        "references/long-run-runbook.md",
+        "references/phase2-user-review-packet.md",
+        "resources/coverage/2024.1/live-coverage-matrix.json"
+      ],
+      "assertions": [
+        {
+          "name": "uses_2024_build_and_project_identity",
+          "text": "Output includes the 2024.1 build identity plus WwiseConsole and SampleProject project names without requiring local absolute paths in eval metadata.",
+          "required_terms": [
+            "Wwise2024.1.13.9056",
+            "SampleProject2024.1.13.9056",
+            "WwiseConsole.sh",
+            "SampleProject.wproj"
+          ]
+        },
+        {
+          "name": "includes_three_command_modes",
+          "text": "Output includes default, live read-only, and destructive sandbox validation commands.",
+          "required_terms": [
+            "python -m pytest -q",
+            "tests/live/test_2024_live_prerequisites.py",
+            "tests/destructive/test_2024_project_mutation_sandbox.py",
+            "WWISE_DESTRUCTIVE=1"
+          ]
+        },
+        {
+          "name": "windows_caveat_not_gate",
+          "text": "Output states Windows validation as non-blocking evidence or caveat, not a hard gate.",
+          "required_terms_any": [
+            "non-blocking evidence",
+            "non-blocking caveat"
+          ],
+          "forbidden_terms": [
+            "Windows validation is mandatory before acceptance",
+            "Windows evidence is required before accepting 2024.1",
+            "macOS evidence is invalid without Windows"
+          ]
+        }
+      ]
     }
   ]
 }

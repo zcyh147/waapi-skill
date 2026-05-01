@@ -6,6 +6,8 @@ This packet is for Wwise 2022.1 Phase 2.1 coverage. Wwise 2023.1 support is sepa
 
 For 2023.1 parity review, use `.sisyphus/evidence/wwise-2023-test-parity/parity-review-packet.md`. That packet records complete 2023.1 inventory/parity classification while keeping behavior evidence limited to one live read-only URI and ten copied-sandbox mutating URIs. Windows validation is recorded there as a non-blocking evidence caveat, not a hard gate.
 
+For 2024.1 parity review, use `.sisyphus/evidence/wwise-2024-waapi-integration-coverage/parity-review-packet.md`. That packet records complete 2024.1 reflected inventory and parity classification for 148 functions while keeping behavior evidence limited to `ak.wwise.core.object.get` as the only live read-only URI and ten copied-sandbox mutating URIs. The remaining 137 entries stay deferred or excluded, readback helpers `ak.wwise.core.soundbank.getInclusions` and `ak.wwise.core.switchContainer.getAssignments` remain unpromoted, and Windows validation is recorded as a non-blocking evidence caveat, not a hard gate.
+
 Exact 2023.1 opt-in command templates, for the separate 2023.1 support path, are:
 
 ```bash
@@ -24,7 +26,25 @@ WWISE_DESTRUCTIVE=1 \
 python -m pytest tests/destructive -q
 ```
 
-NotebookLM is source evidence generation or refresh only. Runtime reads local persisted evidence and source notes. 2024 and 2025 are future sequential follow-ups, not implemented here.
+Exact 2024.1 opt-in command templates, for the separate 2024.1 support path, are:
+
+```bash
+WWISE_VERSION=2024.1 \
+WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2024.1.13.9056/Wwise.app/Contents/Tools/WwiseConsole.sh" \
+WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject/SampleProject.wproj" \
+WWISE_LIVE=1 \
+python -m pytest tests/live/test_2024_live_prerequisites.py tests/live/test_2024_reflection_inventory.py tests/live/test_2024_waql_live_matrix.py -q
+
+WWISE_VERSION=2024.1 \
+WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2024.1.13.9056/Wwise.app/Contents/Tools/WwiseConsole.sh" \
+WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject/SampleProject.wproj" \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_LIVE=1 \
+WWISE_DESTRUCTIVE=1 \
+python -m pytest tests/destructive/test_2024_project_mutation_sandbox.py tests/destructive/test_2024_soundbank_audio_sandbox.py tests/destructive/test_2024_switchcontainer_assignment_sandbox.py -q
+```
+
+NotebookLM is source evidence generation or refresh only. Runtime reads local persisted evidence and source notes. 2025 is a future sequential follow-up, not implemented here.
 
 ## Before and after counts
 

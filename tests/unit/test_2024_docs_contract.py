@@ -10,11 +10,46 @@ ROOT = Path(__file__).resolve().parents[2]
 EVALS_JSON = ROOT / "evals" / "evals.json"
 REFERENCE_ROOT = ROOT / "references"
 SEMANTIC_2024_REFERENCES = REFERENCE_ROOT / "semantic" / "2024.1"
+TASK11_REVIEW_PACKET = ROOT / ".sisyphus" / "evidence" / "wwise-2024-waapi-integration-coverage" / "parity-review-packet.md"
 DOC_PATHS = (
     ROOT / "SKILL.md",
     *sorted(REFERENCE_ROOT.glob("*.md")),
     *sorted(SEMANTIC_2024_REFERENCES.glob("*.md")),
 )
+DOC_CONTRACT_PATHS = (
+    ROOT / "SKILL.md",
+    ROOT / "references" / "long-run-runbook.md",
+    ROOT / "references" / "eval-review-workflow.md",
+    ROOT / "references" / "phase2-user-review-packet.md",
+)
+WWISE_2024_CONSOLE = "/Applications/Audiokinetic/Wwise2024.1.13.9056/Wwise.app/Contents/Tools/WwiseConsole.sh"
+WWISE_2024_SAMPLE_PROJECT = "/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject/SampleProject.wproj"
+LIVE_2024_READ_ONLY_COMMAND = (
+    'WWISE_VERSION=2024.1 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2024.1.13.9056/Wwise.app/Contents/Tools/WwiseConsole.sh" '
+    'WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject/SampleProject.wproj" '
+    "WWISE_LIVE=1 python -m pytest tests/live/test_2024_live_prerequisites.py "
+    "tests/live/test_2024_reflection_inventory.py tests/live/test_2024_waql_live_matrix.py -q"
+)
+DESTRUCTIVE_2024_COMMAND = (
+    'WWISE_VERSION=2024.1 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2024.1.13.9056/Wwise.app/Contents/Tools/WwiseConsole.sh" '
+    'WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject/SampleProject.wproj" '
+    "WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 "
+    "python -m pytest tests/destructive/test_2024_project_mutation_sandbox.py "
+    "tests/destructive/test_2024_soundbank_audio_sandbox.py "
+    "tests/destructive/test_2024_switchcontainer_assignment_sandbox.py -q"
+)
+PROMOTED_2024_MUTATING_APIS = {
+    "ak.wwise.core.audio.import",
+    "ak.wwise.core.object.create",
+    "ak.wwise.core.object.delete",
+    "ak.wwise.core.object.set",
+    "ak.wwise.core.soundbank.setInclusions",
+    "ak.wwise.core.switchContainer.addAssignment",
+    "ak.wwise.core.switchContainer.removeAssignment",
+    "ak.wwise.core.undo.beginGroup",
+    "ak.wwise.core.undo.endGroup",
+    "ak.wwise.core.undo.undo",
+}
 
 FORBIDDEN_2024_POSITIVE_CLAIMS = (
     "all 2024.1 APIs are live-tested",
@@ -99,6 +134,11 @@ def test_2024_eval_examples_are_version_scoped_when_added() -> None:
     payload = json.loads(EVALS_JSON.read_text(encoding="utf-8"))
     entries = [entry for entry in payload["evals"] if entry["id"].startswith("2024-")]
 
+    assert {entry["id"] for entry in entries} == {
+        "2024-parity-review-version-scoped-summary",
+        "2024-live-and-destructive-command-review",
+    }
+
     for entry in entries:
         serialized = json.dumps(entry, sort_keys=True)
         lowered = serialized.lower()
@@ -113,6 +153,68 @@ def test_2024_eval_examples_are_version_scoped_when_added() -> None:
         assert "wwise-2023.1-docs proves 2024.1" not in serialized, entry["id"]
         for claim in FORBIDDEN_2024_POSITIVE_CLAIMS:
             assert claim.lower() not in lowered, entry["id"]
+
+
+def test_2024_docs_include_exact_paths_commands_and_limited_claims() -> None:
+    combined = "\n".join(path.read_text(encoding="utf-8") for path in DOC_CONTRACT_PATHS)
+
+    assert WWISE_2024_CONSOLE in combined
+    assert WWISE_2024_SAMPLE_PROJECT in combined
+    assert "python -m pytest -q" in combined
+    assert _squash_command(LIVE_2024_READ_ONLY_COMMAND) in _squash_command(combined)
+    assert _squash_command(DESTRUCTIVE_2024_COMMAND) in _squash_command(combined)
+
+    assert "complete reflected inventory and parity classification" in combined
+    assert "148 functions" in combined
+    assert "one live read-only URI" in combined
+    assert "ten copied-sandbox mutating URIs" in combined
+    assert "remaining 137 entries" in combined
+    assert "ak.wwise.core.object.get" in combined
+    assert "ak.wwise.core.soundbank.getInclusions" in combined
+    assert "ak.wwise.core.switchContainer.getAssignments" in combined
+    assert "remain unpromoted" in combined
+    assert "Windows validation is recorded as a non-blocking evidence caveat, not a hard gate" in combined
+
+    for api in PROMOTED_2024_MUTATING_APIS:
+        assert api in combined
+
+
+def test_task11_review_packet_has_required_sections_and_limited_claims() -> None:
+    packet = TASK11_REVIEW_PACKET.read_text(encoding="utf-8")
+
+    assert [
+        line.removeprefix("## ")
+        for line in packet.splitlines()
+        if line.startswith("## ")
+    ] == [
+        "Promoted Evidence",
+        "Deferred/Excluded",
+        "Commands Run",
+        "Source Immutability",
+        "Windows Caveat",
+        "Known Non-Goals",
+    ]
+
+    assert "reconcile to 148 functions" in packet
+    assert "one live read-only URI and ten copied-sandbox mutating URIs" in packet
+    assert "ak.wwise.core.object.get" in packet
+    assert packet.count("promoted to `live-tested`") == 1
+    assert "137 entries deferred or excluded" in packet
+    assert "remain unpromoted" in packet
+    assert "fail closed" in packet
+    assert "Windows validation is non-blocking evidence and caveat" in packet
+    assert "not a hard gate" in packet
+    assert WWISE_2024_CONSOLE in packet
+    assert WWISE_2024_SAMPLE_PROJECT in packet
+    assert _squash_command(LIVE_2024_READ_ONLY_COMMAND) in _squash_command(packet)
+    assert _squash_command(DESTRUCTIVE_2024_COMMAND) in _squash_command(packet)
+
+    for api in PROMOTED_2024_MUTATING_APIS:
+        assert api in packet
+
+    lowered = packet.lower()
+    for claim in FORBIDDEN_2024_POSITIVE_CLAIMS:
+        assert claim.lower() not in lowered
 
 
 def _combined_docs_and_evals_text() -> str:
@@ -137,3 +239,7 @@ def _claim_surfaces() -> list[tuple[Path, str]]:
         if "2024.1" in serialized or entry["id"].startswith("2024-"):
             surfaces.append((EVALS_JSON, serialized))
     return surfaces
+
+
+def _squash_command(text: str) -> str:
+    return re.sub(r"\s+", " ", text.replace("\\\n", " ")).strip()

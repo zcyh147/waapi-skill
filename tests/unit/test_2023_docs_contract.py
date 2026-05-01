@@ -27,7 +27,8 @@ def test_2023_docs_include_exact_paths_and_no_full_coverage_claims() -> None:
     assert "resources/semantic/2023.1/source_notes.json" in combined
     assert "Runtime builders and dispatcher flows do not query NotebookLM" in combined
     assert "Runtime reads local persisted evidence" in combined
-    assert "2024 and 2025 are future sequential follow-ups" in combined
+    assert "2024.1 support is explicit and scoped" in combined
+    assert "2025 is a future sequential follow-up" in combined
     assert "not implemented here" in combined
     assert "Manifest reflection proves inventory only" in combined
     assert "Manifest reflection, skipped live tests, and skipped destructive tests are not behavioral proof." in combined

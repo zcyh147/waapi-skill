@@ -489,7 +489,7 @@ Support Wwise 2024.1.13 WAAPI resources and tests as an explicit opt-in version 
 
   **Commit**: YES | Message: `test(destructive): add 2024 sandbox parity evidence` | Files: `tests/destructive/test_2024_*.py`, `resources/coverage/2024.1/*.json`, `resources/deferred/2024.1.json`, `.sisyphus/evidence/wwise-2024-waapi-integration-coverage/destructive/*`
 
-- [ ] 11. Produce 2024 docs, evals, and review packet without overclaims
+- [x] 11. Produce 2024 docs, evals, and review packet without overclaims
 
   **What to do**: Update `SKILL.md`, `references/long-run-runbook.md`, `references/eval-review-workflow.md`, `references/phase2-user-review-packet.md`, and `evals/evals.json` only where 2024.1 planning/support claims need exact paths and no-overclaim wording. Create `.sisyphus/evidence/wwise-2024-waapi-integration-coverage/parity-review-packet.md` with promoted evidence, deferred/excluded policy, exact commands, source immutability, Windows caveat, and known non-goals.
   **Must NOT do**: Do not claim full 2024.1 support or all APIs live-tested.
