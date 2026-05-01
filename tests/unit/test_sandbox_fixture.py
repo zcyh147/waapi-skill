@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+import wwise_waapi.live_environment as live_env  # pyright: ignore[reportMissingImports]
 import wwise_waapi.sandbox_fixture as sandbox_fixture  # pyright: ignore[reportMissingImports]
 from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
     ENV_WWISE_SANDBOX_KEEP_ON_FAILURE,
@@ -23,6 +24,7 @@ from wwise_waapi.live_environment import LiveEnvironmentError, require_destructi
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ORG_FIXTURE_ROOT = REPO_ROOT / "tests" / "_org" / "2022.1"
+ORG_FIXTURE_2023_ROOT = REPO_ROOT / "tests" / "_org" / "2023.1"
 
 
 def make_console(tmp_path: Path) -> Path:
@@ -108,12 +110,25 @@ def test_rejects_sandbox_roots_that_overlap_source(tmp_path: Path) -> None:
         prepare_sample_project_sandbox(base_env(console, source_project, tmp_path))
 
 
-def test_rejects_sandbox_roots_under_committed_org_fixture_source(tmp_path: Path) -> None:
+@pytest.mark.parametrize("fixture_root", [ORG_FIXTURE_ROOT, ORG_FIXTURE_2023_ROOT])
+def test_rejects_sandbox_roots_under_committed_org_fixture_source(fixture_root: Path, tmp_path: Path) -> None:
     console = make_console(tmp_path)
     source_project = make_sample_project(tmp_path / "source")
 
     with pytest.raises(SandboxFixtureError, match="tests/_org"):
-        prepare_sample_project_sandbox(base_env(console, source_project, ORG_FIXTURE_ROOT / "runtime-sandbox"))
+        prepare_sample_project_sandbox(base_env(console, source_project, fixture_root / "runtime-sandbox"))
+
+
+def test_rejects_sandbox_roots_under_installed_sample_project_source(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    console = make_console(tmp_path)
+    source_project = make_sample_project(tmp_path / "source")
+    installed_root = tmp_path / "Applications" / "Audiokinetic" / "SampleProject2023.1.19.8928" / "SampleProject"
+    monkeypatch.setattr(live_env, "INSTALLED_SAMPLE_PROJECT_2023_1_ROOT", installed_root)
+
+    with pytest.raises(SandboxFixtureError, match="installed SampleProject"):
+        prepare_sample_project_sandbox(base_env(console, source_project, installed_root / "runtime-sandbox"))
 
 
 def test_committed_org_fixture_source_is_copied_outside_source(tmp_path: Path) -> None:

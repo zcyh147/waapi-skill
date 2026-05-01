@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Mapping
 
 from .headless import WwiseConsolePathResolver
+from .versions import WWISE_2023_1_BUILD, WWISE_2023_1_VERSION_KEY  # pyright: ignore[reportMissingImports]
 
 
 ENV_WWISE_LIVE = "WWISE_LIVE"
@@ -19,7 +20,18 @@ ENV_WWISE_SAMPLE_PROJECT_PATH = "WWISE_SAMPLE_PROJECT_PATH"
 ENV_WWISE_SANDBOX_ROOT = "WWISE_SANDBOX_ROOT"
 
 SUPPORTED_WWISE_VERSION = "2022.1"
-DEFAULT_SAMPLE_PROJECT_ROOT = Path("/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject")
+WWISE_2022_1_BUILD = "2022.1.19.8584"
+WWISE_2022_1_CONSOLE_PATH = Path(
+    f"/Applications/Audiokinetic/Wwise{WWISE_2022_1_BUILD}/Wwise.app/Contents/Tools/WwiseConsole.sh"
+)
+WWISE_2023_1_CONSOLE_PATH = Path(
+    f"/Applications/Audiokinetic/Wwise{WWISE_2023_1_BUILD}/Wwise.app/Contents/Tools/WwiseConsole.sh"
+)
+DEFAULT_SAMPLE_PROJECT_ROOT = Path(f"/Applications/Audiokinetic/Wwise{WWISE_2022_1_BUILD}/SampleProject")
+WWISE_2023_1_SAMPLE_PROJECT_PATH = Path(
+    f"/Applications/Audiokinetic/SampleProject{WWISE_2023_1_BUILD}/SampleProject/SampleProject.wproj"
+)
+INSTALLED_SAMPLE_PROJECT_2023_1_ROOT = WWISE_2023_1_SAMPLE_PROJECT_PATH.parent
 ORG_FIXTURE_SOURCE_ROOT = Path(__file__).resolve().parents[1] / "tests" / "_org"
 
 
@@ -56,6 +68,29 @@ class LiveEnvironmentContract:
         return None
 
 
+@dataclass(frozen=True, slots=True)
+class _LiveVersionPaths:
+    version: str
+    console_path: Path
+    sample_project_path: Path
+    require_exact_paths: bool = False
+
+
+LIVE_VERSION_PATHS: dict[str, _LiveVersionPaths] = {
+    SUPPORTED_WWISE_VERSION: _LiveVersionPaths(
+        version=SUPPORTED_WWISE_VERSION,
+        console_path=WWISE_2022_1_CONSOLE_PATH,
+        sample_project_path=DEFAULT_SAMPLE_PROJECT_ROOT,
+    ),
+    WWISE_2023_1_VERSION_KEY: _LiveVersionPaths(
+        version=WWISE_2023_1_VERSION_KEY,
+        console_path=WWISE_2023_1_CONSOLE_PATH,
+        sample_project_path=WWISE_2023_1_SAMPLE_PROJECT_PATH,
+        require_exact_paths=True,
+    ),
+}
+
+
 def parse_live_environment(env: Mapping[str, str] | None = None) -> LiveEnvironmentContract:
     """Parse and canonicalize Phase 2 Wwise test-tier environment variables."""
 
@@ -63,7 +98,7 @@ def parse_live_environment(env: Mapping[str, str] | None = None) -> LiveEnvironm
     live_enabled = env_map.get(ENV_WWISE_LIVE) == "1"
     destructive_enabled = live_enabled and env_map.get(ENV_WWISE_DESTRUCTIVE) == "1"
     version = env_map.get(ENV_WWISE_VERSION, SUPPORTED_WWISE_VERSION)
-    console_path = WwiseConsolePathResolver(env=dict(env_map)).resolve(env_map.get(ENV_WWISE_CONSOLE))
+    console_path = resolve_wwise_console_path(env_map, version)
     sample_source = resolve_sample_project_source(env_map)
     fixture_project = _canonical_optional_path(env_map.get(ENV_WWISE_FIXTURE_PROJECT))
     sandbox_root = _canonical_optional_path(env_map.get(ENV_WWISE_SANDBOX_ROOT))
@@ -82,12 +117,34 @@ def resolve_sample_project_source(env: Mapping[str, str] | None = None) -> Path 
     """Resolve the immutable SampleProject source, defaulting only when it exists."""
 
     env_map = env if env is not None else os.environ
+    version = env_map.get(ENV_WWISE_VERSION, SUPPORTED_WWISE_VERSION)
+    version_paths = LIVE_VERSION_PATHS.get(version)
     configured = env_map.get(ENV_WWISE_SAMPLE_PROJECT_PATH)
     if configured:
         return _canonical_project_path(Path(configured).expanduser())
-    if DEFAULT_SAMPLE_PROJECT_ROOT.exists():
-        return _canonical_project_path(DEFAULT_SAMPLE_PROJECT_ROOT)
+    if version_paths is None:
+        return None
+    if version == SUPPORTED_WWISE_VERSION:
+        if DEFAULT_SAMPLE_PROJECT_ROOT.exists():
+            return _canonical_project_path(DEFAULT_SAMPLE_PROJECT_ROOT)
+        return None
+    if version_paths.require_exact_paths:
+        return version_paths.sample_project_path
+    if version_paths.sample_project_path.exists():
+        return _canonical_project_path(version_paths.sample_project_path)
     return None
+
+
+def resolve_wwise_console_path(env: Mapping[str, str] | None = None, version: str | None = None) -> Path | None:
+    """Resolve WwiseConsole for the requested supported version without cross-version fallback."""
+
+    env_map = env if env is not None else os.environ
+    requested_version = version or env_map.get(ENV_WWISE_VERSION, SUPPORTED_WWISE_VERSION)
+    version_paths = LIVE_VERSION_PATHS.get(requested_version)
+    if version_paths is None:
+        return None
+    resolver = WwiseConsolePathResolver(env=dict(env_map), macos_default=version_paths.console_path)
+    return resolver.resolve(env_map.get(ENV_WWISE_CONSOLE))
 
 
 def require_live_environment(env: Mapping[str, str] | None = None) -> LiveEnvironmentContract:
@@ -97,13 +154,25 @@ def require_live_environment(env: Mapping[str, str] | None = None) -> LiveEnviro
     if not contract.live_enabled:
         return contract
     errors: list[str] = []
-    if contract.version != SUPPORTED_WWISE_VERSION:
+    version_paths = LIVE_VERSION_PATHS.get(contract.version)
+    if version_paths is None:
         errors.append(
-            f"{ENV_WWISE_VERSION} must be {SUPPORTED_WWISE_VERSION!r} for this Phase 2 contract; got {contract.version!r}"
+            f"{ENV_WWISE_VERSION} must be one of {sorted(LIVE_VERSION_PATHS)!r}; got {contract.version!r}"
         )
+    elif version_paths.require_exact_paths:
+        if contract.console_path != version_paths.console_path:
+            errors.append(
+                f"{ENV_WWISE_CONSOLE} must be the exact {contract.version} WwiseConsole path "
+                f"{version_paths.console_path}; got {contract.console_path}"
+            )
+        if contract.sample_project_source != version_paths.sample_project_path:
+            errors.append(
+                f"{ENV_WWISE_SAMPLE_PROJECT_PATH} must be the exact {contract.version} SampleProject path "
+                f"{version_paths.sample_project_path}; got {contract.sample_project_source}"
+            )
     if contract.sample_project_source is None and contract.fixture_project is None:
         errors.append(
-            f"missing immutable SampleProject source: set {ENV_WWISE_SAMPLE_PROJECT_PATH} or install default source at {DEFAULT_SAMPLE_PROJECT_ROOT}"
+            f"missing immutable SampleProject source: set {ENV_WWISE_SAMPLE_PROJECT_PATH} or install default source at {_default_sample_project_message_path(contract.version)}"
         )
     if contract.fixture_project is not None and not contract.fixture_project.exists():
         errors.append(f"{ENV_WWISE_FIXTURE_PROJECT} does not exist: {contract.fixture_project}")
@@ -140,6 +209,10 @@ def require_destructive_environment(env: Mapping[str, str] | None = None) -> Liv
         errors.append(f"{ENV_WWISE_SANDBOX_ROOT} must not be under immutable tests/_org fixture sources")
     if contract.fixture_project is not None and path_is_under_org_fixture(contract.fixture_project):
         errors.append(f"{ENV_WWISE_FIXTURE_PROJECT} must not target immutable tests/_org fixture sources")
+    if contract.sandbox_root is not None and path_overlaps_immutable_sample_source(contract.sandbox_root):
+        errors.append(f"{ENV_WWISE_SANDBOX_ROOT} must not overlap immutable installed SampleProject sources")
+    if contract.fixture_project is not None and path_is_under_immutable_sample_source(contract.fixture_project):
+        errors.append(f"{ENV_WWISE_FIXTURE_PROJECT} must not target immutable installed SampleProject sources")
     if errors:
         raise LiveEnvironmentError("WWISE_DESTRUCTIVE=1 guard failure: " + "; ".join(errors))
     return contract
@@ -157,6 +230,31 @@ def path_is_under_org_fixture(path: Path) -> bool:
     """Return True when a path points at the committed immutable tests/_org source fixture tree."""
 
     return path_is_under(path, ORG_FIXTURE_SOURCE_ROOT)
+
+
+def path_is_under_immutable_sample_source(path: Path) -> bool:
+    """Return True when a path points at a known installed immutable SampleProject source tree."""
+
+    return any(path_is_under(path, root) for root in _immutable_sample_project_roots())
+
+
+def path_overlaps_immutable_sample_source(path: Path) -> bool:
+    """Return True when a path is inside, equal to, or contains a known installed SampleProject source."""
+
+    return any(path_is_under(path, root) or path_is_under(root, path) for root in _immutable_sample_project_roots())
+
+
+def _immutable_sample_project_roots() -> tuple[Path, ...]:
+    return (DEFAULT_SAMPLE_PROJECT_ROOT, INSTALLED_SAMPLE_PROJECT_2023_1_ROOT)
+
+
+def _default_sample_project_message_path(version: str) -> Path:
+    if version == SUPPORTED_WWISE_VERSION:
+        return DEFAULT_SAMPLE_PROJECT_ROOT
+    version_paths = LIVE_VERSION_PATHS.get(version)
+    if version_paths is None:
+        return DEFAULT_SAMPLE_PROJECT_ROOT
+    return version_paths.sample_project_path
 
 
 def _canonical_optional_path(raw: str | None) -> Path | None:
@@ -185,14 +283,23 @@ __all__ = [
     "ENV_WWISE_SAMPLE_PROJECT_PATH",
     "ENV_WWISE_SANDBOX_ROOT",
     "ENV_WWISE_VERSION",
+    "INSTALLED_SAMPLE_PROJECT_2023_1_ROOT",
+    "LIVE_VERSION_PATHS",
     "LiveEnvironmentContract",
     "LiveEnvironmentError",
     "ORG_FIXTURE_SOURCE_ROOT",
     "SUPPORTED_WWISE_VERSION",
+    "WWISE_2022_1_BUILD",
+    "WWISE_2022_1_CONSOLE_PATH",
+    "WWISE_2023_1_CONSOLE_PATH",
+    "WWISE_2023_1_SAMPLE_PROJECT_PATH",
     "parse_live_environment",
     "path_is_under",
+    "path_is_under_immutable_sample_source",
     "path_is_under_org_fixture",
+    "path_overlaps_immutable_sample_source",
     "require_destructive_environment",
     "require_live_environment",
     "resolve_sample_project_source",
+    "resolve_wwise_console_path",
 ]

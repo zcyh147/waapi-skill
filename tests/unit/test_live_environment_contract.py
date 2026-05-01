@@ -6,9 +6,11 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 import wwise_waapi.live_environment as live_env  # pyright: ignore[reportMissingImports]
 from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImports]
+    INSTALLED_SAMPLE_PROJECT_2023_1_ROOT,
     LiveEnvironmentError,
     parse_live_environment,
     path_is_under,
+    path_is_under_immutable_sample_source,
     require_destructive_environment,
     require_live_environment,
     resolve_sample_project_source,
@@ -129,8 +131,46 @@ def test_destructive_guard_rejects_sample_source_as_active_project(tmp_path: Pat
         )
 
 
+def test_destructive_guard_rejects_installed_2023_sample_project_targets(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    console = make_console(tmp_path)
+    installed_root = tmp_path / "Applications" / "Audiokinetic" / "SampleProject2023.1.19.8928" / "SampleProject"
+    installed_project = make_project(installed_root, "SampleProject.wproj")
+    monkeypatch.setattr(live_env, "INSTALLED_SAMPLE_PROJECT_2023_1_ROOT", installed_root)
+
+    with pytest.raises(LiveEnvironmentError, match="immutable installed SampleProject"):
+        require_destructive_environment(
+            {
+                "WWISE_LIVE": "1",
+                "WWISE_DESTRUCTIVE": "1",
+                "WWISE_CONSOLE": str(console),
+                "WWISE_FIXTURE_PROJECT": str(installed_project),
+                "WWISE_SANDBOX_ROOT": str(installed_root),
+            }
+        )
+
+
+def test_installed_2023_sample_project_source_path_is_guarded() -> None:
+    expected = Path("/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject")
+
+    assert INSTALLED_SAMPLE_PROJECT_2023_1_ROOT == expected
+    assert path_is_under_immutable_sample_source(expected / "SampleProject.wproj")
+
+
 def test_live_prerequisites_fail_fast_without_fake_fallbacks(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(live_env, "DEFAULT_SAMPLE_PROJECT_ROOT", tmp_path / "missing-default")
+    monkeypatch.setattr(
+        live_env,
+        "LIVE_VERSION_PATHS",
+        {
+            live_env.SUPPORTED_WWISE_VERSION: live_env._LiveVersionPaths(
+                version=live_env.SUPPORTED_WWISE_VERSION,
+                console_path=live_env.WWISE_2022_1_CONSOLE_PATH,
+                sample_project_path=tmp_path / "missing-default",
+            )
+        },
+    )
     with pytest.raises(LiveEnvironmentError) as exc_info:
         require_live_environment({"WWISE_LIVE": "1", "WWISE_CONSOLE": str(tmp_path / "missing-console")})
 
