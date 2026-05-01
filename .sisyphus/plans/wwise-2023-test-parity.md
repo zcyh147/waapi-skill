@@ -399,7 +399,7 @@ Wave 4: Final Verification Wave F1-F4.
 
   **Commit**: YES | Message: `test(wwise): enforce 2023 parity audits` | Files: `tests/unit/test_2023_*.py`
 
-- [ ] 8. Produce review packet and docs/evals without full-coverage overclaims
+- [x] 8. Produce review packet and docs/evals without full-coverage overclaims
 
   **What to do**: Update `references/phase2-user-review-packet.md`, `references/eval-review-workflow.md`, `references/long-run-runbook.md`, `SKILL.md`, and `evals/evals.json` only where claims need to reflect 2023.1 parity evidence. Create `.sisyphus/evidence/wwise-2023-test-parity/parity-review-packet.md` summarizing promoted APIs, deferred/excluded APIs, evidence paths, exact live/destructive commands, source immutability proof, and Windows non-blocking caveat.
   **Must NOT do**: Do not claim “all 2023.1 APIs are live-tested” or “full support for 2023.1” unless every API has live behavioral evidence, which is not expected under the chosen risky-family policy.

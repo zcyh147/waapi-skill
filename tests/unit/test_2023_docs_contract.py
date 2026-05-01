@@ -12,6 +12,7 @@ DOC_PATHS = (
     ROOT / "references" / "phase2-user-review-packet.md",
 )
 EVALS_JSON = ROOT / "evals" / "evals.json"
+TASK8_REVIEW_PACKET = ROOT / ".sisyphus" / "evidence" / "wwise-2023-test-parity" / "parity-review-packet.md"
 
 WWISE_2023_CONSOLE = "/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh"
 WWISE_2023_SAMPLE_PROJECT = "/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj"
@@ -73,3 +74,39 @@ def test_2023_eval_examples_are_version_scoped() -> None:
 
     assert "wwise-2022.1-docs proves 2023.1" in serialized_entries
     assert "not live-tested" in serialized_entries
+
+
+def test_task8_review_packet_has_required_sections_and_limited_claims() -> None:
+    packet = TASK8_REVIEW_PACKET.read_text(encoding="utf-8")
+
+    assert [
+        line.removeprefix("## ")
+        for line in packet.splitlines()
+        if line.startswith("## ")
+    ] == [
+        "Promoted Evidence",
+        "Deferred/Excluded",
+        "Commands Run",
+        "Source Immutability",
+        "Windows Caveat",
+        "Known Non-Goals",
+    ]
+
+    assert "inventory and parity classification reconcile to 181 APIs" in packet
+    assert "one live read-only URI and ten sandbox-mutating URIs" in packet
+    assert "ak.wwise.core.object.get" in packet
+    assert packet.count("promoted to `live-tested`") == 1
+    assert "Task 5 keeps 92 risky-family entries excluded" in packet
+    assert "risky-family accidental promotions are zero" in packet
+    assert "fail-closed" in packet
+    assert "Windows validation is non-blocking evidence and caveat" in packet
+    assert "not a hard gate" in packet
+
+    lowered = packet.lower()
+    for claim in (
+        "complete 2023.1 support",
+        "full support for 2023.1",
+        "all 2023.1 APIs are live-tested",
+        "manifest reflection proves behavioral support",
+    ):
+        assert claim not in lowered

@@ -4,6 +4,8 @@ Use this packet when asking the user to approve the Phase 2.1 live sandbox cover
 
 This packet is for Wwise 2022.1 Phase 2.1 coverage. Wwise 2023.1 support is separate and version-scoped. 2023.1 is supported only where resources, source notes, tests, and evidence exist under paths such as `references/semantic/2023.1/`, `resources/manifest/2023.1/`, `resources/semantic/2023.1/source_notes.json`, and `resources/coverage/2023.1/`. Do not use this 2022.1 packet to claim full 2023.1 WAAPI behavioral coverage.
 
+For 2023.1 parity review, use `.sisyphus/evidence/wwise-2023-test-parity/parity-review-packet.md`. That packet records complete 2023.1 inventory/parity classification while keeping behavior evidence limited to one live read-only URI and ten copied-sandbox mutating URIs. Windows validation is recorded there as a non-blocking evidence caveat, not a hard gate.
+
 Exact 2023.1 opt-in command templates, for the separate 2023.1 support path, are:
 
 ```bash

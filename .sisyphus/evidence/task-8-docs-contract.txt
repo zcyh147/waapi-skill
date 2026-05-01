@@ -1,0 +1,12 @@
+Task 8 docs contract verification
+
+Command:
+python -m pytest tests/unit/test_2023_docs_contract.py -q
+
+Result:
+exit_code=0
+...                                                                      [100%]
+3 passed in 0.01s
+
+Notes:
+- The focused docs contract verifies exact 2023.1 paths, rejects forbidden full-coverage claims in docs, checks version-scoped eval examples, and locks the Task 8 review packet headings and limited promotion language.

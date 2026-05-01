@@ -1,0 +1,21 @@
+Task 8 review packet heading check
+
+Command:
+python - <<'PY'
+from pathlib import Path
+packet = Path('.sisyphus/evidence/wwise-2023-test-parity/parity-review-packet.md')
+expected = ['Promoted Evidence', 'Deferred/Excluded', 'Commands Run', 'Source Immutability', 'Windows Caveat', 'Known Non-Goals']
+headings = [line.removeprefix('## ').strip() for line in packet.read_text(encoding='utf-8').splitlines() if line.startswith('## ')]
+print('headings=' + repr(headings))
+if headings != expected:
+    raise SystemExit(1)
+print('review_packet_headings_ok=True')
+PY
+
+Result:
+exit_code=0
+headings=['Promoted Evidence', 'Deferred/Excluded', 'Commands Run', 'Source Immutability', 'Windows Caveat', 'Known Non-Goals']
+review_packet_headings_ok=True
+
+Review packet:
+.sisyphus/evidence/wwise-2023-test-parity/parity-review-packet.md
