@@ -1,0 +1,478 @@
+{
+  "functions": {
+    "added": [
+      {
+        "type": "function",
+        "uri": "ak.wwise.core.mediaPool.get"
+      },
+      {
+        "type": "function",
+        "uri": "ak.wwise.core.mediaPool.getFields"
+      },
+      {
+        "type": "function",
+        "uri": "ak.wwise.core.profiler.moveCursor"
+      },
+      {
+        "type": "function",
+        "uri": "ak.wwise.core.profiler.setCursorTime"
+      },
+      {
+        "type": "function",
+        "uri": "ak.wwise.core.workUnit.load"
+      },
+      {
+        "type": "function",
+        "uri": "ak.wwise.core.workUnit.unload"
+      }
+    ],
+    "changed": [
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.soundengine.getSwitch"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.soundengine.postEvent"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.soundengine.seekOnEvent"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.soundengine.setMultiplePositions"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.soundengine.setObjectObstructionAndOcclusion"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.soundengine.setPosition"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.soundengine.setRTPCValue"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.soundengine.stopAll"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.cli.addNewPlatform"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.cli.convertExternalSource"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.cli.dumpObjects"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.cli.executeLuaScript"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.cli.generateSoundbank"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.cli.waapiServer"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.console.project.open"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.audio.import"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.audio.importTabDelimited"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.audio.setConversionPlugin"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.blendContainer.addTrack"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.executeLuaScript"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.getInfo"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.getProjectInfo"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.log.get"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.object.create"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.object.diff"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.object.get"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.object.getAttenuationCurve"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.object.getPropertyInfo"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.object.getTypes"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.object.move"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.object.pasteProperties"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.object.set"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.object.setAttenuationCurve"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.object.setProperty"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.object.setRandomizer"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.object.setReference"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.profiler.getCpuUsage"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.profiler.getLoadedMedia"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.profiler.getMeters"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.profiler.getPerformanceMonitor"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.profiler.getRTPCs"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.profiler.getStreamedMedia"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.profiler.getVoiceContributions"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.profiler.registerMeter"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.soundbank.convertExternalSources"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.soundbank.generate"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.soundbank.processDefinitionFiles"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.core.sourceControl.getSourceFiles"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.debug.generateToneWAV"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.debug.getWalTree"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "function",
+        "uri": "ak.wwise.waapi.getSchema"
+      }
+    ],
+    "counts": {
+      "added": 6,
+      "changed": 53,
+      "removed": 0
+    },
+    "removed": []
+  },
+  "metadata": {
+    "baseline_version": "2024.1",
+    "comparison_basis": "live-reflection-split-resources",
+    "generator": "task-2025-3-added-inventory",
+    "source_files": {
+      "2024.1": [
+        "resources/manifest/2024.1/functions.json",
+        "resources/manifest/2024.1/topics.json",
+        "resources/manifest/2024.1/schemas.json"
+      ],
+      "2025.1": [
+        "resources/manifest/2025.1/functions.json",
+        "resources/manifest/2025.1/topics.json",
+        "resources/manifest/2025.1/schemas.json"
+      ]
+    },
+    "target_inventory_source": "live-reflection-2025.1-sandbox-manifest",
+    "target_version": "2025.1",
+    "target_wwise_build": "2025.1.7.9143"
+  },
+  "summary": {
+    "baseline_audit": {
+      "counts_match": true,
+      "manifest_function_count": 148,
+      "manifest_topic_count": 30,
+      "reflected_function_count": 148,
+      "reflected_topic_count": 30,
+      "schema_count": 178,
+      "schema_failure_count": 0
+    },
+    "function_added_count": 6,
+    "function_changed_count": 53,
+    "function_removed_count": 0,
+    "target_audit": {
+      "counts_match": true,
+      "manifest_function_count": 154,
+      "manifest_topic_count": 31,
+      "reflected_function_count": 154,
+      "reflected_topic_count": 31,
+      "schema_count": 185,
+      "schema_failure_count": 0
+    },
+    "topic_added_count": 1,
+    "topic_changed_count": 10,
+    "topic_removed_count": 0
+  },
+  "topics": {
+    "added": [
+      {
+        "type": "topic",
+        "uri": "ak.wwise.core.object.structureChanged"
+      }
+    ],
+    "changed": [
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "topic",
+        "uri": "ak.wwise.core.log.itemAdded"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "topic",
+        "uri": "ak.wwise.core.object.childAdded"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "topic",
+        "uri": "ak.wwise.core.object.childRemoved"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "topic",
+        "uri": "ak.wwise.core.object.created"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "topic",
+        "uri": "ak.wwise.core.object.nameChanged"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "topic",
+        "uri": "ak.wwise.core.object.postDeleted"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "topic",
+        "uri": "ak.wwise.core.object.preDeleted"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "topic",
+        "uri": "ak.wwise.core.object.propertyChanged"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "topic",
+        "uri": "ak.wwise.core.profiler.captureLog.itemAdded"
+      },
+      {
+        "reflection_changed": false,
+        "schema_changed": true,
+        "type": "topic",
+        "uri": "ak.wwise.core.soundbank.generated"
+      }
+    ],
+    "counts": {
+      "added": 1,
+      "changed": 10,
+      "removed": 0
+    },
+    "removed": []
+  }
+}

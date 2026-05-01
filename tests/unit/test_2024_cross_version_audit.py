@@ -60,6 +60,9 @@ NO_2025_RESOURCE_ROOTS = (
     ROOT / "resources" / "semantic",
     ROOT / "references" / "semantic",
 )
+PLANNED_2025_RESOURCE_DIRS = {
+    ROOT / "resources" / "manifest" / "2025.1",
+}
 
 
 def _reject_forbidden_2024_fallback(path: Path) -> None:
@@ -143,7 +146,7 @@ def test_explicit_2024_1_resource_lookups_never_read_prior_generic_global_or_202
 
 
 def test_no_2025_resource_payloads_were_introduced() -> None:
-    discovered_2025_paths: list[Path] = []
+    discovered_unplanned_2025_paths: list[Path] = []
 
     for root in NO_2025_RESOURCE_ROOTS:
         if not root.exists():
@@ -151,10 +154,12 @@ def test_no_2025_resource_payloads_were_introduced() -> None:
         for child in root.iterdir():
             if not child.name.startswith("2025"):
                 continue
+            if child in PLANNED_2025_RESOURCE_DIRS:
+                continue
             candidates = [child] if child.is_file() else list(child.iterdir())
-            discovered_2025_paths.extend(candidate for candidate in candidates if candidate.name != ".gitkeep")
+            discovered_unplanned_2025_paths.extend(candidate for candidate in candidates if candidate.name != ".gitkeep")
 
-    assert discovered_2025_paths == []
+    assert discovered_unplanned_2025_paths == []
 
 def test_2024_semantic_source_notes_use_2024_notebook_and_versioned_references() -> None:
     payload = json.loads(SEMANTIC_2024.read_text(encoding="utf-8"))
@@ -394,4 +399,3 @@ def _has_approved_2024_promotion_evidence(*objects: dict[str, Any]) -> bool:
 def _has_forbidden_2024_promotion_evidence(*objects: dict[str, Any]) -> bool:
     encoded = json.dumps(objects, sort_keys=True)
     return any(fragment in encoded for fragment in FORBIDDEN_2024_FALLBACK_FRAGMENTS)
-

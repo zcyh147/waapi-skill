@@ -204,7 +204,7 @@ Wave 5: F1-F4 final review agents.
 
   **Commit**: YES | Message: `test(wwise): add 2025 fixture source` | Files: `tests/_org/2025.1/*`, `tests/unit/test_2025_1_fixture_inventory.py`
 
-- [ ] 3. Generate 2025.1 live reflection manifest resources and 2025-only inventory
+- [x] 3. Generate 2025.1 live reflection manifest resources and 2025-only inventory
 
   **What to do**: Use exact 2025 live env to reflect functions, topics, and schemas into `resources/manifest/2025.1/{manifest.json,functions.json,topics.json,schemas.json}`. Include build metadata `2025.1.7.9143`, scrubbed paths, source URIs, audit counts, schema failure count, and a derived `resources/manifest/2025.1/added-since-2024.1.json` comparing reflected 2025 functions/topics to 2024.1 resources. Accept discovered counts; do not normalize to 2024 counts.
   **Must NOT do**: Do not place payloads under `resources/manifest/2025/`. Do not reuse 2024 counts or 2024 schema proof.

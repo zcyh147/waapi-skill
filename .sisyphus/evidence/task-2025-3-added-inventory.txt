@@ -1,0 +1,3 @@
+Task 3 evidence: 2025-only inventory added for the live reflection manifest set.
+
+Inventory scope is limited to the explicit 2025.1 manifest resource set and does not introduce bare 2025 manifest payloads.
