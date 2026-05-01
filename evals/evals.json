@@ -512,6 +512,97 @@
           ]
         }
       ]
+    },
+    {
+      "id": "2023-semantic-builder-version-scoped-preview",
+      "category": "2023.1 semantic builder version scope",
+      "prompt": "Show a Wwise 2023.1 semantic builder preview for a read-only Sound object query. Keep it version-scoped and do not use 2022.1 semantic references as proof.",
+      "expected_output": "Uses version=2023.1, reads resources/semantic/2023.1/source_notes.json and references/semantic/2023.1/ evidence, keeps the example as a preview, and avoids claiming full 2023.1 behavioral coverage.",
+      "files": [
+        "SKILL.md",
+        "references/semantic/2023.1/semantic-builder-query.md",
+        "resources/semantic/2023.1/source_notes.json",
+        "resources/manifest/2023.1/functions.json"
+      ],
+      "assertions": [
+        {
+          "name": "uses_2023_version_scope",
+          "text": "Output names Wwise 2023.1 and keeps resources version-scoped.",
+          "required_terms": [
+            "2023.1",
+            "resources/semantic/2023.1/source_notes.json",
+            "references/semantic/2023.1/"
+          ]
+        },
+        {
+          "name": "no_global_2022_reference_for_2023",
+          "text": "Output does not cite old global 2022.1 semantic builder reference paths as 2023.1 evidence.",
+          "forbidden_terms": [
+            "references/semantic-builder-query.md",
+            "references/semantic-builder-notebooklm-gate.md proves 2023.1",
+            "wwise-2022.1-docs proves 2023.1"
+          ]
+        },
+        {
+          "name": "no_full_coverage_claim",
+          "text": "Output avoids full 2023.1 WAAPI behavioral coverage claims.",
+          "forbidden_terms": [
+            "full 2023.1 WAAPI behavioral coverage",
+            "all 2023.1 APIs are behavior-tested",
+            "complete 2023.1 support"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2023-deferred-coverage-version-scoped-review",
+      "category": "2023.1 deferred coverage review",
+      "prompt": "A reviewer sees 2023.1 manifest resources and skipped live tests. Explain whether that proves live-tested behavior, and mention what resources should be checked.",
+      "expected_output": "Explains that 2023.1 manifest reflection and skipped live or destructive tests are not live-tested behavior. Points reviewers to resources/coverage/2023.1/, resources/deferred/2023.1.json, and versioned local evidence before promoting coverage.",
+      "files": [
+        "resources/coverage/2023.1/api-coverage.json",
+        "resources/coverage/2023.1/live-coverage-matrix.json",
+        "resources/deferred/2023.1.json",
+        "references/phase2-user-review-packet.md"
+      ],
+      "assertions": [
+        {
+          "name": "separates_manifest_from_behavior",
+          "text": "Output says reflected manifest inventory is not behavioral proof.",
+          "required_terms_any": [
+            "manifest reflection",
+            "reflected inventory",
+            "inventory evidence"
+          ],
+          "required_terms_any_secondary": [
+            "not behavioral proof",
+            "not behavioral coverage",
+            "not live-tested"
+          ]
+        },
+        {
+          "name": "does_not_treat_skips_as_evidence",
+          "text": "Output states skipped live or destructive tests are not live evidence.",
+          "required_terms_any": [
+            "skipped live",
+            "skipped destructive",
+            "skipped tests"
+          ],
+          "required_terms_any_secondary": [
+            "not live evidence",
+            "not live-tested",
+            "not proof"
+          ]
+        },
+        {
+          "name": "points_to_2023_resources",
+          "text": "Output points to 2023.1 coverage and deferred resources.",
+          "required_terms": [
+            "resources/coverage/2023.1/",
+            "resources/deferred/2023.1.json"
+          ]
+        }
+      ]
     }
   ]
 }

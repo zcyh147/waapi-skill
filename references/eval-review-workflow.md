@@ -13,6 +13,10 @@ The eval set covers six Wwise WAAPI behaviors that are easy to regress in prose 
 5. Missing or non-starting Wwise diagnostics without committing local state.
 6. Deferred API explanations that separate inventory coverage from behavioral coverage.
 
+Additional 2023.1 eval examples are version-scoped. They must point to versioned resources such as `resources/manifest/2023.1/`, `resources/semantic/2023.1/source_notes.json`, `resources/coverage/2023.1/`, and `references/semantic/2023.1/`. They must not point 2023.1 answers at the older global `references/semantic-builder-*.md` files, and they must not claim full 2023.1 WAAPI behavioral coverage.
+
+2024 and 2025 are future sequential follow-ups. Do not grade an answer as if those versions are implemented here.
+
 ## Prepare a review workspace
 
 Create a sibling workspace for generated outputs. Keep generated model outputs out of the skill package unless a plan asks for committed evidence.
@@ -62,6 +66,8 @@ Open or share `review.html` with the reviewer. When the reviewer clicks Submit A
 ## Assertions and pytest
 
 The assertions in `evals/evals.json` are objective checks for reviewing model outputs. They are intentionally simple text checks so reviewers can understand failures quickly. They do not prove runtime behavior.
+
+For 2023.1 prompts, treat NotebookLM as source evidence generation or refresh only. Runtime examples should read local persisted evidence and source-note resources, not query NotebookLM while constructing builders or dispatcher requests.
 
 Keep the normal test suite as the verification source:
 

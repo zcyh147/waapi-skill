@@ -5,7 +5,7 @@ description: Use this skill for Wwise WAAPI automation, dispatcher calls, genera
 
 # Wwise WAAPI Skill
 
-This skill provides one generic, manifest-backed WAAPI dispatcher for Wwise 2022.1 automation. Do not create one skill or wrapper per API: validate the requested URI against `resources/manifest/<version>/`, then dispatch functions through the WAAPI client or topics through the bounded subscription runtime.
+This skill provides one generic, manifest-backed WAAPI dispatcher for Wwise automation. The default behavior remains Wwise 2022.1. Wwise 2023.1 is supported only where versioned manifests, semantic source notes, tests, and evidence resources exist. Do not create one skill or wrapper per API: validate the requested URI against `resources/manifest/<version>/`, then dispatch functions through the WAAPI client or topics through the bounded subscription runtime.
 
 ## Command templates
 
@@ -30,6 +30,24 @@ result = WwiseDispatcher(client=waapi_client).dispatch(
     allow_destructive=False,
     evidence_dir=".sisyphus/evidence/waapi",
 )
+```
+
+Wwise 2023.1 live gates must use explicit version and path inputs. Use these exact local command templates only for opt-in live or destructive validation, never for default pytest:
+
+```bash
+WWISE_VERSION=2023.1 \
+WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh" \
+WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj" \
+WWISE_LIVE=1 \
+python -m pytest tests/live -q
+
+WWISE_VERSION=2023.1 \
+WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh" \
+WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj" \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_LIVE=1 \
+WWISE_DESTRUCTIVE=1 \
+python -m pytest tests/destructive -q
 ```
 
 Topic waits use the same dispatcher, not a separate topic-specific skill:
@@ -128,7 +146,18 @@ Required error fields are `ok`, `api`, `version`, `error_code`, `message`, and `
 
 ## NotebookLM documentation gate
 
-Documentation-sensitive generation must use the NotebookLM gate before relying on semantic Wwise API behavior. The accepted gate evidence must show `Gate status: open`, notebook id `wwise-2022.1-docs`, and successful auth/list/query checks. If the gate is missing or fail-closed, stop docs-dependent generation and request fresh NotebookLM evidence rather than guessing.
+Documentation-sensitive source-note generation or refresh must use the NotebookLM gate before relying on semantic Wwise API behavior. Runtime builders and dispatcher flows do not query NotebookLM. Runtime reads local persisted evidence and source notes only.
+
+- Wwise 2022.1 source notes use notebook id `wwise-2022.1-docs` and persisted evidence such as `references/semantic-builder-notebooklm-gate.md`.
+- Wwise 2023.1 source notes use notebook id `wwise-2023.1-docs`, versioned references under `references/semantic/2023.1/`, and local source-note resource `resources/semantic/2023.1/source_notes.json`.
+- If the gate evidence is missing, wrong, or fail-closed for the requested version, stop docs-dependent source-note refresh and request fresh NotebookLM evidence rather than guessing.
+
+## Version support scope
+
+- `2022.1` remains the default dispatcher, live environment, semantic source-note, and docs behavior.
+- `2023.1` is explicit opt-in support. It is supported only where the repo has versioned resources, source notes, tests, and evidence under paths such as `resources/manifest/2023.1/`, `resources/semantic/2023.1/source_notes.json`, `resources/coverage/2023.1/`, and `references/semantic/2023.1/`.
+- The 2023.1 coverage model separates `supported`, `deferred`, `excluded`, `untested`, `evidence-only`, and reserved `live-tested`. Manifest reflection, skipped live tests, and skipped destructive tests are not behavioral proof.
+- 2024 and 2025 are future sequential follow-ups. They are not implemented here.
 
 ## Layout
 
@@ -137,5 +166,6 @@ Documentation-sensitive generation must use the NotebookLM gate before relying o
 - `wwise_waapi/manifest.py` - generated manifest loading and reflection helpers.
 - `wwise_waapi/deferred_registry.py` and `api_coverage_audit.py` - evidence-backed behavioral coverage deferrals.
 - `wwise_waapi/headless.py` - headless lifecycle launch/probe/cleanup helpers for WwiseConsole WAAPI gates.
+- `resources/semantic/2023.1/source_notes.json` and `references/semantic/2023.1/` - versioned 2023.1 semantic source-note resources and audit references.
 - `scripts/run.py` - thin command wrapper.
 - `tests/unit/` - fast fake-client tests; live and destructive tests remain opt-in.

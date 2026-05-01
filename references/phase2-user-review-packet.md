@@ -2,6 +2,28 @@
 
 Use this packet when asking the user to approve the Phase 2.1 live sandbox coverage outcome. It summarizes what changed, what remains deferred, and what must not be claimed yet.
 
+This packet is for Wwise 2022.1 Phase 2.1 coverage. Wwise 2023.1 support is separate and version-scoped. 2023.1 is supported only where resources, source notes, tests, and evidence exist under paths such as `references/semantic/2023.1/`, `resources/manifest/2023.1/`, `resources/semantic/2023.1/source_notes.json`, and `resources/coverage/2023.1/`. Do not use this 2022.1 packet to claim full 2023.1 WAAPI behavioral coverage.
+
+Exact 2023.1 opt-in command templates, for the separate 2023.1 support path, are:
+
+```bash
+WWISE_VERSION=2023.1 \
+WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh" \
+WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj" \
+WWISE_LIVE=1 \
+python -m pytest tests/live -q
+
+WWISE_VERSION=2023.1 \
+WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh" \
+WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj" \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_LIVE=1 \
+WWISE_DESTRUCTIVE=1 \
+python -m pytest tests/destructive -q
+```
+
+NotebookLM is source evidence generation or refresh only. Runtime reads local persisted evidence and source notes. 2024 and 2025 are future sequential follow-ups, not implemented here.
+
 ## Before and after counts
 
 | Metric | Count |
