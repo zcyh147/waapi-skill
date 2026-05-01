@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WwiseDocument Type="WorkUnit" ID="{4A6B5F44-3921-40CE-8E88-60A3C51DE7BE}" SchemaVersion="133">
+	<SoundcasterSessions>
+		<WorkUnit Name="Minigun" ID="{4A6B5F44-3921-40CE-8E88-60A3C51DE7BE}" PersistMode="Standalone">
+			<ChildrenList>
+				<SoundcasterSession Name="Minigun" ID="{1C5BA931-9550-4DC8-B1C7-13689B8AE813}">
+					<ModuleList>
+						<Module>
+							<ObjectRef Name="Play_Minigun" ID="{2B98695B-2238-45B1-89C5-A5B826472425}" WorkUnitID="{ED23F4DA-DCE5-4423-887B-E01272D6C483}"/>
+							<Position X="0" Y="0"/>
+						</Module>
+						<Module>
+							<ObjectRef Name="Stop_Minigun" ID="{CBA334AA-6BC1-4847-854B-A9B55D1571FE}" WorkUnitID="{ED23F4DA-DCE5-4423-887B-E01272D6C483}"/>
+							<Position X="1" Y="0"/>
+						</Module>
+					</ModuleList>
+				</SoundcasterSession>
+			</ChildrenList>
+		</WorkUnit>
+	</SoundcasterSessions>
+</WwiseDocument>

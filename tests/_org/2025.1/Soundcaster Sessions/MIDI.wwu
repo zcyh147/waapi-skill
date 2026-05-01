@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WwiseDocument Type="WorkUnit" ID="{8E30088F-3B64-48D3-8CBB-C37BED36118F}" SchemaVersion="133">
+	<SoundcasterSessions>
+		<WorkUnit Name="MIDI" ID="{8E30088F-3B64-48D3-8CBB-C37BED36118F}" PersistMode="Standalone">
+			<ChildrenList>
+				<SoundcasterSession Name="MIDI" ID="{9C02096E-8E29-4029-9D49-778F85015C87}">
+					<ModuleList>
+						<Module>
+							<ObjectRef Name="Falling" ID="{C11640EE-39E3-46D0-8F0E-A696522F5ED0}" WorkUnitID="{170E89B3-0253-45C4-A46B-E86073778489}"/>
+							<Position X="0" Y="1"/>
+						</Module>
+						<Module>
+							<ObjectRef Name="Defeat" ID="{E6BF27A8-7A86-48F3-9C38-4D94F487FC79}" WorkUnitID="{170E89B3-0253-45C4-A46B-E86073778489}"/>
+							<Position X="0" Y="2"/>
+						</Module>
+						<Module>
+							<ObjectRef Name="Start_MIDI_Music" ID="{4055E964-46A8-4BE0-A072-52035C0C865D}" WorkUnitID="{170E89B3-0253-45C4-A46B-E86073778489}"/>
+							<Position X="1" Y="0"/>
+						</Module>
+						<Module>
+							<ObjectRef Name="Neutral" ID="{ECF1FA83-D23C-4E63-93DB-6C8074FBB063}" WorkUnitID="{170E89B3-0253-45C4-A46B-E86073778489}"/>
+							<Position X="1" Y="1"/>
+						</Module>
+						<Module>
+							<ObjectRef Name="Play_Again" ID="{B956FD69-B748-4410-8287-84DA8CC9F851}" WorkUnitID="{170E89B3-0253-45C4-A46B-E86073778489}"/>
+							<Position X="1" Y="3"/>
+						</Module>
+						<Module>
+							<ObjectRef Name="Rising" ID="{E7922474-BE64-4319-8D04-6F4A3D5670E8}" WorkUnitID="{170E89B3-0253-45C4-A46B-E86073778489}"/>
+							<Position X="2" Y="1"/>
+						</Module>
+						<Module>
+							<ObjectRef Name="Victory" ID="{DA07E212-D811-42AC-A48B-D76758546EE5}" WorkUnitID="{170E89B3-0253-45C4-A46B-E86073778489}"/>
+							<Position X="2" Y="2"/>
+						</Module>
+					</ModuleList>
+				</SoundcasterSession>
+			</ChildrenList>
+		</WorkUnit>
+	</SoundcasterSessions>
+</WwiseDocument>
