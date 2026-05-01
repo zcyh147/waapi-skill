@@ -13,7 +13,7 @@
   },
   "mutation_attempted": false,
   "reason": "WWISE_LIVE=1 prerequisite failure: WWISE_CONSOLE must be the exact 2025.1 WwiseConsole path /Applications/Audiokinetic/Wwise2025.1.7.9143/Wwise.app/Contents/Tools/WwiseConsole.sh; got /Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wrong-2025/WwiseConsole.sh; WWISE_SAMPLE_PROJECT_PATH must be the exact 2025.1 SampleProject path /Applications/Audiokinetic/SampleProject2025.1.7.9143/SampleProject/SampleProject.wproj; got /Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wrong-2025/SampleProject.wproj; WWISE_SAMPLE_PROJECT_PATH does not exist: /Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wrong-2025/SampleProject.wproj; WwiseConsole is unavailable at /Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wrong-2025/WwiseConsole.sh",
-  "recorded_at_unix": 1777656166,
+  "recorded_at_unix": 1777656553,
   "sandbox_copy_attempted": false,
   "status": "skipped-before-sandbox-copy"
 }
