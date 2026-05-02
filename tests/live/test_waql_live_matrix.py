@@ -26,6 +26,7 @@ from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImport
     prepare_sample_project_sandbox,
     shutdown_sandboxed_wwise,
 )
+from tests.support.active_gate_failures import fail_if_active_runtime_failure  # pyright: ignore[reportMissingImports]
 from wwise_waapi.waql import WAQL_API_URI  # pyright: ignore[reportMissingImports]
 
 
@@ -85,6 +86,7 @@ def test_live_waql_matrix_runs_read_only_against_sandbox() -> None:
             failed = False
     except (LiveEnvironmentError, SandboxFixtureError, HeadlessLifecycleError, OSError) as exc:
         _write_blocker_evidence(exc)
+        fail_if_active_runtime_failure(exc, "live WAQL sandbox environment blocked execution")
         pytest.skip(f"live WAQL sandbox environment blocked execution: {type(exc).__name__}: {exc}")
     finally:
         if client is not None:

@@ -27,6 +27,7 @@ from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImport
     prepare_sample_project_sandbox,
     shutdown_sandboxed_wwise,
 )
+from tests.support.active_gate_failures import fail_if_active_runtime_failure  # pyright: ignore[reportMissingImports]
 from wwise_waapi.subscriptions import SubscriptionManager, SubscriptionTimeout  # pyright: ignore[reportMissingImports]
 
 
@@ -68,6 +69,7 @@ def test_live_object_reads_and_deterministic_topics_against_sandbox() -> None:
             failed = False
     except (LiveEnvironmentError, SandboxFixtureError, HeadlessLifecycleError, OSError) as exc:
         _write_blocker_evidence(exc)
+        fail_if_active_runtime_failure(exc, "live object/topic sandbox environment blocked execution")
         pytest.skip(f"live object/topic sandbox environment blocked execution: {type(exc).__name__}: {exc}")
     finally:
         if client is not None:
