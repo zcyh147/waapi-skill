@@ -104,7 +104,7 @@ WWISE_VERSION=2023.1 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2023.1.19.89
 Destructive 2023.1 tests, sandbox copy required before mutation:
 
 ```sh
-WWISE_VERSION=2023.1 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh" WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive -q
+WWISE_VERSION=2023.1 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh" WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2023.1 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive -q
 ```
 
 Use the installed SampleProject path only as the immutable source for copying. Destructive testing should copy from `WWISE_SAMPLE_PROJECT_PATH` into `WWISE_SANDBOX_ROOT` before mutation; it must never mutate the installed `/Applications/Audiokinetic/...` project or the `tests/_org/2023.1/` source fixture directly.

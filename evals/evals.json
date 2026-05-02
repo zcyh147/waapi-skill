@@ -602,7 +602,7 @@
             "WWISE_VERSION=2021.1",
             "WWISE_LIVE=1",
             "WWISE_DESTRUCTIVE=1",
-            "WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes"
+            "WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2021.1"
           ]
         },
         {

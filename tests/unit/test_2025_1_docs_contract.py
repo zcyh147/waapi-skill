@@ -40,7 +40,7 @@ LIVE_2025_READ_ONLY_COMMAND = (
 DESTRUCTIVE_2025_COMMAND = (
     'WWISE_VERSION=2025.1 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2025.1.7.9143/Wwise.app/Contents/Tools/WwiseConsole.sh" '
     'WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2025.1.7.9143/SampleProject/SampleProject.wproj" '
-    "WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_READINESS_TIMEOUT=180 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 "
+    "WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2025.1 WWISE_READINESS_TIMEOUT=180 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 "
     "python -m pytest tests/destructive/test_2025_1_project_mutation_sandbox.py "
     "tests/destructive/test_2025_1_soundbank_audio_sandbox.py "
     "tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py -q"
@@ -133,10 +133,11 @@ def test_2025_docs_include_exact_counts_paths_commands_and_limited_claims() -> N
     counts = _resource_counts()
 
     assert counts == {
-        "coverage_total": 154,
+        "coverage_total": 185,
         "live_total": 154,
         "deferred_total": 143,
-        "coverage_status": {"excluded": 48, "deferred": 95, "sandbox-mutating-tested": 10, "live-tested": 1},
+        "coverage_status": {"excluded": 48, "deferred": 126, "sandbox-mutating-tested": 10, "live-tested": 1},
+        "coverage_item_type": {"function": 154, "topic": 31},
         "classification_total": 70,
         "classification_item_type": {"function": 59, "topic": 11},
         "classification_inventory_change": {"added": 7, "changed": 63},
@@ -150,6 +151,8 @@ def test_2025_docs_include_exact_counts_paths_commands_and_limited_claims() -> N
     assert _squash_command(DESTRUCTIVE_2025_COMMAND) in _squash_command(combined)
 
     assert "complete reflected inventory and parity classification for 154 functions" in combined
+    assert "topic inventory is now present" in combined
+    assert "topic inventory rows are inventory/substitute accounting only until fresh active live topic evidence exists" in combined
     assert "one live read-only URI" in combined
     assert "ten copied-sandbox mutating URIs" in combined
     assert "143" in combined
@@ -287,6 +290,7 @@ def _resource_counts() -> dict[str, Any]:
         "live_total": len(live),
         "deferred_total": len(deferred),
         "coverage_status": dict(Counter(entry["coverage_status"] for entry in coverage)),
+        "coverage_item_type": dict(Counter(entry["item_type"] for entry in coverage)),
         "classification_total": len(classifications),
         "classification_item_type": dict(Counter(entry["item_type"] for entry in classifications)),
         "classification_inventory_change": dict(Counter(entry["inventory_change"] for entry in classifications)),

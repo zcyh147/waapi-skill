@@ -80,10 +80,12 @@ Use these command tiers for semantic builder work:
 python -m pytest tests/unit/test_semantic_builder_audit.py -q
 python -m pytest tests/unit/test_semantic_builder_query.py tests/unit/test_semantic_builder_object_mutation.py tests/unit/test_semantic_builder_properties.py tests/unit/test_semantic_builder_import.py tests/unit/test_semantic_builder_soundbank.py tests/unit/test_semantic_builder_switchcontainer.py -q
 WWISE_LIVE=1 python -m pytest tests/live/test_waql_live_matrix.py -q
-WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes python -m pytest tests/destructive/test_project_mutation_sandbox.py tests/destructive/test_soundbank_audio_sandbox.py tests/destructive/test_switchcontainer_assignment_sandbox.py -q
+WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2022.1 python -m pytest tests/destructive/test_project_mutation_sandbox.py tests/destructive/test_soundbank_audio_sandbox.py tests/destructive/test_switchcontainer_assignment_sandbox.py -q
 ```
 
 Live and destructive tests skip unless the matching environment variables are explicitly set. Never treat a skipped live/destructive suite as proof of live execution.
+
+Timeout tuning is a diagnostic fallback, not the primary fix. If startup or readiness times out after gates and prerequisites pass, inspect getInfo readiness diagnostics, argv, cwd, dynamic port, process state, and output tails before raising `WWISE_READINESS_TIMEOUT`. A timeout increase may preserve evidence for a slow host, but it does not turn a blocked or failed runtime launch into a pass.
 
 NotebookLM boundary: NotebookLM produces or refreshes source evidence only. Runtime code reads local persisted source notes and evidence files. Do not add a runtime NotebookLM dependency or imply that builders query NotebookLM while constructing previews.
 
@@ -129,7 +131,7 @@ python -m pytest tests/live/test_2021_1_live_prerequisites.py tests/live/test_20
 WWISE_VERSION=2021.1 \
 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh" \
 WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj" \
-WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2021.1 \
 WWISE_LIVE=1 \
 WWISE_DESTRUCTIVE=1 \
 python -m pytest tests/destructive/test_2021_1_project_mutation_sandbox.py tests/destructive/test_2021_1_soundbank_audio_sandbox.py tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py -q
@@ -161,7 +163,7 @@ python -m pytest tests/live -q
 WWISE_VERSION=2023.1 \
 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh" \
 WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj" \
-WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2023.1 \
 WWISE_LIVE=1 \
 WWISE_DESTRUCTIVE=1 \
 python -m pytest tests/destructive -q
@@ -212,7 +214,7 @@ python -m pytest tests/live/test_2024_live_prerequisites.py tests/live/test_2024
 WWISE_VERSION=2024.1 \
 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2024.1.13.9056/Wwise.app/Contents/Tools/WwiseConsole.sh" \
 WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject/SampleProject.wproj" \
-WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2024.1 \
 WWISE_LIVE=1 \
 WWISE_DESTRUCTIVE=1 \
 python -m pytest tests/destructive/test_2024_project_mutation_sandbox.py tests/destructive/test_2024_soundbank_audio_sandbox.py tests/destructive/test_2024_switchcontainer_assignment_sandbox.py -q
@@ -262,7 +264,7 @@ python -m pytest tests/live/test_2025_1_live_prerequisites.py tests/live/test_20
 WWISE_VERSION=2025.1 \
 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2025.1.7.9143/Wwise.app/Contents/Tools/WwiseConsole.sh" \
 WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2025.1.7.9143/SampleProject/SampleProject.wproj" \
-WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2025.1 \
 WWISE_READINESS_TIMEOUT=180 \
 WWISE_LIVE=1 \
 WWISE_DESTRUCTIVE=1 \
@@ -286,6 +288,14 @@ Phase 2.1 uses five workflow families:
 - Live workflow: `WWISE_LIVE=1` read-only suites may inspect copied fixture projects after prerequisites pass.
 - Destructive workflow: `WWISE_LIVE=1 WWISE_DESTRUCTIVE=1` suites may mutate only copied sandboxes under `WWISE_SANDBOX_ROOT`.
 - Profiler workflow: profiler, transport, and soundengine probes may record capability or blocker evidence, but accepted calls alone never promote coverage.
+
+After active gates and prerequisites pass, WwiseConsole startup, getInfo readiness, live read-only runtime, and copied-sandbox destructive runtime failures fail the active suite. They are not collection skips and cannot fall back to fake routes. Missing prerequisites may stop the workflow before launch, but once runtime startup begins, blocked launch, early exit, readiness timeout, or teardown safety failure is failure evidence.
+
+Task 4, Task 5, Task 6, Task 8, and Task 9 evidence in `.sisyphus/evidence/waapi-test-remediation/` records Wwise-launch-blocked or no-gate static validation because the operator instructed agents not to launch Wwise. Those blockers are honest evidence, not runtime pass evidence, and must not be counted as fresh active live or destructive behavior.
+
+2021.1, 2024.1, and 2025.1 topic inventory is now present in versioned coverage resources. Task 8 topic plans are bounded, safe, and non-behavioral until fresh active live topic publisher and subscription evidence exists.
+
+For 2022.1, inventory, substitute coverage, fake-route entries, and deferred entries stay separate from behavior. Fake-route-tested and deferred rows may explain route or inventory accounting, but they do not count as behavioral or live behavioral coverage.
 
 ### Default Wwise-free verification
 
@@ -331,7 +341,7 @@ Expected result: read-only live checks use SampleProject as the source fixture a
 WWISE_LIVE=1 \
 WWISE_DESTRUCTIVE=1 \
 WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject \
-WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2022.1 \
 python -m pytest tests/destructive/test_project_mutation_sandbox.py tests/destructive/test_soundbank_audio_sandbox.py -q
 ```
 
@@ -344,7 +354,7 @@ WWISE_LIVE=1 \
 WWISE_DESTRUCTIVE=1 \
 WWISE_SANDBOX_KEEP_ON_FAILURE=1 \
 WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject \
-WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2022.1 \
 python -m pytest tests/destructive/test_project_mutation_sandbox.py -q
 ```
 
@@ -374,14 +384,14 @@ Expected result: the summary keeps `windows_validation` as `pending` unless Wind
 
 - `WWISE_SAMPLE_PROJECT_PATH`: immutable source-to-copy fixture path. The local example is `/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject`. This source is copied because tests need disposable sandboxes while the installed SampleProject stays unchanged and is not committed or vendored.
 - `WWISE_FIXTURE_PROJECT`: active copied `.wproj` used by a live or destructive test. For destructive runs, it must be under `WWISE_SANDBOX_ROOT`.
-- `WWISE_SANDBOX_ROOT`: root directory for copied sandbox projects. The default project runtime path is `.sisyphus/runtime/wwise-waapi-sandboxes`.
+- `WWISE_SANDBOX_ROOT`: root directory for copied sandbox projects. Use a versioned runtime path such as `.sisyphus/runtime/wwise-waapi-sandboxes/2022.1`, `.sisyphus/runtime/wwise-waapi-sandboxes/2023.1`, `.sisyphus/runtime/wwise-waapi-sandboxes/2024.1`, or `.sisyphus/runtime/wwise-waapi-sandboxes/2025.1`.
 - `WWISE_SANDBOX_KEEP_ON_FAILURE`: set to `1` to preserve a failing sandbox and evidence for inspection. Leave unset for normal cleanup.
 - `WWISE_LIVE`: set to `1` to opt into live Wwise prerequisite and read-only sandbox suites.
 - `WWISE_DESTRUCTIVE`: set to `1` together with `WWISE_LIVE=1` to opt into copied-sandbox mutation suites. It has no destructive effect without the live gate.
 
 ## Phase 2.1 status meanings
 
-- `fake-route-tested`: Phase 1 fake-route behavior remains accepted for non-policy APIs, but it is not live behavior.
+- `fake-route-tested`: Phase 1 fake-route coverage remains accepted as inventory/substitute evidence for non-policy APIs, but it is not behavioral or live behavioral coverage.
 - `sandbox-mutating-tested`: copied-sandbox behavior evidence exists and counts as live behavioral coverage.
 - `skipped-approved`: user-approved inventory-only exclusion, not behavioral or live behavioral coverage.
 - `wrapper-only`: wrapper diagnostics or route coverage only, not behavioral or live behavioral coverage.
@@ -395,7 +405,7 @@ Rerun only the failed category after the prerequisite smoke test passes. Keep th
 ```bash
 WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject python -m pytest tests/live/test_waql_live_matrix.py -q
 WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject python -m pytest tests/live/test_profiler_transport_soundengine.py -q
-WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes python -m pytest tests/destructive/test_soundbank_audio_sandbox.py -q
+WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2022.1 python -m pytest tests/destructive/test_soundbank_audio_sandbox.py -q
 ```
 
 Accepted WAAPI calls alone are not coverage. Promotion requires bounded readback, topic payload, profiler payload, generated artifact, or cleanup evidence that matches the category contract.

@@ -92,7 +92,7 @@ def test_runbook_documents_semantic_builder_refresh_and_execution_tiers() -> Non
         "tests/unit/test_semantic_builder_source_notes.py tests/unit/test_semantic_builder_audit.py -q",
         "profiler, transport, soundengine, UI, CLI, remote, or debug APIs",
         "WWISE_LIVE=1 python -m pytest tests/live/test_waql_live_matrix.py -q",
-        "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes",
+        "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2022.1",
         "Live and destructive tests skip unless the matching environment variables are explicitly set",
         "Never treat a skipped live/destructive suite as proof of live execution",
     ):
@@ -102,7 +102,7 @@ def test_runbook_documents_phase21_status_meanings_without_overclaiming() -> Non
     text = read_reference(RUNBOOK)
 
     for phrase in (
-        "`fake-route-tested`: Phase 1 fake-route behavior remains accepted",
+        "`fake-route-tested`: Phase 1 fake-route coverage remains accepted as inventory/substitute evidence",
         "`sandbox-mutating-tested`: copied-sandbox behavior evidence exists",
         "`skipped-approved`: user-approved inventory-only exclusion",
         "`wrapper-only`: wrapper diagnostics or route coverage only",
@@ -131,16 +131,19 @@ def test_phase21_review_packet() -> None:
         "Original deferred promoted to behavioral coverage | 13",
         "Original deferred policy-approved as inventory only | 41",
         "Live behavioral covered count | 13",
-        "Behavioral covered count including fake-route coverage | 38",
-        "`fake-route-tested` | 25",
+        "Behavioral/live behavioral covered count | 13",
+        "Fake-route inventory/substitute count (not behavioral) | 25",
+        "`fake-route-tested` | 25 | Non-policy Phase 1 fake-route coverage remains inventory/substitute coverage only; it is not behavioral or live behavioral coverage.",
         "`sandbox-mutating-tested` | 13",
         "`skipped-approved` | 21",
         "`wrapper-only` | 11",
         "`conformance-only-skip` | 11",
         "`still-deferred-with-evidence` | 63",
-        "13 promoted behavioral, 41 policy-approved inventory-only, and 63 still deferred with evidence",
-        "includes 21 skipped-approved APIs, 11 wrapper-only APIs, and 11 conformance-only-skip APIs",
+        "The original-deferred accepted split is 13 promoted behavioral, 41 policy-approved inventory-only, and 63 still deferred with evidence",
+        "The 41 original-deferred policy-approved inventory-only rows are 19 skipped-approved APIs, 11 wrapper-only APIs, and 11 conformance-only-skip APIs",
+        "the final status table has 21 skipped-approved rows because 2 skipped-approved rows came from fake-route-tested inventory/substitute evidence",
         "Do not claim that all 117 original deferred APIs are fully behavior-tested",
+        "The 25 fake-route-tested rows are inventory/substitute evidence only and do not contribute to behavioral or live behavioral counts",
     ):
         assert phrase in text
 

@@ -51,7 +51,7 @@ LIVE_2021_READ_ONLY_COMMAND = (
 DESTRUCTIVE_2021_COMMAND = (
     'WWISE_VERSION=2021.1 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh" '
     'WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj" '
-    'WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 '
+    'WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2021.1 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 '
     'python -m pytest tests/destructive/test_2021_1_project_mutation_sandbox.py '
     'tests/destructive/test_2021_1_soundbank_audio_sandbox.py '
     'tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py -q'
@@ -156,12 +156,15 @@ def test_2021_docs_include_exact_counts_paths_commands_and_limited_claims() -> N
     counts = _resource_counts()
 
     assert counts == {
-        'coverage_total': 99,
+        'coverage_total': 126,
         'summary_total': 99,
         'deferred_registry_total': 89,
-        'coverage_status': {'excluded': 46, 'deferred': 43, 'sandbox-mutating-tested': 9, 'live-tested': 1},
+        'coverage_status': {'excluded': 46, 'deferred': 70, 'sandbox-mutating-tested': 9, 'live-tested': 1},
+        'coverage_item_type': {'function': 99, 'topic': 27},
         'summary_status': {'excluded': 46, 'deferred': 43, 'sandbox-mutating-tested': 9, 'live-tested': 1},
+        'summary_item_type': {'function': 99},
         'deferred_registry_status': {'excluded': 46, 'deferred': 43},
+        'deferred_registry_item_type': {'function': 89},
     }
 
     assert WWISE_2021_CONSOLE in combined
@@ -172,6 +175,8 @@ def test_2021_docs_include_exact_counts_paths_commands_and_limited_claims() -> N
 
     for phrase in (
         '99 functions',
+        'topic inventory is now present',
+        'topic inventory rows are inventory/substitute accounting only until fresh active live topic evidence exists',
         'supported 0',
         'behavioral 0',
         'deferred 43',
@@ -242,8 +247,11 @@ def _resource_counts() -> dict[str, Any]:
         'summary_total': len(summary),
         'deferred_registry_total': len(deferred),
         'coverage_status': dict(Counter(entry['coverage_status'] for entry in coverage)),
+        'coverage_item_type': dict(Counter(entry['item_type'] for entry in coverage)),
         'summary_status': dict(Counter(entry['coverage_status'] for entry in summary)),
+        'summary_item_type': dict(Counter(entry['item_type'] for entry in summary)),
         'deferred_registry_status': dict(Counter(entry['coverage_status'] for entry in deferred)),
+        'deferred_registry_item_type': dict(Counter(entry['item_type'] for entry in deferred)),
     }
 
 

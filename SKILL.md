@@ -32,6 +32,22 @@ result = WwiseDispatcher(client=waapi_client).dispatch(
 )
 ```
 
+
+
+Wwise 2022.1 remains the default behavior. Use these templates for optional opt-in 2022.1 live or destructive validation, never for default pytest. Destructive validation must use the versioned sandbox root shown here:
+
+```bash
+WWISE_LIVE=1 \
+WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject \
+python -m pytest tests/live/test_live_prerequisites.py tests/live/test_waql_live_matrix.py tests/live/test_object_topics_sandbox.py -q
+
+WWISE_LIVE=1 \
+WWISE_DESTRUCTIVE=1 \
+WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2022.1 \
+python -m pytest tests/destructive/test_project_mutation_sandbox.py tests/destructive/test_soundbank_audio_sandbox.py tests/destructive/test_switchcontainer_assignment_sandbox.py -q
+```
+
 Wwise 2021.1 live gates must use explicit version and path inputs. Use these exact local command templates only for opt-in 2021.1 validation, never for default pytest. The installed SampleProject is immutable source only; destructive tests must copy it into `WWISE_SANDBOX_ROOT` and may mutate only the copied sandbox:
 
 ```bash
@@ -44,7 +60,7 @@ python -m pytest tests/live/test_2021_1_live_prerequisites.py tests/live/test_20
 WWISE_VERSION=2021.1 \
 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh" \
 WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj" \
-WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2021.1 \
 WWISE_LIVE=1 \
 WWISE_DESTRUCTIVE=1 \
 python -m pytest tests/destructive/test_2021_1_project_mutation_sandbox.py tests/destructive/test_2021_1_soundbank_audio_sandbox.py tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py -q
@@ -62,7 +78,7 @@ python -m pytest tests/live -q
 WWISE_VERSION=2023.1 \
 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh" \
 WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj" \
-WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2023.1 \
 WWISE_LIVE=1 \
 WWISE_DESTRUCTIVE=1 \
 python -m pytest tests/destructive -q
@@ -80,7 +96,7 @@ python -m pytest tests/live/test_2024_live_prerequisites.py tests/live/test_2024
 WWISE_VERSION=2024.1 \
 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2024.1.13.9056/Wwise.app/Contents/Tools/WwiseConsole.sh" \
 WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject/SampleProject.wproj" \
-WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2024.1 \
 WWISE_LIVE=1 \
 WWISE_DESTRUCTIVE=1 \
 python -m pytest tests/destructive/test_2024_project_mutation_sandbox.py tests/destructive/test_2024_soundbank_audio_sandbox.py tests/destructive/test_2024_switchcontainer_assignment_sandbox.py -q
@@ -99,7 +115,7 @@ python -m pytest tests/live/test_2025_1_live_prerequisites.py tests/live/test_20
 WWISE_VERSION=2025.1 \
 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2025.1.7.9143/Wwise.app/Contents/Tools/WwiseConsole.sh" \
 WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2025.1.7.9143/SampleProject/SampleProject.wproj" \
-WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2025.1 \
 WWISE_READINESS_TIMEOUT=180 \
 WWISE_LIVE=1 \
 WWISE_DESTRUCTIVE=1 \
@@ -199,6 +215,10 @@ Required error fields are `ok`, `api`, `version`, `error_code`, `message`, and `
 - Phase 2 live tests use the canonical environment contract in `wwise_waapi.live_environment`: `WWISE_SAMPLE_PROJECT_PATH` is the immutable source-to-copy (defaulting to `/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject` only when that path exists), `WWISE_FIXTURE_PROJECT` is read-only for live smoke, and destructive tests may only mutate a fixture project under `WWISE_SANDBOX_ROOT` with both `WWISE_LIVE=1` and `WWISE_DESTRUCTIVE=1`.
 - Do not mutate user Wwise projects in unit tests. Use injectable fake clients for dispatcher and subscription tests.
 - Keep runtime data, logs, auth state, and evidence artifacts out of git unless the plan explicitly asks for committed evidence.
+
+- After active gates and prerequisites pass, WwiseConsole startup, getInfo readiness, live read-only runtime, and copied-sandbox destructive runtime failures fail instead of skipping. Wwise-launch-blocked evidence from Tasks 4-6, 8, and 9 is honest blocker evidence, not runtime pass evidence.
+- Timeout tuning, including `WWISE_READINESS_TIMEOUT`, is diagnostic fallback only. Fix prerequisites, startup, readiness, sandbox isolation, or evidence problems first; a larger timeout does not convert a blocked or failed launch into runtime proof.
+- 2021.1, 2024.1, and 2025.1 topic inventory rows are inventory/substitute accounting only until fresh active live topic evidence exists. For 2022.1, fake-route and deferred entries stay separate from behavior and do not count as live behavior.
 
 ## NotebookLM documentation gate
 

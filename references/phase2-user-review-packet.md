@@ -24,7 +24,7 @@ python -m pytest tests/live/test_2021_1_live_prerequisites.py tests/live/test_20
 WWISE_VERSION=2021.1 \
 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh" \
 WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj" \
-WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2021.1 \
 WWISE_LIVE=1 \
 WWISE_DESTRUCTIVE=1 \
 python -m pytest tests/destructive/test_2021_1_project_mutation_sandbox.py tests/destructive/test_2021_1_soundbank_audio_sandbox.py tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py -q
@@ -42,7 +42,7 @@ python -m pytest tests/live -q
 WWISE_VERSION=2023.1 \
 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh" \
 WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj" \
-WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2023.1 \
 WWISE_LIVE=1 \
 WWISE_DESTRUCTIVE=1 \
 python -m pytest tests/destructive -q
@@ -60,7 +60,7 @@ python -m pytest tests/live/test_2024_live_prerequisites.py tests/live/test_2024
 WWISE_VERSION=2024.1 \
 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2024.1.13.9056/Wwise.app/Contents/Tools/WwiseConsole.sh" \
 WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject/SampleProject.wproj" \
-WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2024.1 \
 WWISE_LIVE=1 \
 WWISE_DESTRUCTIVE=1 \
 python -m pytest tests/destructive/test_2024_project_mutation_sandbox.py tests/destructive/test_2024_soundbank_audio_sandbox.py tests/destructive/test_2024_switchcontainer_assignment_sandbox.py -q
@@ -79,7 +79,7 @@ python -m pytest tests/live/test_2025_1_live_prerequisites.py tests/live/test_20
 WWISE_VERSION=2025.1 \
 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2025.1.7.9143/Wwise.app/Contents/Tools/WwiseConsole.sh" \
 WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2025.1.7.9143/SampleProject/SampleProject.wproj" \
-WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2025.1 \
 WWISE_READINESS_TIMEOUT=180 \
 WWISE_LIVE=1 \
 WWISE_DESTRUCTIVE=1 \
@@ -100,20 +100,21 @@ NotebookLM is source evidence generation or refresh only. Runtime reads local pe
 | Original deferred promoted to behavioral coverage | 13 |
 | Original deferred policy-approved as inventory only | 41 |
 | Live behavioral covered count | 13 |
-| Behavioral covered count including fake-route coverage | 38 |
+| Behavioral/live behavioral covered count | 13 |
+| Fake-route inventory/substitute count (not behavioral) | 25 |
 
 ## Final status split
 
 | Status | Count | Review meaning |
 | --- | ---: | --- |
-| `fake-route-tested` | 25 | Non-policy Phase 1 fake-route coverage remains accepted, but it is not live behavior. |
+| `fake-route-tested` | 25 | Non-policy Phase 1 fake-route coverage remains inventory/substitute coverage only; it is not behavioral or live behavioral coverage. |
 | `sandbox-mutating-tested` | 13 | Original deferred APIs promoted through copied-sandbox behavior evidence. |
 | `skipped-approved` | 21 | `cli`, `core.remote`, and `debug` are user-approved inventory-only exclusions. |
 | `wrapper-only` | 11 | `ui`, `ui.commands`, and `ui.project` keep wrapper diagnostics only. |
 | `conformance-only-skip` | 11 | User-approved inventory and route conformance coverage only. It is not behavioral or live behavioral coverage. |
 | `still-deferred-with-evidence` | 63 | Deferred entries have concrete blocker evidence and future review triggers. |
 
-Do not claim that all 117 original deferred APIs are fully behavior-tested. The accepted split is 13 promoted behavioral, 41 policy-approved inventory-only, and 63 still deferred with evidence. The policy-approved inventory-only count includes 21 skipped-approved APIs, 11 wrapper-only APIs, and 11 conformance-only-skip APIs.
+Do not claim that all 117 original deferred APIs are fully behavior-tested. The 25 fake-route-tested rows are inventory/substitute evidence only and do not contribute to behavioral or live behavioral counts. The original-deferred accepted split is 13 promoted behavioral, 41 policy-approved inventory-only, and 63 still deferred with evidence. The 41 original-deferred policy-approved inventory-only rows are 19 skipped-approved APIs, 11 wrapper-only APIs, and 11 conformance-only-skip APIs; the final status table has 21 skipped-approved rows because 2 skipped-approved rows came from fake-route-tested inventory/substitute evidence.
 
 ## Promoted APIs and statuses
 

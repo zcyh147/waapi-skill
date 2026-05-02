@@ -33,7 +33,7 @@ LIVE_2024_READ_ONLY_COMMAND = (
 DESTRUCTIVE_2024_COMMAND = (
     'WWISE_VERSION=2024.1 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2024.1.13.9056/Wwise.app/Contents/Tools/WwiseConsole.sh" '
     'WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject/SampleProject.wproj" '
-    "WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 "
+    "WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2024.1 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 "
     "python -m pytest tests/destructive/test_2024_project_mutation_sandbox.py "
     "tests/destructive/test_2024_soundbank_audio_sandbox.py "
     "tests/destructive/test_2024_switchcontainer_assignment_sandbox.py -q"
@@ -166,6 +166,8 @@ def test_2024_docs_include_exact_paths_commands_and_limited_claims() -> None:
 
     assert "complete reflected inventory and parity classification" in combined
     assert "148 functions" in combined
+    assert "topic inventory is now present" in combined
+    assert "topic inventory rows are inventory/substitute accounting only until fresh active live topic evidence exists" in combined
     assert "one live read-only URI" in combined
     assert "ten copied-sandbox mutating URIs" in combined
     assert "remaining 137 entries" in combined
