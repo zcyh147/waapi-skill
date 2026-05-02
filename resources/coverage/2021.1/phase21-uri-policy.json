@@ -1,7 +1,7 @@
 {
   "metadata": {
     "api_coverage_resource": "resources/coverage/2021.1/api-coverage.json",
-    "evidence_policy": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
+    "evidence_policy": "2021.1 source notes and reflection are inventory-only; Task 7 promotes only ak.wwise.core.object.get with fresh exact-version read-only live evidence.",
     "generator": "task-5-deterministic-2021.1-uri-policy",
     "version": "2021.1"
   },
@@ -19,7 +19,6 @@
         "ak.wwise.core.object.copy",
         "ak.wwise.core.object.create",
         "ak.wwise.core.object.delete",
-        "ak.wwise.core.object.get",
         "ak.wwise.core.object.getAttenuationCurve",
         "ak.wwise.core.object.getPropertyAndReferenceNames",
         "ak.wwise.core.object.getPropertyInfo",
@@ -112,7 +111,10 @@
         "ak.wwise.ui.project.close",
         "ak.wwise.ui.project.open"
       ],
-      "supported": []
+      "supported": [],
+      "live-tested": [
+        "ak.wwise.core.object.get"
+      ]
     },
     "deferred_uris": [
       "ak.wwise.core.audio.import",
@@ -124,7 +126,6 @@
       "ak.wwise.core.object.copy",
       "ak.wwise.core.object.create",
       "ak.wwise.core.object.delete",
-      "ak.wwise.core.object.get",
       "ak.wwise.core.object.getAttenuationCurve",
       "ak.wwise.core.object.getPropertyAndReferenceNames",
       "ak.wwise.core.object.getPropertyInfo",
@@ -229,7 +230,6 @@
         "ak.wwise.core.object.copy",
         "ak.wwise.core.object.create",
         "ak.wwise.core.object.delete",
-        "ak.wwise.core.object.get",
         "ak.wwise.core.object.getAttenuationCurve",
         "ak.wwise.core.object.getPropertyAndReferenceNames",
         "ak.wwise.core.object.getPropertyInfo",
@@ -322,22 +322,30 @@
         "ak.wwise.ui.project.close",
         "ak.wwise.ui.project.open"
       ],
-      "supported": []
+      "supported": [],
+      "live-tested": [
+        "ak.wwise.core.object.get"
+      ]
     },
-    "source_only_evidence_policy": "2021.1 source notes and reflection are inventory support only, not behavior proof.",
-    "supported_uris": []
+    "source_only_evidence_policy": "2021.1 source notes and reflection are inventory support only, not behavior proof; Task 7 live evidence promotes only ak.wwise.core.object.get.",
+    "supported_uris": [],
+    "live_tested_uris": [
+      "ak.wwise.core.object.get"
+    ]
   },
   "summary": {
     "classification_counts": {
       "behavioral": 0,
-      "deferred": 53,
+      "deferred": 52,
       "excluded": 46,
+      "live-tested": 1,
       "supported": 0
     },
     "parity_bucket_counts": {
       "behavioral": 0,
-      "deferred": 53,
+      "deferred": 52,
       "excluded": 46,
+      "live-tested": 1,
       "supported": 0
     },
     "parity_bucket_total": 99,

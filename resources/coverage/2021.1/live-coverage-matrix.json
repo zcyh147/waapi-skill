@@ -1051,27 +1051,32 @@
       "version": "2021.1"
     },
     {
-      "achieved_status": "deferred",
-      "allowed_test_tier": "deferred-needs-2021.1-evidence",
+      "achieved_status": "live-tested",
+      "allowed_test_tier": "live-read-only-sandbox",
       "category": "core.object",
-      "counts_as_behavioral": false,
-      "counts_as_live_behavioral": false,
-      "coverage_status": "deferred",
-      "current_status": "deferred",
+      "counts_as_behavioral": true,
+      "counts_as_live_behavioral": true,
+      "coverage_status": "live-tested",
+      "current_status": "live-tested",
       "destructive_risk": {
         "destructive_opt_in": false,
         "risk_level": "low"
       },
-      "evidence_path": "resources/deferred/2021.1.json",
-      "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
-      "fixture_prerequisites": [],
+      "evidence_path": "resources/waql/2021.1/object-get-live-matrix.json",
+      "evidence_standard": "2021.1 read-only live sandbox evidence under .sisyphus/evidence/wwise-2021-waapi-integration-coverage/ plus resources/waql/2021.1/object-get-live-matrix.json counts as behavioral/live proof for ak.wwise.core.object.get only.",
+      "fixture_prerequisites": [
+        "WWISE_VERSION=2021.1",
+        "WWISE_CONSOLE exact 2021.1.14.8108 path",
+        "WWISE_SAMPLE_PROJECT_PATH exact SampleProject2021.1.14.8108 path",
+        "WWISE_LIVE=1"
+      ],
       "item_type": "function",
       "manifest_source_uri": "resources/manifest/2021.1/schemas.json#ak.wwise.core.object.get",
-      "parity_bucket": "deferred",
+      "parity_bucket": "live-tested",
       "phase1_inventory_status": "2021.1-reflected-deferred",
       "source_coverage_uri": "resources/coverage/2021.1/api-coverage.json",
       "source_note_family": "query",
-      "target_status": "deferred",
+      "target_status": "live-tested",
       "uri": "ak.wwise.core.object.get",
       "version": "2021.1"
     },
@@ -2478,34 +2483,36 @@
   ],
   "metadata": {
     "api_coverage_resource": "resources/coverage/2021.1/api-coverage.json",
-    "evidence_policy": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
+    "evidence_policy": "2021.1 manifest reflection and source notes remain inventory-only; Task 7 promotes only ak.wwise.core.object.get with fresh exact-version read-only live evidence.",
     "generator": "task-5-deterministic-2021.1-live-coverage-matrix",
-    "status_policy": "No 2021.1 live/destructive behavior evidence exists in this task; all live behavioral counters remain zero.",
+    "status_policy": "Task 7 promotes only ak.wwise.core.object.get using exact 2021.1.14 build 8108 read-only live sandbox evidence; all other 2021.1 functions remain deferred or excluded.",
     "version": "2021.1"
   },
   "summary": {
     "behavioral": 0,
-    "behavioral_covered_count": 0,
-    "behavioral_supported": 0,
-    "deferred": 53,
+    "behavioral_covered_count": 1,
+    "behavioral_supported": 1,
+    "deferred": 52,
     "destructive_opt_in": 39,
     "excluded": 46,
     "implemented": 99,
-    "live_behavioral_covered_count": 0,
-    "live_tested": 0,
+    "live_behavioral_covered_count": 1,
+    "live_tested": 1,
     "parity_bucket_counts": {
+      "supported": 0,
       "behavioral": 0,
-      "deferred": 53,
+      "deferred": 52,
       "excluded": 46,
-      "supported": 0
+      "live-tested": 1
     },
     "parity_bucket_total": 99,
     "reflected_total": 99,
     "status_counts": {
+      "supported": 0,
       "behavioral": 0,
-      "deferred": 53,
+      "deferred": 52,
       "excluded": 46,
-      "supported": 0
+      "live-tested": 1
     },
     "supported": 0,
     "total_functions": 99,

@@ -28,6 +28,7 @@ REQUIRED_TASK5_FIELDS = {
     "tool_version",
 }
 FORBIDDEN_NEWER_EVIDENCE = ("2022.1", "2023.1", "2024.1", "2025.1")
+LIVE_TESTED_OBJECT_GET = "ak.wwise.core.object.get"
 
 
 def test_2021_deferred_registry_loads_and_matches_blocked_coverage() -> None:
@@ -37,10 +38,17 @@ def test_2021_deferred_registry_loads_and_matches_blocked_coverage() -> None:
     reflected = {entry["uri"] for entry in _json(FUNCTIONS_MANIFEST)["functions"]}
     blocked_coverage = {entry["uri"] for entry in coverage if entry["coverage_status"] in {"deferred", "excluded"}}
 
-    assert len(registry.entries) == 99
-    assert set(registry.entries) == reflected == blocked_coverage
-    assert payload["summary"]["deferred_registry_entries"] == 99
-    assert payload["summary"]["classification_counts"] == {"supported": 0, "behavioral": 0, "deferred": 53, "excluded": 46}
+    assert len(registry.entries) == 98
+    assert set(registry.entries) == blocked_coverage == reflected - {LIVE_TESTED_OBJECT_GET}
+    assert payload["summary"]["deferred_registry_entries"] == 98
+    assert payload["summary"]["classification_counts"] == {
+        "supported": 0,
+        "behavioral": 0,
+        "deferred": 52,
+        "excluded": 46,
+        "live-tested": 1,
+    }
+    assert LIVE_TESTED_OBJECT_GET not in registry.entries
 
 
 def test_2021_deferred_entries_include_task5_evidence_contract() -> None:
