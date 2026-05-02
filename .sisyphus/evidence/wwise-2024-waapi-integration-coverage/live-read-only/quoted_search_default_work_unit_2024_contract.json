@@ -8,9 +8,9 @@
     ],
     "rows": [
       {
-        "id": "{B231292D-F96D-4EDC-AE14-D62DE1E07EDD}",
+        "id": "{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}",
         "name": "Default Work Unit",
-        "path": "\\Audio Devices\\Default Work Unit"
+        "path": "\\Conversion Settings\\Default Work Unit"
       }
     ]
   },
@@ -44,7 +44,7 @@
     ]
   },
   "query": "from search \"Default Work Unit\" where name = \"Default Work Unit\" take 1",
-  "recorded_at_unix": 1777641617,
+  "recorded_at_unix": 1777744195,
   "result_count": 1,
   "result_count_policy": {
     "allow_empty": true,
