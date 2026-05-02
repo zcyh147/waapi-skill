@@ -12,12 +12,12 @@ Required behavior for `/start-work`:
 - Start with the headless first gate: WwiseConsole lifecycle, dynamic WAAPI port, readiness probe, bounded startup, bounded shutdown, stdout and stderr capture, and process-tree cleanup.
 - Use TDD for each task: write or update failing tests first, implement the smallest compliant change, then run targeted and default pytest verification.
 - Keep overall line and branch coverage >=85%, and keep core headless, manifest, generator, and timeout module coverage >=95%.
-- Treat NotebookLM notebook `wwise-2022.1-docs` as the mandatory NotebookLM gate before 2022.1 WAQL or API semantic source-note refresh. For 2023.1, use `wwise-2023.1-docs` only to generate or refresh persisted local evidence under `references/semantic/2023.1/` and `resources/semantic/2023.1/source_notes.json`. For 2024.1, use `wwise-2024.1-docs` only to generate or refresh persisted local evidence under `references/semantic/2024.1/` and `resources/semantic/2024.1/source_notes.json`. For 2025.1, use `wwise-2025.1-docs` only to generate or refresh persisted local evidence under `references/semantic/2025.1/` and `resources/semantic/2025.1/source_notes.json`.
+- Treat NotebookLM notebook `wwise-2022.1-docs` as the mandatory NotebookLM gate before 2022.1 WAQL or API semantic source-note refresh. For 2021.1, use `wwise-2021.1.14-docs` only to generate or refresh persisted local source-only evidence under `references/semantic/2021.1/` and `resources/semantic/2021.1/source_notes.json`. For 2023.1, use `wwise-2023.1-docs` only to generate or refresh persisted local evidence under `references/semantic/2023.1/` and `resources/semantic/2023.1/source_notes.json`. For 2024.1, use `wwise-2024.1-docs` only to generate or refresh persisted local evidence under `references/semantic/2024.1/` and `resources/semantic/2024.1/source_notes.json`. For 2025.1, use `wwise-2025.1-docs` only to generate or refresh persisted local evidence under `references/semantic/2025.1/` and `resources/semantic/2025.1/source_notes.json`.
 - Never allow silent skips. Every reflected Wwise 2022.1 function and topic must be implemented and tested, or recorded in the deferred registry with required evidence.
 - Enforce deferred registry completeness before claiming Wwise 2022.1 API coverage.
 - Use bounded waits only. No unbounded waits are allowed for readiness, WAAPI calls, subscriptions, listener joins, process startup, or process cleanup.
 - Never mutate user Wwise projects. Live and destructive work must use isolated fixture projects and explicit opt-in gates.
-- Keep 2023.1, 2024.1, and 2025.1 support explicit and evidence-scoped. Each version is supported only where resources, source notes, tests, and evidence exist.
+- Keep 2021.1, 2023.1, 2024.1, and 2025.1 support explicit and evidence-scoped. Each version is supported only where resources, source notes, tests, and evidence exist.
 - Keep Windows validation truthful: macOS-only evidence is a non-blocking caveat and cannot claim cross-platform completion.
 
 ## Optional path: guarded Ralph-loop
@@ -34,7 +34,7 @@ Obey the plan exactly. Do not weaken plan constraints for speed. Do not modify t
 Critical constraints:
 1. No silent skips: every reflected Wwise 2022.1 function and topic must be implemented and tested, or deferred with complete evidence in the deferred registry.
 2. Headless first: complete the WwiseConsole lifecycle gate before broad API generation. Use dynamic WAAPI ports, readiness probes, stdout and stderr capture, bounded startup and shutdown timeouts, and forced process-tree cleanup.
-3. NotebookLM gate: use notebook id `wwise-2022.1-docs` as the mandatory NotebookLM gate before 2022.1 WAQL or API semantic source-note refresh. Use `wwise-2023.1-docs` only for 2023.1 persisted source-note evidence refresh, `wwise-2024.1-docs` only for 2024.1 persisted source-note evidence refresh, and `wwise-2025.1-docs` only for 2025.1 persisted source-note evidence refresh. Runtime builders must read local persisted evidence and must not query NotebookLM.
+3. NotebookLM gate: use notebook id `wwise-2022.1-docs` as the mandatory NotebookLM gate before 2022.1 WAQL or API semantic source-note refresh. Use `wwise-2021.1.14-docs` only for 2021.1 persisted source-only source-note evidence refresh, `wwise-2023.1-docs` only for 2023.1 persisted source-note evidence refresh, `wwise-2024.1-docs` only for 2024.1 persisted source-note evidence refresh, and `wwise-2025.1-docs` only for 2025.1 persisted source-note evidence refresh. Runtime builders must read local persisted evidence and must not query NotebookLM.
 4. TDD: add or update tests before implementation, then run the targeted tests for the changed behavior.
 5. Coverage thresholds: maintain overall line and branch coverage >=85%, plus >=95% coverage for core headless, manifest, generator, and timeout modules.
 6. No unbounded waits: every WAAPI call, subscription wait, listener join, process startup, process run, and shutdown path needs a bounded timeout.
@@ -65,11 +65,11 @@ Required evidence paths:
 
 ## Semantic builder and source-note refresh workflow
 
-Default development remains Wwise-free. Semantic builders use persisted source notes in `resources/semantic/2022.1/source_notes.json` by default. 2023.1, 2024.1, and 2025.1 callers must explicitly use versioned resources such as `resources/semantic/2023.1/source_notes.json`, `resources/semantic/2024.1/source_notes.json`, `resources/semantic/2025.1/source_notes.json`, and references under the matching `references/semantic/<version>/` directory. Builders return previews, dispatcher-ready payloads, readback plans, or topic expectations only. They do not execute live WAAPI calls by default.
+Default development remains Wwise-free. Semantic builders use persisted source notes in `resources/semantic/2022.1/source_notes.json` by default. 2021.1, 2023.1, 2024.1, and 2025.1 callers must explicitly use versioned resources such as `resources/semantic/2021.1/source_notes.json`, `resources/semantic/2023.1/source_notes.json`, `resources/semantic/2024.1/source_notes.json`, `resources/semantic/2025.1/source_notes.json`, and references under the matching `references/semantic/<version>/` directory. Builders return previews, dispatcher-ready payloads, readback plans, or topic expectations only. They do not execute live WAAPI calls by default.
 
 Refresh the source-note gate only when semantic docs change:
 
-1. Query NotebookLM notebook `wwise-2022.1-docs` for 2022.1 families and save the accepted gate evidence in `references/semantic-builder-notebooklm-gate.md`. Query `wwise-2023.1-docs` only for 2023.1 source-note refresh and save accepted evidence under `references/semantic/2023.1/`. Query `wwise-2024.1-docs` only for 2024.1 source-note refresh and save accepted evidence under `references/semantic/2024.1/`. Query `wwise-2025.1-docs` only for 2025.1 source-note refresh and save accepted evidence under `references/semantic/2025.1/`.
+1. Query NotebookLM notebook `wwise-2022.1-docs` for 2022.1 families and save the accepted gate evidence in `references/semantic-builder-notebooklm-gate.md`. Query `wwise-2021.1.14-docs` only for 2021.1 source-note refresh and save accepted source-only evidence under `references/semantic/2021.1/`. Query `wwise-2023.1-docs` only for 2023.1 source-note refresh and save accepted evidence under `references/semantic/2023.1/`. Query `wwise-2024.1-docs` only for 2024.1 source-note refresh and save accepted evidence under `references/semantic/2024.1/`. Query `wwise-2025.1-docs` only for 2025.1 source-note refresh and save accepted evidence under `references/semantic/2025.1/`.
 2. Update the family note in the matching local source-note resource, `resources/semantic/2022.1/source_notes.json`, `resources/semantic/2023.1/source_notes.json`, `resources/semantic/2024.1/source_notes.json`, or `resources/semantic/2025.1/source_notes.json`, with cited required fields and the exact endpoint inventory.
 3. Run `python -m pytest tests/unit/test_semantic_builder_source_notes.py tests/unit/test_semantic_builder_audit.py -q`.
 4. Do not promote profiler, transport, soundengine, UI, CLI, remote, or debug APIs into semantic builders without a new plan and source-note approval.
@@ -86,6 +86,54 @@ WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waap
 Live and destructive tests skip unless the matching environment variables are explicitly set. Never treat a skipped live/destructive suite as proof of live execution.
 
 NotebookLM boundary: NotebookLM produces or refreshes source evidence only. Runtime code reads local persisted source notes and evidence files. Do not add a runtime NotebookLM dependency or imply that builders query NotebookLM while constructing previews.
+
+## Wwise 2021.1 versioned support scope
+
+Wwise 2021.1 support is explicit and scoped to committed resources, source notes, tests, and evidence. It has reflected inventory and parity classification for 99 functions. Do not claim broad 2021.1 WAAPI behavioral coverage. Manifest reflection proves inventory only, source notes and NotebookLM notes are source-only, and skipped live or destructive tests are not live evidence.
+
+Versioned 2021.1 layout:
+
+- `references/semantic/2021.1/`
+- `resources/manifest/2021.1/`
+- `resources/semantic/2021.1/source_notes.json`
+- `resources/coverage/2021.1/`
+- `resources/waql/2021.1/`
+- `resources/deferred/2021.1.json`
+- `tests/_org/2021.1/`
+
+Accepted 2021.1 behavior evidence is limited to one live read-only URI, `ak.wwise.core.object.get`, and these nine copied-sandbox mutating URIs:
+
+- `ak.wwise.core.audio.import`
+- `ak.wwise.core.object.create`
+- `ak.wwise.core.object.delete`
+- `ak.wwise.core.object.setNotes`
+- `ak.wwise.core.soundbank.setInclusions`
+- `ak.wwise.core.switchContainer.addAssignment`
+- `ak.wwise.core.switchContainer.removeAssignment`
+- `ak.wwise.core.undo.beginGroup`
+- `ak.wwise.core.undo.endGroup`
+
+The status split is supported 0, behavioral 0, deferred 43, excluded 46, live-tested 1, sandbox-mutating-tested 9, and unknown 0. `ak.wwise.core.soundbank.getInclusions` and `ak.wwise.core.switchContainer.getAssignments` are readback helpers only. `ak.wwise.core.object.setReference` was setup helper evidence only for the switchContainer test. The installed SampleProject is immutable source only, and destructive tests must only mutate copied sandboxes under `WWISE_SANDBOX_ROOT`.
+
+Exact 2021.1 command templates:
+
+```bash
+python -m pytest -q
+
+WWISE_VERSION=2021.1 \
+WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh" \
+WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj" \
+WWISE_LIVE=1 \
+python -m pytest tests/live/test_2021_1_live_prerequisites.py tests/live/test_2021_1_reflection_prerequisites.py tests/live/test_2021_1_object_get_matrix.py -q
+
+WWISE_VERSION=2021.1 \
+WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh" \
+WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj" \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_LIVE=1 \
+WWISE_DESTRUCTIVE=1 \
+python -m pytest tests/destructive/test_2021_1_project_mutation_sandbox.py tests/destructive/test_2021_1_soundbank_audio_sandbox.py tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py -q
+```
 
 ## Wwise 2023.1 versioned support scope
 

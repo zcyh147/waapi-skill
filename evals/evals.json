@@ -514,6 +514,113 @@
       ]
     },
     {
+      "id": "2021-parity-review-version-scoped-summary",
+      "category": "2021.1 parity review",
+      "prompt": "Summarize the accepted Wwise 2021.1 support scope for a reviewer. Include exact evidence limits, NotebookLM source-only caveats, and avoid overclaiming behavior support.",
+      "expected_output": "Explains that 2021.1 has 99 reflected functions, one live read-only URI, nine copied-sandbox mutating URIs, 43 deferred entries, 46 excluded entries, and unknown 0. It states that NotebookLM and source notes are source-only, not runtime proof, and that skipped live or destructive tests are opt-in gates rather than proof.",
+      "files": [
+        "references/semantic/2021.1/semantic-builder-protocol.md",
+        "resources/manifest/2021.1/functions.json",
+        "resources/coverage/2021.1/api-coverage.json",
+        "resources/deferred/2021.1.json",
+        "resources/waql/2021.1/object-get-live-matrix.json"
+      ],
+      "assertions": [
+        {
+          "name": "uses_2021_version_scope",
+          "text": "Output names Wwise 2021.1 and points to versioned 2021.1 resources.",
+          "required_terms": [
+            "2021.1",
+            "resources/manifest/2021.1/",
+            "resources/coverage/2021.1/",
+            "references/semantic/2021.1/"
+          ]
+        },
+        {
+          "name": "limited_promoted_evidence",
+          "text": "Output limits promoted evidence to one live read-only URI and nine copied-sandbox mutating URIs.",
+          "required_terms": [
+            "99 reflected functions",
+            "ak.wwise.core.object.get",
+            "nine",
+            "copied-sandbox",
+            "43 deferred",
+            "46 excluded",
+            "unknown 0"
+          ],
+          "forbidden_terms": [
+            "sweeping 2021.1 live-tested claim",
+            "sweeping 2021.1 behavior-tested claim",
+            "unqualified 2021.1 support claim"
+          ]
+        },
+        {
+          "name": "keeps_source_only_notes_out_of_runtime_proof",
+          "text": "Output says NotebookLM and source notes are source-only and not runtime proof.",
+          "required_terms": [
+            "NotebookLM",
+            "source-only",
+            "not runtime proof"
+          ],
+          "forbidden_terms": [
+            "NotebookLM as runtime proof for 2021.1",
+            "source notes as runtime proof for 2021.1",
+            "source-only notes as behavior support for 2021.1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2021-live-and-destructive-command-review",
+      "category": "2021.1 command review",
+      "prompt": "Give the exact Wwise 2021.1 opt-in commands for default tests, live read-only validation, and destructive sandbox validation. State the SampleProject immutability rule correctly.",
+      "expected_output": "Lists the default pytest command, the 2021.1 live read-only command, and the 2021.1 destructive sandbox command with the 2021.1.14.8108 WwiseConsole and SampleProject identities. It states that installed SampleProject is immutable source only and destructive tests must mutate copied sandboxes under WWISE_SANDBOX_ROOT.",
+      "files": [
+        "SKILL.md",
+        "references/long-run-runbook.md",
+        "references/phase2-user-review-packet.md",
+        "resources/coverage/2021.1/phase2-coverage-summary.json"
+      ],
+      "assertions": [
+        {
+          "name": "uses_2021_build_and_project_identity",
+          "text": "Output includes the exact 2021.1 WwiseConsole and SampleProject paths.",
+          "required_terms": [
+            "Wwise2021.1.14.8108",
+            "SampleProject2021.1.14.8108",
+            "WwiseConsole.sh",
+            "SampleProject.wproj"
+          ]
+        },
+        {
+          "name": "includes_three_command_modes",
+          "text": "Output includes default, live read-only, and destructive sandbox validation commands.",
+          "required_terms": [
+            "python -m pytest -q",
+            "tests/live/test_2021_1_live_prerequisites.py",
+            "tests/destructive/test_2021_1_project_mutation_sandbox.py",
+            "WWISE_VERSION=2021.1",
+            "WWISE_LIVE=1",
+            "WWISE_DESTRUCTIVE=1",
+            "WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes"
+          ]
+        },
+        {
+          "name": "sample_project_immutable_source_only",
+          "text": "Output protects installed SampleProject and requires copied sandboxes for destructive tests.",
+          "required_terms": [
+            "immutable source only",
+            "copied sandboxes",
+            "WWISE_SANDBOX_ROOT"
+          ],
+          "forbidden_terms": [
+            "mutate the installed SampleProject",
+            "destructive tests can edit SampleProject in place"
+          ]
+        }
+      ]
+    },
+    {
       "id": "2023-semantic-builder-version-scoped-preview",
       "category": "2023.1 semantic builder version scope",
       "prompt": "Show a Wwise 2023.1 semantic builder preview for a read-only Sound object query. Keep it version-scoped and do not use 2022.1 semantic references as proof.",

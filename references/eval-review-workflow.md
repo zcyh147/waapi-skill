@@ -13,6 +13,8 @@ The eval set covers six Wwise WAAPI behaviors that are easy to regress in prose 
 5. Missing or non-starting Wwise diagnostics without committing local state.
 6. Deferred API explanations that separate inventory coverage from behavioral coverage.
 
+Additional 2021.1 eval examples are version-scoped. They must point to versioned resources such as `resources/manifest/2021.1/`, `resources/semantic/2021.1/source_notes.json`, `resources/coverage/2021.1/`, `resources/deferred/2021.1.json`, `resources/waql/2021.1/`, and `references/semantic/2021.1/`. They must keep 2021.1 claims limited to 99 reflected functions, one live read-only URI, nine copied-sandbox mutating URIs, 43 deferred entries, 46 excluded entries, and unknown 0. They must not claim broad 2021.1 WAAPI behavioral coverage, must label NotebookLM and source notes as source-only, and must state that destructive tests require copied sandboxes under `.sisyphus/runtime/wwise-waapi-sandboxes`.
+
 Additional 2023.1 eval examples are version-scoped. They must point to versioned resources such as `resources/manifest/2023.1/`, `resources/semantic/2023.1/source_notes.json`, `resources/coverage/2023.1/`, and `references/semantic/2023.1/`. They must not point 2023.1 answers at the older global `references/semantic-builder-*.md` files, and they must not claim full 2023.1 WAAPI behavioral coverage.
 
 Additional 2024.1 eval examples are version-scoped. They must point to versioned resources such as `resources/manifest/2024.1/`, `resources/semantic/2024.1/source_notes.json`, `resources/coverage/2024.1/`, `resources/deferred/2024.1.json`, `resources/waql/2024.1/`, and `references/semantic/2024.1/`. They must keep 2024.1 claims limited to complete reflected inventory and parity classification, one live read-only URI, ten copied-sandbox mutating URIs, and remaining deferred or excluded entries. They must not claim broad 2024.1 WAAPI behavioral coverage.
@@ -68,6 +70,8 @@ Open or share `review.html` with the reviewer. When the reviewer clicks Submit A
 ## Assertions and pytest
 
 The assertions in `evals/evals.json` are objective checks for reviewing model outputs. They are intentionally simple text checks so reviewers can understand failures quickly. They do not prove runtime behavior.
+
+For 2021.1 prompts, treat NotebookLM and source notes as source-only evidence generation or refresh. Runtime examples should read local persisted evidence and source-note resources, not query NotebookLM while constructing builders or dispatcher requests. Keep readback helpers such as `ak.wwise.core.soundbank.getInclusions` and `ak.wwise.core.switchContainer.getAssignments` unpromoted unless a later plan changes the coverage resources.
 
 For 2023.1 prompts, treat NotebookLM as source evidence generation or refresh only. Runtime examples should read local persisted evidence and source-note resources, not query NotebookLM while constructing builders or dispatcher requests.
 

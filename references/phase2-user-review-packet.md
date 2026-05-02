@@ -4,11 +4,31 @@ Use this packet when asking the user to approve the Phase 2.1 live sandbox cover
 
 This packet is for Wwise 2022.1 Phase 2.1 coverage. Wwise 2023.1 support is separate and version-scoped. 2023.1 is supported only where resources, source notes, tests, and evidence exist under paths such as `references/semantic/2023.1/`, `resources/manifest/2023.1/`, `resources/semantic/2023.1/source_notes.json`, and `resources/coverage/2023.1/`. Do not use this 2022.1 packet to claim full 2023.1 WAAPI behavioral coverage.
 
+For 2021.1 parity review, use `.sisyphus/evidence/wwise-2021-waapi-integration-coverage/parity-review-packet.md` when present with final reconciliation evidence. Current committed 2021.1 resources record 99 reflected functions with status counts supported 0, behavioral 0, deferred 43, excluded 46, live-tested 1, sandbox-mutating-tested 9, and unknown 0. Behavior evidence is limited to `ak.wwise.core.object.get` as the only live read-only URI and nine copied-sandbox mutating URIs: `ak.wwise.core.audio.import`, `ak.wwise.core.object.create`, `ak.wwise.core.object.delete`, `ak.wwise.core.object.setNotes`, `ak.wwise.core.soundbank.setInclusions`, `ak.wwise.core.switchContainer.addAssignment`, `ak.wwise.core.switchContainer.removeAssignment`, `ak.wwise.core.undo.beginGroup`, and `ak.wwise.core.undo.endGroup`. NotebookLM and source notes are source-only, not runtime proof, and the installed SampleProject is immutable source only.
+
 For 2023.1 parity review, use `.sisyphus/evidence/wwise-2023-test-parity/parity-review-packet.md`. That packet records complete 2023.1 inventory/parity classification while keeping behavior evidence limited to one live read-only URI and ten copied-sandbox mutating URIs. Windows validation is recorded there as a non-blocking evidence caveat, not a hard gate.
 
 For 2024.1 parity review, use `.sisyphus/evidence/wwise-2024-waapi-integration-coverage/parity-review-packet.md`. That packet records complete 2024.1 reflected inventory and parity classification for 148 functions while keeping behavior evidence limited to `ak.wwise.core.object.get` as the only live read-only URI and ten copied-sandbox mutating URIs. The remaining 137 entries stay deferred or excluded, readback helpers `ak.wwise.core.soundbank.getInclusions` and `ak.wwise.core.switchContainer.getAssignments` remain unpromoted, and Windows validation is recorded as a non-blocking evidence caveat, not a hard gate.
 
 For 2025.1 parity review, use `.sisyphus/evidence/wwise-2025-waapi-integration-coverage/parity-review-packet.md`. That packet records complete 2025.1 reflected inventory and parity classification for 154 functions while keeping behavior evidence limited to `ak.wwise.core.object.get` as the only live read-only URI and ten copied-sandbox mutating URIs. The remaining 143 entries stay deferred or excluded, split as 95 deferred and 48 excluded. 2024 evidence is comparison metadata only, skipped live or destructive tests are opt-in gates rather than behavior proof, NotebookLM-only text is not runtime proof, and Windows validation remains a caveat and follow-up rather than macOS validation.
+
+Exact 2021.1 opt-in command templates, for the separate 2021.1 support path, are:
+
+```bash
+WWISE_VERSION=2021.1 \
+WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh" \
+WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj" \
+WWISE_LIVE=1 \
+python -m pytest tests/live/test_2021_1_live_prerequisites.py tests/live/test_2021_1_reflection_prerequisites.py tests/live/test_2021_1_object_get_matrix.py -q
+
+WWISE_VERSION=2021.1 \
+WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh" \
+WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj" \
+WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes \
+WWISE_LIVE=1 \
+WWISE_DESTRUCTIVE=1 \
+python -m pytest tests/destructive/test_2021_1_project_mutation_sandbox.py tests/destructive/test_2021_1_soundbank_audio_sandbox.py tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py -q
+```
 
 Exact 2023.1 opt-in command templates, for the separate 2023.1 support path, are:
 
@@ -66,7 +86,7 @@ WWISE_DESTRUCTIVE=1 \
 python -m pytest tests/destructive/test_2025_1_project_mutation_sandbox.py tests/destructive/test_2025_1_soundbank_audio_sandbox.py tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py -q
 ```
 
-NotebookLM is source evidence generation or refresh only. Runtime reads local persisted evidence and source notes. 2025.1 evidence is version-scoped and limited to the committed 2025.1 resources, tests, and evidence packet.
+NotebookLM is source evidence generation or refresh only. Runtime reads local persisted evidence and source notes. 2021.1 NotebookLM and source notes remain source-only and are not runtime or behavior proof. 2025.1 evidence is version-scoped and limited to the committed 2025.1 resources, tests, and evidence packet.
 
 ## Before and after counts
 
