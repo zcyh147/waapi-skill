@@ -38,6 +38,7 @@ SUPPORTED_VERSIONS = {"2021.1", "2024.1", "2025.1"}
 ACTOR_PARENT = r"\Actor-Mixer Hierarchy\Default Work Unit"
 READBACK_FIELDS = ["id", "name", "type", "path", "notes", "Volume"]
 TOPIC_RETURN_FIELDS = ["id", "name", "type", "path", "notes", "Volume"]
+DYNAMIC_OBJECT_ID_MARKER = "$disposable_object_id"
 
 
 def run_versioned_topic_plan(version: str, plan_path: Path, test_node: str) -> None:
@@ -89,6 +90,7 @@ def run_versioned_topic_plan(version: str, plan_path: Path, test_node: str) -> N
 def _run_topic_case(client: Any, version: str, case: Mapping[str, Any]) -> None:
     uri = case["uri"]
     with _tracked_objects(client) as tracked:
+        dynamic_subscription_values: dict[str, Any] = {}
         if uri == "ak.wwise.core.object.created":
 
             def mutate() -> Mapping[str, Any]:
@@ -146,6 +148,7 @@ def _run_topic_case(client: Any, version: str, case: Mapping[str, Any]) -> None:
 
         elif uri == "ak.wwise.core.object.propertyChanged":
             object_id = tracked.create(ACTOR_PARENT, "ActorMixer", _unique_name(version, "topic_property"))
+            dynamic_subscription_values["object"] = object_id
 
             def mutate() -> Mapping[str, Any]:
                 client.call("ak.wwise.core.object.setProperty", {"object": object_id, "property": "Volume", "value": -3.0}, options={})
@@ -164,7 +167,8 @@ def _run_topic_case(client: Any, version: str, case: Mapping[str, Any]) -> None:
         else:  # pragma: no cover - unit plan tests constrain cases
             raise AssertionError(f"unsupported topic case {uri}")
 
-        event, expected = _subscribe_then_mutate(client, case, mutate)
+        subscription_options = _subscription_options(case, dynamic_subscription_values)
+        event, expected = _subscribe_then_mutate(client, case, mutate, subscription_options=subscription_options)
         if uri == "ak.wwise.core.log.itemAdded":
             _assert_log_payload(case, event.payload, expected)
         else:
@@ -172,7 +176,24 @@ def _run_topic_case(client: Any, version: str, case: Mapping[str, Any]) -> None:
         _write_topic_evidence(version, case, payload=event.payload, expected=expected)
 
 
-def _subscribe_then_mutate(client: Any, case: Mapping[str, Any], mutate: Callable[[], Mapping[str, Any]]) -> tuple[Any, Mapping[str, Any]]:
+def _subscription_options(case: Mapping[str, Any], dynamic_values: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    options = dict(case["subscription_options"])
+    for key, value in dict(case.get("dynamic_subscription_options", {})).items():
+        if value == DYNAMIC_OBJECT_ID_MARKER:
+            assert dynamic_values is not None and "object" in dynamic_values, f"{case['uri']} requires a disposable object id for subscription options"
+            options[key] = dynamic_values["object"]
+        else:
+            options[key] = value
+    return options
+
+
+def _subscribe_then_mutate(
+    client: Any,
+    case: Mapping[str, Any],
+    mutate: Callable[[], Mapping[str, Any]],
+    *,
+    subscription_options: Mapping[str, Any],
+) -> tuple[Any, Mapping[str, Any]]:
     manager = SubscriptionManager(client)
     event_queue: queue.Queue[SubscriptionEvent] = queue.Queue(maxsize=1)
     expected_holder: dict[str, Mapping[str, Any]] = {}
@@ -189,7 +210,7 @@ def _subscribe_then_mutate(client: Any, case: Mapping[str, Any], mutate: Callabl
         except BaseException as exc:  # pragma: no cover - reported through live evidence
             publisher_errors.append(exc)
 
-    handle = manager.subscribe(str(case["uri"]), callback=callback, options=dict(case["subscription_options"]))
+    handle = manager.subscribe(str(case["uri"]), callback=callback, options=dict(subscription_options))
     if handle is None:
         raise AssertionError("WAAPI client is required for Task 8 topic subscriptions")
     thread = threading.Thread(target=publish, name=f"task-8-topic:{case['uri']}")

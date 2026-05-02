@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+from importlib import import_module
 from pathlib import Path
 from typing import Any, Mapping
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+DYNAMIC_OBJECT_ID_MARKER = "$disposable_object_id"
 PLAN_PATH = (
     REPO_ROOT
     / "resources"
@@ -168,6 +170,31 @@ def test_task_8_planned_publishers_are_deterministic_and_2021_log_topic_stays_de
                 }
 
 
+def test_task_8_property_changed_documents_dynamic_subscription_options() -> None:
+    for path in TASK_8_PLAN_PATHS.values():
+        case = _task8_topic_case(path, "ak.wwise.core.object.propertyChanged")
+
+        assert case["subscription_options"] == {"return": ["id", "name", "type", "path", "notes", "Volume"]}
+        assert case["dynamic_subscription_options"] == {"object": DYNAMIC_OBJECT_ID_MARKER, "property": "Volume"}
+        assert "object" not in case["subscription_options"]
+        assert "property" not in case["subscription_options"]
+        assert case["publisher"]["uri"] == "ak.wwise.core.object.setProperty"
+
+
+def test_property_changed_subscription_options_render_disposable_object_id() -> None:
+    case = _task8_topic_case(TASK_8_PLAN_PATHS["2021.1"], "ak.wwise.core.object.propertyChanged")
+    subscription_options = getattr(import_module("tests.live.versioned_object_topics_sandbox"), "_subscription_options")
+
+    rendered = subscription_options(case, {"object": "{12345678-1234-1234-1234-123456789abc}"})
+
+    assert rendered == {
+        "return": ["id", "name", "type", "path", "notes", "Volume"],
+        "object": "{12345678-1234-1234-1234-123456789abc}",
+        "property": "Volume",
+    }
+    assert "object" not in case["subscription_options"]
+
+
 def _topic_case(uri: str) -> Mapping[str, Any]:
     for case in _plan()["topic_cases"]:
         if case["uri"] == uri:
@@ -188,6 +215,13 @@ def _plan() -> Mapping[str, Any]:
 
 def _task8_plan(path: Path) -> Mapping[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _task8_topic_case(path: Path, uri: str) -> Mapping[str, Any]:
+    for case in _task8_plan(path)["topic_cases"]:
+        if case["uri"] == uri:
+            return case
+    raise AssertionError(f"missing Task 8 topic case {uri} in {path}")
 
 
 def _manifest_topics(version: str) -> set[str]:
