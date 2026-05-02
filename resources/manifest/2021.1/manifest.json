@@ -1,22 +1,46 @@
 {
   "audit": {
     "counts_match": true,
-    "manifest_function_count": 0,
-    "manifest_topic_count": 0,
-    "reflected_function_count": 0,
-    "reflected_topic_count": 0,
-    "schema_count": 0,
+    "manifest_function_count": 99,
+    "manifest_topic_count": 27,
+    "reflected_function_count": 99,
+    "reflected_topic_count": 27,
+    "schema_count": 126,
     "schema_failure_count": 0
   },
   "metadata": {
     "generator": "wwise_waapi.manifest.ReflectionManifestBuilder",
-    "inventory_source": "source_pending",
-    "note": "intentional placeholder; reflection pending and not support proof",
-    "schema_source_uri": "source_pending",
-    "schema_source_uris": [],
-    "source_status": "source_pending",
-    "source_uris": [],
-    "support_status": "non-support",
+    "inventory_source": "live-reflection-2021.1-sandbox-manifest",
+    "provenance": {
+      "get_info": {
+        "apiVersion": 1,
+        "branch": "wwise_v2021.1",
+        "configuration": "release",
+        "isCommandLine": true,
+        "platform": "x64",
+        "version": {
+          "build": 8108,
+          "displayName": "v2021.1.14",
+          "major": 1,
+          "minor": 14,
+          "schema": 103,
+          "year": 2021
+        }
+      },
+      "sample_project": {
+        "name": "SampleProject",
+        "path": "/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj"
+      }
+    },
+    "schema_source_uri": "ak.wwise.waapi.getSchema",
+    "schema_source_uris": [
+      "ak.wwise.waapi.getSchema"
+    ],
+    "source_uris": [
+      "ak.wwise.waapi.getFunctions",
+      "ak.wwise.waapi.getTopics",
+      "ak.wwise.waapi.getSchema"
+    ],
     "version_key": "2021.1",
     "wwise_build": "2021.1.14.8108",
     "wwise_console_path": "/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh",

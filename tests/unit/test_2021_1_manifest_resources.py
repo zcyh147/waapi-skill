@@ -4,11 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-import pytest  # pyright: ignore[reportMissingImports]
-
 from wwise_waapi.manifest import (  # pyright: ignore[reportMissingImports]
     DeterministicJsonWriter,
-    ManifestResourceMissingError,
     ManifestStore,
     audit_manifest,
 )
@@ -16,8 +13,18 @@ from wwise_waapi.manifest import (  # pyright: ignore[reportMissingImports]
 
 RESOURCE_ROOT = Path("resources") / "manifest"
 VERSION = "2021.1"
-MANIFEST_PATH = RESOURCE_ROOT / VERSION / "manifest.json"
+BUILD = "2021.1.14.8108"
+CONSOLE_PATH = "/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh"
+SAMPLE_PROJECT_PATH = (
+    "/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj"
+)
+SOURCE_URIS = [
+    "ak.wwise.waapi.getFunctions",
+    "ak.wwise.waapi.getTopics",
+    "ak.wwise.waapi.getSchema",
+]
 FORBIDDEN_FRAGMENTS = (
+    "resources/manifest/2021/",
     "resources/manifest/2022.1",
     "resources/manifest/2023.1",
     "resources/manifest/2024.1",
@@ -41,57 +48,103 @@ class GuardedManifestPath(type(Path())):
                 raise AssertionError(f"2021.1 manifest lookup touched fallback path: {self}")
 
 
-def _load_manifest() -> dict[str, Any]:
-    return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+def _load_split_file(filename: str) -> dict[str, Any]:
+    return json.loads((RESOURCE_ROOT / VERSION / filename).read_text(encoding="utf-8"))
 
 
-def test_2021_1_manifest_placeholder_is_explicitly_pending() -> None:
-    payload = _load_manifest()
+def test_2021_1_manifest_files_exist_and_metadata_records_live_provenance() -> None:
+    payloads = {
+        filename: _load_split_file(filename)
+        for filename in ("manifest.json", "functions.json", "topics.json", "schemas.json")
+    }
 
-    assert payload["metadata"]["version_key"] == VERSION
-    assert payload["metadata"]["wwise_version_target"] == VERSION
-    assert payload["metadata"]["inventory_source"] == "source_pending"
-    assert payload["metadata"]["source_status"] == "source_pending"
-    assert payload["metadata"]["support_status"] == "non-support"
-    assert payload["metadata"]["schema_source_uri"] == "source_pending"
-    assert payload["metadata"]["source_uris"] == []
-    assert payload["metadata"]["schema_source_uris"] == []
-    assert payload["audit"]["counts_match"] is True
-    assert payload["audit"]["manifest_function_count"] == 0
-    assert payload["audit"]["manifest_topic_count"] == 0
-    assert payload["audit"]["schema_count"] == 0
+    for payload in payloads.values():
+        metadata = payload["metadata"]
+        assert metadata["version_key"] == VERSION
+        assert metadata["wwise_version_target"] == VERSION
+        assert metadata["wwise_build"] == BUILD
+        assert metadata["wwise_console_path"] == CONSOLE_PATH
+        assert metadata["inventory_source"] == "live-reflection-2021.1-sandbox-manifest"
+        assert metadata["source_uris"] == SOURCE_URIS
+        assert metadata["schema_source_uri"] == "ak.wwise.waapi.getSchema"
+        assert metadata["schema_source_uris"] == ["ak.wwise.waapi.getSchema"]
+        assert metadata["provenance"]["sample_project"] == {
+            "name": "SampleProject",
+            "path": SAMPLE_PROJECT_PATH,
+        }
+        get_info = metadata["provenance"]["get_info"]
+        assert get_info["branch"] == "wwise_v2021.1"
+        assert get_info["isCommandLine"] is True
+        assert get_info["version"] == {
+            "build": 8108,
+            "displayName": "v2021.1.14",
+            "major": 1,
+            "minor": 14,
+            "schema": 103,
+            "year": 2021,
+        }
+
+    audit = payloads["manifest.json"]["audit"]
+    assert audit["counts_match"] is True
+    assert audit["manifest_function_count"] == 99
+    assert audit["reflected_function_count"] == 99
+    assert audit["manifest_topic_count"] == 27
+    assert audit["reflected_topic_count"] == 27
+    assert audit["schema_count"] == 126
+    assert audit["schema_failure_count"] == 0
+    assert (audit["manifest_function_count"], audit["manifest_topic_count"], audit["schema_count"]) != (
+        112,
+        32,
+        144,
+    )
+    assert payloads["functions.json"]["functions"]
+    assert payloads["topics.json"]["topics"]
+    assert payloads["schemas.json"]["schemas"]
 
 
-def test_2021_1_manifest_store_fails_closed_when_2021_1_resource_files_are_missing(tmp_path: Path) -> None:
-    manifest_root = tmp_path / "resources" / "manifest"
-    (manifest_root / VERSION).mkdir(parents=True)
-    (manifest_root / VERSION / "manifest.json").write_text(MANIFEST_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+def test_2021_1_manifest_store_loads_2021_1_only_without_newer_fallbacks() -> None:
+    guarded_root = GuardedManifestPath(RESOURCE_ROOT)
+    loaded = ManifestStore(root=guarded_root).load(VERSION)
+    audit = audit_manifest(loaded)
 
-    store = ManifestStore(root=manifest_root)
+    assert loaded["metadata"]["version_key"] == VERSION
+    assert loaded["metadata"]["wwise_build"] == BUILD
+    assert audit.counts_match is True
+    assert audit.manifest_function_count == loaded["audit"]["manifest_function_count"]
+    assert audit.manifest_topic_count == loaded["audit"]["manifest_topic_count"]
+    assert audit.schema_count == audit.manifest_function_count + audit.manifest_topic_count
+    assert audit.schema_failure_count == loaded["audit"]["schema_failure_count"]
+    assert all(entry["type"] == "function" for entry in loaded["functions"])
+    assert all(entry["type"] == "topic" for entry in loaded["topics"])
 
-    with pytest.raises(ManifestResourceMissingError) as exc_info:
-        store.load(VERSION)
 
-    assert exc_info.value.version == VERSION
-    assert exc_info.value.path == manifest_root / VERSION / "functions.json"
+def test_2021_1_manifest_reflection_payloads_do_not_expose_local_paths() -> None:
+    reflected_payload = {
+        "functions": _load_split_file("functions.json")["functions"],
+        "topics": _load_split_file("topics.json")["topics"],
+        "schemas": _load_split_file("schemas.json")["schemas"],
+    }
+    serialized = json.dumps(reflected_payload, sort_keys=True)
 
-
-def test_2021_1_manifest_store_does_not_fall_back_to_newer_versions(tmp_path: Path) -> None:
-    guarded_root = GuardedManifestPath(tmp_path / "resources" / "manifest")
-    (guarded_root / VERSION).mkdir(parents=True)
-    (guarded_root / VERSION / "manifest.json").write_text(MANIFEST_PATH.read_text(encoding="utf-8"), encoding="utf-8")
-
-    store = ManifestStore(root=guarded_root)
-
-    with pytest.raises(ManifestResourceMissingError):
-        store.load(VERSION)
+    assert "/Applications/Audiokinetic" not in serialized
+    assert "/Users/" not in serialized
+    assert "/Volumes/" not in serialized
+    assert "/private/" not in serialized
+    assert "C:\\\\Users" not in serialized
+    assert "Z:\\\\Applications" not in serialized
+    assert "Y:\\\\" not in serialized
+    assert ".sisyphus/runtime" not in serialized
+    assert SAMPLE_PROJECT_PATH not in serialized
 
 
 def test_2021_1_manifest_serialization_is_deterministic() -> None:
     writer = DeterministicJsonWriter()
-    payload = _load_manifest()
 
-    assert MANIFEST_PATH.read_text(encoding="utf-8") == writer.dumps(payload)
+    for filename in ("manifest.json", "functions.json", "topics.json", "schemas.json"):
+        path = RESOURCE_ROOT / VERSION / filename
+        payload = json.loads(path.read_text(encoding="utf-8"))
+
+        assert path.read_text(encoding="utf-8") == writer.dumps(payload)
 
 
 def test_2021_1_manifest_source_code_contains_no_cross_version_loader_paths() -> None:
@@ -103,11 +156,11 @@ def test_2021_1_manifest_source_code_contains_no_cross_version_loader_paths() ->
 
 
 def test_2021_1_loaded_manifest_audit_stays_fail_closed_when_recomputed() -> None:
-    manifest = _load_manifest()
+    manifest = ManifestStore(root=RESOURCE_ROOT).load(VERSION)
     audit = audit_manifest(manifest)
 
     assert audit.counts_match is True
-    assert audit.manifest_function_count == 0
-    assert audit.manifest_topic_count == 0
-    assert audit.schema_count == 0
+    assert audit.manifest_function_count == 99
+    assert audit.manifest_topic_count == 27
+    assert audit.schema_count == 126
     assert audit.schema_failure_count == 0
