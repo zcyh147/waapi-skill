@@ -1,49 +1,617 @@
 {
+  "hierarchy_preflight": {
+    "absent_assumptions": [
+      {
+        "blocked_reason": "Fresh 2021.1 hierarchy preflight did not return this root path; newer-version root names must not be promoted as 2021.1 behavior proof.",
+        "coverage_status": "deferred-not-live-tested",
+        "path": "\\Containers",
+        "promotion_allowed": false,
+        "source": "blocked-newer-version-assumption"
+      }
+    ],
+    "confirmed_roots": [
+      {
+        "name": "SampleProject",
+        "path": "\\",
+        "type": "Project"
+      },
+      {
+        "name": "Actor-Mixer Hierarchy",
+        "path": "\\Actor-Mixer Hierarchy",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Attenuations",
+        "path": "\\Attenuations",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Audio Devices",
+        "path": "\\Audio Devices",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Control Surface Sessions",
+        "path": "\\Control Surface Sessions",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Conversion Settings",
+        "path": "\\Conversion Settings",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Dynamic Dialogue",
+        "path": "\\Dynamic Dialogue",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Effects",
+        "path": "\\Effects",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Events",
+        "path": "\\Events",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Game Parameters",
+        "path": "\\Game Parameters",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Interactive Music Hierarchy",
+        "path": "\\Interactive Music Hierarchy",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Master-Mixer Hierarchy",
+        "path": "\\Master-Mixer Hierarchy",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Metadata",
+        "path": "\\Metadata",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Mixing Sessions",
+        "path": "\\Mixing Sessions",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Modulators",
+        "path": "\\Modulators",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Presets",
+        "path": "\\Presets",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Queries",
+        "path": "\\Queries",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "SoundBanks",
+        "path": "\\SoundBanks",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Soundcaster Sessions",
+        "path": "\\Soundcaster Sessions",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "States",
+        "path": "\\States",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Switches",
+        "path": "\\Switches",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Triggers",
+        "path": "\\Triggers",
+        "type": "WorkUnit"
+      },
+      {
+        "name": "Virtual Acoustics",
+        "path": "\\Virtual Acoustics",
+        "type": "WorkUnit"
+      }
+    ],
+    "live_preflight_case": "hierarchy_roots_preflight_2021_contract",
+    "method": "ak.wwise.core.object.get with WAQL `from project` and return fields id/name/type/path",
+    "root_count": 23
+  },
   "live_cases": [
     {
       "args": {
-        "waql": "source_pending"
+        "waql": "from project"
       },
       "assertions": [
-        "No 2021.1 live behavior is asserted yet."
+        "fresh 2021.1 preflight discovers hierarchy roots before any path-specific cases run",
+        "newer-version-only assumed roots remain absent/deferred and are not promoted as live-tested"
       ],
-      "category": "source_pending",
-      "coverage_status": "reflection_pending",
-      "evidence_path": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-2-resource-isolation.txt",
+      "category": "hierarchy preflight",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/hierarchy_roots_preflight_2021_contract.json",
       "expected": {
-        "fields": [],
+        "absent_paths": [
+          "\\Containers"
+        ],
+        "fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "result_count": {
+          "allow_empty": false,
+          "count": 23,
+          "policy": "at_least_roots"
+        },
+        "root_paths": [
+          "\\",
+          "\\Actor-Mixer Hierarchy",
+          "\\Attenuations",
+          "\\Audio Devices",
+          "\\Control Surface Sessions",
+          "\\Conversion Settings",
+          "\\Dynamic Dialogue",
+          "\\Effects",
+          "\\Events",
+          "\\Game Parameters",
+          "\\Interactive Music Hierarchy",
+          "\\Master-Mixer Hierarchy",
+          "\\Metadata",
+          "\\Mixing Sessions",
+          "\\Modulators",
+          "\\Presets",
+          "\\Queries",
+          "\\SoundBanks",
+          "\\Soundcaster Sessions",
+          "\\States",
+          "\\Switches",
+          "\\Triggers",
+          "\\Virtual Acoustics"
+        ],
+        "root_types": {
+          "\\": "Project",
+          "\\Actor-Mixer Hierarchy": "WorkUnit",
+          "\\Attenuations": "WorkUnit",
+          "\\Audio Devices": "WorkUnit",
+          "\\Control Surface Sessions": "WorkUnit",
+          "\\Conversion Settings": "WorkUnit",
+          "\\Dynamic Dialogue": "WorkUnit",
+          "\\Effects": "WorkUnit",
+          "\\Events": "WorkUnit",
+          "\\Game Parameters": "WorkUnit",
+          "\\Interactive Music Hierarchy": "WorkUnit",
+          "\\Master-Mixer Hierarchy": "WorkUnit",
+          "\\Metadata": "WorkUnit",
+          "\\Mixing Sessions": "WorkUnit",
+          "\\Modulators": "WorkUnit",
+          "\\Presets": "WorkUnit",
+          "\\Queries": "WorkUnit",
+          "\\SoundBanks": "WorkUnit",
+          "\\Soundcaster Sessions": "WorkUnit",
+          "\\States": "WorkUnit",
+          "\\Switches": "WorkUnit",
+          "\\Triggers": "WorkUnit",
+          "\\Virtual Acoustics": "WorkUnit"
+        }
+      },
+      "id": "hierarchy_roots_preflight_2021_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/hierarchy_roots_preflight_2021_contract.json",
+      "promotion_required_evidence": "Exact 2021.1.14 build 8108 live sandbox JSON with getInfo preflight and read-only object.get hierarchy discovery.",
+      "sources": [
+        "resources/manifest/2021.1/schemas.json#ak.wwise.core.object.get",
+        "resources/semantic/2021.1/source_notes.json#query",
+        "2021.1 read-only live sandbox execution writes per-case behavior evidence before promotion."
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\""
+      },
+      "assertions": [
+        "returned object identity matches the 2021.1-preflighted Actor-Mixer Hierarchy path",
+        "returned fields stay within the requested return option set"
+      ],
+      "category": "path queries",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/path_actor_mixer_root_2021_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "identity": {
+          "name": "Actor-Mixer Hierarchy",
+          "path": "\\Actor-Mixer Hierarchy",
+          "type": "WorkUnit"
+        },
+        "result_count": {
+          "count": 1,
+          "policy": "exact"
+        }
+      },
+      "id": "path_actor_mixer_root_2021_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/path_actor_mixer_root_2021_contract.json",
+      "promotion_required_evidence": "Exact 2021.1.14 build 8108 live sandbox JSON with read-only object.get assertions for this case.",
+      "sources": [
+        "resources/manifest/2021.1/schemas.json#ak.wwise.core.object.get",
+        "resources/semantic/2021.1/source_notes.json#query",
+        "2021.1 hierarchy preflight confirmed \\Actor-Mixer Hierarchy before this case was promoted."
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from object \"{actor_mixer_root_id}\""
+      },
+      "assertions": [
+        "returned object id equals the root GUID discovered earlier in the same 2021.1 sandbox run"
+      ],
+      "category": "GUID queries",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/guid_actor_mixer_root_2021_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "identity": {
+          "id": "{actor_mixer_root_id}",
+          "name": "Actor-Mixer Hierarchy",
+          "path": "\\Actor-Mixer Hierarchy",
+          "type": "WorkUnit"
+        },
+        "result_count": {
+          "count": 1,
+          "policy": "exact"
+        }
+      },
+      "id": "guid_actor_mixer_root_2021_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ]
+      },
+      "placeholders": {
+        "actor_mixer_root_id": "path_actor_mixer_root_2021_contract.return[0].id"
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/guid_actor_mixer_root_2021_contract.json",
+      "promotion_required_evidence": "Exact 2021.1.14 build 8108 live sandbox JSON with read-only object.get assertions for this case.",
+      "sources": [
+        "resources/manifest/2021.1/schemas.json#ak.wwise.core.object.get",
+        "resources/semantic/2021.1/source_notes.json#query",
+        "2021.1 live sandbox execution discovers the GUID in the same run before use."
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from type Sound where type = \"Sound\" take 1"
+      },
+      "assertions": [
+        "non-empty results, when present, have type Sound",
+        "schema-safe empty results are allowed for SampleProject variance"
+      ],
+      "category": "type filters",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/type_sound_filter_2021_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "type"
+        ],
         "result_count": {
           "allow_empty": true,
+          "count": 1,
+          "policy": "at_most"
+        },
+        "type": "Sound"
+      },
+      "id": "type_sound_filter_2021_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/type_sound_filter_2021_contract.json",
+      "promotion_required_evidence": "Exact 2021.1.14 build 8108 live sandbox JSON with read-only object.get assertions for this case.",
+      "sources": [
+        "resources/manifest/2021.1/schemas.json#ak.wwise.core.object.get",
+        "resources/semantic/2021.1/source_notes.json#query",
+        "2021.1 read-only live sandbox execution writes per-case behavior evidence before promotion."
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from search \"Default Work Unit\" where name = \"Default Work Unit\" take 1"
+      },
+      "assertions": [
+        "JSON-escaped WAQL string literal is accepted",
+        "any returned row has the expected name"
+      ],
+      "category": "quoted strings and JSON escaping",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/quoted_search_default_work_unit_2021_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "path"
+        ],
+        "identity": {
+          "name": "Default Work Unit"
+        },
+        "result_count": {
+          "allow_empty": true,
+          "count": 1,
+          "policy": "at_most"
+        }
+      },
+      "id": "quoted_search_default_work_unit_2021_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "path"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/quoted_search_default_work_unit_2021_contract.json",
+      "promotion_required_evidence": "Exact 2021.1.14 build 8108 live sandbox JSON with read-only object.get assertions for this case.",
+      "sources": [
+        "resources/manifest/2021.1/schemas.json#ak.wwise.core.object.get",
+        "resources/semantic/2021.1/source_notes.json#query",
+        "2021.1 read-only live sandbox execution writes per-case behavior evidence before promotion."
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\" select descendants take 1"
+      },
+      "assertions": [
+        "descendant rows, when present, remain under the preflighted 2021.1 Actor-Mixer Hierarchy path"
+      ],
+      "category": "descendant traversal",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/descendant_traversal_actor_mixer_2021_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "path"
+        ],
+        "path_prefix": "\\Actor-Mixer Hierarchy\\",
+        "result_count": {
+          "allow_empty": true,
+          "count": 1,
+          "policy": "at_most"
+        }
+      },
+      "id": "descendant_traversal_actor_mixer_2021_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "path"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/descendant_traversal_actor_mixer_2021_contract.json",
+      "promotion_required_evidence": "Exact 2021.1.14 build 8108 live sandbox JSON with read-only object.get assertions for this case.",
+      "sources": [
+        "resources/manifest/2021.1/schemas.json#ak.wwise.core.object.get",
+        "resources/semantic/2021.1/source_notes.json#query",
+        "2021.1 hierarchy preflight confirmed \\Actor-Mixer Hierarchy before this case was promoted."
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\" where childrenCount >= 0"
+      },
+      "assertions": [
+        "childrenCount is returned and satisfies the numeric comparison on the 2021.1-preflighted root"
+      ],
+      "category": "property comparisons",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/children_count_property_comparison_2021_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "childrenCount"
+        ],
+        "identity": {
+          "name": "Actor-Mixer Hierarchy"
+        },
+        "property": {
+          "comparison": ">=",
+          "name": "childrenCount",
+          "value": 0
+        },
+        "result_count": {
+          "count": 1,
+          "policy": "exact"
+        }
+      },
+      "id": "children_count_property_comparison_2021_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "childrenCount"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/children_count_property_comparison_2021_contract.json",
+      "promotion_required_evidence": "Exact 2021.1.14 build 8108 live sandbox JSON with read-only object.get assertions for this case.",
+      "sources": [
+        "resources/manifest/2021.1/schemas.json#ak.wwise.core.object.get",
+        "resources/semantic/2021.1/source_notes.json#query",
+        "2021.1 hierarchy preflight confirmed \\Actor-Mixer Hierarchy before this case was promoted."
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\""
+      },
+      "assertions": [
+        "returned row is constrained to the requested return fields",
+        "forbidden fields are absent from the readback payload"
+      ],
+      "category": "return/options selection",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/return_options_selection_2021_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name"
+        ],
+        "forbidden_fields": [
+          "path",
+          "childrenCount"
+        ],
+        "identity": {
+          "name": "Actor-Mixer Hierarchy"
+        },
+        "result_count": {
+          "count": 1,
+          "policy": "exact"
+        }
+      },
+      "id": "return_options_selection_2021_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/return_options_selection_2021_contract.json",
+      "promotion_required_evidence": "Exact 2021.1.14 build 8108 live sandbox JSON with read-only object.get assertions for this case.",
+      "sources": [
+        "resources/manifest/2021.1/schemas.json#ak.wwise.core.object.get",
+        "resources/semantic/2021.1/source_notes.json#query",
+        "2021.1 hierarchy preflight confirmed \\Actor-Mixer Hierarchy before this case was promoted."
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from project where name = \"__waapi_skills_missing_object__\""
+      },
+      "assertions": [
+        "deliberately absent object name returns an empty result array without relying on error payloads"
+      ],
+      "category": "empty results",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/empty_results_missing_name_2021_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name"
+        ],
+        "result_count": {
           "count": 0,
           "policy": "exact"
         }
       },
-      "id": "pending_object_get_2021_1",
+      "id": "empty_results_missing_name_2021_contract",
       "no_mutation": true,
-      "notes": [
-        "This matrix is a scaffold only.",
-        "Task 4 will replace it with live sandbox evidence if and when it exists."
-      ],
+      "options": {
+        "return": [
+          "id",
+          "name"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/empty_results_missing_name_2021_contract.json",
+      "promotion_required_evidence": "Exact 2021.1.14 build 8108 live sandbox JSON with read-only object.get assertions for this case.",
       "sources": [
-        "resources/semantic/2021.1/source_notes.json",
-        "references/semantic/2021.1/semantic-builder-notebooklm-gate.md"
+        "resources/manifest/2021.1/schemas.json#ak.wwise.core.object.get",
+        "resources/semantic/2021.1/source_notes.json#query",
+        "2021.1 read-only live sandbox execution writes per-case behavior evidence before promotion."
       ],
       "uri": "ak.wwise.core.object.get"
     }
   ],
   "metadata": {
     "default_live": false,
-    "gap_evidence": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-2-resource-isolation-error.txt",
-    "name": "WAQL live sandbox matrix for ak.wwise.core.object.get",
+    "exact_live_command": "WWISE_VERSION=2021.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj\" WWISE_LIVE=1 python -m pytest tests/live/test_2021_1_object_get_matrix.py -q",
+    "fresh_2021_live_evidence_required": true,
+    "live_command_evidence": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-7-waql-matrix.json",
+    "name": "WAQL 2021.1 object.get contract matrix",
     "notes": [
-      "2021.1 uses a fail-closed scaffold only.",
-      "Do not treat this file as behavioral proof."
+      "Manifest/schema presence for ak.wwise.core.object.get is not behavioral WAQL support.",
+      "Live behavior is promoted only by the exact 2021.1.14 build 8108 sandbox command after ak.wwise.core.getInfo validation.",
+      "Hierarchy roots are preflighted with 2021.1 object.get before any root path case runs; newer-version root assumptions stay deferred when absent.",
+      "Only read-only WAAPI operations are used: ak.wwise.core.getInfo and ak.wwise.core.object.get."
     ],
-    "reference": "references/semantic/2021.1/semantic-builder-protocol.md",
+    "read_only_waapi_operations": [
+      "ak.wwise.core.getInfo",
+      "ak.wwise.core.object.get"
+    ],
     "sandbox_required": true,
+    "schema_source": "resources/manifest/2021.1/schemas.json#ak.wwise.core.object.get",
     "source_project_mutation_allowed": false,
-    "schema_source": "resources/manifest/2021.1/manifest.json",
+    "status_policy": "Live-tested only after fresh exact-version 2021.1.14 build 8108 live sandbox evidence records getInfo validation, hierarchy preflight, and per-case read-only object.get assertion JSON.",
     "uri": "ak.wwise.core.object.get",
+    "wwise_build": "2021.1.14.8108",
+    "wwise_version_display": "v2021.1.14",
     "wwise_version_target": "2021.1"
+  },
+  "summary": {
+    "case_count": 9,
+    "coverage_status": "live-tested",
+    "deferred_assumed_roots": 1,
+    "live_tested_cases": 9,
+    "preflighted_hierarchy_roots": 23,
+    "version": "2021.1"
   }
 }
