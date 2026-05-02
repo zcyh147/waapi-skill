@@ -1,48 +1,53 @@
 # Semantic builder source note: query, Wwise 2021.1
 
 - family: `query`
-- status: `source_pending`
-- notebook id: `source_pending`
+- status: `grounded`
+- notebook id: `wwise-2021.1.14-docs`
 - version target: `2021.1`
 - gate evidence path: `references/semantic/2021.1/semantic-builder-notebooklm-gate.md`
-- official URL status: `source_pending`
+- official URL status: `evidence-candidate`
 
 ## Official/source URLs
 
-- source_pending
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=waapi.html
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=waapi_functions_index.html
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=waql_reference.html
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_object_get.html
 
 ## Endpoint inventory
 
-- source_pending
+- `ak.wwise.core.object.get`
 
 ## Required fields
 
-- source_pending
+- `ak.wwise.core.object.get: waql or deprecated from/where query`
 
 ## Optional fields
 
-- source_pending
+- `options.return`
+- `options.platform`
+- `options.language`
 
 ## Return shape
 
-source_pending
+Object with a return array; each returned item contains fields requested by options.return, such as id, name, and property accessors.
 
 ## Destructive behavior
 
-source_pending
+Read-only. Query builders must not mutate Wwise state or dispatch automatically.
 
 ## Ambiguity constraints
 
-source_pending
+Prefer WAQL because the legacy JSON from and where query format is deprecated in 2021.1. If platform or language options are omitted, Wwise uses the current platform and current language.
 
 ## Unsupported cases
 
-source_pending
+Do not mix WAQL with deprecated JSON query bodies in one source note. Profiler, transport, soundengine, UI, CLI, remote, debug, and mutating operations are outside this family.
 
 ## Cited required fields
 
-- source_pending
+- `ak.wwise.core.object.get: waql or deprecated from/where query`
 
 ## Evidence caveat
 
-This is a scaffold only. Task 3 will replace the pending fields with NotebookLM-backed source notes.
+NotebookLM returned source-grounded 2021.1 details for this family from notebook `wwise-2021.1.14-docs`. Exact full URLs were not directly surfaced in the browser answer, so the URLs above are versioned public-library candidates and exact page ids; they should be treated as source evidence, not behavioral proof.

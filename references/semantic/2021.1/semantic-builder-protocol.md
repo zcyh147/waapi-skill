@@ -2,11 +2,41 @@
 
 Version target: `2021.1`
 
-NotebookLM notebook id: `source_pending`
+NotebookLM notebook id: `wwise-2021.1.14-docs`
 
 Persisted gate evidence: `references/semantic/2021.1/semantic-builder-notebooklm-gate.md`
 
-Status: `reflection_pending`
+Semantic builder families are limited to exactly:
 
-This folder is a scaffold only. It does not prove support or behavior.
-Task 3 and Task 4 will replace these pending fields with grounded evidence.
+- `query`
+- `object-mutation`
+- `property-reference`
+- `import`
+- `soundbank`
+- `switchcontainer`
+
+Excluded families: profiler, transport, soundengine, UI, CLI, remote, and debug.
+
+## Unlock rule
+
+Each 2021.1 family note must point to the versioned local gate evidence file above and must never point to newer semantic notes or non-2021.1 paths as proof. Missing local evidence, wrong NotebookLM notebook id, incomplete endpoint inventory, duplicate endpoint URIs, or uncited required fields must fail closed when runtime resources check source notes.
+
+## Required source-note fields
+
+Each family note records:
+
+- NotebookLM gate evidence path.
+- Notebook id.
+- Version target.
+- Official/source URLs.
+- Endpoint inventory.
+- Required fields.
+- Optional fields.
+- Return shape.
+- Destructive behavior.
+- Ambiguity constraints.
+- Unsupported cases.
+- Cited required fields.
+- Evidence caveat for source URLs that could not be directly fetched in this environment.
+
+The deterministic resource for tests and builders is `resources/semantic/2021.1/source_notes.json`. Markdown notes in this folder are the human reference layout only. Runtime builders must read local JSON and Markdown resources, not NotebookLM. Source notes are not behavioral proof.

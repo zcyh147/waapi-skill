@@ -1,48 +1,85 @@
 # Semantic builder source note: soundbank, Wwise 2021.1
 
 - family: `soundbank`
-- status: `source_pending`
-- notebook id: `source_pending`
+- status: `grounded`
+- notebook id: `wwise-2021.1.14-docs`
 - version target: `2021.1`
 - gate evidence path: `references/semantic/2021.1/semantic-builder-notebooklm-gate.md`
-- official URL status: `source_pending`
+- official URL status: `evidence-candidate`
 
 ## Official/source URLs
 
-- source_pending
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=waapi.html
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=waapi_functions_index.html
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=waapi_topics_index.html
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_getinclusions.html
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_setinclusions.html
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_generate.html
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_convertexternalsources.html
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_processdefinitionfiles.html
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_generated.html
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_generationdone.html
 
 ## Endpoint inventory
 
-- source_pending
+- `ak.wwise.core.soundbank.getInclusions`
+- `ak.wwise.core.soundbank.setInclusions`
+- `ak.wwise.core.soundbank.generate`
+- `ak.wwise.core.soundbank.convertExternalSources`
+- `ak.wwise.core.soundbank.processDefinitionFiles`
+- `ak.wwise.core.soundbank.generated`
+- `ak.wwise.core.soundbank.generationDone`
 
 ## Required fields
 
-- source_pending
+- `ak.wwise.core.soundbank.getInclusions: soundbank`
+- `ak.wwise.core.soundbank.setInclusions: soundbank, operation, inclusions`
+- `ak.wwise.core.soundbank.generate: no required fields when generating all, otherwise identify supplied soundbanks`
+- `ak.wwise.core.soundbank.convertExternalSources: sources array with source input path and platform`
+- `ak.wwise.core.soundbank.processDefinitionFiles: files array`
+- `ak.wwise.core.soundbank.generated: topic payload only`
+- `ak.wwise.core.soundbank.generationDone: topic payload only`
 
 ## Optional fields
 
-- source_pending
+- `platforms`
+- `languages`
+- `skipLanguages`
+- `soundbanks`
+- `events, auxBusses, inclusions, and rebuild inside supplied soundbank entries`
+- `rebuildSoundBanks`
+- `clearAudioFileCache`
+- `writeToDisk`
+- `rebuildInitBank`
+- `sources output path for convertExternalSources`
+- `infoFile, bankData, pluginInfo, and return array for generated topic options`
 
 ## Return shape
 
-source_pending
+getInclusions returns an inclusions array. setInclusions and convertExternalSources return empty JSON objects. processDefinitionFiles reports status through the WAAPI log. generate returns logs and error fields. generated publishes the soundbank object with optional infoFile, bankData, or pluginInfo. generationDone publishes logs.
 
 ## Destructive behavior
 
-source_pending
+Mutating. setInclusions with replace and an empty list clears SoundBank inclusions. clearAudioFileCache deletes the audio file cache before conversion. Generation can overwrite on-disk bank and media files.
 
 ## Ambiguity constraints
 
-source_pending
+If soundbanks is omitted or empty during generation, Wwise generates all user-defined SoundBanks. Auto-defined SoundBanks cannot be manually specified in the soundbanks array. generated can publish multiple times during one generation request.
 
 ## Unsupported cases
 
-source_pending
+Do not include profiler, transport, soundengine, UI, CLI, remote, or debug APIs. Do not treat generationDone as proof that soundbank.generate has fully completed. Do not assume object size fields are accurate until SoundBanks have been generated.
 
 ## Cited required fields
 
-- source_pending
+- `ak.wwise.core.soundbank.getInclusions: soundbank`
+- `ak.wwise.core.soundbank.setInclusions: soundbank, operation, inclusions`
+- `ak.wwise.core.soundbank.generate: no required fields when generating all, otherwise identify supplied soundbanks`
+- `ak.wwise.core.soundbank.convertExternalSources: sources array with source input path and platform`
+- `ak.wwise.core.soundbank.processDefinitionFiles: files array`
+- `ak.wwise.core.soundbank.generated: topic payload only`
+- `ak.wwise.core.soundbank.generationDone: topic payload only`
 
 ## Evidence caveat
 
-This is a scaffold only. Task 3 will replace the pending fields with NotebookLM-backed source notes.
+NotebookLM returned source-grounded 2021.1 details for this family from notebook `wwise-2021.1.14-docs`. Exact full URLs were not directly surfaced in the browser answer, so the URLs above are versioned public-library candidates and exact page ids; they should be treated as source evidence, not behavioral proof.

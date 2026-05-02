@@ -1,48 +1,72 @@
 # Semantic builder source note: import, Wwise 2021.1
 
 - family: `import`
-- status: `source_pending`
-- notebook id: `source_pending`
+- status: `grounded`
+- notebook id: `wwise-2021.1.14-docs`
 - version target: `2021.1`
 - gate evidence path: `references/semantic/2021.1/semantic-builder-notebooklm-gate.md`
-- official URL status: `source_pending`
+- official URL status: `evidence-candidate`
 
 ## Official/source URLs
 
-- source_pending
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=waapi.html
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=waapi_functions_index.html
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=waapi_topics_index.html
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_audio_import.html
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_audio_importtabdelimited.html
+- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_audio_imported.html
+- https://www.audiokinetic.com/library/edge/?source=Help&id=importing_media_files_from_tab_delimited_text_file
 
 ## Endpoint inventory
 
-- source_pending
+- `ak.wwise.core.audio.import`
+- `ak.wwise.core.audio.importTabDelimited`
+- `ak.wwise.core.audio.imported`
 
 ## Required fields
 
-- source_pending
+- `ak.wwise.core.audio.import: imports array`
+- `ak.wwise.core.audio.import: objectPath and audioFile or audioFileBase64 for media import items`
+- `ak.wwise.core.audio.importTabDelimited: importLanguage, importOperation, importFile`
+- `ak.wwise.core.audio.imported: topic payload only`
 
 ## Optional fields
 
-- source_pending
+- `importOperation`
+- `default`
+- `importLocation`
+- `originalsSubFolder`
+- `notes`
+- `switchAssignation`
+- `autoAddToSourceControl`
+- `autoCheckOutToSourceControl`
+- `audioFileBase64`
+- `options.return`
+- `per-import objectType and @PropertyName values`
 
 ## Return shape
 
-source_pending
+Import returns log, files, and objects arrays. importTabDelimited returns an objects array. imported publishes topic payloads.
 
 ## Destructive behavior
 
-source_pending
+Mutating. replaceExisting, ReplaceFile, and ReplaceObject can overwrite or destroy existing objects and assets that share imported names.
 
 ## Ambiguity constraints
 
-source_pending
+Per-import properties take precedence over fallback parameters. Base64 audio inputs need a vertical bar separator between the target relative file path and the encoded WAV payload. Import logs must be parsed because import can report failures through log entries.
 
 ## Unsupported cases
 
-source_pending
+Do not use import builders for profiler, transport, soundengine, UI, CLI, remote, or debug APIs. Do not set constraint-based Switch Container associations through import when ordering cannot be proven.
 
 ## Cited required fields
 
-- source_pending
+- `ak.wwise.core.audio.import: imports array`
+- `ak.wwise.core.audio.import: objectPath and audioFile or audioFileBase64 for media import items`
+- `ak.wwise.core.audio.importTabDelimited: importLanguage, importOperation, importFile`
+- `ak.wwise.core.audio.imported: topic payload only`
 
 ## Evidence caveat
 
-This is a scaffold only. Task 3 will replace the pending fields with NotebookLM-backed source notes.
+NotebookLM returned source-grounded 2021.1 details for this family from notebook `wwise-2021.1.14-docs`. Exact full URLs were not directly surfaced in the browser answer, so the URLs above are versioned public-library candidates and exact page ids; they should be treated as source evidence, not behavioral proof.
