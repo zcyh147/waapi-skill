@@ -1,0 +1,11 @@
+{
+  "coverage": [],
+  "metadata": {
+    "coverage_status": "source_pending",
+    "notes": [
+      "No 2021.1 behavioral coverage exists yet.",
+      "Task 2 only seeds the scaffold; Task 3/4 will replace this placeholder with evidence-backed entries."
+    ],
+    "version": "2021.1"
+  }
+}

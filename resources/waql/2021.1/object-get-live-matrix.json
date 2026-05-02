@@ -1,0 +1,49 @@
+{
+  "live_cases": [
+    {
+      "args": {
+        "waql": "source_pending"
+      },
+      "assertions": [
+        "No 2021.1 live behavior is asserted yet."
+      ],
+      "category": "source_pending",
+      "coverage_status": "reflection_pending",
+      "evidence_path": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-2-resource-isolation.txt",
+      "expected": {
+        "fields": [],
+        "result_count": {
+          "allow_empty": true,
+          "count": 0,
+          "policy": "exact"
+        }
+      },
+      "id": "pending_object_get_2021_1",
+      "no_mutation": true,
+      "notes": [
+        "This matrix is a scaffold only.",
+        "Task 4 will replace it with live sandbox evidence if and when it exists."
+      ],
+      "sources": [
+        "resources/semantic/2021.1/source_notes.json",
+        "references/semantic/2021.1/semantic-builder-notebooklm-gate.md"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    }
+  ],
+  "metadata": {
+    "default_live": false,
+    "gap_evidence": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-2-resource-isolation-error.txt",
+    "name": "WAQL live sandbox matrix for ak.wwise.core.object.get",
+    "notes": [
+      "2021.1 uses a fail-closed scaffold only.",
+      "Do not treat this file as behavioral proof."
+    ],
+    "reference": "references/semantic/2021.1/semantic-builder-protocol.md",
+    "sandbox_required": true,
+    "source_project_mutation_allowed": false,
+    "schema_source": "resources/manifest/2021.1/manifest.json",
+    "uri": "ak.wwise.core.object.get",
+    "wwise_version_target": "2021.1"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "audit": {
+    "counts_match": true,
+    "manifest_function_count": 0,
+    "manifest_topic_count": 0,
+    "reflected_function_count": 0,
+    "reflected_topic_count": 0,
+    "schema_count": 0,
+    "schema_failure_count": 0
+  },
+  "metadata": {
+    "generator": "wwise_waapi.manifest.ReflectionManifestBuilder",
+    "inventory_source": "source_pending",
+    "note": "intentional placeholder; reflection pending and not support proof",
+    "schema_source_uri": "source_pending",
+    "schema_source_uris": [],
+    "source_status": "source_pending",
+    "source_uris": [],
+    "support_status": "non-support",
+    "version_key": "2021.1",
+    "wwise_build": "2021.1.14.8108",
+    "wwise_console_path": "/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh",
+    "wwise_version_target": "2021.1"
+  }
+}

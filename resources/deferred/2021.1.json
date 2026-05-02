@@ -1,0 +1,19 @@
+{
+  "deferred": [
+    {
+      "behavioral_coverage": "deferred",
+      "blocking_condition": "2021.1 source and live evidence are pending; this scaffold cannot be treated as behavioral proof.",
+      "category": "source_pending",
+      "coverage_status": "pending",
+      "evidence_source": "source_pending",
+      "item_type": "placeholder",
+      "reason": "Task 2 seeds the 2021.1 directory layout only.",
+      "review_trigger": "Replace with Task 3/4 evidence and remove the placeholder status.",
+      "risk_level": "low",
+      "status": true,
+      "substitute_test": "versioned scaffold only",
+      "uri": "source_pending",
+      "version": "2021.1"
+    }
+  ]
+}

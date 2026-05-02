@@ -1,0 +1,127 @@
+{
+  "notes": {
+    "import": {
+      "ambiguity_constraints": "source_pending",
+      "cited_required_fields": [],
+      "destructive_behavior": "source_pending",
+      "endpoints": [],
+      "family": "import",
+      "gate_evidence_path": "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
+      "notebook_id": "source_pending",
+      "official_urls": [],
+      "optional_fields": [],
+      "required_fields": [],
+      "return_shape": "source_pending",
+      "source_urls": [
+        "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2021.1/semantic-builder-import.md"
+      ],
+      "status": "source_pending",
+      "unsupported_cases": "source_pending",
+      "version_target": "2021.1"
+    },
+    "object-mutation": {
+      "ambiguity_constraints": "source_pending",
+      "cited_required_fields": [],
+      "destructive_behavior": "source_pending",
+      "endpoints": [],
+      "family": "object-mutation",
+      "gate_evidence_path": "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
+      "notebook_id": "source_pending",
+      "official_urls": [],
+      "optional_fields": [],
+      "required_fields": [],
+      "return_shape": "source_pending",
+      "source_urls": [
+        "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2021.1/semantic-builder-object-mutation.md"
+      ],
+      "status": "source_pending",
+      "unsupported_cases": "source_pending",
+      "version_target": "2021.1"
+    },
+    "property-reference": {
+      "ambiguity_constraints": "source_pending",
+      "cited_required_fields": [],
+      "destructive_behavior": "source_pending",
+      "endpoints": [],
+      "family": "property-reference",
+      "gate_evidence_path": "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
+      "notebook_id": "source_pending",
+      "official_urls": [],
+      "optional_fields": [],
+      "required_fields": [],
+      "return_shape": "source_pending",
+      "source_urls": [
+        "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2021.1/semantic-builder-property-reference.md"
+      ],
+      "status": "source_pending",
+      "unsupported_cases": "source_pending",
+      "version_target": "2021.1"
+    },
+    "query": {
+      "ambiguity_constraints": "source_pending",
+      "cited_required_fields": [],
+      "destructive_behavior": "source_pending",
+      "endpoints": [],
+      "family": "query",
+      "gate_evidence_path": "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
+      "notebook_id": "source_pending",
+      "official_urls": [],
+      "optional_fields": [],
+      "required_fields": [],
+      "return_shape": "source_pending",
+      "source_urls": [
+        "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2021.1/semantic-builder-query.md"
+      ],
+      "status": "source_pending",
+      "unsupported_cases": "source_pending",
+      "version_target": "2021.1"
+    },
+    "soundbank": {
+      "ambiguity_constraints": "source_pending",
+      "cited_required_fields": [],
+      "destructive_behavior": "source_pending",
+      "endpoints": [],
+      "family": "soundbank",
+      "gate_evidence_path": "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
+      "notebook_id": "source_pending",
+      "official_urls": [],
+      "optional_fields": [],
+      "required_fields": [],
+      "return_shape": "source_pending",
+      "source_urls": [
+        "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2021.1/semantic-builder-soundbank.md"
+      ],
+      "status": "source_pending",
+      "unsupported_cases": "source_pending",
+      "version_target": "2021.1"
+    },
+    "switchcontainer": {
+      "ambiguity_constraints": "source_pending",
+      "cited_required_fields": [],
+      "destructive_behavior": "source_pending",
+      "endpoints": [],
+      "family": "switchcontainer",
+      "gate_evidence_path": "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
+      "notebook_id": "source_pending",
+      "official_urls": [],
+      "optional_fields": [],
+      "required_fields": [],
+      "return_shape": "source_pending",
+      "source_urls": [
+        "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
+        "references/semantic/2021.1/semantic-builder-switchcontainer.md"
+      ],
+      "status": "source_pending",
+      "unsupported_cases": "source_pending",
+      "version_target": "2021.1"
+    }
+  },
+  "notebook_id": "source_pending",
+  "protocol": "references/semantic/2021.1/semantic-builder-protocol.md",
+  "version": "2021.1"
+}
