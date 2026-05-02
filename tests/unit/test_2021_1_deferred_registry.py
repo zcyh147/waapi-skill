@@ -56,8 +56,13 @@ def test_2021_deferred_entries_include_task5_evidence_contract() -> None:
         assert entry["date"] == "2026-05-02"
         assert entry["behavioral_coverage"] == "deferred"
         assert entry["inventory_coverage"] == "reflected-2021.1-schema-ok"
-        assert entry["source_evidence_path"].startswith("resources/")
+        if entry["source_evidence_path"].startswith("not-applicable:"):
+            assert entry["evidence_source"] == entry["reflection_evidence_path"], entry["uri"]
+        else:
+            assert entry["source_evidence_path"].startswith("resources/semantic/2021.1/source_notes.json#"), entry["uri"]
+            assert entry["source_evidence_path"] in entry["evidence_source"], entry["uri"]
         assert entry["reflection_evidence_path"] == f"resources/manifest/2021.1/functions.json#{entry['uri']}"
+        assert len(entry["evidence_source"].split(" + ")) == len(set(entry["evidence_source"].split(" + "))), entry["uri"]
         assert "not behavioral coverage" in entry["substitute_test"]
         assert "2021.1" in entry["tool_version"]
         assert entry["live_applicability"] == "blocked-pending-fresh-2021.1-live-evidence"

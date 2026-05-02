@@ -9,9 +9,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.executeActionOnEvent",
           "resources/manifest/2021.1/functions.json#ak.soundengine.executeActionOnEvent"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -24,11 +24,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.executeActionOnEvent + resources/manifest/2021.1/functions.json#ak.soundengine.executeActionOnEvent",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.executeActionOnEvent",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.executeActionOnEvent",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.executeActionOnEvent",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -102,9 +102,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.postEvent",
           "resources/manifest/2021.1/functions.json#ak.soundengine.postEvent"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -117,11 +117,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.postEvent + resources/manifest/2021.1/functions.json#ak.soundengine.postEvent",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.postEvent",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.postEvent",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.postEvent",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -193,9 +193,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.postMsgMonitor",
           "resources/manifest/2021.1/functions.json#ak.soundengine.postMsgMonitor"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -208,11 +208,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.postMsgMonitor + resources/manifest/2021.1/functions.json#ak.soundengine.postMsgMonitor",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.postMsgMonitor",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.postMsgMonitor",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.postMsgMonitor",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -278,9 +278,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.postTrigger",
           "resources/manifest/2021.1/functions.json#ak.soundengine.postTrigger"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -293,11 +293,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.postTrigger + resources/manifest/2021.1/functions.json#ak.soundengine.postTrigger",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.postTrigger",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.postTrigger",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.postTrigger",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -365,9 +365,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.registerGameObj",
           "resources/manifest/2021.1/functions.json#ak.soundengine.registerGameObj"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -380,11 +380,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.registerGameObj + resources/manifest/2021.1/functions.json#ak.soundengine.registerGameObj",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.registerGameObj",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.registerGameObj",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.registerGameObj",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -452,9 +452,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.resetRTPCValue",
           "resources/manifest/2021.1/functions.json#ak.soundengine.resetRTPCValue"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -467,11 +467,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.resetRTPCValue + resources/manifest/2021.1/functions.json#ak.soundengine.resetRTPCValue",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.resetRTPCValue",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.resetRTPCValue",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.resetRTPCValue",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -539,9 +539,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.seekOnEvent",
           "resources/manifest/2021.1/functions.json#ak.soundengine.seekOnEvent"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -554,11 +554,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.seekOnEvent + resources/manifest/2021.1/functions.json#ak.soundengine.seekOnEvent",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.seekOnEvent",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.seekOnEvent",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.seekOnEvent",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -627,9 +627,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.setDefaultListeners",
           "resources/manifest/2021.1/functions.json#ak.soundengine.setDefaultListeners"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -642,11 +642,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setDefaultListeners + resources/manifest/2021.1/functions.json#ak.soundengine.setDefaultListeners",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setDefaultListeners",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setDefaultListeners",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setDefaultListeners",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -712,9 +712,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.setGameObjectAuxSendValues",
           "resources/manifest/2021.1/functions.json#ak.soundengine.setGameObjectAuxSendValues"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -727,11 +727,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setGameObjectAuxSendValues + resources/manifest/2021.1/functions.json#ak.soundengine.setGameObjectAuxSendValues",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setGameObjectAuxSendValues",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setGameObjectAuxSendValues",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setGameObjectAuxSendValues",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -799,9 +799,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.setGameObjectOutputBusVolume",
           "resources/manifest/2021.1/functions.json#ak.soundengine.setGameObjectOutputBusVolume"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -814,11 +814,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setGameObjectOutputBusVolume + resources/manifest/2021.1/functions.json#ak.soundengine.setGameObjectOutputBusVolume",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setGameObjectOutputBusVolume",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setGameObjectOutputBusVolume",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setGameObjectOutputBusVolume",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -888,9 +888,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.setListenerSpatialization",
           "resources/manifest/2021.1/functions.json#ak.soundengine.setListenerSpatialization"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -903,11 +903,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setListenerSpatialization + resources/manifest/2021.1/functions.json#ak.soundengine.setListenerSpatialization",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setListenerSpatialization",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setListenerSpatialization",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setListenerSpatialization",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -979,9 +979,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.setListeners",
           "resources/manifest/2021.1/functions.json#ak.soundengine.setListeners"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -994,11 +994,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setListeners + resources/manifest/2021.1/functions.json#ak.soundengine.setListeners",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setListeners",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setListeners",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setListeners",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -1066,9 +1066,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.setMultiplePositions",
           "resources/manifest/2021.1/functions.json#ak.soundengine.setMultiplePositions"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -1081,11 +1081,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setMultiplePositions + resources/manifest/2021.1/functions.json#ak.soundengine.setMultiplePositions",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setMultiplePositions",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setMultiplePositions",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setMultiplePositions",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -1155,9 +1155,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.setObjectObstructionAndOcclusion",
           "resources/manifest/2021.1/functions.json#ak.soundengine.setObjectObstructionAndOcclusion"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -1170,11 +1170,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setObjectObstructionAndOcclusion + resources/manifest/2021.1/functions.json#ak.soundengine.setObjectObstructionAndOcclusion",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setObjectObstructionAndOcclusion",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setObjectObstructionAndOcclusion",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setObjectObstructionAndOcclusion",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -1246,9 +1246,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.setPosition",
           "resources/manifest/2021.1/functions.json#ak.soundengine.setPosition"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -1261,11 +1261,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setPosition + resources/manifest/2021.1/functions.json#ak.soundengine.setPosition",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setPosition",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setPosition",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setPosition",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -1333,9 +1333,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.setRTPCValue",
           "resources/manifest/2021.1/functions.json#ak.soundengine.setRTPCValue"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -1348,11 +1348,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setRTPCValue + resources/manifest/2021.1/functions.json#ak.soundengine.setRTPCValue",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setRTPCValue",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setRTPCValue",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setRTPCValue",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -1422,9 +1422,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.setScalingFactor",
           "resources/manifest/2021.1/functions.json#ak.soundengine.setScalingFactor"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -1437,11 +1437,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setScalingFactor + resources/manifest/2021.1/functions.json#ak.soundengine.setScalingFactor",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setScalingFactor",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setScalingFactor",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setScalingFactor",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -1509,9 +1509,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.setState",
           "resources/manifest/2021.1/functions.json#ak.soundengine.setState"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -1524,11 +1524,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setState + resources/manifest/2021.1/functions.json#ak.soundengine.setState",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setState",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setState",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setState",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -1596,9 +1596,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.setSwitch",
           "resources/manifest/2021.1/functions.json#ak.soundengine.setSwitch"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -1611,11 +1611,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setSwitch + resources/manifest/2021.1/functions.json#ak.soundengine.setSwitch",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.setSwitch",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setSwitch",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.setSwitch",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -1685,9 +1685,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.stopAll",
           "resources/manifest/2021.1/functions.json#ak.soundengine.stopAll"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -1700,11 +1700,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.stopAll + resources/manifest/2021.1/functions.json#ak.soundengine.stopAll",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.stopAll",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.stopAll",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.stopAll",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -1770,9 +1770,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.stopPlayingID",
           "resources/manifest/2021.1/functions.json#ak.soundengine.stopPlayingID"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -1785,11 +1785,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.stopPlayingID + resources/manifest/2021.1/functions.json#ak.soundengine.stopPlayingID",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.stopPlayingID",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.stopPlayingID",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.stopPlayingID",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -1859,9 +1859,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.soundengine.unregisterGameObj",
           "resources/manifest/2021.1/functions.json#ak.soundengine.unregisterGameObj"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -1874,11 +1874,11 @@
         "blocking_condition": "soundengine is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.unregisterGameObj + resources/manifest/2021.1/functions.json#ak.soundengine.unregisterGameObj",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.soundengine.unregisterGameObj",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.unregisterGameObj",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for soundengine changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.soundengine.unregisterGameObj",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -1944,9 +1944,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.cli.addNewPlatform",
           "resources/manifest/2021.1/functions.json#ak.wwise.cli.addNewPlatform"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -1959,11 +1959,11 @@
         "blocking_condition": "cli is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.addNewPlatform + resources/manifest/2021.1/functions.json#ak.wwise.cli.addNewPlatform",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.addNewPlatform",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.addNewPlatform",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for cli changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.addNewPlatform",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -2036,9 +2036,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.cli.convertExternalSource",
           "resources/manifest/2021.1/functions.json#ak.wwise.cli.convertExternalSource"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -2051,11 +2051,11 @@
         "blocking_condition": "cli is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.convertExternalSource + resources/manifest/2021.1/functions.json#ak.wwise.cli.convertExternalSource",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.convertExternalSource",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.convertExternalSource",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for cli changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.convertExternalSource",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -2132,9 +2132,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.cli.createNewProject",
           "resources/manifest/2021.1/functions.json#ak.wwise.cli.createNewProject"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -2147,11 +2147,11 @@
         "blocking_condition": "cli is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.createNewProject + resources/manifest/2021.1/functions.json#ak.wwise.cli.createNewProject",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.createNewProject",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.createNewProject",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for cli changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.createNewProject",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -2224,9 +2224,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.cli.dumpObjects",
           "resources/manifest/2021.1/functions.json#ak.wwise.cli.dumpObjects"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -2239,11 +2239,11 @@
         "blocking_condition": "cli is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.dumpObjects + resources/manifest/2021.1/functions.json#ak.wwise.cli.dumpObjects",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.dumpObjects",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.dumpObjects",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for cli changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.dumpObjects",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -2317,9 +2317,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.cli.generateSoundbank",
           "resources/manifest/2021.1/functions.json#ak.wwise.cli.generateSoundbank"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -2332,11 +2332,11 @@
         "blocking_condition": "cli is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.generateSoundbank + resources/manifest/2021.1/functions.json#ak.wwise.cli.generateSoundbank",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.generateSoundbank",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.generateSoundbank",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for cli changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.generateSoundbank",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -2437,9 +2437,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.cli.migrate",
           "resources/manifest/2021.1/functions.json#ak.wwise.cli.migrate"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -2452,11 +2452,11 @@
         "blocking_condition": "cli is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.migrate + resources/manifest/2021.1/functions.json#ak.wwise.cli.migrate",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.migrate",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.migrate",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for cli changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.migrate",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -2529,9 +2529,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.cli.moveMediaIdsToSingleFile",
           "resources/manifest/2021.1/functions.json#ak.wwise.cli.moveMediaIdsToSingleFile"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -2544,11 +2544,11 @@
         "blocking_condition": "cli is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.moveMediaIdsToSingleFile + resources/manifest/2021.1/functions.json#ak.wwise.cli.moveMediaIdsToSingleFile",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.moveMediaIdsToSingleFile",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.moveMediaIdsToSingleFile",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for cli changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.moveMediaIdsToSingleFile",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -2614,9 +2614,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.cli.moveMediaIdsToWorkUnits",
           "resources/manifest/2021.1/functions.json#ak.wwise.cli.moveMediaIdsToWorkUnits"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -2629,11 +2629,11 @@
         "blocking_condition": "cli is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.moveMediaIdsToWorkUnits + resources/manifest/2021.1/functions.json#ak.wwise.cli.moveMediaIdsToWorkUnits",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.moveMediaIdsToWorkUnits",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.moveMediaIdsToWorkUnits",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for cli changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.moveMediaIdsToWorkUnits",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -2699,9 +2699,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.cli.tabDelimitedImport",
           "resources/manifest/2021.1/functions.json#ak.wwise.cli.tabDelimitedImport"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -2714,11 +2714,11 @@
         "blocking_condition": "cli is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.tabDelimitedImport + resources/manifest/2021.1/functions.json#ak.wwise.cli.tabDelimitedImport",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.tabDelimitedImport",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.tabDelimitedImport",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for cli changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.tabDelimitedImport",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -2798,9 +2798,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.cli.updateMediaIdsInSingleFile",
           "resources/manifest/2021.1/functions.json#ak.wwise.cli.updateMediaIdsInSingleFile"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -2813,11 +2813,11 @@
         "blocking_condition": "cli is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.updateMediaIdsInSingleFile + resources/manifest/2021.1/functions.json#ak.wwise.cli.updateMediaIdsInSingleFile",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.updateMediaIdsInSingleFile",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.updateMediaIdsInSingleFile",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for cli changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.updateMediaIdsInSingleFile",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -2883,9 +2883,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.cli.waapiServer",
           "resources/manifest/2021.1/functions.json#ak.wwise.cli.waapiServer"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -2898,11 +2898,11 @@
         "blocking_condition": "cli is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.waapiServer + resources/manifest/2021.1/functions.json#ak.wwise.cli.waapiServer",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.cli.waapiServer",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.waapiServer",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for cli changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.cli.waapiServer",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -2981,6 +2981,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.import",
         "source_note_family": "import",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.import",
@@ -3071,6 +3072,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.import",
         "source_note_family": "import",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.import",
@@ -3164,9 +3166,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -3179,11 +3181,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion + resources/manifest/2021.1/functions.json#ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.audioSourcePeaks changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -3262,9 +3264,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -3277,11 +3279,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion + resources/manifest/2021.1/functions.json#ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.audioSourcePeaks changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -3356,9 +3358,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.getInfo",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.getInfo"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -3371,11 +3373,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.getInfo + resources/manifest/2021.1/functions.json#ak.wwise.core.getInfo",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.getInfo",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.getInfo",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.getInfo",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -3463,9 +3465,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.log.get",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.log.get"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -3478,11 +3480,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.log.get + resources/manifest/2021.1/functions.json#ak.wwise.core.log.get",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.log.get",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.log.get",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.log changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.log.get",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -3552,6 +3554,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.object-mutation",
         "source_note_family": "object-mutation",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.object-mutation",
@@ -3640,6 +3643,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.object-mutation",
         "source_note_family": "object-mutation",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.object-mutation",
@@ -3739,6 +3743,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.object-mutation",
         "source_note_family": "object-mutation",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.object-mutation",
@@ -3824,6 +3829,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.query",
         "source_note_family": "query",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.query",
@@ -3911,6 +3917,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.property-reference",
         "source_note_family": "property-reference",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.property-reference",
@@ -4003,6 +4010,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.property-reference",
         "source_note_family": "property-reference",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.property-reference",
@@ -4089,6 +4097,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.property-reference",
         "source_note_family": "property-reference",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.property-reference",
@@ -4184,6 +4193,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.property-reference",
         "source_note_family": "property-reference",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.property-reference",
@@ -4267,6 +4277,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.property-reference",
         "source_note_family": "property-reference",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.property-reference",
@@ -4358,6 +4369,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.object-mutation",
         "source_note_family": "object-mutation",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.object-mutation",
@@ -4446,6 +4458,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.property-reference",
         "source_note_family": "property-reference",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.property-reference",
@@ -4538,6 +4551,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.property-reference",
         "source_note_family": "property-reference",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.property-reference",
@@ -4625,6 +4639,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.property-reference",
         "source_note_family": "property-reference",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.property-reference",
@@ -4712,6 +4727,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.property-reference",
         "source_note_family": "property-reference",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.property-reference",
@@ -4802,6 +4818,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.property-reference",
         "source_note_family": "property-reference",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.property-reference",
@@ -4890,6 +4907,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.property-reference",
         "source_note_family": "property-reference",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.property-reference",
@@ -4980,9 +4998,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.enableProfilerData",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.enableProfilerData"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -4995,11 +5013,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.enableProfilerData + resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.enableProfilerData",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.enableProfilerData",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.enableProfilerData",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.profiler changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.enableProfilerData",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -5065,9 +5083,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getAudioObjects",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getAudioObjects"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -5080,11 +5098,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getAudioObjects + resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getAudioObjects",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getAudioObjects",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getAudioObjects",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.profiler changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getAudioObjects",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -5157,9 +5175,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getBusses",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getBusses"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -5172,11 +5190,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getBusses + resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getBusses",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getBusses",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getBusses",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.profiler changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getBusses",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -5249,9 +5267,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getCursorTime",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getCursorTime"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -5264,11 +5282,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getCursorTime + resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getCursorTime",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getCursorTime",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getCursorTime",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.profiler changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getCursorTime",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -5336,9 +5354,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getRTPCs",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getRTPCs"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -5351,11 +5369,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getRTPCs + resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getRTPCs",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getRTPCs",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getRTPCs",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.profiler changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getRTPCs",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -5425,9 +5443,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getVoiceContributions",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getVoiceContributions"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -5440,11 +5458,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getVoiceContributions + resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getVoiceContributions",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getVoiceContributions",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getVoiceContributions",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.profiler changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getVoiceContributions",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -5515,9 +5533,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getVoices",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getVoices"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -5530,11 +5548,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getVoices + resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getVoices",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getVoices",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getVoices",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.profiler changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.getVoices",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -5607,9 +5625,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.startCapture",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.startCapture"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -5622,11 +5640,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.startCapture + resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.startCapture",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.startCapture",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.startCapture",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.profiler changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.startCapture",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -5690,9 +5708,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.stopCapture",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.stopCapture"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -5705,11 +5723,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.stopCapture + resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.stopCapture",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.stopCapture",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.stopCapture",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.profiler changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.profiler.stopCapture",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -5773,9 +5791,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.project.save",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.project.save"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -5788,11 +5806,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.project.save + resources/manifest/2021.1/functions.json#ak.wwise.core.project.save",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.project.save",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.project.save",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.project changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.project.save",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -5854,9 +5872,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.connect",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.connect"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -5869,11 +5887,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.connect + resources/manifest/2021.1/functions.json#ak.wwise.core.remote.connect",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.connect",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.connect",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.remote changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.connect",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -5942,9 +5960,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.disconnect",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.disconnect"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -5957,11 +5975,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.disconnect + resources/manifest/2021.1/functions.json#ak.wwise.core.remote.disconnect",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.disconnect",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.disconnect",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.remote changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.disconnect",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -6023,9 +6041,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.getAvailableConsoles",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.getAvailableConsoles"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -6038,11 +6056,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.getAvailableConsoles + resources/manifest/2021.1/functions.json#ak.wwise.core.remote.getAvailableConsoles",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.getAvailableConsoles",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.getAvailableConsoles",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.remote changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.getAvailableConsoles",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -6108,9 +6126,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.getConnectionStatus",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.getConnectionStatus"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -6123,11 +6141,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.getConnectionStatus + resources/manifest/2021.1/functions.json#ak.wwise.core.remote.getConnectionStatus",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.getConnectionStatus",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.getConnectionStatus",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.remote changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.remote.getConnectionStatus",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -6196,6 +6214,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.soundbank",
         "source_note_family": "soundbank",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.soundbank",
@@ -6286,6 +6305,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.soundbank",
         "source_note_family": "soundbank",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.soundbank",
@@ -6373,6 +6393,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.soundbank",
         "source_note_family": "soundbank",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.soundbank",
@@ -6462,6 +6483,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.switchcontainer",
         "source_note_family": "switchcontainer",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.switchcontainer",
@@ -6549,6 +6571,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.switchcontainer",
         "source_note_family": "switchcontainer",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.switchcontainer",
@@ -6636,6 +6659,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.switchcontainer",
         "source_note_family": "switchcontainer",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.switchcontainer",
@@ -6723,9 +6747,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.create",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.create"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -6738,11 +6762,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.create + resources/manifest/2021.1/functions.json#ak.wwise.core.transport.create",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.create",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.create",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.transport changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.create",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -6811,9 +6835,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.destroy",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.destroy"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -6826,11 +6850,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.destroy + resources/manifest/2021.1/functions.json#ak.wwise.core.transport.destroy",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.destroy",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.destroy",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.transport changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.destroy",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -6896,9 +6920,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.executeAction",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.executeAction"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -6911,11 +6935,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.executeAction + resources/manifest/2021.1/functions.json#ak.wwise.core.transport.executeAction",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.executeAction",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.executeAction",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.transport changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.executeAction",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -6982,9 +7006,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.getList",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.getList"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -6997,11 +7021,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.getList + resources/manifest/2021.1/functions.json#ak.wwise.core.transport.getList",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.getList",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.getList",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.transport changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.getList",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -7065,9 +7089,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.getState",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.getState"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -7080,11 +7104,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.getState + resources/manifest/2021.1/functions.json#ak.wwise.core.transport.getState",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.getState",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.getState",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.transport changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.transport.getState",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -7154,6 +7178,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.object-mutation",
         "source_note_family": "object-mutation",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.object-mutation",
@@ -7235,9 +7260,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.core.undo.cancelGroup",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.undo.cancelGroup"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -7250,11 +7275,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.undo.cancelGroup + resources/manifest/2021.1/functions.json#ak.wwise.core.undo.cancelGroup",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.core.undo.cancelGroup",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.undo.cancelGroup",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.undo changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.undo.cancelGroup",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -7316,6 +7341,7 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.object-mutation",
         "source_note_family": "object-mutation",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.object-mutation",
@@ -7401,9 +7427,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.debug.enableAsserts",
           "resources/manifest/2021.1/functions.json#ak.wwise.debug.enableAsserts"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -7416,11 +7442,11 @@
         "blocking_condition": "debug is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.debug.enableAsserts + resources/manifest/2021.1/functions.json#ak.wwise.debug.enableAsserts",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.debug.enableAsserts",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.debug.enableAsserts",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for debug changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.debug.enableAsserts",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -7486,9 +7512,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.debug.enableAutomationMode",
           "resources/manifest/2021.1/functions.json#ak.wwise.debug.enableAutomationMode"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -7501,11 +7527,11 @@
         "blocking_condition": "debug is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.debug.enableAutomationMode + resources/manifest/2021.1/functions.json#ak.wwise.debug.enableAutomationMode",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.debug.enableAutomationMode",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.debug.enableAutomationMode",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for debug changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.debug.enableAutomationMode",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -7571,9 +7597,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.debug.testAssert",
           "resources/manifest/2021.1/functions.json#ak.wwise.debug.testAssert"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -7586,11 +7612,11 @@
         "blocking_condition": "debug is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.debug.testAssert + resources/manifest/2021.1/functions.json#ak.wwise.debug.testAssert",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.debug.testAssert",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.debug.testAssert",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for debug changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.debug.testAssert",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -7652,9 +7678,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.debug.testCrash",
           "resources/manifest/2021.1/functions.json#ak.wwise.debug.testCrash"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -7667,11 +7693,11 @@
         "blocking_condition": "debug is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.debug.testCrash + resources/manifest/2021.1/functions.json#ak.wwise.debug.testCrash",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.debug.testCrash",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.debug.testCrash",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for debug changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.debug.testCrash",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -7733,9 +7759,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.ui.bringToForeground",
           "resources/manifest/2021.1/functions.json#ak.wwise.ui.bringToForeground"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -7748,11 +7774,11 @@
         "blocking_condition": "ui is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.ui.bringToForeground + resources/manifest/2021.1/functions.json#ak.wwise.ui.bringToForeground",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.ui.bringToForeground",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.ui.bringToForeground",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for ui changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.ui.bringToForeground",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -7814,9 +7840,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.ui.captureScreen",
           "resources/manifest/2021.1/functions.json#ak.wwise.ui.captureScreen"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -7829,11 +7855,11 @@
         "blocking_condition": "ui is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.ui.captureScreen + resources/manifest/2021.1/functions.json#ak.wwise.ui.captureScreen",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.ui.captureScreen",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.ui.captureScreen",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for ui changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.ui.captureScreen",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -7902,9 +7928,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.execute",
           "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.execute"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -7917,11 +7943,11 @@
         "blocking_condition": "ui.commands is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.execute + resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.execute",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.execute",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.execute",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for ui.commands changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.execute",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -7990,9 +8016,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.getCommands",
           "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.getCommands"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -8005,11 +8031,11 @@
         "blocking_condition": "ui.commands is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.getCommands + resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.getCommands",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.getCommands",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.getCommands",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for ui.commands changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.getCommands",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -8073,9 +8099,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.register",
           "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.register"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -8088,11 +8114,11 @@
         "blocking_condition": "ui.commands is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.register + resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.register",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.register",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.register",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for ui.commands changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.register",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -8158,9 +8184,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.unregister",
           "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.unregister"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -8173,11 +8199,11 @@
         "blocking_condition": "ui.commands is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.unregister + resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.unregister",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.unregister",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.unregister",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for ui.commands changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.ui.commands.unregister",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -8243,9 +8269,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.ui.getSelectedObjects",
           "resources/manifest/2021.1/functions.json#ak.wwise.ui.getSelectedObjects"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -8258,11 +8284,11 @@
         "blocking_condition": "ui is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.ui.getSelectedObjects + resources/manifest/2021.1/functions.json#ak.wwise.ui.getSelectedObjects",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.ui.getSelectedObjects",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.ui.getSelectedObjects",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for ui changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.ui.getSelectedObjects",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -8328,9 +8354,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.ui.project.close",
           "resources/manifest/2021.1/functions.json#ak.wwise.ui.project.close"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -8343,11 +8369,11 @@
         "blocking_condition": "ui.project is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.ui.project.close + resources/manifest/2021.1/functions.json#ak.wwise.ui.project.close",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.ui.project.close",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.ui.project.close",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for ui.project changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.ui.project.close",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -8413,9 +8439,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "excluded",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.ui.project.open",
           "resources/manifest/2021.1/functions.json#ak.wwise.ui.project.open"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -8428,11 +8454,11 @@
         "blocking_condition": "ui.project is excluded from 2021.1 behavioral/live promotion by local URI policy; manifest reflection does not count as behavioral proof.",
         "coverage_status": "excluded",
         "destructive_applicability": "destructive-opt-in-required",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.ui.project.open + resources/manifest/2021.1/functions.json#ak.wwise.ui.project.open",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.ui.project.open",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.ui.project.open",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for ui.project changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.ui.project.open",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -8500,9 +8526,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.waapi.getFunctions",
           "resources/manifest/2021.1/functions.json#ak.wwise.waapi.getFunctions"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -8515,11 +8541,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.waapi.getFunctions + resources/manifest/2021.1/functions.json#ak.wwise.waapi.getFunctions",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.waapi.getFunctions",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.waapi.getFunctions",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for waapi changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.waapi.getFunctions",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -8583,9 +8609,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.waapi.getSchema",
           "resources/manifest/2021.1/functions.json#ak.wwise.waapi.getSchema"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -8598,11 +8624,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.waapi.getSchema + resources/manifest/2021.1/functions.json#ak.wwise.waapi.getSchema",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.waapi.getSchema",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.waapi.getSchema",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for waapi changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.waapi.getSchema",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },
@@ -8673,9 +8699,9 @@
         "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
         "manifest_reflection_only": true,
         "parity_bucket": "deferred",
+        "source_note_evidence": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "source_note_family": "",
         "source_paths": [
-          "resources/manifest/2021.1/functions.json#ak.wwise.waapi.getTopics",
           "resources/manifest/2021.1/functions.json#ak.wwise.waapi.getTopics"
         ],
         "test": "tests/unit/test_2021_1_api_resource_coverage.py"
@@ -8688,11 +8714,11 @@
         "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
         "coverage_status": "deferred",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.waapi.getTopics + resources/manifest/2021.1/functions.json#ak.wwise.waapi.getTopics",
+        "evidence_source": "resources/manifest/2021.1/functions.json#ak.wwise.waapi.getTopics",
         "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.waapi.getTopics",
         "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for waapi changes.",
-        "source_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.waapi.getTopics",
+        "source_evidence_path": "not-applicable: no 2021.1 source-note family mapped for this URI",
         "status": true,
         "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
       },

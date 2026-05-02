@@ -78,8 +78,14 @@ def test_2021_entries_are_deferred_or_excluded_without_behavioral_promotion() ->
         assert evidence["manifest_reflection_only"] is True
         assert evidence["counts_as_behavioral"] is False
         assert evidence["counts_as_live_behavioral"] is False
+        assert len(evidence["source_paths"]) == len(set(evidence["source_paths"])), entry["uri"]
         assert "Task 4 reflection prove inventory presence, not behavior" in evidence["evidence_standard"]
         assert "no 2022.1/2023.1/2024.1/2025.1 evidence" in evidence["evidence_standard"]
+        if entry["source_note_family"]:
+            assert evidence["source_note_evidence"].startswith("resources/semantic/2021.1/source_notes.json#"), entry["uri"]
+        else:
+            assert evidence["source_note_evidence"] == "not-applicable: no 2021.1 source-note family mapped for this URI", entry["uri"]
+            assert evidence["source_paths"] == [entry["deferred"]["reflection_evidence_path"]], entry["uri"]
 
 
 def test_2021_classification_accounting_has_zero_unknowns() -> None:
