@@ -8,9 +8,9 @@
     ],
     "rows": [
       {
-        "id": "{B231292D-F96D-4EDC-AE14-D62DE1E07EDD}",
+        "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
         "name": "Default Work Unit",
-        "path": "\\Devices\\Default Work Unit"
+        "path": "\\Containers\\Default Work Unit"
       }
     ]
   },
@@ -44,7 +44,7 @@
     ]
   },
   "query": "from search \"Default Work Unit\" where name = \"Default Work Unit\" take 1",
-  "recorded_at_unix": 1777661730,
+  "recorded_at_unix": 1777744221,
   "result_count": 1,
   "result_count_policy": {
     "allow_empty": true,
