@@ -282,6 +282,7 @@ class HeadlessLifecycle:
     output: ProcessOutput = field(init=False, default_factory=ProcessOutput)
     ready_result: Any = field(init=False, default=None)
     command: list[str] = field(init=False, default_factory=list)
+    launch_cwd: Path | None = field(init=False, default=None)
     _drainer: PipeDrainer = field(init=False)
 
     def __post_init__(self) -> None:
@@ -305,10 +306,12 @@ class HeadlessLifecycle:
         assert_port_free(self.host, selected_port)
         self.port = selected_port
         self.console_path = resolved_path
+        launch_project_path = Path(self.project_path).expanduser().resolve(strict=False) if self.project_path is not None else None
+        self.launch_cwd = launch_project_path.parent if launch_project_path is not None else None
         self.command = build_wwise_console_command(
             resolved_path,
             selected_port,
-            project_path=self.project_path,
+            project_path=launch_project_path,
             extra_args=self.command_extra_args,
         )
 
@@ -319,6 +322,8 @@ class HeadlessLifecycle:
                 "text": True,
                 "bufsize": 1,
             }
+            if self.launch_cwd is not None:
+                kwargs["cwd"] = str(self.launch_cwd)
             if os.name != "nt":
                 kwargs["start_new_session"] = True
             return self.process_factory(self.command, **kwargs)
@@ -396,22 +401,24 @@ class HeadlessLifecycle:
             return
         completed = False
         try:
-            if self._poll() is None:
-                self._terminate(process)
+            self._terminate(process)
+            try:
+                process.wait(timeout=self.timeouts.shutdown)
+                completed = True
+            except AttributeError:
+                completed = self._poll_process(process) is not None
+            except subprocess.TimeoutExpired:
+                self._force_kill(process)
                 try:
-                    process.wait(timeout=self.timeouts.shutdown)
+                    process.wait(timeout=self.timeouts.kill)
                     completed = True
-                except subprocess.TimeoutExpired:
-                    self._force_kill(process)
-                    try:
-                        process.wait(timeout=self.timeouts.kill)
-                        completed = True
-                    except subprocess.TimeoutExpired as exc:
-                        if not suppress_errors:
-                            raise ShutdownTimeout(
-                                f"WwiseConsole did not exit after terminate+kill timeouts; pid={getattr(process, 'pid', 'unknown')}"
-                            ) from exc
+                except subprocess.TimeoutExpired as exc:
+                    if not suppress_errors:
+                        raise ShutdownTimeout(
+                            f"WwiseConsole did not exit after terminate+kill timeouts; pid={getattr(process, 'pid', 'unknown')}"
+                        ) from exc
         finally:
+            self._cleanup_detached_waapi_servers()
             self._drainer.join()
             if completed or self._poll() is not None:
                 self.process = None
@@ -463,7 +470,7 @@ class HeadlessLifecycle:
             "port": self.port,
             "waapi_url": self.waapi_url if self.port is not None else None,
             "argv": list(self.command),
-            "cwd": os.getcwd(),
+            "cwd": str(self.launch_cwd) if self.launch_cwd is not None else os.getcwd(),
             "environment": _environment_summary(),
             "pid": getattr(process, "pid", None),
             "process_state": process_state,
@@ -534,6 +541,83 @@ class HeadlessLifecycle:
         kill = getattr(process, "kill", None)
         if kill is not None:
             kill()
+
+    def _cleanup_detached_waapi_servers(self) -> None:
+        if self.port is None or os.name == "nt" or getattr(os, "kill", None) is None:
+            return
+        for pid in self._detached_waapi_server_pids_for_port(self.port):
+            if not self._signal_pid(pid, signal.SIGTERM):
+                continue
+            deadline = time.monotonic() + min(0.5, max(0.0, self.timeouts.kill))
+            while self._pid_exists(pid) and time.monotonic() < deadline:
+                time.sleep(min(0.05, max(0.0, deadline - time.monotonic())))
+            if self._pid_exists(pid):
+                self._signal_pid(pid, 9)
+
+    def _detached_waapi_server_pids_for_port(self, port: int) -> list[int]:
+        try:
+            result = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True, check=False)
+        except (OSError, subprocess.SubprocessError):
+            return []
+        if getattr(result, "returncode", 1) != 0:
+            return []
+
+        current_pid = os.getpid() if getattr(os, "getpid", None) is not None else None
+        pids: list[int] = []
+        for line in (getattr(result, "stdout", "") or "").splitlines():
+            pid_text, separator, command_line = line.strip().partition(" ")
+            if not separator:
+                continue
+            try:
+                pid = int(pid_text)
+            except ValueError:
+                continue
+            if current_pid is not None and pid == current_pid:
+                continue
+            if self._is_waapi_server_command_for_port(command_line, port):
+                pids.append(pid)
+        return pids
+
+    def _is_waapi_server_command_for_port(self, command_line: str, port: int) -> bool:
+        tokens = command_line.split()
+        if "waapi-server" not in tokens:
+            return False
+        if not any("wwiseconsole" in token.lower() for token in tokens):
+            return False
+
+        port_text = str(port)
+        for index, token in enumerate(tokens):
+            if token == "--wamp-port" and index + 1 < len(tokens) and tokens[index + 1] == port_text:
+                return True
+            if token == f"--wamp-port={port_text}":
+                return True
+        return False
+
+    def _signal_pid(self, pid: int, sig: int) -> bool:
+        kill = getattr(os, "kill", None)
+        if kill is None:
+            return False
+        try:
+            kill(pid, sig)
+            return True
+        except ProcessLookupError:
+            return False
+        except OSError:
+            return False
+
+    def _pid_exists(self, pid: int) -> bool:
+        kill = getattr(os, "kill", None)
+        if kill is None:
+            return False
+        try:
+            kill(pid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        except OSError:
+            return False
 
 
 __all__ = [

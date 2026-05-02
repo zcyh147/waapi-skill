@@ -135,9 +135,11 @@ def test_launch_uses_argument_list_dynamic_port_and_drains_output(tmp_path: Path
     executable = make_executable(tmp_path)
     fake_process = FakeProcess()
     commands: list[list[str]] = []
+    seen_kwargs: list[dict[str, Any]] = []
 
     def process_factory(command: list[str], **kwargs: Any) -> FakeProcess:
         commands.append(command)
+        seen_kwargs.append(kwargs)
         return fake_process
 
     lifecycle = HeadlessLifecycle(console_path=executable, process_factory=process_factory)
@@ -146,6 +148,7 @@ def test_launch_uses_argument_list_dynamic_port_and_drains_output(tmp_path: Path
 
     assert lifecycle.port is not None and lifecycle.port > 0
     assert commands == [[str(executable), "waapi-server", "--wamp-port", str(lifecycle.port)]]
+    assert "cwd" not in seen_kwargs[0]
     assert "stdout line" in "".join(lifecycle.output.stdout)
     assert "stderr line" in "".join(lifecycle.output.stderr)
     lifecycle.shutdown()
@@ -169,6 +172,66 @@ def test_launch_preserves_project_path_with_spaces_as_single_argument(tmp_path: 
     assert commands[0][0:3] == [str(executable), "waapi-server", str(project)]
     assert "--wamp-port" in commands[0]
     lifecycle.shutdown()
+
+
+def test_project_launch_normalizes_relative_project_path_cwd_and_diagnostics(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    executable = make_executable(tmp_path)
+    project = Path("Fixture Project") / "Fixture Project.wproj"
+    absolute_project = (tmp_path / project).resolve(strict=False)
+    absolute_project.parent.mkdir()
+    absolute_project.write_text("<WwiseDocument />", encoding="utf-8")
+    seen_kwargs: list[dict[str, Any]] = []
+
+    monkeypatch.chdir(tmp_path)
+
+    def process_factory(command: list[str], **kwargs: Any) -> FakeProcess:
+        seen_kwargs.append(kwargs)
+        return FakeProcess()
+
+    def failing_client_factory(url: str) -> FakeClient:
+        raise OSError("not ready")
+
+    lifecycle = HeadlessLifecycle(
+        console_path=executable,
+        project_path=project,
+        process_factory=process_factory,
+        waapi_client_factory=failing_client_factory,
+        timeouts=LifecycleTimeouts(readiness=0.02, probe=0.01, probe_interval=0.001),
+    )
+    lifecycle.launch()
+
+    assert lifecycle.port is not None
+    assert seen_kwargs[0]["cwd"] == str(absolute_project.parent)
+    assert lifecycle.command == [str(executable), "waapi-server", str(absolute_project), "--wamp-port", str(lifecycle.port)]
+    with pytest.raises(ReadinessTimeout) as exc_info:
+        lifecycle.wait_ready()
+    assert exc_info.value.diagnostics["cwd"] == str(absolute_project.parent)
+
+
+def test_no_project_launch_diagnostics_use_current_process_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    executable = make_executable(tmp_path)
+    seen_kwargs: list[dict[str, Any]] = []
+
+    def process_factory(command: list[str], **kwargs: Any) -> FakeProcess:
+        seen_kwargs.append(kwargs)
+        return FakeProcess()
+
+    def failing_client_factory(url: str) -> FakeClient:
+        raise OSError("not ready")
+
+    monkeypatch.chdir(tmp_path)
+    lifecycle = HeadlessLifecycle(
+        console_path=executable,
+        process_factory=process_factory,
+        waapi_client_factory=failing_client_factory,
+        timeouts=LifecycleTimeouts(readiness=0.02, probe=0.01, probe_interval=0.001),
+    )
+    lifecycle.launch()
+
+    assert "cwd" not in seen_kwargs[0]
+    with pytest.raises(ReadinessTimeout) as exc_info:
+        lifecycle.wait_ready()
+    assert exc_info.value.diagnostics["cwd"] == str(Path.cwd())
 
 
 def test_launch_on_windows_omits_posix_session_kwarg(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -371,6 +434,94 @@ def test_shutdown_clears_process_that_already_exited(tmp_path: Path) -> None:
     lifecycle = HeadlessLifecycle(console_path=executable, process_factory=lambda command, **kwargs: FakeProcess(returncode=0))
     lifecycle.launch()
     lifecycle.shutdown()
+    assert lifecycle.process is None
+
+
+def test_shutdown_cleans_process_group_when_wrapper_already_exited(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    executable = make_executable(tmp_path)
+    fake_process = FakeProcess(returncode=0)
+    killpg_calls: list[tuple[int, int]] = []
+
+    def fake_killpg(pid: int, sig: int) -> None:
+        killpg_calls.append((pid, sig))
+
+    lifecycle = HeadlessLifecycle(console_path=executable, process_factory=lambda command, **kwargs: fake_process)
+    lifecycle.launch()
+    monkeypatch.setattr(headless_module, "os", types.SimpleNamespace(name="posix", killpg=fake_killpg))
+    lifecycle.shutdown()
+
+    assert killpg_calls == [(fake_process.pid, headless_module.signal.SIGTERM)]
+    assert lifecycle.process is None
+
+
+def test_detached_waapi_server_scan_matches_only_wwise_waapi_selected_port(monkeypatch: pytest.MonkeyPatch) -> None:
+    port = 57645
+    ps_output = f"""
+      101 /usr/bin/python WwiseConsole.exe waapi-server --wamp-port {port}
+      200 /Applications/WwiseConsole.sh waapi-server /tmp/Sample Project/SampleProject.wproj --wamp-port {port}
+      201 /Applications/WwiseConsole.sh waapi-server /tmp/SampleProject.wproj --wamp-port 1
+      202 /Applications/WwiseConsole.sh profiler-server --wamp-port {port}
+      203 /usr/bin/python waapi-server --wamp-port {port}
+      204 C:/WwiseConsole.exe waapi-server C:/SampleProject.wproj --wamp-port={port}
+      not-a-pid /Applications/WwiseConsole.sh waapi-server --wamp-port {port}
+      malformed
+    """
+
+    def fake_run(command: list[str], **kwargs: Any) -> object:
+        assert command == ["ps", "-axo", "pid=,command="]
+        return types.SimpleNamespace(returncode=0, stdout=ps_output)
+
+    monkeypatch.setattr(headless_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(headless_module.os, "getpid", lambda: 101)
+
+    lifecycle = HeadlessLifecycle()
+    assert lifecycle._detached_waapi_server_pids_for_port(port) == [200, 204]  # pyright: ignore[reportPrivateUsage]
+
+
+def test_detached_waapi_server_scan_tolerates_unavailable_ps(monkeypatch: pytest.MonkeyPatch) -> None:
+    def failing_run(command: list[str], **kwargs: Any) -> object:
+        raise OSError("ps unavailable")
+
+    monkeypatch.setattr(headless_module.subprocess, "run", failing_run)
+
+    lifecycle = HeadlessLifecycle()
+    assert lifecycle._detached_waapi_server_pids_for_port(57645) == []  # pyright: ignore[reportPrivateUsage]
+
+
+def test_shutdown_detached_port_fallback_terminates_only_matching_ps_rows(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    executable = make_executable(tmp_path)
+    port = 57645
+    fake_process = FakeProcess(returncode=0)
+    ps_output = f"""
+      200 /Applications/WwiseConsole.sh waapi-server /tmp/SampleProject.wproj --wamp-port {port}
+      201 /Applications/WwiseConsole.sh waapi-server /tmp/SampleProject.wproj --wamp-port 1
+      202 /Applications/WwiseConsole.sh profiler-server --wamp-port {port}
+      203 /usr/bin/python waapi-server --wamp-port {port}
+    """
+    signal_calls: list[tuple[int, int]] = []
+
+    def fake_run(command: list[str], **kwargs: Any) -> object:
+        return types.SimpleNamespace(returncode=0, stdout=ps_output)
+
+    def fake_signal_pid(self: HeadlessLifecycle, pid: int, sig: int) -> bool:
+        signal_calls.append((pid, sig))
+        return True
+
+    monkeypatch.setattr(headless_module.os, "killpg", lambda pid, sig: None)
+    monkeypatch.setattr(headless_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(HeadlessLifecycle, "_signal_pid", fake_signal_pid)
+    monkeypatch.setattr(HeadlessLifecycle, "_pid_exists", lambda self, pid: True)
+
+    lifecycle = HeadlessLifecycle(
+        console_path=executable,
+        port=port,
+        process_factory=lambda command, **kwargs: fake_process,
+        timeouts=LifecycleTimeouts(kill=0.0),
+    )
+    lifecycle.launch()
+    lifecycle.shutdown()
+
+    assert signal_calls == [(200, headless_module.signal.SIGTERM), (200, 9)]
     assert lifecycle.process is None
 
 
