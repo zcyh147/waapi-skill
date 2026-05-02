@@ -215,7 +215,7 @@ class ManifestSchemaLoader:
         raise SemanticValidationError(
             SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
             f"No usable schema for WAAPI URI {uri!r} in manifest {version}",
-            details={"uri": uri, "version": version},
+            details=_schema_absence_details(uri, version),
         )
 
 
@@ -274,3 +274,23 @@ def require_source_note(
             details=status.as_dict(),
         )
     return status
+
+
+def _schema_absence_details(uri: str, version: str) -> dict[str, Any]:
+    details: dict[str, Any] = {
+        "uri": uri,
+        "version": version,
+        "status": "unsupported",
+        "schema_status": "absent-from-version-manifest",
+        "fallback_allowed": False,
+    }
+    try:
+        from wwise_waapi.deferred_registry import DeferredRegistry
+
+        entry = DeferredRegistry.load_default(version).get(uri)
+    except (FileNotFoundError, KeyError, ValueError):
+        entry = None
+    if entry is not None:
+        details["status"] = "deferred"
+        details["deferred_registry"] = entry.as_dict()
+    return details
