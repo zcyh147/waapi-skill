@@ -101,6 +101,7 @@
       "publisher": {"uri": "ak.wwise.core.object.setProperty", "deterministic": true, "description": "set Volume on disposable ActorMixer", "options": {}},
       "bounded_wait_seconds": 5.0,
       "subscription_options": {"return": ["id", "name", "type", "path", "notes", "Volume"]},
+      "dynamic_subscription_options": {"object": "$disposable_object_id", "property": "Volume"},
       "payload_identity_requirements": {"match_object_id_or_path": true, "old_new_required_when_applicable": true, "required_return_fields": ["id", "name", "type", "path", "Volume"], "topic_specific_fields": ["id", "path", "property", "old", "new"]},
       "readback": "object.get confirms Volume value on disposable ActorMixer",
       "cleanup": ["delete disposable object if still present", "object.get by tracked id proves cleanup", "sandbox copy deleted on success"],
