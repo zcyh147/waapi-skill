@@ -41,7 +41,7 @@ from .sandbox_fixture import (
 from .versions import WWISE_2024_1_VERSION_KEY  # pyright: ignore[reportMissingImports]
 
 
-DEFAULT_2024_DESTRUCTIVE_SANDBOX_ROOT = Path(".sisyphus") / "runtime" / "wwise-2024-destructive-sandboxes"
+DEFAULT_2024_DESTRUCTIVE_SANDBOX_ROOT = Path(".sisyphus") / "runtime" / "wwise-waapi-sandboxes" / "2024.1"
 GENERATED_OUTPUT_DIR_NAMES = {
     ".cache",
     "GeneratedSoundBanks",

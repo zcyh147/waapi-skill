@@ -24,6 +24,7 @@ from wwise_waapi.destructive_2021_sandbox import (  # pyright: ignore[reportMiss
     unique_2021_name,
 )
 from wwise_waapi.live_environment import path_is_under  # pyright: ignore[reportMissingImports]
+from tests.support.active_gate_failures import skip_or_fail_unavailable  # pyright: ignore[reportMissingImports]
 
 OBJECT_CREATE_URI = "ak.wwise.core.object.create"
 OBJECT_DELETE_URI = "ak.wwise.core.object.delete"
@@ -47,7 +48,7 @@ TASK_EVIDENCE_PATH = EVIDENCE_ROOT / "task-10-object-crud.json"
 EXACT_DESTRUCTIVE_COMMAND = (
     'WWISE_VERSION=2021.1 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh" '
     'WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj" '
-    "WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 "
+    "WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2021.1 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 "
     "python -m pytest tests/destructive/test_2021_1_project_mutation_sandbox.py -q"
 )
 
@@ -58,7 +59,7 @@ def _destructive_sandbox() -> Iterator[Destructive2021SandboxRuntime]:
         with Destructive2021SandboxRuntime() as runtime:
             yield runtime
     except DestructiveSandboxUnavailable as exc:
-        pytest.skip(str(exc))
+        skip_or_fail_unavailable(exc)
 
 
 @pytest.mark.live

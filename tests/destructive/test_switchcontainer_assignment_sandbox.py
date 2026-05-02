@@ -31,6 +31,7 @@ from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImport
     prepare_sample_project_sandbox,
     shutdown_sandboxed_wwise,
 )
+from tests.support.active_gate_failures import fail_if_active_runtime_failure  # pyright: ignore[reportMissingImports]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -269,6 +270,7 @@ class _SandboxRuntime:
         except (LiveEnvironmentError, SandboxFixtureError, HeadlessLifecycleError, OSError) as exc:
             self._write_environment_blocker(exc)
             self.__exit__(type(exc), exc, exc.__traceback__)
+            fail_if_active_runtime_failure(exc, "destructive switchContainer sandbox environment blocked execution")
             pytest.skip(f"destructive switchContainer sandbox environment blocked execution: {type(exc).__name__}: {exc}")
             raise AssertionError("pytest.skip should stop execution") from exc
 

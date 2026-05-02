@@ -22,6 +22,7 @@ from wwise_waapi.destructive_2023_sandbox import (  # pyright: ignore[reportMiss
     DestructiveSandboxUnavailable,
     unique_2023_name,
 )
+from tests.support.active_gate_failures import skip_or_fail_unavailable  # pyright: ignore[reportMissingImports]
 
 ACTOR_PARENT = r"\Actor-Mixer Hierarchy\Default Work Unit"
 READBACK_FIELDS = ["id", "name", "type", "path", "notes"]
@@ -35,7 +36,7 @@ def _destructive_sandbox(*, track_generated_outputs: bool = False) -> Iterator[D
         with Destructive2023SandboxRuntime(track_generated_outputs=track_generated_outputs) as runtime:
             yield runtime
     except DestructiveSandboxUnavailable as exc:
-        pytest.skip(str(exc))
+        skip_or_fail_unavailable(exc)
 
 
 def _create_object(client: Any, parent: str, object_type: str, name: str) -> str:
