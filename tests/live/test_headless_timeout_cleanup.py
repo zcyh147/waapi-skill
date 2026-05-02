@@ -29,8 +29,19 @@ def test_headless_startup_timeout_is_controlled_and_cleans_up() -> None:
         ),
     )
     try:
-        with pytest.raises((StartupTimeout, ReadinessTimeout)):
+        with pytest.raises((StartupTimeout, ReadinessTimeout)) as exc_info:
             lifecycle.run_until_ready()
+        diagnostics = exc_info.value.diagnostics
+        assert diagnostics["port"] == lifecycle.port
+        assert diagnostics["argv"] == lifecycle.command
+        assert diagnostics["cwd"]
+        assert diagnostics["timeout"] in {lifecycle.timeouts.startup, lifecycle.timeouts.readiness}
+        assert diagnostics["duration"] >= 0.0
+        assert "process_state" in diagnostics
+        assert "exit_code" in diagnostics
+        assert "stdout_tail" in diagnostics
+        assert "stderr_tail" in diagnostics
+        assert "last_exception" in diagnostics
     finally:
         lifecycle.shutdown(suppress_errors=True)
         assert lifecycle.process is None or lifecycle.process.poll() is not None

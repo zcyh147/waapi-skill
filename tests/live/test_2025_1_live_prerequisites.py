@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from tests.support.active_gate_failures import fail_if_active_runtime_failure  # pyright: ignore[reportMissingImports]
+from wwise_waapi.headless import ReadinessTimeout  # pyright: ignore[reportMissingImports]
 from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImports]
     ENV_WWISE_CONSOLE,
     ENV_WWISE_LIVE,
@@ -70,6 +72,17 @@ def test_2025_wrong_path_prerequisites_skip_before_sandbox_copy(monkeypatch: pyt
     assert "controlled wrong-path prerequisite coverage" in blocker
     assert "sandbox_copy_attempted: false" in blocker
     assert "mutation_attempted: false" in blocker
+
+
+@pytest.mark.active_gate_policy
+def test_2025_active_gated_readiness_timeout_fails_not_skips() -> None:
+    timeout = ReadinessTimeout("fake readiness timeout", {"port": 31337, "timeout": 0.01})
+
+    with pytest.raises(pytest.fail.Exception) as failed:
+        fail_if_active_runtime_failure(timeout, "2025.1 live prerequisite launch")
+
+    assert "ReadinessTimeout" in str(failed.value)
+    assert "active Wwise runtime failure" in str(failed.value)
 
 
 def require_2025_live_environment() -> LiveEnvironmentContract:

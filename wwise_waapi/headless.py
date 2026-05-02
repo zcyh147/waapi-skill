@@ -33,6 +33,10 @@ DEFAULT_KILL_TIMEOUT = 3.0
 class HeadlessLifecycleError(RuntimeError):
     """Base error for WwiseConsole lifecycle failures."""
 
+    def __init__(self, message: str = "", diagnostics: dict[str, Any] | None = None) -> None:
+        super().__init__(message)
+        self.diagnostics = diagnostics or {}
+
 
 class WwiseConsoleNotFound(HeadlessLifecycleError):
     """Raised when no WwiseConsole executable can be resolved."""
@@ -139,6 +143,24 @@ class ProcessOutput:
         stdout = "".join(self.stdout[-max_lines:]).strip()
         stderr = "".join(self.stderr[-max_lines:]).strip()
         return f"stdout={stdout!r}\nstderr={stderr!r}"
+
+    def tail(self, stream_name: str, max_lines: int = 20) -> str:
+        lines = self.stdout if stream_name == "stdout" else self.stderr
+        return "".join(lines[-max_lines:]).strip()
+
+
+def _environment_summary(env: dict[str, str] | None = None) -> dict[str, Any]:
+    source = env if env is not None else os.environ
+    keys = ("WWISE_CONSOLE", "WWISECONSOLE", "WWISEROOT", "WWISE_LIVE", "WWISE_DESTRUCTIVE")
+    summary: dict[str, Any] = {key: source.get(key) for key in keys if key in source}
+    summary["PATH_present"] = bool(source.get("PATH"))
+    return summary
+
+
+def _exception_summary(exc: BaseException | None) -> dict[str, str] | None:
+    if exc is None:
+        return None
+    return {"type": type(exc).__name__, "message": str(exc)}
 
 
 class PipeDrainer:
@@ -274,6 +296,7 @@ class HeadlessLifecycle:
     def launch(self) -> None:
         """Start WwiseConsole waapi-server with a dynamic or caller-supplied port."""
 
+        started_at = time.monotonic()
         if self.process is not None and self._poll() is None:
             raise HeadlessLifecycleError("WwiseConsole process is already running")
 
@@ -308,6 +331,15 @@ class HeadlessLifecycle:
                 f"WwiseConsole startup exceeded {self.timeouts.startup:.2f}s",
                 self._cleanup_late_process,
             )
+        except StartupTimeout as exc:
+            diagnostics = self._failure_diagnostics(
+                phase="startup",
+                timeout=self.timeouts.startup,
+                duration=time.monotonic() - started_at,
+                last_error=exc.__cause__,
+            )
+            self.shutdown(suppress_errors=True)
+            raise StartupTimeout(self._failure_message("WwiseConsole startup timed out", diagnostics), diagnostics) from exc
         except BaseException:
             self.shutdown(suppress_errors=True)
             raise
@@ -316,19 +348,24 @@ class HeadlessLifecycle:
         self._drainer.start(getattr(self.process, "stderr", None), "stderr")
 
     def wait_ready(self) -> Any:
-        """Probe WAAPI by calling ak.wwise.waapi.getFunctions until ready."""
+        """Probe WAAPI by calling ak.wwise.core.getInfo until ready."""
 
         if self.process is None:
             raise HeadlessLifecycleError("Cannot probe readiness before launch")
 
+        started_at = time.monotonic()
         deadline = time.monotonic() + self.timeouts.readiness
         last_error: BaseException | None = None
         while time.monotonic() < deadline:
             returncode = self._poll()
             if returncode is not None:
-                raise EarlyProcessExit(
-                    f"WwiseConsole exited with {returncode} before WAAPI readiness\n{self.output.summary()}"
+                diagnostics = self._failure_diagnostics(
+                    phase="readiness",
+                    timeout=self.timeouts.readiness,
+                    duration=time.monotonic() - started_at,
+                    last_error=last_error,
                 )
+                raise EarlyProcessExit(self._failure_message("WwiseConsole exited before WAAPI readiness", diagnostics), diagnostics)
             try:
                 self.ready_result = self._probe_once()
                 return self.ready_result
@@ -337,8 +374,13 @@ class HeadlessLifecycle:
                 time.sleep(min(self.timeouts.probe_interval, max(0.0, deadline - time.monotonic())))
 
         self.shutdown(suppress_errors=True)
-        detail = f"; last error: {last_error}" if last_error else ""
-        raise ReadinessTimeout(f"WAAPI readiness exceeded {self.timeouts.readiness:.2f}s{detail}")
+        diagnostics = self._failure_diagnostics(
+            phase="readiness",
+            timeout=self.timeouts.readiness,
+            duration=time.monotonic() - started_at,
+            last_error=last_error,
+        )
+        raise ReadinessTimeout(self._failure_message("WAAPI readiness timed out", diagnostics), diagnostics)
 
     def run_until_ready(self) -> Any:
         """Launch WwiseConsole and block until WAAPI is ready."""
@@ -388,7 +430,7 @@ class HeadlessLifecycle:
         def probe() -> Any:
             client = self.waapi_client_factory(self.waapi_url)
             try:
-                return client.call("ak.wwise.waapi.getFunctions")
+                return client.call("ak.wwise.core.getInfo")
             finally:
                 client.disconnect()
 
@@ -399,10 +441,59 @@ class HeadlessLifecycle:
             f"Single WAAPI probe exceeded {self.timeouts.probe:.2f}s",
         )
 
+    def _failure_diagnostics(
+        self,
+        *,
+        phase: str,
+        timeout: float | None,
+        duration: float | None,
+        last_error: BaseException | None,
+    ) -> dict[str, Any]:
+        process = self.process
+        exit_code = self._poll_process(process)
+        if process is None:
+            process_state = "not-started"
+        elif exit_code is None:
+            process_state = "running"
+        else:
+            process_state = "exited"
+        return {
+            "phase": phase,
+            "host": self.host,
+            "port": self.port,
+            "waapi_url": self.waapi_url if self.port is not None else None,
+            "argv": list(self.command),
+            "cwd": os.getcwd(),
+            "environment": _environment_summary(),
+            "pid": getattr(process, "pid", None),
+            "process_state": process_state,
+            "exit_code": exit_code,
+            "timeout": timeout,
+            "duration": duration,
+            "last_exception": _exception_summary(last_error),
+            "stdout_tail": self.output.tail("stdout"),
+            "stderr_tail": self.output.tail("stderr"),
+        }
+
+    def _failure_message(self, headline: str, diagnostics: dict[str, Any]) -> str:
+        last_exception = diagnostics.get("last_exception") or {}
+        last_exception_type = last_exception.get("type", "none") if isinstance(last_exception, dict) else "none"
+        return (
+            f"{headline}; port={diagnostics.get('port')}; timeout={diagnostics.get('timeout')}; "
+            f"duration={diagnostics.get('duration'):.3f}s; last_exception_type={last_exception_type}; "
+            f"argv={diagnostics.get('argv')!r}; cwd={diagnostics.get('cwd')!r}; "
+            f"pid={diagnostics.get('pid')}; process_state={diagnostics.get('process_state')}; "
+            f"exit_code={diagnostics.get('exit_code')}; stdout_tail={diagnostics.get('stdout_tail')!r}; "
+            f"stderr_tail={diagnostics.get('stderr_tail')!r}"
+        )
+
     def _poll(self) -> int | None:
-        if self.process is None:
+        return self._poll_process(self.process)
+
+    def _poll_process(self, process: Any) -> int | None:
+        if process is None:
             return None
-        poll = getattr(self.process, "poll", None)
+        poll = getattr(process, "poll", None)
         if poll is None:
             return None
         return poll()

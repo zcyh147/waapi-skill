@@ -62,7 +62,7 @@ class FakeProcess:
 class FakeClient:
     def __init__(self, calls: list[str], result: Any = None) -> None:
         self.calls = calls
-        self.result = result if result is not None else {"functions": ["ak.wwise.waapi.getFunctions"]}
+        self.result = result if result is not None else {"version": {"displayName": "fake Wwise"}}
         self.disconnected = False
 
     def call(self, uri: str, *args: Any, **kwargs: Any) -> Any:
@@ -189,7 +189,7 @@ def test_launch_on_windows_omits_posix_session_kwarg(monkeypatch: pytest.MonkeyP
     lifecycle.shutdown(suppress_errors=True)
 
 
-def test_wait_ready_calls_get_functions_and_disconnects(tmp_path: Path) -> None:
+def test_wait_ready_calls_get_info_before_reflection_inventory_and_disconnects(tmp_path: Path) -> None:
     executable = make_executable(tmp_path)
     calls: list[str] = []
     urls: list[str] = []
@@ -206,8 +206,9 @@ def test_wait_ready_calls_get_functions_and_disconnects(tmp_path: Path) -> None:
     lifecycle.launch()
     result = lifecycle.wait_ready()
 
-    assert result == {"functions": ["ak.wwise.waapi.getFunctions"]}
-    assert calls == ["ak.wwise.waapi.getFunctions"]
+    assert result == {"version": {"displayName": "fake Wwise"}}
+    assert calls == ["ak.wwise.core.getInfo"]
+    assert "ak.wwise.waapi.getFunctions" not in calls
     assert urls == [lifecycle.waapi_url]
     lifecycle.shutdown()
 
@@ -255,8 +256,22 @@ def test_readiness_timeout_cleans_up_process(tmp_path: Path) -> None:
         timeouts=LifecycleTimeouts(readiness=0.02, probe=0.01, probe_interval=0.001),
     )
     lifecycle.launch()
-    with pytest.raises(ReadinessTimeout):
+    with pytest.raises(ReadinessTimeout) as exc_info:
         lifecycle.wait_ready()
+    diagnostics = exc_info.value.diagnostics
+    assert diagnostics["port"] == lifecycle.port
+    assert diagnostics["argv"] == lifecycle.command
+    assert diagnostics["cwd"]
+    assert diagnostics["timeout"] == lifecycle.timeouts.readiness
+    assert diagnostics["duration"] >= 0.0
+    assert diagnostics["last_exception"] == {"type": "OSError", "message": "not ready"}
+    assert diagnostics["stdout_tail"] == "stdout line"
+    assert diagnostics["stderr_tail"] == "stderr line"
+    message = str(exc_info.value)
+    assert f"port={lifecycle.port}" in message
+    assert "last_exception_type=OSError" in message
+    assert "stdout_tail='stdout line'" in message
+    assert "stderr_tail='stderr line'" in message
     assert fake_process.terminated is True
     assert lifecycle.process is None
 
@@ -270,8 +285,14 @@ def test_early_process_exit_reports_console_output(tmp_path: Path) -> None:
     )
     lifecycle.launch()
     lifecycle._drainer.join()  # pyright: ignore[reportPrivateUsage]
-    with pytest.raises(EarlyProcessExit, match="stdout line"):
+    with pytest.raises(EarlyProcessExit, match="stdout line") as exc_info:
         lifecycle.wait_ready()
+    diagnostics = exc_info.value.diagnostics
+    assert diagnostics["port"] == lifecycle.port
+    assert diagnostics["process_state"] == "exited"
+    assert diagnostics["exit_code"] == 17
+    assert diagnostics["stdout_tail"] == "stdout line"
+    assert diagnostics["stderr_tail"] == "stderr line"
 
 
 def test_startup_timeout_cleans_up(tmp_path: Path) -> None:
@@ -286,8 +307,16 @@ def test_startup_timeout_cleans_up(tmp_path: Path) -> None:
         process_factory=slow_process_factory,
         timeouts=LifecycleTimeouts(startup=0.005),
     )
-    with pytest.raises(StartupTimeout):
+    with pytest.raises(StartupTimeout) as exc_info:
         lifecycle.launch()
+    diagnostics = exc_info.value.diagnostics
+    assert diagnostics["port"] == lifecycle.port
+    assert diagnostics["argv"] == [str(executable), "waapi-server", "--wamp-port", str(lifecycle.port)]
+    assert diagnostics["cwd"]
+    assert diagnostics["timeout"] == lifecycle.timeouts.startup
+    assert diagnostics["duration"] >= lifecycle.timeouts.startup
+    assert diagnostics["last_exception"] == {"type": "Empty", "message": ""}
+    assert "PATH_present" in diagnostics["environment"]
 
 
 def test_startup_timeout_cleans_up_late_created_process(tmp_path: Path) -> None:
@@ -469,5 +498,5 @@ def test_context_manager_launches_and_suppresses_shutdown_errors(tmp_path: Path)
         timeouts=LifecycleTimeouts(shutdown=0.001, kill=0.001),
     )
     with lifecycle as running:
-        assert running.ready_result == {"functions": ["ak.wwise.waapi.getFunctions"]}
-    assert calls == ["ak.wwise.waapi.getFunctions"]
+        assert running.ready_result == {"version": {"displayName": "fake Wwise"}}
+    assert calls == ["ak.wwise.core.getInfo"]

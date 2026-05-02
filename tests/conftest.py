@@ -15,6 +15,7 @@ if str(SKILL_ROOT) not in sys.path:
 def pytest_configure(config):
     config.addinivalue_line("markers", "live: tests that require Wwise and WAAPI access")
     config.addinivalue_line("markers", "destructive: tests that may mutate a fixture Wwise project")
+    config.addinivalue_line("markers", "active_gate_policy: fake tests for active gate skip/fail semantics")
 
 
 def pytest_collection_modifyitems(items):
@@ -22,6 +23,8 @@ def pytest_collection_modifyitems(items):
     destructive_enabled = os.getenv("WWISE_DESTRUCTIVE") == "1"
 
     for item in items:
+        if "active_gate_policy" in item.keywords:
+            continue
         if "live" in item.keywords and not live_enabled:
             item.add_marker(pytest.mark.skip(reason="WWISE_LIVE=1 is required for live tests"))
         if "destructive" in item.keywords and not (live_enabled and destructive_enabled):

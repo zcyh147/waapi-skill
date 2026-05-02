@@ -7,9 +7,11 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImports]
     ENV_WWISE_CONSOLE,
+    ENV_WWISE_LIVE,
     ENV_WWISE_SAMPLE_PROJECT_PATH,
     ENV_WWISE_VERSION,
     LiveEnvironmentContract,
+    LiveEnvironmentError,
     require_live_environment,
 )
 
@@ -40,17 +42,23 @@ def test_2023_live_environment_prerequisites_fail_fast() -> None:
 
 
 def require_2023_live_environment() -> LiveEnvironmentContract:
+    if os.getenv(ENV_WWISE_LIVE) != "1":
+        pytest.skip(f"{ENV_WWISE_LIVE}=1 is required for 2023.1 live smoke gates")
     if os.getenv(ENV_WWISE_VERSION) != EXPECTED_WWISE_VERSION:
-        pytest.fail(f"{ENV_WWISE_VERSION}=2023.1 is required for 2023.1 live smoke gates")
+        pytest.skip(f"{ENV_WWISE_VERSION}=2023.1 is required for 2023.1 live smoke gates")
 
-    contract = require_live_environment()
+    try:
+        contract = require_live_environment()
+    except LiveEnvironmentError as exc:
+        pytest.skip(str(exc))
+        raise AssertionError("unreachable after prerequisite skip")
     if contract.console_path != EXPECTED_WWISE_CONSOLE:
-        pytest.fail(
+        pytest.skip(
             f"{ENV_WWISE_CONSOLE} must be the exact 2023.1 WwiseConsole path "
             f"{EXPECTED_WWISE_CONSOLE}; got {contract.console_path}"
         )
     if contract.sample_project_source != EXPECTED_SAMPLE_PROJECT:
-        pytest.fail(
+        pytest.skip(
             f"{ENV_WWISE_SAMPLE_PROJECT_PATH} must be the exact 2023.1 SampleProject path "
             f"{EXPECTED_SAMPLE_PROJECT}; got {contract.sample_project_source}"
         )
