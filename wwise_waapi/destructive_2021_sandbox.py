@@ -11,7 +11,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any, Mapping
 
-from .headless import HeadlessLifecycleError, default_waapi_client_factory
+from .headless import HeadlessLifecycleError, LifecycleTimeouts, default_waapi_client_factory
 from .live_environment import (
     ENV_WWISE_DESTRUCTIVE,
     ENV_WWISE_LIVE,
@@ -42,6 +42,7 @@ from .versions import WWISE_2021_1_VERSION_KEY  # pyright: ignore[reportMissingI
 
 
 DEFAULT_2021_DESTRUCTIVE_SANDBOX_ROOT = Path(".sisyphus") / "runtime" / "wwise-2021-destructive-sandboxes"
+WWISE_2021_DESTRUCTIVE_TIMEOUTS = LifecycleTimeouts(readiness=180.0)
 GENERATED_OUTPUT_DIR_NAMES = {
     ".cache",
     "GeneratedSoundBanks",
@@ -88,7 +89,7 @@ class Destructive2021SandboxRuntime:
             self.assert_source_unchanged()
             if self.track_generated_outputs:
                 self.source_generated_snapshot_before = generated_output_snapshot(self.sandbox.source_root)
-            self.lifecycle = launch_sandboxed_wwise(self.sandbox, self.env)
+            self.lifecycle = launch_sandboxed_wwise(self.sandbox, self.env, timeouts=WWISE_2021_DESTRUCTIVE_TIMEOUTS)
             self.client = default_waapi_client_factory(self.lifecycle.waapi_url)
             return self
         except (LiveEnvironmentError, SandboxFixtureError, HeadlessLifecycleError, OSError) as exc:
@@ -322,6 +323,7 @@ __all__ = [
     "DEFAULT_2021_DESTRUCTIVE_SANDBOX_ROOT",
     "Destructive2021SandboxRuntime",
     "DestructiveSandboxUnavailable",
+    "WWISE_2021_DESTRUCTIVE_TIMEOUTS",
     "cleanup_stale_2021_destructive_sandboxes",
     "generated_output_snapshot",
     "hash_mutation_bearing_project_files",

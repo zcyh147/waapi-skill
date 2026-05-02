@@ -18,9 +18,16 @@ MATRIX_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "live-coverag
 SUMMARY_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "phase2-coverage-summary.json"
 POLICY_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "phase21-uri-policy.json"
 
-CLASSIFICATION_STATUSES = {"supported", "behavioral", "deferred", "excluded", "live-tested"}
+CLASSIFICATION_STATUSES = {"supported", "behavioral", "deferred", "excluded", "live-tested", "sandbox-mutating-tested"}
 BLOCKED_STATUSES = {"deferred", "excluded"}
 LIVE_TESTED_OBJECT_GET = "ak.wwise.core.object.get"
+SANDBOX_MUTATING_TESTED_URIS = {
+    "ak.wwise.core.object.create",
+    "ak.wwise.core.object.delete",
+    "ak.wwise.core.object.setNotes",
+    "ak.wwise.core.undo.beginGroup",
+    "ak.wwise.core.undo.endGroup",
+}
 FORBIDDEN_NEWER_EVIDENCE = (
     "resources/manifest/2022.1",
     "resources/manifest/2023.1",
@@ -82,6 +89,19 @@ def test_2021_entries_are_deferred_or_excluded_without_behavioral_promotion() ->
             )
             assert "Task 7" not in evidence["evidence_standard"] or "ak.wwise.core.object.get" in evidence["evidence_standard"]
             continue
+        if entry["uri"] in SANDBOX_MUTATING_TESTED_URIS:
+            assert entry["coverage_status"] == "sandbox-mutating-tested", entry["uri"]
+            assert entry["test_status"] == "sandbox-mutating-tested", entry["uri"]
+            assert entry["parity_bucket"] == "sandbox-mutating-tested", entry["uri"]
+            assert entry["deferred"]["status"] is False, entry["uri"]
+            assert evidence["manifest_reflection_only"] is False, entry["uri"]
+            assert evidence["counts_as_behavioral"] is True, entry["uri"]
+            assert evidence["counts_as_live_behavioral"] is True, entry["uri"]
+            assert "Fresh 2021.1 copied-sandbox destructive behavior evidence" in evidence["evidence_standard"]
+            assert evidence["live_command_evidence"] == (
+                ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-10-object-crud.json"
+            )
+            continue
 
         assert entry["coverage_status"] in BLOCKED_STATUSES, entry["uri"]
         assert entry["test_status"] == entry["coverage_status"], entry["uri"]
@@ -109,9 +129,16 @@ def test_2021_classification_accounting_has_zero_unknowns() -> None:
 
     status_counts = payload["summary"]["status_counts"]
     assert set(status_counts) == CLASSIFICATION_STATUSES
-    assert status_counts == {"supported": 0, "behavioral": 0, "deferred": 52, "excluded": 46, "live-tested": 1}
+    assert status_counts == {
+        "supported": 0,
+        "behavioral": 0,
+        "deferred": 47,
+        "excluded": 46,
+        "live-tested": 1,
+        "sandbox-mutating-tested": 5,
+    }
     assert payload["summary"]["unknown"] == 0
-    assert payload["summary"]["behavioral_supported"] == 1
+    assert payload["summary"]["behavioral_supported"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
     assert payload["summary"]["live_tested"] == 1
 
 
@@ -134,10 +161,10 @@ def test_2021_matrix_summary_and_policy_match_coverage_accounting() -> None:
     assert matrix["summary"]["status_counts"] == coverage["summary"]["status_counts"]
     assert phase2["summary"]["status_counts"] == coverage["summary"]["status_counts"]
     assert policy["summary"]["classification_counts"] == coverage["summary"]["status_counts"]
-    assert matrix["summary"]["behavioral_covered_count"] == 1
-    assert matrix["summary"]["live_behavioral_covered_count"] == 1
-    assert phase2["summary"]["behavioral_covered_count"] == 1
-    assert phase2["summary"]["live_behavioral_covered_count"] == 1
+    assert matrix["summary"]["behavioral_covered_count"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
+    assert matrix["summary"]["live_behavioral_covered_count"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
+    assert phase2["summary"]["behavioral_covered_count"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
+    assert phase2["summary"]["live_behavioral_covered_count"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
 
     assigned = [uri for uris in policy["policy"]["classification_buckets"].values() for uri in uris]
     assert sorted(assigned) == [entry["uri"] for entry in coverage["coverage"]]
@@ -149,6 +176,13 @@ def test_2021_matrix_summary_and_policy_match_coverage_accounting() -> None:
             assert entry["counts_as_live_behavioral"] is True
             assert entry["evidence_path"] == "resources/waql/2021.1/object-get-live-matrix.json"
             assert entry["coverage_status"] == "live-tested"
+        elif entry["uri"] in SANDBOX_MUTATING_TESTED_URIS:
+            assert entry["counts_as_behavioral"] is True
+            assert entry["counts_as_live_behavioral"] is True
+            assert entry["evidence_path"].startswith(
+                ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/destructive/"
+            )
+            assert entry["coverage_status"] == "sandbox-mutating-tested"
         else:
             assert entry["counts_as_behavioral"] is False
             assert entry["counts_as_live_behavioral"] is False

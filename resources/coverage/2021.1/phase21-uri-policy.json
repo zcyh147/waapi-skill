@@ -1,12 +1,18 @@
 {
   "metadata": {
     "api_coverage_resource": "resources/coverage/2021.1/api-coverage.json",
-    "evidence_policy": "2021.1 source notes and reflection are inventory-only; Task 7 promotes only ak.wwise.core.object.get with fresh exact-version read-only live evidence.",
+    "evidence_policy": "2021.1 source notes and reflection are inventory-only; Task 7 promotes only ak.wwise.core.object.get with fresh exact-version read-only live evidence, and Task 10 promotes only reflected object CRUD/undo URIs with fresh copied-sandbox destructive evidence. No 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
     "generator": "task-5-deterministic-2021.1-uri-policy",
     "version": "2021.1"
   },
   "policy": {
-    "behavioral_uris": [],
+    "behavioral_uris": [
+      "ak.wwise.core.object.create",
+      "ak.wwise.core.object.delete",
+      "ak.wwise.core.object.setNotes",
+      "ak.wwise.core.undo.beginGroup",
+      "ak.wwise.core.undo.endGroup"
+    ],
     "classification_buckets": {
       "behavioral": [],
       "deferred": [
@@ -17,8 +23,6 @@
         "ak.wwise.core.getInfo",
         "ak.wwise.core.log.get",
         "ak.wwise.core.object.copy",
-        "ak.wwise.core.object.create",
-        "ak.wwise.core.object.delete",
         "ak.wwise.core.object.getAttenuationCurve",
         "ak.wwise.core.object.getPropertyAndReferenceNames",
         "ak.wwise.core.object.getPropertyInfo",
@@ -27,7 +31,6 @@
         "ak.wwise.core.object.move",
         "ak.wwise.core.object.setAttenuationCurve",
         "ak.wwise.core.object.setName",
-        "ak.wwise.core.object.setNotes",
         "ak.wwise.core.object.setProperty",
         "ak.wwise.core.object.setRandomizer",
         "ak.wwise.core.object.setReference",
@@ -56,9 +59,7 @@
         "ak.wwise.core.transport.executeAction",
         "ak.wwise.core.transport.getList",
         "ak.wwise.core.transport.getState",
-        "ak.wwise.core.undo.beginGroup",
         "ak.wwise.core.undo.cancelGroup",
-        "ak.wwise.core.undo.endGroup",
         "ak.wwise.waapi.getFunctions",
         "ak.wwise.waapi.getSchema",
         "ak.wwise.waapi.getTopics"
@@ -111,10 +112,17 @@
         "ak.wwise.ui.project.close",
         "ak.wwise.ui.project.open"
       ],
-      "supported": [],
       "live-tested": [
         "ak.wwise.core.object.get"
-      ]
+      ],
+      "sandbox-mutating-tested": [
+        "ak.wwise.core.object.create",
+        "ak.wwise.core.object.delete",
+        "ak.wwise.core.object.setNotes",
+        "ak.wwise.core.undo.beginGroup",
+        "ak.wwise.core.undo.endGroup"
+      ],
+      "supported": []
     },
     "deferred_uris": [
       "ak.wwise.core.audio.import",
@@ -124,8 +132,6 @@
       "ak.wwise.core.getInfo",
       "ak.wwise.core.log.get",
       "ak.wwise.core.object.copy",
-      "ak.wwise.core.object.create",
-      "ak.wwise.core.object.delete",
       "ak.wwise.core.object.getAttenuationCurve",
       "ak.wwise.core.object.getPropertyAndReferenceNames",
       "ak.wwise.core.object.getPropertyInfo",
@@ -134,7 +140,6 @@
       "ak.wwise.core.object.move",
       "ak.wwise.core.object.setAttenuationCurve",
       "ak.wwise.core.object.setName",
-      "ak.wwise.core.object.setNotes",
       "ak.wwise.core.object.setProperty",
       "ak.wwise.core.object.setRandomizer",
       "ak.wwise.core.object.setReference",
@@ -163,9 +168,7 @@
       "ak.wwise.core.transport.executeAction",
       "ak.wwise.core.transport.getList",
       "ak.wwise.core.transport.getState",
-      "ak.wwise.core.undo.beginGroup",
       "ak.wwise.core.undo.cancelGroup",
-      "ak.wwise.core.undo.endGroup",
       "ak.wwise.waapi.getFunctions",
       "ak.wwise.waapi.getSchema",
       "ak.wwise.waapi.getTopics"
@@ -218,6 +221,9 @@
       "ak.wwise.ui.project.close",
       "ak.wwise.ui.project.open"
     ],
+    "live_tested_uris": [
+      "ak.wwise.core.object.get"
+    ],
     "parity_buckets": {
       "behavioral": [],
       "deferred": [
@@ -228,8 +234,6 @@
         "ak.wwise.core.getInfo",
         "ak.wwise.core.log.get",
         "ak.wwise.core.object.copy",
-        "ak.wwise.core.object.create",
-        "ak.wwise.core.object.delete",
         "ak.wwise.core.object.getAttenuationCurve",
         "ak.wwise.core.object.getPropertyAndReferenceNames",
         "ak.wwise.core.object.getPropertyInfo",
@@ -238,7 +242,6 @@
         "ak.wwise.core.object.move",
         "ak.wwise.core.object.setAttenuationCurve",
         "ak.wwise.core.object.setName",
-        "ak.wwise.core.object.setNotes",
         "ak.wwise.core.object.setProperty",
         "ak.wwise.core.object.setRandomizer",
         "ak.wwise.core.object.setReference",
@@ -267,9 +270,7 @@
         "ak.wwise.core.transport.executeAction",
         "ak.wwise.core.transport.getList",
         "ak.wwise.core.transport.getState",
-        "ak.wwise.core.undo.beginGroup",
         "ak.wwise.core.undo.cancelGroup",
-        "ak.wwise.core.undo.endGroup",
         "ak.wwise.waapi.getFunctions",
         "ak.wwise.waapi.getSchema",
         "ak.wwise.waapi.getTopics"
@@ -322,30 +323,43 @@
         "ak.wwise.ui.project.close",
         "ak.wwise.ui.project.open"
       ],
-      "supported": [],
       "live-tested": [
         "ak.wwise.core.object.get"
-      ]
+      ],
+      "sandbox-mutating-tested": [
+        "ak.wwise.core.object.create",
+        "ak.wwise.core.object.delete",
+        "ak.wwise.core.object.setNotes",
+        "ak.wwise.core.undo.beginGroup",
+        "ak.wwise.core.undo.endGroup"
+      ],
+      "supported": []
     },
-    "source_only_evidence_policy": "2021.1 source notes and reflection are inventory support only, not behavior proof; Task 7 live evidence promotes only ak.wwise.core.object.get.",
-    "supported_uris": [],
-    "live_tested_uris": [
-      "ak.wwise.core.object.get"
-    ]
+    "sandbox_mutating_tested_uris": [
+      "ak.wwise.core.object.create",
+      "ak.wwise.core.object.delete",
+      "ak.wwise.core.object.setNotes",
+      "ak.wwise.core.undo.beginGroup",
+      "ak.wwise.core.undo.endGroup"
+    ],
+    "source_only_evidence_policy": "2021.1 source notes and reflection are inventory support only, not behavior proof; Task 7 promotes object.get and Task 10 promotes only reflected copied-sandbox destructive CRUD/undo URIs.",
+    "supported_uris": []
   },
   "summary": {
     "classification_counts": {
       "behavioral": 0,
-      "deferred": 52,
+      "deferred": 47,
       "excluded": 46,
       "live-tested": 1,
+      "sandbox-mutating-tested": 5,
       "supported": 0
     },
     "parity_bucket_counts": {
       "behavioral": 0,
-      "deferred": 52,
+      "deferred": 47,
       "excluded": 46,
       "live-tested": 1,
+      "sandbox-mutating-tested": 5,
       "supported": 0
     },
     "parity_bucket_total": 99,
