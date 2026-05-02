@@ -583,7 +583,7 @@
   ],
   "metadata": {
     "default_live": false,
-    "exact_live_command": "WWISE_VERSION=2021.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj\" WWISE_LIVE=1 python -m pytest tests/live/test_2021_1_object_get_matrix.py -q",
+    "exact_live_command": "WWISE_VERSION=2021.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj\" WWISE_LIVE=1 python -m pytest tests/live/test_2021_1_live_prerequisites.py tests/live/test_2021_1_object_get_matrix.py -q",
     "fresh_2021_live_evidence_required": true,
     "live_command_evidence": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-7-waql-matrix.json",
     "name": "WAQL 2021.1 object.get contract matrix",

@@ -27,13 +27,16 @@ from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImport
 )
 from wwise_waapi.waql import WAQL_API_URI  # pyright: ignore[reportMissingImports]
 
+from tests.live.test_2021_1_live_prerequisites import (  # pyright: ignore[reportMissingImports]
+    EXACT_LIVE_COMMAND,
+    _assert_2021_1_exact_live_get_info,
+)
 from tests.live.test_2021_1_reflection_prerequisites import (  # pyright: ignore[reportMissingImports]
     EXPECTED_SAMPLE_PROJECT,
     EXPECTED_WWISE_BUILD,
     EXPECTED_WWISE_CONSOLE,
     EXPECTED_WWISE_VERSION,
     REFLECTION_TIMEOUTS,
-    _assert_2021_1_exact_version,
     _metadata,
     _stable_get_info_summary,
     require_2021_1_live_environment,
@@ -89,7 +92,7 @@ def test_2021_1_live_waql_object_get_matrix_runs_read_only_against_sandbox() -> 
             client = default_waapi_client_factory(lifecycle.waapi_url)
 
             info = _metadata(client.call("ak.wwise.core.getInfo"))
-            _assert_2021_1_exact_version(info)
+            _assert_2021_1_exact_live_get_info(info)
 
             context: dict[str, Any] = {}
             for case in matrix["live_cases"]:
@@ -121,6 +124,7 @@ def _load_matrix() -> dict[str, Any]:
     assert matrix["metadata"]["default_live"] is False
     assert matrix["metadata"]["sandbox_required"] is True
     assert matrix["metadata"]["source_project_mutation_allowed"] is False
+    assert matrix["metadata"]["exact_live_command"] == EXACT_LIVE_COMMAND
     return matrix
 
 
@@ -358,7 +362,7 @@ def _write_run_evidence(matrix: Mapping[str, Any], *, info: Mapping[str, Any], c
         "sandbox_required": True,
         "wwise_build": EXPECTED_WWISE_BUILD,
         "wwise_version": EXPECTED_WWISE_VERSION,
-        "exact_command": matrix["metadata"]["exact_live_command"],
+        "exact_command": EXACT_LIVE_COMMAND,
         "env": {
             ENV_WWISE_VERSION: EXPECTED_WWISE_VERSION,
             ENV_WWISE_CONSOLE: str(EXPECTED_WWISE_CONSOLE),
