@@ -9,6 +9,8 @@ from typing import Mapping
 
 from .headless import WwiseConsolePathResolver
 from .versions import (  # pyright: ignore[reportMissingImports]
+    WWISE_2021_1_BUILD,
+    WWISE_2021_1_VERSION_KEY,
     WWISE_2023_1_BUILD,
     WWISE_2023_1_VERSION_KEY,
     WWISE_2024_1_BUILD,
@@ -31,6 +33,9 @@ WWISE_2022_1_BUILD = "2022.1.19.8584"
 WWISE_2022_1_CONSOLE_PATH = Path(
     f"/Applications/Audiokinetic/Wwise{WWISE_2022_1_BUILD}/Wwise.app/Contents/Tools/WwiseConsole.sh"
 )
+WWISE_2021_1_CONSOLE_PATH = Path(
+    f"/Applications/Audiokinetic/Wwise{WWISE_2021_1_BUILD}/Wwise.app/Contents/Tools/WwiseConsole.sh"
+)
 WWISE_2023_1_CONSOLE_PATH = Path(
     f"/Applications/Audiokinetic/Wwise{WWISE_2023_1_BUILD}/Wwise.app/Contents/Tools/WwiseConsole.sh"
 )
@@ -41,6 +46,9 @@ WWISE_2025_1_CONSOLE_PATH = Path(
     f"/Applications/Audiokinetic/Wwise{WWISE_2025_1_BUILD}/Wwise.app/Contents/Tools/WwiseConsole.sh"
 )
 DEFAULT_SAMPLE_PROJECT_ROOT = Path(f"/Applications/Audiokinetic/Wwise{WWISE_2022_1_BUILD}/SampleProject")
+WWISE_2021_1_SAMPLE_PROJECT_PATH = Path(
+    f"/Applications/Audiokinetic/SampleProject{WWISE_2021_1_BUILD}/SampleProject/SampleProject.wproj"
+)
 WWISE_2023_1_SAMPLE_PROJECT_PATH = Path(
     f"/Applications/Audiokinetic/SampleProject{WWISE_2023_1_BUILD}/SampleProject/SampleProject.wproj"
 )
@@ -51,6 +59,7 @@ WWISE_2025_1_SAMPLE_PROJECT_PATH = Path(
     f"/Applications/Audiokinetic/SampleProject{WWISE_2025_1_BUILD}/SampleProject/SampleProject.wproj"
 )
 INSTALLED_SAMPLE_PROJECT_2023_1_ROOT = WWISE_2023_1_SAMPLE_PROJECT_PATH.parent
+INSTALLED_SAMPLE_PROJECT_2021_1_ROOT = WWISE_2021_1_SAMPLE_PROJECT_PATH.parent
 INSTALLED_SAMPLE_PROJECT_2024_1_ROOT = WWISE_2024_1_SAMPLE_PROJECT_PATH.parent
 INSTALLED_SAMPLE_PROJECT_2025_1_ROOT = WWISE_2025_1_SAMPLE_PROJECT_PATH.parent
 ORG_FIXTURE_SOURCE_ROOT = Path(__file__).resolve().parents[1] / "tests" / "_org"
@@ -102,6 +111,12 @@ LIVE_VERSION_PATHS: dict[str, _LiveVersionPaths] = {
         version=SUPPORTED_WWISE_VERSION,
         console_path=WWISE_2022_1_CONSOLE_PATH,
         sample_project_path=DEFAULT_SAMPLE_PROJECT_ROOT,
+    ),
+    WWISE_2021_1_VERSION_KEY: _LiveVersionPaths(
+        version=WWISE_2021_1_VERSION_KEY,
+        console_path=WWISE_2021_1_CONSOLE_PATH,
+        sample_project_path=WWISE_2021_1_SAMPLE_PROJECT_PATH,
+        require_exact_paths=True,
     ),
     WWISE_2023_1_VERSION_KEY: _LiveVersionPaths(
         version=WWISE_2023_1_VERSION_KEY,
@@ -280,6 +295,7 @@ def path_overlaps_immutable_sample_source(path: Path) -> bool:
 def _immutable_sample_project_roots() -> tuple[Path, ...]:
     return (
         DEFAULT_SAMPLE_PROJECT_ROOT,
+        INSTALLED_SAMPLE_PROJECT_2021_1_ROOT,
         INSTALLED_SAMPLE_PROJECT_2023_1_ROOT,
         INSTALLED_SAMPLE_PROJECT_2024_1_ROOT,
         INSTALLED_SAMPLE_PROJECT_2025_1_ROOT,
@@ -321,6 +337,7 @@ __all__ = [
     "ENV_WWISE_SAMPLE_PROJECT_PATH",
     "ENV_WWISE_SANDBOX_ROOT",
     "ENV_WWISE_VERSION",
+    "INSTALLED_SAMPLE_PROJECT_2021_1_ROOT",
     "INSTALLED_SAMPLE_PROJECT_2023_1_ROOT",
     "INSTALLED_SAMPLE_PROJECT_2024_1_ROOT",
     "INSTALLED_SAMPLE_PROJECT_2025_1_ROOT",
@@ -331,6 +348,9 @@ __all__ = [
     "SUPPORTED_WWISE_VERSION",
     "WWISE_2022_1_BUILD",
     "WWISE_2022_1_CONSOLE_PATH",
+    "WWISE_2021_1_BUILD",
+    "WWISE_2021_1_CONSOLE_PATH",
+    "WWISE_2021_1_SAMPLE_PROJECT_PATH",
     "WWISE_2023_1_CONSOLE_PATH",
     "WWISE_2023_1_SAMPLE_PROJECT_PATH",
     "WWISE_2024_1_CONSOLE_PATH",
