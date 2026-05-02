@@ -30,9 +30,11 @@ REQUIRED_TASK5_FIELDS = {
 FORBIDDEN_NEWER_EVIDENCE = ("2022.1", "2023.1", "2024.1", "2025.1")
 LIVE_TESTED_OBJECT_GET = "ak.wwise.core.object.get"
 SANDBOX_MUTATING_TESTED_URIS = {
+    "ak.wwise.core.audio.import",
     "ak.wwise.core.object.create",
     "ak.wwise.core.object.delete",
     "ak.wwise.core.object.setNotes",
+    "ak.wwise.core.soundbank.setInclusions",
     "ak.wwise.core.undo.beginGroup",
     "ak.wwise.core.undo.endGroup",
 }
@@ -45,16 +47,16 @@ def test_2021_deferred_registry_loads_and_matches_blocked_coverage() -> None:
     reflected = {entry["uri"] for entry in _json(FUNCTIONS_MANIFEST)["functions"]}
     blocked_coverage = {entry["uri"] for entry in coverage if entry["coverage_status"] in {"deferred", "excluded"}}
 
-    assert len(registry.entries) == 93
+    assert len(registry.entries) == 91
     assert set(registry.entries) == blocked_coverage == reflected - {LIVE_TESTED_OBJECT_GET} - SANDBOX_MUTATING_TESTED_URIS
-    assert payload["summary"]["deferred_registry_entries"] == 93
+    assert payload["summary"]["deferred_registry_entries"] == 91
     assert payload["summary"]["classification_counts"] == {
         "supported": 0,
         "behavioral": 0,
-        "deferred": 47,
+        "deferred": 45,
         "excluded": 46,
         "live-tested": 1,
-        "sandbox-mutating-tested": 5,
+        "sandbox-mutating-tested": 7,
     }
     assert LIVE_TESTED_OBJECT_GET not in registry.entries
     assert not (SANDBOX_MUTATING_TESTED_URIS & set(registry.entries))

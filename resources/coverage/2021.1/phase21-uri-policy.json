@@ -1,22 +1,23 @@
 {
   "metadata": {
     "api_coverage_resource": "resources/coverage/2021.1/api-coverage.json",
-    "evidence_policy": "2021.1 source notes and reflection are inventory-only; Task 7 promotes only ak.wwise.core.object.get with fresh exact-version read-only live evidence, and Task 10 promotes only reflected object CRUD/undo URIs with fresh copied-sandbox destructive evidence. No 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
+    "evidence_policy": "2021.1 source notes and reflection are inventory-only; Task 7 promotes only ak.wwise.core.object.get with fresh exact-version read-only live evidence, Task 10 promotes reflected object CRUD/undo URIs with fresh copied-sandbox destructive evidence, and Task 11 promotes only ak.wwise.core.audio.import and ak.wwise.core.soundbank.setInclusions with fresh copied-sandbox destructive evidence. No 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
     "generator": "task-5-deterministic-2021.1-uri-policy",
     "version": "2021.1"
   },
   "policy": {
     "behavioral_uris": [
+      "ak.wwise.core.audio.import",
       "ak.wwise.core.object.create",
       "ak.wwise.core.object.delete",
       "ak.wwise.core.object.setNotes",
+      "ak.wwise.core.soundbank.setInclusions",
       "ak.wwise.core.undo.beginGroup",
       "ak.wwise.core.undo.endGroup"
     ],
     "classification_buckets": {
       "behavioral": [],
       "deferred": [
-        "ak.wwise.core.audio.import",
         "ak.wwise.core.audio.importTabDelimited",
         "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
         "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
@@ -50,7 +51,6 @@
         "ak.wwise.core.remote.getConnectionStatus",
         "ak.wwise.core.soundbank.generate",
         "ak.wwise.core.soundbank.getInclusions",
-        "ak.wwise.core.soundbank.setInclusions",
         "ak.wwise.core.switchContainer.addAssignment",
         "ak.wwise.core.switchContainer.getAssignments",
         "ak.wwise.core.switchContainer.removeAssignment",
@@ -116,16 +116,17 @@
         "ak.wwise.core.object.get"
       ],
       "sandbox-mutating-tested": [
+        "ak.wwise.core.audio.import",
         "ak.wwise.core.object.create",
         "ak.wwise.core.object.delete",
         "ak.wwise.core.object.setNotes",
+        "ak.wwise.core.soundbank.setInclusions",
         "ak.wwise.core.undo.beginGroup",
         "ak.wwise.core.undo.endGroup"
       ],
       "supported": []
     },
     "deferred_uris": [
-      "ak.wwise.core.audio.import",
       "ak.wwise.core.audio.importTabDelimited",
       "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
       "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
@@ -159,7 +160,6 @@
       "ak.wwise.core.remote.getConnectionStatus",
       "ak.wwise.core.soundbank.generate",
       "ak.wwise.core.soundbank.getInclusions",
-      "ak.wwise.core.soundbank.setInclusions",
       "ak.wwise.core.switchContainer.addAssignment",
       "ak.wwise.core.switchContainer.getAssignments",
       "ak.wwise.core.switchContainer.removeAssignment",
@@ -227,7 +227,6 @@
     "parity_buckets": {
       "behavioral": [],
       "deferred": [
-        "ak.wwise.core.audio.import",
         "ak.wwise.core.audio.importTabDelimited",
         "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
         "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
@@ -261,7 +260,6 @@
         "ak.wwise.core.remote.getConnectionStatus",
         "ak.wwise.core.soundbank.generate",
         "ak.wwise.core.soundbank.getInclusions",
-        "ak.wwise.core.soundbank.setInclusions",
         "ak.wwise.core.switchContainer.addAssignment",
         "ak.wwise.core.switchContainer.getAssignments",
         "ak.wwise.core.switchContainer.removeAssignment",
@@ -327,43 +325,50 @@
         "ak.wwise.core.object.get"
       ],
       "sandbox-mutating-tested": [
+        "ak.wwise.core.audio.import",
         "ak.wwise.core.object.create",
         "ak.wwise.core.object.delete",
         "ak.wwise.core.object.setNotes",
+        "ak.wwise.core.soundbank.setInclusions",
         "ak.wwise.core.undo.beginGroup",
         "ak.wwise.core.undo.endGroup"
       ],
       "supported": []
     },
     "sandbox_mutating_tested_uris": [
+      "ak.wwise.core.audio.import",
       "ak.wwise.core.object.create",
       "ak.wwise.core.object.delete",
       "ak.wwise.core.object.setNotes",
+      "ak.wwise.core.soundbank.setInclusions",
       "ak.wwise.core.undo.beginGroup",
       "ak.wwise.core.undo.endGroup"
     ],
-    "source_only_evidence_policy": "2021.1 source notes and reflection are inventory support only, not behavior proof; Task 7 promotes object.get and Task 10 promotes only reflected copied-sandbox destructive CRUD/undo URIs.",
+    "source_only_evidence_policy": "2021.1 source notes and reflection are inventory support only, not behavior proof; Task 7 promotes object.get, Task 10 promotes reflected copied-sandbox CRUD/undo URIs, and Task 11 promotes only audio.import and soundbank.setInclusions from copied-sandbox destructive evidence.",
     "supported_uris": []
   },
   "summary": {
     "classification_counts": {
       "behavioral": 0,
-      "deferred": 47,
+      "deferred": 45,
       "excluded": 46,
       "live-tested": 1,
-      "sandbox-mutating-tested": 5,
+      "sandbox-mutating-tested": 7,
       "supported": 0
     },
+    "deferred": 45,
+    "excluded": 46,
     "parity_bucket_counts": {
       "behavioral": 0,
-      "deferred": 47,
+      "deferred": 45,
       "excluded": 46,
       "live-tested": 1,
-      "sandbox-mutating-tested": 5,
+      "sandbox-mutating-tested": 7,
       "supported": 0
     },
     "parity_bucket_total": 99,
     "reflected_total": 99,
+    "sandbox-mutating-tested": 7,
     "unknown": 0,
     "version": "2021.1"
   }

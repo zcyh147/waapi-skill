@@ -86,9 +86,9 @@ class Destructive2021SandboxRuntime:
             self.source_mtime_before = self.sandbox.source_project.stat().st_mtime
             self.source_project_files_hash_before = hash_mutation_bearing_project_files(self.sandbox.source_root)
             self.destructive_contract = require_2021_sandbox_copy_target(self.env, self.sandbox)
-            self.assert_source_unchanged()
             if self.track_generated_outputs:
                 self.source_generated_snapshot_before = generated_output_snapshot(self.sandbox.source_root)
+            self.assert_source_unchanged()
             self.lifecycle = launch_sandboxed_wwise(self.sandbox, self.env, timeouts=WWISE_2021_DESTRUCTIVE_TIMEOUTS)
             self.client = default_waapi_client_factory(self.lifecycle.waapi_url)
             return self

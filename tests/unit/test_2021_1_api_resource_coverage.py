@@ -22,9 +22,11 @@ CLASSIFICATION_STATUSES = {"supported", "behavioral", "deferred", "excluded", "l
 BLOCKED_STATUSES = {"deferred", "excluded"}
 LIVE_TESTED_OBJECT_GET = "ak.wwise.core.object.get"
 SANDBOX_MUTATING_TESTED_URIS = {
+    "ak.wwise.core.audio.import",
     "ak.wwise.core.object.create",
     "ak.wwise.core.object.delete",
     "ak.wwise.core.object.setNotes",
+    "ak.wwise.core.soundbank.setInclusions",
     "ak.wwise.core.undo.beginGroup",
     "ak.wwise.core.undo.endGroup",
 }
@@ -98,9 +100,10 @@ def test_2021_entries_are_deferred_or_excluded_without_behavioral_promotion() ->
             assert evidence["counts_as_behavioral"] is True, entry["uri"]
             assert evidence["counts_as_live_behavioral"] is True, entry["uri"]
             assert "Fresh 2021.1 copied-sandbox destructive behavior evidence" in evidence["evidence_standard"]
-            assert evidence["live_command_evidence"] == (
-                ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-10-object-crud.json"
-            )
+            assert evidence["live_command_evidence"] in {
+                ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-10-object-crud.json",
+                ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-11-soundbank-audio.json",
+            }
             continue
 
         assert entry["coverage_status"] in BLOCKED_STATUSES, entry["uri"]
@@ -132,10 +135,10 @@ def test_2021_classification_accounting_has_zero_unknowns() -> None:
     assert status_counts == {
         "supported": 0,
         "behavioral": 0,
-        "deferred": 47,
+        "deferred": 45,
         "excluded": 46,
         "live-tested": 1,
-        "sandbox-mutating-tested": 5,
+        "sandbox-mutating-tested": 7,
     }
     assert payload["summary"]["unknown"] == 0
     assert payload["summary"]["behavioral_supported"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
