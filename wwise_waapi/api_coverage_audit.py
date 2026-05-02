@@ -189,7 +189,7 @@ class Phase2CoverageStatusRecord:
     def counts_as_behavioral(self) -> bool:
         if self.status == "profiler-backed-tested":
             return self.behavioral_coverage == "direct-behavior-with-profiler-evidence"
-        return self.status in {"fake-route-tested", *LIVE_BEHAVIOR_STATUSES}
+        return self.status in LIVE_BEHAVIOR_STATUSES
 
     @property
     def counts_as_live_behavioral(self) -> bool:
@@ -207,6 +207,8 @@ class ApiCoverageAuditResult:
     inventory_covered_count: int
     behavioral_covered_count: int
     deferred_count: int
+    substitute_covered_count: int = 0
+    excluded_count: int = 0
     covered_count: int = 0
     phase2_status_covered_count: int = 0
     live_behavioral_covered_count: int = 0
@@ -256,6 +258,8 @@ class ApiCoverageAuditor:
         covered_count = 0
         phase2_status_count = 0
         live_behavioral_count = 0
+        substitute_count = 0
+        excluded_count = 0
 
         for uri in sorted(set(behavior_by_uri) & set(deferred_registry.entries)):
             invalid.append(f"URI {uri} has both behavioral coverage and a deferred entry")
@@ -273,6 +277,12 @@ class ApiCoverageAuditor:
                     behavioral_count += 1
                 if phase2.counts_as_live_behavioral:
                     live_behavioral_count += 1
+                if phase2.status == "fake-route-tested":
+                    substitute_count += 1
+                if phase2.status in POLICY_APPROVED_NON_BEHAVIOR_STATUSES:
+                    excluded_count += 1
+                if phase2.status == STILL_DEFERRED_STATUS:
+                    deferred_count += 1
                 covered_count += 1
                 continue
             if behavior is not None:
@@ -283,6 +293,7 @@ class ApiCoverageAuditor:
             if deferred is not None:
                 invalid.extend(self._validate_deferred_entry(deferred, item, version))
                 deferred_count += 1
+                substitute_count += 1
                 covered_count += 1
                 continue
             if item.uri not in invalid_phase2_uris:
@@ -301,6 +312,8 @@ class ApiCoverageAuditor:
             inventory_covered_count=len(items),
             behavioral_covered_count=behavioral_count,
             deferred_count=deferred_count,
+            substitute_covered_count=substitute_count,
+            excluded_count=excluded_count,
             covered_count=covered_count,
             phase2_status_covered_count=phase2_status_count,
             live_behavioral_covered_count=live_behavioral_count,

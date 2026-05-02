@@ -19,10 +19,21 @@ REQUIRED_EXCLUDED_FAMILIES = {"CLI", "UI", "debug", "remote", "soundengine"}
 def test_2025_deferred_registry_loads_and_matches_all_blocked_coverage() -> None:
     registry = DeferredRegistry.load_default(VERSION)
     coverage = _coverage_payload()["coverage"]
-    blocked = {entry["uri"] for entry in coverage if entry["coverage_status"] in {"deferred", "excluded"}}
+    blocked = {
+        entry["uri"]
+        for entry in coverage
+        if entry["item_type"] == "function" and entry["coverage_status"] in {"deferred", "excluded"}
+    }
+    blocked_topics = {
+        entry["uri"]
+        for entry in coverage
+        if entry["item_type"] == "topic" and entry["coverage_status"] in {"deferred", "excluded"}
+    }
 
     assert set(registry.entries) == blocked
     assert len(registry.entries) == len(blocked) == 143
+    assert len(blocked_topics) == 31
+    assert not (blocked_topics & set(registry.entries))
     for uri, deferred in registry.entries.items():
         source = next(entry for entry in coverage if entry["uri"] == uri)
         assert deferred.version == VERSION
@@ -47,7 +58,11 @@ def test_2025_deferred_resource_declares_shape_and_forbidden_promotions() -> Non
     assert set(payload["metadata"]["coverage_model"]["coverage_status"]) == {"deferred", "excluded"}
     assert set(payload["metadata"]["coverage_model"]["forbidden_promoted_statuses"]) == FORBIDDEN_PROMOTED_STATUSES
     assert {entry["coverage_status"] for entry in payload["deferred"]} == {"deferred", "excluded"}
-    blocked = {entry["uri"] for entry in coverage if entry["coverage_status"] in {"deferred", "excluded"}}
+    blocked = {
+        entry["uri"]
+        for entry in coverage
+        if entry["item_type"] == "function" and entry["coverage_status"] in {"deferred", "excluded"}
+    }
     assert {entry["uri"] for entry in payload["deferred"]} == blocked
     assert not any(entry["coverage_status"] in FORBIDDEN_PROMOTED_STATUSES for entry in payload["deferred"])
 
@@ -57,7 +72,7 @@ def test_2025_deferred_registry_exactly_matches_coverage_entries() -> None:
     coverage = _coverage_payload()["coverage"]
     coverage_by_uri = {entry["uri"]: entry for entry in coverage}
 
-    blocked_coverage = [entry for entry in coverage if entry["coverage_status"] in {"deferred", "excluded"}]
+    blocked_coverage = [entry for entry in coverage if entry["item_type"] == "function" and entry["coverage_status"] in {"deferred", "excluded"}]
     assert [entry["uri"] for entry in deferred] == [entry["uri"] for entry in blocked_coverage]
     for entry in deferred:
         source = coverage_by_uri[entry["uri"]]
@@ -67,6 +82,19 @@ def test_2025_deferred_registry_exactly_matches_coverage_entries() -> None:
         assert entry["version"] == VERSION
         assert "resources/manifest/2025.1" in entry["evidence_source"]
         assert "2024.1" not in entry["evidence_source"]
+
+
+def test_2025_topic_inventory_rows_are_not_deferred_registry_behavior() -> None:
+    topic_entries = [entry for entry in _coverage_payload()["coverage"] if entry["item_type"] == "topic"]
+
+    assert len(topic_entries) == 31
+    assert {entry["coverage_status"] for entry in topic_entries} == {"deferred"}
+    assert {entry["parity_bucket"] for entry in topic_entries} == {"deferred"}
+    for entry in topic_entries:
+        evidence = entry["behavioral_evidence"]
+        assert evidence["counts_as_behavioral"] is False, entry["uri"]
+        assert evidence["counts_as_live_behavioral"] is False, entry["uri"]
+        assert "not behavioral coverage" in entry["deferred"]["substitute_test"], entry["uri"]
 
 
 def test_2025_deferred_summary_reconciles_deferred_and_excluded_counts() -> None:

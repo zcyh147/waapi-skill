@@ -48,14 +48,26 @@ class CoverageSummary:
     live_tested: int
     deferred: int
     destructive_opt_in: int
+    inventory_covered_count: int
+    behavioral_covered_count: int
+    live_behavioral_covered_count: int
+    substitute_covered_count: int
+    deferred_count: int
+    excluded_count: int
 
     def as_dict(self) -> dict[str, int | str]:
         return {
             "deferred": self.deferred,
             "destructive_opt_in": self.destructive_opt_in,
+            "behavioral_covered_count": self.behavioral_covered_count,
+            "deferred_count": self.deferred_count,
+            "excluded_count": self.excluded_count,
             "implemented": self.implemented,
+            "inventory_covered_count": self.inventory_covered_count,
+            "live_behavioral_covered_count": self.live_behavioral_covered_count,
             "live_tested": self.live_tested,
             "safe_tested": self.safe_tested,
+            "substitute_covered_count": self.substitute_covered_count,
             "total_functions": self.total_functions,
             "total_topics": self.total_topics,
             "version": self.version,
@@ -80,26 +92,34 @@ class ApiCoverageBuilder:
     """Build one coverage entry for every reflected function/topic URI."""
 
     manifest_store: ManifestStore = field(default_factory=lambda: ManifestStore(root=DEFAULT_MANIFEST_ROOT))
-    deferred_registry: DeferredRegistry = field(default_factory=lambda: DeferredRegistry.load_default(DEFAULT_WWISE_VERSION))
+    deferred_registry: DeferredRegistry | None = None
     classifier: ApiClassifier = field(default_factory=ApiClassifier)
     waql_reference_path: Path = DEFAULT_WAQL_REFERENCE
 
     def build(self, version: str = DEFAULT_WWISE_VERSION) -> CoverageResource:
-        manifest = self.manifest_store.load(version)
+        manifest = self._manifest(version)
+        deferred_registry = self.deferred_registry or DeferredRegistry.load_default(version)
         schemas = self._schemas_by_uri(manifest)
         waql_uris = set(require_waql_helper_generation(manifest, self.waql_reference_path))
         entries = [
-            self._entry(payload, "function", version, schemas, waql_uris)
+            self._entry(payload, "function", version, schemas, waql_uris, deferred_registry)
             for payload in self._section(manifest, "functions")
         ]
         entries.extend(
-            self._entry(payload, "topic", version, schemas, waql_uris)
+            self._entry(payload, "topic", version, schemas, waql_uris, deferred_registry)
             for payload in self._section(manifest, "topics")
         )
         entries = sorted(entries, key=lambda entry: entry["uri"])
         self._validate_exact_coverage(manifest, entries)
         summary = self._summary(version, entries, manifest)
         return CoverageResource(version=version, metadata=self._metadata(version), entries=entries, summary=summary)
+
+
+    def _manifest(self, version: str) -> dict[str, Any]:
+        manifest = self.manifest_store.load(version)
+        if self.manifest_store.root is None and version not in self.manifest_store.versions:
+            return ManifestStore(root=DEFAULT_MANIFEST_ROOT).load(version)
+        return manifest
 
     def _entry(
         self,
@@ -108,6 +128,7 @@ class ApiCoverageBuilder:
         version: str,
         schemas: Mapping[str, Mapping[str, Any]],
         waql_uris: set[str],
+        deferred_registry: DeferredRegistry,
     ) -> dict[str, Any]:
         uri = self._uri(payload)
         classification = self.classifier.classify(uri, item_type)
@@ -118,7 +139,15 @@ class ApiCoverageBuilder:
         entry: dict[str, Any] = {
             "behavioral_evidence": self._behavioral_evidence(uri, item_type, deferred, version),
             "category": classification.category,
-            "deferred": self._deferred_payload(uri, deferred),
+            "deferred": self._deferred_payload(
+                uri,
+                deferred,
+                deferred_registry,
+                version,
+                item_type,
+                classification.category,
+                classification.risk_level,
+            ),
             "destructive_opt_in": self._requires_destructive_opt_in(uri, item_type, classification.risk_level),
             "item_type": item_type,
             "risk_level": classification.risk_level,
@@ -202,10 +231,39 @@ class ApiCoverageBuilder:
             "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime",
         }
 
-    def _deferred_payload(self, uri: str, deferred: bool) -> dict[str, Any]:
+    def _deferred_payload(
+        self,
+        uri: str,
+        deferred: bool,
+        deferred_registry: DeferredRegistry,
+        version: str,
+        item_type: str,
+        category: str,
+        risk_level: str,
+    ) -> dict[str, Any]:
         if not deferred:
             return {"status": False}
-        entry = self.deferred_registry.require(uri)
+        entry = deferred_registry.get(uri)
+        if entry is None:
+            if version == DEFAULT_WWISE_VERSION:
+                deferred_registry.require(uri)
+            return {
+                "status": True,
+                "behavioral_coverage": "deferred",
+                "blocking_condition": (
+                    f"No version-specific deferred registry entry exists for {uri}; "
+                    "treat this reflected inventory row as substitute coverage only until live behavior evidence is added."
+                ),
+                "evidence_source": f"resources/manifest/{version} plus synthesized inventory-only deferral",
+                "review_trigger": f"When {version} receives behavior-backed coverage or a complete deferred registry entry.",
+                "risk_level": risk_level,
+                "substitute_test": (
+                    f"ApiCoverageBuilder inventory validation for {version}; not behavioral coverage."
+                ),
+                "synthesized": True,
+                "item_type": item_type,
+                "category": category,
+            }
         return {
             "status": True,
             "behavioral_coverage": entry.behavioral_coverage,
@@ -281,18 +339,29 @@ class ApiCoverageBuilder:
         }
 
     def _summary(self, version: str, entries: Sequence[Mapping[str, Any]], manifest: Mapping[str, Any]) -> CoverageSummary:
-        safe_tested = sum(1 for entry in entries if entry["test_status"] == "fake-route-tested")
+        fake_route_tested = sum(1 for entry in entries if entry["test_status"] == "fake-route-tested")
         deferred = sum(1 for entry in entries if entry["deferred"]["status"] is True)
         destructive = sum(1 for entry in entries if entry["destructive_opt_in"] is True)
+        substitute = sum(
+            1
+            for entry in entries
+            if entry["test_status"] in {"fake-route-tested", "deferred-with-substitute-test"}
+        )
         return CoverageSummary(
             version=version,
             total_functions=len(self._section(manifest, "functions")),
             total_topics=len(self._section(manifest, "topics")),
             implemented=len(entries),
-            safe_tested=safe_tested,
+            safe_tested=fake_route_tested,
             live_tested=0,
             deferred=deferred,
             destructive_opt_in=destructive,
+            inventory_covered_count=len(entries),
+            behavioral_covered_count=0,
+            live_behavioral_covered_count=0,
+            substitute_covered_count=substitute,
+            deferred_count=deferred,
+            excluded_count=0,
         )
 
     def _validate_exact_coverage(self, manifest: Mapping[str, Any], entries: Sequence[Mapping[str, Any]]) -> None:

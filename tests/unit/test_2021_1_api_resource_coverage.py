@@ -13,6 +13,7 @@ from wwise_waapi.deferred_registry import ApiClassifier  # pyright: ignore[repor
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2021.1"
 FUNCTIONS_MANIFEST = REPO_ROOT / "resources" / "manifest" / VERSION / "functions.json"
+TOPICS_MANIFEST = REPO_ROOT / "resources" / "manifest" / VERSION / "topics.json"
 COVERAGE_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "api-coverage.json"
 MATRIX_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "live-coverage-matrix.json"
 SUMMARY_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "phase2-coverage-summary.json"
@@ -48,14 +49,16 @@ FORBIDDEN_NEWER_EVIDENCE = (
 )
 
 
-def test_2021_resource_covers_every_reflected_function_once_with_2021_paths() -> None:
-    reflected = sorted(_uris(FUNCTIONS_MANIFEST, "functions"))
+def test_2021_resource_covers_every_reflected_function_and_topic_once_with_2021_paths() -> None:
+    reflected = sorted(_uris(FUNCTIONS_MANIFEST, "functions") + _uris(TOPICS_MANIFEST, "topics"))
     payload = _coverage_payload()
     coverage = payload["coverage"]
     encoded = json.dumps(payload)
 
-    assert len(reflected) == 99
-    assert len(coverage) == 99
+    assert len(_uris(FUNCTIONS_MANIFEST, "functions")) == 99
+    assert len(_uris(TOPICS_MANIFEST, "topics")) == 27
+    assert len(reflected) == 126
+    assert len(coverage) == 126
     assert [entry["uri"] for entry in coverage] == reflected
     assert len({entry["uri"] for entry in coverage}) == len(coverage)
     assert payload["metadata"]["version"] == VERSION
@@ -75,7 +78,7 @@ def test_2021_entries_are_deferred_or_excluded_without_behavioral_promotion() ->
         evidence = entry["behavioral_evidence"]
 
         assert entry["version"] == VERSION
-        assert entry["item_type"] == "function"
+        assert entry["item_type"] in {"function", "topic"}
         assert entry["category"] == expected.category
         assert entry["risk_level"] == expected.risk_level
         assert entry["schema_status"] == "ok", entry["uri"]
@@ -120,10 +123,17 @@ def test_2021_entries_are_deferred_or_excluded_without_behavioral_promotion() ->
         assert evidence["counts_as_behavioral"] is False
         assert evidence["counts_as_live_behavioral"] is False
         assert len(evidence["source_paths"]) == len(set(evidence["source_paths"])), entry["uri"]
-        assert "Task 4 reflection prove inventory presence, not behavior" in evidence["evidence_standard"]
-        assert "no 2022.1/2023.1/2024.1/2025.1 evidence" in evidence["evidence_standard"]
+        if entry["item_type"] == "topic":
+            assert "topic coverage is manifest inventory/substitute accounting only" in evidence["evidence_standard"]
+            assert "no-Wwise-launch instruction" in evidence["evidence_standard"]
+        else:
+            assert "Task 4 reflection prove inventory presence, not behavior" in evidence["evidence_standard"]
+            assert "no 2022.1/2023.1/2024.1/2025.1 evidence" in evidence["evidence_standard"]
         if entry["source_note_family"]:
             assert evidence["source_note_evidence"].startswith("resources/semantic/2021.1/source_notes.json#"), entry["uri"]
+        elif entry["item_type"] == "topic":
+            assert "topics are sourced" in evidence["source_note_evidence"], entry["uri"]
+            assert evidence["source_paths"] == [entry["deferred"]["reflection_evidence_path"]], entry["uri"]
         else:
             assert evidence["source_note_evidence"] == "not-applicable: no 2021.1 source-note family mapped for this URI", entry["uri"]
             assert evidence["source_paths"] == [entry["deferred"]["reflection_evidence_path"]], entry["uri"]
@@ -131,14 +141,14 @@ def test_2021_entries_are_deferred_or_excluded_without_behavioral_promotion() ->
 
 def test_2021_classification_accounting_has_zero_unknowns() -> None:
     payload = _coverage_payload()
-    _assert_exact_classification_accounting(payload, _uris(FUNCTIONS_MANIFEST, "functions"))
+    _assert_exact_classification_accounting(payload, _uris(FUNCTIONS_MANIFEST, "functions") + _uris(TOPICS_MANIFEST, "topics"))
 
     status_counts = payload["summary"]["status_counts"]
     assert set(status_counts) == CLASSIFICATION_STATUSES
     assert status_counts == {
         "supported": 0,
         "behavioral": 0,
-        "deferred": 43,
+        "deferred": 70,
         "excluded": 46,
         "live-tested": 1,
         "sandbox-mutating-tested": 9,
@@ -150,7 +160,7 @@ def test_2021_classification_accounting_has_zero_unknowns() -> None:
 
 def test_2021_unclassified_reflected_uri_is_rejected_by_accounting_fixture() -> None:
     payload = json.loads(json.dumps(_coverage_payload()))
-    reflected = [*_uris(FUNCTIONS_MANIFEST, "functions"), "ak.wwise.core.unclassifiedInjected"]
+    reflected = [*_uris(FUNCTIONS_MANIFEST, "functions"), *_uris(TOPICS_MANIFEST, "topics"), "ak.wwise.core.unclassifiedInjected"]
 
     with pytest.raises(AssertionError, match="unclassified reflected URIs"):
         _assert_exact_classification_accounting(payload, reflected)
@@ -162,18 +172,20 @@ def test_2021_matrix_summary_and_policy_match_coverage_accounting() -> None:
     phase2 = _json(SUMMARY_RESOURCE)
     policy = _json(POLICY_RESOURCE)
 
-    assert [entry["uri"] for entry in matrix["matrix"]] == [entry["uri"] for entry in coverage["coverage"]]
-    assert [entry["uri"] for entry in phase2["entries"]] == [entry["uri"] for entry in coverage["coverage"]]
-    assert matrix["summary"]["status_counts"] == coverage["summary"]["status_counts"]
-    assert phase2["summary"]["status_counts"] == coverage["summary"]["status_counts"]
-    assert policy["summary"]["classification_counts"] == coverage["summary"]["status_counts"]
+    function_coverage = [entry for entry in coverage["coverage"] if entry["item_type"] == "function"]
+    assert [entry["uri"] for entry in matrix["matrix"]] == [entry["uri"] for entry in function_coverage]
+    assert [entry["uri"] for entry in phase2["entries"]] == [entry["uri"] for entry in function_coverage]
+    function_status_counts = {key: Counter(entry["coverage_status"] for entry in function_coverage).get(key, 0) for key in matrix["summary"]["status_counts"]}
+    assert matrix["summary"]["status_counts"] == function_status_counts
+    assert phase2["summary"]["status_counts"] == function_status_counts
+    assert policy["summary"]["classification_counts"] == function_status_counts
     assert matrix["summary"]["behavioral_covered_count"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
     assert matrix["summary"]["live_behavioral_covered_count"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
     assert phase2["summary"]["behavioral_covered_count"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
     assert phase2["summary"]["live_behavioral_covered_count"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
 
     assigned = [uri for uris in policy["policy"]["classification_buckets"].values() for uri in uris]
-    assert sorted(assigned) == [entry["uri"] for entry in coverage["coverage"]]
+    assert sorted(assigned) == [entry["uri"] for entry in function_coverage]
     assert len(assigned) == len(set(assigned)) == 99
 
     for entry in matrix["matrix"]:

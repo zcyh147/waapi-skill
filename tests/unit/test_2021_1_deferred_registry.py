@@ -12,6 +12,7 @@ VERSION = "2021.1"
 DEFERRED_RESOURCE = REPO_ROOT / "resources" / "deferred" / f"{VERSION}.json"
 COVERAGE_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "api-coverage.json"
 FUNCTIONS_MANIFEST = REPO_ROOT / "resources" / "manifest" / VERSION / "functions.json"
+TOPICS_MANIFEST = REPO_ROOT / "resources" / "manifest" / VERSION / "topics.json"
 
 REQUIRED_TASK5_FIELDS = {
     "uri",
@@ -47,10 +48,21 @@ def test_2021_deferred_registry_loads_and_matches_blocked_coverage() -> None:
     payload = _deferred_payload()
     coverage = _coverage_payload()["coverage"]
     reflected = {entry["uri"] for entry in _json(FUNCTIONS_MANIFEST)["functions"]}
-    blocked_coverage = {entry["uri"] for entry in coverage if entry["coverage_status"] in {"deferred", "excluded"}}
+    reflected_topics = {entry["uri"] for entry in _json(TOPICS_MANIFEST)["topics"]}
+    blocked_function_coverage = {
+        entry["uri"]
+        for entry in coverage
+        if entry["item_type"] == "function" and entry["coverage_status"] in {"deferred", "excluded"}
+    }
+    blocked_topic_coverage = {
+        entry["uri"]
+        for entry in coverage
+        if entry["item_type"] == "topic" and entry["coverage_status"] in {"deferred", "excluded"}
+    }
 
     assert len(registry.entries) == 89
-    assert set(registry.entries) == blocked_coverage == reflected - {LIVE_TESTED_OBJECT_GET} - SANDBOX_MUTATING_TESTED_URIS
+    assert set(registry.entries) == blocked_function_coverage == reflected - {LIVE_TESTED_OBJECT_GET} - SANDBOX_MUTATING_TESTED_URIS
+    assert blocked_topic_coverage == reflected_topics
     assert payload["summary"]["deferred_registry_entries"] == 89
     assert payload["summary"]["classification_counts"] == {
         "supported": 0,
@@ -62,6 +74,23 @@ def test_2021_deferred_registry_loads_and_matches_blocked_coverage() -> None:
     }
     assert LIVE_TESTED_OBJECT_GET not in registry.entries
     assert not (SANDBOX_MUTATING_TESTED_URIS & set(registry.entries))
+    assert not (reflected_topics & set(registry.entries))
+
+
+def test_2021_topic_inventory_rows_are_deferred_and_non_behavioral() -> None:
+    coverage = _coverage_payload()["coverage"]
+    reflected_topics = {entry["uri"] for entry in _json(TOPICS_MANIFEST)["topics"]}
+    topic_entries = [entry for entry in coverage if entry["item_type"] == "topic"]
+
+    assert {entry["uri"] for entry in topic_entries} == reflected_topics
+    assert len(topic_entries) == 27
+    for entry in topic_entries:
+        evidence = entry["behavioral_evidence"]
+        assert entry["coverage_status"] == "deferred", entry["uri"]
+        assert entry["parity_bucket"] == "deferred", entry["uri"]
+        assert evidence["counts_as_behavioral"] is False, entry["uri"]
+        assert evidence["counts_as_live_behavioral"] is False, entry["uri"]
+        assert "not behavioral coverage" in entry["deferred"]["substitute_test"], entry["uri"]
 
 
 def test_2021_deferred_entries_include_task5_evidence_contract() -> None:

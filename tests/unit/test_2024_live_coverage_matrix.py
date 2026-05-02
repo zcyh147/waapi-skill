@@ -99,20 +99,30 @@ def test_2024_phase2_summary_matches_matrix_with_object_get_promotion() -> None:
     coverage = _coverage_payload()
     matrix_entries = matrix["matrix"]
     coverage_entries = coverage["coverage"]
+    coverage_function_entries = [entry for entry in coverage_entries if entry["item_type"] == "function"]
+    coverage_topic_entries = [entry for entry in coverage_entries if entry["item_type"] == "topic"]
 
     assert summary["metadata"]["baseline_resource"] == "resources/coverage/2024.1/api-coverage.json"
     assert summary["metadata"]["live_matrix_resource"] == "resources/coverage/2024.1/live-coverage-matrix.json"
-    assert summary["summary"]["status_counts"] == matrix["summary"]["status_counts"] == coverage["summary"]["status_counts"]
-    assert summary["summary"]["parity_bucket_counts"] == matrix["summary"]["parity_bucket_counts"] == coverage["summary"]["parity_bucket_counts"]
+    function_status_counts = _counts(coverage_function_entries, "coverage_status")
+    function_parity_counts = _counts(coverage_function_entries, "parity_bucket")
+    assert summary["summary"]["status_counts"] == matrix["summary"]["status_counts"] == function_status_counts
+    assert summary["summary"]["parity_bucket_counts"] == matrix["summary"]["parity_bucket_counts"] == function_parity_counts
+    assert coverage["summary"]["status_counts"]["deferred"] == function_status_counts["deferred"] + len(coverage_topic_entries)
+    assert coverage["summary"]["parity_bucket_counts"]["deferred"] == function_parity_counts["deferred"] + len(coverage_topic_entries)
     assert set(summary["summary"]["parity_bucket_counts"]) == ALLOWED_PARITY_BUCKETS
     expected_total = len(_uris(FUNCTIONS_MANIFEST, "functions"))
 
     assert summary["summary"]["parity_bucket_total"] == matrix["summary"]["parity_bucket_total"] == expected_total
-    assert coverage["summary"]["parity_bucket_total"] == expected_total
+    assert coverage["summary"]["parity_bucket_total"] == expected_total + len(coverage_topic_entries)
     assert summary["summary"]["behavioral_covered_count"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
     assert summary["summary"]["live_behavioral_covered_count"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
-    assert [entry["uri"] for entry in summary["entries"]] == [entry["uri"] for entry in matrix_entries] == [entry["uri"] for entry in coverage_entries]
+    assert [entry["uri"] for entry in summary["entries"]] == [entry["uri"] for entry in matrix_entries] == [entry["uri"] for entry in coverage_function_entries]
     assert all(entry["version"] == VERSION for entry in summary["entries"])
+    assert len(coverage_topic_entries) == 30
+    assert all(entry["coverage_status"] == "deferred" for entry in coverage_topic_entries)
+    assert all(entry["behavioral_evidence"]["counts_as_behavioral"] is False for entry in coverage_topic_entries)
+    assert all(entry["behavioral_evidence"]["counts_as_live_behavioral"] is False for entry in coverage_topic_entries)
     assert {entry["uri"] for entry in summary["entries"] if entry["manifest_reflection_only"] is False} == (
         PROMOTED_READ_ONLY_URIS | SANDBOX_MUTATING_TESTED_URIS
     )
@@ -121,6 +131,8 @@ def test_2024_phase2_summary_matches_matrix_with_object_get_promotion() -> None:
 def test_2024_phase21_policy_reconciles_parity_buckets_and_blocked_lists() -> None:
     policy = json.loads(POLICY_RESOURCE.read_text(encoding="utf-8"))
     coverage_by_uri = {entry["uri"]: entry for entry in _coverage_payload()["coverage"]}
+    function_coverage_by_uri = {uri: entry for uri, entry in coverage_by_uri.items() if entry["item_type"] == "function"}
+    topic_uris = {uri for uri, entry in coverage_by_uri.items() if entry["item_type"] == "topic"}
     parity_buckets = policy["policy"]["parity_buckets"]
 
     assert set(parity_buckets) == ALLOWED_PARITY_BUCKETS
@@ -130,19 +142,20 @@ def test_2024_phase21_policy_reconciles_parity_buckets_and_blocked_lists() -> No
     assert sum(policy["summary"]["parity_bucket_counts"].values()) == expected_total
 
     assigned = [uri for uris in parity_buckets.values() for uri in uris]
-    assert sorted(assigned) == sorted(coverage_by_uri)
+    assert sorted(assigned) == sorted(function_coverage_by_uri)
     assert len(assigned) == len(set(assigned)) == expected_total
     for bucket, uris in parity_buckets.items():
         assert policy["summary"]["parity_bucket_counts"][bucket] == len(uris)
-        assert all(coverage_by_uri[uri]["parity_bucket"] == bucket for uri in uris)
+        assert all(function_coverage_by_uri[uri]["parity_bucket"] == bucket for uri in uris)
 
     assert policy["policy"]["live_tested_uris"] == [PROMOTED_READ_ONLY_URI]
     assert set(policy["policy"]["sandbox_mutating_tested_uris"]) == SANDBOX_MUTATING_TESTED_URIS
     assert PROMOTED_READ_ONLY_URI not in policy["policy"]["manifest_only_uris"]
     assert not (SANDBOX_MUTATING_TESTED_URIS & set(policy["policy"]["manifest_only_uris"]))
     assert READBACK_HELPER_URIS <= set(policy["policy"]["manifest_only_uris"])
-    assert sorted(policy["policy"]["manifest_only_uris"] + policy["policy"]["live_tested_uris"] + policy["policy"]["sandbox_mutating_tested_uris"]) == sorted(coverage_by_uri)
-    assert sorted(policy["policy"]["deferred_uris"] + policy["policy"]["excluded_uris"] + policy["policy"]["live_tested_uris"] + policy["policy"]["sandbox_mutating_tested_uris"]) == sorted(coverage_by_uri)
+    assert sorted(policy["policy"]["manifest_only_uris"] + policy["policy"]["live_tested_uris"] + policy["policy"]["sandbox_mutating_tested_uris"]) == sorted(function_coverage_by_uri)
+    assert sorted(policy["policy"]["deferred_uris"] + policy["policy"]["excluded_uris"] + policy["policy"]["live_tested_uris"] + policy["policy"]["sandbox_mutating_tested_uris"]) == sorted(function_coverage_by_uri)
+    assert not (topic_uris & set(assigned))
 
 
 def test_2024_risky_policy_keeps_all_risky_families_excluded() -> None:
@@ -173,3 +186,8 @@ def _coverage_payload() -> dict:
 
 def _uris(path: Path, section: str) -> list[str]:
     return [entry["uri"] for entry in json.loads(path.read_text(encoding="utf-8"))[section]]
+
+
+def _counts(entries: list[dict], key: str) -> dict:
+    values = ALLOWED_PARITY_BUCKETS if key == "parity_bucket" else set(entry[key] for entry in entries)
+    return {value: sum(1 for entry in entries if entry[key] == value) for value in sorted(values)}

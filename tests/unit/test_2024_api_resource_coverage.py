@@ -11,6 +11,7 @@ from wwise_waapi.deferred_registry import ApiClassifier  # pyright: ignore[repor
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2024.1"
 FUNCTIONS_MANIFEST = REPO_ROOT / "resources" / "manifest" / VERSION / "functions.json"
+TOPICS_MANIFEST = REPO_ROOT / "resources" / "manifest" / VERSION / "topics.json"
 COVERAGE_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "api-coverage.json"
 SOURCE_NOTES_RESOURCE = REPO_ROOT / "resources" / "semantic" / VERSION / "source_notes.json"
 PROMOTED_READ_ONLY_URI = "ak.wwise.core.object.get"
@@ -44,14 +45,16 @@ RISKY_CATEGORY_PREFIXES = (
 )
 
 
-def test_2024_resource_covers_every_reflected_function_once_with_2024_paths() -> None:
-    reflected = sorted(_uris(FUNCTIONS_MANIFEST, "functions"))
+def test_2024_resource_covers_every_reflected_function_and_topic_once_with_2024_paths() -> None:
+    reflected = sorted(_uris(FUNCTIONS_MANIFEST, "functions") + _uris(TOPICS_MANIFEST, "topics"))
     payload = _coverage_payload()
     coverage = payload["coverage"]
     encoded = json.dumps(payload)
 
-    assert len(reflected) == 148
-    assert len(coverage) == 148
+    assert len(_uris(FUNCTIONS_MANIFEST, "functions")) == 148
+    assert len(_uris(TOPICS_MANIFEST, "topics")) == 30
+    assert len(reflected) == 178
+    assert len(coverage) == 178
     assert [entry["uri"] for entry in coverage] == reflected
     assert len({entry["uri"] for entry in coverage}) == len(coverage)
     assert payload["metadata"]["version"] == VERSION
@@ -71,7 +74,7 @@ def test_2024_coverage_entries_have_required_versioned_metadata() -> None:
         evidence = entry["behavioral_evidence"]
 
         assert entry["version"] == VERSION
-        assert entry["item_type"] == "function"
+        assert entry["item_type"] in {"function", "topic"}
         assert entry["coverage_status"] in ALLOWED_STATUSES, entry["uri"]
         assert entry["test_status"] == entry["coverage_status"], entry["uri"]
         assert entry["schema_status"] == "ok", entry["uri"]
@@ -123,11 +126,12 @@ def test_2024_statuses_promote_only_fresh_2024_live_and_destructive_evidence() -
     assert set(status_counts) == ALLOWED_STATUSES
     assert set(payload["metadata"]["parity_bucket_model"]) == ALLOWED_PARITY_BUCKETS
     assert set(parity_counts) == ALLOWED_PARITY_BUCKETS
-    assert sum(status_counts.values()) == len(coverage) == 148
-    assert sum(parity_counts.values()) == len(coverage) == 148
+    assert sum(status_counts.values()) == len(coverage) == 178
+    assert sum(parity_counts.values()) == len(coverage) == 178
     assert payload["summary"]["total_functions"] == 148
-    assert payload["summary"]["implemented"] == 148
-    assert payload["summary"]["manifest_only"] == 137
+    assert payload["summary"]["implemented"] == 178
+    assert payload["summary"]["total_topics"] == 30
+    assert payload["summary"]["manifest_only"] == 167
     assert payload["summary"]["live_tested"] == 1
     assert payload["summary"]["behavioral_supported"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
     assert status_counts == _counts_with_zeroes(Counter(entry["coverage_status"] for entry in coverage), status_counts)
@@ -147,7 +151,7 @@ def test_2024_source_note_families_are_context_except_promoted_object_get() -> N
         if family in expected_families
         for uri in note["endpoints"]
     }
-    coverage_by_uri = {entry["uri"]: entry for entry in _coverage_payload()["coverage"]}
+    coverage_by_uri = {entry["uri"]: entry for entry in _coverage_payload()["coverage"] if entry["item_type"] == "function"}
     covered_source_uris = source_uris & set(coverage_by_uri)
 
     assert set(source_notes) == expected_families
@@ -171,6 +175,10 @@ def test_2024_source_note_families_are_context_except_promoted_object_get() -> N
 
 def test_2024_risky_families_are_not_promoted() -> None:
     for entry in _coverage_payload()["coverage"]:
+        if entry["item_type"] == "topic":
+            assert entry["coverage_status"] == "deferred", entry["uri"]
+            assert entry["behavioral_evidence"]["counts_as_behavioral"] is False, entry["uri"]
+            continue
         if _is_risky_category(entry["category"]):
             assert entry["coverage_status"] == "excluded", entry["uri"]
             assert entry["parity_bucket"] == "excluded", entry["uri"]

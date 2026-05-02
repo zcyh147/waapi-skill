@@ -4210,6 +4210,7 @@
     "does_not_count_as_live_behavioral_coverage": [
       "conformance-only-skip",
       "deferred-with-substitute-test",
+      "fake-route-tested",
       "skipped-approved",
       "wrapper-only"
     ],

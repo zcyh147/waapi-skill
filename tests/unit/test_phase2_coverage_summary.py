@@ -45,8 +45,11 @@ def test_phase2_summary_covers_144_reflected_apis_and_audits_statuses() -> None:
     assert result.reflected_count == 144
     assert result.inventory_covered_count == 144
     assert result.phase2_status_covered_count == 144
-    assert result.behavioral_covered_count == 38
+    assert result.behavioral_covered_count == 13
     assert result.live_behavioral_covered_count == 13
+    assert result.substitute_covered_count == 25
+    assert result.deferred_count == 63
+    assert result.excluded_count == 43
     assert result.status_counts == payload["summary"]["phase2_status_counts"]
     assert sum(payload["summary"]["phase2_status_counts"].values()) == 144
     assert [entry["uri"] for entry in payload["entries"]] == sorted(
@@ -60,6 +63,12 @@ def test_before_after_counts_preserve_phase1_baseline_and_phase2_policy() -> Non
     assert summary["total_functions"] == 112
     assert summary["total_topics"] == 32
     assert summary["reflected_count"] == 144
+    assert summary["inventory_covered_count"] == 144
+    assert summary["behavioral_covered_count"] == 13
+    assert summary["live_behavioral_covered_count"] == 13
+    assert summary["substitute_covered_count"] == 25
+    assert summary["deferred_count"] == 63
+    assert summary["excluded_count"] == 43
     assert summary["phase1_status_counts"] == {"deferred-with-substitute-test": 117, "fake-route-tested": 27}
     assert summary["original_deferred_before_phase2"] == 117
     assert summary["original_deferred_after_phase2"] == 63
@@ -112,6 +121,29 @@ def test_non_policy_phase1_fake_route_tested_apis_remain_accepted_and_unchanged(
         entry["evidence_command"] == "python -m pytest tests/unit/test_dispatch_routes_all_2022.py -q"
         for entry in non_policy_fake_route_entries
     )
+    assert all(entry["counts_as_behavioral"] is False for entry in fake_route_entries)
+    assert all(entry["counts_as_live_behavioral"] is False for entry in fake_route_entries)
+
+
+def test_behavioral_counts_are_derived_from_explicit_entry_flags_only() -> None:
+    payload = _summary_payload()
+    entries = payload["entries"]
+    summary = payload["summary"]
+
+    behavioral_entries = [entry for entry in entries if entry["counts_as_behavioral"] is True]
+    live_behavioral_entries = [entry for entry in entries if entry["counts_as_live_behavioral"] is True]
+    non_behavior_statuses = {
+        "fake-route-tested",
+        "still-deferred-with-evidence",
+        "wrapper-only",
+        "skipped-approved",
+        "conformance-only-skip",
+    }
+
+    assert summary["behavioral_covered_count"] == len(behavioral_entries)
+    assert summary["live_behavioral_covered_count"] == len(live_behavioral_entries)
+    assert not any(entry["achieved_status"] in non_behavior_statuses for entry in behavioral_entries)
+    assert not any(entry["phase1_status"] == "fake-route-tested" for entry in behavioral_entries)
 
 
 def test_every_phase2_transition_has_evidence_and_deferred_entries_keep_blockers() -> None:
@@ -215,7 +247,7 @@ def test_conformance_only_policy_entries_are_explicit_and_non_live() -> None:
 
     for uri in ACCEPTED_FAKE_ROUTE_PROFILER_READ_URIS:
         assert entries[uri]["achieved_status"] == "fake-route-tested"
-        assert entries[uri]["counts_as_behavioral"] is True
+        assert entries[uri]["counts_as_behavioral"] is False
         assert entries[uri]["counts_as_live_behavioral"] is False
 
 

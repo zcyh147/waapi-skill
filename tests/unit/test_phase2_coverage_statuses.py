@@ -12,7 +12,7 @@ from wwise_waapi.deferred_registry import DeferredRegistry  # pyright: ignore[re
 @pytest.mark.parametrize(
     ("status", "uri", "expected_behavioral", "expected_live_behavioral"),
     [
-        ("fake-route-tested", "ak.wwise.core.getInfo", 1, 0),
+        ("fake-route-tested", "ak.wwise.core.getInfo", 0, 0),
         ("live-smoke-tested", "ak.wwise.core.getInfo", 1, 1),
         ("live-sandbox-tested", "ak.wwise.core.object.get", 1, 1),
         ("sandbox-mutating-tested", "ak.wwise.core.object.create", 1, 1),

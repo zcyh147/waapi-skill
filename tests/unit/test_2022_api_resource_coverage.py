@@ -47,6 +47,32 @@ def test_generated_coverage_resource_represents_every_reflected_2022_api_once() 
     assert len({entry["uri"] for entry in coverage}) == 144
 
 
+def test_builder_inventory_includes_functions_and_topics_for_all_supported_versions() -> None:
+    expected_counts = {
+        "2021.1": (99, 27),
+        "2022.1": (112, 32),
+        "2023.1": (149, 32),
+        "2024.1": (148, 30),
+        "2025.1": (154, 31),
+    }
+    store = ManifestStore(root=MANIFEST_ROOT)
+    builder = ApiCoverageBuilder(manifest_store=store)
+
+    for version, (function_count, topic_count) in expected_counts.items():
+        manifest = store.load(version)
+        resource = builder.build(version)
+        reflected = sorted(entry["uri"] for entry in manifest["functions"] + manifest["topics"])
+        inventory = [entry["uri"] for entry in resource.entries]
+
+        assert len(manifest["functions"]) == function_count
+        assert len(manifest["topics"]) == topic_count
+        assert inventory == reflected
+        assert len(inventory) == len(set(inventory)) == function_count + topic_count
+        assert resource.summary.inventory_covered_count == function_count + topic_count
+        assert resource.summary.behavioral_covered_count == 0
+        assert resource.summary.live_behavioral_covered_count == 0
+
+
 def test_coverage_entries_have_required_metadata_schema_route_safety_and_guidance() -> None:
     payload = _coverage_payload()
     classifier = ApiClassifier()
@@ -100,10 +126,31 @@ def test_evidence_summary_counts_match_generated_resource() -> None:
     assert summary["total_functions"] == 112
     assert summary["total_topics"] == 32
     assert summary["implemented"] == len(coverage) == 144
+    assert summary["inventory_covered_count"] == len(coverage) == 144
     assert summary["safe_tested"] == sum(1 for entry in coverage if entry["test_status"] == "fake-route-tested")
+    assert summary["substitute_covered_count"] == len(coverage)
     assert summary["deferred"] == sum(1 for entry in coverage if entry["deferred"]["status"] is True)
+    assert summary["deferred_count"] == summary["deferred"]
+    assert summary["behavioral_covered_count"] == 0
+    assert summary["live_behavioral_covered_count"] == 0
+    assert summary["excluded_count"] == 0
     assert summary["live_tested"] == 0
     assert summary["destructive_opt_in"] == sum(1 for entry in coverage if entry["destructive_opt_in"] is True)
+
+
+def test_phase1_fake_route_and_substitute_evidence_is_inventory_only() -> None:
+    coverage = _coverage_payload()["coverage"]
+
+    for entry in coverage:
+        assert entry["behavioral_evidence"]["coverage"].startswith(("fake-route-tested", "substitute-test"))
+        if entry["test_status"] == "fake-route-tested":
+            assert entry["behavioral_evidence"]["evidence"] in {
+                "Injected fake WAAPI client validates WwiseDispatcher route resolution without live project mutation.",
+                "references/waql-2022.1.md",
+            }
+        if entry["test_status"] == "deferred-with-substitute-test":
+            assert entry["deferred"]["behavioral_coverage"] == "deferred"
+            assert "not behavioral coverage" in entry["deferred"]["substitute_test"]
 
 
 def test_builder_fails_on_artificial_missing_api_instead_of_silent_skip() -> None:

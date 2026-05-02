@@ -126,7 +126,7 @@ def test_fake_route_profiler_reads_remain_accepted_fake_route_not_conformance_on
     for uri in ACCEPTED_FAKE_ROUTE_PROFILER_READ_URIS:
         assert uri not in CONFORMANCE_ONLY_URIS
         assert summary_entries[uri]["achieved_status"] == "fake-route-tested"
-        assert summary_entries[uri]["counts_as_behavioral"] is True
+        assert summary_entries[uri]["counts_as_behavioral"] is False
         assert summary_entries[uri]["counts_as_live_behavioral"] is False
         assert summary_entries[uri]["attempted_live_blocker"]
 

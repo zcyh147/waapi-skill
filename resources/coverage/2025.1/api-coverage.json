@@ -4197,6 +4197,92 @@
         "counts_as_behavioral": false,
         "counts_as_live_behavioral": false,
         "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.audio.imported"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.audio",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.audio.imported",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.audio.imported",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.audio.imported.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.audio.imported",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "return"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.audio.imported",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
         "evidence": "2025.1 manifest/source-note/classification reconciliation only; no behavior evidence was created in this task.",
         "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
         "manifest_reflection_only": true,
@@ -5887,6 +5973,90 @@
         "counts_as_behavioral": false,
         "counts_as_live_behavioral": false,
         "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.log.itemAdded"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.log",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.log.itemAdded",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.log.itemAdded",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.log.itemAdded.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.log.itemAdded",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.log.itemAdded",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
         "evidence": "2025.1 manifest/source-note/classification reconciliation only; no behavior evidence was created in this task.",
         "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
         "manifest_reflection_only": true,
@@ -6056,6 +6226,354 @@
       "usage_guidance": {
         "default_path": "deferred-needs-2025-evidence",
         "notes": "Do not use 2024 evidence or manifest reflection as 2025.1 behavior proof; keep blocked until fresh 2025.1 evidence exists."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.object.attenuationCurveChanged"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.object",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.attenuationCurveChanged",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.attenuationCurveChanged",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.object.attenuationCurveChanged.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.attenuationCurveChanged",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "platform",
+              "return"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.object.attenuationCurveChanged",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.object.attenuationCurveLinkChanged"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.object",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.attenuationCurveLinkChanged",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.attenuationCurveLinkChanged",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.object.attenuationCurveLinkChanged.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.attenuationCurveLinkChanged",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "platform",
+              "return"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.object.attenuationCurveLinkChanged",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.object.childAdded"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.object",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.childAdded",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.childAdded",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.object.childAdded.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.childAdded",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "platform",
+              "return"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.object.childAdded",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.object.childRemoved"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.object",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.childRemoved",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.childRemoved",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.object.childRemoved.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.childRemoved",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "platform",
+              "return"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.object.childRemoved",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
       },
       "version": "2025.1"
     },
@@ -6258,6 +6776,180 @@
       "usage_guidance": {
         "default_path": "sandbox-mutating-tested",
         "notes": "Use only with WWISE_LIVE=1, WWISE_DESTRUCTIVE=1, exact 2025.1 installed paths, and copied-sandbox safety gates."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.object.created"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.object",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.created",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.created",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.object.created.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.created",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "platform",
+              "return"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.object.created",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.object.curveChanged"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.object",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.curveChanged",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.curveChanged",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.object.curveChanged.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.curveChanged",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "platform",
+              "return"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.object.curveChanged",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
       },
       "version": "2025.1"
     },
@@ -7195,6 +7887,180 @@
     },
     {
       "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.object.nameChanged"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.object",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.nameChanged",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.nameChanged",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.object.nameChanged.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.nameChanged",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "platform",
+              "return"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.object.nameChanged",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.object.notesChanged"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.object",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.notesChanged",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.notesChanged",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.object.notesChanged.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.notesChanged",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "platform",
+              "return"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.object.notesChanged",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
         "candidate_origin": "task6-classification",
         "candidate_status": "candidate-sandbox-mutating",
         "counts_as_behavioral": false,
@@ -7283,6 +8149,359 @@
       "usage_guidance": {
         "default_path": "candidate-sandbox-mutating-needs-2025-evidence",
         "notes": "Do not use 2024 evidence or manifest reflection as 2025.1 behavior proof; keep blocked until fresh 2025.1 evidence exists."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.object.postDeleted"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.object",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.postDeleted",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.postDeleted",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.object.postDeleted.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "high",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.postDeleted",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "platform",
+              "return"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.object.postDeleted",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.object.preDeleted"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.object",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.preDeleted",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.preDeleted",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.object.preDeleted.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "high",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.preDeleted",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "platform",
+              "return"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.object.preDeleted",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.object.propertyChanged"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.object",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.propertyChanged",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.propertyChanged",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.object.propertyChanged.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.propertyChanged",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "object",
+              "platform",
+              "property",
+              "return"
+            ],
+            "required": [
+              "object",
+              "property"
+            ],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.object.propertyChanged",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.object.referenceChanged"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.object",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.referenceChanged",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.referenceChanged",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.object.referenceChanged.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.referenceChanged",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "platform",
+              "return"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.object.referenceChanged",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
       },
       "version": "2025.1"
     },
@@ -8219,6 +9438,93 @@
         "counts_as_behavioral": false,
         "counts_as_live_behavioral": false,
         "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.object.structureChanged"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.object",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.structureChanged",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.object.structureChanged",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.object.structureChanged.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "added",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.object.structureChanged",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "includeLoadedAndUnloadedNestedObjects",
+              "return"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.object.structureChanged",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
         "evidence": "2025.1 manifest/source-note/classification reconciliation only; no behavior evidence was created in this task.",
         "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
         "manifest_reflection_only": true,
@@ -8307,6 +9613,92 @@
         "counts_as_behavioral": false,
         "counts_as_live_behavioral": false,
         "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.profiler.captureLog.itemAdded"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.profiler.captureLog",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.profiler.captureLog.itemAdded",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.profiler.captureLog.itemAdded",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.profiler.captureLog.itemAdded.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.profiler.captureLog.itemAdded",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "types"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.profiler.captureLog.itemAdded",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
         "evidence": "2025.1 manifest/source-note/classification reconciliation only; no behavior evidence was created in this task.",
         "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
         "manifest_reflection_only": true,
@@ -8385,6 +9777,258 @@
       "usage_guidance": {
         "default_path": "deferred-needs-2025-evidence",
         "notes": "Do not use 2024 evidence or manifest reflection as 2025.1 behavior proof; keep blocked until fresh 2025.1 evidence exists."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.profiler.gameObjectRegistered"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.profiler",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.profiler.gameObjectRegistered",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.profiler.gameObjectRegistered",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.profiler.gameObjectRegistered.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.profiler.gameObjectRegistered",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.profiler.gameObjectRegistered",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.profiler.gameObjectReset"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.profiler",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.profiler.gameObjectReset",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.profiler.gameObjectReset",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.profiler.gameObjectReset.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.profiler.gameObjectReset",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.profiler.gameObjectReset",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.profiler.gameObjectUnregistered"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.profiler",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.profiler.gameObjectUnregistered",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.profiler.gameObjectUnregistered",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.profiler.gameObjectUnregistered.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.profiler.gameObjectUnregistered",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.profiler.gameObjectUnregistered",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
       },
       "version": "2025.1"
     },
@@ -9955,6 +11599,93 @@
         "counts_as_behavioral": false,
         "counts_as_live_behavioral": false,
         "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.profiler.stateChanged"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.profiler",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.profiler.stateChanged",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.profiler.stateChanged",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.profiler.stateChanged.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.profiler.stateChanged",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "platform",
+              "return"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.profiler.stateChanged",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
         "evidence": "2025.1 manifest/source-note/classification reconciliation only; no behavior evidence was created in this task.",
         "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
         "manifest_reflection_only": true,
@@ -10031,6 +11762,93 @@
       "usage_guidance": {
         "default_path": "deferred-needs-2025-evidence",
         "notes": "Do not use 2024 evidence or manifest reflection as 2025.1 behavior proof; keep blocked until fresh 2025.1 evidence exists."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.profiler.switchChanged"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.profiler",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.profiler.switchChanged",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.profiler.switchChanged",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.profiler.switchChanged.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.profiler.switchChanged",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "platform",
+              "return"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.profiler.switchChanged",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
       },
       "version": "2025.1"
     },
@@ -10129,6 +11947,258 @@
         "counts_as_behavioral": false,
         "counts_as_live_behavioral": false,
         "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.project.loaded"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.project",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.project.loaded",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.project.loaded",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.project.loaded.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.project.loaded",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.project.loaded",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.project.postClosed"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.project",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.project.postClosed",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.project.postClosed",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.project.postClosed.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.project.postClosed",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.project.postClosed",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.project.preClosed"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.project",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.project.preClosed",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.project.preClosed",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.project.preClosed.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.project.preClosed",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.project.preClosed",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
         "evidence": "2025.1 manifest/source-note/classification reconciliation only; no behavior evidence was created in this task.",
         "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
         "manifest_reflection_only": true,
@@ -10205,6 +12275,90 @@
       "usage_guidance": {
         "default_path": "deferred-needs-2025-evidence",
         "notes": "Do not use 2024 evidence or manifest reflection as 2025.1 behavior proof; keep blocked until fresh 2025.1 evidence exists."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.project.saved"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.project",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.project.saved",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.project.saved",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.project.saved.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.project.saved",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.project.saved",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
       },
       "version": "2025.1"
     },
@@ -10480,6 +12634,179 @@
       "usage_guidance": {
         "default_path": "candidate-sandbox-mutating-needs-2025-evidence",
         "notes": "Do not use 2024 evidence or manifest reflection as 2025.1 behavior proof; keep blocked until fresh 2025.1 evidence exists."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.soundbank.generated"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.soundbank",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.soundbank.generated",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.soundbank.generated",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.soundbank.generated.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.soundbank.generated",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "bankData",
+              "infoFile",
+              "pluginInfo",
+              "return"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.soundbank.generated",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.soundbank.generationDone"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.soundbank",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.soundbank.generationDone",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.soundbank.generationDone",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.soundbank.generationDone.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.soundbank.generationDone",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.soundbank.generationDone",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
       },
       "version": "2025.1"
     },
@@ -11705,6 +14032,178 @@
         "counts_as_behavioral": false,
         "counts_as_live_behavioral": false,
         "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.switchContainer.assignmentAdded"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.switchContainer",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.switchContainer.assignmentAdded",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.switchContainer.assignmentAdded",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.switchContainer.assignmentAdded.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.switchContainer.assignmentAdded",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "return"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.switchContainer.assignmentAdded",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.switchContainer.assignmentRemoved"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.switchContainer",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.switchContainer.assignmentRemoved",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.switchContainer.assignmentRemoved",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.switchContainer.assignmentRemoved.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.switchContainer.assignmentRemoved",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "return"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.switchContainer.assignmentRemoved",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
         "evidence": "2025.1 manifest/source-note/classification reconciliation only; no behavior evidence was created in this task.",
         "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
         "manifest_reflection_only": true,
@@ -12425,6 +14924,94 @@
         "counts_as_behavioral": false,
         "counts_as_live_behavioral": false,
         "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.core.transport.stateChanged"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "core.transport",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.core.transport.stateChanged",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.core.transport.stateChanged",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.core.transport.stateChanged.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.core.transport.stateChanged",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [
+              "transport"
+            ],
+            "required": [
+              "transport"
+            ],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.core.transport.stateChanged",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
         "evidence": "2025.1 manifest/source-note/classification reconciliation only; no behavior evidence was created in this task.",
         "evidence_standard": "2025.1 baseline is manifest/source-note/classification planning only; reflected inventory, 2024 evidence, and Task 6 candidate status do not count as 2025 behavioral proof.",
         "manifest_reflection_only": true,
@@ -13123,6 +15710,90 @@
       "usage_guidance": {
         "default_path": "deferred-needs-2025-evidence",
         "notes": "Do not use 2024 evidence or manifest reflection as 2025.1 behavior proof; keep blocked until fresh 2025.1 evidence exists."
+      },
+      "version": "2025.1"
+    },
+    {
+      "behavioral_evidence": {
+        "candidate_origin": "",
+        "candidate_status": "",
+        "counts_as_behavioral": false,
+        "counts_as_live_behavioral": false,
+        "coverage": "deferred",
+        "evidence": "Reflected in resources/manifest/2025.1/topics.json; no version-scoped live event publisher evidence was created.",
+        "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+        "manifest_reflection_only": true,
+        "parity_bucket": "deferred",
+        "previous_2024_status": "deferred",
+        "source_note_family": "",
+        "source_paths": [
+          "resources/manifest/2025.1/topics.json#ak.wwise.debug.assertFailed"
+        ],
+        "test": "tests/unit/test_2025_1_api_resource_coverage.py"
+      },
+      "candidate_status": "",
+      "category": "debug",
+      "coverage_status": "deferred",
+      "deferred": {
+        "behavioral_coverage": "deferred",
+        "blocker": "No version-scoped live publisher/subscription fixture evidence exists for this topic; inventory row is substitute coverage only.",
+        "blocking_condition": "Topic behavior requires a live event publisher and bounded subscription fixture; no Wwise launch or live event validation was performed for this task.",
+        "coverage_status": "deferred",
+        "evidence_source": "resources/manifest/2025.1/topics.json#ak.wwise.debug.assertFailed",
+        "live_applicability": "blocked-pending-fresh-2025.1-topic-live-evidence",
+        "reflection_evidence_path": "resources/manifest/2025.1/topics.json#ak.wwise.debug.assertFailed",
+        "review_trigger": "When fresh 2025.1 live topic publisher/subscription evidence exists for ak.wwise.debug.assertFailed.",
+        "status": true,
+        "substitute_test": "Manifest topic inventory assertion plus versioned coverage resource unit test; not behavioral coverage."
+      },
+      "destructive_opt_in": false,
+      "evidence_standard": "2025.1 topic coverage is manifest inventory/substitute accounting only: reflected topic presence, schema mapping, and bounded subscription route metadata do not count as behavioral proof. Active live validation remains blocked by the no-Wwise-launch instruction.",
+      "inventory_change": "unchanged",
+      "item_type": "topic",
+      "parity_bucket": "deferred",
+      "previous_2024_status": "deferred",
+      "risk_level": "medium",
+      "route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_2025_1_api_resource_coverage.py",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "safety": {
+        "classification": "deferred",
+        "deterministic_default": false,
+        "reason": "Topic callbacks require live WAAPI event publication; default coverage records substitute inventory only."
+      },
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2025.1/schemas.json#ak.wwise.debug.assertFailed",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "source_note_family": "",
+      "task6_classification_status": "",
+      "test_status": "deferred",
+      "uri": "ak.wwise.debug.assertFailed",
+      "usage_guidance": {
+        "default_path": "deferred-topic-substitute-inventory",
+        "notes": "Use SubscriptionManager.wait_for_event with a bounded timeout only when a version-scoped live publisher fixture is available; do not count manifest reflection as behavior."
       },
       "version": "2025.1"
     },
@@ -14264,29 +16935,29 @@
       "candidate-live-read-only": 4,
       "candidate-sandbox-mutating": 21
     },
-    "deferred": 153,
+    "deferred": 174,
     "excluded": 48,
     "forbidden_promoted_counts": {
       "live-tested": 1,
       "sandbox-mutating-tested": 10
     },
-    "implemented": 154,
+    "implemented": 185,
     "inventory_change_counts": {
-      "added": 6,
+      "added": 7,
       "changed": 53,
-      "unchanged": 95
+      "unchanged": 125
     },
     "live_tested": 1,
-    "manifest_only": 143,
+    "manifest_only": 174,
     "parity_bucket_counts": {
-      "deferred": 95,
+      "deferred": 126,
       "excluded": 48,
       "live-tested": 1,
       "manifest-only": 0,
       "sandbox-mutating-tested": 10
     },
-    "parity_bucket_total": 154,
-    "reflected_count": 154,
+    "parity_bucket_total": 185,
+    "reflected_count": 185,
     "source_note_family_counts": {
       "import": 2,
       "object-mutation": 10,
@@ -14296,12 +16967,13 @@
       "switchcontainer": 3
     },
     "status_counts": {
-      "deferred": 95,
+      "deferred": 126,
       "excluded": 48,
       "live-tested": 1,
       "sandbox-mutating-tested": 10
     },
     "total_functions": 154,
+    "total_topics": 31,
     "version": "2025.1"
   }
 }

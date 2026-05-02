@@ -298,6 +298,7 @@ def _assert_2025_resources_reconcile(
 ) -> None:
     reflected_function_uris = sorted(entry["uri"] for entry in manifest["functions"])
     reflected_topic_uris = sorted(entry["uri"] for entry in manifest["topics"])
+    reflected_inventory_uris = sorted({*reflected_function_uris, *reflected_topic_uris})
     coverage_entries = coverage["coverage"]
     matrix_entries = live_matrix["matrix"]
     summary_entries = phase2_summary["entries"]
@@ -314,11 +315,26 @@ def _assert_2025_resources_reconcile(
         dict(Counter(entry["parity_bucket"] for entry in coverage_entries)),
         coverage["summary"]["parity_bucket_counts"],
     )
+    function_entries = [entry for entry in coverage_entries if entry.get("item_type") != "topic"]
+    expected_function_status_counts = _counts_with_summary_zeroes(
+        dict(Counter(entry["coverage_status"] for entry in function_entries)),
+        live_matrix["summary"]["status_counts"],
+    )
+    expected_function_parity_counts = _counts_with_summary_zeroes(
+        dict(Counter(entry["parity_bucket"] for entry in function_entries)),
+        live_matrix["summary"]["parity_bucket_counts"],
+    )
     expected_candidate_counts = dict(
         sorted(Counter(entry["candidate_status"] for entry in coverage_entries if entry["candidate_status"]).items())
     )
+    expected_function_candidate_counts = dict(
+        sorted(Counter(entry["candidate_status"] for entry in function_entries if entry["candidate_status"]).items())
+    )
     expected_source_note_counts = dict(
         sorted(Counter(entry["source_note_family"] for entry in coverage_entries if entry["source_note_family"]).items())
+    )
+    expected_function_source_note_counts = dict(
+        sorted(Counter(entry["source_note_family"] for entry in function_entries if entry["source_note_family"]).items())
     )
     promoted_uris = {
         entry["uri"]
@@ -330,19 +346,20 @@ def _assert_2025_resources_reconcile(
 
     assert len(reflected_function_uris) == EXPECTED_2025_AUDIT_COUNTS[0], failure_context
     assert len(reflected_topic_uris) == EXPECTED_2025_AUDIT_COUNTS[1], failure_context
-    assert [entry["uri"] for entry in coverage_entries] == reflected_function_uris, failure_context
+    assert [entry["uri"] for entry in coverage_entries] == reflected_inventory_uris, failure_context
     assert [entry["uri"] for entry in matrix_entries] == reflected_function_uris, failure_context
     assert [entry["uri"] for entry in summary_entries] == reflected_function_uris, failure_context
-    assert len(coverage_by_uri) == len(matrix_by_uri) == len(summary_by_uri) == len(reflected_function_uris), failure_context
+    assert len(coverage_by_uri) == len(reflected_inventory_uris), failure_context
+    assert len(matrix_by_uri) == len(summary_by_uri) == len(reflected_function_uris), failure_context
     assert _version_set(coverage_entries) == {VERSION_2025}, failure_context
     assert _version_set(matrix_entries) == {VERSION_2025}, failure_context
     assert _version_set(summary_entries) == {VERSION_2025}, failure_context
 
     _assert_common_2025_metadata(coverage, live_matrix, phase2_summary, policy)
-    _assert_common_2025_summary(coverage, expected_status_counts, expected_parity_counts, expected_candidate_counts, expected_source_note_counts, len(reflected_function_uris), failure_context)
-    _assert_common_2025_summary(live_matrix, expected_status_counts, expected_parity_counts, expected_candidate_counts, expected_source_note_counts, len(reflected_function_uris), failure_context)
-    _assert_common_2025_summary(phase2_summary, expected_status_counts, expected_parity_counts, expected_candidate_counts, expected_source_note_counts, len(reflected_function_uris), failure_context)
-    _assert_common_2025_summary(policy, expected_status_counts, expected_parity_counts, expected_candidate_counts, expected_source_note_counts, len(reflected_function_uris), failure_context)
+    _assert_common_2025_summary(coverage, expected_status_counts, expected_parity_counts, expected_candidate_counts, expected_source_note_counts, len(reflected_inventory_uris), failure_context, total_functions=len(reflected_function_uris), total_topics=len(reflected_topic_uris))
+    _assert_common_2025_summary(live_matrix, expected_function_status_counts, expected_function_parity_counts, expected_function_candidate_counts, expected_function_source_note_counts, len(reflected_function_uris), failure_context)
+    _assert_common_2025_summary(phase2_summary, expected_function_status_counts, expected_function_parity_counts, expected_function_candidate_counts, expected_function_source_note_counts, len(reflected_function_uris), failure_context)
+    _assert_common_2025_summary(policy, expected_function_status_counts, expected_function_parity_counts, expected_function_candidate_counts, expected_function_source_note_counts, len(reflected_function_uris), failure_context)
     assert live_matrix["summary"]["behavioral_covered_count"] == len(behavioral_uris), failure_context
     assert live_matrix["summary"]["live_behavioral_covered_count"] == len(live_behavioral_uris), failure_context
     assert phase2_summary["summary"]["behavioral_covered_count"] == len(behavioral_uris), failure_context
@@ -361,7 +378,9 @@ def _assert_2025_resources_reconcile(
         uri for uri, entry in coverage_by_uri.items() if entry["coverage_status"] == "sandbox-mutating-tested"
     ), failure_context
     assert sorted(policy["policy"]["deferred_uris"] + policy["policy"]["excluded_uris"]) == sorted(
-        uri for uri, entry in coverage_by_uri.items() if entry["coverage_status"] in {"deferred", "excluded"}
+        uri
+        for uri, entry in coverage_by_uri.items()
+        if entry["coverage_status"] in {"deferred", "excluded"} and entry.get("item_type") != "topic"
     ), failure_context
     assert sorted(
         policy["policy"]["manifest_only_uris"]
@@ -369,10 +388,16 @@ def _assert_2025_resources_reconcile(
         + policy["policy"]["sandbox_mutating_tested_uris"]
     ) == reflected_function_uris, failure_context
 
+    topic_entries = [entry for entry in coverage_entries if entry.get("item_type") == "topic"]
+    assert sorted(entry["uri"] for entry in topic_entries) == reflected_topic_uris, failure_context
+    assert all(entry["behavioral_evidence"]["counts_as_behavioral"] is False for entry in topic_entries), failure_context
+    assert all(entry["behavioral_evidence"]["counts_as_live_behavioral"] is False for entry in topic_entries), failure_context
+    assert all("topic coverage is manifest inventory/substitute accounting only" in entry["evidence_standard"] for entry in topic_entries), failure_context
+
     blocked_uris = {
         entry["uri"]
         for entry in coverage_entries
-        if entry["coverage_status"] in {"deferred", "excluded"}
+        if entry["coverage_status"] in {"deferred", "excluded"} and entry.get("item_type") != "topic"
     }
     assert set(deferred_by_uri) == blocked_uris, failure_context
     assert deferred["summary"]["total"] == len(blocked_uris), failure_context
@@ -396,13 +421,17 @@ def _assert_2025_resources_reconcile(
             assert (ROOT / evidence_path).is_file(), failure_context
             assert not _has_forbidden_2025_text(evidence_path), failure_context
         for uri in note["endpoints"]:
-            if uri in coverage_by_uri:
+            if uri in coverage_by_uri and coverage_by_uri[uri].get("item_type") != "topic":
                 assert coverage_by_uri[uri]["source_note_family"] == family, failure_context
 
     _assert_2025_reference_docs_are_versioned(failure_context)
     _assert_optional_2025_waql_resources_are_versioned(failure_context)
 
     for uri, entry in coverage_by_uri.items():
+        if entry.get("item_type") == "topic":
+            assert uri not in matrix_by_uri, failure_context
+            assert uri not in summary_by_uri, failure_context
+            continue
         matrix_entry = matrix_by_uri[uri]
         summary_entry = summary_by_uri[uri]
         evidence = entry["behavioral_evidence"]
@@ -458,10 +487,15 @@ def _assert_common_2025_summary(
     expected_source_note_counts: dict[str, int],
     reflected_count: int,
     failure_context: str,
+    *,
+    total_functions: int | None = None,
+    total_topics: int | None = None,
 ) -> None:
     summary = payload["summary"]
     assert summary["reflected_count"] == reflected_count, failure_context
-    assert summary["total_functions"] == reflected_count, failure_context
+    assert summary["total_functions"] == (total_functions if total_functions is not None else reflected_count), failure_context
+    if total_topics is not None:
+        assert summary["total_topics"] == total_topics, failure_context
     assert summary["implemented"] == reflected_count, failure_context
     assert summary["manifest_only"] == reflected_count - summary["behavioral_supported"], failure_context
     assert summary["status_counts"] == expected_status_counts, failure_context
@@ -588,30 +622,49 @@ def _refresh_summaries(
     deferred: dict[str, Any],
 ) -> None:
     coverage_entries = coverage["coverage"]
-    status_counts = _counts_with_summary_zeroes(
+    function_entries = [entry for entry in coverage_entries if entry.get("item_type") != "topic"]
+    coverage_status_counts = _counts_with_summary_zeroes(
         dict(Counter(entry["coverage_status"] for entry in coverage_entries)),
         coverage["summary"]["status_counts"],
     )
-    parity_counts = _counts_with_summary_zeroes(
+    coverage_parity_counts = _counts_with_summary_zeroes(
         dict(Counter(entry["parity_bucket"] for entry in coverage_entries)),
         coverage["summary"]["parity_bucket_counts"],
     )
-    behavioral_supported = len(
+    function_status_counts = _counts_with_summary_zeroes(
+        dict(Counter(entry["coverage_status"] for entry in function_entries)),
+        live_matrix["summary"]["status_counts"],
+    )
+    function_parity_counts = _counts_with_summary_zeroes(
+        dict(Counter(entry["parity_bucket"] for entry in function_entries)),
+        live_matrix["summary"]["parity_bucket_counts"],
+    )
+    coverage_behavioral_supported = len(
         [entry for entry in coverage_entries if entry["behavioral_evidence"]["counts_as_behavioral"] is True]
     )
-    manifest_only = len(coverage_entries) - behavioral_supported
-    for payload in (coverage, live_matrix, phase2_summary, policy):
-        payload["summary"]["status_counts"] = status_counts
-        payload["summary"]["parity_bucket_counts"] = parity_counts
-        payload["summary"]["behavioral_supported"] = behavioral_supported
-        payload["summary"]["manifest_only"] = manifest_only
-        payload["summary"]["live_tested"] = status_counts["live-tested"]
+    function_behavioral_supported = len(
+        [entry for entry in function_entries if entry["behavioral_evidence"]["counts_as_behavioral"] is True]
+    )
+    coverage["summary"]["status_counts"] = coverage_status_counts
+    coverage["summary"]["parity_bucket_counts"] = coverage_parity_counts
+    coverage["summary"]["behavioral_supported"] = coverage_behavioral_supported
+    coverage["summary"]["manifest_only"] = len(coverage_entries) - coverage_behavioral_supported
+    coverage["summary"]["live_tested"] = coverage_status_counts["live-tested"]
+    coverage["summary"]["forbidden_promoted_counts"] = {
+        status: coverage_status_counts[status] for status in PROMOTED_2025_STATUSES
+    }
+    for payload in (live_matrix, phase2_summary, policy):
+        payload["summary"]["status_counts"] = function_status_counts
+        payload["summary"]["parity_bucket_counts"] = function_parity_counts
+        payload["summary"]["behavioral_supported"] = function_behavioral_supported
+        payload["summary"]["manifest_only"] = len(function_entries) - function_behavioral_supported
+        payload["summary"]["live_tested"] = function_status_counts["live-tested"]
         payload["summary"]["forbidden_promoted_counts"] = {
-            status: status_counts[status] for status in PROMOTED_2025_STATUSES
+            status: function_status_counts[status] for status in PROMOTED_2025_STATUSES
         }
         if "behavioral_covered_count" in payload["summary"]:
-            payload["summary"]["behavioral_covered_count"] = behavioral_supported
-            payload["summary"]["live_behavioral_covered_count"] = behavioral_supported
+            payload["summary"]["behavioral_covered_count"] = function_behavioral_supported
+            payload["summary"]["live_behavioral_covered_count"] = function_behavioral_supported
     deferred["summary"]["total"] = len(deferred["deferred"])
     deferred["summary"]["status_counts"] = dict(sorted(Counter(entry["coverage_status"] for entry in deferred["deferred"]).items()))
 

@@ -279,7 +279,7 @@ class Phase2CoverageSummaryBuilder:
             "achieved_status": achieved_status,
             "blocking_condition": "",
             "category": category,
-            "counts_as_behavioral": achieved_status in {"fake-route-tested", "live-sandbox-tested", "sandbox-mutating-tested", "soundengine-backed-tested"},
+            "counts_as_behavioral": achieved_status in {"live-sandbox-tested", "sandbox-mutating-tested", "soundengine-backed-tested"},
             "counts_as_live_behavioral": achieved_status in {"live-sandbox-tested", "sandbox-mutating-tested", "soundengine-backed-tested"},
             "evidence_command": "",
             "evidence_class": "",
@@ -496,22 +496,23 @@ class Phase2CoverageSummaryBuilder:
             for entry in entries
             if entry["achieved_status"] in {"wrapper-only", "skipped-approved", "conformance-only-skip"}
         }
-        behavioral_statuses = {"fake-route-tested", "live-sandbox-tested", "sandbox-mutating-tested", "soundengine-backed-tested"}
-        live_behavioral_statuses = {"live-sandbox-tested", "sandbox-mutating-tested", "soundengine-backed-tested"}
+        substitute_statuses = {"fake-route-tested"}
+        excluded_statuses = {"wrapper-only", "skipped-approved", "conformance-only-skip"}
         return {
-            "behavioral_covered_count": sum(1 for entry in entries if entry["achieved_status"] in behavioral_statuses),
-            "evidence_model": "Phase 2 statuses count inventory separately from behavioral/live coverage.",
-            "live_behavioral_covered_count": sum(
-                1 for entry in entries if entry["achieved_status"] in live_behavioral_statuses
-            ),
+            "behavioral_covered_count": sum(1 for entry in entries if entry["counts_as_behavioral"] is True),
+            "deferred_count": status_counts.get("still-deferred-with-evidence", 0),
+            "evidence_model": "Phase 2 statuses count inventory separately from behavioral/live coverage; fake-route and substitute evidence do not count as behavioral coverage.",
+            "excluded_count": sum(1 for entry in entries if entry["achieved_status"] in excluded_statuses),
+            "inventory_covered_count": len(entries),
+            "live_behavioral_covered_count": sum(1 for entry in entries if entry["counts_as_live_behavioral"] is True),
             "original_deferred_after_phase2": len(original_deferred_uris & still_deferred_uris),
-            "original_deferred_before_phase2": int(phase1_summary["deferred"]),
+            "original_deferred_before_phase2": int(phase1_summary.get("deferred_count", phase1_summary["deferred"])),
             "original_deferred_policy_approved": len(original_deferred_uris & policy_approved_uris),
             "original_deferred_promoted_behavioral": len(
                 [
                     entry
                     for entry in entries
-                    if entry["uri"] in original_deferred_uris and entry["achieved_status"] in live_behavioral_statuses
+                    if entry["uri"] in original_deferred_uris and entry["counts_as_live_behavioral"] is True
                 ]
             ),
             "original_fake_route_promoted_live": len(
@@ -527,6 +528,7 @@ class Phase2CoverageSummaryBuilder:
             "reflected_count": len(entries),
             "sandbox_mutating_tested_count": status_counts.get("sandbox-mutating-tested", 0),
             "soundengine_backed_tested_count": status_counts.get("soundengine-backed-tested", 0),
+            "substitute_covered_count": sum(1 for entry in entries if entry["achieved_status"] in substitute_statuses),
             "total_functions": int(phase1_summary["total_functions"]),
             "total_topics": int(phase1_summary["total_topics"]),
             "version": version,

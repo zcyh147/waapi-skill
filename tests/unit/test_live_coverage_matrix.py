@@ -127,6 +127,7 @@ def test_conformance_only_entries_have_policy_rationales_and_are_not_live_candid
 
 def test_matrix_points_to_final_phase21_consolidation_without_claiming_windows() -> None:
     consolidation = _matrix_payload()["metadata"]["phase2_consolidation"]
+    non_live_statuses = _matrix_payload()["metadata"]["does_not_count_as_live_behavioral_coverage"]
 
     assert consolidation["final_summary_resource"] == "resources/coverage/2022.1/phase2-coverage-summary.json"
     assert consolidation["audit_resource"] == "wwise_waapi/api_coverage_audit.py"
@@ -138,6 +139,7 @@ def test_matrix_points_to_final_phase21_consolidation_without_claiming_windows()
     ]
     assert consolidation["windows_validation"] == "pending"
     assert "final one-status-per-URI" in consolidation["policy"]
+    assert "fake-route-tested" in non_live_statuses
 
 
 def test_user_category_policy() -> None:

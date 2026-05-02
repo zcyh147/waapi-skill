@@ -1053,7 +1053,7 @@
         ".sisyphus/evidence/task-4-destructive-sandbox.txt",
         ".sisyphus/evidence/wwise-2023-test-parity/destructive/audio_import_generated_wav_readback_cleanup.json"
       ],
-      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2023.1 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
       "evidence_class": "live_behavioral_waapi"
     },
     {
@@ -1621,7 +1621,7 @@
         ".sisyphus/evidence/task-4-destructive-sandbox.txt",
         ".sisyphus/evidence/wwise-2023-test-parity/destructive/object_create_set_delete_readback.json"
       ],
-      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2023.1 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
       "evidence_class": "live_behavioral_waapi"
     },
     {
@@ -1713,7 +1713,7 @@
         ".sisyphus/evidence/task-4-destructive-sandbox.txt",
         ".sisyphus/evidence/wwise-2023-test-parity/destructive/object_create_set_delete_readback.json"
       ],
-      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2023.1 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
       "evidence_class": "live_behavioral_waapi"
     },
     {
@@ -2203,7 +2203,7 @@
         ".sisyphus/evidence/task-4-destructive-sandbox.txt",
         ".sisyphus/evidence/wwise-2023-test-parity/destructive/object_create_set_delete_readback.json"
       ],
-      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2023.1 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
       "evidence_class": "live_behavioral_waapi"
     },
     {
@@ -3423,7 +3423,7 @@
         ".sisyphus/evidence/task-4-destructive-sandbox.txt",
         ".sisyphus/evidence/wwise-2023-test-parity/destructive/soundbank_inclusions_replace_read_remove_cleanup.json"
       ],
-      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2023.1 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
       "evidence_class": "live_behavioral_waapi"
     },
     {
@@ -3687,7 +3687,7 @@
         ".sisyphus/evidence/task-4-destructive-sandbox.txt",
         ".sisyphus/evidence/wwise-2023-test-parity/destructive/switchcontainer_assignment_add_get_remove_cleanup.json"
       ],
-      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2023.1 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
       "evidence_class": "live_behavioral_waapi"
     },
     {
@@ -3807,7 +3807,7 @@
         ".sisyphus/evidence/task-4-destructive-sandbox.txt",
         ".sisyphus/evidence/wwise-2023-test-parity/destructive/switchcontainer_assignment_add_get_remove_cleanup.json"
       ],
-      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2023.1 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
       "evidence_class": "live_behavioral_waapi"
     },
     {
@@ -4035,7 +4035,7 @@
         ".sisyphus/evidence/task-4-destructive-sandbox.txt",
         ".sisyphus/evidence/wwise-2023-test-parity/destructive/undo_group_create_then_undo_readback.json"
       ],
-      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2023.1 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
       "evidence_class": "live_behavioral_waapi"
     },
     {
@@ -4095,7 +4095,7 @@
         ".sisyphus/evidence/task-4-destructive-sandbox.txt",
         ".sisyphus/evidence/wwise-2023-test-parity/destructive/undo_group_create_then_undo_readback.json"
       ],
-      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2023.1 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
       "evidence_class": "live_behavioral_waapi"
     },
     {
@@ -4155,7 +4155,7 @@
         ".sisyphus/evidence/task-4-destructive-sandbox.txt",
         ".sisyphus/evidence/wwise-2023-test-parity/destructive/undo_group_create_then_undo_readback.json"
       ],
-      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
+      "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2023.1 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py -q",
       "evidence_class": "live_behavioral_waapi"
     },
     {

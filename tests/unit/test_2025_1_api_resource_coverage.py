@@ -12,6 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2025.1"
 BASELINE_VERSION = "2024.1"
 FUNCTIONS_MANIFEST = REPO_ROOT / "resources" / "manifest" / VERSION / "functions.json"
+TOPICS_MANIFEST = REPO_ROOT / "resources" / "manifest" / VERSION / "topics.json"
 COVERAGE_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "api-coverage.json"
 CLASSIFICATION_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "added-api-classification.json"
 SOURCE_NOTES_RESOURCE = REPO_ROOT / "resources" / "semantic" / VERSION / "source_notes.json"
@@ -36,14 +37,16 @@ SANDBOX_MUTATING_TESTED_URIS = {
 }
 
 
-def test_2025_resource_covers_every_reflected_function_once_with_2025_paths() -> None:
-    reflected = sorted(_uris(FUNCTIONS_MANIFEST, "functions"))
+def test_2025_resource_covers_every_reflected_function_and_topic_once_with_2025_paths() -> None:
+    reflected = sorted(_uris(FUNCTIONS_MANIFEST, "functions") + _uris(TOPICS_MANIFEST, "topics"))
     payload = _coverage_payload()
     coverage = payload["coverage"]
     encoded = json.dumps(payload)
 
-    assert len(reflected) == 154
-    assert len(coverage) == 154
+    assert len(_uris(FUNCTIONS_MANIFEST, "functions")) == 154
+    assert len(_uris(TOPICS_MANIFEST, "topics")) == 31
+    assert len(reflected) == 185
+    assert len(coverage) == 185
     assert [entry["uri"] for entry in coverage] == reflected
     assert len({entry["uri"] for entry in coverage}) == len(coverage)
     assert payload["metadata"]["version"] == VERSION
@@ -62,7 +65,7 @@ def test_2025_coverage_entries_are_blocked_until_fresh_2025_evidence_exists() ->
         evidence = entry["behavioral_evidence"]
 
         assert entry["version"] == VERSION
-        assert entry["item_type"] == "function"
+        assert entry["item_type"] in {"function", "topic"}
         assert entry["category"] == expected.category
         assert entry["risk_level"] == expected.risk_level
         assert entry["schema_status"] == "ok", entry["uri"]
@@ -98,7 +101,11 @@ def test_2025_coverage_entries_are_blocked_until_fresh_2025_evidence_exists() ->
         assert evidence["manifest_reflection_only"] is True
         assert evidence["counts_as_behavioral"] is False
         assert evidence["counts_as_live_behavioral"] is False
-        assert "2024 evidence" in evidence["evidence_standard"]
+        if entry["item_type"] == "topic":
+            assert "topic coverage is manifest inventory/substitute accounting only" in evidence["evidence_standard"]
+            assert "no-Wwise-launch instruction" in evidence["evidence_standard"]
+        else:
+            assert "2024 evidence" in evidence["evidence_standard"]
         assert entry["coverage_status"] not in FORBIDDEN_PROMOTED_STATUSES, entry["uri"]
 
 
@@ -143,10 +150,11 @@ def test_2025_status_totals_record_zero_accidental_promotion_and_2024_comparison
     assert set(status_counts) == ALLOWED_STATUSES
     assert status_counts == _counts_with_zeroes(Counter(entry["coverage_status"] for entry in coverage), status_counts)
     assert parity_counts == _counts_with_zeroes(Counter(entry["parity_bucket"] for entry in coverage), parity_counts)
-    assert sum(status_counts.values()) == len(coverage) == 154
+    assert sum(status_counts.values()) == len(coverage) == 185
     assert payload["summary"]["total_functions"] == 154
-    assert payload["summary"]["implemented"] == 154
-    assert payload["summary"]["manifest_only"] == 153 - len(SANDBOX_MUTATING_TESTED_URIS)
+    assert payload["summary"]["total_topics"] == 31
+    assert payload["summary"]["implemented"] == 185
+    assert payload["summary"]["manifest_only"] == 184 - len(SANDBOX_MUTATING_TESTED_URIS)
     assert payload["summary"]["behavioral_supported"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
     assert payload["summary"]["live_tested"] == 1
     assert status_counts["live-tested"] == 1
@@ -154,15 +162,17 @@ def test_2025_status_totals_record_zero_accidental_promotion_and_2024_comparison
     assert parity_counts["live-tested"] == 1
     assert parity_counts["sandbox-mutating-tested"] == len(SANDBOX_MUTATING_TESTED_URIS)
     assert baseline["baseline_version"] == BASELINE_VERSION
-    assert baseline["baseline_reflected_count"] == len(_baseline_payload()["coverage"]) == 148
-    assert baseline["common_function_count"] == len({entry["uri"] for entry in coverage} & {entry["uri"] for entry in _baseline_payload()["coverage"]})
+    baseline_functions = [entry for entry in _baseline_payload()["coverage"] if entry["item_type"] == "function"]
+    coverage_functions = [entry for entry in coverage if entry["item_type"] == "function"]
+    assert baseline["baseline_reflected_count"] == len(baseline_functions) == 148
+    assert baseline["common_function_count"] == len({entry["uri"] for entry in coverage_functions} & {entry["uri"] for entry in baseline_functions})
     assert baseline["policy"] == "2024.1 evidence is comparison metadata only and never counts as 2025.1 proof."
 
 
 def test_2025_source_notes_are_context_not_behavior_proof() -> None:
     source_notes = _source_notes_payload()["notes"]
     source_uris = {uri for note in source_notes.values() for uri in note["endpoints"]}
-    coverage_by_uri = {entry["uri"]: entry for entry in _coverage_payload()["coverage"]}
+    coverage_by_uri = {entry["uri"]: entry for entry in _coverage_payload()["coverage"] if entry["item_type"] == "function"}
     covered_source_uris = source_uris & set(coverage_by_uri)
 
     assert covered_source_uris

@@ -232,6 +232,7 @@ def test_2024_coverage_policy_deferred_and_source_notes_reconcile_without_manife
 
     reflected_function_uris = sorted(entry["uri"] for entry in manifest["functions"])
     reflected_topic_uris = sorted(entry["uri"] for entry in manifest["topics"])
+    reflected_inventory_uris = sorted({*reflected_function_uris, *reflected_topic_uris})
     coverage_entries = coverage["coverage"]
     matrix_entries = live_matrix["matrix"]
     summary_entries = phase2_summary["entries"]
@@ -246,8 +247,20 @@ def test_2024_coverage_policy_deferred_and_source_notes_reconcile_without_manife
         dict(Counter(entry["parity_bucket"] for entry in coverage_entries)),
         coverage["summary"]["parity_bucket_counts"],
     )
+    function_entries = [entry for entry in coverage_entries if entry.get("item_type") != "topic"]
+    expected_function_status_counts = _counts_with_summary_zeroes(
+        dict(Counter(entry["coverage_status"] for entry in function_entries)),
+        live_matrix["summary"]["status_counts"],
+    )
+    expected_function_parity_counts = _counts_with_summary_zeroes(
+        dict(Counter(entry["parity_bucket"] for entry in function_entries)),
+        live_matrix["summary"]["parity_bucket_counts"],
+    )
     expected_source_note_counts = dict(
         sorted(Counter(entry["source_note_family"] for entry in coverage_entries if entry["source_note_family"]).items())
+    )
+    expected_function_source_note_counts = dict(
+        sorted(Counter(entry["source_note_family"] for entry in function_entries if entry["source_note_family"]).items())
     )
     promoted_uris = {
         entry["uri"]
@@ -258,16 +271,18 @@ def test_2024_coverage_policy_deferred_and_source_notes_reconcile_without_manife
     live_behavioral_uris = {entry["uri"] for entry in matrix_entries if entry["counts_as_live_behavioral"] is True}
 
     assert len(reflected_topic_uris) == len(manifest["topics"])
-    assert [entry["uri"] for entry in coverage_entries] == reflected_function_uris
+    assert [entry["uri"] for entry in coverage_entries] == reflected_inventory_uris
     assert [entry["uri"] for entry in matrix_entries] == reflected_function_uris
     assert [entry["uri"] for entry in summary_entries] == reflected_function_uris
-    assert len(coverage_by_uri) == len(matrix_by_uri) == len(summary_by_uri) == len(reflected_function_uris)
+    assert len(coverage_by_uri) == len(reflected_inventory_uris)
+    assert len(matrix_by_uri) == len(summary_by_uri) == len(reflected_function_uris)
     assert coverage["summary"]["total_functions"] == len(reflected_function_uris)
-    assert coverage["summary"]["implemented"] == len(reflected_function_uris)
-    assert coverage["summary"]["reflected_count"] == len(reflected_function_uris)
+    assert coverage["summary"]["total_topics"] == len(reflected_topic_uris)
+    assert coverage["summary"]["implemented"] == len(reflected_inventory_uris)
+    assert coverage["summary"]["reflected_count"] == len(reflected_inventory_uris)
     assert coverage["summary"]["status_counts"] == expected_status_counts
     assert coverage["summary"]["parity_bucket_counts"] == expected_parity_counts
-    assert coverage["summary"]["parity_bucket_total"] == len(reflected_function_uris)
+    assert coverage["summary"]["parity_bucket_total"] == len(reflected_inventory_uris)
     assert coverage["summary"]["manifest_only"] == len(
         [entry for entry in coverage_entries if entry["behavioral_evidence"]["manifest_reflection_only"] is True]
     )
@@ -278,12 +293,12 @@ def test_2024_coverage_policy_deferred_and_source_notes_reconcile_without_manife
     assert live_matrix["metadata"]["baseline_resource"] == "resources/coverage/2024.1/api-coverage.json"
     assert live_matrix["summary"]["reflected_count"] == len(reflected_function_uris)
     assert live_matrix["summary"]["total_functions"] == len(reflected_function_uris)
-    assert live_matrix["summary"]["status_counts"] == expected_status_counts
-    assert live_matrix["summary"]["parity_bucket_counts"] == expected_parity_counts
+    assert live_matrix["summary"]["status_counts"] == expected_function_status_counts
+    assert live_matrix["summary"]["parity_bucket_counts"] == expected_function_parity_counts
     assert live_matrix["summary"]["parity_bucket_total"] == len(reflected_function_uris)
     assert live_matrix["summary"]["behavioral_covered_count"] == len(behavioral_uris)
     assert live_matrix["summary"]["live_behavioral_covered_count"] == len(live_behavioral_uris)
-    assert live_matrix["summary"]["source_note_family_counts"] == expected_source_note_counts
+    assert live_matrix["summary"]["source_note_family_counts"] == expected_function_source_note_counts
     assert {entry["version"] for entry in matrix_entries} == {VERSION_2024}
     assert all(entry["source_coverage_uri"] == "resources/coverage/2024.1/api-coverage.json" for entry in matrix_entries)
 
@@ -291,20 +306,20 @@ def test_2024_coverage_policy_deferred_and_source_notes_reconcile_without_manife
     assert phase2_summary["metadata"]["live_matrix_resource"] == "resources/coverage/2024.1/live-coverage-matrix.json"
     assert phase2_summary["summary"]["reflected_count"] == len(reflected_function_uris)
     assert phase2_summary["summary"]["total_functions"] == len(reflected_function_uris)
-    assert phase2_summary["summary"]["status_counts"] == expected_status_counts
-    assert phase2_summary["summary"]["parity_bucket_counts"] == expected_parity_counts
+    assert phase2_summary["summary"]["status_counts"] == expected_function_status_counts
+    assert phase2_summary["summary"]["parity_bucket_counts"] == expected_function_parity_counts
     assert phase2_summary["summary"]["parity_bucket_total"] == len(reflected_function_uris)
     assert phase2_summary["summary"]["behavioral_covered_count"] == len(behavioral_uris)
     assert phase2_summary["summary"]["live_behavioral_covered_count"] == len(live_behavioral_uris)
-    assert phase2_summary["summary"]["source_note_family_counts"] == expected_source_note_counts
+    assert phase2_summary["summary"]["source_note_family_counts"] == expected_function_source_note_counts
 
     assigned_policy_uris = [uri for uris in policy["policy"]["parity_buckets"].values() for uri in uris]
     assert sorted(assigned_policy_uris) == reflected_function_uris
     assert len(assigned_policy_uris) == len(set(assigned_policy_uris)) == len(reflected_function_uris)
-    assert policy["summary"]["status_counts"] == expected_status_counts
-    assert policy["summary"]["parity_bucket_counts"] == expected_parity_counts
+    assert policy["summary"]["status_counts"] == expected_function_status_counts
+    assert policy["summary"]["parity_bucket_counts"] == expected_function_parity_counts
     assert policy["summary"]["parity_bucket_total"] == len(reflected_function_uris)
-    assert policy["summary"]["source_note_family_counts"] == expected_source_note_counts
+    assert policy["summary"]["source_note_family_counts"] == expected_function_source_note_counts
     assert sorted(policy["policy"]["live_tested_uris"]) == sorted(
         uri for uri, entry in coverage_by_uri.items() if entry["coverage_status"] == "live-tested"
     )
@@ -312,15 +327,23 @@ def test_2024_coverage_policy_deferred_and_source_notes_reconcile_without_manife
         uri for uri, entry in coverage_by_uri.items() if entry["coverage_status"] == "sandbox-mutating-tested"
     )
     assert sorted(policy["policy"]["deferred_uris"] + policy["policy"]["excluded_uris"]) == sorted(
-        uri for uri, entry in coverage_by_uri.items() if entry["coverage_status"] in {"deferred", "excluded"}
+        uri
+        for uri, entry in coverage_by_uri.items()
+        if entry["coverage_status"] in {"deferred", "excluded"} and entry.get("item_type") != "topic"
     )
 
     deferred_entries = deferred["deferred"]
     deferred_by_uri = {entry["uri"]: entry for entry in deferred_entries}
+    topic_entries = [entry for entry in coverage_entries if entry.get("item_type") == "topic"]
+    assert sorted(entry["uri"] for entry in topic_entries) == reflected_topic_uris
+    assert all(entry["behavioral_evidence"]["counts_as_behavioral"] is False for entry in topic_entries)
+    assert all(entry["behavioral_evidence"]["counts_as_live_behavioral"] is False for entry in topic_entries)
+    assert all("topic coverage is manifest inventory/substitute accounting only" in entry["evidence_standard"] for entry in topic_entries)
+
     blocked_uris = {
         entry["uri"]
         for entry in coverage_entries
-        if entry["coverage_status"] in {"deferred", "excluded"}
+        if entry["coverage_status"] in {"deferred", "excluded"} and entry.get("item_type") != "topic"
     }
     assert set(deferred_by_uri) == blocked_uris
     assert deferred["summary"]["total"] == len(blocked_uris)
@@ -340,6 +363,10 @@ def test_2024_coverage_policy_deferred_and_source_notes_reconcile_without_manife
     assert source_notes["notebook_id"] == NOTEBOOK_2024
 
     for uri, entry in coverage_by_uri.items():
+        if entry.get("item_type") == "topic":
+            assert uri not in matrix_by_uri
+            assert uri not in summary_by_uri
+            continue
         matrix_entry = matrix_by_uri[uri]
         summary_entry = summary_by_uri[uri]
         evidence = entry["behavioral_evidence"]
