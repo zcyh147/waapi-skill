@@ -20,7 +20,8 @@
       },
       "sample_project": {
         "name": "SampleProject",
-        "path": "/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj"
+        "path": "<local-path-redacted>",
+        "path_status": "matched-exact-expected-path"
       }
     },
     "schema_source_uri": "ak.wwise.waapi.getSchema",
@@ -34,7 +35,8 @@
     ],
     "version_key": "2021.1",
     "wwise_build": "2021.1.14.8108",
-    "wwise_console_path": "/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh",
+    "wwise_console_path": "<local-path-redacted>",
+    "wwise_console_path_status": "matched-exact-expected-path",
     "wwise_version_target": "2021.1"
   },
   "topics": [

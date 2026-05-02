@@ -12,12 +12,12 @@ from wwise_waapi.manifest import (  # pyright: ignore[reportMissingImports]
 
 
 RESOURCE_ROOT = Path("resources") / "manifest"
+EVIDENCE_ROOT = Path(".sisyphus") / "evidence" / "wwise-2021-waapi-integration-coverage"
+TASK_REFLECTION_EVIDENCE = EVIDENCE_ROOT / "task-4-reflection.json"
+RAW_REFLECTION_EVIDENCE = EVIDENCE_ROOT / "reflection" / "raw-reflection.json"
 VERSION = "2021.1"
 BUILD = "2021.1.14.8108"
-CONSOLE_PATH = "/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh"
-SAMPLE_PROJECT_PATH = (
-    "/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj"
-)
+REDACTED_LOCAL_PATH = "<local-path-redacted>"
 SOURCE_URIS = [
     "ak.wwise.waapi.getFunctions",
     "ak.wwise.waapi.getTopics",
@@ -63,14 +63,16 @@ def test_2021_1_manifest_files_exist_and_metadata_records_live_provenance() -> N
         assert metadata["version_key"] == VERSION
         assert metadata["wwise_version_target"] == VERSION
         assert metadata["wwise_build"] == BUILD
-        assert metadata["wwise_console_path"] == CONSOLE_PATH
+        assert metadata["wwise_console_path"] == REDACTED_LOCAL_PATH
+        assert metadata["wwise_console_path_status"] == "matched-exact-expected-path"
         assert metadata["inventory_source"] == "live-reflection-2021.1-sandbox-manifest"
         assert metadata["source_uris"] == SOURCE_URIS
         assert metadata["schema_source_uri"] == "ak.wwise.waapi.getSchema"
         assert metadata["schema_source_uris"] == ["ak.wwise.waapi.getSchema"]
         assert metadata["provenance"]["sample_project"] == {
             "name": "SampleProject",
-            "path": SAMPLE_PROJECT_PATH,
+            "path": REDACTED_LOCAL_PATH,
+            "path_status": "matched-exact-expected-path",
         }
         get_info = metadata["provenance"]["get_info"]
         assert get_info["branch"] == "wwise_v2021.1"
@@ -119,12 +121,11 @@ def test_2021_1_manifest_store_loads_2021_1_only_without_newer_fallbacks() -> No
 
 
 def test_2021_1_manifest_reflection_payloads_do_not_expose_local_paths() -> None:
-    reflected_payload = {
-        "functions": _load_split_file("functions.json")["functions"],
-        "topics": _load_split_file("topics.json")["topics"],
-        "schemas": _load_split_file("schemas.json")["schemas"],
+    resource_payloads = {
+        filename: _load_split_file(filename)
+        for filename in ("manifest.json", "functions.json", "topics.json", "schemas.json")
     }
-    serialized = json.dumps(reflected_payload, sort_keys=True)
+    serialized = json.dumps(resource_payloads, sort_keys=True)
 
     assert "/Applications/Audiokinetic" not in serialized
     assert "/Users/" not in serialized
@@ -134,7 +135,30 @@ def test_2021_1_manifest_reflection_payloads_do_not_expose_local_paths() -> None
     assert "Z:\\\\Applications" not in serialized
     assert "Y:\\\\" not in serialized
     assert ".sisyphus/runtime" not in serialized
-    assert SAMPLE_PROJECT_PATH not in serialized
+
+
+def test_2021_1_reflection_evidence_is_present_and_path_scrubbed() -> None:
+    task_evidence = json.loads(TASK_REFLECTION_EVIDENCE.read_text(encoding="utf-8"))
+    raw_evidence = json.loads(RAW_REFLECTION_EVIDENCE.read_text(encoding="utf-8"))
+    serialized = json.dumps({"raw": raw_evidence, "task": task_evidence}, sort_keys=True)
+
+    assert task_evidence["status"] == "reflected"
+    assert task_evidence["audit"] == _load_split_file("manifest.json")["audit"]
+    assert task_evidence["read_only_waapi_operations"] == ["ak.wwise.core.getInfo", *SOURCE_URIS]
+    assert task_evidence["get_info"]["version"]["build"] == 8108
+    assert "/Applications/Audiokinetic" not in serialized
+    assert "/Users/" not in serialized
+    assert "/Volumes/" not in serialized
+    assert "/private/" not in serialized
+    assert "/tmp/" not in serialized
+    assert "C:\\\\Users" not in serialized
+    assert "Z:\\\\Applications" not in serialized
+    assert "Y:\\\\" not in serialized
+    assert ".sisyphus/runtime" not in serialized
+    assert "processId" not in task_evidence["get_info"]
+    assert "sessionId" not in task_evidence["get_info"]
+    assert "processId" not in raw_evidence["get_info"]
+    assert "sessionId" not in raw_evidence["get_info"]
 
 
 def test_2021_1_manifest_serialization_is_deterministic() -> None:
