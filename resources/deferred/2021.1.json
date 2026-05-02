@@ -1592,30 +1592,6 @@
       "coverage_status": "deferred",
       "date": "2026-05-02",
       "destructive_applicability": "not-destructive-by-uri-risk",
-      "evidence_source": "resources/semantic/2021.1/source_notes.json#notes.switchcontainer + resources/manifest/2021.1/functions.json#ak.wwise.core.switchContainer.addAssignment",
-      "family": "switchcontainer",
-      "inventory_coverage": "reflected-2021.1-schema-ok",
-      "item_type": "function",
-      "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
-      "owner_follow_up": "Add fresh 2021.1 behavior-backed coverage or explicit policy review before promotion.",
-      "reason": "Reflected in the 2021.1 manifest, but only source/reflection inventory evidence exists for this URI.",
-      "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.switchContainer.addAssignment",
-      "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.switchContainer changes.",
-      "risk_level": "medium",
-      "source_evidence_path": "resources/semantic/2021.1/source_notes.json#notes.switchcontainer",
-      "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage.",
-      "tool_version": "wwise_waapi.api_coverage_audit+deferred_registry 2021.1 task5 2026-05-02",
-      "uri": "ak.wwise.core.switchContainer.addAssignment",
-      "version": "2021.1"
-    },
-    {
-      "behavioral_coverage": "deferred",
-      "blocker": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
-      "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
-      "category": "core.switchContainer",
-      "coverage_status": "deferred",
-      "date": "2026-05-02",
-      "destructive_applicability": "not-destructive-by-uri-risk",
       "evidence_source": "resources/semantic/2021.1/source_notes.json#notes.switchcontainer + resources/manifest/2021.1/functions.json#ak.wwise.core.switchContainer.getAssignments",
       "family": "switchcontainer",
       "inventory_coverage": "reflected-2021.1-schema-ok",
@@ -1630,30 +1606,6 @@
       "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage.",
       "tool_version": "wwise_waapi.api_coverage_audit+deferred_registry 2021.1 task5 2026-05-02",
       "uri": "ak.wwise.core.switchContainer.getAssignments",
-      "version": "2021.1"
-    },
-    {
-      "behavioral_coverage": "deferred",
-      "blocker": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
-      "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
-      "category": "core.switchContainer",
-      "coverage_status": "deferred",
-      "date": "2026-05-02",
-      "destructive_applicability": "not-destructive-by-uri-risk",
-      "evidence_source": "resources/semantic/2021.1/source_notes.json#notes.switchcontainer + resources/manifest/2021.1/functions.json#ak.wwise.core.switchContainer.removeAssignment",
-      "family": "switchcontainer",
-      "inventory_coverage": "reflected-2021.1-schema-ok",
-      "item_type": "function",
-      "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
-      "owner_follow_up": "Add fresh 2021.1 behavior-backed coverage or explicit policy review before promotion.",
-      "reason": "Reflected in the 2021.1 manifest, but only source/reflection inventory evidence exists for this URI.",
-      "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.switchContainer.removeAssignment",
-      "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.switchContainer changes.",
-      "risk_level": "medium",
-      "source_evidence_path": "resources/semantic/2021.1/source_notes.json#notes.switchcontainer",
-      "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage.",
-      "tool_version": "wwise_waapi.api_coverage_audit+deferred_registry 2021.1 task5 2026-05-02",
-      "uri": "ak.wwise.core.switchContainer.removeAssignment",
       "version": "2021.1"
     },
     {
@@ -2187,7 +2139,7 @@
   ],
   "metadata": {
     "coverage_resource": "resources/coverage/2021.1/api-coverage.json",
-    "evidence_policy": "2021.1 source notes and reflection are inventory-only; Task 7 promotes only ak.wwise.core.object.get with fresh exact-version read-only live evidence, Task 10 promotes reflected object CRUD/undo URIs with fresh copied-sandbox destructive evidence, and Task 11 promotes only ak.wwise.core.audio.import and ak.wwise.core.soundbank.setInclusions with fresh copied-sandbox destructive evidence. No 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
+    "evidence_policy": "2021.1 source notes and reflection are inventory-only; Task 7 promotes only ak.wwise.core.object.get with fresh exact-version read-only live evidence, Task 10 promotes reflected object CRUD/undo URIs with fresh copied-sandbox destructive evidence, Task 11 promotes only ak.wwise.core.audio.import and ak.wwise.core.soundbank.setInclusions with fresh copied-sandbox destructive evidence, and Task 12 promotes only ak.wwise.core.switchContainer.addAssignment and ak.wwise.core.switchContainer.removeAssignment with fresh copied-sandbox destructive evidence. No 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
     "generator": "task-5-deterministic-2021.1-deferred-registry",
     "manifest_source": "resources/manifest/2021.1/functions.json",
     "version": "2021.1"
@@ -2195,21 +2147,21 @@
   "summary": {
     "classification_counts": {
       "behavioral": 0,
-      "deferred": 45,
+      "deferred": 43,
       "excluded": 46,
       "live-tested": 1,
-      "sandbox-mutating-tested": 7,
+      "sandbox-mutating-tested": 9,
       "supported": 0
     },
-    "deferred_count": 45,
-    "deferred_registry_entries": 91,
+    "deferred_count": 43,
+    "deferred_registry_entries": 89,
     "excluded_count": 46,
     "reflected_total": 99,
     "status_counts": {
-      "deferred": 45,
+      "deferred": 43,
       "excluded": 46
     },
-    "total": 91,
+    "total": 89,
     "version": "2021.1"
   }
 }

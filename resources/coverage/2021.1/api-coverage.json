@@ -6508,42 +6508,48 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "2021.1 source/reflection accounting only; no behavior evidence was created in this task.",
-        "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": "Fresh 2021.1 copied-sandbox destructive behavior passed for ak.wwise.core.switchContainer.addAssignment.",
+        "evidence_path": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/destructive/switchcontainer_assignment_add_remove_readback_cleanup.json",
+        "evidence_standard": "Fresh 2021.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2021-waapi-integration-coverage/destructive/switchcontainer_assignment_add_remove_readback_cleanup.json plus .sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-12-switchcontainer-assignment.json counts as behavioral/live proof for ak.wwise.core.switchContainer.addAssignment.",
+        "fixture_prerequisites": [
+          ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-12-switchcontainer-assignment.json",
+          ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/destructive/switchcontainer_assignment_add_remove_readback_cleanup.json"
+        ],
+        "live_command_evidence": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-12-switchcontainer-assignment.json",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
         "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.switchcontainer",
         "source_note_family": "switchcontainer",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.switchcontainer",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.switchContainer.addAssignment"
         ],
-        "test": "tests/unit/test_2021_1_api_resource_coverage.py"
+        "test": "tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py"
       },
       "category": "core.switchContainer",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocker": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
-        "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
-        "coverage_status": "deferred",
-        "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/semantic/2021.1/source_notes.json#notes.switchcontainer + resources/manifest/2021.1/functions.json#ak.wwise.core.switchContainer.addAssignment",
-        "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocker": "Cleared by fresh 2021.1 copied-sandbox destructive switchContainer assignment evidence with before/add/remove readback, cleanup, and source immutability assertions.",
+        "blocking_condition": "Cleared by fresh 2021.1 copied-sandbox destructive switchContainer assignment evidence with before/add/remove readback, cleanup, and source immutability assertions.",
+        "coverage_status": "sandbox-mutating-tested",
+        "destructive_applicability": "destructive-opt-in-required",
+        "evidence_source": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/destructive/switchcontainer_assignment_add_remove_readback_cleanup.json",
+        "live_applicability": "fresh-2021.1-copied-sandbox-destructive-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.switchContainer.addAssignment",
-        "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.switchContainer changes.",
+        "review_trigger": "When the 2021.1 destructive copied-sandbox switchContainer assignment behavior contract changes or evidence is refreshed.",
         "source_evidence_path": "resources/semantic/2021.1/source_notes.json#notes.switchcontainer",
-        "status": true,
-        "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py."
       },
-      "destructive_opt_in": false,
-      "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
+      "destructive_opt_in": true,
+      "evidence_standard": "Fresh 2021.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2021-waapi-integration-coverage/destructive/switchcontainer_assignment_add_remove_readback_cleanup.json plus .sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-12-switchcontainer-assignment.json counts as behavioral/live proof for ak.wwise.core.switchContainer.addAssignment.",
       "family": "switchcontainer",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
         "deferred_registry_required": true,
@@ -6553,9 +6559,9 @@
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "Reflected in the 2021.1 manifest, but only source/reflection inventory evidence exists for this URI."
+        "reason": "Fresh 2021.1 destructive copied-sandbox test passed with reversible switchContainer assignment mutation, readback, cleanup, and source immutability guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2021.1/schemas.json#ak.wwise.core.switchContainer.addAssignment",
@@ -6586,11 +6592,11 @@
       },
       "schema_status": "ok",
       "source_note_family": "switchcontainer",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.switchContainer.addAssignment",
       "usage_guidance": {
-        "default_path": "blocked-by-2021.1-evidence-gate",
-        "notes": "Do not use reflection, source notes, skipped live/destructive tests, or newer-version evidence as 2021.1 behavioral proof."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Use only with WWISE_LIVE=1, WWISE_DESTRUCTIVE=1, exact 2021.1 installed paths, and copied-sandbox safety gates."
       },
       "version": "2021.1"
     },
@@ -6684,42 +6690,48 @@
     },
     {
       "behavioral_evidence": {
-        "counts_as_behavioral": false,
-        "counts_as_live_behavioral": false,
-        "coverage": "deferred",
-        "evidence": "2021.1 source/reflection accounting only; no behavior evidence was created in this task.",
-        "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
-        "manifest_reflection_only": true,
-        "parity_bucket": "deferred",
+        "counts_as_behavioral": true,
+        "counts_as_live_behavioral": true,
+        "coverage": "sandbox-mutating-tested",
+        "evidence": "Fresh 2021.1 copied-sandbox destructive behavior passed for ak.wwise.core.switchContainer.removeAssignment.",
+        "evidence_path": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/destructive/switchcontainer_assignment_add_remove_readback_cleanup.json",
+        "evidence_standard": "Fresh 2021.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2021-waapi-integration-coverage/destructive/switchcontainer_assignment_add_remove_readback_cleanup.json plus .sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-12-switchcontainer-assignment.json counts as behavioral/live proof for ak.wwise.core.switchContainer.removeAssignment.",
+        "fixture_prerequisites": [
+          ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-12-switchcontainer-assignment.json",
+          ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/destructive/switchcontainer_assignment_add_remove_readback_cleanup.json"
+        ],
+        "live_command_evidence": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-12-switchcontainer-assignment.json",
+        "manifest_reflection_only": false,
+        "parity_bucket": "sandbox-mutating-tested",
         "source_note_evidence": "resources/semantic/2021.1/source_notes.json#notes.switchcontainer",
         "source_note_family": "switchcontainer",
         "source_paths": [
           "resources/semantic/2021.1/source_notes.json#notes.switchcontainer",
           "resources/manifest/2021.1/functions.json#ak.wwise.core.switchContainer.removeAssignment"
         ],
-        "test": "tests/unit/test_2021_1_api_resource_coverage.py"
+        "test": "tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py"
       },
       "category": "core.switchContainer",
-      "coverage_status": "deferred",
+      "coverage_status": "sandbox-mutating-tested",
       "deferred": {
-        "behavioral_coverage": "deferred",
-        "blocker": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
-        "blocking_condition": "Requires dedicated fresh 2021.1 behavioral evidence before supported, live, sandbox, or destructive promotion.",
-        "coverage_status": "deferred",
-        "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/semantic/2021.1/source_notes.json#notes.switchcontainer + resources/manifest/2021.1/functions.json#ak.wwise.core.switchContainer.removeAssignment",
-        "live_applicability": "blocked-pending-fresh-2021.1-live-evidence",
+        "behavioral_coverage": "sandbox-mutating-tested",
+        "blocker": "Cleared by fresh 2021.1 copied-sandbox destructive switchContainer assignment evidence with before/add/remove readback, cleanup, and source immutability assertions.",
+        "blocking_condition": "Cleared by fresh 2021.1 copied-sandbox destructive switchContainer assignment evidence with before/add/remove readback, cleanup, and source immutability assertions.",
+        "coverage_status": "sandbox-mutating-tested",
+        "destructive_applicability": "destructive-opt-in-required",
+        "evidence_source": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/destructive/switchcontainer_assignment_add_remove_readback_cleanup.json",
+        "live_applicability": "fresh-2021.1-copied-sandbox-destructive-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.switchContainer.removeAssignment",
-        "review_trigger": "When fresh 2021.1 behavioral tests, live evidence, destructive sandbox evidence, or policy for core.switchContainer changes.",
+        "review_trigger": "When the 2021.1 destructive copied-sandbox switchContainer assignment behavior contract changes or evidence is refreshed.",
         "source_evidence_path": "resources/semantic/2021.1/source_notes.json#notes.switchcontainer",
-        "status": true,
-        "substitute_test": "tests/unit/test_2021_1_api_resource_coverage.py and tests/unit/test_2021_1_deferred_registry.py validate manifest accounting, schema presence, and deferral metadata only; not behavioral coverage."
+        "status": false,
+        "substitute_test": "Not deferred; covered by tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py."
       },
-      "destructive_opt_in": false,
-      "evidence_standard": "2021.1 coverage is manifest/reflection/source-note accounting only: source notes and Task 4 reflection prove inventory presence, not behavior. Skipped live/destructive tests are never counted, and no 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
+      "destructive_opt_in": true,
+      "evidence_standard": "Fresh 2021.1 copied-sandbox destructive behavior evidence in .sisyphus/evidence/wwise-2021-waapi-integration-coverage/destructive/switchcontainer_assignment_add_remove_readback_cleanup.json plus .sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-12-switchcontainer-assignment.json counts as behavioral/live proof for ak.wwise.core.switchContainer.removeAssignment.",
       "family": "switchcontainer",
       "item_type": "function",
-      "parity_bucket": "deferred",
+      "parity_bucket": "sandbox-mutating-tested",
       "risk_level": "medium",
       "route": {
         "deferred_registry_required": true,
@@ -6729,9 +6741,9 @@
         "target": "WwiseDispatcher.dispatch"
       },
       "safety": {
-        "classification": "deferred",
+        "classification": "sandbox-mutating-tested",
         "deterministic_default": false,
-        "reason": "Reflected in the 2021.1 manifest, but only source/reflection inventory evidence exists for this URI."
+        "reason": "Fresh 2021.1 destructive copied-sandbox test passed with reversible switchContainer assignment mutation, readback, cleanup, and source immutability guards."
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2021.1/schemas.json#ak.wwise.core.switchContainer.removeAssignment",
@@ -6762,11 +6774,11 @@
       },
       "schema_status": "ok",
       "source_note_family": "switchcontainer",
-      "test_status": "deferred",
+      "test_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.switchContainer.removeAssignment",
       "usage_guidance": {
-        "default_path": "blocked-by-2021.1-evidence-gate",
-        "notes": "Do not use reflection, source notes, skipped live/destructive tests, or newer-version evidence as 2021.1 behavioral proof."
+        "default_path": "sandbox-mutating-tested",
+        "notes": "Use only with WWISE_LIVE=1, WWISE_DESTRUCTIVE=1, exact 2021.1 installed paths, and copied-sandbox safety gates."
       },
       "version": "2021.1"
     },
@@ -8828,7 +8840,7 @@
       "sandbox-mutating-tested"
     ],
     "deferred_source": "resources/deferred/2021.1.json",
-    "evidence_policy": "2021.1 source notes and reflection are inventory-only; Task 7 promotes only ak.wwise.core.object.get with fresh exact-version read-only live evidence, Task 10 promotes reflected object CRUD/undo URIs with fresh copied-sandbox destructive evidence, and Task 11 promotes only ak.wwise.core.audio.import and ak.wwise.core.soundbank.setInclusions with fresh copied-sandbox destructive evidence. No 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
+    "evidence_policy": "2021.1 source notes and reflection are inventory-only; Task 7 promotes only ak.wwise.core.object.get with fresh exact-version read-only live evidence, Task 10 promotes reflected object CRUD/undo URIs with fresh copied-sandbox destructive evidence, Task 11 promotes only ak.wwise.core.audio.import and ak.wwise.core.soundbank.setInclusions with fresh copied-sandbox destructive evidence, and Task 12 promotes only ak.wwise.core.switchContainer.addAssignment and ak.wwise.core.switchContainer.removeAssignment with fresh copied-sandbox destructive evidence. No 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
     "generator": "task-5-deterministic-2021.1-coverage-resource",
     "manifest_source": "resources/manifest/2021.1",
     "reflected_counts": {
@@ -8855,8 +8867,8 @@
   },
   "summary": {
     "behavioral": 0,
-    "behavioral_supported": 8,
-    "deferred": 45,
+    "behavioral_supported": 10,
+    "deferred": 43,
     "destructive_opt_in": 39,
     "excluded": 46,
     "implemented": 99,
@@ -8864,21 +8876,21 @@
     "live_tested": 1,
     "parity_bucket_counts": {
       "behavioral": 0,
-      "deferred": 45,
+      "deferred": 43,
       "excluded": 46,
       "live-tested": 1,
-      "sandbox-mutating-tested": 7,
+      "sandbox-mutating-tested": 9,
       "supported": 0
     },
     "parity_bucket_total": 99,
     "reflected_total": 99,
-    "sandbox-mutating-tested": 7,
+    "sandbox-mutating-tested": 9,
     "status_counts": {
       "behavioral": 0,
-      "deferred": 45,
+      "deferred": 43,
       "excluded": 46,
       "live-tested": 1,
-      "sandbox-mutating-tested": 7,
+      "sandbox-mutating-tested": 9,
       "supported": 0
     },
     "supported": 0,

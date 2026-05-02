@@ -1,7 +1,7 @@
 {
   "metadata": {
     "api_coverage_resource": "resources/coverage/2021.1/api-coverage.json",
-    "evidence_policy": "2021.1 source notes and reflection are inventory-only; Task 7 promotes only ak.wwise.core.object.get with fresh exact-version read-only live evidence, Task 10 promotes reflected object CRUD/undo URIs with fresh copied-sandbox destructive evidence, and Task 11 promotes only ak.wwise.core.audio.import and ak.wwise.core.soundbank.setInclusions with fresh copied-sandbox destructive evidence. No 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
+    "evidence_policy": "2021.1 source notes and reflection are inventory-only; Task 7 promotes only ak.wwise.core.object.get with fresh exact-version read-only live evidence, Task 10 promotes reflected object CRUD/undo URIs with fresh copied-sandbox destructive evidence, Task 11 promotes only ak.wwise.core.audio.import and ak.wwise.core.soundbank.setInclusions with fresh copied-sandbox destructive evidence, and Task 12 promotes only ak.wwise.core.switchContainer.addAssignment and ak.wwise.core.switchContainer.removeAssignment with fresh copied-sandbox destructive evidence. No 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
     "generator": "task-5-deterministic-2021.1-uri-policy",
     "version": "2021.1"
   },
@@ -12,6 +12,8 @@
       "ak.wwise.core.object.delete",
       "ak.wwise.core.object.setNotes",
       "ak.wwise.core.soundbank.setInclusions",
+      "ak.wwise.core.switchContainer.addAssignment",
+      "ak.wwise.core.switchContainer.removeAssignment",
       "ak.wwise.core.undo.beginGroup",
       "ak.wwise.core.undo.endGroup"
     ],
@@ -51,9 +53,7 @@
         "ak.wwise.core.remote.getConnectionStatus",
         "ak.wwise.core.soundbank.generate",
         "ak.wwise.core.soundbank.getInclusions",
-        "ak.wwise.core.switchContainer.addAssignment",
         "ak.wwise.core.switchContainer.getAssignments",
-        "ak.wwise.core.switchContainer.removeAssignment",
         "ak.wwise.core.transport.create",
         "ak.wwise.core.transport.destroy",
         "ak.wwise.core.transport.executeAction",
@@ -121,6 +121,8 @@
         "ak.wwise.core.object.delete",
         "ak.wwise.core.object.setNotes",
         "ak.wwise.core.soundbank.setInclusions",
+        "ak.wwise.core.switchContainer.addAssignment",
+        "ak.wwise.core.switchContainer.removeAssignment",
         "ak.wwise.core.undo.beginGroup",
         "ak.wwise.core.undo.endGroup"
       ],
@@ -160,9 +162,7 @@
       "ak.wwise.core.remote.getConnectionStatus",
       "ak.wwise.core.soundbank.generate",
       "ak.wwise.core.soundbank.getInclusions",
-      "ak.wwise.core.switchContainer.addAssignment",
       "ak.wwise.core.switchContainer.getAssignments",
-      "ak.wwise.core.switchContainer.removeAssignment",
       "ak.wwise.core.transport.create",
       "ak.wwise.core.transport.destroy",
       "ak.wwise.core.transport.executeAction",
@@ -260,9 +260,7 @@
         "ak.wwise.core.remote.getConnectionStatus",
         "ak.wwise.core.soundbank.generate",
         "ak.wwise.core.soundbank.getInclusions",
-        "ak.wwise.core.switchContainer.addAssignment",
         "ak.wwise.core.switchContainer.getAssignments",
-        "ak.wwise.core.switchContainer.removeAssignment",
         "ak.wwise.core.transport.create",
         "ak.wwise.core.transport.destroy",
         "ak.wwise.core.transport.executeAction",
@@ -330,6 +328,8 @@
         "ak.wwise.core.object.delete",
         "ak.wwise.core.object.setNotes",
         "ak.wwise.core.soundbank.setInclusions",
+        "ak.wwise.core.switchContainer.addAssignment",
+        "ak.wwise.core.switchContainer.removeAssignment",
         "ak.wwise.core.undo.beginGroup",
         "ak.wwise.core.undo.endGroup"
       ],
@@ -341,34 +341,36 @@
       "ak.wwise.core.object.delete",
       "ak.wwise.core.object.setNotes",
       "ak.wwise.core.soundbank.setInclusions",
+      "ak.wwise.core.switchContainer.addAssignment",
+      "ak.wwise.core.switchContainer.removeAssignment",
       "ak.wwise.core.undo.beginGroup",
       "ak.wwise.core.undo.endGroup"
     ],
-    "source_only_evidence_policy": "2021.1 source notes and reflection are inventory support only, not behavior proof; Task 7 promotes object.get, Task 10 promotes reflected copied-sandbox CRUD/undo URIs, and Task 11 promotes only audio.import and soundbank.setInclusions from copied-sandbox destructive evidence.",
+    "source_only_evidence_policy": "2021.1 source notes and reflection are inventory support only, not behavior proof; Task 7 promotes object.get, Task 10 promotes reflected copied-sandbox CRUD/undo URIs, Task 11 promotes only audio.import and soundbank.setInclusions from copied-sandbox destructive evidence, and Task 12 promotes only switchContainer addAssignment/removeAssignment from copied-sandbox destructive evidence.",
     "supported_uris": []
   },
   "summary": {
     "classification_counts": {
       "behavioral": 0,
-      "deferred": 45,
+      "deferred": 43,
       "excluded": 46,
       "live-tested": 1,
-      "sandbox-mutating-tested": 7,
+      "sandbox-mutating-tested": 9,
       "supported": 0
     },
-    "deferred": 45,
+    "deferred": 43,
     "excluded": 46,
     "parity_bucket_counts": {
       "behavioral": 0,
-      "deferred": 45,
+      "deferred": 43,
       "excluded": 46,
       "live-tested": 1,
-      "sandbox-mutating-tested": 7,
+      "sandbox-mutating-tested": 9,
       "supported": 0
     },
     "parity_bucket_total": 99,
     "reflected_total": 99,
-    "sandbox-mutating-tested": 7,
+    "sandbox-mutating-tested": 9,
     "unknown": 0,
     "version": "2021.1"
   }

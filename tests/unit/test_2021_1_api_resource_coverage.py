@@ -27,6 +27,8 @@ SANDBOX_MUTATING_TESTED_URIS = {
     "ak.wwise.core.object.delete",
     "ak.wwise.core.object.setNotes",
     "ak.wwise.core.soundbank.setInclusions",
+    "ak.wwise.core.switchContainer.addAssignment",
+    "ak.wwise.core.switchContainer.removeAssignment",
     "ak.wwise.core.undo.beginGroup",
     "ak.wwise.core.undo.endGroup",
 }
@@ -103,6 +105,7 @@ def test_2021_entries_are_deferred_or_excluded_without_behavioral_promotion() ->
             assert evidence["live_command_evidence"] in {
                 ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-10-object-crud.json",
                 ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-11-soundbank-audio.json",
+                ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-12-switchcontainer-assignment.json",
             }
             continue
 
@@ -135,10 +138,10 @@ def test_2021_classification_accounting_has_zero_unknowns() -> None:
     assert status_counts == {
         "supported": 0,
         "behavioral": 0,
-        "deferred": 45,
+        "deferred": 43,
         "excluded": 46,
         "live-tested": 1,
-        "sandbox-mutating-tested": 7,
+        "sandbox-mutating-tested": 9,
     }
     assert payload["summary"]["unknown"] == 0
     assert payload["summary"]["behavioral_supported"] == 1 + len(SANDBOX_MUTATING_TESTED_URIS)
