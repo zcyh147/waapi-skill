@@ -2,24 +2,24 @@
   "case_id": "switchcontainer_assignment_add_get_remove_cleanup",
   "cleanup": "assignment is removed and disposable objects are deleted before test exit",
   "details": {
-    "active_destructive_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/sample-project-e8dc3c34248d4524b6aa574719bc2258/SampleProject.wproj",
+    "active_destructive_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/2024.1-destructive/sample-project-498412669a21445593c4ea7d40e3d3f3/SampleProject.wproj",
     "assignments_after_add": [
       {
-        "child": "{6776F345-20C6-48F0-BDEC-56C2FCD1A5CA}",
-        "stateOrSwitch": "{F4FC5434-802C-4F07-94E8-86402CD86ECB}"
+        "child": "{3300C93F-0CA2-442C-A456-4D86BABC5291}",
+        "stateOrSwitch": "{B45A8245-3D1C-4289-922D-976D59C033FC}"
       }
     ],
     "assignments_after_remove": [],
     "assignments_before": [],
     "read_after_target_delete": [],
-    "sandbox_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/sample-project-e8dc3c34248d4524b6aa574719bc2258/SampleProject.wproj",
+    "sandbox_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/2024.1-destructive/sample-project-498412669a21445593c4ea7d40e3d3f3/SampleProject.wproj",
     "source_immutability_guard": "Destructive2024SandboxRuntime.assert_source_unchanged runs on exit",
-    "switch_container_id": "{E0C5887A-543A-4C9E-B768-877781EE24F4}",
-    "switch_group_id": "{3562796B-1382-41F6-9E78-FD1F5F7D3AC5}",
-    "switch_id": "{F4FC5434-802C-4F07-94E8-86402CD86ECB}",
-    "target_id": "{6776F345-20C6-48F0-BDEC-56C2FCD1A5CA}"
+    "switch_container_id": "{514438FE-2BCD-4CA1-ABC4-8DB5748A50CC}",
+    "switch_group_id": "{90932CB9-F5AB-48C3-893C-BE550B2B0EAC}",
+    "switch_id": "{B45A8245-3D1C-4289-922D-976D59C033FC}",
+    "target_id": "{3300C93F-0CA2-442C-A456-4D86BABC5291}"
   },
-  "recorded_at_unix": 1777641880,
+  "recorded_at_unix": 1777744214,
   "sandbox_required": true,
   "source_project_mutation_allowed": false,
   "status": "passed",
