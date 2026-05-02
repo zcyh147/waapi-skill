@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from tests.support.active_gate_failures import skip_or_fail_strict_real  # pyright: ignore[reportMissingImports]
 from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImports]
     ENV_WWISE_CONSOLE,
     ENV_WWISE_LIVE,
@@ -99,4 +100,4 @@ def _skip_with_prerequisite_evidence(reason: str) -> None:
         "recorded_at_unix": int(time.time()),
     }
     PREREQUISITE_EVIDENCE.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    pytest.skip(reason)
+    skip_or_fail_strict_real(reason)

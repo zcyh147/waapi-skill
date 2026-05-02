@@ -13,7 +13,7 @@ from typing import Any, Callable, Iterator, Mapping
 
 import pytest  # pyright: ignore[reportMissingImports]
 
-from tests.support.active_gate_failures import fail_if_active_runtime_failure  # pyright: ignore[reportMissingImports]
+from tests.support.active_gate_failures import skip_or_fail_unavailable  # pyright: ignore[reportMissingImports]
 from wwise_waapi.headless import HeadlessLifecycleError, default_waapi_client_factory  # pyright: ignore[reportMissingImports]
 from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImports]
     LiveEnvironmentError,
@@ -75,9 +75,9 @@ def run_versioned_topic_plan(version: str, plan_path: Path, test_node: str) -> N
             assert hash_project(sandbox.source_root, preferred_strategy="bounded").digest == source_hash_before.digest
             failed = False
     except (LiveEnvironmentError, SandboxFixtureError, HeadlessLifecycleError, OSError) as exc:
+        context = f"{version} live object/topic sandbox environment blocked execution"
         _write_run_blocker(version, test_node, exc)
-        fail_if_active_runtime_failure(exc, f"{version} live object/topic sandbox environment blocked execution")
-        pytest.skip(f"{version} live object/topic sandbox environment blocked execution: {type(exc).__name__}: {exc}")
+        skip_or_fail_unavailable(exc, context)
     finally:
         if client is not None:
             client.disconnect()

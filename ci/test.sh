@@ -224,20 +224,48 @@ set_mode_flags() {
     live)
       export WWISE_LIVE="1"
       export WWISE_DESTRUCTIVE="0"
+      export WWISE_STRICT_REAL="1"
       ;;
     destructive)
       export WWISE_LIVE="1"
       export WWISE_DESTRUCTIVE="1"
+      export WWISE_STRICT_REAL="1"
       ;;
     smoke)
       export WWISE_LIVE="1"
       export WWISE_DESTRUCTIVE="0"
+      export WWISE_STRICT_REAL="1"
       ;;
     nonlive|default)
       export WWISE_LIVE="0"
       export WWISE_DESTRUCTIVE="0"
+      export WWISE_STRICT_REAL="0"
       ;;
   esac
+}
+
+require_real_prerequisites() {
+  local v="$1"
+  local m="$2"
+  if [[ "${WWISE_STRICT_REAL:-0}" != "1" ]]; then
+    return 0
+  fi
+  if [[ -z "${WWISE_CONSOLE:-}" ]]; then
+    echo "Strict real $m for $v requires WWISE_CONSOLE to be set" >&2
+    exit 1
+  fi
+  if [[ ! -f "$WWISE_CONSOLE" || ! -x "$WWISE_CONSOLE" ]]; then
+    echo "Strict real $m for $v requires executable WWISE_CONSOLE: $WWISE_CONSOLE" >&2
+    exit 1
+  fi
+  if [[ -z "${WWISE_SAMPLE_PROJECT_PATH:-}" ]]; then
+    echo "Strict real $m for $v requires WWISE_SAMPLE_PROJECT_PATH to be set" >&2
+    exit 1
+  fi
+  if [[ ! -f "$WWISE_SAMPLE_PROJECT_PATH" || "$WWISE_SAMPLE_PROJECT_PATH" != *.wproj ]]; then
+    echo "Strict real $m for $v requires an existing .wproj WWISE_SAMPLE_PROJECT_PATH: $WWISE_SAMPLE_PROJECT_PATH" >&2
+    exit 1
+  fi
 }
 
 run_pytest() {
@@ -258,6 +286,7 @@ run_smoke_for_version() {
   local v="$1"
   set_version_environment "$v" "smoke"
   set_mode_flags "smoke"
+  require_real_prerequisites "$v" "smoke"
   print_context "$v" "smoke"
   (
     cd "$ROOT_DIR"
@@ -300,15 +329,16 @@ run_live_for_version() {
   local v="$1"
   set_version_environment "$v" "live"
   set_mode_flags "live"
+  require_real_prerequisites "$v" "live"
   print_context "$v" "live"
 
   case "$v" in
     2021.1)
       run_pytest \
-        tests/live/test_2021_1_live_prerequisites.py \
-        tests/live/test_2021_1_reflection_prerequisites.py \
-        tests/live/test_2021_1_object_get_matrix.py \
-        tests/live/test_2021_1_object_topics_sandbox.py
+        tests/live/test_2021_1_live_prerequisites.py::test_2021_1_live_read_only_prerequisites_validate_exact_get_info_before_matrix \
+        tests/live/test_2021_1_reflection_prerequisites.py::test_2021_1_live_reflection_prerequisites_and_resource_generation \
+        tests/live/test_2021_1_object_get_matrix.py::test_2021_1_live_waql_object_get_matrix_runs_read_only_against_sandbox \
+        tests/live/test_2021_1_object_topics_sandbox.py::test_2021_1_live_safe_object_topics_against_sandbox
       ;;
     2022.1)
       echo "Focused live matrix is not defined for 2022.1; use smoke mode for this version." >&2
@@ -316,23 +346,20 @@ run_live_for_version() {
       ;;
     2023.1)
       run_pytest \
-        tests/live/test_2023_live_prerequisites.py \
-        tests/live/test_2023_reflection_inventory.py \
-        tests/live/test_2023_waql_live_matrix.py
+        tests/live/test_2023_reflection_inventory.py::test_2023_live_reflection_inventory_runs_against_sandbox \
+        tests/live/test_2023_waql_live_matrix.py::test_2023_live_waql_object_get_matrix_runs_read_only_against_sandbox
       ;;
     2024.1)
       run_pytest \
-        tests/live/test_2024_live_prerequisites.py \
-        tests/live/test_2024_reflection_inventory.py \
-        tests/live/test_2024_waql_live_matrix.py \
-        tests/live/test_2024_object_topics_sandbox.py
+        tests/live/test_2024_reflection_inventory.py::test_2024_live_reflection_inventory_runs_against_sandbox \
+        tests/live/test_2024_waql_live_matrix.py::test_2024_live_waql_object_get_matrix_runs_read_only_against_sandbox \
+        tests/live/test_2024_object_topics_sandbox.py::test_2024_1_live_safe_object_topics_against_sandbox
       ;;
     2025.1)
       run_pytest \
-        tests/live/test_2025_1_live_prerequisites.py \
-        tests/live/test_2025_1_reflection_inventory.py \
-        tests/live/test_2025_1_waql_live_matrix.py \
-        tests/live/test_2025_1_object_topics_sandbox.py
+        tests/live/test_2025_1_reflection_inventory.py::test_2025_live_reflection_inventory_runs_against_sandbox \
+        tests/live/test_2025_1_waql_live_matrix.py::test_2025_live_waql_object_get_matrix_runs_read_only_against_sandbox \
+        tests/live/test_2025_1_object_topics_sandbox.py::test_2025_1_live_safe_object_topics_against_sandbox
       ;;
     *)
       echo "Unsupported live version: $v" >&2
@@ -345,6 +372,7 @@ run_destructive_for_version() {
   local v="$1"
   set_version_environment "$v" "destructive"
   set_mode_flags "destructive"
+  require_real_prerequisites "$v" "destructive"
   print_context "$v" "destructive"
 
   case "$v" in

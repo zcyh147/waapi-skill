@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 
 import pytest  # pyright: ignore[reportMissingImports]
@@ -28,8 +29,21 @@ def fail_if_active_runtime_failure(exc: BaseException, context: str) -> None:
 
 
 def skip_or_fail_unavailable(exc: BaseException, context: str | None = None) -> None:
-    fail_if_active_runtime_failure(exc, context or str(exc))
+    failure_context = context or str(exc)
+    fail_if_active_runtime_failure(exc, failure_context)
+    if strict_real_mode_enabled():
+        pytest.fail(f"{failure_context}: strict real Wwise prerequisite unavailable: {type(exc).__name__}: {exc}")
     pytest.skip(str(exc))
+
+
+def skip_or_fail_strict_real(reason: str) -> None:
+    if strict_real_mode_enabled():
+        pytest.fail(f"strict real Wwise prerequisite unavailable: {reason}")
+    pytest.skip(reason)
+
+
+def strict_real_mode_enabled() -> bool:
+    return os.getenv("WWISE_STRICT_REAL") == "1"
 
 
 def active_runtime_failure(exc: BaseException) -> BaseException | None:

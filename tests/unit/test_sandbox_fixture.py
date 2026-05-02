@@ -10,7 +10,9 @@ import pytest  # pyright: ignore[reportMissingImports]
 import wwise_waapi.live_environment as live_env  # pyright: ignore[reportMissingImports]
 import wwise_waapi.sandbox_fixture as sandbox_fixture  # pyright: ignore[reportMissingImports]
 from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
+    ENV_WWISE_REAL_LAUNCH_AUDIT_PATH,
     ENV_WWISE_SANDBOX_KEEP_ON_FAILURE,
+    ENV_WWISE_STRICT_REAL,
     KEEP_ON_FAILURE_ROOT,
     SandboxFixtureError,
     cleanup_sandbox,
@@ -50,6 +52,10 @@ def base_env(console: Path, project: Path, sandbox_root: Path) -> dict[str, str]
         "WWISE_SAMPLE_PROJECT_PATH": str(project),
         "WWISE_SANDBOX_ROOT": str(sandbox_root),
     }
+
+
+class FakeProcess:
+    pid = 4242
 
 
 def test_prepare_and_cleanup_success_preserves_source_immutability(tmp_path: Path) -> None:
@@ -174,14 +180,16 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
 
     class FakeLifecycle:
         def __init__(self, **kwargs: Any) -> None:
-            self.process = object()
+            self.process = FakeProcess()
             self.port = 31337
             self.project_path = kwargs["project_path"]
             self.command = [str(kwargs["console_path"]), "waapi-server", str(self.project_path), "--wamp-port", str(self.port)]
+            self.ready_result: object = None
             seen_project_paths.append(self.project_path)
 
         def run_until_ready(self) -> object:
-            return {"ok": True}
+            self.ready_result = {"version": {"displayName": "fake Wwise 2024.1"}}
+            return self.ready_result
 
         def shutdown(self, suppress_errors: bool = True) -> None:
             self.process = None
@@ -194,9 +202,125 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
     assert seen_project_paths == [sandbox.sandbox_project]
     assert str(source_project) not in " ".join(sandbox.metadata.command or [])
     assert sandbox.metadata.selected_port == 31337
+    assert sandbox.metadata.launch_project_path == str(sandbox.sandbox_project)
+    assert sandbox.metadata.ready_duration_seconds is not None
+    assert sandbox.metadata.get_info_version == {"displayName": "fake Wwise 2024.1"}
+    assert sandbox.metadata.get_info_display_name == "fake Wwise 2024.1"
     assert sandbox.metadata.identity_verified is True
     assert sandbox.metadata.process_cleanup_result == "cleaned"
     cleanup_sandbox(sandbox)
+
+
+def test_strict_real_launch_audit_is_written_after_shutdown(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    console = make_console(tmp_path)
+    source_project = make_sample_project(tmp_path / "source")
+    env = base_env(console, source_project, tmp_path / "sandbox-root")
+    audit_path = tmp_path / "evidence" / "real-launches.jsonl"
+    monkeypatch.setenv(ENV_WWISE_STRICT_REAL, "1")
+    monkeypatch.setenv(ENV_WWISE_REAL_LAUNCH_AUDIT_PATH, str(audit_path))
+    sandbox = prepare_sample_project_sandbox(env)
+
+    class FakeLifecycle:
+        def __init__(self, **kwargs: Any) -> None:
+            self.process = FakeProcess()
+            self.port = 31337
+            self.project_path = kwargs["project_path"]
+            self.command = [str(kwargs["console_path"]), "waapi-server", str(self.project_path), "--wamp-port", str(self.port)]
+            self.ready_result: object = None
+
+        def run_until_ready(self) -> object:
+            self.ready_result = {"version": {"displayName": "fake Wwise 2024.1", "year": 2024}}
+            return self.ready_result
+
+        def shutdown(self, suppress_errors: bool = True) -> None:
+            self.process = None
+
+    monkeypatch.setattr(sandbox_fixture, "HeadlessLifecycle", FakeLifecycle)
+
+    lifecycle = launch_sandboxed_wwise(sandbox, env)
+    shutdown_sandboxed_wwise(lifecycle, sandbox)
+
+    records = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
+    assert len(records) == 1
+    record = records[0]
+    assert record["wwise_version"] == "2022.1"
+    assert record["pid"] == 4242
+    assert record["port"] == 31337
+    assert record["command"] == [str(console), "waapi-server", str(sandbox.sandbox_project), "--wamp-port", "31337"]
+    assert record["launch_project_path"] == str(sandbox.sandbox_project)
+    assert record["sandbox_project_path"] == str(sandbox.sandbox_project)
+    assert record["ready_duration_seconds"] >= 0
+    assert record["get_info_version"] == {"displayName": "fake Wwise 2024.1", "year": 2024}
+    assert record["get_info_display_name"] == "fake Wwise 2024.1"
+    assert record["cleanup_result"] == "cleaned"
+    assert isinstance(record["recorded_at_unix"], int)
+    cleanup_sandbox(sandbox)
+
+
+def test_non_strict_launch_does_not_write_persistent_audit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    console = make_console(tmp_path)
+    source_project = make_sample_project(tmp_path / "source")
+    env = base_env(console, source_project, tmp_path / "sandbox-root")
+    audit_path = tmp_path / "evidence" / "real-launches.jsonl"
+    monkeypatch.delenv(ENV_WWISE_STRICT_REAL, raising=False)
+    monkeypatch.setenv(ENV_WWISE_REAL_LAUNCH_AUDIT_PATH, str(audit_path))
+    sandbox = prepare_sample_project_sandbox(env)
+
+    class FakeLifecycle:
+        def __init__(self, **kwargs: Any) -> None:
+            self.process = FakeProcess()
+            self.port = 31337
+            self.project_path = kwargs["project_path"]
+            self.command = [str(kwargs["console_path"]), "waapi-server", str(self.project_path), "--wamp-port", str(self.port)]
+            self.ready_result: object = None
+
+        def run_until_ready(self) -> object:
+            self.ready_result = {"version": {"displayName": "fake Wwise 2024.1"}}
+            return self.ready_result
+
+        def shutdown(self, suppress_errors: bool = True) -> None:
+            self.process = None
+
+    monkeypatch.setattr(sandbox_fixture, "HeadlessLifecycle", FakeLifecycle)
+
+    lifecycle = launch_sandboxed_wwise(sandbox, env)
+    shutdown_sandboxed_wwise(lifecycle, sandbox)
+
+    assert not audit_path.exists()
+    cleanup_sandbox(sandbox)
+
+
+def test_launch_shuts_down_when_ready_proof_is_invalid(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    console = make_console(tmp_path)
+    source_project = make_sample_project(tmp_path / "source")
+    env = base_env(console, source_project, tmp_path / "sandbox-root")
+    sandbox = prepare_sample_project_sandbox(env)
+    shutdown_calls: list[bool] = []
+
+    class FakeLifecycle:
+        def __init__(self, **kwargs: Any) -> None:
+            self.process = FakeProcess()
+            self.port = 31338
+            self.project_path = kwargs["project_path"]
+            self.command = [str(kwargs["console_path"]), "waapi-server", str(self.project_path), "--wamp-port", str(self.port)]
+            self.ready_result: object = None
+
+        def run_until_ready(self) -> object:
+            self.ready_result = {"version": {}}
+            return self.ready_result
+
+        def shutdown(self, suppress_errors: bool = True) -> None:
+            shutdown_calls.append(suppress_errors)
+            self.process = None
+
+    monkeypatch.setattr(sandbox_fixture, "HeadlessLifecycle", FakeLifecycle)
+
+    try:
+        with pytest.raises(SandboxFixtureError, match="displayName"):
+            launch_sandboxed_wwise(sandbox, env)
+        assert shutdown_calls == [True]
+    finally:
+        cleanup_sandbox(sandbox, failed=True)
 
 
 def test_missing_copied_wproj_is_rejected(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

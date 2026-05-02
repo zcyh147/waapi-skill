@@ -12,7 +12,7 @@ import uuid
 from contextlib import AbstractContextManager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Mapping
+from typing import Any, Mapping
 
 from .headless import HeadlessLifecycle, LifecycleTimeouts
 from .live_environment import (  # pyright: ignore[reportMissingImports]
@@ -31,9 +31,12 @@ from .live_environment import (  # pyright: ignore[reportMissingImports]
 
 
 ENV_WWISE_SANDBOX_KEEP_ON_FAILURE = "WWISE_SANDBOX_KEEP_ON_FAILURE"
+ENV_WWISE_STRICT_REAL = "WWISE_STRICT_REAL"
+ENV_WWISE_REAL_LAUNCH_AUDIT_PATH = "WWISE_REAL_LAUNCH_AUDIT_PATH"
 DEFAULT_SANDBOX_ROOT = Path(".sisyphus") / "runtime" / "wwise-waapi-sandboxes"
 KEEP_ON_FAILURE_ROOT = Path(".sisyphus") / "evidence" / "wwise-waapi-live-sandbox-coverage"
 LOCK_FILE_NAME = ".wwise-live-sandbox.lock"
+REAL_LAUNCH_AUDIT_PATH = Path(".sisyphus") / "evidence" / "waapi-test-remediation" / "real-wwise-launches.jsonl"
 
 
 class SandboxFixtureError(RuntimeError):
@@ -67,6 +70,11 @@ class SandboxMetadata:
     source_mtime_after: float | None = None
     selected_port: int | None = None
     command: list[str] | None = None
+    process_pid: int | None = None
+    launch_project_path: str | None = None
+    ready_duration_seconds: float | None = None
+    get_info_version: dict[str, Any] | None = None
+    get_info_display_name: str | None = None
     process_cleanup_result: str | None = None
     keep_decision: str = "pending"
     metadata_path: str | None = None
@@ -220,11 +228,23 @@ def launch_sandboxed_wwise(
         timeouts=timeouts or _timeouts_from_env(env_map),
     )
     try:
+        ready_started = time.perf_counter()
         lifecycle.run_until_ready()
-        sandbox.metadata.selected_port = lifecycle.port
-        sandbox.metadata.command = list(lifecycle.command)
-        sandbox.metadata.identity_verified = verify_project_identity(sandbox)
-        return lifecycle
+        ready_duration = time.perf_counter() - ready_started
+        try:
+            ready_info = require_lifecycle_ready_proof(lifecycle)
+            sandbox.metadata.selected_port = lifecycle.port
+            sandbox.metadata.command = list(lifecycle.command)
+            sandbox.metadata.process_pid = getattr(lifecycle.process, "pid", None)
+            sandbox.metadata.launch_project_path = str(sandbox.sandbox_project)
+            sandbox.metadata.ready_duration_seconds = ready_duration
+            sandbox.metadata.get_info_version = dict(ready_info["version"])
+            sandbox.metadata.get_info_display_name = _get_info_display_name(ready_info)
+            sandbox.metadata.identity_verified = verify_project_identity(sandbox)
+            return lifecycle
+        except BaseException:
+            lifecycle.shutdown(suppress_errors=True)
+            raise
     finally:
         sandbox.write_metadata()
 
@@ -258,9 +278,96 @@ def shutdown_sandboxed_wwise(
     except BaseException as exc:
         sandbox.metadata.process_cleanup_result = f"error:{type(exc).__name__}:{exc}"
         sandbox.write_metadata()
+        _append_strict_real_launch_audit(sandbox)
         raise
     sandbox.metadata.process_cleanup_result = "cleaned" if lifecycle.process is None else "still-running"
     sandbox.write_metadata()
+    _append_strict_real_launch_audit(sandbox)
+
+
+def _append_strict_real_launch_audit(sandbox: SandboxProject) -> None:
+    if os.getenv(ENV_WWISE_STRICT_REAL) != "1":
+        return
+    payload = _strict_real_launch_audit_payload(sandbox)
+    audit_path = _real_launch_audit_path()
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    with audit_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, sort_keys=True) + "\n")
+
+
+def _strict_real_launch_audit_payload(sandbox: SandboxProject) -> dict[str, Any]:
+    metadata = sandbox.metadata
+    missing = [
+        name
+        for name, value in (
+            ("process_pid", metadata.process_pid),
+            ("selected_port", metadata.selected_port),
+            ("command", metadata.command),
+            ("launch_project_path", metadata.launch_project_path),
+            ("ready_duration_seconds", metadata.ready_duration_seconds),
+            ("get_info_version", metadata.get_info_version),
+            ("get_info_display_name", metadata.get_info_display_name),
+        )
+        if value in (None, [], {})
+    ]
+    if missing:
+        raise SandboxFixtureError(f"strict real launch audit missing proven field(s): {', '.join(missing)}")
+    return {
+        "recorded_at_unix": int(time.time()),
+        "wwise_version": metadata.wwise_version,
+        "pid": metadata.process_pid,
+        "port": metadata.selected_port,
+        "command": list(metadata.command or []),
+        "launch_project_path": metadata.launch_project_path,
+        "sandbox_project_path": metadata.sandbox_project_path,
+        "ready_duration_seconds": metadata.ready_duration_seconds,
+        "get_info_version": metadata.get_info_version,
+        "get_info_display_name": metadata.get_info_display_name,
+        "cleanup_result": metadata.process_cleanup_result,
+        "metadata_path": metadata.metadata_path,
+    }
+
+
+def _real_launch_audit_path() -> Path:
+    configured = os.getenv(ENV_WWISE_REAL_LAUNCH_AUDIT_PATH)
+    if configured:
+        return Path(configured).expanduser().resolve(strict=False)
+    return (Path.cwd() / REAL_LAUNCH_AUDIT_PATH).resolve(strict=False)
+
+
+def require_lifecycle_ready_proof(lifecycle: HeadlessLifecycle) -> Mapping[str, Any]:
+    """Require real WwiseConsole WAAPI readiness proof from getInfo."""
+
+    ready_result = lifecycle.ready_result
+    if not isinstance(ready_result, Mapping):
+        raise SandboxFixtureError(
+            f"WwiseConsole readiness proof must be a getInfo mapping; got {type(ready_result).__name__}"
+        )
+    version = ready_result.get("version")
+    if not isinstance(version, Mapping):
+        raise SandboxFixtureError(f"WwiseConsole getInfo proof is missing version mapping: {ready_result!r}")
+    display_name = _get_info_display_name(ready_result)
+    if not display_name:
+        raise SandboxFixtureError(f"WwiseConsole getInfo proof is missing displayName: {ready_result!r}")
+    if lifecycle.process is None:
+        raise SandboxFixtureError("WwiseConsole readiness proof requires a launched process")
+    if lifecycle.port is None:
+        raise SandboxFixtureError("WwiseConsole readiness proof requires a selected WAAPI port")
+    if not lifecycle.command:
+        raise SandboxFixtureError("WwiseConsole readiness proof requires the launch command")
+    return ready_result
+
+
+def _get_info_display_name(info: Mapping[str, Any]) -> str | None:
+    top_level_display_name = info.get("displayName")
+    if isinstance(top_level_display_name, str) and top_level_display_name:
+        return top_level_display_name
+    version = info.get("version")
+    if isinstance(version, Mapping):
+        version_display_name = version.get("displayName")
+        if isinstance(version_display_name, str) and version_display_name:
+            return version_display_name
+    return None
 
 
 def hash_project(root: Path, *, preferred_strategy: str = "full") -> ProjectHash:
@@ -361,8 +468,11 @@ def _preserve_sandbox(sandbox: SandboxProject) -> Path:
 
 __all__ = [
     "DEFAULT_SANDBOX_ROOT",
+    "ENV_WWISE_REAL_LAUNCH_AUDIT_PATH",
     "ENV_WWISE_SANDBOX_KEEP_ON_FAILURE",
+    "ENV_WWISE_STRICT_REAL",
     "KEEP_ON_FAILURE_ROOT",
+    "REAL_LAUNCH_AUDIT_PATH",
     "LiveSandboxLock",
     "ProjectHash",
     "SandboxFixtureError",
@@ -372,6 +482,7 @@ __all__ = [
     "hash_project",
     "launch_sandboxed_wwise",
     "prepare_sample_project_sandbox",
+    "require_lifecycle_ready_proof",
     "shutdown_sandboxed_wwise",
     "verify_project_identity",
 ]

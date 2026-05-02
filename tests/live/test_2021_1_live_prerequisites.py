@@ -9,6 +9,7 @@ from typing import Any, Mapping
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from tests.support.active_gate_failures import skip_or_fail_strict_real  # pyright: ignore[reportMissingImports]
 from wwise_waapi.headless import default_waapi_client_factory  # pyright: ignore[reportMissingImports]
 from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImports]
     ENV_WWISE_CONSOLE,
@@ -261,7 +262,7 @@ def _skip_with_prerequisite_evidence(reason: str) -> None:
     }
     PREREQUISITE_EVIDENCE.parent.mkdir(parents=True, exist_ok=True)
     PREREQUISITE_EVIDENCE.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    pytest.skip(reason)
+    skip_or_fail_strict_real(reason)
 
 
 def _write_prerequisite_pass_evidence(*, info: Mapping[str, Any], sandbox_project: str) -> None:

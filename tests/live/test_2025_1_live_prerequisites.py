@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from tests.support.active_gate_failures import skip_or_fail_strict_real  # pyright: ignore[reportMissingImports]
 from tests.support.active_gate_failures import fail_if_active_runtime_failure  # pyright: ignore[reportMissingImports]
 from wwise_waapi.headless import ReadinessTimeout  # pyright: ignore[reportMissingImports]
 from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImports]
@@ -133,7 +134,7 @@ def _skip_with_prerequisite_evidence(reason: str) -> None:
     PREREQUISITE_EVIDENCE.parent.mkdir(parents=True, exist_ok=True)
     PREREQUISITE_EVIDENCE.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     _write_task_prerequisite_blocker(reason, payload)
-    pytest.skip(reason)
+    skip_or_fail_strict_real(reason)
 
 
 def _write_task_prerequisite_blocker(reason: str, payload: dict[str, object]) -> None:
