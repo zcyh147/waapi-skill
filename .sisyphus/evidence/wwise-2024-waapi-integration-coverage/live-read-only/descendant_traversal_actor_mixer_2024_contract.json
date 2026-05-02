@@ -41,7 +41,7 @@
     ]
   },
   "query": "\"\\Actor-Mixer Hierarchy\" select descendants take 1",
-  "recorded_at_unix": 1777744195,
+  "recorded_at_unix": 1777746257,
   "result_count": 1,
   "result_count_policy": {
     "allow_empty": true,

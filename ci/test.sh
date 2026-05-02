@@ -4,7 +4,9 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  ci/test.sh <version> <mode> [-- <extra pytest args...>]
+  ci/test.sh --version <version> --mode <mode> [-- <extra pytest args...>]
+  ci/test.sh -v <version> -m <mode> [-- <extra pytest args...>]
+  ci/test.sh <version> <mode> [-- <extra pytest args...>]  # backwards compatible
 
 Versions:
   2021.1 | 2022.1 | 2023.1 | 2024.1 | 2025.1 | all | none
@@ -25,6 +27,10 @@ Notes:
       .sisyphus/runtime/wwise-waapi-sandboxes/<version>-<mode>
 
 Examples:
+  ci/test.sh --version 2021.1 --mode live
+  ci/test.sh --mode nonlive
+  ci/test.sh -v all -m matrix
+  ci/test.sh --version 2024.1 --mode live -- -k object_topics -q
   ci/test.sh 2021.1 live
   ci/test.sh 2025.1 destructive
   ci/test.sh all matrix
@@ -38,28 +44,108 @@ EOF
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEFAULT_SANDBOX_BASE="$ROOT_DIR/.sisyphus/runtime/wwise-waapi-sandboxes"
 
+INITIAL_WWISE_CONSOLE=""
+INITIAL_WWISE_SAMPLE_PROJECT_PATH=""
+INITIAL_WWISE_SANDBOX_ROOT=""
+HAS_INITIAL_WWISE_CONSOLE="0"
+HAS_INITIAL_WWISE_SAMPLE_PROJECT_PATH="0"
+HAS_INITIAL_WWISE_SANDBOX_ROOT="0"
+
+if [[ -n "${WWISE_CONSOLE+x}" ]]; then
+  INITIAL_WWISE_CONSOLE="$WWISE_CONSOLE"
+  HAS_INITIAL_WWISE_CONSOLE="1"
+fi
+if [[ -n "${WWISE_SAMPLE_PROJECT_PATH+x}" ]]; then
+  INITIAL_WWISE_SAMPLE_PROJECT_PATH="$WWISE_SAMPLE_PROJECT_PATH"
+  HAS_INITIAL_WWISE_SAMPLE_PROJECT_PATH="1"
+fi
+if [[ -n "${WWISE_SANDBOX_ROOT+x}" ]]; then
+  INITIAL_WWISE_SANDBOX_ROOT="$WWISE_SANDBOX_ROOT"
+  HAS_INITIAL_WWISE_SANDBOX_ROOT="1"
+fi
+
 declare -a PYTEST_EXTRA_ARGS=()
+declare -a POSITIONAL_ARGS=()
 
 if [[ ${1:-} == "--help" || ${1:-} == "-h" ]]; then
   usage
   exit 0
 fi
 
-if [[ $# -lt 2 ]]; then
+VERSION=""
+MODE=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -v|--version)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for $1" >&2
+        usage
+        exit 1
+      fi
+      VERSION="$2"
+      shift 2
+      ;;
+    -m|--mode)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for $1" >&2
+        usage
+        exit 1
+      fi
+      MODE="$2"
+      shift 2
+      ;;
+    --)
+      shift
+      if [[ $# -gt 0 ]]; then
+        PYTEST_EXTRA_ARGS=("$@")
+      fi
+      break
+      ;;
+    -*)
+      echo "Unknown option: $1" >&2
+      usage
+      exit 1
+      ;;
+    *)
+      POSITIONAL_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$VERSION" && ${#POSITIONAL_ARGS[@]} -ge 1 ]]; then
+  VERSION="${POSITIONAL_ARGS[0]}"
+fi
+if [[ -z "$MODE" && ${#POSITIONAL_ARGS[@]} -ge 2 ]]; then
+  MODE="${POSITIONAL_ARGS[1]}"
+fi
+
+if [[ -z "$MODE" ]]; then
+  echo "Mode is required (use --mode or positional form)." >&2
   usage
   exit 1
 fi
 
-VERSION="$1"
-MODE="$2"
-shift 2
-
-if [[ ${1:-} == "--" ]]; then
-  shift
-fi
-if [[ $# -gt 0 ]]; then
-  PYTEST_EXTRA_ARGS=("$@")
-fi
+case "$MODE" in
+  nonlive|default)
+    VERSION="${VERSION:-none}"
+    ;;
+  matrix|focused)
+    VERSION="${VERSION:-all}"
+    ;;
+  *)
+    if [[ -z "$VERSION" ]]; then
+      echo "Version is required for mode '$MODE' (use --version or positional form)." >&2
+      usage
+      exit 1
+    fi
+    ;;
+esac
 
 resolve_version_paths() {
   local v="$1"
@@ -97,9 +183,23 @@ set_version_environment() {
   resolve_version_paths "$v"
 
   export WWISE_VERSION="$v"
-  export WWISE_CONSOLE="${WWISE_CONSOLE:-$RESOLVED_CONSOLE}"
-  export WWISE_SAMPLE_PROJECT_PATH="${WWISE_SAMPLE_PROJECT_PATH:-$RESOLVED_PROJECT}"
-  export WWISE_SANDBOX_ROOT="${WWISE_SANDBOX_ROOT:-$DEFAULT_SANDBOX_BASE/${v}-${m}}"
+  if [[ "$HAS_INITIAL_WWISE_CONSOLE" == "1" ]]; then
+    export WWISE_CONSOLE="$INITIAL_WWISE_CONSOLE"
+  else
+    export WWISE_CONSOLE="$RESOLVED_CONSOLE"
+  fi
+
+  if [[ "$HAS_INITIAL_WWISE_SAMPLE_PROJECT_PATH" == "1" ]]; then
+    export WWISE_SAMPLE_PROJECT_PATH="$INITIAL_WWISE_SAMPLE_PROJECT_PATH"
+  else
+    export WWISE_SAMPLE_PROJECT_PATH="$RESOLVED_PROJECT"
+  fi
+
+  if [[ "$HAS_INITIAL_WWISE_SANDBOX_ROOT" == "1" ]]; then
+    export WWISE_SANDBOX_ROOT="$INITIAL_WWISE_SANDBOX_ROOT"
+  else
+    export WWISE_SANDBOX_ROOT="$DEFAULT_SANDBOX_BASE/${v}-${m}"
+  fi
 }
 
 print_context() {
