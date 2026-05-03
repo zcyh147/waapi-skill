@@ -13,11 +13,10 @@ SKILL_ARTIFACT_ENTRIES = (
     "SKILL.md",
     "wwise_waapi",
     "resources",
-    "references",
     "scripts",
     "requirements.txt",
 )
-ROOT_DEVELOPMENT_ENTRIES = ("tests", "ci", "evals", "references", "pyproject.toml")
+ROOT_DEVELOPMENT_ENTRIES = ("tests", "ci", "references", "pyproject.toml")
 ROOT_MOVED_ENTRIES = ("SKILL.md", "wwise_waapi", "resources", "scripts", "requirements.txt")
 LEGACY_SOURCE_DIRS = ("wwise_waapi", "resources", "references")
 
@@ -47,20 +46,26 @@ def test_package_imports_from_skill_artifact_package() -> None:
     assert not package_path.is_relative_to(LEGACY_SKILL_ROOT)
 
 
-def test_semantic_source_note_references_are_packaged_with_skill() -> None:
+def test_semantic_source_note_references_remain_root_source_evidence_metadata() -> None:
     for source_notes_path in sorted((SKILL_ROOT / "resources" / "semantic").glob("*/source_notes.json")):
         payload = json.loads(source_notes_path.read_text(encoding="utf-8"))
-        referenced_paths = [payload["protocol"]]
+        root_source_evidence_paths = [payload["protocol"]]
         for note in payload["notes"].values():
-            referenced_paths.append(note["gate_evidence_path"])
-            referenced_paths.extend(
+            assert note["gate_evidence_path"].startswith("references/"), source_notes_path
+            root_source_evidence_paths.extend(
                 source_url for source_url in note["source_urls"] if source_url.startswith("references/")
             )
 
-        for relative_path in set(referenced_paths):
-            assert (SKILL_ROOT / relative_path).is_file() or (REPO_ROOT / relative_path).is_file(), (
+        for relative_path in set(root_source_evidence_paths):
+            assert (REPO_ROOT / relative_path).is_file(), (
                 f"{source_notes_path}: {relative_path}"
             )
+
+
+def test_packaged_skill_contains_no_runtime_reference_markdown() -> None:
+    references_dir = SKILL_ROOT / "references"
+
+    assert not list(references_dir.glob("**/*.md"))
 
 
 def test_project_metadata_does_not_point_at_nested_skill_root() -> None:
