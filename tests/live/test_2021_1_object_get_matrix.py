@@ -44,7 +44,7 @@ from tests.live.test_2021_1_reflection_prerequisites import (  # pyright: ignore
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MATRIX_PATH = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "waql" / EXPECTED_WWISE_VERSION / "object-get-live-matrix.json"
+MATRIX_PATH = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "waql" / EXPECTED_WWISE_VERSION / "object-get-live-matrix.json"
 SANDBOX_ROOT = REPO_ROOT / ".sisyphus" / "runtime" / "wwise-2021-live-read-only-sandboxes"
 EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-2021-waapi-integration-coverage" / "live-read-only"
 TASK_EVIDENCE = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-2021-waapi-integration-coverage" / "task-7-waql-matrix.json"

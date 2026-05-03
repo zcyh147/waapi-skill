@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DOC_PATHS = (
-    ROOT / "skills" / "wwise-waapi" / "SKILL.md",
+    ROOT / "skills" / "waapi-skill" / "SKILL.md",
     ROOT / "references" / "long-run-runbook.md",
     ROOT / "references" / "eval-review-workflow.md",
     ROOT / "references" / "phase2-user-review-packet.md",

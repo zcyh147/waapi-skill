@@ -29,7 +29,7 @@ from tests.live.test_2023_live_prerequisites import (  # pyright: ignore[reportM
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MATRIX_PATH = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "waql" / EXPECTED_WWISE_VERSION / "object-get-live-matrix.json"
+MATRIX_PATH = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "waql" / EXPECTED_WWISE_VERSION / "object-get-live-matrix.json"
 SANDBOX_ROOT = REPO_ROOT / ".sisyphus" / "runtime" / "wwise-2023-live-smoke-sandboxes"
 EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-2023-test-parity" / "live-read-only"
 MUTATING_TOKENS = ("set", "delete", "create", "import", "move", "rename")

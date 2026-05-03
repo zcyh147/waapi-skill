@@ -35,7 +35,7 @@ from tests.support.active_gate_failures import fail_if_active_runtime_failure  #
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLAN_PATH = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / "2022.1" / "task-7-switchcontainer-assignment-plan.json"
+PLAN_PATH = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / "2022.1" / "task-7-switchcontainer-assignment-plan.json"
 DEFAULT_SOURCE_PROJECT = REPO_ROOT / "tests" / "_org" / "2022.1" / "SampleProject.wproj"
 EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-waapi-deferred-reevaluation"
 READBACK_FIELDS = ["id", "name", "type", "path"]

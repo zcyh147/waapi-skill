@@ -11,18 +11,18 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 MATRIX_PATH = (
     REPO_ROOT
     / "skills"
-    / "wwise-waapi"
+    / "waapi-skill"
     / "resources"
     / "waql"
     / "2022.1"
     / "object-get-live-matrix.json"
 )
-RESOURCE_REFERENCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "waql" / "2022.1" / "object-get-live-matrix.json"
+RESOURCE_REFERENCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "waql" / "2022.1" / "object-get-live-matrix.json"
 GAP_EVIDENCE_PATH = REPO_ROOT / ".sisyphus" / "evidence" / "task-8-waql-missing.md"
 MANIFEST_PATH = (
     REPO_ROOT
     / "skills"
-    / "wwise-waapi"
+    / "waapi-skill"
     / "resources"
     / "manifest"
     / "2022.1"

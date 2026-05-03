@@ -11,7 +11,7 @@ from wwise_waapi.manifest import (  # pyright: ignore[reportMissingImports]
 )
 
 
-RESOURCE_ROOT = Path("skills") / "wwise-waapi" / "resources" / "manifest"
+RESOURCE_ROOT = Path("skills") / "waapi-skill" / "resources" / "manifest"
 EVIDENCE_ROOT = Path(".sisyphus") / "evidence" / "wwise-2021-waapi-integration-coverage"
 TASK_REFLECTION_EVIDENCE = EVIDENCE_ROOT / "task-4-reflection.json"
 RAW_REFLECTION_EVIDENCE = EVIDENCE_ROOT / "reflection" / "raw-reflection.json"
@@ -172,7 +172,7 @@ def test_2021_1_manifest_serialization_is_deterministic() -> None:
 
 
 def test_2021_1_manifest_source_code_contains_no_cross_version_loader_paths() -> None:
-    source = Path("skills") / "wwise-waapi" / "wwise_waapi" / "manifest.py"
+    source = Path("skills") / "waapi-skill" / "wwise_waapi" / "manifest.py"
     text = source.read_text(encoding="utf-8")
 
     for fragment in FORBIDDEN_FRAGMENTS:

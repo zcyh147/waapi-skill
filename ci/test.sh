@@ -44,7 +44,7 @@ EOF
 }
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SKILL_DIR="$ROOT_DIR/skills/wwise-waapi"
+SKILL_DIR="$ROOT_DIR/skills/waapi-skill"
 DEFAULT_SANDBOX_BASE="$ROOT_DIR/.sisyphus/runtime/wwise-waapi-sandboxes"
 export PYTHONPATH="$SKILL_DIR${PYTHONPATH:+:$PYTHONPATH}"
 

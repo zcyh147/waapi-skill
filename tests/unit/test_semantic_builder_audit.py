@@ -9,8 +9,8 @@ from wwise_waapi.builders.source_notes import EXPECTED_SOURCE_NOTE_URI_INVENTORY
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE_NOTES = ROOT / "skills" / "wwise-waapi" / "resources" / "semantic" / "2022.1" / "source_notes.json"
-SKILL_MD = ROOT / "skills" / "wwise-waapi" / "SKILL.md"
+SOURCE_NOTES = ROOT / "skills" / "waapi-skill" / "resources" / "semantic" / "2022.1" / "source_notes.json"
+SKILL_MD = ROOT / "skills" / "waapi-skill" / "SKILL.md"
 
 INCLUDED_FAMILIES = {
     "query",
@@ -42,7 +42,7 @@ def test_builder_package_exports_stable_semantic_api_without_root_package_promot
     for name in REQUIRED_PUBLIC_EXPORTS:
         assert getattr(builders, name) is not None
 
-    root_init = (ROOT / "skills" / "wwise-waapi" / "wwise_waapi" / "__init__.py").read_text(encoding="utf-8")
+    root_init = (ROOT / "skills" / "waapi-skill" / "wwise_waapi" / "__init__.py").read_text(encoding="utf-8")
     assert "build_object_get_query" not in root_init
     assert "ObjectMutationBuilder" not in root_init
 

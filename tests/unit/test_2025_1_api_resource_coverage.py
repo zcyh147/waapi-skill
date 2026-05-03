@@ -11,12 +11,12 @@ from wwise_waapi.deferred_registry import ApiClassifier  # pyright: ignore[repor
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2025.1"
 BASELINE_VERSION = "2024.1"
-FUNCTIONS_MANIFEST = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest" / VERSION / "functions.json"
-TOPICS_MANIFEST = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest" / VERSION / "topics.json"
-COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION / "api-coverage.json"
-CLASSIFICATION_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION / "added-api-classification.json"
-SOURCE_NOTES_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "semantic" / VERSION / "source_notes.json"
-BASELINE_COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / BASELINE_VERSION / "api-coverage.json"
+FUNCTIONS_MANIFEST = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "manifest" / VERSION / "functions.json"
+TOPICS_MANIFEST = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "manifest" / VERSION / "topics.json"
+COVERAGE_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "api-coverage.json"
+CLASSIFICATION_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "added-api-classification.json"
+SOURCE_NOTES_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "semantic" / VERSION / "source_notes.json"
+BASELINE_COVERAGE_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / BASELINE_VERSION / "api-coverage.json"
 
 ALLOWED_STATUSES = {"deferred", "excluded", "live-tested", "sandbox-mutating-tested"}
 ALLOWED_BLOCKED_STATUSES = {"deferred", "excluded"}

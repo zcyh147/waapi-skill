@@ -22,7 +22,7 @@ from wwise_waapi.builders.source_notes import (  # pyright: ignore[reportMissing
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE_NOTES_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "semantic" / "2023.1" / "source_notes.json"
+SOURCE_NOTES_2023 = ROOT / "skills" / "waapi-skill" / "resources" / "semantic" / "2023.1" / "source_notes.json"
 NOTEBOOK_ID_2023 = "wwise-2023.1-docs"
 GATE_EVIDENCE_2023 = "references/semantic/2023.1/semantic-builder-notebooklm-gate.md"
 EXPECTED_FAMILIES = {
@@ -53,14 +53,14 @@ def write_gate_evidence(tmp_path: Path, text: str) -> Path:
 
 
 def write_artifact_resource(tmp_path: Path, data: dict[str, Any]) -> Path:
-    path = tmp_path / "wwise-waapi" / "resources" / "semantic" / "2023.1" / "source_notes.json"
+    path = tmp_path / "waapi-skill" / "resources" / "semantic" / "2023.1" / "source_notes.json"
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     return path
 
 
 def write_artifact_gate_evidence(tmp_path: Path, text: str, name: str = "test-gate.md") -> str:
-    evidence = tmp_path / "wwise-waapi" / "references" / name
+    evidence = tmp_path / "waapi-skill" / "references" / name
     evidence.parent.mkdir(parents=True)
     evidence.write_text(text, encoding="utf-8")
     return f"references/{name}"

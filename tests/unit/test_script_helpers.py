@@ -11,7 +11,7 @@ setup_script = importlib.import_module("scripts.setup_environment")
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SKILL_ROOT = REPO_ROOT / "skills" / "wwise-waapi"
+SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
 
 
 def test_script_config_exports_expected_paths_and_targets() -> None:

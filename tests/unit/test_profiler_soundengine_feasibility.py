@@ -18,7 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 TASK3_RESOURCE_PATH = (
     REPO_ROOT
     / "skills"
-    / "wwise-waapi"
+    / "waapi-skill"
     / "resources"
     / "capabilities"
     / "2022.1"
@@ -27,7 +27,7 @@ TASK3_RESOURCE_PATH = (
 TASK5_RESOURCE_PATH = (
     REPO_ROOT
     / "skills"
-    / "wwise-waapi"
+    / "waapi-skill"
     / "resources"
     / "capabilities"
     / "2022.1"

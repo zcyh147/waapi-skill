@@ -4,9 +4,9 @@ from pathlib import Path
 
 
 def test_skill_contract_mentions_scaffold_elements() -> None:
-    skill_md = Path(__file__).resolve().parents[2] / "skills" / "wwise-waapi" / "SKILL.md"
+    skill_md = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill" / "SKILL.md"
     text = skill_md.read_text(encoding="utf-8")
-    assert "wwise-waapi" in text
+    assert "name: waapi-skill" in text
     assert "scripts/run.py" in text
     assert "resources/capabilities/<version>/" in text
     assert "Windows validation" in text

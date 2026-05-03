@@ -7,7 +7,7 @@ import wwise_waapi  # pyright: ignore[reportMissingImports]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SKILL_ROOT = REPO_ROOT / "skills" / "wwise-waapi"
+SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
 LEGACY_SKILL_ROOT = REPO_ROOT / ".agents" / "skills" / "wwise-waapi"
 SKILL_ARTIFACT_ENTRIES = (
     "SKILL.md",
@@ -68,4 +68,4 @@ def test_project_metadata_does_not_point_at_nested_skill_root() -> None:
 
     assert ".agents/skills/wwise-waapi" not in pyproject
     assert "package-mode = false" in pyproject
-    assert 'source = ["skills/wwise-waapi/wwise_waapi", "skills/wwise-waapi/scripts"]' in pyproject
+    assert 'source = ["skills/waapi-skill/wwise_waapi", "skills/waapi-skill/scripts"]' in pyproject

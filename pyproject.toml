@@ -13,7 +13,7 @@ coverage = "==7.13.5"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
-pythonpath = ["skills/wwise-waapi"]
+pythonpath = ["skills/waapi-skill"]
 markers = [
   "live: tests that require Wwise and WAAPI access",
   "destructive: tests that may mutate a fixture Wwise project",
@@ -22,7 +22,7 @@ markers = [
 [tool.coverage.run]
 branch = true
 relative_files = true
-source = ["skills/wwise-waapi/wwise_waapi", "skills/wwise-waapi/scripts"]
+source = ["skills/waapi-skill/wwise_waapi", "skills/waapi-skill/scripts"]
 
 [tool.coverage.report]
 fail_under = 85

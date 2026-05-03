@@ -36,7 +36,7 @@ from tests.live.test_2025_1_live_prerequisites import (  # pyright: ignore[repor
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MATRIX_PATH = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "waql" / EXPECTED_WWISE_VERSION / "object-get-live-matrix.json"
+MATRIX_PATH = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "waql" / EXPECTED_WWISE_VERSION / "object-get-live-matrix.json"
 SANDBOX_ROOT = REPO_ROOT / ".sisyphus" / "runtime" / "wwise-2025-live-read-only-sandboxes"
 EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-2025-waapi-integration-coverage" / "live-read-only"
 TASK_LIVE_READ_ONLY_EVIDENCE = REPO_ROOT / ".sisyphus" / "evidence" / "task-2025-9-live-read-only.txt"

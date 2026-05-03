@@ -11,7 +11,7 @@ from wwise_waapi.builders.source_notes import SemanticSourceNoteChecker  # pyrig
 
 
 REFERENCE_ROOT = Path("references") / "semantic" / "2025.1"
-SOURCE_NOTES = Path("skills") / "wwise-waapi" / "resources" / "semantic" / "2025.1" / "source_notes.json"
+SOURCE_NOTES = Path("skills") / "waapi-skill" / "resources" / "semantic" / "2025.1" / "source_notes.json"
 GATE_PATH = REFERENCE_ROOT / "semantic-builder-notebooklm-gate.md"
 TASK_5_NOTEBOOKLM_EVIDENCE = Path(".sisyphus") / "evidence" / "task-2025-5-notebooklm-gate.txt"
 VERSION_2025 = "2025.1"
@@ -82,7 +82,7 @@ def read_source_notes() -> dict[str, Any]:
 
 
 def write_artifact_resource(tmp_path: Path, data: dict[str, Any]) -> Path:
-    path = tmp_path / "wwise-waapi" / "resources" / "semantic" / "2025.1" / "source_notes.json"
+    path = tmp_path / "waapi-skill" / "resources" / "semantic" / "2025.1" / "source_notes.json"
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     return path

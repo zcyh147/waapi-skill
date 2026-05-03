@@ -8,7 +8,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLAN_PATH = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / "2022.1" / "task-6-process-definition-files-plan.json"
+PLAN_PATH = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / "2022.1" / "task-6-process-definition-files-plan.json"
 TASK6_EVIDENCE_PATH = ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-6-process-definition-files.md"
 VALIDATOR_EVIDENCE_PATH = ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-6-definition-validator.md"
 SOURCE_FIXTURE = "tests/_org/2022.1/SampleProject.wproj"

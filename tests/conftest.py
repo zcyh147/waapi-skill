@@ -8,7 +8,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SKILL_ROOT = REPO_ROOT / "skills" / "wwise-waapi"
+SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
 if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 

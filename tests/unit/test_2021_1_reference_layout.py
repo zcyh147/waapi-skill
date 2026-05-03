@@ -6,8 +6,8 @@ from typing import Any, cast
 
 
 REFERENCE_ROOT = Path('references') / 'semantic' / '2021.1'
-SOURCE_NOTES = Path('skills') / 'wwise-waapi' / 'resources' / 'semantic' / '2021.1' / 'source_notes.json'
-RUNTIME_PACKAGE_ROOT = Path('skills') / 'wwise-waapi' / 'wwise_waapi'
+SOURCE_NOTES = Path('skills') / 'waapi-skill' / 'resources' / 'semantic' / '2021.1' / 'source_notes.json'
+RUNTIME_PACKAGE_ROOT = Path('skills') / 'waapi-skill' / 'wwise_waapi'
 GATE_PATH = REFERENCE_ROOT / 'semantic-builder-notebooklm-gate.md'
 VERSION = '2021.1'
 NOTEBOOK = 'wwise-2021.1.14-docs'

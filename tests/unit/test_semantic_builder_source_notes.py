@@ -44,14 +44,14 @@ def write_gate_evidence(tmp_path: Path, text: str) -> Path:
 
 
 def write_artifact_resource(tmp_path: Path, data: dict[str, Any]) -> Path:
-    path = tmp_path / "wwise-waapi" / "resources" / "semantic" / "2022.1" / "source_notes.json"
+    path = tmp_path / "waapi-skill" / "resources" / "semantic" / "2022.1" / "source_notes.json"
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     return path
 
 
 def write_artifact_gate_evidence(tmp_path: Path, text: str, name: str = "test-gate.md") -> str:
-    evidence = tmp_path / "wwise-waapi" / "references" / name
+    evidence = tmp_path / "waapi-skill" / "references" / name
     evidence.parent.mkdir(parents=True)
     evidence.write_text(text, encoding="utf-8")
     return f"references/{name}"
@@ -115,7 +115,7 @@ def test_source_notes_have_no_embedded_gate_success_claims() -> None:
 
 
 def test_source_notes_resolve_gate_evidence_from_skill_local_artifact(tmp_path: Path) -> None:
-    artifact_root = tmp_path / "wwise-waapi"
+    artifact_root = tmp_path / "waapi-skill"
     resource_path = artifact_root / "resources" / "semantic" / "2022.1" / "source_notes.json"
     evidence_path = artifact_root / "references" / "artifact-only-gate.md"
     data = load_resource()

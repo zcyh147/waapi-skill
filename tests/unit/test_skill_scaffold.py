@@ -14,8 +14,8 @@ from wwise_waapi import (  # pyright: ignore[reportMissingImports]
 
 
 def test_package_imports_and_placeholders() -> None:
-    assert SkillPaths(Path("/tmp/wwise-waapi")).skill_root.name == "wwise-waapi"
-    assert SkillConfig(Path("/tmp/wwise-waapi")).coverage_minimum == 85
+    assert SkillPaths(Path("/tmp/waapi-skill")).skill_root.name == "waapi-skill"
+    assert SkillConfig(Path("/tmp/waapi-skill")).coverage_minimum == 85
     assert isinstance(HeadlessLifecycle(), HeadlessLifecycle)
     assert isinstance(ManifestStore(), ManifestStore)
     assert isinstance(WwiseDispatcher(), WwiseDispatcher)
@@ -24,7 +24,7 @@ def test_package_imports_and_placeholders() -> None:
 
 
 def test_config_targets_are_documented() -> None:
-    config = SkillConfig(Path("/tmp/wwise-waapi"))
+    config = SkillConfig(Path("/tmp/waapi-skill"))
     assert config.paths.data_dir.name == "data"
     assert config.core_coverage_targets["headless"] == 95
     assert config.wwise_live_env == "WWISE_LIVE"

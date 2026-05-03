@@ -43,7 +43,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 TASK3_PLAN_PATH = (
     REPO_ROOT
     / "skills"
-    / "wwise-waapi"
+    / "waapi-skill"
     / "resources"
     / "capabilities"
     / "2022.1"
@@ -52,7 +52,7 @@ TASK3_PLAN_PATH = (
 TASK5_SOUNDENGINE_PATH = (
     REPO_ROOT
     / "skills"
-    / "wwise-waapi"
+    / "waapi-skill"
     / "resources"
     / "capabilities"
     / "2022.1"

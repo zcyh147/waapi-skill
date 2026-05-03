@@ -11,16 +11,16 @@ DYNAMIC_OBJECT_ID_MARKER = "$disposable_object_id"
 PLAN_PATH = (
     REPO_ROOT
     / "skills"
-    / "wwise-waapi"
+    / "waapi-skill"
     / "resources"
     / "capabilities"
     / "2022.1"
     / "task-6-object-topic-live-plan.json"
 )
 TASK_8_PLAN_PATHS = {
-    "2021.1": REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / "2021.1" / "task-8-object-topic-live-plan.json",
-    "2024.1": REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / "2024.1" / "task-8-object-topic-live-plan.json",
-    "2025.1": REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / "2025.1" / "task-8-object-topic-live-plan.json",
+    "2021.1": REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / "2021.1" / "task-8-object-topic-live-plan.json",
+    "2024.1": REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / "2024.1" / "task-8-object-topic-live-plan.json",
+    "2025.1": REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / "2025.1" / "task-8-object-topic-live-plan.json",
 }
 SAFE_TASK_8_TOPIC_URIS = {
     "ak.wwise.core.object.childAdded",
@@ -232,5 +232,5 @@ def _task8_topic_case(path: Path, uri: str) -> Mapping[str, Any]:
 
 
 def _manifest_topics(version: str) -> set[str]:
-    path = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest" / version / "topics.json"
+    path = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "manifest" / version / "topics.json"
     return {entry["uri"] for entry in json.loads(path.read_text(encoding="utf-8"))["topics"]}

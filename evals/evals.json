@@ -1,5 +1,5 @@
 {
-  "skill_name": "wwise-waapi",
+  "skill_name": "waapi-skill",
   "schema_version": 1,
   "purpose": "Review-focused eval metadata for Wwise WAAPI skill behavior. These evals help human reviewers compare model outputs and do not replace pytest verification.",
   "review_workflow": "references/eval-review-workflow.md",
@@ -52,7 +52,7 @@
       "prompt": "Build a Wwise 2022.1 WAAPI query that finds Sound objects with negative direct Volume and returns id, name, path, type, and @Volume. Use WAQL only if the source-grounded WAQL reference supports it.",
       "expected_output": "Uses the WAQL resource gate and ak.wwise.core.object.get with args.waql, cites or references the packaged live WAQL matrix, returns the requested fields, and avoids inventing WAQL operators or unsupported semantics.",
       "files": [
-        "skills/wwise-waapi/resources/waql/2022.1/object-get-live-matrix.json",
+        "skills/waapi-skill/resources/waql/2022.1/object-get-live-matrix.json",
         "SKILL.md"
       ],
       "assertions": [

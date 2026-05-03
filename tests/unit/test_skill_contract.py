@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 
-SKILL_MD = Path(__file__).resolve().parents[2] / "skills" / "wwise-waapi" / "SKILL.md"
+SKILL_MD = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill" / "SKILL.md"
 
 
 def skill_text() -> str:

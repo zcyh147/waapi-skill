@@ -26,19 +26,19 @@ Additional 2025.1 eval examples are version-scoped. They must point to versioned
 Create a sibling workspace for generated outputs. Keep generated model outputs out of the skill package unless a plan asks for committed evidence.
 
 ```bash
-mkdir -p wwise-waapi-workspace/iteration-1
+mkdir -p waapi-skill-workspace/iteration-1
 ```
 
-For each eval in `evals/evals.json`, run the prompt with the `wwise-waapi` skill loaded and save the response under a descriptive directory such as:
+For each eval in `evals/evals.json`, run the prompt with the `waapi-skill` skill loaded and save the response under a descriptive directory such as:
 
 ```text
-wwise-waapi-workspace/iteration-1/safe-object-query/with_skill/outputs/response.md
+waapi-skill-workspace/iteration-1/safe-object-query/with_skill/outputs/response.md
 ```
 
 If you compare against a baseline, save it beside the skill run:
 
 ```text
-wwise-waapi-workspace/iteration-1/safe-object-query/without_skill/outputs/response.md
+waapi-skill-workspace/iteration-1/safe-object-query/without_skill/outputs/response.md
 ```
 
 Each eval directory should include an `eval_metadata.json` copied from the eval id, prompt, and assertions so the viewer and graders can show the reviewer what to check.
@@ -48,13 +48,13 @@ Each eval directory should include an `eval_metadata.json` copied from the eval 
 Use the Skill Creator review viewer after outputs exist:
 
 ```bash
-python <skill-creator-path>/eval-viewer/generate_review.py   wwise-waapi-workspace/iteration-1   --skill-name "wwise-waapi"
+python <skill-creator-path>/eval-viewer/generate_review.py   waapi-skill-workspace/iteration-1   --skill-name "waapi-skill"
 ```
 
 If a benchmark has been generated from assertion grading, include it:
 
 ```bash
-python <skill-creator-path>/eval-viewer/generate_review.py   wwise-waapi-workspace/iteration-1   --skill-name "wwise-waapi"   --benchmark wwise-waapi-workspace/iteration-1/benchmark.json
+python <skill-creator-path>/eval-viewer/generate_review.py   waapi-skill-workspace/iteration-1   --skill-name "waapi-skill"   --benchmark waapi-skill-workspace/iteration-1/benchmark.json
 ```
 
 ## Static fallback for headless environments
@@ -62,7 +62,7 @@ python <skill-creator-path>/eval-viewer/generate_review.py   wwise-waapi-workspa
 When a browser cannot open, generate a standalone HTML file instead:
 
 ```bash
-python <skill-creator-path>/eval-viewer/generate_review.py   wwise-waapi-workspace/iteration-1   --skill-name "wwise-waapi"   --static wwise-waapi-workspace/iteration-1/review.html
+python <skill-creator-path>/eval-viewer/generate_review.py   waapi-skill-workspace/iteration-1   --skill-name "waapi-skill"   --static waapi-skill-workspace/iteration-1/review.html
 ```
 
 Open or share `review.html` with the reviewer. When the reviewer clicks Submit All Reviews, copy the downloaded `feedback.json` back into the iteration directory before revising evals or skill instructions.

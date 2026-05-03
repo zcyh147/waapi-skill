@@ -37,7 +37,7 @@ from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImport
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RESOURCE_ROOT = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest"
+RESOURCE_ROOT = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "manifest"
 EXPECTED_WWISE_VERSION = "2021.1"
 EXPECTED_WWISE_BUILD = "2021.1.14.8108"
 EXPECTED_DISPLAY_PREFIX = "2021.1.14"

@@ -17,17 +17,17 @@ from wwise_waapi.builders.source_notes import (  # pyright: ignore[reportMissing
 ROOT = Path(__file__).resolve().parents[2]
 EVALS_JSON = ROOT / 'evals' / 'evals.json'
 DOC_CONTRACT_PATHS = (
-    ROOT / 'skills' / 'wwise-waapi' / 'SKILL.md',
+    ROOT / 'skills' / 'waapi-skill' / 'SKILL.md',
     ROOT / 'references' / 'long-run-runbook.md',
     ROOT / 'references' / 'eval-review-workflow.md',
     ROOT / 'references' / 'phase2-user-review-packet.md',
 )
 REFERENCE_ROOT = ROOT / 'references' / 'semantic' / '2021.1'
-SOURCE_NOTES = ROOT / 'skills' / 'wwise-waapi' / 'resources' / 'semantic' / '2021.1' / 'source_notes.json'
-RUNTIME_PACKAGE_ROOT = ROOT / 'skills' / 'wwise-waapi' / 'wwise_waapi'
-COVERAGE_2021 = ROOT / 'skills' / 'wwise-waapi' / 'resources' / 'capabilities' / '2021.1' / 'api-coverage.json'
-SUMMARY_2021 = ROOT / 'skills' / 'wwise-waapi' / 'resources' / 'capabilities' / '2021.1' / 'phase2-coverage-summary.json'
-DEFERRED_2021 = ROOT / 'skills' / 'wwise-waapi' / 'resources' / 'deferred' / '2021.1.json'
+SOURCE_NOTES = ROOT / 'skills' / 'waapi-skill' / 'resources' / 'semantic' / '2021.1' / 'source_notes.json'
+RUNTIME_PACKAGE_ROOT = ROOT / 'skills' / 'waapi-skill' / 'wwise_waapi'
+COVERAGE_2021 = ROOT / 'skills' / 'waapi-skill' / 'resources' / 'capabilities' / '2021.1' / 'api-coverage.json'
+SUMMARY_2021 = ROOT / 'skills' / 'waapi-skill' / 'resources' / 'capabilities' / '2021.1' / 'phase2-coverage-summary.json'
+DEFERRED_2021 = ROOT / 'skills' / 'waapi-skill' / 'resources' / 'deferred' / '2021.1.json'
 NOTEBOOK = 'wwise-2021.1.14-docs'
 VERSION = '2021.1'
 GENERATED_AT = '2026-05-02T00:00:00Z'

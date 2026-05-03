@@ -1,5 +1,5 @@
 ---
-name: wwise-waapi
+name: waapi-skill
 description: Use this skill for Wwise WAAPI automation through the skill-local Python runner, versioned manifests, semantic builders, bounded subscriptions, and safe dispatcher calls. Always use this skill when the task mentions Wwise, WAAPI, Audiokinetic APIs, generated manifests, topic subscriptions, Wwise version selection, or destructive Wwise guardrails.
 ---
 

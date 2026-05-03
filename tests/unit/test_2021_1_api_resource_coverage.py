@@ -12,12 +12,12 @@ from wwise_waapi.deferred_registry import ApiClassifier  # pyright: ignore[repor
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2021.1"
-FUNCTIONS_MANIFEST = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest" / VERSION / "functions.json"
-TOPICS_MANIFEST = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest" / VERSION / "topics.json"
-COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION / "api-coverage.json"
-MATRIX_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION / "live-coverage-matrix.json"
-SUMMARY_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION / "phase2-coverage-summary.json"
-POLICY_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION / "phase21-uri-policy.json"
+FUNCTIONS_MANIFEST = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "manifest" / VERSION / "functions.json"
+TOPICS_MANIFEST = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "manifest" / VERSION / "topics.json"
+COVERAGE_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "api-coverage.json"
+MATRIX_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "live-coverage-matrix.json"
+SUMMARY_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "phase2-coverage-summary.json"
+POLICY_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "phase21-uri-policy.json"
 
 CLASSIFICATION_STATUSES = {"supported", "behavioral", "deferred", "excluded", "live-tested", "sandbox-mutating-tested"}
 BLOCKED_STATUSES = {"deferred", "excluded"}

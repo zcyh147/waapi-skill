@@ -6,7 +6,7 @@ from typing import Any, Mapping
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SKILL_ROOT = REPO_ROOT / "skills" / "wwise-waapi"
+SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
 EVALS_JSON = REPO_ROOT / "evals" / "evals.json"
 REVIEW_WORKFLOW = REPO_ROOT / "references" / "eval-review-workflow.md"
 REQUIRED_CATEGORIES = {
@@ -36,7 +36,7 @@ FORBIDDEN_LOCAL_MARKERS = (
 def test_eval_metadata_has_required_review_shape() -> None:
     payload = _eval_payload()
 
-    assert payload["skill_name"] == "wwise-waapi"
+    assert payload["skill_name"] == "waapi-skill"
     assert payload["review_workflow"] == "references/eval-review-workflow.md"
     assert "not replace pytest" in payload["purpose"]
     assert len(payload["evals"]) >= 6

@@ -10,8 +10,8 @@ from wwise_waapi.manifest import ManifestStore  # pyright: ignore[reportMissingI
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2023.1"
-MANIFEST_ROOT = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest"
-COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION / "api-coverage.json"
+MANIFEST_ROOT = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "manifest"
+COVERAGE_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "api-coverage.json"
 ALLOWED_STATUSES = {
     "supported",
     "deferred",

@@ -40,7 +40,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PLAN_PATH = (
     REPO_ROOT
     / "skills"
-    / "wwise-waapi"
+    / "waapi-skill"
     / "resources"
     / "capabilities"
     / "2022.1"
@@ -49,7 +49,7 @@ PLAN_PATH = (
 TASK6_PLAN_PATH = (
     REPO_ROOT
     / "skills"
-    / "wwise-waapi"
+    / "waapi-skill"
     / "resources"
     / "capabilities"
     / "2022.1"

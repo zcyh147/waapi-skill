@@ -15,7 +15,7 @@ from wwise_waapi.deferred_registry import (  # pyright: ignore[reportMissingImpo
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SKILL_ROOT = REPO_ROOT / "skills" / "wwise-waapi"
+SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
 DEFERRED_RESOURCE = SKILL_ROOT / "resources" / "deferred" / "2022.1.json"
 MANIFEST_DIR = SKILL_ROOT / "resources" / "manifest" / "2022.1"
 
