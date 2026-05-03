@@ -168,22 +168,23 @@ def test_2024_semantic_source_notes_use_2024_notebook_and_versioned_references()
     payload = json.loads(SEMANTIC_2024.read_text(encoding="utf-8"))
 
     assert payload["version"] == VERSION_2024
-    assert payload["notebook_id"] == NOTEBOOK_2024
+    assert "notebook_id" not in payload
     assert payload["protocol"] == "references/semantic/2024.1/semantic-builder-protocol.md"
 
     for family, note in payload["notes"].items():
         assert note["status"] == "grounded"
-        assert note["notebook_id"] == NOTEBOOK_2024
+        assert "notebook_id" not in note
         assert note["version_target"] == VERSION_2024
-        assert note["gate_evidence_path"] == "references/semantic/2024.1/semantic-builder-notebooklm-gate.md"
+        assert "gate_evidence_path" not in note
         assert set(note["required_fields"]) <= set(note["cited_required_fields"])
-        for evidence_path in [note["gate_evidence_path"], *note["source_urls"]]:
+        for evidence_path in note["source_urls"]:
             assert evidence_path.startswith("references/semantic/2024.1/"), evidence_path
             assert "references/semantic-builder-" not in evidence_path
             assert "2022.1" not in evidence_path
             assert "2023.1" not in evidence_path
         encoded_note = json.dumps(note, sort_keys=True)
-        assert NOTEBOOK_2024 in encoded_note
+        assert "NotebookLM" not in encoded_note
+        assert NOTEBOOK_2024 not in encoded_note
         assert "wwise-2022.1-docs" not in encoded_note
         assert "wwise-2023.1-docs" not in encoded_note
         assert "resources/semantic/2024/" not in encoded_note
@@ -214,7 +215,7 @@ def test_2024_semantic_runtime_checks_read_local_files_only(monkeypatch: pytest.
     payload = json.loads(SEMANTIC_2024.read_text(encoding="utf-8"))
     gate_text = (REFERENCES_2024 / "semantic-builder-notebooklm-gate.md").read_text(encoding="utf-8")
 
-    assert payload["notebook_id"] == NOTEBOOK_2024
+    assert "notebook_id" not in payload
     assert "Runtime builders must read versioned local source-note resources" in gate_text
     assert any("resources/semantic/2024.1/source_notes.json" in path for path in touched)
     assert any("references/semantic/2024.1/semantic-builder-notebooklm-gate.md" in path for path in touched)
@@ -360,7 +361,7 @@ def test_2024_coverage_policy_deferred_and_source_notes_reconcile_without_manife
         if entry["source_note_family"]:
             assert entry["uri"] in source_note_uris
     assert source_notes["version"] == VERSION_2024
-    assert source_notes["notebook_id"] == NOTEBOOK_2024
+    assert "notebook_id" not in source_notes
 
     for uri, entry in coverage_by_uri.items():
         if entry.get("item_type") == "topic":

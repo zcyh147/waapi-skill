@@ -45,14 +45,13 @@ def test_2023_resource_lookup_does_not_fallback_to_2022(tmp_path: Path) -> None:
     assert manifest_exc.value.path == tmp_path / "2023.1" / "manifest.json"
 
     status = require_source_note(
-        SemanticSourceNoteChecker(notebook_id="wwise-2023.1-docs"),
+        SemanticSourceNoteChecker(),
         BuilderFamily.QUERY,
         version="2023.1",
     )
 
     assert status.allowed is True
     assert status.version == "2023.1"
-    assert status.notebook_id == "wwise-2023.1-docs"
 
 
 def test_manifest_store_explicit_2023_1_missing_manifest_fails_closed_without_2022_1_fallback(tmp_path: Path) -> None:
@@ -93,10 +92,9 @@ def test_dispatcher_explicit_2023_1_missing_manifest_reports_fail_closed_error(t
 
 
 def test_semantic_source_note_checker_explicit_2023_1_uses_2023_1_resource_path_without_reference_fallback() -> None:
-    checker = SemanticSourceNoteChecker(notebook_id="wwise-2023.1-docs")
+    checker = SemanticSourceNoteChecker()
 
     status = require_source_note(checker, BuilderFamily.QUERY, version="2023.1")
 
     assert status.allowed is True
     assert status.version == "2023.1"
-    assert status.notebook_id == "wwise-2023.1-docs"

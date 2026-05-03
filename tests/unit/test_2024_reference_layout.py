@@ -52,9 +52,7 @@ FORBIDDEN_TEXT = (
 REQUIRED_NOTE_KEYS = {
     "family",
     "status",
-    "notebook_id",
     "version_target",
-    "gate_evidence_path",
     "official_urls",
     "source_urls",
     "endpoints",
@@ -116,7 +114,7 @@ def test_2024_source_notes_schema_uses_only_2024_notebook_and_local_references()
     payload = read_source_notes()
 
     assert payload["version"] == VERSION_2024
-    assert payload["notebook_id"] == NOTEBOOK_2024
+    assert "notebook_id" not in payload
     assert payload["protocol"] == "references/semantic/2024.1/semantic-builder-protocol.md"
     assert set(payload["notes"]) == set(FAMILIES)
 
@@ -125,13 +123,10 @@ def test_2024_source_notes_schema_uses_only_2024_notebook_and_local_references()
         assert set(note) == REQUIRED_NOTE_KEYS
         assert note["family"] == family
         assert note["status"] == "grounded"
-        assert note["notebook_id"] == NOTEBOOK_2024
+        assert "notebook_id" not in note
         assert note["version_target"] == VERSION_2024
-        assert note["gate_evidence_path"] == "references/semantic/2024.1/semantic-builder-notebooklm-gate.md"
-        assert note["source_urls"] == [
-            "references/semantic/2024.1/semantic-builder-notebooklm-gate.md",
-            f"references/semantic/2024.1/semantic-builder-{family}.md",
-        ]
+        assert "gate_evidence_path" not in note
+        assert note["source_urls"] == [f"references/semantic/2024.1/semantic-builder-{family}.md"]
         assert set(note["required_fields"]) <= set(note["cited_required_fields"])
         assert note["official_urls"]
         assert note["endpoints"]
@@ -159,7 +154,7 @@ def test_2024_runtime_layout_checks_have_no_notebooklm_dependency() -> None:
     payload = read_source_notes()
     gate_text = GATE_PATH.read_text(encoding="utf-8")
 
-    assert payload["notebook_id"] == NOTEBOOK_2024
+    assert "notebook_id" not in payload
     assert "NotebookLM" in gate_text
     assert "browser_state" not in gate_text
     assert "state.json" not in gate_text

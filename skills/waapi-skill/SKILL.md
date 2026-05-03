@@ -134,9 +134,9 @@ Keep runtime data, logs, auth state, and evidence artifacts out of git unless th
 
 ## Resources and documentation
 
-The prompt should not load every reference file up front. Python code reads versioned manifests, semantic source notes, WAQL resources, and deferred registries for the selected version and task. The structured `resources/semantic/<version>/source_notes.json` files are the runtime semantic source-note resource; their `protocol`, `gate_evidence_path`, and `source_urls` fields are metadata pointing back to repository source-evidence history, not markdown files that packaged runtime validation opens.
+The prompt should not load every reference file up front. Python code reads versioned manifests, semantic source notes, WAQL resources, and deferred registries for the selected version and task. The structured `resources/semantic/<version>/source_notes.json` files are the runtime semantic source-note resource.
 
-Use NotebookLM-gated documentation only for documentation-sensitive source-note refresh or semantic behavior questions that cannot be answered from packaged resources. Runtime dispatcher and builder flows should rely on local packaged resources, not large prompt-loaded 2025 reference files.
+Their `protocol` and `source_urls` fields point back to repository source-evidence history, which lives in root `references/` as development material outside the packaged runtime path. Runtime dispatcher and builder flows should rely on local packaged resources, not large prompt-loaded 2025 reference files.
 
 ## Skill layout
 
@@ -148,4 +148,4 @@ Key paths:
 4. `wwise_waapi/manifest.py`: versioned manifest loading and reflection helpers.
 5. `wwise_waapi/builders/`: semantic builders and preview objects.
 6. `resources/manifest/<version>/`: generated API manifests.
-7. `resources/semantic/<version>/`, `resources/waql/<version>/`, and `resources/deferred/<version>.json`: versioned runtime supporting resources loaded only when needed. Root `references/` and `references/semantic/<version>/` keep historical NotebookLM/source-evidence markdown for development review outside the packaged runtime path.
+7. `resources/semantic/<version>/`, `resources/waql/<version>/`, and `resources/deferred/<version>.json`: versioned runtime supporting resources loaded only when needed. Root `references/` and `references/semantic/<version>/` keep historical source-evidence markdown for development review outside the packaged runtime path.

@@ -49,9 +49,11 @@ def test_package_imports_from_skill_artifact_package() -> None:
 def test_semantic_source_note_references_remain_root_source_evidence_metadata() -> None:
     for source_notes_path in sorted((SKILL_ROOT / "resources" / "semantic").glob("*/source_notes.json")):
         payload = json.loads(source_notes_path.read_text(encoding="utf-8"))
+        assert "notebook_id" not in payload
         root_source_evidence_paths = [payload["protocol"]]
         for note in payload["notes"].values():
-            assert note["gate_evidence_path"].startswith("references/"), source_notes_path
+            assert "notebook_id" not in note
+            assert "gate_evidence_path" not in note
             root_source_evidence_paths.extend(
                 source_url for source_url in note["source_urls"] if source_url.startswith("references/")
             )

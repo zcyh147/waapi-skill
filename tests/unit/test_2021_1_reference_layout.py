@@ -14,10 +14,7 @@ NOTEBOOK = 'wwise-2021.1.14-docs'
 GENERATED_AT = '2026-05-02T00:00:00Z'
 GATE_METADATA = {
     'status': 'open',
-    'notebook_id': NOTEBOOK,
-    'gate_evidence_path': 'references/semantic/2021.1/semantic-builder-notebooklm-gate.md',
     'source_only_caveat': 'source notes are not behavioral proof',
-    'citation_caveat': 'NotebookLM returned numbered citation labels rather than stable source URLs',
 }
 FAMILIES = (
     'query',
@@ -63,9 +60,7 @@ FORBIDDEN_TEXT = (
 REQUIRED_NOTE_KEYS = {
     'family',
     'status',
-    'notebook_id',
     'version_target',
-    'gate_evidence_path',
     'official_urls',
     'source_urls',
     'endpoints',
@@ -175,7 +170,7 @@ def test_2021_1_source_notes_are_grounded_and_local_only() -> None:
     payload = read_source_notes()
 
     assert payload['version'] == VERSION
-    assert payload['notebook_id'] == NOTEBOOK
+    assert 'notebook_id' not in payload
     assert payload['protocol'] == 'references/semantic/2021.1/semantic-builder-protocol.md'
     assert payload['generated_at'] == GENERATED_AT
     assert payload['gate'] == GATE_METADATA
@@ -185,13 +180,10 @@ def test_2021_1_source_notes_are_grounded_and_local_only() -> None:
         assert set(note) == REQUIRED_NOTE_KEYS
         assert note['family'] == family
         assert note['status'] == 'grounded'
-        assert note['notebook_id'] == NOTEBOOK
+        assert 'notebook_id' not in note
         assert note['version_target'] == VERSION
-        assert note['gate_evidence_path'] == 'references/semantic/2021.1/semantic-builder-notebooklm-gate.md'
-        assert note['source_urls'] == [
-            'references/semantic/2021.1/semantic-builder-notebooklm-gate.md',
-            f'references/semantic/2021.1/semantic-builder-{family}.md',
-        ]
+        assert 'gate_evidence_path' not in note
+        assert note['source_urls'] == [f'references/semantic/2021.1/semantic-builder-{family}.md']
         assert note['endpoints'] == list(EXPECTED_INVENTORY[family])
         assert note['required_fields']
         assert note['optional_fields']
@@ -212,12 +204,11 @@ def test_2021_1_runtime_layout_checks_have_no_notebooklm_dependency() -> None:
     assert GATE_PATH.is_file()
     assert _runtime_package_has_no_notebooklm_calls()
 
-    checker = SemanticSourceNoteChecker(resource_path=SOURCE_NOTES, notebook_id=NOTEBOOK)
+    checker = SemanticSourceNoteChecker(resource_path=SOURCE_NOTES)
     status = checker.check('query', version=VERSION)
 
     assert status.allowed is True
     assert status.version == VERSION
-    assert status.notebook_id == NOTEBOOK
     assert status.reason == 'Semantic source note is grounded.'
 
 

@@ -57,9 +57,7 @@ FORBIDDEN_TEXT = (
 REQUIRED_NOTE_KEYS = {
     "family",
     "status",
-    "notebook_id",
     "version_target",
-    "gate_evidence_path",
     "official_urls",
     "source_urls",
     "endpoints",
@@ -128,7 +126,7 @@ def test_2025_1_source_notes_schema_uses_only_2025_1_notebook_and_local_referenc
     payload = read_source_notes()
 
     assert payload["version"] == VERSION_2025
-    assert payload["notebook_id"] == NOTEBOOK_2025
+    assert "notebook_id" not in payload
     assert payload["protocol"] == "references/semantic/2025.1/semantic-builder-protocol.md"
     assert set(payload["notes"]) == set(FAMILIES)
 
@@ -137,13 +135,10 @@ def test_2025_1_source_notes_schema_uses_only_2025_1_notebook_and_local_referenc
         assert set(note) == REQUIRED_NOTE_KEYS
         assert note["family"] == family
         assert note["status"] == "grounded"
-        assert note["notebook_id"] == NOTEBOOK_2025
+        assert "notebook_id" not in note
         assert note["version_target"] == VERSION_2025
-        assert note["gate_evidence_path"] == "references/semantic/2025.1/semantic-builder-notebooklm-gate.md"
-        assert note["source_urls"] == [
-            "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-            f"references/semantic/2025.1/semantic-builder-{family}.md",
-        ]
+        assert "gate_evidence_path" not in note
+        assert note["source_urls"] == [f"references/semantic/2025.1/semantic-builder-{family}.md"]
         assert set(note["required_fields"]) <= set(note["cited_required_fields"])
         assert note["official_urls"]
         assert note["endpoints"]
@@ -171,7 +166,7 @@ def test_2025_1_runtime_layout_checks_have_no_notebooklm_dependency() -> None:
     payload = read_source_notes()
     gate_text = GATE_PATH.read_text(encoding="utf-8")
 
-    assert payload["notebook_id"] == NOTEBOOK_2025
+    assert "notebook_id" not in payload
     assert "NotebookLM" in gate_text
     assert "browser_state" not in gate_text
     assert "state.json" not in gate_text
@@ -180,46 +175,11 @@ def test_2025_1_runtime_layout_checks_have_no_notebooklm_dependency() -> None:
 
 def test_2025_1_source_note_checker_allows_grounded_local_notes() -> None:
     for family in BuilderFamily:
-        status = SemanticSourceNoteChecker(notebook_id=NOTEBOOK_2025).check(family.value, version=VERSION_2025)
+        status = SemanticSourceNoteChecker().check(family.value, version=VERSION_2025)
 
         assert status.allowed is True
         assert status.version == VERSION_2025
-        assert status.notebook_id == NOTEBOOK_2025
         assert status.reason == "Semantic source note is grounded."
-
-
-def test_2025_1_source_note_checker_fails_closed_for_wrong_notebook(tmp_path: Path) -> None:
-    payload = read_source_notes()
-    wrong_payload = copy.deepcopy(payload)
-    wrong_payload["notebook_id"] = "wrong-notebook"
-    wrong_path = tmp_path / "wrong-source-notes.json"
-    wrong_path.write_text(json.dumps(wrong_payload), encoding="utf-8")
-
-    status = SemanticSourceNoteChecker(resource_path=wrong_path, notebook_id=NOTEBOOK_2025).check(
-        BuilderFamily.QUERY.value,
-        version=VERSION_2025,
-    )
-
-    assert status.allowed is False
-    assert status.error_code == SemanticErrorCode.SOURCE_NOTE_WRONG_NOTEBOOK
-    assert "wrong-notebook" in status.reason
-
-
-def test_2025_1_source_note_checker_treats_gate_path_as_metadata(tmp_path: Path) -> None:
-    payload = read_source_notes()
-    missing_gate_payload = copy.deepcopy(payload)
-    for note in missing_gate_payload["notes"].values():
-        note["gate_evidence_path"] = "references/missing-gate.md"
-    metadata_only_path = write_artifact_resource(tmp_path, missing_gate_payload)
-
-    status = SemanticSourceNoteChecker(resource_path=metadata_only_path, notebook_id=NOTEBOOK_2025).check(
-        BuilderFamily.QUERY.value,
-        version=VERSION_2025,
-    )
-
-    assert status.allowed is True
-    assert status.error_code is None
-    assert status.reason == "Semantic source note is grounded."
 
 
 def test_2025_1_task5_notebooklm_evidence_omits_auth_artifacts() -> None:

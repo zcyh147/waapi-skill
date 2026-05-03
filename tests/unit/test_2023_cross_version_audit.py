@@ -77,7 +77,7 @@ def test_2023_and_2022_resources_are_independently_addressable() -> None:
     assert manifest_2023["metadata"]["wwise_version_target"] == VERSION_2023
     assert coverage_2023["metadata"]["manifest_source"] == "resources/manifest/2023.1"
     assert notes_2023["version"] == VERSION_2023
-    assert notes_2023["notebook_id"] == NOTEBOOK_2023
+    assert "notebook_id" not in notes_2023
     assert set(notes_2023["notes"]) == EXPECTED_FAMILIES
     assert (FIXTURE_2023 / "SampleProject.wproj").is_file()
     assert (REFERENCES_2023 / "semantic-builder-notebooklm-gate.md").is_file()
@@ -110,7 +110,7 @@ def test_explicit_2023_resource_lookups_never_read_2022_or_global_semantic_paths
 
     store = ManifestStore(root=MANIFEST_ROOT)
     manifest = store.load(VERSION_2023)
-    status = require_source_note(SemanticSourceNoteChecker(notebook_id=NOTEBOOK_2023), BuilderFamily.QUERY, version=VERSION_2023)
+    status = require_source_note(SemanticSourceNoteChecker(), BuilderFamily.QUERY, version=VERSION_2023)
     coverage = _read_json(COVERAGE_2023)
     live_matrix = _read_json(LIVE_MATRIX_2023)
     deferred = _read_json(DEFERRED_2023)
@@ -138,16 +138,17 @@ def test_2023_semantic_source_notes_use_2023_notebook_and_versioned_references()
     for family, note in payload["notes"].items():
         assert family in EXPECTED_FAMILIES
         assert note["status"] == "grounded"
-        assert note["notebook_id"] == NOTEBOOK_2023
+        assert "notebook_id" not in note
         assert note["version_target"] == VERSION_2023
-        assert note["gate_evidence_path"] == "references/semantic/2023.1/semantic-builder-notebooklm-gate.md"
+        assert "gate_evidence_path" not in note
         assert set(note["required_fields"]) <= set(note["cited_required_fields"])
-        for evidence_path in [note["gate_evidence_path"], *note["source_urls"]]:
+        for evidence_path in note["source_urls"]:
             assert evidence_path.startswith("references/semantic/2023.1/"), evidence_path
             assert "references/semantic-builder-" not in evidence_path
             assert "2022.1" not in evidence_path
         encoded_note = json.dumps(note, sort_keys=True)
-        assert NOTEBOOK_2023 in encoded_note
+        assert "NotebookLM" not in encoded_note
+        assert NOTEBOOK_2023 not in encoded_note
         assert "wwise-2022.1-docs" not in encoded_note
 
     for reference in REFERENCES_2023.glob("*.md"):

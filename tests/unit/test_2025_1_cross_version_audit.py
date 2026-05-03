@@ -151,7 +151,7 @@ def test_explicit_2025_1_resource_lookups_never_read_prior_bare_or_global_paths(
     summary = _read_json(PHASE2_SUMMARY_2025)
     policy = _read_json(POLICY_2025)
     deferred = _read_json(DEFERRED_2025)
-    source_note_status = SemanticSourceNoteChecker(notebook_id=NOTEBOOK_2025).check(
+    source_note_status = SemanticSourceNoteChecker().check(
         BuilderFamily.QUERY.value,
         version=VERSION_2025,
     )
@@ -408,15 +408,15 @@ def _assert_2025_resources_reconcile(
     source_note_uris = {uri for note in source_notes["notes"].values() for uri in note["endpoints"]}
     reflected_uris = set(reflected_function_uris) | set(reflected_topic_uris)
     assert source_notes["version"] == VERSION_2025, failure_context
-    assert source_notes["notebook_id"] == NOTEBOOK_2025, failure_context
+    assert "notebook_id" not in source_notes
     assert source_note_uris <= reflected_uris, failure_context
     for family, note in source_notes["notes"].items():
         assert note["status"] == "grounded", failure_context
-        assert note["notebook_id"] == NOTEBOOK_2025, failure_context
+        assert "notebook_id" not in note
         assert note["version_target"] == VERSION_2025, failure_context
-        assert note["gate_evidence_path"] == "references/semantic/2025.1/semantic-builder-notebooklm-gate.md", failure_context
+        assert "gate_evidence_path" not in note
         assert set(note["required_fields"]) <= set(note["cited_required_fields"]), failure_context
-        for evidence_path in [source_notes["protocol"], note["gate_evidence_path"], *note["source_urls"]]:
+        for evidence_path in [source_notes["protocol"], *note["source_urls"]]:
             assert evidence_path.startswith("references/semantic/2025.1/"), failure_context
             assert (ROOT / evidence_path).is_file(), failure_context
             assert not _has_forbidden_2025_text(evidence_path), failure_context

@@ -122,7 +122,7 @@ def test_semantic_source_note_checker_explicit_2025_1_uses_2025_1_resource_path_
     monkeypatch.setattr(Path, "exists", guarded_exists)
     monkeypatch.setattr(Path, "read_text", guarded_read_text)
 
-    status = SemanticSourceNoteChecker(notebook_id=NOTEBOOK_2025).check(
+    status = SemanticSourceNoteChecker().check(
         BuilderFamily.QUERY.value,
         version=VERSION_2025,
     )
