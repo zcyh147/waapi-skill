@@ -2,24 +2,24 @@
   "case_id": "switchcontainer_assignment_add_get_remove_cleanup",
   "cleanup": "assignment is removed and disposable objects are deleted before test exit",
   "details": {
-    "active_destructive_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/2025.1-destructive/sample-project-59ce05a5f886448c9aaacfb8b7cf67b1/SampleProject.wproj",
+    "active_destructive_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/2025.1-destructive/sample-project-4847743150314438baaeb5b776d1eac2/SampleProject.wproj",
     "assignments_after_add": [
       {
-        "child": "{DEA035F3-D660-4209-8235-9BA173417491}",
-        "stateOrSwitch": "{66EDD604-E065-436C-809E-FF698D8750FE}"
+        "child": "{3F6EF272-315C-4D61-A62E-08B2C46229C7}",
+        "stateOrSwitch": "{99072B89-6591-4693-A640-CD053363E1B9}"
       }
     ],
     "assignments_after_remove": [],
     "assignments_before": [],
     "read_after_target_delete": [],
-    "sandbox_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/2025.1-destructive/sample-project-59ce05a5f886448c9aaacfb8b7cf67b1/SampleProject.wproj",
+    "sandbox_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/2025.1-destructive/sample-project-4847743150314438baaeb5b776d1eac2/SampleProject.wproj",
     "source_immutability_guard": "Destructive2025SandboxRuntime.assert_source_unchanged runs on exit",
-    "switch_container_id": "{76870393-CE2E-44BE-8C31-B7F147E50C4E}",
-    "switch_group_id": "{C8AF6E52-9C42-4BF0-8C64-A2756F546F5D}",
-    "switch_id": "{66EDD604-E065-436C-809E-FF698D8750FE}",
-    "target_id": "{DEA035F3-D660-4209-8235-9BA173417491}"
+    "switch_container_id": "{5827CEF0-D5FB-445B-B9C5-DFADE56B6A89}",
+    "switch_group_id": "{C4886BEF-1036-43A7-B4B2-E46A65877DA1}",
+    "switch_id": "{99072B89-6591-4693-A640-CD053363E1B9}",
+    "target_id": "{3F6EF272-315C-4D61-A62E-08B2C46229C7}"
   },
-  "recorded_at_unix": 1777748504,
+  "recorded_at_unix": 1777788921,
   "sandbox_required": true,
   "source_project_mutation_allowed": false,
   "status": "passed",

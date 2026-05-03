@@ -2,7 +2,7 @@
   "case_id": "soundbank_inclusions_replace_read_remove_cleanup",
   "cleanup": "objects are removed and read back absent before test exit",
   "details": {
-    "active_destructive_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/2023.1-destructive/sample-project-abf24d44238f4d709132bf295b2166d5/SampleProject.wproj",
+    "active_destructive_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/2023.1-destructive/sample-project-addb669e5d4045c5a9340bcf7a3b1818/SampleProject.wproj",
     "inclusions_after_remove": [],
     "inclusions_after_replace": [
       {
@@ -10,15 +10,15 @@
           "structures",
           "media"
         ],
-        "object": "{8D4FBDB9-5FCB-4DC9-8FA4-A0B6FFE95DE5}"
+        "object": "{94C737D9-C6A3-41ED-B663-756C42D84308}"
       }
     ],
-    "sandbox_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/2023.1-destructive/sample-project-abf24d44238f4d709132bf295b2166d5/SampleProject.wproj",
-    "sound_id": "{8D4FBDB9-5FCB-4DC9-8FA4-A0B6FFE95DE5}",
-    "soundbank_id": "{921E6B2C-5F0D-4442-9DF8-A86D5F009CD3}",
+    "sandbox_project": "/Users/xiye/Documents/Git/waapi-skills/.sisyphus/runtime/wwise-waapi-sandboxes/2023.1-destructive/sample-project-addb669e5d4045c5a9340bcf7a3b1818/SampleProject.wproj",
+    "sound_id": "{94C737D9-C6A3-41ED-B663-756C42D84308}",
+    "soundbank_id": "{2052594B-FAEB-4C8A-A7C9-93ECF79C00BB}",
     "source_immutability_guard": "Destructive2023SandboxRuntime.assert_source_unchanged runs on exit"
   },
-  "recorded_at_unix": 1777748458,
+  "recorded_at_unix": 1777788877,
   "sandbox_required": true,
   "source_project_mutation_allowed": false,
   "status": "passed",
