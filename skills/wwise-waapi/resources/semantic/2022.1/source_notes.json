@@ -15,7 +15,7 @@
       ],
       "source_urls": [
         "references/notebooklm-workflow.md",
-        "references/waql-2022.1.md",
+        "resources/waql/2022.1/object-get-live-matrix.json",
         "NotebookLM notebook wwise-2022.1-docs; cited answer for WAQL and ak.wwise.core.object.get"
       ],
       "endpoints": [

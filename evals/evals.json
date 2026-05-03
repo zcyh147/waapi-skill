@@ -50,9 +50,9 @@
       "id": "waql-query-gated",
       "category": "WAQL query",
       "prompt": "Build a Wwise 2022.1 WAAPI query that finds Sound objects with negative direct Volume and returns id, name, path, type, and @Volume. Use WAQL only if the source-grounded WAQL reference supports it.",
-      "expected_output": "Uses the WAQL reference gate and ak.wwise.core.object.get with args.waql, cites or references waql-2022.1.md, returns the requested fields, and avoids inventing WAQL operators or unsupported semantics.",
+      "expected_output": "Uses the WAQL resource gate and ak.wwise.core.object.get with args.waql, cites or references the packaged live WAQL matrix, returns the requested fields, and avoids inventing WAQL operators or unsupported semantics.",
       "files": [
-        "references/waql-2022.1.md",
+        "skills/wwise-waapi/resources/waql/2022.1/object-get-live-matrix.json",
         "SKILL.md"
       ],
       "assertions": [
@@ -60,10 +60,10 @@
           "name": "uses_waql_reference_gate",
           "text": "Output says WAQL helper behavior is gated by the stored WAQL reference before relying on semantics.",
           "required_terms": [
-            "waql-2022.1.md"
+            "object-get-live-matrix.json"
           ],
           "required_terms_any": [
-            "WAQL reference gate",
+            "WAQL resource gate",
             "require_waql_helper_generation",
             "source-grounded"
           ]
@@ -223,7 +223,7 @@
       "prompt": "The 2022.1 coverage file lists ak.soundengine.executeActionOnEvent with schema data, so can we count it as behaviorally tested and remove the deferral? Explain the correct status for a reviewer.",
       "expected_output": "Explains that reflected inventory and schema coverage are not behavioral coverage, keeps the API deferred until live-safe behavioral assertions exist, cites the coverage resource or deferred registry, and notes substitute tests only validate metadata completeness.",
       "files": [
-        "resources/coverage/2022.1/api-coverage.json",
+        "resources/capabilities/2022.1/api-coverage.json",
         "SKILL.md"
       ],
       "assertions": [
@@ -521,7 +521,7 @@
       "files": [
         "references/semantic/2021.1/semantic-builder-protocol.md",
         "resources/manifest/2021.1/functions.json",
-        "resources/coverage/2021.1/api-coverage.json",
+        "resources/capabilities/2021.1/api-coverage.json",
         "resources/deferred/2021.1.json",
         "resources/waql/2021.1/object-get-live-matrix.json"
       ],
@@ -532,7 +532,7 @@
           "required_terms": [
             "2021.1",
             "resources/manifest/2021.1/",
-            "resources/coverage/2021.1/",
+            "resources/capabilities/2021.1/",
             "references/semantic/2021.1/"
           ]
         },
@@ -579,7 +579,7 @@
         "SKILL.md",
         "references/long-run-runbook.md",
         "references/phase2-user-review-packet.md",
-        "resources/coverage/2021.1/phase2-coverage-summary.json"
+        "resources/capabilities/2021.1/phase2-coverage-summary.json"
       ],
       "assertions": [
         {
@@ -665,10 +665,10 @@
       "id": "2023-deferred-coverage-version-scoped-review",
       "category": "2023.1 deferred coverage review",
       "prompt": "A reviewer sees 2023.1 manifest resources and skipped live tests. Explain whether that proves live-tested behavior, and mention what resources should be checked.",
-      "expected_output": "Explains that 2023.1 manifest reflection and skipped live or destructive tests are not live-tested behavior. Points reviewers to resources/coverage/2023.1/, resources/deferred/2023.1.json, and versioned local evidence before promoting coverage.",
+      "expected_output": "Explains that 2023.1 manifest reflection and skipped live or destructive tests are not live-tested behavior. Points reviewers to resources/capabilities/2023.1/, resources/deferred/2023.1.json, and versioned local evidence before promoting coverage.",
       "files": [
-        "resources/coverage/2023.1/api-coverage.json",
-        "resources/coverage/2023.1/live-coverage-matrix.json",
+        "resources/capabilities/2023.1/api-coverage.json",
+        "resources/capabilities/2023.1/live-coverage-matrix.json",
         "resources/deferred/2023.1.json",
         "references/phase2-user-review-packet.md"
       ],
@@ -705,7 +705,7 @@
           "name": "points_to_2023_resources",
           "text": "Output points to 2023.1 coverage and deferred resources.",
           "required_terms": [
-            "resources/coverage/2023.1/",
+            "resources/capabilities/2023.1/",
             "resources/deferred/2023.1.json"
           ]
         }
@@ -720,7 +720,7 @@
         "SKILL.md",
         "references/semantic/2024.1/semantic-builder-protocol.md",
         "resources/manifest/2024.1/functions.json",
-        "resources/coverage/2024.1/api-coverage.json",
+        "resources/capabilities/2024.1/api-coverage.json",
         "resources/deferred/2024.1.json",
         "resources/waql/2024.1/object-get-live-matrix.json"
       ],
@@ -731,7 +731,7 @@
           "required_terms": [
             "2024.1",
             "resources/manifest/2024.1/",
-            "resources/coverage/2024.1/",
+            "resources/capabilities/2024.1/",
             "references/semantic/2024.1/"
           ]
         },
@@ -771,7 +771,7 @@
         "SKILL.md",
         "references/long-run-runbook.md",
         "references/phase2-user-review-packet.md",
-        "resources/coverage/2024.1/live-coverage-matrix.json"
+        "resources/capabilities/2024.1/live-coverage-matrix.json"
       ],
       "assertions": [
         {
@@ -818,7 +818,7 @@
         "references/semantic/2025.1/semantic-builder-protocol.md",
         "references/semantic/2025.1/discrepancy-register.md",
         "resources/manifest/2025.1/functions.json",
-        "resources/coverage/2025.1/api-coverage.json",
+        "resources/capabilities/2025.1/api-coverage.json",
         "resources/deferred/2025.1.json",
         "resources/waql/2025.1/object-get-live-matrix.json"
       ],
@@ -829,7 +829,7 @@
           "required_terms": [
             "2025.1",
             "resources/manifest/2025.1/",
-            "resources/coverage/2025.1/",
+            "resources/capabilities/2025.1/",
             "references/semantic/2025.1/"
           ]
         },
@@ -872,7 +872,7 @@
       "files": [
         "references/long-run-runbook.md",
         "references/phase2-user-review-packet.md",
-        "resources/coverage/2025.1/live-coverage-matrix.json"
+        "resources/capabilities/2025.1/live-coverage-matrix.json"
       ],
       "assertions": [
         {

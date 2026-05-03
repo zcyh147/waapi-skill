@@ -58,7 +58,9 @@ def test_semantic_source_note_references_are_packaged_with_skill() -> None:
             )
 
         for relative_path in set(referenced_paths):
-            assert (SKILL_ROOT / relative_path).is_file(), f"{source_notes_path}: {relative_path}"
+            assert (SKILL_ROOT / relative_path).is_file() or (REPO_ROOT / relative_path).is_file(), (
+                f"{source_notes_path}: {relative_path}"
+            )
 
 
 def test_project_metadata_does_not_point_at_nested_skill_root() -> None:

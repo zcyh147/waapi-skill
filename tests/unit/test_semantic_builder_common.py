@@ -155,6 +155,7 @@ def test_envelope_converts_to_dry_run_dispatcher_request_without_metadata() -> N
     assert request.args == {"waql": "from type Sound"}
     assert request.options == {"return": ["id"]}
     assert request.dry_run is True
+    assert request.args is not None
     assert "semantic" not in request.args
 
 
