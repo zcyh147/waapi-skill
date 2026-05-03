@@ -8,7 +8,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.headless import default_waapi_client_factory  # pyright: ignore[reportMissingImports]
 from wwise_waapi.manifest import ManifestStore, audit_manifest, build_manifest_from_caller  # pyright: ignore[reportMissingImports]
-from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
     LiveSandboxLock,
     cleanup_sandbox,
     hash_project,

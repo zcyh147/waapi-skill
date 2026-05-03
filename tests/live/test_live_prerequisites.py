@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest  # pyright: ignore[reportMissingImports]
 
-from wwise_waapi.live_environment import require_live_environment  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.live_environment import require_live_environment  # pyright: ignore[reportMissingImports]
 
 
 @pytest.mark.live

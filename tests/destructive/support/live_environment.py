@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
-from .headless import WwiseConsolePathResolver
-from .versions import (  # pyright: ignore[reportMissingImports]
+from wwise_waapi.headless import WwiseConsolePathResolver  # pyright: ignore[reportMissingImports]
+from wwise_waapi.versions import (  # pyright: ignore[reportMissingImports]
     WWISE_2021_1_BUILD,
     WWISE_2021_1_VERSION_KEY,
     WWISE_2023_1_BUILD,

@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest  # pyright: ignore[reportMissingImports]
 
-import wwise_waapi.live_environment as live_env  # pyright: ignore[reportMissingImports]
-from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImports]
+import tests.destructive.support.live_environment as live_env  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.live_environment import (  # pyright: ignore[reportMissingImports]
     INSTALLED_SAMPLE_PROJECT_2023_1_ROOT,
     LiveEnvironmentError,
     parse_live_environment,

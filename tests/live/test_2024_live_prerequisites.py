@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest  # pyright: ignore[reportMissingImports]
 
 from tests.support.active_gate_failures import skip_or_fail_strict_real  # pyright: ignore[reportMissingImports]
-from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.live_environment import (  # pyright: ignore[reportMissingImports]
     ENV_WWISE_CONSOLE,
     ENV_WWISE_LIVE,
     ENV_WWISE_SAMPLE_PROJECT_PATH,
