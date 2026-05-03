@@ -14,6 +14,7 @@ DEFAULT_WWISE_CONSOLE_MACOS = Path(
     "/Applications/Audiokinetic/Wwise2022.1.19.8584/Wwise.app/Contents/Tools/WwiseConsole.sh"
 )
 WINDOWS_WWISE_CONSOLE_RELATIVE = Path("Authoring") / "x64" / "Release" / "bin" / "WwiseConsole.exe"
+PROJECT_MODIFICATION_POLICIES = ("never", "preview_then_confirm", "allow_with_notice")
 
 
 @dataclass(slots=True, frozen=True)
@@ -45,6 +46,7 @@ class SkillConfig:
     wwise_version: str | None = None
     waapi_host: str = "127.0.0.1"
     waapi_port: int | None = None
+    project_modification_policy: str = "preview_then_confirm"
     use_current_selection_for_ambiguous_queries: bool = True
     paths: SkillPaths = field(init=False)
     coverage_minimum: int = 85
@@ -91,6 +93,11 @@ class SkillConfig:
         config.wwise_version = _load_optional_string(payload, "wwise_version")
         config.waapi_host = _load_string(payload, "waapi_host", default=config.waapi_host)
         config.waapi_port = _load_optional_int(payload, "waapi_port")
+        config.project_modification_policy = _load_project_modification_policy(
+            payload,
+            "project_modification_policy",
+            default=config.project_modification_policy,
+        )
         config.use_current_selection_for_ambiguous_queries = _load_bool(
             payload,
             "use_current_selection_for_ambiguous_queries",
@@ -105,6 +112,9 @@ class SkillConfig:
             "wwise_version": self.wwise_version,
             "waapi_host": self.waapi_host,
             "waapi_port": self.waapi_port,
+            "project_modification_policy": _validate_project_modification_policy(
+                self.project_modification_policy
+            ),
             "use_current_selection_for_ambiguous_queries": self.use_current_selection_for_ambiguous_queries,
         }
         with tempfile.NamedTemporaryFile(
@@ -125,12 +135,15 @@ class SkillConfig:
             "wwise_version",
             "waapi_host",
             "waapi_port",
+            "project_modification_policy",
             "use_current_selection_for_ambiguous_queries",
         }
         for key in changes:
             if key not in allowed_fields:
                 raise ValueError(f"Unsupported config field: {key}")
         for key, value in changes.items():
+            if key == "project_modification_policy":
+                value = _validate_project_modification_policy(value)
             setattr(self, key, value)
         self.save(path=path)
         return self
@@ -165,4 +178,17 @@ def _load_bool(payload: dict[str, Any], key: str, default: bool) -> bool:
     value = payload.get(key, default)
     if not isinstance(value, bool):
         raise ValueError(f"{key} must be a boolean")
+    return value
+
+
+def _load_project_modification_policy(payload: dict[str, Any], key: str, default: str) -> str:
+    value = payload.get(key, default)
+    return _validate_project_modification_policy(value, key=key)
+
+
+def _validate_project_modification_policy(value: Any, key: str = "project_modification_policy") -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{key} must be one of: {', '.join(PROJECT_MODIFICATION_POLICIES)}")
+    if value not in PROJECT_MODIFICATION_POLICIES:
+        raise ValueError(f"{key} must be one of: {', '.join(PROJECT_MODIFICATION_POLICIES)}")
     return value
