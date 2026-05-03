@@ -6,15 +6,8 @@ from typing import Any, Mapping
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLAN_PATH = (
-    REPO_ROOT
-    / "skills"
-    / "waapi-skill"
-    / "resources"
-    / "capabilities"
-    / "2022.1"
-    / "task-7-project-mutation-sandbox-plan.json"
-)
+CAPABILITY_ROOT = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities"
+PLAN_PATH = CAPABILITY_ROOT / "2022.1" / "task-7-project-mutation-sandbox-plan.json"
 REQUIRED_URIS = {
     "ak.wwise.core.object.create",
     "ak.wwise.core.object.set",

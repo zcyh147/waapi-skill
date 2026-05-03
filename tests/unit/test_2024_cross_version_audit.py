@@ -17,10 +17,10 @@ VERSION_2024 = "2024.1"
 NOTEBOOK_2024 = "wwise-2024.1-docs"
 MANIFEST_ROOT = Path("skills") / "waapi-skill" / "resources" / "manifest"
 SEMANTIC_2024 = ROOT / "skills" / "waapi-skill" / "resources" / "semantic" / VERSION_2024 / "source_notes.json"
-COVERAGE_2024 = ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION_2024 / "api-coverage.json"
-LIVE_MATRIX_2024 = ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION_2024 / "live-coverage-matrix.json"
-PHASE2_SUMMARY_2024 = ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION_2024 / "phase2-coverage-summary.json"
-POLICY_2024 = ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION_2024 / "phase21-uri-policy.json"
+COVERAGE_2024 = ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION_2024 / "api-coverage.json"
+LIVE_MATRIX_2024 = ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION_2024 / "live-coverage-matrix.json"
+PHASE2_SUMMARY_2024 = ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION_2024 / "phase2-coverage-summary.json"
+POLICY_2024 = ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION_2024 / "phase21-uri-policy.json"
 DEFERRED_2024 = ROOT / "skills" / "waapi-skill" / "resources" / "deferred" / f"{VERSION_2024}.json"
 REFERENCES_2024 = ROOT / "references" / "semantic" / VERSION_2024
 FIXTURE_2024 = ROOT / "tests" / "_org" / VERSION_2024
@@ -36,10 +36,10 @@ FORBIDDEN_2024_FALLBACK_FRAGMENTS = (
     "resources/manifest/2023.1",
     "resources/manifest/2024/",
     "resources/manifest/2025",
-    "resources/capabilities/2022.1",
-    "resources/capabilities/2023.1",
-    "resources/capabilities/2024/",
-    "resources/capabilities/2025",
+    "tests/destructive/support/resources/capabilities/2022.1",
+    "tests/destructive/support/resources/capabilities/2023.1",
+    "tests/destructive/support/resources/capabilities/2024/",
+    "tests/destructive/support/resources/capabilities/2025",
     "resources/deferred/2022.1",
     "resources/deferred/2023.1",
     "resources/deferred/2024/",
@@ -56,13 +56,13 @@ FORBIDDEN_2024_FALLBACK_FRAGMENTS = (
 )
 NO_2025_RESOURCE_ROOTS = (
     ROOT / "skills" / "waapi-skill" / "resources" / "manifest",
-    ROOT / "skills" / "waapi-skill" / "resources" / "capabilities",
+    ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities",
     ROOT / "skills" / "waapi-skill" / "resources" / "semantic",
     ROOT / "references" / "semantic",
 )
 PLANNED_2025_RESOURCE_DIRS = {
     ROOT / "skills" / "waapi-skill" / "resources" / "manifest" / "2025.1",
-    ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / "2025.1",
+    ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / "2025.1",
     ROOT / "skills" / "waapi-skill" / "resources" / "semantic" / "2025.1",
     ROOT / "references" / "semantic" / "2025.1",
 }
@@ -137,10 +137,10 @@ def test_explicit_2024_1_resource_lookups_never_read_prior_generic_global_or_202
     assert any("resources/manifest/2024.1/functions.json" in path for path in touched)
     assert any("resources/manifest/2024.1/topics.json" in path for path in touched)
     assert any("resources/manifest/2024.1/schemas.json" in path for path in touched)
-    assert any("resources/capabilities/2024.1/api-coverage.json" in path for path in touched)
-    assert any("resources/capabilities/2024.1/live-coverage-matrix.json" in path for path in touched)
-    assert any("resources/capabilities/2024.1/phase2-coverage-summary.json" in path for path in touched)
-    assert any("resources/capabilities/2024.1/phase21-uri-policy.json" in path for path in touched)
+    assert any("tests/destructive/support/resources/capabilities/2024.1/api-coverage.json" in path for path in touched)
+    assert any("tests/destructive/support/resources/capabilities/2024.1/live-coverage-matrix.json" in path for path in touched)
+    assert any("tests/destructive/support/resources/capabilities/2024.1/phase2-coverage-summary.json" in path for path in touched)
+    assert any("tests/destructive/support/resources/capabilities/2024.1/phase21-uri-policy.json" in path for path in touched)
     assert any("resources/deferred/2024.1.json" in path for path in touched)
     assert not any(
         any(fragment in path for fragment in FORBIDDEN_2024_FALLBACK_FRAGMENTS)
@@ -290,7 +290,7 @@ def test_2024_coverage_policy_deferred_and_source_notes_reconcile_without_manife
     assert {entry["version"] for entry in coverage_entries} == {VERSION_2024}
     assert all(entry["schema_mapping"]["manifest_uri"].startswith("resources/manifest/2024.1/") for entry in coverage_entries)
 
-    assert live_matrix["metadata"]["baseline_resource"] == "resources/capabilities/2024.1/api-coverage.json"
+    assert live_matrix["metadata"]["baseline_resource"] == "tests/destructive/support/resources/capabilities/2024.1/api-coverage.json"
     assert live_matrix["summary"]["reflected_count"] == len(reflected_function_uris)
     assert live_matrix["summary"]["total_functions"] == len(reflected_function_uris)
     assert live_matrix["summary"]["status_counts"] == expected_function_status_counts
@@ -300,10 +300,10 @@ def test_2024_coverage_policy_deferred_and_source_notes_reconcile_without_manife
     assert live_matrix["summary"]["live_behavioral_covered_count"] == len(live_behavioral_uris)
     assert live_matrix["summary"]["source_note_family_counts"] == expected_function_source_note_counts
     assert {entry["version"] for entry in matrix_entries} == {VERSION_2024}
-    assert all(entry["source_coverage_uri"] == "resources/capabilities/2024.1/api-coverage.json" for entry in matrix_entries)
+    assert all(entry["source_coverage_uri"] == "tests/destructive/support/resources/capabilities/2024.1/api-coverage.json" for entry in matrix_entries)
 
-    assert phase2_summary["metadata"]["baseline_resource"] == "resources/capabilities/2024.1/api-coverage.json"
-    assert phase2_summary["metadata"]["live_matrix_resource"] == "resources/capabilities/2024.1/live-coverage-matrix.json"
+    assert phase2_summary["metadata"]["baseline_resource"] == "tests/destructive/support/resources/capabilities/2024.1/api-coverage.json"
+    assert phase2_summary["metadata"]["live_matrix_resource"] == "tests/destructive/support/resources/capabilities/2024.1/live-coverage-matrix.json"
     assert phase2_summary["summary"]["reflected_count"] == len(reflected_function_uris)
     assert phase2_summary["summary"]["total_functions"] == len(reflected_function_uris)
     assert phase2_summary["summary"]["status_counts"] == expected_function_status_counts

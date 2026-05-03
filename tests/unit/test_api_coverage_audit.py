@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest  # pyright: ignore[reportMissingImports]
 
-from wwise_waapi.api_coverage_audit import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.api_coverage_audit import (  # pyright: ignore[reportMissingImports]
     ApiCoverageAuditor,
     BehavioralCoverageRecord,
     Phase2CoverageStatusRecord,

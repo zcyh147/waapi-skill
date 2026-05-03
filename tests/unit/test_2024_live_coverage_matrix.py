@@ -6,10 +6,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2024.1"
-MATRIX_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "live-coverage-matrix.json"
-SUMMARY_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "phase2-coverage-summary.json"
-API_COVERAGE_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "api-coverage.json"
-POLICY_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "phase21-uri-policy.json"
+MATRIX_RESOURCE = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION / "live-coverage-matrix.json"
+SUMMARY_RESOURCE = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION / "phase2-coverage-summary.json"
+API_COVERAGE_RESOURCE = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION / "api-coverage.json"
+POLICY_RESOURCE = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION / "phase21-uri-policy.json"
 FUNCTIONS_MANIFEST = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "manifest" / VERSION / "functions.json"
 PROMOTED_READ_ONLY_URI = "ak.wwise.core.object.get"
 PROMOTED_READ_ONLY_URIS = {PROMOTED_READ_ONLY_URI}
@@ -66,7 +66,7 @@ def test_2024_live_matrix_promotes_only_fresh_2024_evidence() -> None:
         assert entry["counts_as_behavioral"] == evidence["counts_as_behavioral"], entry["uri"]
         assert entry["counts_as_live_behavioral"] == evidence["counts_as_live_behavioral"], entry["uri"]
         assert entry["manifest_source_uri"].startswith("resources/manifest/2024.1/"), entry["uri"]
-        assert entry["source_coverage_uri"] == "resources/capabilities/2024.1/api-coverage.json"
+        assert entry["source_coverage_uri"] == "tests/destructive/support/resources/capabilities/2024.1/api-coverage.json"
 
         if entry["uri"] == PROMOTED_READ_ONLY_URI:
             assert entry["parity_bucket"] == "live-tested"
@@ -102,8 +102,8 @@ def test_2024_phase2_summary_matches_matrix_with_object_get_promotion() -> None:
     coverage_function_entries = [entry for entry in coverage_entries if entry["item_type"] == "function"]
     coverage_topic_entries = [entry for entry in coverage_entries if entry["item_type"] == "topic"]
 
-    assert summary["metadata"]["baseline_resource"] == "resources/capabilities/2024.1/api-coverage.json"
-    assert summary["metadata"]["live_matrix_resource"] == "resources/capabilities/2024.1/live-coverage-matrix.json"
+    assert summary["metadata"]["baseline_resource"] == "tests/destructive/support/resources/capabilities/2024.1/api-coverage.json"
+    assert summary["metadata"]["live_matrix_resource"] == "tests/destructive/support/resources/capabilities/2024.1/live-coverage-matrix.json"
     function_status_counts = _counts(coverage_function_entries, "coverage_status")
     function_parity_counts = _counts(coverage_function_entries, "parity_bucket")
     assert summary["summary"]["status_counts"] == matrix["summary"]["status_counts"] == function_status_counts

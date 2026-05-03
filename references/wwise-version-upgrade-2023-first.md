@@ -52,7 +52,7 @@ Suggested 2023.1 paths:
 references/semantic/2023.1/
 resources/manifest/2023.1/
 resources/semantic/2023.1/source_notes.json
-resources/capabilities/2023.1/
+tests/destructive/support/resources/capabilities/2023.1/
 resources/waql/2023.1/
 resources/deferred/2023.1.json
 tests/_org/2023.1/

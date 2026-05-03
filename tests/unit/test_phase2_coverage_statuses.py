@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest  # pyright: ignore[reportMissingImports]
 
-from wwise_waapi.api_coverage_audit import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.api_coverage_audit import (  # pyright: ignore[reportMissingImports]
     ApiCoverageAuditor,
     Phase2CoverageStatusRecord,
 )

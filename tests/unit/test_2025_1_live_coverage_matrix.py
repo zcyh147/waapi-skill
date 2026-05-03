@@ -6,10 +6,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2025.1"
-MATRIX_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "live-coverage-matrix.json"
-SUMMARY_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "phase2-coverage-summary.json"
-API_COVERAGE_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "api-coverage.json"
-POLICY_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "phase21-uri-policy.json"
+MATRIX_RESOURCE = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION / "live-coverage-matrix.json"
+SUMMARY_RESOURCE = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION / "phase2-coverage-summary.json"
+API_COVERAGE_RESOURCE = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION / "api-coverage.json"
+POLICY_RESOURCE = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION / "phase21-uri-policy.json"
 FUNCTIONS_MANIFEST = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "manifest" / VERSION / "functions.json"
 
 ALLOWED_PARITY_BUCKETS = {"deferred", "excluded", "live-tested", "manifest-only", "sandbox-mutating-tested"}
@@ -77,7 +77,7 @@ def test_2025_live_matrix_promotes_only_fresh_object_get_and_destructive_evidenc
         assert entry["counts_as_behavioral"] == evidence["counts_as_behavioral"] is False, entry["uri"]
         assert entry["counts_as_live_behavioral"] == evidence["counts_as_live_behavioral"] is False, entry["uri"]
         assert entry["manifest_source_uri"].startswith("resources/manifest/2025.1/"), entry["uri"]
-        assert entry["source_coverage_uri"] == "resources/capabilities/2025.1/api-coverage.json"
+        assert entry["source_coverage_uri"] == "tests/destructive/support/resources/capabilities/2025.1/api-coverage.json"
         assert entry["achieved_status"] not in FORBIDDEN_PROMOTED_STATUSES, entry["uri"]
         assert entry["current_status"] not in FORBIDDEN_PROMOTED_STATUSES, entry["uri"]
         assert entry["target_status"] not in FORBIDDEN_PROMOTED_STATUSES, entry["uri"]
@@ -92,8 +92,8 @@ def test_2025_phase2_summary_matches_matrix_and_coverage_accounting() -> None:
     coverage_function_entries = [entry for entry in coverage_entries if entry["item_type"] == "function"]
     coverage_topic_entries = [entry for entry in coverage_entries if entry["item_type"] == "topic"]
 
-    assert summary["metadata"]["baseline_resource"] == "resources/capabilities/2025.1/api-coverage.json"
-    assert summary["metadata"]["live_matrix_resource"] == "resources/capabilities/2025.1/live-coverage-matrix.json"
+    assert summary["metadata"]["baseline_resource"] == "tests/destructive/support/resources/capabilities/2025.1/api-coverage.json"
+    assert summary["metadata"]["live_matrix_resource"] == "tests/destructive/support/resources/capabilities/2025.1/live-coverage-matrix.json"
     function_status_counts = _counts(coverage_function_entries, "coverage_status")
     function_parity_counts = _counts(coverage_function_entries, "parity_bucket")
     assert summary["summary"]["status_counts"] == matrix["summary"]["status_counts"] == function_status_counts

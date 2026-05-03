@@ -12,10 +12,10 @@ EVALS_JSON = ROOT / "evals" / "evals.json"
 REFERENCE_ROOT = ROOT / "references"
 SEMANTIC_2025_REFERENCES = REFERENCE_ROOT / "semantic" / "2025.1"
 TASK12_REVIEW_PACKET = ROOT / ".sisyphus" / "evidence" / "wwise-2025-waapi-integration-coverage" / "parity-review-packet.md"
-COVERAGE_2025 = ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / "2025.1" / "api-coverage.json"
-LIVE_MATRIX_2025 = ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / "2025.1" / "live-coverage-matrix.json"
+COVERAGE_2025 = ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / "2025.1" / "api-coverage.json"
+LIVE_MATRIX_2025 = ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / "2025.1" / "live-coverage-matrix.json"
 DEFERRED_2025 = ROOT / "skills" / "waapi-skill" / "resources" / "deferred" / "2025.1.json"
-CLASSIFICATION_2025 = ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / "2025.1" / "added-api-classification.json"
+CLASSIFICATION_2025 = ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / "2025.1" / "added-api-classification.json"
 DOC_PATHS = (
     ROOT / "skills" / "waapi-skill" / "SKILL.md",
     *sorted(REFERENCE_ROOT.glob("*.md")),
@@ -162,7 +162,7 @@ def test_2025_docs_include_exact_counts_paths_commands_and_limited_claims() -> N
     assert "Wwise 2023.1, 2024.1, and 2025.1 are supported only where versioned manifests" in combined
     assert "resources/manifest/2025.1/" in combined
     assert "resources/semantic/2025.1/source_notes.json" in combined
-    assert "resources/capabilities/2025.1/" in combined
+    assert "tests/destructive/support/resources/capabilities/2025.1/" in combined
     assert "skipped live or destructive tests" in combined
     assert "NotebookLM-only text" in combined
     assert "not runtime proof" in combined

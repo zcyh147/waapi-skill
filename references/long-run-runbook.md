@@ -98,7 +98,7 @@ Versioned 2021.1 layout:
 - `references/semantic/2021.1/`
 - `resources/manifest/2021.1/`
 - `resources/semantic/2021.1/source_notes.json`
-- `resources/capabilities/2021.1/`
+- `tests/destructive/support/resources/capabilities/2021.1/`
 - `resources/waql/2021.1/`
 - `resources/deferred/2021.1.json`
 - `tests/_org/2021.1/`
@@ -146,7 +146,7 @@ Versioned 2023.1 layout:
 - `references/semantic/2023.1/`
 - `resources/manifest/2023.1/`
 - `resources/semantic/2023.1/source_notes.json`
-- `resources/capabilities/2023.1/`
+- `tests/destructive/support/resources/capabilities/2023.1/`
 - `resources/waql/2023.1/`
 - `resources/deferred/2023.1.json`
 - `tests/_org/2023.1/`
@@ -180,7 +180,7 @@ Versioned 2024.1 layout:
 - `references/semantic/2024.1/`
 - `resources/manifest/2024.1/`
 - `resources/semantic/2024.1/source_notes.json`
-- `resources/capabilities/2024.1/`
+- `tests/destructive/support/resources/capabilities/2024.1/`
 - `resources/waql/2024.1/`
 - `resources/deferred/2024.1.json`
 - `tests/_org/2024.1/`
@@ -229,7 +229,7 @@ Versioned 2025.1 layout:
 - `references/semantic/2025.1/`
 - `resources/manifest/2025.1/`
 - `resources/semantic/2025.1/source_notes.json`
-- `resources/capabilities/2025.1/`
+- `tests/destructive/support/resources/capabilities/2025.1/`
 - `resources/waql/2025.1/`
 - `resources/deferred/2025.1.json`
 - `tests/_org/2025.1/`
@@ -311,7 +311,7 @@ Expected result: unit tests pass without launching Wwise, opening WwiseConsole, 
 python -m pytest tests/unit/test_phase2_coverage_summary.py tests/unit/test_live_runbook_constraints.py -q
 ```
 
-Expected result: generated Phase 2.1 status accounting and the user review packet agree on the final counts. Unit tests may read committed resources such as `resources/capabilities/2022.1/phase2-coverage-summary.json`, but they must not require a live authoring process or mutate fixture source files.
+Expected result: generated Phase 2.1 status accounting and the user review packet agree on the final counts. Unit tests may read committed resources such as `tests/destructive/support/resources/capabilities/2022.1/phase2-coverage-summary.json`, but they must not require a live authoring process or mutate fixture source files.
 
 ### Live smoke prerequisites
 
@@ -414,7 +414,7 @@ For profiler, transport, and soundengine probes, accepted calls, returned IDs, e
 
 ## Runtime resource and topic-inventory caveats
 
-Runtime builders and dispatcher flows do not query NotebookLM. Runtime reads local persisted evidence from packaged resources such as `resources/manifest/<version>/`, `resources/semantic/<version>/`, `resources/capabilities/<version>/`, `resources/deferred/<version>.json`, and `resources/waql/<version>/`.
+Runtime builders and dispatcher flows do not query NotebookLM. Runtime reads local persisted evidence from packaged resources such as `resources/manifest/<version>/`, `resources/semantic/<version>/`, `tests/destructive/support/resources/capabilities/<version>/`, `resources/deferred/<version>.json`, and `resources/waql/<version>/`.
 
 Manifest reflection proves inventory only. Manifest reflection, skipped live tests, and skipped destructive tests are not behavioral proof. topic inventory rows are inventory/substitute accounting only until fresh active live topic evidence exists.
 

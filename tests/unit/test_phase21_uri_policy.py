@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from wwise_waapi.phase21_uri_policy import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.phase21_uri_policy import (  # pyright: ignore[reportMissingImports]
     ACCEPTED_FAKE_ROUTE_PROFILER_READ_URIS,
     CONFORMANCE_ONLY_URIS,
     PROFILER_PROBED_URIS,
@@ -18,7 +18,7 @@ from wwise_waapi.phase21_uri_policy import (  # pyright: ignore[reportMissingImp
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SUMMARY_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / "2022.1" / "phase2-coverage-summary.json"
+SUMMARY_RESOURCE = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / "2022.1" / "phase2-coverage-summary.json"
 
 
 def test_phase21_policy_resource_pins_exact_reopened_and_probe_uri_sets() -> None:

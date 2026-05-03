@@ -17,7 +17,10 @@ def test_skill_contract_documents_runner_and_dispatcher() -> None:
     assert "WwiseDispatcher" in text
     assert "SubscriptionManager" in text
     assert "resources/manifest/<version>/" in text
-    assert "resources/capabilities/<version>/" in text
+    assert "resources/semantic/<version>/" in text
+    assert "resources/waql/<version>/" in text
+    assert "resources/deferred/<version>.json" in text
+    assert "references/semantic/<version>/" in text
 
 
 def test_skill_contract_documents_inputs_outputs_and_safety() -> None:
@@ -35,7 +38,6 @@ def test_skill_contract_stays_user_facing_and_local_resource_oriented() -> None:
     text = skill_text()
 
     assert "local packaged resources" in text
-    assert "capability data" in text
     assert "large prompt-loaded 2025 reference files" in text
     legacy_path = "resources/" + "coverage/<version>/"
     assert legacy_path not in text

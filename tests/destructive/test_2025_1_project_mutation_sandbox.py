@@ -17,7 +17,7 @@ if os.getenv("WWISE_LIVE") != "1" or os.getenv("WWISE_DESTRUCTIVE") != "1":
 if os.getenv("WWISE_VERSION") != "2025.1":
     pytest.skip("WWISE_VERSION=2025.1 is required for 2025.1 destructive sandbox tests", allow_module_level=True)
 
-from wwise_waapi.destructive_2025_sandbox import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.destructive_2025_sandbox import (  # pyright: ignore[reportMissingImports]
     Destructive2025SandboxRuntime,
     DestructiveSandboxUnavailable,
     unique_2025_name,

@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest  # pyright: ignore[reportMissingImports]
 
-import wwise_waapi.destructive_2023_sandbox as destructive_2023_sandbox  # pyright: ignore[reportMissingImports]
+import tests.destructive.support.destructive_2023_sandbox as destructive_2023_sandbox  # pyright: ignore[reportMissingImports]
 import wwise_waapi.live_environment as live_env  # pyright: ignore[reportMissingImports]
-from wwise_waapi.destructive_2023_sandbox import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.destructive_2023_sandbox import (  # pyright: ignore[reportMissingImports]
     Destructive2023SandboxRuntime,
     DestructiveSandboxUnavailable,
     require_2023_live_destructive_prerequisites,

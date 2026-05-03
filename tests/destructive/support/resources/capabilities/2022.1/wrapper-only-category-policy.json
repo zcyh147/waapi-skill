@@ -1,0 +1,1758 @@
+{
+  "categories": [
+    {
+      "category": "cli",
+      "count_as_live_behavior": false,
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
+      "target_status": "skipped-approved",
+      "unsupported_live_diagnostic": "UNSUPPORTED_LIVE_BEHAVIOR: category 'cli' is 'skipped-approved'; wrappers validate schema/route metadata only.",
+      "uri_count": 12,
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42"
+    },
+    {
+      "category": "core.remote",
+      "count_as_live_behavior": false,
+      "future_review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
+      "risk_explanation": "Remote connect/disconnect behavior depends on external consoles and network/session state not provided by the local sandbox.",
+      "target_status": "skipped-approved",
+      "unsupported_live_diagnostic": "UNSUPPORTED_LIVE_BEHAVIOR: category 'core.remote' is 'skipped-approved'; wrappers validate schema/route metadata only.",
+      "uri_count": 4,
+      "user_approved_rationale": "User guidance approves skipping remote-console behavior because a deterministic remote console environment is unavailable.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42"
+    },
+    {
+      "category": "debug",
+      "count_as_live_behavior": false,
+      "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
+      "risk_explanation": "Debug assert/crash APIs can intentionally fail, crash, or alter automation/assert handling in the running Wwise instance.",
+      "target_status": "skipped-approved",
+      "unsupported_live_diagnostic": "UNSUPPORTED_LIVE_BEHAVIOR: category 'debug' is 'skipped-approved'; wrappers validate schema/route metadata only.",
+      "uri_count": 5,
+      "user_approved_rationale": "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42"
+    },
+    {
+      "category": "ui",
+      "count_as_live_behavior": false,
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
+      "target_status": "wrapper-only",
+      "unsupported_live_diagnostic": "UNSUPPORTED_LIVE_BEHAVIOR: category 'ui' is 'wrapper-only'; wrappers validate schema/route metadata only.",
+      "uri_count": 4,
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42"
+    },
+    {
+      "category": "ui.commands",
+      "count_as_live_behavior": false,
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
+      "target_status": "wrapper-only",
+      "unsupported_live_diagnostic": "UNSUPPORTED_LIVE_BEHAVIOR: category 'ui.commands' is 'wrapper-only'; wrappers validate schema/route metadata only.",
+      "uri_count": 5,
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42"
+    },
+    {
+      "category": "ui.project",
+      "count_as_live_behavior": false,
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
+      "target_status": "wrapper-only",
+      "unsupported_live_diagnostic": "UNSUPPORTED_LIVE_BEHAVIOR: category 'ui.project' is 'wrapper-only'; wrappers validate schema/route metadata only.",
+      "uri_count": 2,
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42"
+    }
+  ],
+  "entries": [
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "cli",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.cli.addNewPlatform",
+        "sections": {
+          "args": {
+            "properties": [
+              "copy-from-platform",
+              "new-platform-base",
+              "new-platform-name",
+              "project"
+            ],
+            "required": [
+              "project"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [
+              "result"
+            ],
+            "required": [
+              "result"
+            ],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.cli.addNewPlatform",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "cli",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.cli.convertExternalSource",
+        "sections": {
+          "args": {
+            "properties": [
+              "no-wwise-dat",
+              "output",
+              "platform",
+              "project",
+              "quiet",
+              "source-by-platform",
+              "source-file",
+              "verbose"
+            ],
+            "required": [
+              "project"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [
+              "result"
+            ],
+            "required": [
+              "result"
+            ],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.cli.convertExternalSource",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "cli",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
+      "risk_level": "high",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.cli.createNewProject",
+        "sections": {
+          "args": {
+            "properties": [
+              "platform",
+              "project",
+              "quiet",
+              "verbose"
+            ],
+            "required": [
+              "project"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [
+              "result"
+            ],
+            "required": [
+              "result"
+            ],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.cli.createNewProject",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "cli",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
+      "risk_level": "low",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.cli.dumpObjects",
+        "sections": {
+          "args": {
+            "properties": [
+              "content",
+              "no-session",
+              "output",
+              "project"
+            ],
+            "required": [
+              "output",
+              "project"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [
+              "result"
+            ],
+            "required": [
+              "result"
+            ],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.cli.dumpObjects",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "cli",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.cli.generateSoundbank",
+        "sections": {
+          "args": {
+            "properties": [
+              "abort-on-load-issues",
+              "audio-source-from-original",
+              "bank",
+              "cache",
+              "clear-audio-file-cache",
+              "continue-on-error",
+              "custom-global-closing-cmd",
+              "custom-global-opening-cmd",
+              "custom-post-gen-cmd",
+              "custom-pre-gen-cmd",
+              "header-file",
+              "header-file-path",
+              "import-definition-file",
+              "import-language",
+              "language",
+              "license",
+              "no-decode",
+              "no-source-control",
+              "no-wwise-dat",
+              "output",
+              "platform",
+              "project",
+              "quiet",
+              "readable-soundbanks",
+              "root-output-path",
+              "save",
+              "skip-languages",
+              "soundbank-path",
+              "source-by-platform",
+              "source-file",
+              "tab-delimited-import-file",
+              "tab-delimited-operation",
+              "use-stable-guid",
+              "use-user-overrides",
+              "verbose"
+            ],
+            "required": [
+              "project"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [
+              "result"
+            ],
+            "required": [
+              "result"
+            ],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.cli.generateSoundbank",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "cli",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
+      "risk_level": "high",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.cli.migrate",
+        "sections": {
+          "args": {
+            "properties": [
+              "abort-on-load-issues",
+              "project",
+              "quiet",
+              "verbose"
+            ],
+            "required": [
+              "project"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [
+              "result"
+            ],
+            "required": [
+              "result"
+            ],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.cli.migrate",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "cli",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.cli.moveMediaIdsToSingleFile",
+        "sections": {
+          "args": {
+            "properties": [
+              "project"
+            ],
+            "required": [
+              "project"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.cli.moveMediaIdsToSingleFile",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "cli",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.cli.moveMediaIdsToWorkUnits",
+        "sections": {
+          "args": {
+            "properties": [
+              "project"
+            ],
+            "required": [
+              "project"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.cli.moveMediaIdsToWorkUnits",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "cli",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.cli.tabDelimitedImport",
+        "sections": {
+          "args": {
+            "properties": [
+              "audio-source-from-original",
+              "continue-on-error",
+              "custom-global-closing-cmd",
+              "custom-global-opening-cmd",
+              "import-language",
+              "project",
+              "quiet",
+              "tab-delimited-import-file",
+              "tab-delimited-operation",
+              "verbose"
+            ],
+            "required": [
+              "project",
+              "tab-delimited-import-file"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [
+              "result"
+            ],
+            "required": [
+              "result"
+            ],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.cli.tabDelimitedImport",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "cli",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.cli.updateMediaIdsInSingleFile",
+        "sections": {
+          "args": {
+            "properties": [
+              "project"
+            ],
+            "required": [
+              "project"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.cli.updateMediaIdsInSingleFile",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "cli",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
+      "risk_level": "low",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.cli.verify",
+        "sections": {
+          "args": {
+            "properties": [
+              "abort-on-load-issues",
+              "project",
+              "quiet",
+              "verbose"
+            ],
+            "required": [
+              "project"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [
+              "result"
+            ],
+            "required": [
+              "result"
+            ],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.cli.verify",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "cli",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts outside the narrow live sandbox behavior scope.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.cli.waapiServer",
+        "sections": {
+          "args": {
+            "properties": [
+              "allow-migration",
+              "allowed-addr",
+              "allowed-origin",
+              "http-max-clients",
+              "http-port",
+              "project",
+              "quiet",
+              "verbose",
+              "wamp-max-clients",
+              "wamp-port"
+            ],
+            "required": [
+              "project"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [
+              "result"
+            ],
+            "required": [
+              "result"
+            ],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.cli.waapiServer",
+      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "core.remote",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "Remote connect/disconnect behavior depends on external consoles and network/session state not provided by the local sandbox.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.core.remote.connect",
+        "sections": {
+          "args": {
+            "properties": [
+              "appName",
+              "commandPort",
+              "host",
+              "notificationPort"
+            ],
+            "required": [
+              "host"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.core.remote.connect",
+      "user_approved_rationale": "User guidance approves skipping remote-console behavior because a deterministic remote console environment is unavailable.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "core.remote",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "Remote connect/disconnect behavior depends on external consoles and network/session state not provided by the local sandbox.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.core.remote.disconnect",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.core.remote.disconnect",
+      "user_approved_rationale": "User guidance approves skipping remote-console behavior because a deterministic remote console environment is unavailable.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "core.remote",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": false,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "Remote connect/disconnect behavior depends on external consoles and network/session state not provided by the local sandbox.",
+      "risk_level": "low",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.core.remote.getAvailableConsoles",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [
+              "consoles"
+            ],
+            "required": [
+              "consoles"
+            ],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.core.remote.getAvailableConsoles",
+      "user_approved_rationale": "User guidance approves skipping remote-console behavior because a deterministic remote console environment is unavailable.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "core.remote",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": false,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "Remote connect/disconnect behavior depends on external consoles and network/session state not provided by the local sandbox.",
+      "risk_level": "low",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.core.remote.getConnectionStatus",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [
+              "console",
+              "isConnected",
+              "status"
+            ],
+            "required": [
+              "isConnected",
+              "status"
+            ],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.core.remote.getConnectionStatus",
+      "user_approved_rationale": "User guidance approves skipping remote-console behavior because a deterministic remote console environment is unavailable.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "debug",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
+      "item_type": "topic",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "Debug assert/crash APIs can intentionally fail, crash, or alter automation/assert handling in the running Wwise instance.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.debug.assertFailed",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.debug.assertFailed",
+      "user_approved_rationale": "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "debug",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "Debug assert/crash APIs can intentionally fail, crash, or alter automation/assert handling in the running Wwise instance.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.debug.enableAsserts",
+        "sections": {
+          "args": {
+            "properties": [
+              "enable"
+            ],
+            "required": [
+              "enable"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": true,
+      "uri": "ak.wwise.debug.enableAsserts",
+      "user_approved_rationale": "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "debug",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "Debug assert/crash APIs can intentionally fail, crash, or alter automation/assert handling in the running Wwise instance.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.debug.enableAutomationMode",
+        "sections": {
+          "args": {
+            "properties": [
+              "enable"
+            ],
+            "required": [
+              "enable"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": true,
+      "uri": "ak.wwise.debug.enableAutomationMode",
+      "user_approved_rationale": "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "debug",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "Debug assert/crash APIs can intentionally fail, crash, or alter automation/assert handling in the running Wwise instance.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.debug.testAssert",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": true,
+      "uri": "ak.wwise.debug.testAssert",
+      "user_approved_rationale": "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "debug",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "Debug assert/crash APIs can intentionally fail, crash, or alter automation/assert handling in the running Wwise instance.",
+      "risk_level": "high",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.debug.testCrash",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "skipped-approved",
+      "unsafe_default_execution_blocked": true,
+      "uri": "ak.wwise.debug.testCrash",
+      "user_approved_rationale": "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "ui",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.ui.bringToForeground",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "wrapper-only",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.ui.bringToForeground",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "ui",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.ui.captureScreen",
+        "sections": {
+          "args": {
+            "properties": [
+              "rect",
+              "viewName",
+              "viewSelectionChannel"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [
+              "contentBase64",
+              "contentType"
+            ],
+            "required": [],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "wrapper-only",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.ui.captureScreen",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "ui.commands",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.ui.commands.execute",
+        "sections": {
+          "args": {
+            "properties": [
+              "command",
+              "objects",
+              "platforms",
+              "value"
+            ],
+            "required": [
+              "command"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "wrapper-only",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.ui.commands.execute",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "ui.commands",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "item_type": "topic",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.ui.commands.executed",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "schema-ref"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "wrapper-only",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.ui.commands.executed",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "ui.commands",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
+      "risk_level": "low",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.ui.commands.getCommands",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [
+              "commands"
+            ],
+            "required": [],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "wrapper-only",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.ui.commands.getCommands",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "ui.commands",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.ui.commands.register",
+        "sections": {
+          "args": {
+            "properties": [
+              "commands"
+            ],
+            "required": [
+              "commands"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "wrapper-only",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.ui.commands.register",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "ui.commands",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.ui.commands.unregister",
+        "sections": {
+          "args": {
+            "properties": [
+              "commands"
+            ],
+            "required": [
+              "commands"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "wrapper-only",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.ui.commands.unregister",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "ui",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
+      "risk_level": "low",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.ui.getSelectedObjects",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "schema-ref"
+          },
+          "result": {
+            "properties": [
+              "objects"
+            ],
+            "required": [
+              "objects"
+            ],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "wrapper-only",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.ui.getSelectedObjects",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "ui.project",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
+      "risk_level": "high",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.ui.project.close",
+        "sections": {
+          "args": {
+            "properties": [
+              "bypassSave"
+            ],
+            "required": [],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [
+              "hadProjectOpen"
+            ],
+            "required": [],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "wrapper-only",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.ui.project.close",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "ui.project",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "function-call",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "WwiseDispatcher.dispatch"
+      },
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "item_type": "function",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
+      "risk_level": "high",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.ui.project.open",
+        "sections": {
+          "args": {
+            "properties": [
+              "bypassSave",
+              "onUpgrade",
+              "path"
+            ],
+            "required": [
+              "path"
+            ],
+            "type": "object"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "object"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "wrapper-only",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.ui.project.open",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    },
+    {
+      "allowed_default_diagnostic": "schema-mapping-and-dispatcher-route-validation",
+      "category": "ui",
+      "count_as_live_behavior": false,
+      "dispatcher_route": {
+        "deferred_registry_required": true,
+        "dispatcher": "WwiseDispatcher.dispatch",
+        "mode": "bounded-topic-wait",
+        "route_test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence",
+        "target": "SubscriptionManager.wait_for_event"
+      },
+      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "item_type": "topic",
+      "live_behavior": "unsupported-by-user-approved-phase2-policy",
+      "risk_explanation": "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so default/live smoke suites would be flaky and could affect the operator session.",
+      "risk_level": "medium",
+      "schema_mapping": {
+        "manifest_uri": "resources/manifest/2022.1/schemas.json#ak.wwise.ui.selectionChanged",
+        "sections": {
+          "args": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          },
+          "options": {
+            "properties": [],
+            "required": [],
+            "type": "schema-ref"
+          },
+          "result": {
+            "properties": [],
+            "required": [],
+            "type": "missing"
+          }
+        },
+        "source_status": "ok"
+      },
+      "schema_status": "ok",
+      "target_status": "wrapper-only",
+      "unsafe_default_execution_blocked": false,
+      "uri": "ak.wwise.ui.selectionChanged",
+      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+      "version": "2022.1"
+    }
+  ],
+  "metadata": {
+    "api_coverage_source": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
+    "debug_unsafe_live_uris": [
+      "ak.wwise.debug.enableAsserts",
+      "ak.wwise.debug.enableAutomationMode",
+      "ak.wwise.debug.testAssert",
+      "ak.wwise.debug.testCrash"
+    ],
+    "default_policy": "Default pytest remains Wwise-free; wrappers provide schema and dispatcher diagnostics only.",
+    "generator": "Task 10 wrapper-only/skipped-approved policy encoder",
+    "live_behavior_policy": "Policy-exempt categories are not deep live behavior coverage and return unsupported-live diagnostics when requested as live behavior.",
+    "live_coverage_matrix_source": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
+    "unit_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
+    "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
+    "version": "2022.1"
+  },
+  "summary": {
+    "category_count": 6,
+    "entry_count": 32,
+    "skipped_approved_count": 21,
+    "wrapper_only_count": 11
+  }
+}

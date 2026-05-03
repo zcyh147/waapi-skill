@@ -8,19 +8,12 @@ from typing import Any, Mapping
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DYNAMIC_OBJECT_ID_MARKER = "$disposable_object_id"
-PLAN_PATH = (
-    REPO_ROOT
-    / "skills"
-    / "waapi-skill"
-    / "resources"
-    / "capabilities"
-    / "2022.1"
-    / "task-6-object-topic-live-plan.json"
-)
+CAPABILITY_ROOT = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities"
+PLAN_PATH = CAPABILITY_ROOT / "2022.1" / "task-6-object-topic-live-plan.json"
 TASK_8_PLAN_PATHS = {
-    "2021.1": REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / "2021.1" / "task-8-object-topic-live-plan.json",
-    "2024.1": REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / "2024.1" / "task-8-object-topic-live-plan.json",
-    "2025.1": REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / "2025.1" / "task-8-object-topic-live-plan.json",
+    "2021.1": REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / "2021.1" / "task-8-object-topic-live-plan.json",
+    "2024.1": REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / "2024.1" / "task-8-object-topic-live-plan.json",
+    "2025.1": REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / "2025.1" / "task-8-object-topic-live-plan.json",
 }
 SAFE_TASK_8_TOPIC_URIS = {
     "ak.wwise.core.object.childAdded",

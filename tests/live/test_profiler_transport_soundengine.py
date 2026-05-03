@@ -20,7 +20,7 @@ from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImpor
     path_is_under,
     resolve_sample_project_source,
 )
-from wwise_waapi.profiler_capability import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.profiler_capability import (  # pyright: ignore[reportMissingImports]
     safe_profiler_capability_evidence_path,
 )
 from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImports]

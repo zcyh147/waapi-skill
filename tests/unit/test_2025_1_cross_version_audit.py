@@ -22,10 +22,10 @@ NOTEBOOK_2025 = "wwise-2025.1-docs"
 MANIFEST_ROOT = ROOT / "skills" / "waapi-skill" / "resources" / "manifest"
 MANIFEST_2025 = MANIFEST_ROOT / VERSION_2025
 ADDED_SINCE_2024 = MANIFEST_2025 / "added-since-2024.1.json"
-COVERAGE_2025 = ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION_2025 / "api-coverage.json"
-LIVE_MATRIX_2025 = ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION_2025 / "live-coverage-matrix.json"
-PHASE2_SUMMARY_2025 = ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION_2025 / "phase2-coverage-summary.json"
-POLICY_2025 = ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION_2025 / "phase21-uri-policy.json"
+COVERAGE_2025 = ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION_2025 / "api-coverage.json"
+LIVE_MATRIX_2025 = ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION_2025 / "live-coverage-matrix.json"
+PHASE2_SUMMARY_2025 = ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION_2025 / "phase2-coverage-summary.json"
+POLICY_2025 = ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION_2025 / "phase21-uri-policy.json"
 DEFERRED_2025 = ROOT / "skills" / "waapi-skill" / "resources" / "deferred" / f"{VERSION_2025}.json"
 SEMANTIC_2025 = ROOT / "skills" / "waapi-skill" / "resources" / "semantic" / VERSION_2025 / "source_notes.json"
 REFERENCES_2025 = ROOT / "references" / "semantic" / VERSION_2025
@@ -50,10 +50,10 @@ FORBIDDEN_2025_FALLBACK_FRAGMENTS = (
     "resources/manifest/2023.1",
     "resources/manifest/2024.1",
     "resources/manifest/2025/",
-    "resources/capabilities/2022.1",
-    "resources/capabilities/2023.1",
-    "resources/capabilities/2024.1",
-    "resources/capabilities/2025/",
+    "tests/destructive/support/resources/capabilities/2022.1",
+    "tests/destructive/support/resources/capabilities/2023.1",
+    "tests/destructive/support/resources/capabilities/2024.1",
+    "tests/destructive/support/resources/capabilities/2025/",
     "resources/deferred/2022.1",
     "resources/deferred/2023.1",
     "resources/deferred/2024.1",
@@ -174,10 +174,10 @@ def test_explicit_2025_1_resource_lookups_never_read_prior_bare_or_global_paths(
     assert any("resources/manifest/2025.1/topics.json" in path for path in touched)
     assert any("resources/manifest/2025.1/schemas.json" in path for path in touched)
     assert any("resources/manifest/2025.1/added-since-2024.1.json" in path for path in touched)
-    assert any("resources/capabilities/2025.1/api-coverage.json" in path for path in touched)
-    assert any("resources/capabilities/2025.1/live-coverage-matrix.json" in path for path in touched)
-    assert any("resources/capabilities/2025.1/phase2-coverage-summary.json" in path for path in touched)
-    assert any("resources/capabilities/2025.1/phase21-uri-policy.json" in path for path in touched)
+    assert any("tests/destructive/support/resources/capabilities/2025.1/api-coverage.json" in path for path in touched)
+    assert any("tests/destructive/support/resources/capabilities/2025.1/live-coverage-matrix.json" in path for path in touched)
+    assert any("tests/destructive/support/resources/capabilities/2025.1/phase2-coverage-summary.json" in path for path in touched)
+    assert any("tests/destructive/support/resources/capabilities/2025.1/phase21-uri-policy.json" in path for path in touched)
     assert any("resources/deferred/2025.1.json" in path for path in touched)
     assert any("resources/semantic/2025.1/source_notes.json" in path for path in touched)
     assert not any(
@@ -213,7 +213,7 @@ def test_2025_coverage_policy_deferred_source_notes_docs_and_optional_waql_recon
         ("stale-2022-path", {"evidence_path": ".sisyphus/evidence/wwise-2022-live/object-get.txt"}),
         ("stale-2023-path", {"evidence_path": "resources/waql/2023.1/object-get-live-matrix.json"}),
         ("stale-2024-text", {"evidence_path": "resources/waql/2025.1/object-get-live.json", "fixture_prerequisites": ["2024.1 copied sandbox proof"]}),
-        ("bare-2025-coverage-path", {"evidence_path": "resources/capabilities/2025/object-get-live.json"}),
+        ("bare-2025-coverage-path", {"evidence_path": "tests/destructive/support/resources/capabilities/2025/object-get-live.json"}),
         ("bare-2025-waql-path", {"evidence_path": "resources/waql/2025/object-get-live.json"}),
         ("bare-2025-semantic-path", {"evidence_path": "references/semantic/2025/object-get-live.md"}),
         ("bare-2025-evidence-path", {"evidence_path": ".sisyphus/evidence/wwise-2025/object-get-live.txt"}),
@@ -445,8 +445,8 @@ def _assert_2025_resources_reconcile(
         assert summary_entry["counts_as_live_behavioral"] == evidence["counts_as_live_behavioral"], failure_context
         assert entry["schema_mapping"]["manifest_uri"].startswith("resources/manifest/2025.1/"), failure_context
         assert matrix_entry["manifest_source_uri"].startswith("resources/manifest/2025.1/"), failure_context
-        assert matrix_entry["source_coverage_uri"] == "resources/capabilities/2025.1/api-coverage.json", failure_context
-        assert summary_entry["source_coverage_uri"] == "resources/capabilities/2025.1/api-coverage.json", failure_context
+        assert matrix_entry["source_coverage_uri"] == "tests/destructive/support/resources/capabilities/2025.1/api-coverage.json", failure_context
+        assert summary_entry["source_coverage_uri"] == "tests/destructive/support/resources/capabilities/2025.1/api-coverage.json", failure_context
 
         is_promoted = (
             uri in promoted_uris
@@ -473,7 +473,7 @@ def _assert_common_2025_metadata(*payloads: dict[str, Any]) -> None:
         assert metadata["version"] == VERSION_2025
         assert metadata["manifest_source"] == "resources/manifest/2025.1"
         assert metadata["source_notes"] == "resources/semantic/2025.1/source_notes.json"
-        assert metadata["task6_classification"] == "resources/capabilities/2025.1/added-api-classification.json"
+        assert metadata["task6_classification"] == "tests/destructive/support/resources/capabilities/2025.1/added-api-classification.json"
         assert metadata["no_promotion_from_manifest_only"] is True
         assert metadata["no_reuse_of_2024_behavior_evidence"] is True
         assert metadata["baseline_comparison"]["policy"] == "2024.1 evidence is comparison metadata only and never counts as 2025.1 proof."
@@ -556,7 +556,7 @@ def _assert_2025_reference_docs_are_versioned(failure_context: str) -> None:
         assert "wwise-2025.1-docs" in text or reference.name == "discrepancy-register.md", failure_context
         assert "references/semantic/2025/" not in text, failure_context
         assert "resources/semantic/2025/" not in text, failure_context
-        assert "resources/capabilities/2025/" not in text, failure_context
+        assert "tests/destructive/support/resources/capabilities/2025/" not in text, failure_context
         assert "resources/waql/2025/" not in text, failure_context
         assert "references/semantic-builder-" not in text, failure_context
         assert "wwise-2022.1-docs" not in text, failure_context

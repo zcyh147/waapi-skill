@@ -38,7 +38,7 @@ from wwise_waapi.subscriptions import SubscriptionManager, SubscriptionTimeout  
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLAN_PATH = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / "2022.1" / "task-4-core-object-deferred-plan.json"
+PLAN_PATH = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / "2022.1" / "task-4-core-object-deferred-plan.json"
 DEFAULT_SOURCE_PROJECT = REPO_ROOT / "tests" / "_org" / "2022.1" / "SampleProject.wproj"
 EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-waapi-deferred-reevaluation"
 TEMP_PREFIX = "WAAPI_TASK4_OBJECT_"

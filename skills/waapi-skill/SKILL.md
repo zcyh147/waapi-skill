@@ -22,7 +22,7 @@ For task work, call the Python layer instead of inventing shell commands. The ma
 
 1. `scripts/run.py`: runs skill-local helper scripts with the right import path.
 2. `wwise_waapi.dispatcher`: validates WAAPI functions and topics against versioned manifests, then calls WAAPI or waits for bounded topic events.
-3. `resources/manifest/<version>/` and related versioned resources: loaded by Python as needed.
+3. `resources/manifest/<version>/`, `resources/semantic/<version>/`, `resources/waql/<version>/`, `resources/deferred/<version>.json`, and `references/semantic/<version>/`: loaded on demand for the selected version and task.
 4. `wwise_waapi.builders`: semantic builders for common query, object mutation, import, soundbank, property, reference, and switch container tasks.
 
 ## Version selection
@@ -134,7 +134,7 @@ Keep runtime data, logs, auth state, and evidence artifacts out of git unless th
 
 ## Resources and documentation
 
-The prompt should not load every reference file up front. Python code reads versioned manifests, capability data, semantic source notes, WAQL resources, deferred registries, and references on demand for the selected version and task.
+The prompt should not load every reference file up front. Python code reads versioned manifests, semantic source notes, WAQL resources, deferred registries, and references on demand for the selected version and task.
 
 Use NotebookLM-gated documentation only for documentation-sensitive source-note refresh or semantic behavior questions that cannot be answered from packaged resources. Runtime dispatcher and builder flows should rely on local packaged resources, not large prompt-loaded 2025 reference files.
 
@@ -148,4 +148,4 @@ Key paths:
 4. `wwise_waapi/manifest.py`: versioned manifest loading and reflection helpers.
 5. `wwise_waapi/builders/`: semantic builders and preview objects.
 6. `resources/manifest/<version>/`: generated API manifests.
-7. `resources/semantic/<version>/`, `resources/capabilities/<version>/`, `resources/waql/<version>/`, and `references/semantic/<version>/`: versioned supporting resources loaded only when needed.
+7. `resources/semantic/<version>/`, `resources/waql/<version>/`, `resources/deferred/<version>.json`, and `references/semantic/<version>/`: versioned supporting resources loaded only when needed.

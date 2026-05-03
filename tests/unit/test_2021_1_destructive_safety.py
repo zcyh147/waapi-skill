@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest  # pyright: ignore[reportMissingImports]
 
-import wwise_waapi.destructive_2021_sandbox as destructive_2021_sandbox  # pyright: ignore[reportMissingImports]
+import tests.destructive.support.destructive_2021_sandbox as destructive_2021_sandbox  # pyright: ignore[reportMissingImports]
 import wwise_waapi.live_environment as live_env  # pyright: ignore[reportMissingImports]
-from wwise_waapi.destructive_2021_sandbox import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.destructive_2021_sandbox import (  # pyright: ignore[reportMissingImports]
     Destructive2021SandboxRuntime,
     DestructiveSandboxUnavailable,
     cleanup_stale_2021_destructive_sandboxes,

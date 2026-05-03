@@ -11,7 +11,7 @@ from wwise_waapi.manifest import ManifestStore  # pyright: ignore[reportMissingI
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2023.1"
 MANIFEST_ROOT = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "manifest"
-COVERAGE_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "api-coverage.json"
+COVERAGE_RESOURCE = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION / "api-coverage.json"
 ALLOWED_STATUSES = {
     "supported",
     "deferred",
@@ -67,7 +67,7 @@ def test_2023_resource_covers_every_reflected_api_once_with_2023_paths() -> None
     assert len({entry["uri"] for entry in coverage}) == len(coverage)
     assert payload["metadata"]["version"] == VERSION
     assert payload["metadata"]["manifest_source"] == "resources/manifest/2023.1"
-    assert "resources/capabilities/2022.1" not in json.dumps(payload)
+    assert "tests/destructive/support/resources/capabilities/2022.1" not in json.dumps(payload)
     assert "resources/deferred/2022.1" not in json.dumps(payload)
 
 

@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-from wwise_waapi.api_coverage_audit import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.api_coverage_audit import (  # pyright: ignore[reportMissingImports]
     ApiCoverageAuditor,
     Phase2CoverageStatusRecord,
 )
@@ -20,7 +20,7 @@ from wwise_waapi.manifest import ManifestStore  # pyright: ignore[reportMissingI
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
-COVERAGE_ROOT = SKILL_ROOT / "resources" / "capabilities" / "2022.1"
+COVERAGE_ROOT = Path(__file__).resolve().parents[2] / "tests" / "destructive" / "support" / "resources" / "capabilities" / "2022.1"
 MATRIX_RESOURCE = COVERAGE_ROOT / "live-coverage-matrix.json"
 API_COVERAGE_RESOURCE = COVERAGE_ROOT / "api-coverage.json"
 POLICY_RESOURCE = COVERAGE_ROOT / "wrapper-only-category-policy.json"

@@ -6,7 +6,7 @@ from typing import Any, Mapping
 
 import pytest  # pyright: ignore[reportMissingImports]
 
-from wwise_waapi.profiler_capability import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.profiler_capability import (  # pyright: ignore[reportMissingImports]
     ProfilerCapabilitySchemaError,
     REQUIRED_EVIDENCE_ROW_FIELDS,
     validate_profiler_capability_resource,
@@ -15,24 +15,9 @@ from wwise_waapi.profiler_capability import (  # pyright: ignore[reportMissingIm
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-TASK3_RESOURCE_PATH = (
-    REPO_ROOT
-    / "skills"
-    / "waapi-skill"
-    / "resources"
-    / "capabilities"
-    / "2022.1"
-    / "task-3-profiler-capability.json"
-)
-TASK5_RESOURCE_PATH = (
-    REPO_ROOT
-    / "skills"
-    / "waapi-skill"
-    / "resources"
-    / "capabilities"
-    / "2022.1"
-    / "task-5-profiler-soundengine-evidence.json"
-)
+CAPABILITY_ROOT = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities"
+TASK3_RESOURCE_PATH = CAPABILITY_ROOT / "2022.1" / "task-3-profiler-capability.json"
+TASK5_RESOURCE_PATH = CAPABILITY_ROOT / "2022.1" / "task-5-profiler-soundengine-evidence.json"
 EVIDENCE_ROOT = ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/"
 TASK5_EVIDENCE_PATHS = {
     ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/task-5-soundengine-profiler.md",

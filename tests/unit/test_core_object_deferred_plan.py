@@ -4,11 +4,11 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-from wwise_waapi.phase21_uri_policy import REOPENED_CORE_OBJECT_URIS  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.phase21_uri_policy import REOPENED_CORE_OBJECT_URIS  # pyright: ignore[reportMissingImports]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLAN_PATH = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / "2022.1" / "task-4-core-object-deferred-plan.json"
+PLAN_PATH = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / "2022.1" / "task-4-core-object-deferred-plan.json"
 SOURCE_FIXTURE = "tests/_org/2022.1/SampleProject.wproj"
 FUNCTION_URIS = {
     "ak.wwise.core.object.copy",

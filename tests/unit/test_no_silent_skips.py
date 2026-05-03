@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest  # pyright: ignore[reportMissingImports]
 
-from wwise_waapi.api_coverage import ApiCoverageBuilder  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.api_coverage import ApiCoverageBuilder  # pyright: ignore[reportMissingImports]
 from wwise_waapi.deferred_registry import DeferredRegistry  # pyright: ignore[reportMissingImports]
 from wwise_waapi.manifest import ManifestStore  # pyright: ignore[reportMissingImports]
 
@@ -14,7 +14,7 @@ from wwise_waapi.manifest import ManifestStore  # pyright: ignore[reportMissingI
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
 MANIFEST_ROOT = SKILL_ROOT / "resources" / "manifest"
-COVERAGE_RESOURCE = SKILL_ROOT / "resources" / "capabilities" / "2022.1" / "api-coverage.json"
+COVERAGE_RESOURCE = Path(__file__).resolve().parents[2] / "tests" / "destructive" / "support" / "resources" / "capabilities" / "2022.1" / "api-coverage.json"
 
 
 def test_every_reflected_api_is_implemented_or_deferred_with_evidence() -> None:

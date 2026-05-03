@@ -223,7 +223,7 @@
       "prompt": "The 2022.1 coverage file lists ak.soundengine.executeActionOnEvent with schema data, so can we count it as behaviorally tested and remove the deferral? Explain the correct status for a reviewer.",
       "expected_output": "Explains that reflected inventory and schema coverage are not behavioral coverage, keeps the API deferred until live-safe behavioral assertions exist, cites the coverage resource or deferred registry, and notes substitute tests only validate metadata completeness.",
       "files": [
-        "resources/capabilities/2022.1/api-coverage.json",
+        "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
         "SKILL.md"
       ],
       "assertions": [
@@ -521,7 +521,7 @@
       "files": [
         "references/semantic/2021.1/semantic-builder-protocol.md",
         "resources/manifest/2021.1/functions.json",
-        "resources/capabilities/2021.1/api-coverage.json",
+        "tests/destructive/support/resources/capabilities/2021.1/api-coverage.json",
         "resources/deferred/2021.1.json",
         "resources/waql/2021.1/object-get-live-matrix.json"
       ],
@@ -532,7 +532,7 @@
           "required_terms": [
             "2021.1",
             "resources/manifest/2021.1/",
-            "resources/capabilities/2021.1/",
+            "tests/destructive/support/resources/capabilities/2021.1/",
             "references/semantic/2021.1/"
           ]
         },
@@ -579,7 +579,7 @@
         "SKILL.md",
         "references/long-run-runbook.md",
         "references/phase2-user-review-packet.md",
-        "resources/capabilities/2021.1/phase2-coverage-summary.json"
+        "tests/destructive/support/resources/capabilities/2021.1/phase2-coverage-summary.json"
       ],
       "assertions": [
         {
@@ -665,10 +665,10 @@
       "id": "2023-deferred-coverage-version-scoped-review",
       "category": "2023.1 deferred coverage review",
       "prompt": "A reviewer sees 2023.1 manifest resources and skipped live tests. Explain whether that proves live-tested behavior, and mention what resources should be checked.",
-      "expected_output": "Explains that 2023.1 manifest reflection and skipped live or destructive tests are not live-tested behavior. Points reviewers to resources/capabilities/2023.1/, resources/deferred/2023.1.json, and versioned local evidence before promoting coverage.",
+      "expected_output": "Explains that 2023.1 manifest reflection and skipped live or destructive tests are not live-tested behavior. Points reviewers to tests/destructive/support/resources/capabilities/2023.1/, resources/deferred/2023.1.json, and versioned local evidence before promoting coverage.",
       "files": [
-        "resources/capabilities/2023.1/api-coverage.json",
-        "resources/capabilities/2023.1/live-coverage-matrix.json",
+        "tests/destructive/support/resources/capabilities/2023.1/api-coverage.json",
+        "tests/destructive/support/resources/capabilities/2023.1/live-coverage-matrix.json",
         "resources/deferred/2023.1.json",
         "references/phase2-user-review-packet.md"
       ],
@@ -705,7 +705,7 @@
           "name": "points_to_2023_resources",
           "text": "Output points to 2023.1 coverage and deferred resources.",
           "required_terms": [
-            "resources/capabilities/2023.1/",
+            "tests/destructive/support/resources/capabilities/2023.1/",
             "resources/deferred/2023.1.json"
           ]
         }
@@ -720,7 +720,7 @@
         "SKILL.md",
         "references/semantic/2024.1/semantic-builder-protocol.md",
         "resources/manifest/2024.1/functions.json",
-        "resources/capabilities/2024.1/api-coverage.json",
+        "tests/destructive/support/resources/capabilities/2024.1/api-coverage.json",
         "resources/deferred/2024.1.json",
         "resources/waql/2024.1/object-get-live-matrix.json"
       ],
@@ -731,7 +731,7 @@
           "required_terms": [
             "2024.1",
             "resources/manifest/2024.1/",
-            "resources/capabilities/2024.1/",
+            "tests/destructive/support/resources/capabilities/2024.1/",
             "references/semantic/2024.1/"
           ]
         },
@@ -771,7 +771,7 @@
         "SKILL.md",
         "references/long-run-runbook.md",
         "references/phase2-user-review-packet.md",
-        "resources/capabilities/2024.1/live-coverage-matrix.json"
+        "tests/destructive/support/resources/capabilities/2024.1/live-coverage-matrix.json"
       ],
       "assertions": [
         {
@@ -818,7 +818,7 @@
         "references/semantic/2025.1/semantic-builder-protocol.md",
         "references/semantic/2025.1/discrepancy-register.md",
         "resources/manifest/2025.1/functions.json",
-        "resources/capabilities/2025.1/api-coverage.json",
+        "tests/destructive/support/resources/capabilities/2025.1/api-coverage.json",
         "resources/deferred/2025.1.json",
         "resources/waql/2025.1/object-get-live-matrix.json"
       ],
@@ -829,7 +829,7 @@
           "required_terms": [
             "2025.1",
             "resources/manifest/2025.1/",
-            "resources/capabilities/2025.1/",
+            "tests/destructive/support/resources/capabilities/2025.1/",
             "references/semantic/2025.1/"
           ]
         },
@@ -872,7 +872,7 @@
       "files": [
         "references/long-run-runbook.md",
         "references/phase2-user-review-packet.md",
-        "resources/capabilities/2025.1/live-coverage-matrix.json"
+        "tests/destructive/support/resources/capabilities/2025.1/live-coverage-matrix.json"
       ],
       "assertions": [
         {

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from wwise_waapi.windows_gate import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.windows_gate import (  # pyright: ignore[reportMissingImports]
     FAILED_STATUS,
     PASSED_STATUS,
     PENDING_STATUS,

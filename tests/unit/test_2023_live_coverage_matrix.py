@@ -6,10 +6,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2023.1"
-MATRIX_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "live-coverage-matrix.json"
-SUMMARY_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "phase2-coverage-summary.json"
-API_COVERAGE_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "api-coverage.json"
-POLICY_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "capabilities" / VERSION / "phase21-uri-policy.json"
+MATRIX_RESOURCE = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION / "live-coverage-matrix.json"
+SUMMARY_RESOURCE = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION / "phase2-coverage-summary.json"
+API_COVERAGE_RESOURCE = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION / "api-coverage.json"
+POLICY_RESOURCE = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION / "phase21-uri-policy.json"
 WAQL_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "waql" / VERSION / "object-get-live-matrix.json"
 FUNCTIONS_MANIFEST = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "manifest" / VERSION / "functions.json"
 TOPICS_MANIFEST = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "manifest" / VERSION / "topics.json"
@@ -110,8 +110,8 @@ def test_2023_phase2_summary_matches_matrix_without_behavioral_overclaim() -> No
     live_behavioral_uris = {entry["uri"] for entry in matrix_entries if entry["counts_as_live_behavioral"] is True}
     promoted_uris = {LIVE_TESTED_URI, *SANDBOX_MUTATING_TESTED_URIS}
 
-    assert summary["metadata"]["baseline_resource"] == "resources/capabilities/2023.1/api-coverage.json"
-    assert summary["metadata"]["live_matrix_resource"] == "resources/capabilities/2023.1/live-coverage-matrix.json"
+    assert summary["metadata"]["baseline_resource"] == "tests/destructive/support/resources/capabilities/2023.1/api-coverage.json"
+    assert summary["metadata"]["live_matrix_resource"] == "tests/destructive/support/resources/capabilities/2023.1/live-coverage-matrix.json"
     assert summary["summary"]["status_counts"] == matrix["summary"]["status_counts"] == coverage["summary"]["status_counts"]
     assert summary["summary"]["parity_bucket_counts"] == matrix["summary"]["parity_bucket_counts"] == coverage["summary"]["parity_bucket_counts"]
     assert set(summary["summary"]["parity_bucket_counts"]) == ALLOWED_PARITY_BUCKETS
