@@ -29,7 +29,13 @@ For task work, call the Python layer instead of inventing shell commands. The ma
 
 Prefer an explicit user-provided Wwise version when the task depends on exact API behavior. Pass one of `2021.1`, `2022.1`, `2023.1`, `2024.1`, or `2025.1` to the dispatcher or builder flow when known.
 
-If the user does not specify a version, first probe the live Wwise connection with `ak.wwise.core.getInfo` through the runner or dispatcher. Infer the nearest supported version from the returned Wwise version when possible. If probing is unavailable or the version cannot be mapped safely, ask the user for the target version or use the documented fallback only for dry-run or low-risk read-only work.
+If the user does not specify a version, first probe the live Wwise connection with `ak.wwise.core.getInfo` through the runner or dispatcher, and also record the live WAAPI host/port that worked for this session. Infer the nearest supported version from the returned Wwise version when possible. If probing is unavailable or the version cannot be mapped safely, ask the user for the target version or use the documented fallback only for dry-run or low-risk read-only work.
+
+Persist the approved version, WAAPI host, and WAAPI port in the skill-local JSON config at `data/config.json` so future runs do not depend on conversation memory. Agents should read that config first and only probe live state again when the connection needs to be verified or the saved values are missing.
+
+The saved config is user-overridable. If the user chooses a different Wwise version or WAAPI port, update the config and keep using that saved override until the user changes it again.
+
+By default, the config leaves `wwise_version` unset, uses `127.0.0.1` for the WAAPI host, and leaves the port unset so WAAPI can use its normal default.
 
 Example dispatcher shape:
 

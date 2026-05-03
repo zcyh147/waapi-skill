@@ -28,3 +28,8 @@ def test_config_targets_are_documented() -> None:
     assert config.paths.data_dir.name == "data"
     assert config.core_coverage_targets["headless"] == 95
     assert config.wwise_live_env == "WWISE_LIVE"
+    assert config.wwise_version is None
+    assert config.waapi_host == "127.0.0.1"
+    assert config.waapi_port is None
+    assert config.use_current_selection_for_ambiguous_queries is True
+    assert config.config_path.as_posix().endswith("data/config.json")
