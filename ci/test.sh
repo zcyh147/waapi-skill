@@ -13,6 +13,7 @@ Versions:
 
 Modes:
   nonlive      Run default non-live test suite
+  all          Run non-live suite first, then strict real matrix
   smoke        Run focused WAAPI getInfo smoke via HeadlessLifecycle
   live         Run focused live suite for the selected version
   destructive  Run focused destructive suite for the selected version
@@ -29,6 +30,7 @@ Notes:
 Examples:
   ci/test.sh --version 2021.1 --mode live
   ci/test.sh --mode nonlive
+  ci/test.sh --version all --mode all -- -q -ra
   ci/test.sh -v all -m matrix
   ci/test.sh --version 2024.1 --mode live -- -k object_topics -q
   ci/test.sh 2021.1 live
@@ -136,6 +138,9 @@ fi
 case "$MODE" in
   nonlive|default)
     VERSION="${VERSION:-none}"
+    ;;
+  all)
+    VERSION="${VERSION:-all}"
     ;;
   matrix|focused)
     VERSION="${VERSION:-all}"
@@ -425,6 +430,14 @@ run_matrix_all() {
 case "$MODE" in
   nonlive|default)
     run_nonlive
+    ;;
+  all)
+    if [[ "$VERSION" != "all" ]]; then
+      echo "all mode requires version 'all'" >&2
+      exit 1
+    fi
+    run_nonlive
+    run_matrix_all
     ;;
   smoke)
     if [[ "$VERSION" == "all" ]]; then

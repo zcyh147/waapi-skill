@@ -7,13 +7,14 @@ This inventory is grouped for human review. `python -m pytest --collect-only -q`
 | Scope | Type | Files / Nodes | What it verifies | Real Wwise required |
 | --- | --- | --- | --- | --- |
 | Default non-live suite | Unit and contract | `ci/test.sh --mode nonlive`, equivalent to `python -m pytest -m "not live and not destructive"` | Fast checks for dispatcher behavior, manifest resources, semantic builders, safety gates, docs contracts, and planning resources | No |
+| Full local suite | Unit plus strict real matrix | `ci/test.sh --version all --mode all -- -q -ra` | Runs the non-live suite first, then the strict real matrix across 2021.1, 2023.1, 2024.1, and 2025.1 | Yes for the matrix half |
 | Full strict real matrix | Live plus destructive | `ci/test.sh --version all --mode matrix -- -q -ra` | Sequential real Wwise coverage for 2021.1, 2023.1, 2024.1, and 2025.1 focused live and destructive nodes | Yes |
 | 2021 live focused run | Live | `ci/test.sh --version 2021.1 --mode live -- -q -ra` | Read-only 2021.1 prerequisites, reflection, WAQL object get, and safe object topic behavior | Yes |
 | 2021 destructive focused run | Destructive | `ci/test.sh --version 2021.1 --mode destructive -- -q -ra` | 2021.1 copied sandbox mutation, soundbank/audio, and SwitchContainer assignment behavior | Yes |
 | Smoke | Strict real launch probe | `ci/test.sh --version all --mode smoke` | HeadlessLifecycle starts WwiseConsole, waits for WAAPI readiness, calls `ak.wwise.core.getInfo`, and shuts down | Yes |
 | Audit check | Evidence inspection | `wc -l .sisyphus/evidence/waapi-test-remediation/real-wwise-launches.jsonl` and `tail -n 4 .sisyphus/evidence/waapi-test-remediation/real-wwise-launches.jsonl` | Confirms real launch proof was appended, including pid, port, command, sandbox project, `getInfo` version, `ready_duration_seconds`, and cleanup result | Uses existing evidence |
 
-Strict real modes are `live`, `destructive`, `smoke`, and `matrix`. They require an executable `WWISE_CONSOLE` and an existing `.wproj` at `WWISE_SAMPLE_PROJECT_PATH`; missing prerequisites fail before pytest execution. `ready_duration_seconds` measures WAAPI readiness, not the total foreground GUI or plugin warning lifetime.
+Strict real modes are `live`, `destructive`, `smoke`, and `matrix`. `all` is a composite runner: it executes non-live first, then the strict real matrix. Strict real modes require an executable `WWISE_CONSOLE` and an existing `.wproj` at `WWISE_SAMPLE_PROJECT_PATH`; missing prerequisites fail before pytest execution. `ready_duration_seconds` measures WAAPI readiness, not the total foreground GUI or plugin warning lifetime.
 
 ## Strict real matrix node inventory
 

@@ -5,6 +5,7 @@ Use `ci/test.sh` to run project test modes with consistent environment setup. Se
 ## Common commands
 
 - `ci/test.sh --mode nonlive`
+- `ci/test.sh --version all --mode all -- -q -ra`
 - `ci/test.sh --version all --mode matrix -- -q -ra`
 - `ci/test.sh --version 2021.1 --mode live -- -q -ra`
 - `ci/test.sh --version 2021.1 --mode destructive -- -q -ra`
@@ -32,4 +33,4 @@ Append pytest args after `--`:
 
 ## Matrix safety note
 
-`--mode matrix` with `--version all` runs supported versions sequentially. Do not run all versions in parallel.
+`--mode all` runs the non-live suite first, then `--mode matrix` with `--version all`. `--mode matrix` still runs supported versions sequentially. Do not run all versions in parallel.
