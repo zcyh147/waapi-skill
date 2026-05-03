@@ -14,7 +14,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
-from .headless import HeadlessLifecycle, LifecycleTimeouts
+from wwise_waapi.headless import HeadlessLifecycle, LifecycleTimeouts  # pyright: ignore[reportMissingImports]
 from .live_environment import (  # pyright: ignore[reportMissingImports]
     ENV_WWISE_FIXTURE_PROJECT,
     ENV_WWISE_SANDBOX_ROOT,

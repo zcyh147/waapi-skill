@@ -6,7 +6,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from tests.support.active_gate_failures import skip_or_fail_unavailable  # pyright: ignore[reportMissingImports]
 from wwise_waapi.headless import EarlyProcessExit, ReadinessTimeout  # pyright: ignore[reportMissingImports]
-from wwise_waapi.live_environment import LiveEnvironmentError, require_destructive_environment  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.live_environment import LiveEnvironmentError, require_destructive_environment  # pyright: ignore[reportMissingImports]
 
 
 @pytest.mark.destructive

@@ -15,12 +15,12 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from tests.support.active_gate_failures import skip_or_fail_unavailable  # pyright: ignore[reportMissingImports]
 from wwise_waapi.headless import HeadlessLifecycleError, default_waapi_client_factory  # pyright: ignore[reportMissingImports]
-from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.live_environment import (  # pyright: ignore[reportMissingImports]
     LiveEnvironmentError,
     path_is_under,
     resolve_sample_project_source,
 )
-from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
     LiveSandboxLock,
     SandboxFixtureError,
     cleanup_sandbox,
@@ -216,12 +216,13 @@ def _subscribe_then_mutate(
     thread = threading.Thread(target=publish, name=f"task-8-topic:{case['uri']}")
     event: SubscriptionEvent | None = None
     timeout_error: SubscriptionTimeout | None = None
+    timeout_cause: BaseException | None = None
     try:
         thread.start()
         event = event_queue.get(timeout=float(case["bounded_wait_seconds"]))
     except queue.Empty as exc:
         timeout_error = SubscriptionTimeout(f"Timed out waiting {float(case['bounded_wait_seconds']):.3f}s for WAAPI topic {case['uri']}")
-        timeout_error.__cause__ = exc
+        timeout_cause = exc
     finally:
         handle.unsubscribe()
         thread.join(1.0)
@@ -229,7 +230,7 @@ def _subscribe_then_mutate(
     if publisher_errors:
         raise AssertionError(f"publisher failed for {case['uri']}") from publisher_errors[0]
     if timeout_error is not None:
-        raise timeout_error
+        raise timeout_error from timeout_cause
     assert event is not None
     assert manager.active_topics == set()
     assert "object" in expected_holder

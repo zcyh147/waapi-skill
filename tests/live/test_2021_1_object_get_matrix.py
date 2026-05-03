@@ -10,14 +10,14 @@ from typing import Any, Mapping
 import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.headless import default_waapi_client_factory  # pyright: ignore[reportMissingImports]
-from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.live_environment import (  # pyright: ignore[reportMissingImports]
     ENV_WWISE_CONSOLE,
     ENV_WWISE_LIVE,
     ENV_WWISE_SAMPLE_PROJECT_PATH,
     ENV_WWISE_VERSION,
     path_is_under,
 )
-from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
     LiveSandboxLock,
     cleanup_sandbox,
     hash_project,

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest  # pyright: ignore[reportMissingImports]
 
-from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
     LiveSandboxLock,
     cleanup_sandbox,
     hash_project,

@@ -10,8 +10,8 @@ from typing import Any, Mapping
 import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.headless import default_waapi_client_factory  # pyright: ignore[reportMissingImports]
-from wwise_waapi.live_environment import path_is_under  # pyright: ignore[reportMissingImports]
-from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.live_environment import path_is_under  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
     LiveSandboxLock,
     cleanup_sandbox,
     hash_project,

@@ -23,7 +23,7 @@ from tests.destructive.support.destructive_2021_sandbox import (  # pyright: ign
     hash_mutation_bearing_project_files,
     unique_2021_name,
 )
-from wwise_waapi.live_environment import path_is_under  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.live_environment import path_is_under  # pyright: ignore[reportMissingImports]
 from tests.support.active_gate_failures import skip_or_fail_unavailable  # pyright: ignore[reportMissingImports]
 
 ADD_ASSIGNMENT_URI = "ak.wwise.core.switchContainer.addAssignment"

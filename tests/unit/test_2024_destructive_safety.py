@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest  # pyright: ignore[reportMissingImports]
 
 import tests.destructive.support.destructive_2024_sandbox as destructive_2024_sandbox  # pyright: ignore[reportMissingImports]
-import wwise_waapi.live_environment as live_env  # pyright: ignore[reportMissingImports]
+import tests.destructive.support.live_environment as live_env  # pyright: ignore[reportMissingImports]
 from tests.destructive.support.destructive_2024_sandbox import (  # pyright: ignore[reportMissingImports]
     Destructive2024SandboxRuntime,
     DestructiveSandboxUnavailable,
@@ -15,7 +15,7 @@ from tests.destructive.support.destructive_2024_sandbox import (  # pyright: ign
     require_2024_live_destructive_prerequisites,
     require_2024_sandbox_copy_target,
 )
-from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.live_environment import (  # pyright: ignore[reportMissingImports]
     LiveEnvironmentError,
     SUPPORTED_WWISE_VERSION,
     WWISE_2024_1_CONSOLE_PATH,
@@ -24,7 +24,7 @@ from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImpor
     path_is_under_org_fixture,
     require_destructive_environment,
 )
-from wwise_waapi.sandbox_fixture import ProjectHash, SandboxMetadata, SandboxProject  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.sandbox_fixture import ProjectHash, SandboxMetadata, SandboxProject  # pyright: ignore[reportMissingImports]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

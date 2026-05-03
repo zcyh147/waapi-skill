@@ -7,9 +7,9 @@ from typing import Any
 
 import pytest  # pyright: ignore[reportMissingImports]
 
-import wwise_waapi.live_environment as live_env  # pyright: ignore[reportMissingImports]
-import wwise_waapi.sandbox_fixture as sandbox_fixture  # pyright: ignore[reportMissingImports]
-from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
+import tests.destructive.support.live_environment as live_env  # pyright: ignore[reportMissingImports]
+import tests.destructive.support.sandbox_fixture as sandbox_fixture  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
     ENV_WWISE_REAL_LAUNCH_AUDIT_PATH,
     ENV_WWISE_SANDBOX_KEEP_ON_FAILURE,
     ENV_WWISE_STRICT_REAL,
@@ -21,7 +21,7 @@ from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImport
     prepare_sample_project_sandbox,
     shutdown_sandboxed_wwise,
 )
-from wwise_waapi.live_environment import LiveEnvironmentError, require_destructive_environment  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.live_environment import LiveEnvironmentError, require_destructive_environment  # pyright: ignore[reportMissingImports]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

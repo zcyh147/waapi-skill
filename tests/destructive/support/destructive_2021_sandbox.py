@@ -12,7 +12,7 @@ from types import TracebackType
 from typing import Any, Mapping
 
 from wwise_waapi.headless import HeadlessLifecycleError, LifecycleTimeouts, default_waapi_client_factory  # pyright: ignore[reportMissingImports]
-from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.live_environment import (  # pyright: ignore[reportMissingImports]
     ENV_WWISE_DESTRUCTIVE,
     ENV_WWISE_LIVE,
     ENV_WWISE_SANDBOX_ROOT,
@@ -29,7 +29,7 @@ from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImpor
     require_live_environment,
     resolve_sample_project_source,
 )
-from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
     LiveSandboxLock,
     SandboxFixtureError,
     SandboxProject,

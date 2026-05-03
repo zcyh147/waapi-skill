@@ -15,7 +15,7 @@ if os.getenv("WWISE_LIVE") != "1":
     pytest.skip("WWISE_LIVE=1 is required for live profiler/transport/soundengine tests", allow_module_level=True)
 
 from wwise_waapi.headless import HeadlessLifecycleError, default_waapi_client_factory  # pyright: ignore[reportMissingImports]
-from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.live_environment import (  # pyright: ignore[reportMissingImports]
     LiveEnvironmentError,
     path_is_under,
     resolve_sample_project_source,
@@ -23,7 +23,7 @@ from wwise_waapi.live_environment import (  # pyright: ignore[reportMissingImpor
 from tests.destructive.support.profiler_capability import (  # pyright: ignore[reportMissingImports]
     safe_profiler_capability_evidence_path,
 )
-from wwise_waapi.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
     LiveSandboxLock,
     SandboxFixtureError,
     cleanup_sandbox,
