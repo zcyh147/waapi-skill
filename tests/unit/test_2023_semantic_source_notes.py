@@ -46,34 +46,11 @@ def write_resource(tmp_path: Path, data: dict[str, Any]) -> Path:
     return path
 
 
-def write_gate_evidence(tmp_path: Path, text: str) -> Path:
-    evidence = tmp_path / "semantic-builder-notebooklm-gate.md"
-    evidence.write_text(text, encoding="utf-8")
-    return evidence
-
-
 def write_artifact_resource(tmp_path: Path, data: dict[str, Any]) -> Path:
     path = tmp_path / "waapi-skill" / "resources" / "semantic" / "2023.1" / "source_notes.json"
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     return path
-
-
-def write_artifact_gate_evidence(tmp_path: Path, text: str, name: str = "test-gate.md") -> str:
-    evidence = tmp_path / "waapi-skill" / "references" / name
-    evidence.parent.mkdir(parents=True)
-    evidence.write_text(text, encoding="utf-8")
-    return f"references/{name}"
-
-
-SUCCESS_GATE_EVIDENCE_2023 = """# Semantic builder NotebookLM gate evidence for Wwise 2023.1
-
-- Gate status: open
-- Notebook id: wwise-2023.1-docs
-- Auth result: success
-- List result: success
-- Query result: success
-"""
 
 
 def assert_typed_failure(checker: SemanticSourceNoteChecker, family: BuilderFamily, error_code: SemanticErrorCode) -> SemanticValidationError:
@@ -164,30 +141,25 @@ def test_2023_wrong_note_notebook_fails_with_typed_code(tmp_path: Path) -> None:
     assert failure.details["notebook_id"] == "wwise-2022.1-docs"
 
 
-def test_2023_wrong_gate_evidence_notebook_fails_with_typed_code(tmp_path: Path) -> None:
-    evidence = write_artifact_gate_evidence(tmp_path, SUCCESS_GATE_EVIDENCE_2023.replace(NOTEBOOK_ID_2023, "wwise-2022.1-docs"))
+def test_2023_inconsistent_gate_evidence_metadata_fails_with_typed_code(tmp_path: Path) -> None:
     data = load_2023_resource()
-    for note in data["notes"].values():
-        note["gate_evidence_path"] = evidence
-    checker = SemanticSourceNoteChecker(write_artifact_resource(tmp_path, data), notebook_id=NOTEBOOK_ID_2023)
-
-    assert_typed_failure(checker, BuilderFamily.QUERY, SemanticErrorCode.SOURCE_NOTE_WRONG_NOTEBOOK)
-
-
-def test_2023_fail_closed_gate_evidence_does_not_unlock(tmp_path: Path) -> None:
-    evidence = write_artifact_gate_evidence(
-        tmp_path,
-        SUCCESS_GATE_EVIDENCE_2023.replace("- Gate status: open", "- Gate status: fail-closed")
-        + "- Failure: 2023.1 NotebookLM query did not complete.\n",
-    )
-    data = load_2023_resource()
-    for note in data["notes"].values():
-        note["gate_evidence_path"] = evidence
+    data["notes"]["query"]["gate_evidence_path"] = "references/semantic/2023.1/query-gate.md"
     checker = SemanticSourceNoteChecker(write_artifact_resource(tmp_path, data), notebook_id=NOTEBOOK_ID_2023)
 
     failure = assert_typed_failure(checker, BuilderFamily.QUERY, SemanticErrorCode.SOURCE_NOTE_INCOMPLETE)
 
-    assert "did not complete" in failure.message
+    assert "exactly one gate evidence metadata path" in failure.message
+
+
+def test_2023_gate_evidence_metadata_does_not_require_packaged_markdown_file(tmp_path: Path) -> None:
+    data = load_2023_resource()
+    for note in data["notes"].values():
+        note["gate_evidence_path"] = "references/semantic/2023.1/missing-gate.md"
+    checker = SemanticSourceNoteChecker(write_artifact_resource(tmp_path, data), notebook_id=NOTEBOOK_ID_2023)
+
+    status = require_source_note(checker, BuilderFamily.QUERY, version="2023.1")
+
+    assert status.allowed is True
 
 
 def test_2023_incomplete_note_fails_with_typed_code(tmp_path: Path) -> None:

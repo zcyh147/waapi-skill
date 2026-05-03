@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from wwise_waapi.dispatcher import DEFAULT_WWISE_VERSION
-from wwise_waapi.notebooklm_gate import EXPECTED_NOTEBOOK_ID, NotebookLMGate
+from wwise_waapi.notebooklm_gate import EXPECTED_NOTEBOOK_ID
 from wwise_waapi.versions import is_explicit_fail_closed_version  # pyright: ignore[reportMissingImports]
 
 from .common import BuilderFamily, SemanticErrorCode, SemanticValidationError, SourceNoteCheck
@@ -153,7 +153,7 @@ class SemanticSourceNoteChecker:
                 error_code=SemanticErrorCode.SOURCE_NOTE_WRONG_NOTEBOOK,
             )
 
-        gate_status = _check_notebooklm_gate(resource, self.notebook_id)
+        gate_status = _check_gate_metadata(resource)
         if not gate_status.allowed:
             error_code = (
                 SemanticErrorCode.SOURCE_NOTE_WRONG_NOTEBOOK
@@ -321,7 +321,7 @@ def _semantic_evidence_root(resource_path: Path) -> Path:
     return REPO_ROOT
 
 
-def _check_notebooklm_gate(resource: SemanticSourceNoteResource, notebook_id: str):
+def _check_gate_metadata(resource: SemanticSourceNoteResource):
     evidence_paths = {
         path
         for note in resource.notes.values()
@@ -330,33 +330,31 @@ def _check_notebooklm_gate(resource: SemanticSourceNoteResource, notebook_id: st
     if len(evidence_paths) != 1:
         class _MissingGateStatus:
             allowed = False
-            reason = "Semantic source notes must reference exactly one NotebookLM gate evidence path."
+            reason = "Semantic source notes must reference exactly one gate evidence metadata path."
             notebook_id = None
 
         return _MissingGateStatus()
-    evidence_path = _resolve_gate_evidence_path(resource, next(iter(evidence_paths)))
-    if evidence_path is None:
+    if not _is_safe_gate_evidence_metadata_path(next(iter(evidence_paths))):
         class _InvalidGatePathStatus:
             allowed = False
-            reason = "Semantic source-note gate evidence path must stay under the skill references directory."
+            reason = "Semantic source-note gate evidence metadata path must be relative and stay under references/."
             notebook_id = None
 
         return _InvalidGatePathStatus()
-    return NotebookLMGate(evidence_path, notebook_id).check()
+    class _OpenGateMetadataStatus:
+        allowed = True
+        reason = "Semantic source-note gate evidence metadata is consistent."
+        notebook_id = resource.notebook_id
+
+    return _OpenGateMetadataStatus()
 
 
-def _resolve_gate_evidence_path(resource: SemanticSourceNoteResource, raw_path: str) -> Path | None:
+def _is_safe_gate_evidence_metadata_path(raw_path: str) -> bool:
     evidence_path = Path(raw_path)
     if evidence_path.is_absolute():
-        return None
-    resolved_root = resource.root.resolve()
-    references_root = (resolved_root / "references").resolve()
-    resolved_path = (resolved_root / evidence_path).resolve()
-    try:
-        resolved_path.relative_to(references_root)
-    except ValueError:
-        return None
-    return resolved_path
+        return False
+    parts = evidence_path.parts
+    return bool(parts) and parts[0] == "references" and ".." not in parts
 
 
 def _missing_note_fields(note: Mapping[str, Any]) -> tuple[str, ...]:

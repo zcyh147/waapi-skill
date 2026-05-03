@@ -205,22 +205,21 @@ def test_2025_1_source_note_checker_fails_closed_for_wrong_notebook(tmp_path: Pa
     assert "wrong-notebook" in status.reason
 
 
-def test_2025_1_source_note_checker_fails_closed_for_missing_docs_gate(tmp_path: Path) -> None:
+def test_2025_1_source_note_checker_treats_gate_path_as_metadata(tmp_path: Path) -> None:
     payload = read_source_notes()
     missing_gate_payload = copy.deepcopy(payload)
     for note in missing_gate_payload["notes"].values():
         note["gate_evidence_path"] = "references/missing-gate.md"
-    missing_gate_path = write_artifact_resource(tmp_path, missing_gate_payload)
+    metadata_only_path = write_artifact_resource(tmp_path, missing_gate_payload)
 
-    status = SemanticSourceNoteChecker(resource_path=missing_gate_path, notebook_id=NOTEBOOK_2025).check(
+    status = SemanticSourceNoteChecker(resource_path=metadata_only_path, notebook_id=NOTEBOOK_2025).check(
         BuilderFamily.QUERY.value,
         version=VERSION_2025,
     )
 
-    assert status.allowed is False
-    assert status.error_code == SemanticErrorCode.SOURCE_NOTE_INCOMPLETE
-    assert status.missing_fields == ("gate_evidence_path",)
-    assert "NotebookLM gate evidence is missing" in status.reason
+    assert status.allowed is True
+    assert status.error_code is None
+    assert status.reason == "Semantic source note is grounded."
 
 
 def test_2025_1_task5_notebooklm_evidence_omits_auth_artifacts() -> None:

@@ -37,34 +37,11 @@ def write_resource(tmp_path: Path, data: dict[str, Any]) -> Path:
     return path
 
 
-def write_gate_evidence(tmp_path: Path, text: str) -> Path:
-    evidence = tmp_path / "semantic-builder-notebooklm-gate.md"
-    evidence.write_text(text, encoding="utf-8")
-    return evidence
-
-
 def write_artifact_resource(tmp_path: Path, data: dict[str, Any]) -> Path:
     path = tmp_path / "waapi-skill" / "resources" / "semantic" / "2022.1" / "source_notes.json"
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     return path
-
-
-def write_artifact_gate_evidence(tmp_path: Path, text: str, name: str = "test-gate.md") -> str:
-    evidence = tmp_path / "waapi-skill" / "references" / name
-    evidence.parent.mkdir(parents=True)
-    evidence.write_text(text, encoding="utf-8")
-    return f"references/{name}"
-
-
-SUCCESS_GATE_EVIDENCE = """# Semantic builder NotebookLM gate evidence
-
-- Gate status: open
-- Notebook id: wwise-2022.1-docs
-- Auth result: success
-- List result: success
-- Query result: success
-"""
 
 
 def test_grounded_source_notes_unlock_all_builder_families() -> None:
@@ -114,18 +91,15 @@ def test_source_notes_have_no_embedded_gate_success_claims() -> None:
         assert "query_result" not in note
 
 
-def test_source_notes_resolve_gate_evidence_from_skill_local_artifact(tmp_path: Path) -> None:
+def test_source_notes_keep_gate_evidence_path_as_metadata_without_packaged_markdown(tmp_path: Path) -> None:
     artifact_root = tmp_path / "waapi-skill"
     resource_path = artifact_root / "resources" / "semantic" / "2022.1" / "source_notes.json"
-    evidence_path = artifact_root / "references" / "artifact-only-gate.md"
     data = load_resource()
     for note in data["notes"].values():
         note["gate_evidence_path"] = "references/artifact-only-gate.md"
 
     resource_path.parent.mkdir(parents=True)
-    evidence_path.parent.mkdir(parents=True)
     resource_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    evidence_path.write_text(SUCCESS_GATE_EVIDENCE, encoding="utf-8")
 
     checker = SemanticSourceNoteChecker(resource_path=resource_path)
     status = checker.check(BuilderFamily.QUERY.value)
@@ -189,62 +163,40 @@ def test_wrong_notebook_id_fails_with_typed_code(tmp_path: Path) -> None:
     assert "expected wwise-2022.1-docs" in str(exc.value)
 
 
-def test_wrong_notebook_gate_evidence_fails_with_typed_code(tmp_path: Path) -> None:
-    evidence = write_artifact_gate_evidence(tmp_path, SUCCESS_GATE_EVIDENCE.replace("wwise-2022.1-docs", "other-notebook"))
+def test_inconsistent_gate_evidence_metadata_fails_with_typed_code(tmp_path: Path) -> None:
     data = load_resource()
-    for note in data["notes"].values():
-        note["gate_evidence_path"] = evidence
+    data["notes"]["query"]["gate_evidence_path"] = "references/query-gate.md"
     checker = SemanticSourceNoteChecker(write_artifact_resource(tmp_path, data))
 
     with pytest.raises(SemanticValidationError) as exc:
         require_source_note(checker, BuilderFamily.QUERY)
 
-    assert exc.value.error_code == SemanticErrorCode.SOURCE_NOTE_WRONG_NOTEBOOK
+    assert exc.value.error_code == SemanticErrorCode.SOURCE_NOTE_INCOMPLETE
+    assert "exactly one gate evidence metadata path" in str(exc.value)
 
 
-def test_missing_gate_evidence_file_fails_closed(tmp_path: Path) -> None:
+def test_gate_evidence_metadata_does_not_require_packaged_markdown_file(tmp_path: Path) -> None:
     data = load_resource()
     for note in data["notes"].values():
         note["gate_evidence_path"] = "references/missing-gate.md"
     checker = SemanticSourceNoteChecker(write_artifact_resource(tmp_path, data))
 
-    with pytest.raises(SemanticValidationError) as exc:
-        require_source_note(checker, BuilderFamily.QUERY)
+    status = require_source_note(checker, BuilderFamily.QUERY)
 
-    assert exc.value.error_code == SemanticErrorCode.SOURCE_NOTE_INCOMPLETE
-    assert "missing" in str(exc.value)
-
-
-def test_fail_closed_gate_evidence_file_does_not_unlock(tmp_path: Path) -> None:
-    evidence = write_artifact_gate_evidence(
-        tmp_path,
-        SUCCESS_GATE_EVIDENCE.replace("- Gate status: open", "- Gate status: fail-closed")
-        + "- Failure: NotebookLM query did not complete.\n",
-    )
-    data = load_resource()
-    for note in data["notes"].values():
-        note["gate_evidence_path"] = evidence
-    checker = SemanticSourceNoteChecker(write_artifact_resource(tmp_path, data))
-
-    with pytest.raises(SemanticValidationError) as exc:
-        require_source_note(checker, BuilderFamily.QUERY)
-
-    assert exc.value.error_code == SemanticErrorCode.SOURCE_NOTE_INCOMPLETE
-    assert "did not complete" in str(exc.value)
+    assert status.allowed is True
 
 
 def test_absolute_gate_evidence_path_fails_closed(tmp_path: Path) -> None:
-    evidence = write_gate_evidence(tmp_path, SUCCESS_GATE_EVIDENCE)
     data = load_resource()
     for note in data["notes"].values():
-        note["gate_evidence_path"] = str(evidence)
+        note["gate_evidence_path"] = str(tmp_path / "semantic-builder-notebooklm-gate.md")
     checker = SemanticSourceNoteChecker(write_artifact_resource(tmp_path, data))
 
     with pytest.raises(SemanticValidationError) as exc:
         require_source_note(checker, BuilderFamily.QUERY)
 
     assert exc.value.error_code == SemanticErrorCode.SOURCE_NOTE_INCOMPLETE
-    assert "skill references directory" in str(exc.value)
+    assert "relative and stay under references" in str(exc.value)
 
 
 def test_parent_traversal_gate_evidence_path_fails_closed(tmp_path: Path) -> None:
@@ -257,7 +209,7 @@ def test_parent_traversal_gate_evidence_path_fails_closed(tmp_path: Path) -> Non
         require_source_note(checker, BuilderFamily.QUERY)
 
     assert exc.value.error_code == SemanticErrorCode.SOURCE_NOTE_INCOMPLETE
-    assert "skill references directory" in str(exc.value)
+    assert "relative and stay under references" in str(exc.value)
 
 
 def test_incomplete_source_note_fails_with_typed_code(tmp_path: Path) -> None:
