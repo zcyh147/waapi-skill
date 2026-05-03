@@ -9,8 +9,8 @@ from wwise_waapi.deferred_registry import DeferredRegistry, REQUIRED_COVERAGE_FI
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2025.1"
-DEFERRED_RESOURCE = REPO_ROOT / "resources" / "deferred" / f"{VERSION}.json"
-COVERAGE_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "api-coverage.json"
+DEFERRED_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "deferred" / f"{VERSION}.json"
+COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION / "api-coverage.json"
 
 FORBIDDEN_PROMOTED_STATUSES = {"live-tested", "sandbox-mutating-tested"}
 REQUIRED_EXCLUDED_FAMILIES = {"CLI", "UI", "debug", "remote", "soundengine"}

@@ -14,8 +14,9 @@ from wwise_waapi.versions import is_explicit_fail_closed_version  # pyright: ign
 from .common import BuilderFamily, SemanticErrorCode, SemanticValidationError, SourceNoteCheck
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_SEMANTIC_SOURCE_ROOT = REPO_ROOT / "resources" / "semantic"
+SKILL_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = SKILL_ROOT.parents[1]
+DEFAULT_SEMANTIC_SOURCE_ROOT = SKILL_ROOT / "resources" / "semantic"
 DEFAULT_SEMANTIC_SOURCE_NOTES = DEFAULT_SEMANTIC_SOURCE_ROOT / DEFAULT_WWISE_VERSION / "source_notes.json"
 
 EXPECTED_SOURCE_NOTE_URI_INVENTORY: dict[str, tuple[str, ...]] = {
@@ -277,7 +278,7 @@ def load_semantic_source_notes(
         version=str(data.get("version", "")),
         notebook_id=str(data.get("notebook_id", "")),
         notes={str(key): value for key, value in notes.items() if isinstance(value, Mapping)},
-        root=REPO_ROOT,
+        root=_semantic_evidence_root(resource_path),
     )
 
 
@@ -308,6 +309,18 @@ def source_note_uri_inventory(resource_path: Path = DEFAULT_SEMANTIC_SOURCE_NOTE
     return inventory
 
 
+def _semantic_evidence_root(resource_path: Path) -> Path:
+    resolved = resource_path.resolve()
+    if (
+        resolved.name == "source_notes.json"
+        and len(resolved.parents) >= 4
+        and resolved.parents[1].name == "semantic"
+        and resolved.parents[2].name == "resources"
+    ):
+        return resolved.parents[3]
+    return REPO_ROOT
+
+
 def _check_notebooklm_gate(resource: SemanticSourceNoteResource, notebook_id: str):
     evidence_paths = {
         path
@@ -315,16 +328,35 @@ def _check_notebooklm_gate(resource: SemanticSourceNoteResource, notebook_id: st
         if isinstance(path := note.get("gate_evidence_path"), str) and path.strip()
     }
     if len(evidence_paths) != 1:
-        class _Status:
+        class _MissingGateStatus:
             allowed = False
             reason = "Semantic source notes must reference exactly one NotebookLM gate evidence path."
             notebook_id = None
 
-        return _Status()
-    evidence_path = Path(next(iter(evidence_paths)))
-    if not evidence_path.is_absolute():
-        evidence_path = resource.root / evidence_path
+        return _MissingGateStatus()
+    evidence_path = _resolve_gate_evidence_path(resource, next(iter(evidence_paths)))
+    if evidence_path is None:
+        class _InvalidGatePathStatus:
+            allowed = False
+            reason = "Semantic source-note gate evidence path must stay under the skill references directory."
+            notebook_id = None
+
+        return _InvalidGatePathStatus()
     return NotebookLMGate(evidence_path, notebook_id).check()
+
+
+def _resolve_gate_evidence_path(resource: SemanticSourceNoteResource, raw_path: str) -> Path | None:
+    evidence_path = Path(raw_path)
+    if evidence_path.is_absolute():
+        return None
+    resolved_root = resource.root.resolve()
+    references_root = (resolved_root / "references").resolve()
+    resolved_path = (resolved_root / evidence_path).resolve()
+    try:
+        resolved_path.relative_to(references_root)
+    except ValueError:
+        return None
+    return resolved_path
 
 
 def _missing_note_fields(note: Mapping[str, Any]) -> tuple[str, ...]:

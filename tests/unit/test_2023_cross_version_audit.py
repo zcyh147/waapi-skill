@@ -28,15 +28,15 @@ SANDBOX_MUTATING_TESTED_2023_URIS = {
     "ak.wwise.core.undo.undo",
 }
 NOTEBOOK_2023 = "wwise-2023.1-docs"
-MANIFEST_ROOT = ROOT / "resources" / "manifest"
-SEMANTIC_2023 = ROOT / "resources" / "semantic" / VERSION_2023 / "source_notes.json"
-COVERAGE_2022 = ROOT / "resources" / "coverage" / VERSION_2022 / "api-coverage.json"
-COVERAGE_2023 = ROOT / "resources" / "coverage" / VERSION_2023 / "api-coverage.json"
-LIVE_MATRIX_2023 = ROOT / "resources" / "coverage" / VERSION_2023 / "live-coverage-matrix.json"
-PHASE2_SUMMARY_2023 = ROOT / "resources" / "coverage" / VERSION_2023 / "phase2-coverage-summary.json"
-POLICY_2023 = ROOT / "resources" / "coverage" / VERSION_2023 / "phase21-uri-policy.json"
-DEFERRED_2023 = ROOT / "resources" / "deferred" / "2023.1.json"
-WAQL_2023 = ROOT / "resources" / "waql" / VERSION_2023 / "object-get-live-matrix.json"
+MANIFEST_ROOT = ROOT / "skills" / "wwise-waapi" / "resources" / "manifest"
+SEMANTIC_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "semantic" / VERSION_2023 / "source_notes.json"
+COVERAGE_2022 = ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION_2022 / "api-coverage.json"
+COVERAGE_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION_2023 / "api-coverage.json"
+LIVE_MATRIX_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION_2023 / "live-coverage-matrix.json"
+PHASE2_SUMMARY_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION_2023 / "phase2-coverage-summary.json"
+POLICY_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION_2023 / "phase21-uri-policy.json"
+DEFERRED_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "deferred" / "2023.1.json"
+WAQL_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "waql" / VERSION_2023 / "object-get-live-matrix.json"
 FIXTURE_2023 = ROOT / "tests" / "_org" / VERSION_2023
 REFERENCES_2023 = ROOT / "references" / "semantic" / VERSION_2023
 LIVE_TESTED_2023_URI = "ak.wwise.core.object.get"

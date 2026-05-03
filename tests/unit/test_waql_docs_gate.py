@@ -15,7 +15,7 @@ from wwise_waapi.waql import (  # pyright: ignore[reportMissingImports]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MANIFEST_ROOT = REPO_ROOT / "resources" / "manifest"
+MANIFEST_ROOT = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest"
 WAQL_REFERENCE = REPO_ROOT / "references" / "waql-2022.1.md"
 
 

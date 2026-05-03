@@ -7,9 +7,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2025.1"
-CLASSIFICATION_RESOURCE = REPO_ROOT / "resources" / "coverage" / VERSION / "added-api-classification.json"
-INVENTORY_RESOURCE = REPO_ROOT / "resources" / "manifest" / VERSION / "added-since-2024.1.json"
-SOURCE_NOTES_RESOURCE = REPO_ROOT / "resources" / "semantic" / VERSION / "source_notes.json"
+CLASSIFICATION_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION / "added-api-classification.json"
+INVENTORY_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest" / VERSION / "added-since-2024.1.json"
+SOURCE_NOTES_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "semantic" / VERSION / "source_notes.json"
 DISCREPANCY_REGISTER = REPO_ROOT / "references" / "semantic" / VERSION / "discrepancy-register.md"
 
 ALLOWED_STATUSES = {

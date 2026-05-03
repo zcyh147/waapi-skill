@@ -10,7 +10,7 @@ from wwise_waapi.manifest import (  # pyright: ignore[reportMissingImports]
     audit_manifest,
 )
 
-RESOURCE_ROOT = Path("resources") / "manifest"
+RESOURCE_ROOT = Path("skills") / "wwise-waapi" / "resources" / "manifest"
 VERSION = "2023.1"
 BUILD = "2023.1.19.8928"
 CONSOLE_PATH = "/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh"

@@ -1,0 +1,1 @@
+waapi-client==0.8.1

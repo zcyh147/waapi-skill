@@ -18,7 +18,7 @@ from wwise_waapi.phase21_uri_policy import (  # pyright: ignore[reportMissingImp
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SUMMARY_RESOURCE = REPO_ROOT / "resources" / "coverage" / "2022.1" / "phase2-coverage-summary.json"
+SUMMARY_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / "2022.1" / "phase2-coverage-summary.json"
 
 
 def test_phase21_policy_resource_pins_exact_reopened_and_probe_uri_sets() -> None:

@@ -12,12 +12,12 @@ REFERENCE_ROOT = ROOT / "references"
 SEMANTIC_2024_REFERENCES = REFERENCE_ROOT / "semantic" / "2024.1"
 TASK11_REVIEW_PACKET = ROOT / ".sisyphus" / "evidence" / "wwise-2024-waapi-integration-coverage" / "parity-review-packet.md"
 DOC_PATHS = (
-    ROOT / "SKILL.md",
+    ROOT / "skills" / "wwise-waapi" / "SKILL.md",
     *sorted(REFERENCE_ROOT.glob("*.md")),
     *sorted(SEMANTIC_2024_REFERENCES.glob("*.md")),
 )
 DOC_CONTRACT_PATHS = (
-    ROOT / "SKILL.md",
+    ROOT / "skills" / "wwise-waapi" / "SKILL.md",
     ROOT / "references" / "long-run-runbook.md",
     ROOT / "references" / "eval-review-workflow.md",
     ROOT / "references" / "phase2-user-review-packet.md",

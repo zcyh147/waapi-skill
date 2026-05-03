@@ -6,7 +6,8 @@ from typing import Any, cast
 
 
 REFERENCE_ROOT = Path('references') / 'semantic' / '2021.1'
-SOURCE_NOTES = Path('resources') / 'semantic' / '2021.1' / 'source_notes.json'
+SOURCE_NOTES = Path('skills') / 'wwise-waapi' / 'resources' / 'semantic' / '2021.1' / 'source_notes.json'
+RUNTIME_PACKAGE_ROOT = Path('skills') / 'wwise-waapi' / 'wwise_waapi'
 GATE_PATH = REFERENCE_ROOT / 'semantic-builder-notebooklm-gate.md'
 VERSION = '2021.1'
 NOTEBOOK = 'wwise-2021.1.14-docs'
@@ -228,7 +229,7 @@ def _runtime_package_has_no_notebooklm_calls() -> bool:
         'ask_question.py',
         'notebooklm.google.com/notebook/',
     )
-    for path in Path('wwise_waapi').glob('**/*.py'):
+    for path in RUNTIME_PACKAGE_ROOT.glob('**/*.py'):
         text = path.read_text(encoding='utf-8')
         lowered = text.lower()
         for pattern in forbidden_patterns:

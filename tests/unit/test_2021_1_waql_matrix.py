@@ -18,8 +18,8 @@ from wwise_waapi.waql import WAQL_API_URI, validate_waql_example  # pyright: ign
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2021.1"
-MATRIX_PATH = REPO_ROOT / "resources" / "waql" / VERSION / "object-get-live-matrix.json"
-SCHEMA_PATH = REPO_ROOT / "resources" / "manifest" / VERSION / "schemas.json"
+MATRIX_PATH = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "waql" / VERSION / "object-get-live-matrix.json"
+SCHEMA_PATH = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest" / VERSION / "schemas.json"
 FORBIDDEN_PROOF_FRAGMENTS = ("2022.1", "2023.1", "2024.1", "2025.1")
 
 

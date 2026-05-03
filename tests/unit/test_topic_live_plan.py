@@ -10,15 +10,17 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DYNAMIC_OBJECT_ID_MARKER = "$disposable_object_id"
 PLAN_PATH = (
     REPO_ROOT
+    / "skills"
+    / "wwise-waapi"
     / "resources"
     / "coverage"
     / "2022.1"
     / "task-6-object-topic-live-plan.json"
 )
 TASK_8_PLAN_PATHS = {
-    "2021.1": REPO_ROOT / "resources" / "coverage" / "2021.1" / "task-8-object-topic-live-plan.json",
-    "2024.1": REPO_ROOT / "resources" / "coverage" / "2024.1" / "task-8-object-topic-live-plan.json",
-    "2025.1": REPO_ROOT / "resources" / "coverage" / "2025.1" / "task-8-object-topic-live-plan.json",
+    "2021.1": REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / "2021.1" / "task-8-object-topic-live-plan.json",
+    "2024.1": REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / "2024.1" / "task-8-object-topic-live-plan.json",
+    "2025.1": REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / "2025.1" / "task-8-object-topic-live-plan.json",
 }
 SAFE_TASK_8_TOPIC_URIS = {
     "ak.wwise.core.object.childAdded",
@@ -141,14 +143,19 @@ def test_task_8_versioned_safe_topic_plans_match_manifest_inventory_without_rout
             ), case["id"]
 
 
-def test_task_8_planned_publishers_are_deterministic_and_2021_log_topic_stays_deferred() -> None:
+def test_task_8_planned_publishers_are_deterministic_and_unbounded_log_topics_stay_deferred() -> None:
     for version, path in TASK_8_PLAN_PATHS.items():
         for case in _task8_plan(path)["topic_cases"]:
             if case["status"] == "still-deferred-with-evidence":
-                assert version == "2021.1"
+                assert version in {"2021.1", "2024.1"}
                 assert case["uri"] == "ak.wwise.core.log.itemAdded"
                 assert "publisher" not in case
-                assert "no ak.wwise.core.log.addItem publisher" in case["blocker"]
+                if version == "2021.1":
+                    assert "no ak.wwise.core.log.addItem publisher" in case["blocker"]
+                else:
+                    assert case["attempted_publisher"]["uri"] == "ak.wwise.core.log.addItem"
+                    assert "did not publish a bounded" in case["blocker"]
+                    assert case["future_review_trigger"]
                 continue
 
             assert case["status"] == "planned-active-live-smoke", case["id"]
@@ -225,5 +232,5 @@ def _task8_topic_case(path: Path, uri: str) -> Mapping[str, Any]:
 
 
 def _manifest_topics(version: str) -> set[str]:
-    path = REPO_ROOT / "resources" / "manifest" / version / "topics.json"
+    path = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest" / version / "topics.json"
     return {entry["uri"] for entry in json.loads(path.read_text(encoding="utf-8"))["topics"]}

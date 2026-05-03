@@ -11,7 +11,7 @@ from wwise_waapi.waql import WAQL_API_URI  # pyright: ignore[reportMissingImport
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SKILL_ROOT = REPO_ROOT
+SKILL_ROOT = REPO_ROOT / "skills" / "wwise-waapi"
 MANIFEST_ROOT = SKILL_ROOT / "resources" / "manifest"
 COVERAGE_RESOURCE = SKILL_ROOT / "resources" / "coverage" / "2022.1" / "api-coverage.json"
 EVIDENCE_SUMMARY = REPO_ROOT / ".sisyphus" / "evidence" / "task-7-api-coverage-summary.json"

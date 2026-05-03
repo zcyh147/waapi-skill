@@ -12,18 +12,18 @@ EVALS_JSON = ROOT / "evals" / "evals.json"
 REFERENCE_ROOT = ROOT / "references"
 SEMANTIC_2025_REFERENCES = REFERENCE_ROOT / "semantic" / "2025.1"
 TASK12_REVIEW_PACKET = ROOT / ".sisyphus" / "evidence" / "wwise-2025-waapi-integration-coverage" / "parity-review-packet.md"
-COVERAGE_2025 = ROOT / "resources" / "coverage" / "2025.1" / "api-coverage.json"
-LIVE_MATRIX_2025 = ROOT / "resources" / "coverage" / "2025.1" / "live-coverage-matrix.json"
-DEFERRED_2025 = ROOT / "resources" / "deferred" / "2025.1.json"
-CLASSIFICATION_2025 = ROOT / "resources" / "coverage" / "2025.1" / "added-api-classification.json"
+COVERAGE_2025 = ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / "2025.1" / "api-coverage.json"
+LIVE_MATRIX_2025 = ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / "2025.1" / "live-coverage-matrix.json"
+DEFERRED_2025 = ROOT / "skills" / "wwise-waapi" / "resources" / "deferred" / "2025.1.json"
+CLASSIFICATION_2025 = ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / "2025.1" / "added-api-classification.json"
 DOC_PATHS = (
-    ROOT / "SKILL.md",
+    ROOT / "skills" / "wwise-waapi" / "SKILL.md",
     *sorted(REFERENCE_ROOT.glob("*.md")),
     *sorted(SEMANTIC_2025_REFERENCES.glob("*.md")),
     TASK12_REVIEW_PACKET,
 )
 DOC_CONTRACT_PATHS = (
-    ROOT / "SKILL.md",
+    ROOT / "skills" / "wwise-waapi" / "SKILL.md",
     ROOT / "references" / "long-run-runbook.md",
     ROOT / "references" / "eval-review-workflow.md",
     ROOT / "references" / "phase2-user-review-packet.md",

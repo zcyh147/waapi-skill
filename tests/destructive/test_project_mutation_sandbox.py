@@ -36,6 +36,8 @@ from tests.support.active_gate_failures import fail_if_active_runtime_failure  #
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PLAN_PATH = (
     REPO_ROOT
+    / "skills"
+    / "wwise-waapi"
     / "resources"
     / "coverage"
     / "2022.1"

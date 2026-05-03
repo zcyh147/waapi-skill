@@ -18,7 +18,7 @@ from wwise_waapi.phase21_uri_policy import (  # pyright: ignore[reportMissingImp
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SKILL_ROOT = REPO_ROOT
+SKILL_ROOT = REPO_ROOT / "skills" / "wwise-waapi"
 MANIFEST_ROOT = SKILL_ROOT / "resources" / "manifest"
 SUMMARY_RESOURCE = SKILL_ROOT / "resources" / "coverage" / "2022.1" / "phase2-coverage-summary.json"
 SKIPPED_APPROVED_CATEGORIES = {"cli", "core.remote", "debug"}

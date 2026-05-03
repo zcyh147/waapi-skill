@@ -14,7 +14,7 @@ from wwise_waapi.manifest import ManifestStore  # pyright: ignore[reportMissingI
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MANIFEST_ROOT = REPO_ROOT / "resources" / "manifest"
+MANIFEST_ROOT = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest"
 
 
 def test_default_manifest_audit_passes_with_complete_deferred_registry() -> None:

@@ -11,7 +11,7 @@ from wwise_waapi.builders.source_notes import SemanticSourceNoteChecker  # pyrig
 
 
 REFERENCE_ROOT = Path("references") / "semantic" / "2025.1"
-SOURCE_NOTES = Path("resources") / "semantic" / "2025.1" / "source_notes.json"
+SOURCE_NOTES = Path("skills") / "wwise-waapi" / "resources" / "semantic" / "2025.1" / "source_notes.json"
 GATE_PATH = REFERENCE_ROOT / "semantic-builder-notebooklm-gate.md"
 TASK_5_NOTEBOOKLM_EVIDENCE = Path(".sisyphus") / "evidence" / "task-2025-5-notebooklm-gate.txt"
 VERSION_2025 = "2025.1"
@@ -79,6 +79,13 @@ def read_reference(name: str) -> str:
 
 def read_source_notes() -> dict[str, Any]:
     return cast(dict[str, Any], json.loads(SOURCE_NOTES.read_text(encoding="utf-8")))
+
+
+def write_artifact_resource(tmp_path: Path, data: dict[str, Any]) -> Path:
+    path = tmp_path / "wwise-waapi" / "resources" / "semantic" / "2025.1" / "source_notes.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    return path
 
 
 def test_2025_1_semantic_reference_files_are_versioned_and_complete() -> None:
@@ -202,9 +209,8 @@ def test_2025_1_source_note_checker_fails_closed_for_missing_docs_gate(tmp_path:
     payload = read_source_notes()
     missing_gate_payload = copy.deepcopy(payload)
     for note in missing_gate_payload["notes"].values():
-        note["gate_evidence_path"] = str(tmp_path / "missing-gate.md")
-    missing_gate_path = tmp_path / "missing-gate-source-notes.json"
-    missing_gate_path.write_text(json.dumps(missing_gate_payload), encoding="utf-8")
+        note["gate_evidence_path"] = "references/missing-gate.md"
+    missing_gate_path = write_artifact_resource(tmp_path, missing_gate_payload)
 
     status = SemanticSourceNoteChecker(resource_path=missing_gate_path, notebook_id=NOTEBOOK_2025).check(
         BuilderFamily.QUERY.value,

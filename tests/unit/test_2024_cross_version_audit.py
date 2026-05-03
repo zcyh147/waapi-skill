@@ -15,13 +15,13 @@ ROOT = Path(__file__).resolve().parents[2]
 VERSION_2022 = "2022.1"
 VERSION_2024 = "2024.1"
 NOTEBOOK_2024 = "wwise-2024.1-docs"
-MANIFEST_ROOT = Path("resources") / "manifest"
-SEMANTIC_2024 = ROOT / "resources" / "semantic" / VERSION_2024 / "source_notes.json"
-COVERAGE_2024 = ROOT / "resources" / "coverage" / VERSION_2024 / "api-coverage.json"
-LIVE_MATRIX_2024 = ROOT / "resources" / "coverage" / VERSION_2024 / "live-coverage-matrix.json"
-PHASE2_SUMMARY_2024 = ROOT / "resources" / "coverage" / VERSION_2024 / "phase2-coverage-summary.json"
-POLICY_2024 = ROOT / "resources" / "coverage" / VERSION_2024 / "phase21-uri-policy.json"
-DEFERRED_2024 = ROOT / "resources" / "deferred" / f"{VERSION_2024}.json"
+MANIFEST_ROOT = Path("skills") / "wwise-waapi" / "resources" / "manifest"
+SEMANTIC_2024 = ROOT / "skills" / "wwise-waapi" / "resources" / "semantic" / VERSION_2024 / "source_notes.json"
+COVERAGE_2024 = ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION_2024 / "api-coverage.json"
+LIVE_MATRIX_2024 = ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION_2024 / "live-coverage-matrix.json"
+PHASE2_SUMMARY_2024 = ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION_2024 / "phase2-coverage-summary.json"
+POLICY_2024 = ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION_2024 / "phase21-uri-policy.json"
+DEFERRED_2024 = ROOT / "skills" / "wwise-waapi" / "resources" / "deferred" / f"{VERSION_2024}.json"
 REFERENCES_2024 = ROOT / "references" / "semantic" / VERSION_2024
 FIXTURE_2024 = ROOT / "tests" / "_org" / VERSION_2024
 GET_INFO_URI = "ak.wwise.core.getInfo"
@@ -55,15 +55,15 @@ FORBIDDEN_2024_FALLBACK_FRAGMENTS = (
     "references/semantic-builder-",
 )
 NO_2025_RESOURCE_ROOTS = (
-    ROOT / "resources" / "manifest",
-    ROOT / "resources" / "coverage",
-    ROOT / "resources" / "semantic",
+    ROOT / "skills" / "wwise-waapi" / "resources" / "manifest",
+    ROOT / "skills" / "wwise-waapi" / "resources" / "coverage",
+    ROOT / "skills" / "wwise-waapi" / "resources" / "semantic",
     ROOT / "references" / "semantic",
 )
 PLANNED_2025_RESOURCE_DIRS = {
-    ROOT / "resources" / "manifest" / "2025.1",
-    ROOT / "resources" / "coverage" / "2025.1",
-    ROOT / "resources" / "semantic" / "2025.1",
+    ROOT / "skills" / "wwise-waapi" / "resources" / "manifest" / "2025.1",
+    ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / "2025.1",
+    ROOT / "skills" / "wwise-waapi" / "resources" / "semantic" / "2025.1",
     ROOT / "references" / "semantic" / "2025.1",
 }
 

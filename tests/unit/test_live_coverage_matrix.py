@@ -8,7 +8,7 @@ from wwise_waapi.phase21_uri_policy import CONFORMANCE_ONLY_URIS  # pyright: ign
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SKILL_ROOT = REPO_ROOT
+SKILL_ROOT = REPO_ROOT / "skills" / "wwise-waapi"
 MATRIX_RESOURCE = SKILL_ROOT / "resources" / "coverage" / "2022.1" / "live-coverage-matrix.json"
 API_COVERAGE_RESOURCE = SKILL_ROOT / "resources" / "coverage" / "2022.1" / "api-coverage.json"
 FUNCTIONS_MANIFEST = SKILL_ROOT / "resources" / "manifest" / "2022.1" / "functions.json"

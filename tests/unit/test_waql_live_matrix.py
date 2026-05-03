@@ -10,6 +10,8 @@ from wwise_waapi.waql import WAQL_API_URI, validate_waql_example  # pyright: ign
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MATRIX_PATH = (
     REPO_ROOT
+    / "skills"
+    / "wwise-waapi"
     / "resources"
     / "waql"
     / "2022.1"
@@ -19,6 +21,8 @@ REFERENCE_PATH = REPO_ROOT / "references" / "waql-2022.1.md"
 GAP_EVIDENCE_PATH = REPO_ROOT / ".sisyphus" / "evidence" / "task-8-waql-missing.md"
 MANIFEST_PATH = (
     REPO_ROOT
+    / "skills"
+    / "wwise-waapi"
     / "resources"
     / "manifest"
     / "2022.1"

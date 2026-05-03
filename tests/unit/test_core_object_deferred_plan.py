@@ -8,7 +8,7 @@ from wwise_waapi.phase21_uri_policy import REOPENED_CORE_OBJECT_URIS  # pyright:
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLAN_PATH = REPO_ROOT / "resources" / "coverage" / "2022.1" / "task-4-core-object-deferred-plan.json"
+PLAN_PATH = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / "2022.1" / "task-4-core-object-deferred-plan.json"
 SOURCE_FIXTURE = "tests/_org/2022.1/SampleProject.wproj"
 FUNCTION_URIS = {
     "ak.wwise.core.object.copy",

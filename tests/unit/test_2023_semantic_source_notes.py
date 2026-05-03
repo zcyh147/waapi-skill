@@ -22,7 +22,7 @@ from wwise_waapi.builders.source_notes import (  # pyright: ignore[reportMissing
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE_NOTES_2023 = ROOT / "resources" / "semantic" / "2023.1" / "source_notes.json"
+SOURCE_NOTES_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "semantic" / "2023.1" / "source_notes.json"
 NOTEBOOK_ID_2023 = "wwise-2023.1-docs"
 GATE_EVIDENCE_2023 = "references/semantic/2023.1/semantic-builder-notebooklm-gate.md"
 EXPECTED_FAMILIES = {
@@ -50,6 +50,20 @@ def write_gate_evidence(tmp_path: Path, text: str) -> Path:
     evidence = tmp_path / "semantic-builder-notebooklm-gate.md"
     evidence.write_text(text, encoding="utf-8")
     return evidence
+
+
+def write_artifact_resource(tmp_path: Path, data: dict[str, Any]) -> Path:
+    path = tmp_path / "wwise-waapi" / "resources" / "semantic" / "2023.1" / "source_notes.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    return path
+
+
+def write_artifact_gate_evidence(tmp_path: Path, text: str, name: str = "test-gate.md") -> str:
+    evidence = tmp_path / "wwise-waapi" / "references" / name
+    evidence.parent.mkdir(parents=True)
+    evidence.write_text(text, encoding="utf-8")
+    return f"references/{name}"
 
 
 SUCCESS_GATE_EVIDENCE_2023 = """# Semantic builder NotebookLM gate evidence for Wwise 2023.1
@@ -151,25 +165,25 @@ def test_2023_wrong_note_notebook_fails_with_typed_code(tmp_path: Path) -> None:
 
 
 def test_2023_wrong_gate_evidence_notebook_fails_with_typed_code(tmp_path: Path) -> None:
-    evidence = write_gate_evidence(tmp_path, SUCCESS_GATE_EVIDENCE_2023.replace(NOTEBOOK_ID_2023, "wwise-2022.1-docs"))
+    evidence = write_artifact_gate_evidence(tmp_path, SUCCESS_GATE_EVIDENCE_2023.replace(NOTEBOOK_ID_2023, "wwise-2022.1-docs"))
     data = load_2023_resource()
     for note in data["notes"].values():
-        note["gate_evidence_path"] = str(evidence)
-    checker = SemanticSourceNoteChecker(write_resource(tmp_path, data), notebook_id=NOTEBOOK_ID_2023)
+        note["gate_evidence_path"] = evidence
+    checker = SemanticSourceNoteChecker(write_artifact_resource(tmp_path, data), notebook_id=NOTEBOOK_ID_2023)
 
     assert_typed_failure(checker, BuilderFamily.QUERY, SemanticErrorCode.SOURCE_NOTE_WRONG_NOTEBOOK)
 
 
 def test_2023_fail_closed_gate_evidence_does_not_unlock(tmp_path: Path) -> None:
-    evidence = write_gate_evidence(
+    evidence = write_artifact_gate_evidence(
         tmp_path,
         SUCCESS_GATE_EVIDENCE_2023.replace("- Gate status: open", "- Gate status: fail-closed")
         + "- Failure: 2023.1 NotebookLM query did not complete.\n",
     )
     data = load_2023_resource()
     for note in data["notes"].values():
-        note["gate_evidence_path"] = str(evidence)
-    checker = SemanticSourceNoteChecker(write_resource(tmp_path, data), notebook_id=NOTEBOOK_ID_2023)
+        note["gate_evidence_path"] = evidence
+    checker = SemanticSourceNoteChecker(write_artifact_resource(tmp_path, data), notebook_id=NOTEBOOK_ID_2023)
 
     failure = assert_typed_failure(checker, BuilderFamily.QUERY, SemanticErrorCode.SOURCE_NOTE_INCOMPLETE)
 

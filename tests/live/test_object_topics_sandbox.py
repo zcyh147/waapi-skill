@@ -34,6 +34,8 @@ from wwise_waapi.subscriptions import SubscriptionManager, SubscriptionTimeout  
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PLAN_PATH = (
     REPO_ROOT
+    / "skills"
+    / "wwise-waapi"
     / "resources"
     / "coverage"
     / "2022.1"
