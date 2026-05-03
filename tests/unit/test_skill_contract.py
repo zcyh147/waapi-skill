@@ -28,10 +28,13 @@ def test_skill_contract_documents_inputs_outputs_and_safety() -> None:
 
     for required in ("api", "version", "args", "options", "timeout", "dry_run", "allow_destructive", "evidence_dir"):
         assert required in text
+    for required in ("project modification policy", "never", "preview_then_confirm", "allow_with_notice"):
+        assert required in text
     for required in ("ok", "api", "version", "error_code", "message", "evidence_path"):
         assert f'"{required}"' in text or f"`{required}`" in text
     assert "blocked by default" in text
     assert "Do not claim Windows validation has passed" in text
+    assert "mutating" not in text
 
 
 def test_skill_contract_stays_user_facing_and_local_resource_oriented() -> None:

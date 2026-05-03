@@ -14,3 +14,4 @@ def test_skill_contract_mentions_scaffold_elements() -> None:
     assert "resources/deferred/<version>.json" in text
     assert "references/semantic/<version>/" in text
     assert "Windows validation" in text
+    assert "project modification policy" in text

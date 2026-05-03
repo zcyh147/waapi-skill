@@ -37,6 +37,14 @@ The saved config is user-overridable. If the user chooses a different Wwise vers
 
 By default, the config leaves `wwise_version` unset, uses `127.0.0.1` for the WAAPI host, and leaves the port unset so WAAPI can use its normal default.
 
+On first run, the skill also stores a project modification policy in `data/config.json`:
+
+1. `never`: never execute project-changing operations.
+2. `preview_then_confirm`: preview project changes first, then execute only after confirmation.
+3. `allow_with_notice`: allow project changes for the configured project, but report each change.
+
+The default policy is `preview_then_confirm`, and it persists with the rest of the user config.
+
 Example dispatcher shape:
 
 ```python
@@ -74,7 +82,7 @@ The dispatcher input is a small, explicit contract:
 3. `args` and `options`: JSON-like mappings passed to function calls or topic subscriptions.
 4. `timeout`: finite call or wait timeout. Prefer 5 to 10 seconds unless there is a clear reason to wait longer.
 5. `dry_run`: validates and previews the action without calling WAAPI.
-6. `allow_destructive`: per-call opt-in for mutating or destructive operations.
+6. `allow_destructive`: per-call opt-in for project-changing or destructive operations.
 7. `evidence_dir`: optional location for structured JSON evidence.
 8. `topic_mode`: use `wait` for bounded topic dispatch. Use `SubscriptionManager` directly only when the caller owns listener cleanup.
 
@@ -126,7 +134,7 @@ The raw `WwiseDispatcher` contract remains the explicit escape hatch for low-lev
 
 ## Safety guardrails
 
-Mutating and destructive operations are blocked by default. Only pass `allow_destructive=True` for a clearly requested change, after previewing when possible, and only against a project the user intentionally chose for that operation. Do not casually target a user's active production project.
+Project-changing and destructive operations are blocked by default. Only pass `allow_destructive=True` for a clearly requested change, after previewing when possible, and only against a project the user intentionally chose for that operation. Do not casually target a user's active production project.
 
 Treat operations such as object deletion, object creation, property mutation, imports, soundbank changes, switch container assignment changes, and undo-group mutations as potentially destructive. Prefer read-only queries and dry runs until the requested edit is clear.
 
