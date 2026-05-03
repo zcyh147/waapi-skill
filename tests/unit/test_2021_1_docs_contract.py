@@ -34,10 +34,7 @@ VERSION = '2021.1'
 GENERATED_AT = '2026-05-02T00:00:00Z'
 GATE_METADATA = {
     'status': 'open',
-    'notebook_id': NOTEBOOK,
-    'gate_evidence_path': 'references/semantic/2021.1/semantic-builder-notebooklm-gate.md',
     'source_only_caveat': 'source notes are not behavioral proof',
-    'citation_caveat': 'NotebookLM returned numbered citation labels rather than stable source URLs',
 }
 FORBIDDEN_NOTEBOOK_IDS = ('wwise-2022.1-docs', 'wwise-2023.1-docs', 'wwise-2024.1-docs', 'wwise-2025.1-docs')
 FORBIDDEN_PATHS = ('references/semantic/2022.1', 'references/semantic/2023.1', 'references/semantic/2024.1', 'references/semantic/2025.1', 'resources/semantic/2022.1', 'resources/semantic/2023.1', 'resources/semantic/2024.1', 'resources/semantic/2025.1')
@@ -116,12 +113,11 @@ def test_2021_source_notes_match_runtime_inventory_and_allow_local_checker() -> 
     assert payload['generated_at'] == GENERATED_AT
     assert payload['gate'] == GATE_METADATA
 
-    checker = SemanticSourceNoteChecker(resource_path=SOURCE_NOTES, notebook_id=NOTEBOOK)
+    checker = SemanticSourceNoteChecker(resource_path=SOURCE_NOTES)
     for family in BuilderFamily:
         status = checker.check(family.value, version=VERSION)
         assert status.allowed is True
         assert status.version == VERSION
-        assert status.notebook_id == NOTEBOOK
         assert status.reason == 'Semantic source note is grounded.'
 
 

@@ -7,7 +7,7 @@ from tests.support.active_gate_failures import (  # pyright: ignore[reportMissin
     skip_or_fail_unavailable,
     strict_real_mode_enabled,
 )
-from wwise_waapi.live_environment import LiveEnvironmentError  # pyright: ignore[reportMissingImports]
+from tests.destructive.support.live_environment import LiveEnvironmentError  # pyright: ignore[reportMissingImports]
 
 
 def test_strict_real_mode_disabled_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
