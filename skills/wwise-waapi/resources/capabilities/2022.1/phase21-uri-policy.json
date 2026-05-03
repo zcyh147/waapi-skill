@@ -80,7 +80,7 @@
   "metadata": {
     "no_promotion_in_task_1": true,
     "policy": "Exact Phase 2.1 URI lists define future reevaluation buckets only. Task 1 does not promote APIs, does not count conformance-only as behavioral/live behavioral, and leaves Windows validation pending.",
-    "source_summary": "resources/coverage/2022.1/phase2-coverage-summary.json",
+    "source_summary": "resources/capabilities/2022.1/phase2-coverage-summary.json",
     "version": "2022.1",
     "windows_validation": "pending"
   },

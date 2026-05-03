@@ -13,7 +13,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.executeActionOnEvent",
       "version": "2023.1"
     },
@@ -30,7 +30,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.getState",
       "version": "2023.1"
     },
@@ -47,7 +47,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.getSwitch",
       "version": "2023.1"
     },
@@ -64,7 +64,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.loadBank",
       "version": "2023.1"
     },
@@ -81,7 +81,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.postEvent",
       "version": "2023.1"
     },
@@ -98,7 +98,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.postMsgMonitor",
       "version": "2023.1"
     },
@@ -115,7 +115,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.postTrigger",
       "version": "2023.1"
     },
@@ -132,7 +132,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.registerGameObj",
       "version": "2023.1"
     },
@@ -149,7 +149,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.resetRTPCValue",
       "version": "2023.1"
     },
@@ -166,7 +166,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.seekOnEvent",
       "version": "2023.1"
     },
@@ -183,7 +183,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.setDefaultListeners",
       "version": "2023.1"
     },
@@ -200,7 +200,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.setGameObjectAuxSendValues",
       "version": "2023.1"
     },
@@ -217,7 +217,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.setGameObjectOutputBusVolume",
       "version": "2023.1"
     },
@@ -234,7 +234,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.setListenerSpatialization",
       "version": "2023.1"
     },
@@ -251,7 +251,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.setListeners",
       "version": "2023.1"
     },
@@ -268,7 +268,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.setMultiplePositions",
       "version": "2023.1"
     },
@@ -285,7 +285,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.setObjectObstructionAndOcclusion",
       "version": "2023.1"
     },
@@ -302,7 +302,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.setPosition",
       "version": "2023.1"
     },
@@ -319,7 +319,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.setRTPCValue",
       "version": "2023.1"
     },
@@ -336,7 +336,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.setScalingFactor",
       "version": "2023.1"
     },
@@ -353,7 +353,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.setState",
       "version": "2023.1"
     },
@@ -370,7 +370,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.setSwitch",
       "version": "2023.1"
     },
@@ -387,7 +387,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.stopAll",
       "version": "2023.1"
     },
@@ -404,7 +404,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.stopPlayingID",
       "version": "2023.1"
     },
@@ -421,7 +421,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.unloadBank",
       "version": "2023.1"
     },
@@ -438,7 +438,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.soundengine.unregisterGameObj",
       "version": "2023.1"
     },
@@ -455,7 +455,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.cli.addNewPlatform",
       "version": "2023.1"
     },
@@ -472,7 +472,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.cli.convertExternalSource",
       "version": "2023.1"
     },
@@ -489,7 +489,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.cli.createNewProject",
       "version": "2023.1"
     },
@@ -506,7 +506,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.cli.dumpObjects",
       "version": "2023.1"
     },
@@ -523,7 +523,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.cli.executeLuaScript",
       "version": "2023.1"
     },
@@ -540,7 +540,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.cli.generateSoundbank",
       "version": "2023.1"
     },
@@ -557,7 +557,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.cli.migrate",
       "version": "2023.1"
     },
@@ -574,7 +574,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.cli.moveMediaIdsToSingleFile",
       "version": "2023.1"
     },
@@ -591,7 +591,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.cli.moveMediaIdsToWorkUnits",
       "version": "2023.1"
     },
@@ -608,7 +608,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.cli.tabDelimitedImport",
       "version": "2023.1"
     },
@@ -625,7 +625,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.cli.updateMediaIdsInSingleFile",
       "version": "2023.1"
     },
@@ -642,7 +642,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.cli.verify",
       "version": "2023.1"
     },
@@ -659,7 +659,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.cli.waapiServer",
       "version": "2023.1"
     },
@@ -676,7 +676,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.console.project.close",
       "version": "2023.1"
     },
@@ -693,7 +693,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.console.project.create",
       "version": "2023.1"
     },
@@ -710,7 +710,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.console.project.open",
       "version": "2023.1"
     },
@@ -727,7 +727,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "sandbox-mutating-tested",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.audio.import",
       "version": "2023.1",
       "evidence_paths": [
@@ -750,7 +750,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.audio.importTabDelimited",
       "version": "2023.1"
     },
@@ -767,7 +767,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.audio.imported",
       "version": "2023.1"
     },
@@ -784,7 +784,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "conformance-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.audio.mute",
       "version": "2023.1"
     },
@@ -801,7 +801,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.audio.resetMute",
       "version": "2023.1"
     },
@@ -818,7 +818,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.audio.resetSolo",
       "version": "2023.1"
     },
@@ -835,7 +835,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "conformance-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.audio.solo",
       "version": "2023.1"
     },
@@ -852,7 +852,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
       "version": "2023.1"
     },
@@ -869,7 +869,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
       "version": "2023.1"
     },
@@ -886,7 +886,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.executeLuaScript",
       "version": "2023.1"
     },
@@ -903,7 +903,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.getInfo",
       "version": "2023.1"
     },
@@ -920,7 +920,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.getProjectInfo",
       "version": "2023.1"
     },
@@ -937,7 +937,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.log.addItem",
       "version": "2023.1"
     },
@@ -954,7 +954,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.log.clear",
       "version": "2023.1"
     },
@@ -971,7 +971,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.log.get",
       "version": "2023.1"
     },
@@ -988,7 +988,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.log.itemAdded",
       "version": "2023.1"
     },
@@ -1005,7 +1005,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.attenuationCurveChanged",
       "version": "2023.1"
     },
@@ -1022,7 +1022,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.attenuationCurveLinkChanged",
       "version": "2023.1"
     },
@@ -1039,7 +1039,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.childAdded",
       "version": "2023.1"
     },
@@ -1056,7 +1056,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.childRemoved",
       "version": "2023.1"
     },
@@ -1073,7 +1073,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "conformance-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.copy",
       "version": "2023.1"
     },
@@ -1090,7 +1090,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "sandbox-mutating-tested",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.create",
       "version": "2023.1",
       "evidence_paths": [
@@ -1113,7 +1113,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.created",
       "version": "2023.1"
     },
@@ -1130,7 +1130,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.curveChanged",
       "version": "2023.1"
     },
@@ -1147,7 +1147,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "sandbox-mutating-tested",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.delete",
       "version": "2023.1",
       "evidence_paths": [
@@ -1170,7 +1170,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "conformance-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.diff",
       "version": "2023.1"
     },
@@ -1187,7 +1187,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "live-tested",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.get",
       "version": "2023.1",
       "evidence_paths": [
@@ -1210,7 +1210,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "conformance-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.getAttenuationCurve",
       "version": "2023.1"
     },
@@ -1227,7 +1227,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "conformance-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.getPropertyAndReferenceNames",
       "version": "2023.1"
     },
@@ -1244,7 +1244,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "conformance-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.getPropertyInfo",
       "version": "2023.1"
     },
@@ -1261,7 +1261,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "conformance-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.getTypes",
       "version": "2023.1"
     },
@@ -1278,7 +1278,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "conformance-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.isLinked",
       "version": "2023.1"
     },
@@ -1295,7 +1295,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "conformance-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.isPropertyEnabled",
       "version": "2023.1"
     },
@@ -1312,7 +1312,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.move",
       "version": "2023.1"
     },
@@ -1329,7 +1329,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.nameChanged",
       "version": "2023.1"
     },
@@ -1346,7 +1346,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.notesChanged",
       "version": "2023.1"
     },
@@ -1363,7 +1363,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "conformance-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.pasteProperties",
       "version": "2023.1"
     },
@@ -1380,7 +1380,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.postDeleted",
       "version": "2023.1"
     },
@@ -1397,7 +1397,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.preDeleted",
       "version": "2023.1"
     },
@@ -1414,7 +1414,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.propertyChanged",
       "version": "2023.1"
     },
@@ -1431,7 +1431,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.referenceChanged",
       "version": "2023.1"
     },
@@ -1448,7 +1448,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "sandbox-mutating-tested",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.set",
       "version": "2023.1",
       "evidence_paths": [
@@ -1471,7 +1471,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.setAttenuationCurve",
       "version": "2023.1"
     },
@@ -1488,7 +1488,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.setLinked",
       "version": "2023.1"
     },
@@ -1505,7 +1505,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.setName",
       "version": "2023.1"
     },
@@ -1522,7 +1522,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.setNotes",
       "version": "2023.1"
     },
@@ -1539,7 +1539,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.setProperty",
       "version": "2023.1"
     },
@@ -1556,7 +1556,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.setRandomizer",
       "version": "2023.1"
     },
@@ -1573,7 +1573,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.setReference",
       "version": "2023.1"
     },
@@ -1590,7 +1590,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.setStateGroups",
       "version": "2023.1"
     },
@@ -1607,7 +1607,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.object.setStateProperties",
       "version": "2023.1"
     },
@@ -1624,7 +1624,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.captureLog.itemAdded",
       "version": "2023.1"
     },
@@ -1641,7 +1641,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.enableProfilerData",
       "version": "2023.1"
     },
@@ -1658,7 +1658,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.gameObjectRegistered",
       "version": "2023.1"
     },
@@ -1675,7 +1675,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.gameObjectReset",
       "version": "2023.1"
     },
@@ -1692,7 +1692,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.gameObjectUnregistered",
       "version": "2023.1"
     },
@@ -1709,7 +1709,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.getAudioObjects",
       "version": "2023.1"
     },
@@ -1726,7 +1726,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.getBusses",
       "version": "2023.1"
     },
@@ -1743,7 +1743,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.getCpuUsage",
       "version": "2023.1"
     },
@@ -1760,7 +1760,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.getCursorTime",
       "version": "2023.1"
     },
@@ -1777,7 +1777,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.getGameObjects",
       "version": "2023.1"
     },
@@ -1794,7 +1794,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.getLoadedMedia",
       "version": "2023.1"
     },
@@ -1811,7 +1811,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.getPerformanceMonitor",
       "version": "2023.1"
     },
@@ -1828,7 +1828,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.getRTPCs",
       "version": "2023.1"
     },
@@ -1845,7 +1845,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.getStreamedMedia",
       "version": "2023.1"
     },
@@ -1862,7 +1862,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.getVoiceContributions",
       "version": "2023.1"
     },
@@ -1879,7 +1879,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.getVoices",
       "version": "2023.1"
     },
@@ -1896,7 +1896,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.saveCapture",
       "version": "2023.1"
     },
@@ -1913,7 +1913,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.startCapture",
       "version": "2023.1"
     },
@@ -1930,7 +1930,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.stateChanged",
       "version": "2023.1"
     },
@@ -1947,7 +1947,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.stopCapture",
       "version": "2023.1"
     },
@@ -1964,7 +1964,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.profiler.switchChanged",
       "version": "2023.1"
     },
@@ -1981,7 +1981,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.project.loaded",
       "version": "2023.1"
     },
@@ -1998,7 +1998,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.project.postClosed",
       "version": "2023.1"
     },
@@ -2015,7 +2015,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.project.preClosed",
       "version": "2023.1"
     },
@@ -2032,7 +2032,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.project.save",
       "version": "2023.1"
     },
@@ -2049,7 +2049,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.project.saved",
       "version": "2023.1"
     },
@@ -2066,7 +2066,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.remote.connect",
       "version": "2023.1"
     },
@@ -2083,7 +2083,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.remote.disconnect",
       "version": "2023.1"
     },
@@ -2100,7 +2100,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.remote.getAvailableConsoles",
       "version": "2023.1"
     },
@@ -2117,7 +2117,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.remote.getConnectionStatus",
       "version": "2023.1"
     },
@@ -2134,7 +2134,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.sound.setActiveSource",
       "version": "2023.1"
     },
@@ -2151,7 +2151,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "conformance-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.soundbank.convertExternalSources",
       "version": "2023.1"
     },
@@ -2168,7 +2168,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "conformance-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.soundbank.generate",
       "version": "2023.1"
     },
@@ -2185,7 +2185,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.soundbank.generated",
       "version": "2023.1"
     },
@@ -2202,7 +2202,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.soundbank.generationDone",
       "version": "2023.1"
     },
@@ -2219,7 +2219,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "conformance-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.soundbank.getInclusions",
       "version": "2023.1"
     },
@@ -2236,7 +2236,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "conformance-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.soundbank.processDefinitionFiles",
       "version": "2023.1"
     },
@@ -2253,7 +2253,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "sandbox-mutating-tested",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.soundbank.setInclusions",
       "version": "2023.1",
       "evidence_paths": [
@@ -2276,7 +2276,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.sourceControl.add",
       "version": "2023.1"
     },
@@ -2293,7 +2293,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.sourceControl.checkOut",
       "version": "2023.1"
     },
@@ -2310,7 +2310,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.sourceControl.commit",
       "version": "2023.1"
     },
@@ -2327,7 +2327,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.sourceControl.delete",
       "version": "2023.1"
     },
@@ -2344,7 +2344,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.sourceControl.getSourceFiles",
       "version": "2023.1"
     },
@@ -2361,7 +2361,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.sourceControl.getStatus",
       "version": "2023.1"
     },
@@ -2378,7 +2378,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.sourceControl.move",
       "version": "2023.1"
     },
@@ -2395,7 +2395,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.sourceControl.revert",
       "version": "2023.1"
     },
@@ -2412,7 +2412,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.sourceControl.setProvider",
       "version": "2023.1"
     },
@@ -2429,7 +2429,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "sandbox-mutating-tested",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.switchContainer.addAssignment",
       "version": "2023.1",
       "evidence_paths": [
@@ -2452,7 +2452,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.switchContainer.assignmentAdded",
       "version": "2023.1"
     },
@@ -2469,7 +2469,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.switchContainer.assignmentRemoved",
       "version": "2023.1"
     },
@@ -2486,7 +2486,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "conformance-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.switchContainer.getAssignments",
       "version": "2023.1"
     },
@@ -2503,7 +2503,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "sandbox-mutating-tested",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.switchContainer.removeAssignment",
       "version": "2023.1",
       "evidence_paths": [
@@ -2526,7 +2526,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.transport.create",
       "version": "2023.1"
     },
@@ -2543,7 +2543,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.transport.destroy",
       "version": "2023.1"
     },
@@ -2560,7 +2560,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.transport.executeAction",
       "version": "2023.1"
     },
@@ -2577,7 +2577,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.transport.getList",
       "version": "2023.1"
     },
@@ -2594,7 +2594,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.transport.getState",
       "version": "2023.1"
     },
@@ -2611,7 +2611,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.transport.prepare",
       "version": "2023.1"
     },
@@ -2628,7 +2628,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.transport.stateChanged",
       "version": "2023.1"
     },
@@ -2645,7 +2645,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.transport.useOriginals",
       "version": "2023.1"
     },
@@ -2662,7 +2662,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "sandbox-mutating-tested",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.undo.beginGroup",
       "version": "2023.1",
       "evidence_paths": [
@@ -2685,7 +2685,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.undo.cancelGroup",
       "version": "2023.1"
     },
@@ -2702,7 +2702,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "sandbox-mutating-tested",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.undo.endGroup",
       "version": "2023.1",
       "evidence_paths": [
@@ -2725,7 +2725,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.undo.redo",
       "version": "2023.1"
     },
@@ -2742,7 +2742,7 @@
       "item_type": "function",
       "manifest_reflection_only": false,
       "parity_bucket": "sandbox-mutating-tested",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.core.undo.undo",
       "version": "2023.1",
       "evidence_paths": [
@@ -2765,7 +2765,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.debug.assertFailed",
       "version": "2023.1"
     },
@@ -2782,7 +2782,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.debug.enableAsserts",
       "version": "2023.1"
     },
@@ -2799,7 +2799,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.debug.enableAutomationMode",
       "version": "2023.1"
     },
@@ -2816,7 +2816,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.debug.generateToneWAV",
       "version": "2023.1"
     },
@@ -2833,7 +2833,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.debug.getWalTree",
       "version": "2023.1"
     },
@@ -2850,7 +2850,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.debug.restartWaapiServers",
       "version": "2023.1"
     },
@@ -2867,7 +2867,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.debug.testAssert",
       "version": "2023.1"
     },
@@ -2884,7 +2884,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "excluded",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.debug.testCrash",
       "version": "2023.1"
     },
@@ -2901,7 +2901,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "wrapper-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.ui.bringToForeground",
       "version": "2023.1"
     },
@@ -2918,7 +2918,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "wrapper-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.ui.captureScreen",
       "version": "2023.1"
     },
@@ -2935,7 +2935,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "wrapper-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.ui.commands.execute",
       "version": "2023.1"
     },
@@ -2952,7 +2952,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "wrapper-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.ui.commands.executed",
       "version": "2023.1"
     },
@@ -2969,7 +2969,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "wrapper-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.ui.commands.getCommands",
       "version": "2023.1"
     },
@@ -2986,7 +2986,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "wrapper-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.ui.commands.register",
       "version": "2023.1"
     },
@@ -3003,7 +3003,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "wrapper-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.ui.commands.unregister",
       "version": "2023.1"
     },
@@ -3020,7 +3020,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "wrapper-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.ui.getSelectedObjects",
       "version": "2023.1"
     },
@@ -3037,7 +3037,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "wrapper-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.ui.project.close",
       "version": "2023.1"
     },
@@ -3054,7 +3054,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "wrapper-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.ui.project.create",
       "version": "2023.1"
     },
@@ -3071,7 +3071,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "wrapper-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.ui.project.open",
       "version": "2023.1"
     },
@@ -3088,7 +3088,7 @@
       "item_type": "topic",
       "manifest_reflection_only": true,
       "parity_bucket": "wrapper-only",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.ui.selectionChanged",
       "version": "2023.1"
     },
@@ -3105,7 +3105,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.waapi.getFunctions",
       "version": "2023.1"
     },
@@ -3122,7 +3122,7 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.waapi.getSchema",
       "version": "2023.1"
     },
@@ -3139,16 +3139,16 @@
       "item_type": "function",
       "manifest_reflection_only": true,
       "parity_bucket": "deferred",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "uri": "ak.wwise.waapi.getTopics",
       "version": "2023.1"
     }
   ],
   "metadata": {
-    "baseline_resource": "resources/coverage/2023.1/api-coverage.json",
+    "baseline_resource": "resources/capabilities/2023.1/api-coverage.json",
     "deferred_resource": "resources/deferred/2023.1.json",
     "generator": "task-4 2023.1 phase2 coverage summary contract generator",
-    "live_matrix_resource": "resources/coverage/2023.1/live-coverage-matrix.json",
+    "live_matrix_resource": "resources/capabilities/2023.1/live-coverage-matrix.json",
     "parity_bucket_model": {
       "conformance-only": "Conformance-only parity preserves schema/semantic support while denying behavioral/live credit.",
       "deferred": "Deferred parity requires blocker/pending-evidence metadata and no behavioral/live credit.",
@@ -3160,8 +3160,8 @@
       "wrapper-only": "Wrapper-only parity preserves schema/route diagnostics for policy-blocked families while denying behavioral/live credit."
     },
     "status_resources": [
-      "resources/coverage/2023.1/phase21-uri-policy.json",
-      "resources/coverage/2023.1/wrapper-only-category-policy.json",
+      "resources/capabilities/2023.1/phase21-uri-policy.json",
+      "resources/capabilities/2023.1/wrapper-only-category-policy.json",
       "resources/waql/2023.1/object-get-live-matrix.json"
     ],
     "version": "2023.1"

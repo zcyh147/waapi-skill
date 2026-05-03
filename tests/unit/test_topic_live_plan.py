@@ -13,14 +13,14 @@ PLAN_PATH = (
     / "skills"
     / "wwise-waapi"
     / "resources"
-    / "coverage"
+    / "capabilities"
     / "2022.1"
     / "task-6-object-topic-live-plan.json"
 )
 TASK_8_PLAN_PATHS = {
-    "2021.1": REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / "2021.1" / "task-8-object-topic-live-plan.json",
-    "2024.1": REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / "2024.1" / "task-8-object-topic-live-plan.json",
-    "2025.1": REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / "2025.1" / "task-8-object-topic-live-plan.json",
+    "2021.1": REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / "2021.1" / "task-8-object-topic-live-plan.json",
+    "2024.1": REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / "2024.1" / "task-8-object-topic-live-plan.json",
+    "2025.1": REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / "2025.1" / "task-8-object-topic-live-plan.json",
 }
 SAFE_TASK_8_TOPIC_URIS = {
     "ak.wwise.core.object.childAdded",

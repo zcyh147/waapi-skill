@@ -17,7 +17,7 @@ MATRIX_PATH = (
     / "2022.1"
     / "object-get-live-matrix.json"
 )
-REFERENCE_PATH = REPO_ROOT / "references" / "waql-2022.1.md"
+RESOURCE_REFERENCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "waql" / "2022.1" / "object-get-live-matrix.json"
 GAP_EVIDENCE_PATH = REPO_ROOT / ".sisyphus" / "evidence" / "task-8-waql-missing.md"
 MANIFEST_PATH = (
     REPO_ROOT
@@ -61,10 +61,10 @@ def test_waql_matrix_resource_is_source_grounded_and_schema_linked() -> None:
     object_get_schema = next(entry for entry in manifest["schemas"] if entry["uri"] == WAQL_API_URI)
 
     assert MATRIX_PATH.exists()
-    assert REFERENCE_PATH.exists()
+    assert RESOURCE_REFERENCE.exists()
     assert GAP_EVIDENCE_PATH.exists()
     assert metadata["uri"] == WAQL_API_URI
-    assert metadata["reference"] == "references/waql-2022.1.md"
+    assert metadata["reference"] == "resources/waql/2022.1/object-get-live-matrix.json"
     assert metadata["gap_evidence"] == ".sisyphus/evidence/task-8-waql-missing.md"
     assert metadata["sandbox_required"] is True
     assert metadata["source_project_mutation_allowed"] is False
@@ -91,7 +91,7 @@ def test_waql_live_cases_have_required_shape_and_no_mutation() -> None:
         )
         assert case["evidence_path"].endswith(f"/{case['id']}.json")
         assert case["sources"]
-        assert all("waql-2022.1.md" in source or "schemas.json" in source for source in case["sources"])
+        assert all("waql-2022.1.md" not in source for source in case["sources"])
         assert case["assertions"]
         assert "expected" in case
         assert "result_count" in case["expected"]
@@ -127,7 +127,7 @@ def test_waql_fail_closed_gaps() -> None:
         assert gap["reason"]
         assert gap["references"]
         assert any("task-8-waql-missing.md" in reference for reference in gap["references"])
-        assert any("waql-2022.1.md" in reference for reference in gap["references"])
+        assert any("object-get-live-matrix.json" in reference for reference in gap["references"])
 
     assert "where" in by_id["invalid_syntax_error_payload_schema"]["example_query"]
     assert "delete" in by_id["mutation_semantics_rejection"]["example_query"]

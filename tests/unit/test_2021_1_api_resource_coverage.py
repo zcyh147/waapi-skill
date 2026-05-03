@@ -14,10 +14,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2021.1"
 FUNCTIONS_MANIFEST = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest" / VERSION / "functions.json"
 TOPICS_MANIFEST = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest" / VERSION / "topics.json"
-COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION / "api-coverage.json"
-MATRIX_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION / "live-coverage-matrix.json"
-SUMMARY_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION / "phase2-coverage-summary.json"
-POLICY_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION / "phase21-uri-policy.json"
+COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION / "api-coverage.json"
+MATRIX_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION / "live-coverage-matrix.json"
+SUMMARY_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION / "phase2-coverage-summary.json"
+POLICY_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION / "phase21-uri-policy.json"
 
 CLASSIFICATION_STATUSES = {"supported", "behavioral", "deferred", "excluded", "live-tested", "sandbox-mutating-tested"}
 BLOCKED_STATUSES = {"deferred", "excluded"}
@@ -38,10 +38,10 @@ FORBIDDEN_NEWER_EVIDENCE = (
     "resources/manifest/2023.1",
     "resources/manifest/2024.1",
     "resources/manifest/2025.1",
-    "resources/coverage/2022.1",
-    "resources/coverage/2023.1",
-    "resources/coverage/2024.1",
-    "resources/coverage/2025.1",
+    "resources/capabilities/2022.1",
+    "resources/capabilities/2023.1",
+    "resources/capabilities/2024.1",
+    "resources/capabilities/2025.1",
     "resources/deferred/2022.1",
     "resources/deferred/2023.1",
     "resources/deferred/2024.1",
@@ -206,7 +206,7 @@ def test_2021_matrix_summary_and_policy_match_coverage_accounting() -> None:
             assert entry["counts_as_live_behavioral"] is False
             assert entry["evidence_path"] == "resources/deferred/2021.1.json"
         assert entry["manifest_source_uri"].startswith("resources/manifest/2021.1/")
-        assert entry["source_coverage_uri"] == "resources/coverage/2021.1/api-coverage.json"
+        assert entry["source_coverage_uri"] == "resources/capabilities/2021.1/api-coverage.json"
 
 
 def _assert_exact_classification_accounting(payload: dict[str, Any], reflected_uris: list[str]) -> None:

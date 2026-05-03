@@ -2,7 +2,7 @@
   "metadata": {
     "version": "2022.1",
     "task": "6. Add live sandbox tests for read-only object queries and selected topics",
-    "source_matrix": "resources/coverage/2022.1/live-coverage-matrix.json",
+    "source_matrix": "resources/capabilities/2022.1/live-coverage-matrix.json",
     "live_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject python -m pytest tests/live/test_object_topics_sandbox.py -q",
     "unit_command": "python -m pytest tests/unit/test_topic_live_plan.py -q"
   },

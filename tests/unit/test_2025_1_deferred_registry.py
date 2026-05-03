@@ -10,7 +10,7 @@ from wwise_waapi.deferred_registry import DeferredRegistry, REQUIRED_COVERAGE_FI
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2025.1"
 DEFERRED_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "deferred" / f"{VERSION}.json"
-COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION / "api-coverage.json"
+COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION / "api-coverage.json"
 
 FORBIDDEN_PROMOTED_STATUSES = {"live-tested", "sandbox-mutating-tested"}
 REQUIRED_EXCLUDED_FAMILIES = {"CLI", "UI", "debug", "remote", "soundengine"}
@@ -54,7 +54,7 @@ def test_2025_deferred_resource_declares_shape_and_forbidden_promotions() -> Non
     assert payload["metadata"]["required_fields"] == list(REQUIRED_DEFERRED_FIELDS + REQUIRED_COVERAGE_FIELDS) + ["coverage_status"]
     assert payload["metadata"]["manifest_source"] == "resources/manifest/2025.1"
     assert payload["metadata"]["source_notes"] == "resources/semantic/2025.1/source_notes.json"
-    assert payload["metadata"]["task6_classification"] == "resources/coverage/2025.1/added-api-classification.json"
+    assert payload["metadata"]["task6_classification"] == "resources/capabilities/2025.1/added-api-classification.json"
     assert set(payload["metadata"]["coverage_model"]["coverage_status"]) == {"deferred", "excluded"}
     assert set(payload["metadata"]["coverage_model"]["forbidden_promoted_statuses"]) == FORBIDDEN_PROMOTED_STATUSES
     assert {entry["coverage_status"] for entry in payload["deferred"]} == {"deferred", "excluded"}

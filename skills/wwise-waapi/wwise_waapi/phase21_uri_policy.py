@@ -9,7 +9,7 @@ from typing import Any, Mapping
 
 DEFAULT_WWISE_VERSION = "2022.1"
 SKILL_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_POLICY_RESOURCE = SKILL_ROOT / "resources" / "coverage" / DEFAULT_WWISE_VERSION / "phase21-uri-policy.json"
+DEFAULT_POLICY_RESOURCE = SKILL_ROOT / "resources" / "capabilities" / DEFAULT_WWISE_VERSION / "phase21-uri-policy.json"
 
 
 REOPENED_CORE_OBJECT_URIS = frozenset(

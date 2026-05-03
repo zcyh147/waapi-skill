@@ -17,7 +17,7 @@ from .phase21_uri_policy import CONFORMANCE_ONLY_URIS, load_phase21_uri_policy
 DEFAULT_WWISE_VERSION = "2022.1"
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST_ROOT = SKILL_ROOT / "resources" / "manifest"
-DEFAULT_COVERAGE_ROOT = SKILL_ROOT / "resources" / "coverage"
+DEFAULT_COVERAGE_ROOT = SKILL_ROOT / "resources" / "capabilities"
 DEFAULT_SUMMARY_RESOURCE = DEFAULT_COVERAGE_ROOT / DEFAULT_WWISE_VERSION / "phase2-coverage-summary.json"
 
 LIVE_SANDBOX_TESTED_URIS = frozenset(
@@ -292,7 +292,7 @@ class Phase2CoverageSummaryBuilder:
             "phase1_status": phase1_status,
             "review_trigger": "",
             "source_coverage_uri": matrix_entry["source_coverage_uri"],
-            "source_matrix_uri": "resources/coverage/2022.1/live-coverage-matrix.json",
+            "source_matrix_uri": "resources/capabilities/2022.1/live-coverage-matrix.json",
             "status_transition": self._status_transition(phase1_status, achieved_status),
             "substitute_test": "",
             "uri": uri,
@@ -304,8 +304,8 @@ class Phase2CoverageSummaryBuilder:
             entry.update(
                 {
                     "evidence_command": UNIT_ROUTE_COMMAND,
-                    "evidence_path": "resources/coverage/2022.1/api-coverage.json",
-                    "evidence_paths": ["resources/coverage/2022.1/api-coverage.json"],
+                    "evidence_path": "resources/capabilities/2022.1/api-coverage.json",
+                    "evidence_paths": ["resources/capabilities/2022.1/api-coverage.json"],
                 }
             )
             self._add_attempted_live_context(entry, uri)
@@ -362,8 +362,8 @@ class Phase2CoverageSummaryBuilder:
             entry.update(
                 {
                     "evidence_command": UNIT_WRAPPER_POLICY_COMMAND,
-                    "evidence_path": "resources/coverage/2022.1/wrapper-only-category-policy.json",
-                    "evidence_paths": ["resources/coverage/2022.1/wrapper-only-category-policy.json"],
+                    "evidence_path": "resources/capabilities/2022.1/wrapper-only-category-policy.json",
+                    "evidence_paths": ["resources/capabilities/2022.1/wrapper-only-category-policy.json"],
                     "future_review_trigger": policy.future_review_trigger,
                     "review_trigger": policy.future_review_trigger,
                     "user_approved_rationale": policy.user_approved_rationale,
@@ -381,7 +381,7 @@ class Phase2CoverageSummaryBuilder:
                     "evidence_paths": [
                         TASK8_CONFORMANCE_POLICY_EVIDENCE,
                         TASK8_SUMMARY_ACCOUNTING_EVIDENCE,
-                        "resources/coverage/2022.1/phase21-uri-policy.json",
+                        "resources/capabilities/2022.1/phase21-uri-policy.json",
                     ],
                     "future_review_trigger": future_review_trigger,
                     "review_trigger": future_review_trigger,
@@ -537,22 +537,22 @@ class Phase2CoverageSummaryBuilder:
 
     def _metadata(self, version: str) -> dict[str, Any]:
         return {
-            "baseline_resource": "resources/coverage/2022.1/api-coverage.json",
+            "baseline_resource": "resources/capabilities/2022.1/api-coverage.json",
             "deferred_resource": "resources/deferred/2022.1.json",
             "generator": "wwise_waapi.phase2_coverage_summary.Phase2CoverageSummaryBuilder",
-            "live_matrix_resource": "resources/coverage/2022.1/live-coverage-matrix.json",
+            "live_matrix_resource": "resources/capabilities/2022.1/live-coverage-matrix.json",
             "status_resources": [
-                "resources/coverage/2022.1/phase21-uri-policy.json",
-                "resources/coverage/2022.1/task-4-core-object-deferred-plan.json",
-                "resources/coverage/2022.1/task-5-profiler-soundengine-evidence.json",
-                "resources/coverage/2022.1/task-6-process-definition-files-plan.json",
-                "resources/coverage/2022.1/task-7-switchcontainer-assignment-plan.json",
-                "resources/coverage/2022.1/task-8-soundbank-audio-sandbox-plan.json",
+                "resources/capabilities/2022.1/phase21-uri-policy.json",
+                "resources/capabilities/2022.1/task-4-core-object-deferred-plan.json",
+                "resources/capabilities/2022.1/task-5-profiler-soundengine-evidence.json",
+                "resources/capabilities/2022.1/task-6-process-definition-files-plan.json",
+                "resources/capabilities/2022.1/task-7-switchcontainer-assignment-plan.json",
+                "resources/capabilities/2022.1/task-8-soundbank-audio-sandbox-plan.json",
                 "resources/waql/2022.1/object-get-live-matrix.json",
-                "resources/coverage/2022.1/task-6-object-topic-live-plan.json",
-                "resources/coverage/2022.1/task-7-project-mutation-sandbox-plan.json",
-                "resources/coverage/2022.1/task-9-profiler-soundengine-feasibility.json",
-                "resources/coverage/2022.1/wrapper-only-category-policy.json",
+                "resources/capabilities/2022.1/task-6-object-topic-live-plan.json",
+                "resources/capabilities/2022.1/task-7-project-mutation-sandbox-plan.json",
+                "resources/capabilities/2022.1/task-9-profiler-soundengine-feasibility.json",
+                "resources/capabilities/2022.1/wrapper-only-category-policy.json",
             ],
             "version": version,
             "windows_policy": "Windows host validation remains pending; generated Windows SoundBank artifacts from macOS sandbox output are not Windows validation.",

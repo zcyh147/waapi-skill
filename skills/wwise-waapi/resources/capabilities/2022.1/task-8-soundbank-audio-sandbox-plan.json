@@ -4,7 +4,7 @@
     "fixture_policy": "Audio fixtures are generated as tiny WAV files under each per-test sandbox output directory; no generated audio or SoundBank output may target the immutable SampleProject source.",
     "sandbox_policy": "Each destructive case prepares a fresh Task 3 SampleProject sandbox and launches WwiseConsole only with WWISE_FIXTURE_PROJECT under WWISE_SANDBOX_ROOT.",
     "source_immutability_hash": "source .wproj mtime plus sha256 over mutation-bearing Wwise project files (*.wproj, *.wwu); source generated-output directories are also checked before/after",
-    "source_matrix": "resources/coverage/2022.1/live-coverage-matrix.json",
+    "source_matrix": "resources/capabilities/2022.1/live-coverage-matrix.json",
     "task": "8. Add live-safe audio and soundbank sandbox evidence",
     "temporary_name_prefix": "WAAPI_TASK8_SANDBOX_",
     "unit_command": "python -m pytest tests/unit/test_soundbank_audio_live_plan.py -q",

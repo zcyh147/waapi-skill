@@ -25,8 +25,8 @@ DOC_CONTRACT_PATHS = (
 REFERENCE_ROOT = ROOT / 'references' / 'semantic' / '2021.1'
 SOURCE_NOTES = ROOT / 'skills' / 'wwise-waapi' / 'resources' / 'semantic' / '2021.1' / 'source_notes.json'
 RUNTIME_PACKAGE_ROOT = ROOT / 'skills' / 'wwise-waapi' / 'wwise_waapi'
-COVERAGE_2021 = ROOT / 'skills' / 'wwise-waapi' / 'resources' / 'coverage' / '2021.1' / 'api-coverage.json'
-SUMMARY_2021 = ROOT / 'skills' / 'wwise-waapi' / 'resources' / 'coverage' / '2021.1' / 'phase2-coverage-summary.json'
+COVERAGE_2021 = ROOT / 'skills' / 'wwise-waapi' / 'resources' / 'capabilities' / '2021.1' / 'api-coverage.json'
+SUMMARY_2021 = ROOT / 'skills' / 'wwise-waapi' / 'resources' / 'capabilities' / '2021.1' / 'phase2-coverage-summary.json'
 DEFERRED_2021 = ROOT / 'skills' / 'wwise-waapi' / 'resources' / 'deferred' / '2021.1.json'
 NOTEBOOK = 'wwise-2021.1.14-docs'
 VERSION = '2021.1'
@@ -193,7 +193,7 @@ def test_2021_docs_include_exact_counts_paths_commands_and_limited_claims() -> N
         'not runtime proof',
         'resources/manifest/2021.1/',
         'resources/semantic/2021.1/source_notes.json',
-        'resources/coverage/2021.1/',
+        'resources/capabilities/2021.1/',
         'resources/deferred/2021.1.json',
         'resources/waql/2021.1/',
         'references/semantic/2021.1/',

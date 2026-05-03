@@ -147,8 +147,8 @@ def test_2024_eval_examples_are_version_scoped_when_added() -> None:
         assert "references/semantic-builder-" not in serialized, entry["id"]
         assert "resources/manifest/2022.1" not in serialized, entry["id"]
         assert "resources/manifest/2023.1" not in serialized, entry["id"]
-        assert "resources/coverage/2022.1" not in serialized, entry["id"]
-        assert "resources/coverage/2023.1" not in serialized, entry["id"]
+        assert "resources/capabilities/2022.1" not in serialized, entry["id"]
+        assert "resources/capabilities/2023.1" not in serialized, entry["id"]
         assert "wwise-2022.1-docs proves 2024.1" not in serialized, entry["id"]
         assert "wwise-2023.1-docs proves 2024.1" not in serialized, entry["id"]
         for claim in FORBIDDEN_2024_POSITIVE_CLAIMS:

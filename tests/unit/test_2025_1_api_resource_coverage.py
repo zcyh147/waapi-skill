@@ -13,10 +13,10 @@ VERSION = "2025.1"
 BASELINE_VERSION = "2024.1"
 FUNCTIONS_MANIFEST = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest" / VERSION / "functions.json"
 TOPICS_MANIFEST = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest" / VERSION / "topics.json"
-COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION / "api-coverage.json"
-CLASSIFICATION_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION / "added-api-classification.json"
+COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION / "api-coverage.json"
+CLASSIFICATION_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION / "added-api-classification.json"
 SOURCE_NOTES_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "semantic" / VERSION / "source_notes.json"
-BASELINE_COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / BASELINE_VERSION / "api-coverage.json"
+BASELINE_COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / BASELINE_VERSION / "api-coverage.json"
 
 ALLOWED_STATUSES = {"deferred", "excluded", "live-tested", "sandbox-mutating-tested"}
 ALLOWED_BLOCKED_STATUSES = {"deferred", "excluded"}
@@ -52,7 +52,7 @@ def test_2025_resource_covers_every_reflected_function_and_topic_once_with_2025_
     assert payload["metadata"]["version"] == VERSION
     assert payload["metadata"]["manifest_source"] == "resources/manifest/2025.1"
     assert "resources/manifest/2025/" not in encoded
-    assert "resources/coverage/2025/" not in encoded
+    assert "resources/capabilities/2025/" not in encoded
     assert "resources/manifest/2022.1" not in encoded
     assert "resources/manifest/2023.1" not in encoded
 

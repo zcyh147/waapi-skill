@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "api_coverage_resource": "resources/coverage/2021.1/api-coverage.json",
+    "api_coverage_resource": "resources/capabilities/2021.1/api-coverage.json",
     "evidence_policy": "2021.1 source notes and reflection are inventory-only; Task 7 promotes only ak.wwise.core.object.get with fresh exact-version read-only live evidence, Task 10 promotes reflected object CRUD/undo URIs with fresh copied-sandbox destructive evidence, Task 11 promotes only ak.wwise.core.audio.import and ak.wwise.core.soundbank.setInclusions with fresh copied-sandbox destructive evidence, and Task 12 promotes only ak.wwise.core.switchContainer.addAssignment and ak.wwise.core.switchContainer.removeAssignment with fresh copied-sandbox destructive evidence. No 2022.1/2023.1/2024.1/2025.1 evidence is accepted as 2021.1 proof.",
     "generator": "task-5-deterministic-2021.1-uri-policy",
     "version": "2021.1"

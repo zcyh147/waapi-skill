@@ -1734,7 +1734,7 @@
     }
   ],
   "metadata": {
-    "api_coverage_source": "resources/coverage/2022.1/api-coverage.json",
+    "api_coverage_source": "resources/capabilities/2022.1/api-coverage.json",
     "debug_unsafe_live_uris": [
       "ak.wwise.debug.enableAsserts",
       "ak.wwise.debug.enableAutomationMode",
@@ -1744,7 +1744,7 @@
     "default_policy": "Default pytest remains Wwise-free; wrappers provide schema and dispatcher diagnostics only.",
     "generator": "Task 10 wrapper-only/skipped-approved policy encoder",
     "live_behavior_policy": "Policy-exempt categories are not deep live behavior coverage and return unsupported-live diagnostics when requested as live behavior.",
-    "live_coverage_matrix_source": "resources/coverage/2022.1/live-coverage-matrix.json",
+    "live_coverage_matrix_source": "resources/capabilities/2022.1/live-coverage-matrix.json",
     "unit_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
     "user_guidance_reference": ".sisyphus/plans/wwise-waapi-live-sandbox-coverage.md:36-42",
     "version": "2022.1"

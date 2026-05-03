@@ -3,7 +3,7 @@
     "live_command": "WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/destructive/test_project_mutation_sandbox.py -q",
     "sandbox_policy": "Each live test prepares a fresh Task 3 SampleProject sandbox and launches WwiseConsole only with WWISE_FIXTURE_PROJECT under WWISE_SANDBOX_ROOT.",
     "source_immutability_hash": "sha256 over mutation-bearing Wwise project files (*.wproj, *.wwu), plus source .wproj mtime",
-    "source_matrix": "resources/coverage/2022.1/live-coverage-matrix.json",
+    "source_matrix": "resources/capabilities/2022.1/live-coverage-matrix.json",
     "task": "7. Add destructive sandbox tests for project mutation groups",
     "temporary_name_prefix": "WAAPI_TASK7_SANDBOX_",
     "unit_command": "python -m pytest tests/unit/test_mutating_live_plan.py -q",

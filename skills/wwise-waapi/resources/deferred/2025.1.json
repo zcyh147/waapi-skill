@@ -2577,9 +2577,9 @@
   ],
   "metadata": {
     "baseline_comparison": {
-      "baseline_coverage_resource": "resources/coverage/2024.1/api-coverage.json",
+      "baseline_coverage_resource": "resources/capabilities/2024.1/api-coverage.json",
       "baseline_deferred_resource": "resources/deferred/2024.1.json",
-      "baseline_matrix_resource": "resources/coverage/2024.1/live-coverage-matrix.json",
+      "baseline_matrix_resource": "resources/capabilities/2024.1/live-coverage-matrix.json",
       "baseline_reflected_count": 148,
       "baseline_status_counts": {
         "deferred": 64,
@@ -2640,7 +2640,7 @@
       "coverage_status"
     ],
     "source_notes": "resources/semantic/2025.1/source_notes.json",
-    "task6_classification": "resources/coverage/2025.1/added-api-classification.json",
+    "task6_classification": "resources/capabilities/2025.1/added-api-classification.json",
     "version": "2025.1"
   },
   "summary": {

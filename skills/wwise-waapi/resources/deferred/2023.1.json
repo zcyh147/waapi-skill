@@ -2468,7 +2468,7 @@
     "wwise_build": "2023.1.19.8928",
     "policy_lock": {
       "date": "2026-05-01",
-      "evidence_source": "resources/coverage/2023.1/api-coverage.json + resources/coverage/2023.1/wrapper-only-category-policy.json + resources/coverage/2023.1/phase21-uri-policy.json",
+      "evidence_source": "resources/capabilities/2023.1/api-coverage.json + resources/capabilities/2023.1/wrapper-only-category-policy.json + resources/capabilities/2023.1/phase21-uri-policy.json",
       "scope": "profiler, transport, soundengine, UI, CLI, remote, and debug remain deferred/excluded; no manifest-only behavioral/live promotion is allowed.",
       "promotion_rule": "Only 2023.1 behavioral execution evidence can move a URI out of deferred/excluded status; Task 4 sandbox-mutating-tested and Task 3 live-tested promotions are intentionally absent from this registry.",
       "future_review_trigger": "Revisit only when family-specific 2023.1 fixtures, cleanup/readback evidence, and explicit policy approval exist for the risky family."

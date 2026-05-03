@@ -30,11 +30,11 @@ SANDBOX_MUTATING_TESTED_2023_URIS = {
 NOTEBOOK_2023 = "wwise-2023.1-docs"
 MANIFEST_ROOT = ROOT / "skills" / "wwise-waapi" / "resources" / "manifest"
 SEMANTIC_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "semantic" / VERSION_2023 / "source_notes.json"
-COVERAGE_2022 = ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION_2022 / "api-coverage.json"
-COVERAGE_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION_2023 / "api-coverage.json"
-LIVE_MATRIX_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION_2023 / "live-coverage-matrix.json"
-PHASE2_SUMMARY_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION_2023 / "phase2-coverage-summary.json"
-POLICY_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION_2023 / "phase21-uri-policy.json"
+COVERAGE_2022 = ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION_2022 / "api-coverage.json"
+COVERAGE_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION_2023 / "api-coverage.json"
+LIVE_MATRIX_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION_2023 / "live-coverage-matrix.json"
+PHASE2_SUMMARY_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION_2023 / "phase2-coverage-summary.json"
+POLICY_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION_2023 / "phase21-uri-policy.json"
 DEFERRED_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "deferred" / "2023.1.json"
 WAQL_2023 = ROOT / "skills" / "wwise-waapi" / "resources" / "waql" / VERSION_2023 / "object-get-live-matrix.json"
 FIXTURE_2023 = ROOT / "tests" / "_org" / VERSION_2023
@@ -125,7 +125,7 @@ def test_explicit_2023_resource_lookups_never_read_2022_or_global_semantic_paths
     assert waql["metadata"]["wwise_version_target"] == VERSION_2023
     assert any("resources/manifest/2023.1" in path for path in touched)
     assert any("resources/semantic/2023.1/source_notes.json" in path for path in touched)
-    assert any("resources/coverage/2023.1" in path for path in touched)
+    assert any("resources/capabilities/2023.1" in path for path in touched)
     assert any("resources/deferred/2023.1.json" in path for path in touched)
     assert any("resources/waql/2023.1" in path for path in touched)
     assert not any("2022.1" in path or "references/semantic-builder-" in path for path in touched)
@@ -202,9 +202,9 @@ def test_2023_coverage_deferred_and_waql_counts_are_version_separated() -> None:
     assert live_matrix["summary"]["parity_bucket_total"] == 181
     assert live_matrix["summary"]["live_tested"] == 1
     assert {entry["version"] for entry in matrix_entries} == {VERSION_2023}
-    assert all(entry["source_coverage_uri"] == "resources/coverage/2023.1/api-coverage.json" for entry in matrix_entries)
-    assert phase2_summary["metadata"]["baseline_resource"] == "resources/coverage/2023.1/api-coverage.json"
-    assert phase2_summary["metadata"]["live_matrix_resource"] == "resources/coverage/2023.1/live-coverage-matrix.json"
+    assert all(entry["source_coverage_uri"] == "resources/capabilities/2023.1/api-coverage.json" for entry in matrix_entries)
+    assert phase2_summary["metadata"]["baseline_resource"] == "resources/capabilities/2023.1/api-coverage.json"
+    assert phase2_summary["metadata"]["live_matrix_resource"] == "resources/capabilities/2023.1/live-coverage-matrix.json"
     assert phase2_summary["summary"]["reflected_count"] == 181
     assert phase2_summary["summary"]["status_counts"] == expected_status_counts
     assert phase2_summary["summary"]["parity_bucket_counts"] == expected_parity_counts

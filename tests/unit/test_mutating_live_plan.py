@@ -11,7 +11,7 @@ PLAN_PATH = (
     / "skills"
     / "wwise-waapi"
     / "resources"
-    / "coverage"
+    / "capabilities"
     / "2022.1"
     / "task-7-project-mutation-sandbox-plan.json"
 )

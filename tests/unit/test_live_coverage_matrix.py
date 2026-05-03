@@ -9,8 +9,8 @@ from wwise_waapi.phase21_uri_policy import CONFORMANCE_ONLY_URIS  # pyright: ign
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILL_ROOT = REPO_ROOT / "skills" / "wwise-waapi"
-MATRIX_RESOURCE = SKILL_ROOT / "resources" / "coverage" / "2022.1" / "live-coverage-matrix.json"
-API_COVERAGE_RESOURCE = SKILL_ROOT / "resources" / "coverage" / "2022.1" / "api-coverage.json"
+MATRIX_RESOURCE = SKILL_ROOT / "resources" / "capabilities" / "2022.1" / "live-coverage-matrix.json"
+API_COVERAGE_RESOURCE = SKILL_ROOT / "resources" / "capabilities" / "2022.1" / "api-coverage.json"
 FUNCTIONS_MANIFEST = SKILL_ROOT / "resources" / "manifest" / "2022.1" / "functions.json"
 TOPICS_MANIFEST = SKILL_ROOT / "resources" / "manifest" / "2022.1" / "topics.json"
 WAQL_API_URI = "ak.wwise.core.object.get"
@@ -129,7 +129,7 @@ def test_matrix_points_to_final_phase21_consolidation_without_claiming_windows()
     consolidation = _matrix_payload()["metadata"]["phase2_consolidation"]
     non_live_statuses = _matrix_payload()["metadata"]["does_not_count_as_live_behavioral_coverage"]
 
-    assert consolidation["final_summary_resource"] == "resources/coverage/2022.1/phase2-coverage-summary.json"
+    assert consolidation["final_summary_resource"] == "resources/capabilities/2022.1/phase2-coverage-summary.json"
     assert consolidation["audit_resource"] == "wwise_waapi/api_coverage_audit.py"
     assert consolidation["evidence_classes"] == [
         "live_behavioral_waapi",

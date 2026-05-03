@@ -1,6 +1,8 @@
-"""Fail-closed WAQL documentation gate and read-only examples."""
+"""Fail-closed WAQL resource gate and read-only examples."""
 
 from __future__ import annotations
+
+import json
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,26 +10,8 @@ from typing import Any, Mapping
 
 EXPECTED_WAQL_NOTEBOOK_ID = "wwise-2022.1-docs"
 WAQL_API_URI = "ak.wwise.core.object.get"
-DEFAULT_WAQL_REFERENCE = Path("references/waql-2022.1.md")
-REQUIRED_REFERENCE_SECTIONS = (
-    "## Source map",
-    "## Syntax",
-    "## Operators",
-    "## Object model",
-    "## Escaping",
-    "## Results",
-    "## Examples",
-    "## Limitations",
-    "## Gaps",
-)
-REQUIRED_REFERENCE_TOKENS = (
-    EXPECTED_WAQL_NOTEBOOK_ID,
-    "WwiseSDK-Windows_01.pdf",
-    "WwiseSDK-Windows_02.pdf",
-    WAQL_API_URI,
-    "NotebookLM",
-    "waql",
-)
+DEFAULT_WAQL_REFERENCE = Path("resources/waql/2022.1/object-get-live-matrix.json")
+REQUIRED_WAQL_MATRIX_METADATA = ("name", "uri", "schema_source", "reference")
 
 WAQL_EXAMPLES: tuple[dict[str, Any], ...] = (
     {
@@ -72,29 +56,32 @@ class WaqlReferenceStatus:
 
 
 class WaqlReferenceGate:
-    """Validate source-grounded WAQL notes before helper generation."""
+    """Validate packaged WAQL resources before helper generation."""
 
     def __init__(self, reference_path: Path = DEFAULT_WAQL_REFERENCE) -> None:
         self.reference_path = reference_path
 
     def check(self) -> WaqlReferenceStatus:
         if not self.reference_path.exists():
-            return WaqlReferenceStatus(False, "WAQL reference evidence is missing.", self.reference_path)
+            return WaqlReferenceStatus(False, "WAQL resource evidence is missing.", self.reference_path)
         try:
-            text = self.reference_path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError) as exc:
-            return WaqlReferenceStatus(False, f"WAQL reference evidence could not be read: {exc}", self.reference_path)
+            payload = json.loads(self.reference_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            return WaqlReferenceStatus(False, f"WAQL resource evidence could not be read: {exc}", self.reference_path)
 
-        missing = [section for section in REQUIRED_REFERENCE_SECTIONS if section not in text]
-        missing.extend(token for token in REQUIRED_REFERENCE_TOKENS if token not in text)
-        if missing:
-            return WaqlReferenceStatus(
-                False,
-                "WAQL reference evidence is incomplete.",
-                self.reference_path,
-                tuple(missing),
-            )
-        return WaqlReferenceStatus(True, "WAQL reference evidence is present.", self.reference_path)
+        try:
+            validate_waql_live_matrix(payload)
+            validate_stored_waql_examples()
+        except ValueError as exc:
+            return WaqlReferenceStatus(False, f"WAQL resource evidence is incomplete: {exc}", self.reference_path)
+
+        return WaqlReferenceStatus(True, "WAQL resource evidence is present.", self.reference_path)
+
+
+def waql_matrix_path(version: str) -> Path:
+    """Return the packaged WAQL matrix resource for a Wwise version."""
+
+    return Path("resources") / "waql" / version / "object-get-live-matrix.json"
 
 
 def waql_api_uris(manifest: Mapping[str, Any]) -> tuple[str, ...]:
@@ -121,7 +108,7 @@ def require_waql_helper_generation(
     manifest: Mapping[str, Any],
     reference_path: Path = DEFAULT_WAQL_REFERENCE,
 ) -> tuple[str, ...]:
-    """Return WAQL APIs only when source-grounded WAQL evidence is complete."""
+    """Return WAQL APIs only when packaged WAQL evidence is complete."""
 
     uris = waql_api_uris(manifest)
     if not uris:
@@ -168,6 +155,42 @@ def validate_stored_waql_examples(examples: tuple[Mapping[str, Any], ...] = WAQL
             raise ValueError(f"Duplicate WAQL example name: {name}")
         names.add(name)
         validate_waql_example(example)
+
+
+def validate_waql_live_matrix(matrix: Mapping[str, Any]) -> None:
+    """Validate the packaged live WAQL matrix resource."""
+
+    metadata = matrix.get("metadata")
+    if not isinstance(metadata, Mapping):
+        raise ValueError("WAQL matrix metadata must be a mapping")
+    for key in REQUIRED_WAQL_MATRIX_METADATA:
+        if key not in metadata:
+            raise ValueError(f"WAQL matrix metadata is missing {key}")
+    if metadata.get("uri") != WAQL_API_URI:
+        raise ValueError("WAQL matrix metadata must target ak.wwise.core.object.get")
+
+    live_cases = matrix.get("live_cases")
+    if not isinstance(live_cases, list) or not live_cases:
+        raise ValueError("WAQL matrix live_cases must be a non-empty list")
+
+    for case in live_cases:
+        if not isinstance(case, Mapping):
+            raise ValueError("WAQL matrix live case must be a mapping")
+        synthesized = {
+            "name": case.get("id"),
+            "uri": case.get("uri"),
+            "args": case.get("args"),
+            "options": case.get("options"),
+            "expect_live_safe": True,
+        }
+        validate_waql_example(synthesized)
+        if case.get("no_mutation") is not True:
+            raise ValueError("WAQL live cases must remain read-only")
+        sources = case.get("sources")
+        if not isinstance(sources, list) or not sources:
+            raise ValueError("WAQL live cases must include source evidence")
+        if not all(isinstance(source, str) for source in sources):
+            raise ValueError("WAQL live case sources must be strings")
 
 
 def _looks_mutating(waql: str) -> bool:

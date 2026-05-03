@@ -15,7 +15,7 @@ from .waql import DEFAULT_WAQL_REFERENCE, WAQL_API_URI, require_waql_helper_gene
 DEFAULT_WWISE_VERSION = "2022.1"
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST_ROOT = SKILL_ROOT / "resources" / "manifest"
-DEFAULT_COVERAGE_ROOT = SKILL_ROOT / "resources" / "coverage"
+DEFAULT_COVERAGE_ROOT = SKILL_ROOT / "resources" / "capabilities"
 DEFAULT_DEFERRED_ROOT = SKILL_ROOT / "resources" / "deferred"
 DEFAULT_EVIDENCE_PATH = Path(".sisyphus/evidence/task-7-api-coverage-summary.json")
 
@@ -100,7 +100,8 @@ class ApiCoverageBuilder:
         manifest = self._manifest(version)
         deferred_registry = self.deferred_registry or DeferredRegistry.load_default(version)
         schemas = self._schemas_by_uri(manifest)
-        waql_uris = set(require_waql_helper_generation(manifest, self.waql_reference_path))
+        waql_reference_path = self._waql_reference_path(version)
+        waql_uris = set(require_waql_helper_generation(manifest, waql_reference_path))
         entries = [
             self._entry(payload, "function", version, schemas, waql_uris, deferred_registry)
             for payload in self._section(manifest, "functions")
@@ -113,6 +114,12 @@ class ApiCoverageBuilder:
         self._validate_exact_coverage(manifest, entries)
         summary = self._summary(version, entries, manifest)
         return CoverageResource(version=version, metadata=self._metadata(version), entries=entries, summary=summary)
+
+
+    def _waql_reference_path(self, version: str) -> Path:
+        if self.waql_reference_path != DEFAULT_WAQL_REFERENCE:
+            return self.waql_reference_path
+        return SKILL_ROOT / DEFAULT_WAQL_REFERENCE
 
 
     def _manifest(self, version: str) -> dict[str, Any]:
@@ -221,8 +228,8 @@ class ApiCoverageBuilder:
             }
         if uri == WAQL_API_URI:
             return {
-                "coverage": "fake-route-tested-and-waql-reference-gated",
-                "evidence": "references/waql-2022.1.md",
+                "coverage": "fake-route-tested-and-waql-resource-gated",
+                "evidence": f"resources/waql/{version}/object-get-live-matrix.json",
                 "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime",
             }
         return {
@@ -307,7 +314,7 @@ class ApiCoverageBuilder:
         if deferred:
             guidance["notes"] = "Treat registry evidence as substitute coverage only; do not claim complete behavior until a live-safe behavioral test exists."
         if is_waql:
-            guidance["waql_reference"] = f"references/waql-{version}.md"
+            guidance["waql_reference"] = f"resources/waql/{version}/object-get-live-matrix.json"
             guidance["waql_gate"] = "wwise_waapi.waql.require_waql_helper_generation"
         if category == "soundengine":
             guidance["fixture_requirement"] = "Requires initialized sound engine/game-object state before live behavioral assertions."
@@ -335,7 +342,7 @@ class ApiCoverageBuilder:
             ],
             "sort_key": "uri",
             "version": version,
-            "waql_reference": f"references/waql-{version}.md",
+            "waql_reference": f"resources/waql/{version}/object-get-live-matrix.json",
         }
 
     def _summary(self, version: str, entries: Sequence[Mapping[str, Any]], manifest: Mapping[str, Any]) -> CoverageSummary:

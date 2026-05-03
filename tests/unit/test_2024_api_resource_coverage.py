@@ -12,7 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2024.1"
 FUNCTIONS_MANIFEST = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest" / VERSION / "functions.json"
 TOPICS_MANIFEST = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest" / VERSION / "topics.json"
-COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION / "api-coverage.json"
+COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION / "api-coverage.json"
 SOURCE_NOTES_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "semantic" / VERSION / "source_notes.json"
 PROMOTED_READ_ONLY_URI = "ak.wwise.core.object.get"
 PROMOTED_READ_ONLY_URIS = {PROMOTED_READ_ONLY_URI}
@@ -60,7 +60,7 @@ def test_2024_resource_covers_every_reflected_function_and_topic_once_with_2024_
     assert payload["metadata"]["version"] == VERSION
     assert payload["metadata"]["manifest_source"] == "resources/manifest/2024.1"
     assert "resources/manifest/2024/" not in encoded
-    assert "resources/coverage/2024/" not in encoded
+    assert "resources/capabilities/2024/" not in encoded
     assert "resources/manifest/2022.1" not in encoded
     assert "resources/manifest/2023.1" not in encoded
     assert "resources/manifest/2025" not in encoded

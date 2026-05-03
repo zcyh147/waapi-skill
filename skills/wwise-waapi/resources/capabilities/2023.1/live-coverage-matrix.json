@@ -19,7 +19,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.executeActionOnEvent",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.executeActionOnEvent",
       "version": "2023.1"
@@ -43,7 +43,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.getState",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.getState",
       "version": "2023.1"
@@ -67,7 +67,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.getSwitch",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.getSwitch",
       "version": "2023.1"
@@ -91,7 +91,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.loadBank",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.loadBank",
       "version": "2023.1"
@@ -115,7 +115,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.postEvent",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.postEvent",
       "version": "2023.1"
@@ -139,7 +139,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.postMsgMonitor",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.postMsgMonitor",
       "version": "2023.1"
@@ -163,7 +163,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.postTrigger",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.postTrigger",
       "version": "2023.1"
@@ -187,7 +187,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.registerGameObj",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.registerGameObj",
       "version": "2023.1"
@@ -211,7 +211,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.resetRTPCValue",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.resetRTPCValue",
       "version": "2023.1"
@@ -235,7 +235,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.seekOnEvent",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.seekOnEvent",
       "version": "2023.1"
@@ -259,7 +259,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.setDefaultListeners",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.setDefaultListeners",
       "version": "2023.1"
@@ -283,7 +283,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.setGameObjectAuxSendValues",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.setGameObjectAuxSendValues",
       "version": "2023.1"
@@ -307,7 +307,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.setGameObjectOutputBusVolume",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.setGameObjectOutputBusVolume",
       "version": "2023.1"
@@ -331,7 +331,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.setListenerSpatialization",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.setListenerSpatialization",
       "version": "2023.1"
@@ -355,7 +355,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.setListeners",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.setListeners",
       "version": "2023.1"
@@ -379,7 +379,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.setMultiplePositions",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.setMultiplePositions",
       "version": "2023.1"
@@ -403,7 +403,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.setObjectObstructionAndOcclusion",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.setObjectObstructionAndOcclusion",
       "version": "2023.1"
@@ -427,7 +427,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.setPosition",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.setPosition",
       "version": "2023.1"
@@ -451,7 +451,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.setRTPCValue",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.setRTPCValue",
       "version": "2023.1"
@@ -475,7 +475,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.setScalingFactor",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.setScalingFactor",
       "version": "2023.1"
@@ -499,7 +499,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.setState",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.setState",
       "version": "2023.1"
@@ -523,7 +523,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.setSwitch",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.setSwitch",
       "version": "2023.1"
@@ -547,7 +547,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.stopAll",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.stopAll",
       "version": "2023.1"
@@ -571,7 +571,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.stopPlayingID",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.stopPlayingID",
       "version": "2023.1"
@@ -595,7 +595,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.unloadBank",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.unloadBank",
       "version": "2023.1"
@@ -619,7 +619,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.soundengine.unregisterGameObj",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.soundengine.unregisterGameObj",
       "version": "2023.1"
@@ -643,7 +643,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.cli.addNewPlatform",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.cli.addNewPlatform",
       "version": "2023.1"
@@ -667,7 +667,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.cli.convertExternalSource",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.cli.convertExternalSource",
       "version": "2023.1"
@@ -691,7 +691,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.cli.createNewProject",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.cli.createNewProject",
       "version": "2023.1"
@@ -715,7 +715,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.cli.dumpObjects",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.cli.dumpObjects",
       "version": "2023.1"
@@ -739,7 +739,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.cli.executeLuaScript",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.cli.executeLuaScript",
       "version": "2023.1"
@@ -763,7 +763,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.cli.generateSoundbank",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.cli.generateSoundbank",
       "version": "2023.1"
@@ -787,7 +787,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.cli.migrate",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.cli.migrate",
       "version": "2023.1"
@@ -811,7 +811,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.cli.moveMediaIdsToSingleFile",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.cli.moveMediaIdsToSingleFile",
       "version": "2023.1"
@@ -835,7 +835,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.cli.moveMediaIdsToWorkUnits",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.cli.moveMediaIdsToWorkUnits",
       "version": "2023.1"
@@ -859,7 +859,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.cli.tabDelimitedImport",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.cli.tabDelimitedImport",
       "version": "2023.1"
@@ -883,7 +883,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.cli.updateMediaIdsInSingleFile",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.cli.updateMediaIdsInSingleFile",
       "version": "2023.1"
@@ -907,7 +907,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.cli.verify",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.cli.verify",
       "version": "2023.1"
@@ -931,7 +931,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.cli.waapiServer",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.cli.waapiServer",
       "version": "2023.1"
@@ -959,7 +959,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.console.project.close",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.console.project.close",
       "version": "2023.1"
@@ -987,7 +987,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.console.project.create",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.console.project.create",
       "version": "2023.1"
@@ -1015,7 +1015,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.console.project.open",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.console.project.open",
       "version": "2023.1"
@@ -1045,7 +1045,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.audio.import",
       "parity_bucket": "sandbox-mutating-tested",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.audio.import",
       "version": "2023.1",
@@ -1079,7 +1079,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.audio.importTabDelimited",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.audio.importTabDelimited",
       "version": "2023.1"
@@ -1107,7 +1107,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.audio.imported",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.audio.imported",
       "version": "2023.1"
@@ -1135,7 +1135,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.audio.mute",
       "parity_bucket": "conformance-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.audio.mute",
       "version": "2023.1"
@@ -1163,7 +1163,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.audio.resetMute",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.audio.resetMute",
       "version": "2023.1"
@@ -1191,7 +1191,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.audio.resetSolo",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.audio.resetSolo",
       "version": "2023.1"
@@ -1219,7 +1219,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.audio.solo",
       "parity_bucket": "conformance-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.audio.solo",
       "version": "2023.1"
@@ -1243,7 +1243,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
       "version": "2023.1"
@@ -1267,7 +1267,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
       "version": "2023.1"
@@ -1295,7 +1295,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.executeLuaScript",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.executeLuaScript",
       "version": "2023.1"
@@ -1319,7 +1319,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.getInfo",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.core.getInfo",
       "version": "2023.1"
@@ -1343,7 +1343,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.getProjectInfo",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.core.getProjectInfo",
       "version": "2023.1"
@@ -1367,7 +1367,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.log.addItem",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.core.log.addItem",
       "version": "2023.1"
@@ -1391,7 +1391,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.log.clear",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.core.log.clear",
       "version": "2023.1"
@@ -1415,7 +1415,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.log.get",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.core.log.get",
       "version": "2023.1"
@@ -1443,7 +1443,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.log.itemAdded",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.log.itemAdded",
       "version": "2023.1"
@@ -1471,7 +1471,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.attenuationCurveChanged",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.attenuationCurveChanged",
       "version": "2023.1"
@@ -1499,7 +1499,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.attenuationCurveLinkChanged",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.attenuationCurveLinkChanged",
       "version": "2023.1"
@@ -1527,7 +1527,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.childAdded",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.childAdded",
       "version": "2023.1"
@@ -1555,7 +1555,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.childRemoved",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.childRemoved",
       "version": "2023.1"
@@ -1583,7 +1583,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.copy",
       "parity_bucket": "conformance-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.copy",
       "version": "2023.1"
@@ -1613,7 +1613,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.create",
       "parity_bucket": "sandbox-mutating-tested",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.object.create",
       "version": "2023.1",
@@ -1647,7 +1647,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.created",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.created",
       "version": "2023.1"
@@ -1675,7 +1675,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.curveChanged",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.curveChanged",
       "version": "2023.1"
@@ -1705,7 +1705,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.delete",
       "parity_bucket": "sandbox-mutating-tested",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.object.delete",
       "version": "2023.1",
@@ -1739,7 +1739,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.diff",
       "parity_bucket": "conformance-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.diff",
       "version": "2023.1"
@@ -1767,7 +1767,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
       "parity_bucket": "live-tested",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-tested",
       "uri": "ak.wwise.core.object.get",
       "version": "2023.1",
@@ -1801,7 +1801,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.getAttenuationCurve",
       "parity_bucket": "conformance-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.getAttenuationCurve",
       "version": "2023.1"
@@ -1829,7 +1829,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.getPropertyAndReferenceNames",
       "parity_bucket": "conformance-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.getPropertyAndReferenceNames",
       "version": "2023.1"
@@ -1857,7 +1857,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.getPropertyInfo",
       "parity_bucket": "conformance-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.getPropertyInfo",
       "version": "2023.1"
@@ -1885,7 +1885,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.getTypes",
       "parity_bucket": "conformance-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.getTypes",
       "version": "2023.1"
@@ -1913,7 +1913,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.isLinked",
       "parity_bucket": "conformance-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.isLinked",
       "version": "2023.1"
@@ -1941,7 +1941,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.isPropertyEnabled",
       "parity_bucket": "conformance-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.isPropertyEnabled",
       "version": "2023.1"
@@ -1969,7 +1969,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.move",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.move",
       "version": "2023.1"
@@ -1997,7 +1997,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.nameChanged",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.nameChanged",
       "version": "2023.1"
@@ -2025,7 +2025,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.notesChanged",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.notesChanged",
       "version": "2023.1"
@@ -2053,7 +2053,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.pasteProperties",
       "parity_bucket": "conformance-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.pasteProperties",
       "version": "2023.1"
@@ -2081,7 +2081,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.postDeleted",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.postDeleted",
       "version": "2023.1"
@@ -2109,7 +2109,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.preDeleted",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.preDeleted",
       "version": "2023.1"
@@ -2137,7 +2137,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.propertyChanged",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.propertyChanged",
       "version": "2023.1"
@@ -2165,7 +2165,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.referenceChanged",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.referenceChanged",
       "version": "2023.1"
@@ -2195,7 +2195,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.set",
       "parity_bucket": "sandbox-mutating-tested",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.object.set",
       "version": "2023.1",
@@ -2229,7 +2229,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.setAttenuationCurve",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.setAttenuationCurve",
       "version": "2023.1"
@@ -2257,7 +2257,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.setLinked",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.setLinked",
       "version": "2023.1"
@@ -2285,7 +2285,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.setName",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.setName",
       "version": "2023.1"
@@ -2313,7 +2313,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.setNotes",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.setNotes",
       "version": "2023.1"
@@ -2341,7 +2341,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.setProperty",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.setProperty",
       "version": "2023.1"
@@ -2369,7 +2369,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.setRandomizer",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.setRandomizer",
       "version": "2023.1"
@@ -2397,7 +2397,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.setReference",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.setReference",
       "version": "2023.1"
@@ -2425,7 +2425,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.setStateGroups",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.setStateGroups",
       "version": "2023.1"
@@ -2453,7 +2453,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.setStateProperties",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.object.setStateProperties",
       "version": "2023.1"
@@ -2477,7 +2477,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.captureLog.itemAdded",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.captureLog.itemAdded",
       "version": "2023.1"
@@ -2501,7 +2501,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.enableProfilerData",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.enableProfilerData",
       "version": "2023.1"
@@ -2525,7 +2525,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.gameObjectRegistered",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.gameObjectRegistered",
       "version": "2023.1"
@@ -2549,7 +2549,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.gameObjectReset",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.gameObjectReset",
       "version": "2023.1"
@@ -2573,7 +2573,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.gameObjectUnregistered",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.gameObjectUnregistered",
       "version": "2023.1"
@@ -2597,7 +2597,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.getAudioObjects",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.getAudioObjects",
       "version": "2023.1"
@@ -2621,7 +2621,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.getBusses",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.getBusses",
       "version": "2023.1"
@@ -2645,7 +2645,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.getCpuUsage",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.getCpuUsage",
       "version": "2023.1"
@@ -2669,7 +2669,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.getCursorTime",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.getCursorTime",
       "version": "2023.1"
@@ -2693,7 +2693,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.getGameObjects",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.getGameObjects",
       "version": "2023.1"
@@ -2717,7 +2717,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.getLoadedMedia",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.getLoadedMedia",
       "version": "2023.1"
@@ -2741,7 +2741,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.getPerformanceMonitor",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.getPerformanceMonitor",
       "version": "2023.1"
@@ -2765,7 +2765,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.getRTPCs",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.getRTPCs",
       "version": "2023.1"
@@ -2789,7 +2789,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.getStreamedMedia",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.getStreamedMedia",
       "version": "2023.1"
@@ -2813,7 +2813,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.getVoiceContributions",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.getVoiceContributions",
       "version": "2023.1"
@@ -2837,7 +2837,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.getVoices",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.getVoices",
       "version": "2023.1"
@@ -2861,7 +2861,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.saveCapture",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.saveCapture",
       "version": "2023.1"
@@ -2885,7 +2885,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.startCapture",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.startCapture",
       "version": "2023.1"
@@ -2909,7 +2909,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.stateChanged",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.stateChanged",
       "version": "2023.1"
@@ -2933,7 +2933,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.stopCapture",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.stopCapture",
       "version": "2023.1"
@@ -2957,7 +2957,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.profiler.switchChanged",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.profiler.switchChanged",
       "version": "2023.1"
@@ -2985,7 +2985,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.project.loaded",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.project.loaded",
       "version": "2023.1"
@@ -3013,7 +3013,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.project.postClosed",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.project.postClosed",
       "version": "2023.1"
@@ -3041,7 +3041,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.project.preClosed",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.project.preClosed",
       "version": "2023.1"
@@ -3065,7 +3065,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.project.save",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.core.project.save",
       "version": "2023.1"
@@ -3093,7 +3093,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.project.saved",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.project.saved",
       "version": "2023.1"
@@ -3117,7 +3117,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.remote.connect",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.remote.connect",
       "version": "2023.1"
@@ -3141,7 +3141,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.remote.disconnect",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.remote.disconnect",
       "version": "2023.1"
@@ -3165,7 +3165,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.remote.getAvailableConsoles",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.remote.getAvailableConsoles",
       "version": "2023.1"
@@ -3189,7 +3189,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.remote.getConnectionStatus",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.remote.getConnectionStatus",
       "version": "2023.1"
@@ -3217,7 +3217,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.sound.setActiveSource",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.sound.setActiveSource",
       "version": "2023.1"
@@ -3245,7 +3245,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.soundbank.convertExternalSources",
       "parity_bucket": "conformance-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.soundbank.convertExternalSources",
       "version": "2023.1"
@@ -3273,7 +3273,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.soundbank.generate",
       "parity_bucket": "conformance-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.soundbank.generate",
       "version": "2023.1"
@@ -3301,7 +3301,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.soundbank.generated",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.soundbank.generated",
       "version": "2023.1"
@@ -3329,7 +3329,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.soundbank.generationDone",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.soundbank.generationDone",
       "version": "2023.1"
@@ -3357,7 +3357,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.soundbank.getInclusions",
       "parity_bucket": "conformance-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.soundbank.getInclusions",
       "version": "2023.1"
@@ -3385,7 +3385,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.soundbank.processDefinitionFiles",
       "parity_bucket": "conformance-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.soundbank.processDefinitionFiles",
       "version": "2023.1"
@@ -3415,7 +3415,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.soundbank.setInclusions",
       "parity_bucket": "sandbox-mutating-tested",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.soundbank.setInclusions",
       "version": "2023.1",
@@ -3445,7 +3445,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.sourceControl.add",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.core.sourceControl.add",
       "version": "2023.1"
@@ -3469,7 +3469,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.sourceControl.checkOut",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.core.sourceControl.checkOut",
       "version": "2023.1"
@@ -3493,7 +3493,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.sourceControl.commit",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.core.sourceControl.commit",
       "version": "2023.1"
@@ -3521,7 +3521,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.sourceControl.delete",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.sourceControl.delete",
       "version": "2023.1"
@@ -3545,7 +3545,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.sourceControl.getSourceFiles",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.core.sourceControl.getSourceFiles",
       "version": "2023.1"
@@ -3569,7 +3569,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.sourceControl.getStatus",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.core.sourceControl.getStatus",
       "version": "2023.1"
@@ -3597,7 +3597,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.sourceControl.move",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.sourceControl.move",
       "version": "2023.1"
@@ -3621,7 +3621,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.sourceControl.revert",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.core.sourceControl.revert",
       "version": "2023.1"
@@ -3649,7 +3649,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.sourceControl.setProvider",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.sourceControl.setProvider",
       "version": "2023.1"
@@ -3679,7 +3679,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.switchContainer.addAssignment",
       "parity_bucket": "sandbox-mutating-tested",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.switchContainer.addAssignment",
       "version": "2023.1",
@@ -3713,7 +3713,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.switchContainer.assignmentAdded",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.switchContainer.assignmentAdded",
       "version": "2023.1"
@@ -3741,7 +3741,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.switchContainer.assignmentRemoved",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.switchContainer.assignmentRemoved",
       "version": "2023.1"
@@ -3769,7 +3769,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.switchContainer.getAssignments",
       "parity_bucket": "conformance-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "live-candidate",
       "uri": "ak.wwise.core.switchContainer.getAssignments",
       "version": "2023.1"
@@ -3799,7 +3799,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.switchContainer.removeAssignment",
       "parity_bucket": "sandbox-mutating-tested",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.switchContainer.removeAssignment",
       "version": "2023.1",
@@ -3829,7 +3829,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.transport.create",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.transport.create",
       "version": "2023.1"
@@ -3853,7 +3853,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.transport.destroy",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.transport.destroy",
       "version": "2023.1"
@@ -3877,7 +3877,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.transport.executeAction",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.transport.executeAction",
       "version": "2023.1"
@@ -3901,7 +3901,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.transport.getList",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.transport.getList",
       "version": "2023.1"
@@ -3925,7 +3925,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.transport.getState",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.transport.getState",
       "version": "2023.1"
@@ -3949,7 +3949,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.transport.prepare",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.transport.prepare",
       "version": "2023.1"
@@ -3973,7 +3973,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.transport.stateChanged",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.transport.stateChanged",
       "version": "2023.1"
@@ -3997,7 +3997,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.transport.useOriginals",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.core.transport.useOriginals",
       "version": "2023.1"
@@ -4027,7 +4027,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.undo.beginGroup",
       "parity_bucket": "sandbox-mutating-tested",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.undo.beginGroup",
       "version": "2023.1",
@@ -4057,7 +4057,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.undo.cancelGroup",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.core.undo.cancelGroup",
       "version": "2023.1"
@@ -4087,7 +4087,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.undo.endGroup",
       "parity_bucket": "sandbox-mutating-tested",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.undo.endGroup",
       "version": "2023.1",
@@ -4117,7 +4117,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.undo.redo",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.core.undo.redo",
       "version": "2023.1"
@@ -4147,7 +4147,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.undo.undo",
       "parity_bucket": "sandbox-mutating-tested",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "sandbox-mutating-tested",
       "uri": "ak.wwise.core.undo.undo",
       "version": "2023.1",
@@ -4177,7 +4177,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.debug.assertFailed",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.debug.assertFailed",
       "version": "2023.1"
@@ -4201,7 +4201,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.debug.enableAsserts",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.debug.enableAsserts",
       "version": "2023.1"
@@ -4225,7 +4225,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.debug.enableAutomationMode",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.debug.enableAutomationMode",
       "version": "2023.1"
@@ -4249,7 +4249,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.debug.generateToneWAV",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.debug.generateToneWAV",
       "version": "2023.1"
@@ -4273,7 +4273,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.debug.getWalTree",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.debug.getWalTree",
       "version": "2023.1"
@@ -4297,7 +4297,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.debug.restartWaapiServers",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.debug.restartWaapiServers",
       "version": "2023.1"
@@ -4321,7 +4321,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.debug.testAssert",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.debug.testAssert",
       "version": "2023.1"
@@ -4345,7 +4345,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.debug.testCrash",
       "parity_bucket": "excluded",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.debug.testCrash",
       "version": "2023.1"
@@ -4369,7 +4369,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.ui.bringToForeground",
       "parity_bucket": "wrapper-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.ui.bringToForeground",
       "version": "2023.1"
@@ -4393,7 +4393,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.ui.captureScreen",
       "parity_bucket": "wrapper-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.ui.captureScreen",
       "version": "2023.1"
@@ -4417,7 +4417,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.ui.commands.execute",
       "parity_bucket": "wrapper-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.ui.commands.execute",
       "version": "2023.1"
@@ -4441,7 +4441,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.ui.commands.executed",
       "parity_bucket": "wrapper-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.ui.commands.executed",
       "version": "2023.1"
@@ -4465,7 +4465,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.ui.commands.getCommands",
       "parity_bucket": "wrapper-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.ui.commands.getCommands",
       "version": "2023.1"
@@ -4489,7 +4489,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.ui.commands.register",
       "parity_bucket": "wrapper-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.ui.commands.register",
       "version": "2023.1"
@@ -4513,7 +4513,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.ui.commands.unregister",
       "parity_bucket": "wrapper-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.ui.commands.unregister",
       "version": "2023.1"
@@ -4537,7 +4537,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.ui.getSelectedObjects",
       "parity_bucket": "wrapper-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.ui.getSelectedObjects",
       "version": "2023.1"
@@ -4561,7 +4561,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.ui.project.close",
       "parity_bucket": "wrapper-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.ui.project.close",
       "version": "2023.1"
@@ -4585,7 +4585,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.ui.project.create",
       "parity_bucket": "wrapper-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.ui.project.create",
       "version": "2023.1"
@@ -4609,7 +4609,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.ui.project.open",
       "parity_bucket": "wrapper-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.ui.project.open",
       "version": "2023.1"
@@ -4633,7 +4633,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.ui.selectionChanged",
       "parity_bucket": "wrapper-only",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "excluded",
       "uri": "ak.wwise.ui.selectionChanged",
       "version": "2023.1"
@@ -4657,7 +4657,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.waapi.getFunctions",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.waapi.getFunctions",
       "version": "2023.1"
@@ -4681,7 +4681,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.waapi.getSchema",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.waapi.getSchema",
       "version": "2023.1"
@@ -4705,7 +4705,7 @@
       "manifest_source_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.waapi.getTopics",
       "parity_bucket": "deferred",
       "phase1_inventory_status": "reflected-schema-ok",
-      "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+      "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
       "target_status": "untested",
       "uri": "ak.wwise.waapi.getTopics",
       "version": "2023.1"
@@ -4724,7 +4724,7 @@
       "sandbox-mutating-tested": "Sandbox mutating parity requires 2023.1 execution evidence plus state/readback assertion and cleanup.",
       "wrapper-only": "Wrapper-only parity preserves schema/route diagnostics for policy-blocked families while denying behavioral/live credit."
     },
-    "source_coverage_uri": "resources/coverage/2023.1/api-coverage.json",
+    "source_coverage_uri": "resources/capabilities/2023.1/api-coverage.json",
     "status_policy": "No 2023.1 URI is live-tested by manifest reflection alone; manifest reflection alone is never behavioral support; live-tested requires asserted 2023.1 execution evidence.",
     "version": "2023.1",
     "wwise_build": "2023.1.19.8928"

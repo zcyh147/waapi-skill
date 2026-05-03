@@ -68,7 +68,7 @@
     "live_command": "WWISE_LIVE=1 WWISE_SAMPLE_PROJECT_PATH=$WWISE_SAMPLE_PROJECT_PATH python -m pytest tests/live/test_profiler_transport_soundengine.py -q",
     "sandbox_policy": "Each live test prepares a copied Task 3 SampleProject sandbox and launches WwiseConsole against the sandbox only.",
     "source_immutability_hash": "source .wproj mtime plus bounded hash_project over the immutable SampleProject source",
-    "source_matrix": "resources/coverage/2022.1/live-coverage-matrix.json",
+    "source_matrix": "resources/capabilities/2022.1/live-coverage-matrix.json",
     "task": "9. Add profiler, transport, and soundengine-backed feasibility coverage",
     "unit_command": "python -m pytest tests/unit/test_profiler_soundengine_feasibility.py -q",
     "version": "2022.1"

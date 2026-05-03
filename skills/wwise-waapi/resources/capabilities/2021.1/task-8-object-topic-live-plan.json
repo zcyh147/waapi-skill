@@ -3,7 +3,7 @@
     "version": "2021.1",
     "task": "8. Port Safe Topic Behavior Harnesses to 2021.1, 2024.1, and 2025.1",
     "source_manifest": "resources/manifest/2021.1/topics.json",
-    "source_pattern": "resources/coverage/2022.1/task-4-core-object-deferred-plan.json",
+    "source_pattern": "resources/capabilities/2022.1/task-4-core-object-deferred-plan.json",
     "live_command": "WWISE_VERSION=2021.1 WWISE_LIVE=1 python -m pytest tests/live/test_2021_1_object_topics_sandbox.py -q",
     "active_live_smoke_status": "blocked-by-no-Wwise-launch-instruction",
     "unit_command": "python -m pytest tests/unit/test_topic_live_plan.py -q"

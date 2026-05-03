@@ -125,7 +125,7 @@
     "version": "2023.1",
     "policy_lock": {
       "date": "2026-05-01",
-      "evidence_source": "resources/coverage/2023.1/api-coverage.json + resources/deferred/2023.1.json + resources/coverage/2023.1/phase21-uri-policy.json",
+      "evidence_source": "resources/capabilities/2023.1/api-coverage.json + resources/deferred/2023.1.json + resources/capabilities/2023.1/phase21-uri-policy.json",
       "scope": "profiler, transport, soundengine, UI, CLI, remote, and debug category counts remain excluded with no behavioral/live promotion.",
       "future_review_trigger": "Revisit only with explicit family-specific 2023.1 fixture approval and behavior-backed evidence."
     }

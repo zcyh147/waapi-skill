@@ -10,7 +10,7 @@ from wwise_waapi.deferred_registry import DeferredRegistry, REQUIRED_COVERAGE_FI
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2024.1"
 DEFERRED_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "deferred" / f"{VERSION}.json"
-COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION / "api-coverage.json"
+COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION / "api-coverage.json"
 REQUIRED_EXCLUDED_FAMILIES = {"profiler", "transport", "soundengine", "UI", "CLI", "remote", "debug"}
 PROMOTED_READ_ONLY_URI = "ak.wwise.core.object.get"
 SANDBOX_MUTATING_TESTED_URIS = {

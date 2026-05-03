@@ -4,7 +4,7 @@
     "wwise_version_target": "2022.1",
     "uri": "ak.wwise.core.object.get",
     "schema_source": "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get",
-    "reference": "references/waql-2022.1.md",
+    "reference": "resources/waql/2022.1/object-get-live-matrix.json",
     "gap_evidence": ".sisyphus/evidence/task-8-waql-missing.md",
     "sandbox_required": true,
     "source_project_mutation_allowed": false,
@@ -53,9 +53,8 @@
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql/path_actor_mixer_root.json",
       "no_mutation": true,
       "sources": [
-        "waql-2022.1.md lines 24-28",
-        "waql-2022.1.md lines 82-90",
-        "schemas.json lines 3538-3558"
+        "resources/waql/2022.1/object-get-live-matrix.json#live_cases.path_actor_mixer_root",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
       ]
     },
     {
@@ -98,8 +97,8 @@
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql/guid_actor_mixer_root.json",
       "no_mutation": true,
       "sources": [
-        "waql-2022.1.md lines 24-28",
-        "waql-2022.1.md lines 90-94"
+        "resources/waql/2022.1/object-get-live-matrix.json#live_cases.guid_actor_mixer_root",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
       ]
     },
     {
@@ -135,8 +134,8 @@
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql/sound_name_type_filter.json",
       "no_mutation": true,
       "sources": [
-        "waql-2022.1.md lines 28-39",
-        "waql-2022.1.md lines 54-55"
+        "resources/waql/2022.1/object-get-live-matrix.json#live_cases.sound_name_type_filter",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
       ]
     },
     {
@@ -174,8 +173,8 @@
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql/quoted_search_default_work_unit.json",
       "no_mutation": true,
       "sources": [
-        "waql-2022.1.md lines 29-30",
-        "waql-2022.1.md lines 78-87"
+        "resources/waql/2022.1/object-get-live-matrix.json#live_cases.quoted_search_default_work_unit",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
       ]
     },
     {
@@ -211,8 +210,8 @@
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql/descendant_traversal_actor_mixer.json",
       "no_mutation": true,
       "sources": [
-        "waql-2022.1.md lines 47-52",
-        "waql-2022.1.md lines 116-121"
+        "resources/waql/2022.1/object-get-live-matrix.json#live_cases.descendant_traversal_actor_mixer",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
       ]
     },
     {
@@ -254,7 +253,8 @@
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql/ancestor_traversal_from_discovered_descendant.json",
       "no_mutation": true,
       "sources": [
-        "waql-2022.1.md lines 47-52"
+        "resources/waql/2022.1/object-get-live-matrix.json#live_cases.ancestor_traversal_from_discovered_descendant",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
       ]
     },
     {
@@ -296,8 +296,8 @@
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql/children_count_property_comparison.json",
       "no_mutation": true,
       "sources": [
-        "waql-2022.1.md lines 36-44",
-        "waql-2022.1.md lines 63-69"
+        "resources/waql/2022.1/object-get-live-matrix.json#live_cases.children_count_property_comparison",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
       ]
     },
     {
@@ -336,8 +336,8 @@
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql/return_options_selection.json",
       "no_mutation": true,
       "sources": [
-        "waql-2022.1.md lines 88-94",
-        "schemas.json lines 3545-3558"
+        "resources/waql/2022.1/object-get-live-matrix.json#live_cases.return_options_selection",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
       ]
     },
     {
@@ -369,8 +369,8 @@
       "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql/empty_results_missing_name.json",
       "no_mutation": true,
       "sources": [
-        "waql-2022.1.md lines 26-32",
-        "waql-2022.1.md lines 88-94"
+        "resources/waql/2022.1/object-get-live-matrix.json#live_cases.empty_results_missing_name",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
       ]
     }
   ],
@@ -382,8 +382,8 @@
       "blocked_behavior": "Do not generate helpers that depend on a stable malformed-WAQL error payload schema.",
       "example_query": "from type Sound where",
       "references": [
-        "waql-2022.1.md lines 140-141",
-        "waql-2022.1.md lines 147-150",
+        "resources/waql/2022.1/object-get-live-matrix.json#fail_closed_gaps.invalid_syntax_error_payload_schema",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get",
         "task-8-waql-missing.md lines 5-8"
       ],
       "reason": "Sources do not document WAAPI JSON error shapes for WAQL syntax or compilation errors.",
@@ -396,8 +396,8 @@
       "blocked_behavior": "Do not treat mutating words in WAQL as supported or safe.",
       "example_query": "from type Sound delete",
       "references": [
-        "waql-2022.1.md lines 98-132",
-        "waql-2022.1.md lines 145-151",
+        "resources/waql/2022.1/object-get-live-matrix.json#fail_closed_gaps.mutation_semantics_rejection",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get",
         "task-8-waql-missing.md line 9"
       ],
       "reason": "Stored examples and source notes cover read-only object.get queries only.",
@@ -410,8 +410,8 @@
       "blocked_behavior": "Do not synthesize raw WAQL string-literal escaping rules for embedded quotes or special characters beyond normal JSON escaping.",
       "example_query": "from search \"name with embedded raw quote\"",
       "references": [
-        "waql-2022.1.md lines 78-87",
-        "waql-2022.1.md lines 145-148",
+        "resources/waql/2022.1/object-get-live-matrix.json#fail_closed_gaps.raw_quote_escaping_beyond_json",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get",
         "task-8-waql-missing.md line 5"
       ],
       "reason": "Sources document JSON escaping for the WAAPI string but not exhaustive raw WAQL literal escaping.",
@@ -424,8 +424,8 @@
       "blocked_behavior": "Do not generate exhaustive per-object-type property/reference helpers from the WAQL notes.",
       "example_query": "from type Sound where @UndocumentedProperty = 1",
       "references": [
-        "waql-2022.1.md lines 72-77",
-        "waql-2022.1.md lines 148-149",
+        "resources/waql/2022.1/object-get-live-matrix.json#fail_closed_gaps.exhaustive_property_reference_inventory",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get",
         "task-8-waql-missing.md line 6"
       ],
       "reason": "References explain property/reference prefixes but do not list every property/reference per Wwise type.",
@@ -438,8 +438,8 @@
       "blocked_behavior": "Do not claim timeout, memory, recursion depth, or pagination semantics for WAQL transforms.",
       "example_query": "from project select descendants",
       "references": [
-        "waql-2022.1.md lines 136-141",
-        "waql-2022.1.md lines 149-150",
+        "resources/waql/2022.1/object-get-live-matrix.json#fail_closed_gaps.performance_limit_semantics",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get",
         "task-8-waql-missing.md line 8"
       ],
       "reason": "Sources explicitly omit execution timeout, memory, recursion, and pagination limit rules beyond legacy range transforms.",

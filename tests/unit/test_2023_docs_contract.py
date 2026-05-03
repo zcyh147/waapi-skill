@@ -63,7 +63,7 @@ def test_2023_eval_examples_are_version_scoped() -> None:
     assert "2023.1" in serialized_entries
     assert "resources/semantic/2023.1/source_notes.json" in serialized_entries
     assert "references/semantic/2023.1/" in serialized_entries
-    assert "resources/coverage/2023.1/" in serialized_entries
+    assert "resources/capabilities/2023.1/" in serialized_entries
     assert "resources/deferred/2023.1.json" in serialized_entries
     assert "full 2023.1 WAAPI behavioral coverage" in serialized_entries
 

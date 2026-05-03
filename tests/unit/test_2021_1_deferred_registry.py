@@ -10,7 +10,7 @@ from wwise_waapi.deferred_registry import ApiClassifier, DeferredRegistry  # pyr
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERSION = "2021.1"
 DEFERRED_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "deferred" / f"{VERSION}.json"
-COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION / "api-coverage.json"
+COVERAGE_RESOURCE = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION / "api-coverage.json"
 FUNCTIONS_MANIFEST = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest" / VERSION / "functions.json"
 TOPICS_MANIFEST = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "manifest" / VERSION / "topics.json"
 
@@ -97,7 +97,7 @@ def test_2021_deferred_entries_include_task5_evidence_contract() -> None:
     classifier = ApiClassifier()
     encoded = json.dumps(_deferred_payload())
     assert not any(f"resources/manifest/{version}" in encoded for version in FORBIDDEN_NEWER_EVIDENCE)
-    assert not any(f"resources/coverage/{version}" in encoded for version in FORBIDDEN_NEWER_EVIDENCE)
+    assert not any(f"resources/capabilities/{version}" in encoded for version in FORBIDDEN_NEWER_EVIDENCE)
     assert not any(f"resources/deferred/{version}" in encoded for version in FORBIDDEN_NEWER_EVIDENCE)
 
     for entry in _deferred_payload()["deferred"]:

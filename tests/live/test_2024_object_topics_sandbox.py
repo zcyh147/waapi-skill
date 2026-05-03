@@ -17,7 +17,7 @@ from tests.live.versioned_object_topics_sandbox import run_versioned_topic_plan 
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLAN_PATH = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "coverage" / VERSION / "task-8-object-topic-live-plan.json"
+PLAN_PATH = REPO_ROOT / "skills" / "wwise-waapi" / "resources" / "capabilities" / VERSION / "task-8-object-topic-live-plan.json"
 
 
 @pytest.mark.live

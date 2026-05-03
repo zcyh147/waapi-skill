@@ -20,7 +20,7 @@ TASK3_RESOURCE_PATH = (
     / "skills"
     / "wwise-waapi"
     / "resources"
-    / "coverage"
+    / "capabilities"
     / "2022.1"
     / "task-3-profiler-capability.json"
 )
@@ -29,7 +29,7 @@ TASK5_RESOURCE_PATH = (
     / "skills"
     / "wwise-waapi"
     / "resources"
-    / "coverage"
+    / "capabilities"
     / "2022.1"
     / "task-5-profiler-soundengine-evidence.json"
 )

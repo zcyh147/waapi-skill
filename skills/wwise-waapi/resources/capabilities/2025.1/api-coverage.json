@@ -17,7 +17,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -113,7 +113,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -201,7 +201,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -290,7 +290,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -378,7 +378,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -471,7 +471,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -559,7 +559,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -648,7 +648,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -738,7 +738,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -827,7 +827,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -918,7 +918,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -1006,7 +1006,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -1096,7 +1096,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -1188,7 +1188,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -1282,7 +1282,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -1372,7 +1372,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -1464,7 +1464,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -1558,7 +1558,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -1648,7 +1648,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -1739,7 +1739,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -1829,7 +1829,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -1919,7 +1919,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -2010,7 +2010,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -2096,7 +2096,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -2188,7 +2188,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -2276,7 +2276,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -2364,7 +2364,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -2459,7 +2459,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -2557,7 +2557,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -2652,7 +2652,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -2748,7 +2748,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -2847,7 +2847,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -2973,7 +2973,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -3069,7 +3069,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -3161,7 +3161,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -3253,7 +3253,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -3356,7 +3356,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -3448,7 +3448,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -3543,7 +3543,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -3644,7 +3644,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -3730,7 +3730,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -3820,7 +3820,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -3910,7 +3910,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -4010,7 +4010,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/destructive/test_2025_1_soundbank_audio_sandbox.py"
       },
@@ -4110,7 +4110,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -4293,7 +4293,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -4383,7 +4383,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -4467,7 +4467,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -4551,7 +4551,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -4643,7 +4643,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -4733,7 +4733,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -4835,7 +4835,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -4933,7 +4933,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -5029,7 +5029,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -5125,7 +5125,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -5215,7 +5215,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -5305,7 +5305,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -5399,7 +5399,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -5493,7 +5493,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -5603,7 +5603,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -5715,7 +5715,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -5805,7 +5805,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -5891,7 +5891,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -6067,7 +6067,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -6160,7 +6160,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -6594,7 +6594,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -6693,7 +6693,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/destructive/test_2025_1_project_mutation_sandbox.py"
       },
@@ -6976,7 +6976,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/destructive/test_2025_1_project_mutation_sandbox.py"
       },
@@ -7065,7 +7065,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -7164,7 +7164,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/live/test_2025_1_waql_live_matrix.py"
       },
@@ -7254,7 +7254,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -7349,7 +7349,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -7438,7 +7438,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -7536,7 +7536,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -7622,7 +7622,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -7716,7 +7716,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -7810,7 +7810,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -8076,7 +8076,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -8528,7 +8528,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/destructive/test_2025_1_project_mutation_sandbox.py"
       },
@@ -8622,7 +8622,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -8717,7 +8717,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -8811,7 +8811,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -8901,7 +8901,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -8991,7 +8991,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -9084,7 +9084,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -9175,7 +9175,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -9268,7 +9268,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -9358,7 +9358,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -9535,7 +9535,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -9709,7 +9709,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -10049,7 +10049,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -10144,7 +10144,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -10239,7 +10239,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -10331,7 +10331,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -10423,7 +10423,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -10515,7 +10515,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -10607,7 +10607,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -10699,7 +10699,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -10791,7 +10791,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -10883,7 +10883,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -10975,7 +10975,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -11068,7 +11068,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -11163,7 +11163,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -11255,7 +11255,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -11343,7 +11343,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -11431,7 +11431,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -11523,7 +11523,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -11696,7 +11696,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -11869,7 +11869,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -12209,7 +12209,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -12379,7 +12379,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -12470,7 +12470,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -12558,7 +12558,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -12827,7 +12827,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -12917,7 +12917,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -13011,7 +13011,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/destructive/test_2025_1_soundbank_audio_sandbox.py"
       },
@@ -13103,7 +13103,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -13195,7 +13195,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -13287,7 +13287,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -13381,7 +13381,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -13473,7 +13473,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -13568,7 +13568,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -13662,7 +13662,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -13756,7 +13756,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -13848,7 +13848,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -13952,7 +13952,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py"
       },
@@ -14214,7 +14214,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -14310,7 +14310,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py"
       },
@@ -14400,7 +14400,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -14491,7 +14491,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -14579,7 +14579,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -14668,7 +14668,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -14754,7 +14754,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -14846,7 +14846,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -15022,7 +15022,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -15116,7 +15116,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/destructive/test_2025_1_project_mutation_sandbox.py"
       },
@@ -15200,7 +15200,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -15292,7 +15292,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/destructive/test_2025_1_project_mutation_sandbox.py"
       },
@@ -15380,7 +15380,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -15470,7 +15470,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/destructive/test_2025_1_project_mutation_sandbox.py"
       },
@@ -15554,7 +15554,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -15642,7 +15642,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -15814,7 +15814,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -15902,7 +15902,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -15990,7 +15990,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -16090,7 +16090,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -16178,7 +16178,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -16262,7 +16262,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -16346,7 +16346,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -16430,7 +16430,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -16521,7 +16521,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -16612,7 +16612,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -16698,7 +16698,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -16794,7 +16794,7 @@
           "resources/manifest/2025.1/functions.json",
           "resources/manifest/2025.1/added-since-2024.1.json",
           "resources/semantic/2025.1/source_notes.json",
-          "resources/coverage/2025.1/added-api-classification.json"
+          "resources/capabilities/2025.1/added-api-classification.json"
         ],
         "test": "tests/unit/test_2025_1_api_resource_coverage.py"
       },
@@ -16866,9 +16866,9 @@
   ],
   "metadata": {
     "baseline_comparison": {
-      "baseline_coverage_resource": "resources/coverage/2024.1/api-coverage.json",
+      "baseline_coverage_resource": "resources/capabilities/2024.1/api-coverage.json",
       "baseline_deferred_resource": "resources/deferred/2024.1.json",
-      "baseline_matrix_resource": "resources/coverage/2024.1/live-coverage-matrix.json",
+      "baseline_matrix_resource": "resources/capabilities/2024.1/live-coverage-matrix.json",
       "baseline_reflected_count": 148,
       "baseline_status_counts": {
         "deferred": 64,
@@ -16926,7 +16926,7 @@
       "sandbox-mutating-tested"
     ],
     "status_policy": "All 2025.1 functions are deferred or excluded until fresh 2025.1 live/destructive evidence is added; Task 6 candidate statuses are planning metadata only.",
-    "task6_classification": "resources/coverage/2025.1/added-api-classification.json",
+    "task6_classification": "resources/capabilities/2025.1/added-api-classification.json",
     "version": "2025.1"
   },
   "summary": {

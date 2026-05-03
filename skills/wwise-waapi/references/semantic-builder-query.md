@@ -14,7 +14,7 @@
 
 - https://www.audiokinetic.com/library/2025.1.3_9037/?id=waql_reference.html
 - https://www.audiokinetic.com/en/library/edge/?id=ak_wwise_core_object_get.html
-- `references/waql-2022.1.md`
+- `resources/waql/2022.1/object-get-live-matrix.json`
 - NotebookLM notebook `wwise-2022.1-docs`, cited answer for WAQL and `ak.wwise.core.object.get`.
 
 ## Endpoint list
