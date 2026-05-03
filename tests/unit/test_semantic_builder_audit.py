@@ -65,8 +65,8 @@ def test_source_notes_are_grounded_and_exclude_out_of_scope_families() -> None:
     for family in INCLUDED_FAMILIES:
         note = notes[family]
         assert note["status"] == "grounded"
-        assert note["notebook_id"] == "wwise-2022.1-docs"
-        assert note["gate_evidence_path"] == "references/semantic-builder-notebooklm-gate.md"
+        assert "notebook_id" not in note
+        assert "gate_evidence_path" not in note
         assert note["endpoints"] == list(EXPECTED_SOURCE_NOTE_URI_INVENTORY[family])
         assert set(note["required_fields"]) <= set(note["cited_required_fields"])
 

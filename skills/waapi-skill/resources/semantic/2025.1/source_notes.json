@@ -1,14 +1,11 @@
 {
   "version": "2025.1",
-  "notebook_id": "wwise-2025.1-docs",
   "protocol": "references/semantic/2025.1/semantic-builder-protocol.md",
   "notes": {
     "query": {
       "family": "query",
       "status": "grounded",
-      "notebook_id": "wwise-2025.1-docs",
       "version_target": "2025.1",
-      "gate_evidence_path": "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
       "official_urls": [
         "https://www.audiokinetic.com/en/public-library/2025.1.7_6590/?id=waapi.html",
         "https://www.audiokinetic.com/en/public-library/2025.1.7_6590/?id=waapi_functions_index.html",
@@ -16,7 +13,6 @@
         "https://www.audiokinetic.com/en/public-library/2025.1.7_6590/?id=ak_wwise_core_object_get.html"
       ],
       "source_urls": [
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
         "references/semantic/2025.1/semantic-builder-query.md"
       ],
       "endpoints": [
@@ -42,9 +38,7 @@
     "object-mutation": {
       "family": "object-mutation",
       "status": "grounded",
-      "notebook_id": "wwise-2025.1-docs",
       "version_target": "2025.1",
-      "gate_evidence_path": "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
       "official_urls": [
         "https://www.audiokinetic.com/en/public-library/2025.1.7_6590/?id=waapi.html",
         "https://www.audiokinetic.com/en/public-library/2025.1.7_6590/?id=waapi_functions_index.html",
@@ -61,7 +55,6 @@
         "https://www.audiokinetic.com/en/public-library/2025.1.7_6590/?id=ak_wwise_core_object_structurechanged.html"
       ],
       "source_urls": [
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
         "references/semantic/2025.1/semantic-builder-object-mutation.md"
       ],
       "endpoints": [
@@ -121,9 +114,7 @@
     "property-reference": {
       "family": "property-reference",
       "status": "grounded",
-      "notebook_id": "wwise-2025.1-docs",
       "version_target": "2025.1",
-      "gate_evidence_path": "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
       "official_urls": [
         "https://www.audiokinetic.com/en/public-library/2025.1.7_6590/?id=waapi.html",
         "https://www.audiokinetic.com/en/public-library/2025.1.7_6590/?id=waapi_functions_index.html",
@@ -142,7 +133,6 @@
         "https://www.audiokinetic.com/en/public-library/2025.1.7_6590/?id=ak_wwise_core_object_islinked.html"
       ],
       "source_urls": [
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
         "references/semantic/2025.1/semantic-builder-property-reference.md"
       ],
       "endpoints": [
@@ -180,7 +170,7 @@
         "return array for propertyChanged and referenceChanged topic subscriptions"
       ],
       "return_shape": "Getters return type metadata, property and reference names, property metadata, enabled status, linked status, or attenuation curve data. Setters return empty JSON objects. propertyChanged publishes object, property, old value, new value, and platform when applicable. referenceChanged publishes object, reference, old reference, new reference, and platform when applicable.",
-      "destructive_behavior": "Mutating setters overwrite names, notes, properties, references, randomizers, or attenuation curves. Getter endpoints are read-only. setStateProperties was called out by NotebookLM as destructive because it removes previous state properties, but it is not part of this builder family inventory.",
+      "destructive_behavior": "Mutating setters overwrite names, notes, properties, references, randomizers, or attenuation curves. Getter endpoints are read-only. setStateProperties was called out by source evidence as destructive because it removes previous state properties, but it is not part of this builder family inventory.",
       "ambiguity_constraints": "Use explicit platform values when touching platform-linked data. getPropertyInfo and getPropertyAndReferenceNames need one identity scope, object or classId. getPropertyInfo describes metadata and does not read the current object value. 2025.1 hierarchy labels use Containers, Busses, Devices, and Property Container.",
       "unsupported_cases": "getPropertyNames is deprecated and replaced by getPropertyAndReferenceNames. Constrained references must not be set without proving the structural setup order. Use object.get to read current property values instead of getPropertyInfo.",
       "cited_required_fields": [
@@ -201,9 +191,7 @@
     "import": {
       "family": "import",
       "status": "grounded",
-      "notebook_id": "wwise-2025.1-docs",
       "version_target": "2025.1",
-      "gate_evidence_path": "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
       "official_urls": [
         "https://www.audiokinetic.com/en/public-library/2025.1.7_6590/?id=waapi.html",
         "https://www.audiokinetic.com/en/public-library/2025.1.7_6590/?id=waapi_functions_index.html",
@@ -213,7 +201,6 @@
         "https://www.audiokinetic.com/en/public-library/2025.1.7_6590/?id=ak_wwise_core_audio_imported.html"
       ],
       "source_urls": [
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
         "references/semantic/2025.1/semantic-builder-import.md"
       ],
       "endpoints": [
@@ -254,9 +241,7 @@
     "soundbank": {
       "family": "soundbank",
       "status": "grounded",
-      "notebook_id": "wwise-2025.1-docs",
       "version_target": "2025.1",
-      "gate_evidence_path": "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
       "official_urls": [
         "https://www.audiokinetic.com/en/public-library/2025.1.7_6590/?id=waapi.html",
         "https://www.audiokinetic.com/en/public-library/2025.1.7_6590/?id=waapi_functions_index.html",
@@ -270,7 +255,6 @@
         "https://www.audiokinetic.com/en/public-library/2025.1.7_6590/?id=ak_wwise_core_soundbank_generationdone.html"
       ],
       "source_urls": [
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
         "references/semantic/2025.1/semantic-builder-soundbank.md"
       ],
       "endpoints": [
@@ -321,9 +305,7 @@
     "switchcontainer": {
       "family": "switchcontainer",
       "status": "grounded",
-      "notebook_id": "wwise-2025.1-docs",
       "version_target": "2025.1",
-      "gate_evidence_path": "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
       "official_urls": [
         "https://www.audiokinetic.com/en/public-library/2025.1.7_6590/?id=waapi.html",
         "https://www.audiokinetic.com/en/public-library/2025.1.7_6590/?id=waapi_functions_index.html",
@@ -335,7 +317,6 @@
         "https://www.audiokinetic.com/en/public-library/2025.1.7_6590/?id=ak_wwise_core_switchcontainer_assignmentremoved.html"
       ],
       "source_urls": [
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
         "references/semantic/2025.1/semantic-builder-switchcontainer.md"
       ],
       "endpoints": [

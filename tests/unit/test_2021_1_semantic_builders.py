@@ -32,7 +32,7 @@ FAMILIES = (
 
 
 def source_note_checker_2021() -> SemanticSourceNoteChecker:
-    return SemanticSourceNoteChecker(notebook_id=NOTEBOOK_ID_2021)
+    return SemanticSourceNoteChecker()
 
 
 def assert_2021_preview(preview: SemanticPreview, *, family: BuilderFamily, uri: str, destructive: bool) -> None:
@@ -47,7 +47,6 @@ def assert_2021_preview(preview: SemanticPreview, *, family: BuilderFamily, uri:
     assert validation["uri"] == uri
     assert validation["version"] == VERSION_2021
     assert preview.envelope.metadata["source_note"]["version"] == VERSION_2021
-    assert preview.envelope.metadata["source_note"]["notebook_id"] == NOTEBOOK_ID_2021
     assert any(item.get("kind") == "source-note" for item in payload["evidence_plan"])
     assert any(item.get("kind") == "schema" for item in payload["evidence_plan"])
 
@@ -59,7 +58,6 @@ def test_2021_source_note_gate_opens_for_each_semantic_family(family: BuilderFam
     assert status.allowed is True
     assert status.family == family.value
     assert status.version == VERSION_2021
-    assert status.notebook_id == NOTEBOOK_ID_2021
     assert status.cited_fields
 
 

@@ -69,7 +69,6 @@ class SourceNoteCheck:
     allowed: bool
     family: str
     version: str = DEFAULT_WWISE_VERSION
-    notebook_id: str | None = None
     cited_fields: tuple[str, ...] = ()
     missing_fields: tuple[str, ...] = ()
     uncited_fields: tuple[str, ...] = ()
@@ -90,7 +89,6 @@ class SourceNoteCheck:
             "allowed": self.allowed,
             "family": self.family,
             "version": self.version,
-            "notebook_id": self.notebook_id,
             "cited_fields": list(self.cited_fields),
             "missing_fields": list(self.missing_fields),
             "uncited_fields": list(self.uncited_fields),

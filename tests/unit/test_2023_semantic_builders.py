@@ -32,7 +32,7 @@ GUID_C = "{33333333-3333-3333-3333-333333333333}"
 
 
 def source_note_checker_2023() -> SemanticSourceNoteChecker:
-    return SemanticSourceNoteChecker(notebook_id=NOTEBOOK_ID_2023)
+    return SemanticSourceNoteChecker()
 
 
 def assert_2023_preview(preview: SemanticPreview, *, family: BuilderFamily, uri: str, destructive: bool) -> None:
@@ -47,7 +47,6 @@ def assert_2023_preview(preview: SemanticPreview, *, family: BuilderFamily, uri:
     assert validation["uri"] == uri
     assert validation["version"] == VERSION_2023
     assert preview.envelope.metadata["source_note"]["version"] == VERSION_2023
-    assert preview.envelope.metadata["source_note"]["notebook_id"] == NOTEBOOK_ID_2023
 
 
 def assert_destructive_evidence(preview: SemanticPreview) -> None:

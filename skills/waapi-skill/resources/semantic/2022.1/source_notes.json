@@ -1,22 +1,18 @@
 {
   "version": "2022.1",
-  "notebook_id": "wwise-2022.1-docs",
   "protocol": "references/semantic-builder-protocol.md",
   "notes": {
     "query": {
       "family": "query",
       "status": "grounded",
-      "notebook_id": "wwise-2022.1-docs",
       "version_target": "2022.1",
-      "gate_evidence_path": "references/semantic-builder-notebooklm-gate.md",
       "official_urls": [
         "https://www.audiokinetic.com/library/2025.1.3_9037/?id=waql_reference.html",
         "https://www.audiokinetic.com/en/library/edge/?id=ak_wwise_core_object_get.html"
       ],
       "source_urls": [
-        "references/notebooklm-workflow.md",
         "resources/waql/2022.1/object-get-live-matrix.json",
-        "NotebookLM notebook wwise-2022.1-docs; cited answer for WAQL and ak.wwise.core.object.get"
+        "references/semantic-builder-query.md"
       ],
       "endpoints": [
         "ak.wwise.core.object.get"
@@ -40,16 +36,14 @@
     "object-mutation": {
       "family": "object-mutation",
       "status": "grounded",
-      "notebook_id": "wwise-2022.1-docs",
       "version_target": "2022.1",
-      "gate_evidence_path": "references/semantic-builder-notebooklm-gate.md",
       "official_urls": [
         "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_object_set.html",
         "https://www.audiokinetic.com/en/public-library/2024.1.4_8780/?id=ak_wwise_core_object_create_example_creating_a_random_container_with_two_sound_objects.html"
       ],
       "source_urls": [
         "resources/manifest/2022.1/schemas.json",
-        "NotebookLM notebook wwise-2022.1-docs; cited answer for object mutation and undo endpoints"
+        "references/semantic-builder-object-mutation.md"
       ],
       "endpoints": [
         "ak.wwise.core.object.create",
@@ -105,9 +99,7 @@
     "property-reference": {
       "family": "property-reference",
       "status": "grounded",
-      "notebook_id": "wwise-2022.1-docs",
       "version_target": "2022.1",
-      "gate_evidence_path": "references/semantic-builder-notebooklm-gate.md",
       "official_urls": [
         "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_object_setproperty.html",
         "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_object_setreference.html",
@@ -117,7 +109,7 @@
       ],
       "source_urls": [
         "resources/manifest/2022.1/schemas.json",
-        "NotebookLM notebook wwise-2022.1-docs; cited answer for property/reference endpoints"
+        "references/semantic-builder-property-reference.md"
       ],
       "endpoints": [
         "ak.wwise.core.object.getTypes",
@@ -170,16 +162,14 @@
     "import": {
       "family": "import",
       "status": "grounded",
-      "notebook_id": "wwise-2022.1-docs",
       "version_target": "2022.1",
-      "gate_evidence_path": "references/semantic-builder-notebooklm-gate.md",
       "official_urls": [
         "https://www.audiokinetic.com/en/public-library/2024.1.4_8780/?id=ak_wwise_core_audio_import.html",
         "https://www.audiokinetic.com/library/edge/?source=Help&id=importing_media_files_from_tab_delimited_text_file"
       ],
       "source_urls": [
         "resources/manifest/2022.1/schemas.json",
-        "NotebookLM notebook wwise-2022.1-docs; cited answer for audio import endpoints"
+        "references/semantic-builder-import.md"
       ],
       "endpoints": [
         "ak.wwise.core.audio.import",
@@ -216,9 +206,7 @@
     "soundbank": {
       "family": "soundbank",
       "status": "grounded",
-      "notebook_id": "wwise-2022.1-docs",
       "version_target": "2022.1",
-      "gate_evidence_path": "references/semantic-builder-notebooklm-gate.md",
       "official_urls": [
         "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_soundbank_generate.html",
         "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_soundbank_setinclusions.html",
@@ -227,7 +215,7 @@
       ],
       "source_urls": [
         "resources/manifest/2022.1/schemas.json",
-        "NotebookLM notebook wwise-2022.1-docs; cited answer for SoundBank endpoints"
+        "references/semantic-builder-soundbank.md"
       ],
       "endpoints": [
         "ak.wwise.core.soundbank.getInclusions",
@@ -274,9 +262,7 @@
     "switchcontainer": {
       "family": "switchcontainer",
       "status": "grounded",
-      "notebook_id": "wwise-2022.1-docs",
       "version_target": "2022.1",
-      "gate_evidence_path": "references/semantic-builder-notebooklm-gate.md",
       "official_urls": [
         "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_switchcontainer_addassignment.html",
         "https://www.audiokinetic.com/library/edge/?id=ak_wwise_core_switchcontainer_getassignments.html",
@@ -285,7 +271,7 @@
       ],
       "source_urls": [
         "resources/manifest/2022.1/schemas.json",
-        "NotebookLM notebook wwise-2022.1-docs; cited answer for Switch Container assignment endpoints"
+        "references/semantic-builder-switchcontainer.md"
       ],
       "endpoints": [
         "ak.wwise.core.switchContainer.getAssignments",

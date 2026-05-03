@@ -1,14 +1,11 @@
 {
   "version": "2023.1",
-  "notebook_id": "wwise-2023.1-docs",
   "protocol": "references/semantic/2023.1/semantic-builder-protocol.md",
   "notes": {
     "query": {
       "family": "query",
       "status": "grounded",
-      "notebook_id": "wwise-2023.1-docs",
       "version_target": "2023.1",
-      "gate_evidence_path": "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
       "official_urls": [
         "https://blog.audiokinetic.com/waapi-for-wwise-2023.1/",
         "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=waapi.html",
@@ -16,7 +13,6 @@
         "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_get.html"
       ],
       "source_urls": [
-        "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
         "references/semantic/2023.1/semantic-builder-query.md"
       ],
       "endpoints": [
@@ -41,9 +37,7 @@
     "object-mutation": {
       "family": "object-mutation",
       "status": "grounded",
-      "notebook_id": "wwise-2023.1-docs",
       "version_target": "2023.1",
-      "gate_evidence_path": "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
       "official_urls": [
         "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=waapi_functions_index.html",
         "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_create.html",
@@ -58,7 +52,6 @@
         "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_undo_undo.html"
       ],
       "source_urls": [
-        "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
         "references/semantic/2023.1/semantic-builder-object-mutation.md"
       ],
       "endpoints": [
@@ -116,9 +109,7 @@
     "property-reference": {
       "family": "property-reference",
       "status": "grounded",
-      "notebook_id": "wwise-2023.1-docs",
       "version_target": "2023.1",
-      "gate_evidence_path": "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
       "official_urls": [
         "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_gettypes.html",
         "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_getpropertyandreferencenames.html",
@@ -133,7 +124,6 @@
         "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_object_setattenuationcurve.html"
       ],
       "source_urls": [
-        "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
         "references/semantic/2023.1/semantic-builder-property-reference.md"
       ],
       "endpoints": [
@@ -188,16 +178,13 @@
     "import": {
       "family": "import",
       "status": "grounded",
-      "notebook_id": "wwise-2023.1-docs",
       "version_target": "2023.1",
-      "gate_evidence_path": "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
       "official_urls": [
         "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_audio_import.html",
         "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_audio_importtabdelimited.html",
         "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_audio_imported.html"
       ],
       "source_urls": [
-        "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
         "references/semantic/2023.1/semantic-builder-import.md"
       ],
       "endpoints": [
@@ -235,9 +222,7 @@
     "soundbank": {
       "family": "soundbank",
       "status": "grounded",
-      "notebook_id": "wwise-2023.1-docs",
       "version_target": "2023.1",
-      "gate_evidence_path": "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
       "official_urls": [
         "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_soundbank_getinclusions.html",
         "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_soundbank_setinclusions.html",
@@ -247,7 +232,6 @@
         "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_soundbank_generated.html"
       ],
       "source_urls": [
-        "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
         "references/semantic/2023.1/semantic-builder-soundbank.md"
       ],
       "endpoints": [
@@ -296,9 +280,7 @@
     "switchcontainer": {
       "family": "switchcontainer",
       "status": "grounded",
-      "notebook_id": "wwise-2023.1-docs",
       "version_target": "2023.1",
-      "gate_evidence_path": "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
       "official_urls": [
         "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_switchcontainer_addassignment.html",
         "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_switchcontainer_getassignments.html",
@@ -307,7 +289,6 @@
         "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=ak_wwise_core_switchcontainer_assignmentremoved.html"
       ],
       "source_urls": [
-        "references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
         "references/semantic/2023.1/semantic-builder-switchcontainer.md"
       ],
       "endpoints": [

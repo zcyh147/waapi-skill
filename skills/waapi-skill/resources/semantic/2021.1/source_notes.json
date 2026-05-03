@@ -1,6 +1,5 @@
 {
   "version": "2021.1",
-  "notebook_id": "wwise-2021.1.14-docs",
   "protocol": "references/semantic/2021.1/semantic-builder-protocol.md",
   "notes": {
     "query": {
@@ -30,11 +29,8 @@
       ],
       "family": "query",
       "status": "grounded",
-      "notebook_id": "wwise-2021.1.14-docs",
       "version_target": "2021.1",
-      "gate_evidence_path": "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
       "source_urls": [
-        "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
         "references/semantic/2021.1/semantic-builder-query.md"
       ]
     },
@@ -107,11 +103,8 @@
       ],
       "family": "object-mutation",
       "status": "grounded",
-      "notebook_id": "wwise-2021.1.14-docs",
       "version_target": "2021.1",
-      "gate_evidence_path": "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
       "source_urls": [
-        "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
         "references/semantic/2021.1/semantic-builder-object-mutation.md"
       ]
     },
@@ -181,11 +174,8 @@
       ],
       "family": "property-reference",
       "status": "grounded",
-      "notebook_id": "wwise-2021.1.14-docs",
       "version_target": "2021.1",
-      "gate_evidence_path": "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
       "source_urls": [
-        "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
         "references/semantic/2021.1/semantic-builder-property-reference.md"
       ]
     },
@@ -235,11 +225,8 @@
       ],
       "family": "import",
       "status": "grounded",
-      "notebook_id": "wwise-2021.1.14-docs",
       "version_target": "2021.1",
-      "gate_evidence_path": "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
       "source_urls": [
-        "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
         "references/semantic/2021.1/semantic-builder-import.md"
       ]
     },
@@ -302,11 +289,8 @@
       ],
       "family": "soundbank",
       "status": "grounded",
-      "notebook_id": "wwise-2021.1.14-docs",
       "version_target": "2021.1",
-      "gate_evidence_path": "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
       "source_urls": [
-        "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
         "references/semantic/2021.1/semantic-builder-soundbank.md"
       ]
     },
@@ -352,11 +336,8 @@
       ],
       "family": "switchcontainer",
       "status": "grounded",
-      "notebook_id": "wwise-2021.1.14-docs",
       "version_target": "2021.1",
-      "gate_evidence_path": "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
       "source_urls": [
-        "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
         "references/semantic/2021.1/semantic-builder-switchcontainer.md"
       ]
     }
@@ -364,9 +345,6 @@
   "generated_at": "2026-05-02T00:00:00Z",
   "gate": {
     "status": "open",
-    "notebook_id": "wwise-2021.1.14-docs",
-    "gate_evidence_path": "references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
-    "source_only_caveat": "source notes are not behavioral proof",
-    "citation_caveat": "NotebookLM returned numbered citation labels rather than stable source URLs"
+    "source_only_caveat": "source notes are not behavioral proof"
   }
 }

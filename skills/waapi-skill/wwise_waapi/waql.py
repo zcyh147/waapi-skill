@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
-EXPECTED_WAQL_NOTEBOOK_ID = "wwise-2022.1-docs"
 WAQL_API_URI = "ak.wwise.core.object.get"
 DEFAULT_WAQL_REFERENCE = Path("resources/waql/2022.1/object-get-live-matrix.json")
 REQUIRED_WAQL_MATRIX_METADATA = ("name", "uri", "schema_source", "reference")

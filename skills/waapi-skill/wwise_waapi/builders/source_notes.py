@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from wwise_waapi.dispatcher import DEFAULT_WWISE_VERSION
-from wwise_waapi.notebooklm_gate import EXPECTED_NOTEBOOK_ID
 from wwise_waapi.versions import is_explicit_fail_closed_version  # pyright: ignore[reportMissingImports]
 
 from .common import BuilderFamily, SemanticErrorCode, SemanticValidationError, SourceNoteCheck
@@ -72,9 +71,7 @@ EXPECTED_SOURCE_NOTE_URI_INVENTORY: dict[str, tuple[str, ...]] = {
 REQUIRED_SOURCE_NOTE_FIELDS = (
     "family",
     "status",
-    "notebook_id",
     "version_target",
-    "gate_evidence_path",
     "official_urls",
     "source_urls",
     "endpoints",
@@ -96,7 +93,6 @@ class SemanticSourceNoteResource:
     """Parsed semantic source-note resource bundle."""
 
     version: str
-    notebook_id: str
     notes: Mapping[str, Mapping[str, Any]]
     root: Path
 
@@ -107,10 +103,8 @@ class SemanticSourceNoteChecker:
     def __init__(
         self,
         resource_path: Path | None = None,
-        notebook_id: str = EXPECTED_NOTEBOOK_ID,
     ) -> None:
         self.resource_path = resource_path
-        self.notebook_id = notebook_id
 
     def check(self, family: str, version: str = DEFAULT_WWISE_VERSION) -> SourceNoteCheck:
         try:
@@ -143,40 +137,12 @@ class SemanticSourceNoteChecker:
                 reason=f"Semantic source-note resource is for {resource.version}, expected {version}.",
                 error_code=SemanticErrorCode.SOURCE_NOTE_INCOMPLETE,
             )
-        if resource.notebook_id != self.notebook_id:
-            return SourceNoteCheck(
-                False,
-                family_value,
-                version=version,
-                notebook_id=resource.notebook_id,
-                reason=f"Semantic source-note resource is for {resource.notebook_id or 'no notebook'}, expected {self.notebook_id}.",
-                error_code=SemanticErrorCode.SOURCE_NOTE_WRONG_NOTEBOOK,
-            )
-
-        gate_status = _check_gate_metadata(resource)
-        if not gate_status.allowed:
-            error_code = (
-                SemanticErrorCode.SOURCE_NOTE_WRONG_NOTEBOOK
-                if gate_status.notebook_id is not None and gate_status.notebook_id != self.notebook_id
-                else SemanticErrorCode.SOURCE_NOTE_INCOMPLETE
-            )
-            return SourceNoteCheck(
-                False,
-                family_value,
-                version=version,
-                notebook_id=gate_status.notebook_id,
-                missing_fields=("gate_evidence_path",),
-                reason=gate_status.reason,
-                error_code=error_code,
-            )
-
         note = resource.notes.get(family_value)
         if note is None:
             return SourceNoteCheck(
                 False,
                 family_value,
                 version=version,
-                notebook_id=resource.notebook_id,
                 reason=f"Semantic source note is missing for builder family {family_value!r}.",
                 error_code=SemanticErrorCode.MISSING_SOURCE_NOTE,
             )
@@ -187,28 +153,16 @@ class SemanticSourceNoteChecker:
                 False,
                 family_value,
                 version=version,
-                notebook_id=resource.notebook_id,
                 missing_fields=missing,
                 reason="Semantic source note is incomplete.",
                 error_code=SemanticErrorCode.SOURCE_NOTE_INCOMPLETE,
             )
-        if note.get("notebook_id") != self.notebook_id:
-            return SourceNoteCheck(
-                False,
-                family_value,
-                version=version,
-                notebook_id=_string_or_none(note.get("notebook_id")),
-                reason=f"Semantic source note is for {note.get('notebook_id') or 'no notebook'}, expected {self.notebook_id}.",
-                error_code=SemanticErrorCode.SOURCE_NOTE_WRONG_NOTEBOOK,
-            )
-
         incomplete = _incomplete_note_values(note, family_value, version)
         if incomplete:
             return SourceNoteCheck(
                 False,
                 family_value,
                 version=version,
-                notebook_id=resource.notebook_id,
                 missing_fields=incomplete,
                 reason="Semantic source note is incomplete.",
                 error_code=SemanticErrorCode.SOURCE_NOTE_INCOMPLETE,
@@ -222,7 +176,6 @@ class SemanticSourceNoteChecker:
                 False,
                 family_value,
                 version=version,
-                notebook_id=resource.notebook_id,
                 cited_fields=cited_fields,
                 uncited_fields=uncited,
                 reason="Semantic source note has uncited required fields.",
@@ -233,7 +186,6 @@ class SemanticSourceNoteChecker:
             True,
             family_value,
             version=version,
-            notebook_id=resource.notebook_id,
             cited_fields=cited_fields,
             reason="Semantic source note is grounded.",
         )
@@ -276,7 +228,6 @@ def load_semantic_source_notes(
         raise SemanticValidationError(SemanticErrorCode.SOURCE_NOTE_INCOMPLETE, "Semantic source-note resource lacks notes.")
     return SemanticSourceNoteResource(
         version=str(data.get("version", "")),
-        notebook_id=str(data.get("notebook_id", "")),
         notes={str(key): value for key, value in notes.items() if isinstance(value, Mapping)},
         root=_semantic_evidence_root(resource_path),
     )
@@ -321,41 +272,6 @@ def _semantic_evidence_root(resource_path: Path) -> Path:
     return REPO_ROOT
 
 
-def _check_gate_metadata(resource: SemanticSourceNoteResource):
-    evidence_paths = {
-        path
-        for note in resource.notes.values()
-        if isinstance(path := note.get("gate_evidence_path"), str) and path.strip()
-    }
-    if len(evidence_paths) != 1:
-        class _MissingGateStatus:
-            allowed = False
-            reason = "Semantic source notes must reference exactly one gate evidence metadata path."
-            notebook_id = None
-
-        return _MissingGateStatus()
-    if not _is_safe_gate_evidence_metadata_path(next(iter(evidence_paths))):
-        class _InvalidGatePathStatus:
-            allowed = False
-            reason = "Semantic source-note gate evidence metadata path must be relative and stay under references/."
-            notebook_id = None
-
-        return _InvalidGatePathStatus()
-    class _OpenGateMetadataStatus:
-        allowed = True
-        reason = "Semantic source-note gate evidence metadata is consistent."
-        notebook_id = resource.notebook_id
-
-    return _OpenGateMetadataStatus()
-
-
-def _is_safe_gate_evidence_metadata_path(raw_path: str) -> bool:
-    evidence_path = Path(raw_path)
-    if evidence_path.is_absolute():
-        return False
-    parts = evidence_path.parts
-    return bool(parts) and parts[0] == "references" and ".." not in parts
-
 
 def _missing_note_fields(note: Mapping[str, Any]) -> tuple[str, ...]:
     return tuple(field for field in REQUIRED_SOURCE_NOTE_FIELDS if field not in note)
@@ -369,9 +285,6 @@ def _incomplete_note_values(note: Mapping[str, Any], family: str, version: str) 
         missing.append("status")
     if note.get("version_target") != version:
         missing.append("version_target")
-    gate_evidence_path = note.get("gate_evidence_path")
-    if not isinstance(gate_evidence_path, str) or not gate_evidence_path.strip():
-        missing.append("gate_evidence_path")
     for key in (
         "official_urls",
         "source_urls",
@@ -403,6 +316,3 @@ def _string_tuple(value: Any) -> tuple[str, ...]:
         return ()
     return tuple(item for item in value if isinstance(item, str) and item.strip())
 
-
-def _string_or_none(value: Any) -> str | None:
-    return value if isinstance(value, str) else None

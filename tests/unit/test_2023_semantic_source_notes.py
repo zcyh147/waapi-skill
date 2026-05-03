@@ -23,8 +23,6 @@ from wwise_waapi.builders.source_notes import (  # pyright: ignore[reportMissing
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_NOTES_2023 = ROOT / "skills" / "waapi-skill" / "resources" / "semantic" / "2023.1" / "source_notes.json"
-NOTEBOOK_ID_2023 = "wwise-2023.1-docs"
-GATE_EVIDENCE_2023 = "references/semantic/2023.1/semantic-builder-notebooklm-gate.md"
 EXPECTED_FAMILIES = {
     "query",
     "object-mutation",
@@ -60,20 +58,15 @@ def assert_typed_failure(checker: SemanticSourceNoteChecker, family: BuilderFami
     return exc.value
 
 
-def test_2023_source_notes_require_2023_notebook_evidence() -> None:
-    checker = SemanticSourceNoteChecker(notebook_id=NOTEBOOK_ID_2023)
+def test_2023_source_notes_are_grounded_for_2023() -> None:
+    checker = SemanticSourceNoteChecker()
 
     for family in BuilderFamily:
         status = require_source_note(checker, family, version="2023.1")
         assert status.allowed is True
         assert status.version == "2023.1"
         assert status.family == family.value
-        assert status.notebook_id == NOTEBOOK_ID_2023
         assert status.cited_fields
-
-    default_checker = SemanticSourceNoteChecker()
-    failure = assert_typed_failure(default_checker, BuilderFamily.QUERY, SemanticErrorCode.SOURCE_NOTE_WRONG_NOTEBOOK)
-    assert "expected wwise-2022.1-docs" in failure.message
 
 
 def test_2023_source_note_inventory_exact_families() -> None:
@@ -81,7 +74,7 @@ def test_2023_source_note_inventory_exact_families() -> None:
     inventory = source_note_uri_inventory(SOURCE_NOTES_2023)
 
     assert data["version"] == "2023.1"
-    assert data["notebook_id"] == NOTEBOOK_ID_2023
+    assert "notebook_id" not in data
     assert set(data["notes"]) == EXPECTED_FAMILIES
     assert set(inventory) == EXPECTED_FAMILIES
     assert inventory == EXPECTED_SOURCE_NOTE_URI_INVENTORY
@@ -98,74 +91,33 @@ def test_2023_source_notes_use_only_versioned_local_evidence_paths() -> None:
     for family, note in data["notes"].items():
         assert family in EXPECTED_FAMILIES
         assert note["status"] == "grounded"
-        assert note["notebook_id"] == NOTEBOOK_ID_2023
+        assert "notebook_id" not in note
         assert note["version_target"] == "2023.1"
-        assert note["gate_evidence_path"] == GATE_EVIDENCE_2023
+        assert "gate_evidence_path" not in note
         assert note["endpoints"] == list(EXPECTED_SOURCE_NOTE_URI_INVENTORY[family])
         assert set(note["required_fields"]) <= set(note["cited_required_fields"])
         for field in REQUIRED_SOURCE_NOTE_FIELDS:
             assert field in note
-        for evidence_path in [note["gate_evidence_path"], *note["source_urls"]]:
+        for evidence_path in note["source_urls"]:
             assert evidence_path.startswith("references/semantic/2023.1/"), evidence_path
             assert "references/semantic-builder-" not in evidence_path
             assert "2022.1" not in evidence_path
-        assert NOTEBOOK_ID_2023 in json.dumps(note)
+        assert "NotebookLM" not in json.dumps(note)
         assert "wwise-2022.1-docs" not in json.dumps(note)
 
 
 def test_2023_missing_source_note_resource_fails_with_typed_code(tmp_path: Path) -> None:
-    checker = SemanticSourceNoteChecker(tmp_path / "missing.json", notebook_id=NOTEBOOK_ID_2023)
+    checker = SemanticSourceNoteChecker(tmp_path / "missing.json")
 
     failure = assert_typed_failure(checker, BuilderFamily.QUERY, SemanticErrorCode.MISSING_SOURCE_NOTE)
 
     assert failure.details["version"] == "2023.1"
 
 
-def test_2023_wrong_resource_notebook_fails_with_typed_code(tmp_path: Path) -> None:
-    data = load_2023_resource()
-    data["notebook_id"] = "wwise-2022.1-docs"
-    checker = SemanticSourceNoteChecker(write_resource(tmp_path, data), notebook_id=NOTEBOOK_ID_2023)
-
-    failure = assert_typed_failure(checker, BuilderFamily.QUERY, SemanticErrorCode.SOURCE_NOTE_WRONG_NOTEBOOK)
-
-    assert "expected wwise-2023.1-docs" in failure.message
-
-
-def test_2023_wrong_note_notebook_fails_with_typed_code(tmp_path: Path) -> None:
-    data = load_2023_resource()
-    data["notes"]["query"]["notebook_id"] = "wwise-2022.1-docs"
-    checker = SemanticSourceNoteChecker(write_resource(tmp_path, data), notebook_id=NOTEBOOK_ID_2023)
-
-    failure = assert_typed_failure(checker, BuilderFamily.QUERY, SemanticErrorCode.SOURCE_NOTE_WRONG_NOTEBOOK)
-
-    assert failure.details["notebook_id"] == "wwise-2022.1-docs"
-
-
-def test_2023_inconsistent_gate_evidence_metadata_fails_with_typed_code(tmp_path: Path) -> None:
-    data = load_2023_resource()
-    data["notes"]["query"]["gate_evidence_path"] = "references/semantic/2023.1/query-gate.md"
-    checker = SemanticSourceNoteChecker(write_artifact_resource(tmp_path, data), notebook_id=NOTEBOOK_ID_2023)
-
-    failure = assert_typed_failure(checker, BuilderFamily.QUERY, SemanticErrorCode.SOURCE_NOTE_INCOMPLETE)
-
-    assert "exactly one gate evidence metadata path" in failure.message
-
-
-def test_2023_gate_evidence_metadata_does_not_require_packaged_markdown_file(tmp_path: Path) -> None:
-    data = load_2023_resource()
-    for note in data["notes"].values():
-        note["gate_evidence_path"] = "references/semantic/2023.1/missing-gate.md"
-    checker = SemanticSourceNoteChecker(write_artifact_resource(tmp_path, data), notebook_id=NOTEBOOK_ID_2023)
-
-    status = require_source_note(checker, BuilderFamily.QUERY, version="2023.1")
-
-    assert status.allowed is True
-
-
 def test_2023_incomplete_note_fails_with_typed_code(tmp_path: Path) -> None:
     data = load_2023_resource()
     del data["notes"]["query"]["return_shape"]
-    checker = SemanticSourceNoteChecker(write_resource(tmp_path, data), notebook_id=NOTEBOOK_ID_2023)
+    checker = SemanticSourceNoteChecker(write_resource(tmp_path, data))
 
     failure = assert_typed_failure(checker, BuilderFamily.QUERY, SemanticErrorCode.SOURCE_NOTE_INCOMPLETE)
 
@@ -176,7 +128,7 @@ def test_2023_uncited_required_field_fails_with_typed_code(tmp_path: Path) -> No
     data = load_2023_resource()
     note = data["notes"]["property-reference"]
     note["cited_required_fields"] = note["cited_required_fields"][:-1]
-    checker = SemanticSourceNoteChecker(write_resource(tmp_path, data), notebook_id=NOTEBOOK_ID_2023)
+    checker = SemanticSourceNoteChecker(write_resource(tmp_path, data))
 
     failure = assert_typed_failure(checker, BuilderFamily.PROPERTY_REFERENCE, SemanticErrorCode.SOURCE_NOTE_UNCITED_FIELD)
 
@@ -197,7 +149,7 @@ def test_2023_endpoint_inventory_mismatch_fails_closed(tmp_path: Path) -> None:
 
 
 def test_2023_excluded_family_absence_fails_closed(tmp_path: Path) -> None:
-    checker = SemanticSourceNoteChecker(notebook_id=NOTEBOOK_ID_2023)
+    checker = SemanticSourceNoteChecker()
 
     for family in ("profiler", "transport", "soundengine", "ui", "cli", "remote", "debug"):
         status = checker.check(family, version="2023.1")
