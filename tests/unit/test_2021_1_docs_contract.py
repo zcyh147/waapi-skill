@@ -15,7 +15,7 @@ from wwise_waapi.builders.source_notes import (  # pyright: ignore[reportMissing
 
 
 ROOT = Path(__file__).resolve().parents[2]
-EVALS_JSON = ROOT / 'evals' / 'evals.json'
+EVALS_JSON = ROOT / 'tests' / 'support' / 'evals.json'
 DOC_CONTRACT_PATHS = (
     ROOT / 'skills' / 'waapi-skill' / 'SKILL.md',
     ROOT / 'references' / 'long-run-runbook.md',

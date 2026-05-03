@@ -1,6 +1,6 @@
 # Wwise WAAPI eval review workflow
 
-Use this workflow when you want human review of `evals/evals.json`. These evals are review aids, not release gates, and they do not replace `pytest`.
+Use this workflow when you want human review of `tests/support/evals.json`. These evals are review aids, not release gates, and they do not replace `pytest`.
 
 ## Scope
 
@@ -29,7 +29,7 @@ Create a sibling workspace for generated outputs. Keep generated model outputs o
 mkdir -p waapi-skill-workspace/iteration-1
 ```
 
-For each eval in `evals/evals.json`, run the prompt with the `waapi-skill` skill loaded and save the response under a descriptive directory such as:
+For each eval in `tests/support/evals.json`, run the prompt with the `waapi-skill` skill loaded and save the response under a descriptive directory such as:
 
 ```text
 waapi-skill-workspace/iteration-1/safe-object-query/with_skill/outputs/response.md
@@ -69,7 +69,7 @@ Open or share `review.html` with the reviewer. When the reviewer clicks Submit A
 
 ## Assertions and pytest
 
-The assertions in `evals/evals.json` are objective checks for reviewing model outputs. They are intentionally simple text checks so reviewers can understand failures quickly. They do not prove runtime behavior.
+The assertions in `tests/support/evals.json` are objective checks for reviewing model outputs. They are intentionally simple text checks so reviewers can understand failures quickly. They do not prove runtime behavior.
 
 For 2021.1 prompts, treat NotebookLM and source notes as source-only evidence generation or refresh. Runtime examples should read local persisted evidence and source-note resources, not query NotebookLM while constructing builders or dispatcher requests. Keep readback helpers such as `ak.wwise.core.soundbank.getInclusions` and `ak.wwise.core.switchContainer.getAssignments` unpromoted unless a later plan changes the coverage resources.
 

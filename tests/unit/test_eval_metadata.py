@@ -7,7 +7,7 @@ from typing import Any, Mapping
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
-EVALS_JSON = REPO_ROOT / "evals" / "evals.json"
+EVALS_JSON = REPO_ROOT / "tests" / "support" / "evals.json"
 REVIEW_WORKFLOW = REPO_ROOT / "references" / "eval-review-workflow.md"
 REQUIRED_CATEGORIES = {
     "safe object query",

@@ -7,7 +7,7 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[2]
-EVALS_JSON = ROOT / "evals" / "evals.json"
+EVALS_JSON = ROOT / "tests" / "support" / "evals.json"
 REFERENCE_ROOT = ROOT / "references"
 SEMANTIC_2024_REFERENCES = REFERENCE_ROOT / "semantic" / "2024.1"
 TASK11_REVIEW_PACKET = ROOT / ".sisyphus" / "evidence" / "wwise-2024-waapi-integration-coverage" / "parity-review-packet.md"
