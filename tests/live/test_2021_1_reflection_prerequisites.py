@@ -18,6 +18,8 @@ from tests.destructive.support.live_environment import (  # pyright: ignore[repo
     ENV_WWISE_VERSION,
     LiveEnvironmentContract,
     LiveEnvironmentError,
+    WWISE_2021_1_CONSOLE_PATH,
+    WWISE_2021_1_SAMPLE_PROJECT_PATH,
     require_live_environment,
 )
 from wwise_waapi.manifest import (  # pyright: ignore[reportMissingImports]
@@ -41,12 +43,8 @@ RESOURCE_ROOT = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "manifest"
 EXPECTED_WWISE_VERSION = "2021.1"
 EXPECTED_WWISE_BUILD = "2021.1.14.8108"
 EXPECTED_DISPLAY_PREFIX = "2021.1.14"
-EXPECTED_WWISE_CONSOLE = Path(
-    "/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh"
-)
-EXPECTED_SAMPLE_PROJECT = Path(
-    "/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj"
-)
+EXPECTED_WWISE_CONSOLE = WWISE_2021_1_CONSOLE_PATH
+EXPECTED_SAMPLE_PROJECT = WWISE_2021_1_SAMPLE_PROJECT_PATH
 SOURCE_URIS = [
     "ak.wwise.waapi.getFunctions",
     "ak.wwise.waapi.getTopics",

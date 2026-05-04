@@ -152,7 +152,7 @@ def test_destructive_guard_rejects_installed_2023_sample_project_targets(
 
 
 def test_installed_2023_sample_project_source_path_is_guarded() -> None:
-    expected = Path("/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject")
+    expected = live_env.WWISE_2023_1_SAMPLE_PROJECT_PATH.parent
 
     assert INSTALLED_SAMPLE_PROJECT_2023_1_ROOT == expected
     assert path_is_under_immutable_sample_source(expected / "SampleProject.wproj")

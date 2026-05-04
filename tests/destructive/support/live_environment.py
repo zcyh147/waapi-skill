@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import platform
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
@@ -30,34 +31,36 @@ ENV_WWISE_SANDBOX_ROOT = "WWISE_SANDBOX_ROOT"
 
 SUPPORTED_WWISE_VERSION = "2022.1"
 WWISE_2022_1_BUILD = "2022.1.19.8584"
-WWISE_2022_1_CONSOLE_PATH = Path(
-    f"/Applications/Audiokinetic/Wwise{WWISE_2022_1_BUILD}/Wwise.app/Contents/Tools/WwiseConsole.sh"
-)
-WWISE_2021_1_CONSOLE_PATH = Path(
-    f"/Applications/Audiokinetic/Wwise{WWISE_2021_1_BUILD}/Wwise.app/Contents/Tools/WwiseConsole.sh"
-)
-WWISE_2023_1_CONSOLE_PATH = Path(
-    f"/Applications/Audiokinetic/Wwise{WWISE_2023_1_BUILD}/Wwise.app/Contents/Tools/WwiseConsole.sh"
-)
-WWISE_2024_1_CONSOLE_PATH = Path(
-    f"/Applications/Audiokinetic/Wwise{WWISE_2024_1_BUILD}/Wwise.app/Contents/Tools/WwiseConsole.sh"
-)
-WWISE_2025_1_CONSOLE_PATH = Path(
-    f"/Applications/Audiokinetic/Wwise{WWISE_2025_1_BUILD}/Wwise.app/Contents/Tools/WwiseConsole.sh"
-)
-DEFAULT_SAMPLE_PROJECT_ROOT = Path(f"/Applications/Audiokinetic/Wwise{WWISE_2022_1_BUILD}/SampleProject")
-WWISE_2021_1_SAMPLE_PROJECT_PATH = Path(
-    f"/Applications/Audiokinetic/SampleProject{WWISE_2021_1_BUILD}/SampleProject/SampleProject.wproj"
-)
-WWISE_2023_1_SAMPLE_PROJECT_PATH = Path(
-    f"/Applications/Audiokinetic/SampleProject{WWISE_2023_1_BUILD}/SampleProject/SampleProject.wproj"
-)
-WWISE_2024_1_SAMPLE_PROJECT_PATH = Path(
-    f"/Applications/Audiokinetic/SampleProject{WWISE_2024_1_BUILD}/SampleProject/SampleProject.wproj"
-)
-WWISE_2025_1_SAMPLE_PROJECT_PATH = Path(
-    f"/Applications/Audiokinetic/SampleProject{WWISE_2025_1_BUILD}/SampleProject/SampleProject.wproj"
-)
+
+
+def _versioned_console_path(build: str) -> Path:
+    if platform.system() == "Windows":
+        return Path(fr"C:\Audiokinetic\Wwise{build}\Authoring\x64\Release\bin\WwiseConsole.exe")
+    return Path(f"/Applications/Audiokinetic/Wwise{build}/Wwise.app/Contents/Tools/WwiseConsole.sh")
+
+
+def _versioned_sample_project_path(build: str) -> Path:
+    if platform.system() == "Windows":
+        return Path(fr"C:\Audiokinetic\SampleProject{build}\SampleProject\SampleProject.wproj")
+    return Path(f"/Applications/Audiokinetic/SampleProject{build}/SampleProject/SampleProject.wproj")
+
+
+def _default_sample_project_root(build: str) -> Path:
+    if platform.system() == "Windows":
+        return Path(fr"C:\Audiokinetic\SampleProject{build}\SampleProject")
+    return Path(f"/Applications/Audiokinetic/Wwise{build}/SampleProject")
+
+
+WWISE_2022_1_CONSOLE_PATH = _versioned_console_path(WWISE_2022_1_BUILD)
+WWISE_2021_1_CONSOLE_PATH = _versioned_console_path(WWISE_2021_1_BUILD)
+WWISE_2023_1_CONSOLE_PATH = _versioned_console_path(WWISE_2023_1_BUILD)
+WWISE_2024_1_CONSOLE_PATH = _versioned_console_path(WWISE_2024_1_BUILD)
+WWISE_2025_1_CONSOLE_PATH = _versioned_console_path(WWISE_2025_1_BUILD)
+DEFAULT_SAMPLE_PROJECT_ROOT = _default_sample_project_root(WWISE_2022_1_BUILD)
+WWISE_2021_1_SAMPLE_PROJECT_PATH = _versioned_sample_project_path(WWISE_2021_1_BUILD)
+WWISE_2023_1_SAMPLE_PROJECT_PATH = _versioned_sample_project_path(WWISE_2023_1_BUILD)
+WWISE_2024_1_SAMPLE_PROJECT_PATH = _versioned_sample_project_path(WWISE_2024_1_BUILD)
+WWISE_2025_1_SAMPLE_PROJECT_PATH = _versioned_sample_project_path(WWISE_2025_1_BUILD)
 INSTALLED_SAMPLE_PROJECT_2023_1_ROOT = WWISE_2023_1_SAMPLE_PROJECT_PATH.parent
 INSTALLED_SAMPLE_PROJECT_2021_1_ROOT = WWISE_2021_1_SAMPLE_PROJECT_PATH.parent
 INSTALLED_SAMPLE_PROJECT_2024_1_ROOT = WWISE_2024_1_SAMPLE_PROJECT_PATH.parent

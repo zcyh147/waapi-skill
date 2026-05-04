@@ -29,12 +29,8 @@ from tests.destructive.support.sandbox_fixture import ProjectHash, SandboxMetada
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ORG_FIXTURE_2024_ROOT = REPO_ROOT / "tests" / "_org" / "2024.1"
-EXPECTED_2024_CONSOLE = Path(
-    "/Applications/Audiokinetic/Wwise2024.1.13.9056/Wwise.app/Contents/Tools/WwiseConsole.sh"
-)
-EXPECTED_2024_SAMPLE_PROJECT = Path(
-    "/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject/SampleProject.wproj"
-)
+EXPECTED_2024_CONSOLE = live_env.WWISE_2024_1_CONSOLE_PATH
+EXPECTED_2024_SAMPLE_PROJECT = live_env.WWISE_2024_1_SAMPLE_PROJECT_PATH
 
 
 def test_2024_destructive_runtime_uses_exact_constants_without_changing_default_version() -> None:

@@ -17,18 +17,16 @@ from tests.destructive.support.live_environment import (  # pyright: ignore[repo
     ENV_WWISE_VERSION,
     LiveEnvironmentContract,
     LiveEnvironmentError,
+    WWISE_2025_1_CONSOLE_PATH,
+    WWISE_2025_1_SAMPLE_PROJECT_PATH,
     require_live_environment,
 )
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EXPECTED_WWISE_VERSION = "2025.1"
-EXPECTED_WWISE_CONSOLE = Path(
-    "/Applications/Audiokinetic/Wwise2025.1.7.9143/Wwise.app/Contents/Tools/WwiseConsole.sh"
-)
-EXPECTED_SAMPLE_PROJECT = Path(
-    "/Applications/Audiokinetic/SampleProject2025.1.7.9143/SampleProject/SampleProject.wproj"
-)
+EXPECTED_WWISE_CONSOLE = WWISE_2025_1_CONSOLE_PATH
+EXPECTED_SAMPLE_PROJECT = WWISE_2025_1_SAMPLE_PROJECT_PATH
 PREREQUISITE_EVIDENCE = (
     REPO_ROOT
     / ".sisyphus"

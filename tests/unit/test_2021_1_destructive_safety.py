@@ -33,12 +33,8 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ORG_FIXTURE_2021_ROOT = REPO_ROOT / "tests" / "_org" / "2021.1"
-EXPECTED_2021_CONSOLE = Path(
-    "/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh"
-)
-EXPECTED_2021_SAMPLE_PROJECT = Path(
-    "/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj"
-)
+EXPECTED_2021_CONSOLE = live_env.WWISE_2021_1_CONSOLE_PATH
+EXPECTED_2021_SAMPLE_PROJECT = live_env.WWISE_2021_1_SAMPLE_PROJECT_PATH
 
 
 def test_2021_destructive_runtime_uses_exact_constants_without_changing_default_version() -> None:
@@ -268,7 +264,12 @@ def test_2021_sandbox_copy_target_rejects_symlink_to_installed_source(
     sandbox_root = tmp_path / "runtime" / "safe-sandbox-root"
     sandbox_project = sandbox_root / "sample-project-copy" / "SampleProject.wproj"
     sandbox_project.parent.mkdir(parents=True)
-    sandbox_project.symlink_to(source_project)
+    try:
+        sandbox_project.symlink_to(source_project)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows host does not grant symlink privilege for this safety test")
+        raise
     _configure_2021_paths(monkeypatch, console_path=console, sample_project_path=source_project)
     sandbox = _sandbox_project(source_project=source_project, sandbox_root=sandbox_root, sandbox_project=sandbox_project)
 

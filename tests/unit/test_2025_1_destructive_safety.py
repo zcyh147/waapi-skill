@@ -32,12 +32,8 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ORG_FIXTURE_2025_ROOT = REPO_ROOT / "tests" / "_org" / "2025.1"
-EXPECTED_2025_CONSOLE = Path(
-    "/Applications/Audiokinetic/Wwise2025.1.7.9143/Wwise.app/Contents/Tools/WwiseConsole.sh"
-)
-EXPECTED_2025_SAMPLE_PROJECT = Path(
-    "/Applications/Audiokinetic/SampleProject2025.1.7.9143/SampleProject/SampleProject.wproj"
-)
+EXPECTED_2025_CONSOLE = live_env.WWISE_2025_1_CONSOLE_PATH
+EXPECTED_2025_SAMPLE_PROJECT = live_env.WWISE_2025_1_SAMPLE_PROJECT_PATH
 
 
 def test_2025_destructive_runtime_uses_exact_constants_without_changing_default_version() -> None:

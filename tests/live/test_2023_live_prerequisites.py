@@ -13,17 +13,15 @@ from tests.destructive.support.live_environment import (  # pyright: ignore[repo
     ENV_WWISE_VERSION,
     LiveEnvironmentContract,
     LiveEnvironmentError,
+    WWISE_2023_1_CONSOLE_PATH,
+    WWISE_2023_1_SAMPLE_PROJECT_PATH,
     require_live_environment,
 )
 
 
 EXPECTED_WWISE_VERSION = "2023.1"
-EXPECTED_WWISE_CONSOLE = Path(
-    "/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh"
-)
-EXPECTED_SAMPLE_PROJECT = Path(
-    "/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj"
-)
+EXPECTED_WWISE_CONSOLE = WWISE_2023_1_CONSOLE_PATH
+EXPECTED_SAMPLE_PROJECT = WWISE_2023_1_SAMPLE_PROJECT_PATH
 
 
 @pytest.mark.live
