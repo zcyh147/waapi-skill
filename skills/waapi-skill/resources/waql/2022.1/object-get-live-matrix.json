@@ -50,7 +50,7 @@
       "assertions": [
         "returned object identity matches the Actor-Mixer Hierarchy path"
       ],
-      "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql/path_actor_mixer_root.json",
+      "evidence_path": ".sisyphus/evidence/wwise-2022-test-parity/live-read-only/path_actor_mixer_root.json",
       "no_mutation": true,
       "sources": [
         "resources/waql/2022.1/object-get-live-matrix.json#live_cases.path_actor_mixer_root",
@@ -94,7 +94,7 @@
       "assertions": [
         "returned object id equals the previously discovered root GUID"
       ],
-      "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql/guid_actor_mixer_root.json",
+      "evidence_path": ".sisyphus/evidence/wwise-2022-test-parity/live-read-only/guid_actor_mixer_root.json",
       "no_mutation": true,
       "sources": [
         "resources/waql/2022.1/object-get-live-matrix.json#live_cases.guid_actor_mixer_root",
@@ -131,7 +131,7 @@
       "assertions": [
         "non-empty results, when present, have type Sound"
       ],
-      "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql/sound_name_type_filter.json",
+      "evidence_path": ".sisyphus/evidence/wwise-2022-test-parity/live-read-only/sound_name_type_filter.json",
       "no_mutation": true,
       "sources": [
         "resources/waql/2022.1/object-get-live-matrix.json#live_cases.sound_name_type_filter",
@@ -170,7 +170,7 @@
       "assertions": [
         "JSON-escaped WAQL string literal is accepted; any returned row has the expected name"
       ],
-      "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql/quoted_search_default_work_unit.json",
+      "evidence_path": ".sisyphus/evidence/wwise-2022-test-parity/live-read-only/quoted_search_default_work_unit.json",
       "no_mutation": true,
       "sources": [
         "resources/waql/2022.1/object-get-live-matrix.json#live_cases.quoted_search_default_work_unit",
@@ -207,7 +207,7 @@
       "assertions": [
         "descendant rows, when present, remain under the Actor-Mixer Hierarchy path"
       ],
-      "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql/descendant_traversal_actor_mixer.json",
+      "evidence_path": ".sisyphus/evidence/wwise-2022-test-parity/live-read-only/descendant_traversal_actor_mixer.json",
       "no_mutation": true,
       "sources": [
         "resources/waql/2022.1/object-get-live-matrix.json#live_cases.descendant_traversal_actor_mixer",
@@ -250,7 +250,7 @@
       "assertions": [
         "ancestor traversal from a discovered descendant returns the Actor-Mixer Hierarchy root"
       ],
-      "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql/ancestor_traversal_from_discovered_descendant.json",
+      "evidence_path": ".sisyphus/evidence/wwise-2022-test-parity/live-read-only/ancestor_traversal_from_discovered_descendant.json",
       "no_mutation": true,
       "sources": [
         "resources/waql/2022.1/object-get-live-matrix.json#live_cases.ancestor_traversal_from_discovered_descendant",
@@ -293,7 +293,7 @@
       "assertions": [
         "childrenCount is returned and satisfies the documented numeric comparison"
       ],
-      "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql/children_count_property_comparison.json",
+      "evidence_path": ".sisyphus/evidence/wwise-2022-test-parity/live-read-only/children_count_property_comparison.json",
       "no_mutation": true,
       "sources": [
         "resources/waql/2022.1/object-get-live-matrix.json#live_cases.children_count_property_comparison",
@@ -333,7 +333,7 @@
       "assertions": [
         "returned row is constrained to the requested return fields"
       ],
-      "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql/return_options_selection.json",
+      "evidence_path": ".sisyphus/evidence/wwise-2022-test-parity/live-read-only/return_options_selection.json",
       "no_mutation": true,
       "sources": [
         "resources/waql/2022.1/object-get-live-matrix.json#live_cases.return_options_selection",
@@ -366,7 +366,7 @@
       "assertions": [
         "documented query shape returns an empty result array for a deliberately absent name"
       ],
-      "evidence_path": ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/waql/empty_results_missing_name.json",
+      "evidence_path": ".sisyphus/evidence/wwise-2022-test-parity/live-read-only/empty_results_missing_name.json",
       "no_mutation": true,
       "sources": [
         "resources/waql/2022.1/object-get-live-matrix.json#live_cases.empty_results_missing_name",

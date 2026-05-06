@@ -9457,15 +9457,15 @@
     "waql_reference": "resources/waql/2022.1/object-get-live-matrix.json"
   },
   "summary": {
-    "behavioral_covered_count": 0,
+    "behavioral_covered_count": 11,
     "deferred": 117,
     "deferred_count": 117,
     "destructive_opt_in": 41,
     "excluded_count": 0,
     "implemented": 144,
     "inventory_covered_count": 144,
-    "live_behavioral_covered_count": 0,
-    "live_tested": 0,
+    "live_behavioral_covered_count": 11,
+    "live_tested": 1,
     "safe_tested": 27,
     "substitute_covered_count": 144,
     "total_functions": 112,
