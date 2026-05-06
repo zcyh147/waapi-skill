@@ -32,14 +32,15 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
         "with log_path.open('a', encoding='utf-8') as handle:\n"
         "    handle.write(json.dumps(entry) + '\\n')\n"
         f"fail_on = {fail_on!r}\n"
+        "effective_argv = argv[2:] if argv[:2] == ['run', 'python'] else argv\n"
         "joined = ' '.join(argv)\n"
-        "if fail_on == 'nonlive' and argv[:4] == ['-m', 'pytest', '-m', 'not live and not destructive']:\n"
+        "if fail_on == 'nonlive' and effective_argv[:4] == ['-m', 'pytest', '-m', 'not live and not destructive']:\n"
         "    sys.exit(7)\n"
-        "if fail_on == 'smoke' and argv and argv[0].endswith('wwise_smoke.py'):\n"
+        "if fail_on == 'smoke' and effective_argv and effective_argv[0].endswith('wwise_smoke.py'):\n"
         "    sys.exit(8)\n"
-        "if fail_on == 'live' and 'tests/live/' in joined:\n"
+        "if fail_on == 'live' and 'tests/live/' in ' '.join(effective_argv):\n"
         "    sys.exit(9)\n"
-        "if fail_on == 'destructive' and 'tests/destructive/' in joined:\n"
+        "if fail_on == 'destructive' and 'tests/destructive/' in ' '.join(effective_argv):\n"
         "    sys.exit(10)\n"
         "sys.exit(0)\n",
         encoding="utf-8",
@@ -47,7 +48,16 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
 
     python_bat = bin_dir / "python.bat"
     python_bat.write_text(
-        f'@echo off\r\n"{sys.executable}" "%~dp0fake_python.py" %*\r\n',
+        f'@echo off\r\n"{sys.executable}" "%~dp0fake_python.py" %*\r\nexit /b %%%%ERRORLEVEL%%%%\r\n',
+        encoding="utf-8",
+    )
+
+    poetry_bat = bin_dir / "poetry.bat"
+    poetry_bat.write_text(
+        '@echo off\r\n'
+        'if /I "%~1"=="run" shift\r\n'
+        'if /I "%~1"=="python" shift\r\n'
+        f'"{sys.executable}" "{runner}" %1 %2 %3 %4 %5 %6 %7 %8 %9\r\nexit /b %%%%ERRORLEVEL%%%%\r\n',
         encoding="utf-8",
     )
 
@@ -92,6 +102,26 @@ def _load_calls(log_path: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
 
 
+def _payload_argv(call: dict[str, object]) -> list[str]:
+    argv = call["argv"]
+    assert isinstance(argv, list)
+    return argv
+
+
+def _pytest_argv(call: dict[str, object]) -> list[str]:
+    argv = _payload_argv(call)
+    if argv[:2] == ["run", "python"]:
+        return argv[2:]
+    return argv
+
+
+def _smoke_argv(call: dict[str, object]) -> list[str]:
+    argv = _payload_argv(call)
+    if argv[:2] == ["run", "python"]:
+        return argv[2:]
+    return argv
+
+
 def test_ci_test_bat_help_matches_shell_parity_surface() -> None:
     result = _run_ci_test(os.environ.copy(), "--help")
 
@@ -101,6 +131,7 @@ def test_ci_test_bat_help_matches_shell_parity_surface() -> None:
     assert "all          Run non-live suite first, then strict real matrix" in result.stdout
     assert "smoke        Run focused WAAPI getInfo smoke via HeadlessLifecycle" in result.stdout
     assert "ci\\test.bat all matrix" in result.stdout
+    assert "poetry run python ..." in result.stdout
 
 
 def test_ci_test_bat_all_mode_defaults_to_all_and_runs_full_matrix(tmp_path: Path) -> None:
@@ -110,8 +141,8 @@ def test_ci_test_bat_all_mode_defaults_to_all_and_runs_full_matrix(tmp_path: Pat
 
     assert result.returncode == 0, result.stderr
     calls = _load_calls(log_path)
-    assert len(calls) == 9
-    assert calls[0]["argv"] == ["-m", "pytest", "-m", "not live and not destructive", "-q", "-ra"]
+    assert len(calls) == 11
+    assert _pytest_argv(calls[0]) == ["-m", "pytest", "-m", "not live and not destructive", "-q", "-ra"]
     version_mode_pairs = [
         (call["WWISE_VERSION"], call["WWISE_LIVE"], call["WWISE_DESTRUCTIVE"])
         for call in calls[1:]
@@ -119,6 +150,8 @@ def test_ci_test_bat_all_mode_defaults_to_all_and_runs_full_matrix(tmp_path: Pat
     assert version_mode_pairs == [
         ("2021.1", "1", "0"),
         ("2021.1", "1", "1"),
+        ("2022.1", "1", "0"),
+        ("2022.1", "1", "1"),
         ("2023.1", "1", "0"),
         ("2023.1", "1", "1"),
         ("2024.1", "1", "0"),
@@ -126,7 +159,7 @@ def test_ci_test_bat_all_mode_defaults_to_all_and_runs_full_matrix(tmp_path: Pat
         ("2025.1", "1", "0"),
         ("2025.1", "1", "1"),
     ]
-    assert all(call["argv"][-2:] == ["-q", "-ra"] for call in calls if call["argv"] and call["argv"][0] == "-m")
+    assert all(_pytest_argv(call)[-2:] == ["-q", "-ra"] for call in calls if _pytest_argv(call) and _pytest_argv(call)[0] == "-m")
 
 
 def test_ci_test_bat_smoke_all_runs_all_five_versions(tmp_path: Path) -> None:
@@ -140,7 +173,7 @@ def test_ci_test_bat_smoke_all_runs_all_five_versions(tmp_path: Path) -> None:
     assert all(call["WWISE_LIVE"] == "1" for call in calls)
     assert all(call["WWISE_DESTRUCTIVE"] == "0" for call in calls)
     assert all(call["WWISE_STRICT_REAL"] == "1" for call in calls)
-    assert all(isinstance(call["argv"], list) and call["argv"] and str(call["argv"][0]).endswith("ci\\wwise_smoke.py") for call in calls)
+    assert all(_smoke_argv(call) and str(_smoke_argv(call)[0]).endswith("ci\\wwise_smoke.py") for call in calls)
 
 
 def test_ci_test_bat_nonlive_defaults_to_none_and_stops_before_live_on_failure(tmp_path: Path) -> None:
@@ -152,7 +185,7 @@ def test_ci_test_bat_nonlive_defaults_to_none_and_stops_before_live_on_failure(t
     calls = _load_calls(log_path)
     assert len(calls) == 1
     assert calls[0]["WWISE_VERSION"] is None
-    assert calls[0]["argv"][:4] == ["-m", "pytest", "-m", "not live and not destructive"]
+    assert _pytest_argv(calls[0])[:4] == ["-m", "pytest", "-m", "not live and not destructive"]
 
 
 def test_ci_test_bat_supports_positional_matrix_alias(tmp_path: Path) -> None:
@@ -162,12 +195,14 @@ def test_ci_test_bat_supports_positional_matrix_alias(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stderr
     calls = _load_calls(log_path)
-    assert len(calls) == 8
+    assert len(calls) == 10
     assert calls[0]["WWISE_VERSION"] == "2021.1"
-    assert calls[0]["argv"][2].startswith("tests/live/test_2021_1_live_prerequisites.py")
+    assert _pytest_argv(calls[0])[2].startswith("tests/live/test_2021_1_live_prerequisites.py")
+    assert calls[2]["WWISE_VERSION"] == "2022.1"
+    assert _pytest_argv(calls[2])[2].startswith("tests/live/test_2022_live_prerequisites.py")
     assert calls[-1]["WWISE_VERSION"] == "2025.1"
-    assert calls[-1]["argv"][2] == "tests/destructive/test_2025_1_project_mutation_sandbox.py"
-    assert all(call["argv"][-1:] == ["-q"] for call in calls)
+    assert _pytest_argv(calls[-1])[2] == "tests/destructive/test_2025_1_project_mutation_sandbox.py"
+    assert all(_pytest_argv(call)[-1:] == ["-q"] for call in calls)
 
 
 def test_ci_test_bat_rejects_invalid_mode_version_combinations_and_missing_real_prereqs(tmp_path: Path) -> None:
@@ -181,9 +216,8 @@ def test_ci_test_bat_rejects_invalid_mode_version_combinations_and_missing_real_
     assert wrong_matrix.returncode == 1
     assert "matrix/focused mode requires version 'all'" in wrong_matrix.stderr
 
-    unsupported_2022_live = _run_ci_test(env, "--version", "2022.1", "--mode", "live")
-    assert unsupported_2022_live.returncode == 1
-    assert "Focused live matrix is not defined for 2022.1; use smoke mode for this version." in unsupported_2022_live.stderr
+    supported_2022_live = _run_ci_test(env, "--version", "2022.1", "--mode", "live")
+    assert supported_2022_live.returncode == 0, supported_2022_live.stderr
 
     bad_env = env.copy()
     bad_env["WWISE_SAMPLE_PROJECT_PATH"] = str(tmp_path / "not-a-project.txt")
