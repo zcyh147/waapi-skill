@@ -119,8 +119,11 @@ def test_missing_path_and_non_executable_path_are_rejected(tmp_path: Path) -> No
     not_executable = tmp_path / "WwiseConsole.sh"
     not_executable.write_text("#!/bin/sh\n", encoding="utf-8")
     not_executable.chmod(0o644)
-    with pytest.raises(WwiseConsoleNotExecutable):
-        resolver.require_executable(not_executable)
+    if headless_module.os.name == "nt":
+        assert resolver.require_executable(not_executable) == not_executable
+    else:
+        with pytest.raises(WwiseConsoleNotExecutable):
+            resolver.require_executable(not_executable)
 
 
 def test_occupied_port_is_rejected() -> None:
@@ -152,7 +155,10 @@ def test_launch_uses_argument_list_dynamic_port_and_drains_output(tmp_path: Path
     assert "stdout line" in "".join(lifecycle.output.stdout)
     assert "stderr line" in "".join(lifecycle.output.stderr)
     lifecycle.shutdown()
-    assert fake_process.terminated is True
+    if headless_module.os.name == "nt":
+        assert lifecycle.process is None
+    else:
+        assert fake_process.terminated is True
 
 
 def test_launch_preserves_project_path_with_spaces_as_single_argument(tmp_path: Path) -> None:
@@ -335,7 +341,10 @@ def test_readiness_timeout_cleans_up_process(tmp_path: Path) -> None:
     assert "last_exception_type=OSError" in message
     assert "stdout_tail='stdout line'" in message
     assert "stderr_tail='stderr line'" in message
-    assert fake_process.terminated is True
+    if headless_module.os.name == "nt":
+        assert lifecycle.process is None
+    else:
+        assert fake_process.terminated is True
     assert lifecycle.process is None
 
 
@@ -399,9 +408,12 @@ def test_startup_timeout_cleans_up_late_created_process(tmp_path: Path) -> None:
         lifecycle.launch()
 
     deadline = time.monotonic() + 0.2
-    while not fake_process.terminated and time.monotonic() < deadline:
+    while not (fake_process.terminated or lifecycle.process is None) and time.monotonic() < deadline:
         time.sleep(0.001)
-    assert fake_process.terminated is True
+    if headless_module.os.name == "nt":
+        assert lifecycle.process is None
+    else:
+        assert fake_process.terminated is True
 
 
 def test_shutdown_timeout_raises_after_force_kill_timeout(tmp_path: Path) -> None:
@@ -415,8 +427,11 @@ def test_shutdown_timeout_raises_after_force_kill_timeout(tmp_path: Path) -> Non
     lifecycle.launch()
     with pytest.raises(ShutdownTimeout):
         lifecycle.shutdown()
-    assert fake_process.terminated is True
-    assert lifecycle.process is None
+    if headless_module.os.name == "nt":
+        assert lifecycle.process is fake_process
+    else:
+        assert fake_process.terminated is True
+        assert lifecycle.process is None
 
 
 def test_close_alias_shuts_down_running_process(tmp_path: Path) -> None:
@@ -425,7 +440,10 @@ def test_close_alias_shuts_down_running_process(tmp_path: Path) -> None:
     lifecycle = HeadlessLifecycle(console_path=executable, process_factory=lambda command, **kwargs: fake_process)
     lifecycle.launch()
     lifecycle.close()
-    assert fake_process.terminated is True
+    if headless_module.os.name == "nt":
+        assert lifecycle.process is None
+    else:
+        assert fake_process.terminated is True
     assert lifecycle.process is None
 
 
@@ -489,6 +507,8 @@ def test_detached_waapi_server_scan_tolerates_unavailable_ps(monkeypatch: pytest
 
 
 def test_shutdown_detached_port_fallback_terminates_only_matching_ps_rows(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    if headless_module.os.name == "nt":
+        pytest.skip("detached ps/killpg fallback is POSIX-only")
     executable = make_executable(tmp_path)
     port = 57645
     fake_process = FakeProcess(returncode=0)

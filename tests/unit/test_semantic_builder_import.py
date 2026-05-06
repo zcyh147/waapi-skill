@@ -84,7 +84,7 @@ def test_audio_import_envelope_supports_file_defaults_overrides_and_properties()
             {
                 "objectPath": r"\Actor-Mixer Hierarchy\Default Work Unit\<Random Container>Imported\<Sound>Tone",
                 "objectType": "Sound",
-                "audioFile": "/tmp/tone.wav",
+                "audioFile": str(Path("/tmp/tone.wav")),
                 "importLanguage": "SFX",
                 "originalsSubFolder": "Task7",
                 "notes": "unit import",

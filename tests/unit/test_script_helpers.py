@@ -44,7 +44,7 @@ def test_run_main_executes_existing_script_when_bootstrap_is_stubbed(monkeypatch
 
     monkeypatch.setattr(run_script.subprocess, "run", fake_run)
     assert run_script.main(["setup_environment.py", "--check"]) == 0
-    assert calls and calls[0][0].endswith("python")
+    assert calls and calls[0][0].endswith(("python", "python.exe"))
 
 
 def test_run_bootstrap_if_needed_invokes_setup_when_venv_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
