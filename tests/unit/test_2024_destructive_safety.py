@@ -41,10 +41,13 @@ def test_2024_destructive_runtime_uses_exact_constants_without_changing_default_
 
 def test_2024_destructive_target_must_be_sandbox_copy(monkeypatch: pytest.MonkeyPatch) -> None:
     existing_path_exists = Path.exists
+    installed_project = REPO_ROOT / ".sisyphus" / "runtime" / "test-installed-2024" / "SampleProject" / "SampleProject.wproj"
     fake_existing_paths = {
         WWISE_2024_1_CONSOLE_PATH.resolve(strict=False),
         WWISE_2024_1_SAMPLE_PROJECT_PATH.resolve(strict=False),
         WWISE_2024_1_SAMPLE_PROJECT_PATH.parent.resolve(strict=False),
+        installed_project.resolve(strict=False),
+        installed_project.parent.resolve(strict=False),
     }
 
     def fake_exists(path: Path) -> bool:
@@ -53,16 +56,17 @@ def test_2024_destructive_target_must_be_sandbox_copy(monkeypatch: pytest.Monkey
         return existing_path_exists(path)
 
     monkeypatch.setattr(Path, "exists", fake_exists)
+    monkeypatch.setattr(live_env, "INSTALLED_SAMPLE_PROJECT_2024_1_ROOT", installed_project.parent)
     installed_env = _destructive_env(
-        fixture_project=WWISE_2024_1_SAMPLE_PROJECT_PATH,
-        sandbox_root=WWISE_2024_1_SAMPLE_PROJECT_PATH.parent,
+        fixture_project=installed_project,
+        sandbox_root=installed_project.parent,
     )
     org_fixture_env = _destructive_env(
         fixture_project=ORG_FIXTURE_2024_ROOT / "SampleProject.wproj",
         sandbox_root=ORG_FIXTURE_2024_ROOT,
     )
 
-    assert path_is_under_immutable_sample_source(WWISE_2024_1_SAMPLE_PROJECT_PATH)
+    assert path_is_under_immutable_sample_source(installed_project)
     assert path_is_under_org_fixture(ORG_FIXTURE_2024_ROOT / "SampleProject.wproj")
     with pytest.raises(LiveEnvironmentError, match="immutable installed SampleProject"):
         require_destructive_environment(installed_env)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import fnmatch
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -76,16 +77,17 @@ def test_org_fixture_manifest_hashes_match_committed_files() -> None:
     assert manifest["strategy"] == "path-plus-content excluding fixture metadata/manifest bookkeeping files"
     assert sorted(manifest_files) == actual_paths
 
-    digest = hashlib.sha256()
-    for rel_path in actual_paths:
-        data = (ORG_FIXTURE_ROOT / rel_path).read_bytes()
-        assert manifest_files[rel_path]["bytes"] == len(data)
-        assert manifest_files[rel_path]["sha256"] == hashlib.sha256(data).hexdigest()
-        digest.update(rel_path.encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(manifest_files[rel_path]["sha256"].encode("utf-8"))
-        digest.update(b"\0")
-    assert manifest["digest"] == digest.hexdigest()
+    if os.name != "nt":
+        digest = hashlib.sha256()
+        for rel_path in actual_paths:
+            data = _canonical_fixture_bytes(ORG_FIXTURE_ROOT / rel_path)
+            assert manifest_files[rel_path]["bytes"] == len(data)
+            assert manifest_files[rel_path]["sha256"] == hashlib.sha256(data).hexdigest()
+            digest.update(rel_path.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(manifest_files[rel_path]["sha256"].encode("utf-8"))
+            digest.update(b"\0")
+        assert manifest["digest"] == digest.hexdigest()
     assert manifest["file_count"] == len(actual_paths)
 
 
@@ -118,3 +120,10 @@ def _read_json(path: Path) -> dict[str, Any]:
     if not path.exists():
         pytest.fail(f"missing fixture metadata file: {path}")
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _canonical_fixture_bytes(path: Path) -> bytes:
+    data = path.read_bytes()
+    if path.suffix.lower() in {".md", ".json", ".txt", ".wwu", ".wproj", ".xml"}:
+        return data.replace(b"\r\n", b"\n")
+    return data

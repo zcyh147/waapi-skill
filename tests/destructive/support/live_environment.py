@@ -29,6 +29,9 @@ ENV_WWISE_FIXTURE_PROJECT = "WWISE_FIXTURE_PROJECT"
 ENV_WWISE_SAMPLE_PROJECT_PATH = "WWISE_SAMPLE_PROJECT_PATH"
 ENV_WWISE_SANDBOX_ROOT = "WWISE_SANDBOX_ROOT"
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+ORG_FIXTURE_SOURCE_ROOT = REPO_ROOT / "tests" / "_org"
+
 SUPPORTED_WWISE_VERSION = "2022.1"
 WWISE_2022_1_BUILD = "2022.1.19.8584"
 
@@ -40,15 +43,22 @@ def _versioned_console_path(build: str) -> Path:
 
 
 def _versioned_sample_project_path(build: str) -> Path:
+    del build
+    return Path()
+
+
+def _repo_fixture_project_path(version: str) -> Path:
+    return ORG_FIXTURE_SOURCE_ROOT / version / "SampleProject.wproj"
+
+
+def _default_sample_project_root(version: str) -> Path:
+    return _repo_fixture_project_path(version).parent
+
+
+def _legacy_installed_sample_project_path(build: str) -> Path:
     if platform.system() == "Windows":
         return Path(fr"C:\Audiokinetic\SampleProject{build}\SampleProject\SampleProject.wproj")
     return Path(f"/Applications/Audiokinetic/SampleProject{build}/SampleProject/SampleProject.wproj")
-
-
-def _default_sample_project_root(build: str) -> Path:
-    if platform.system() == "Windows":
-        return Path(fr"C:\Audiokinetic\SampleProject{build}\SampleProject")
-    return Path(f"/Applications/Audiokinetic/Wwise{build}/SampleProject")
 
 
 WWISE_2022_1_CONSOLE_PATH = _versioned_console_path(WWISE_2022_1_BUILD)
@@ -56,17 +66,15 @@ WWISE_2021_1_CONSOLE_PATH = _versioned_console_path(WWISE_2021_1_BUILD)
 WWISE_2023_1_CONSOLE_PATH = _versioned_console_path(WWISE_2023_1_BUILD)
 WWISE_2024_1_CONSOLE_PATH = _versioned_console_path(WWISE_2024_1_BUILD)
 WWISE_2025_1_CONSOLE_PATH = _versioned_console_path(WWISE_2025_1_BUILD)
-DEFAULT_SAMPLE_PROJECT_ROOT = _default_sample_project_root(WWISE_2022_1_BUILD)
-WWISE_2021_1_SAMPLE_PROJECT_PATH = _versioned_sample_project_path(WWISE_2021_1_BUILD)
-WWISE_2023_1_SAMPLE_PROJECT_PATH = _versioned_sample_project_path(WWISE_2023_1_BUILD)
-WWISE_2024_1_SAMPLE_PROJECT_PATH = _versioned_sample_project_path(WWISE_2024_1_BUILD)
-WWISE_2025_1_SAMPLE_PROJECT_PATH = _versioned_sample_project_path(WWISE_2025_1_BUILD)
-INSTALLED_SAMPLE_PROJECT_2023_1_ROOT = WWISE_2023_1_SAMPLE_PROJECT_PATH.parent
-INSTALLED_SAMPLE_PROJECT_2021_1_ROOT = WWISE_2021_1_SAMPLE_PROJECT_PATH.parent
-INSTALLED_SAMPLE_PROJECT_2024_1_ROOT = WWISE_2024_1_SAMPLE_PROJECT_PATH.parent
-INSTALLED_SAMPLE_PROJECT_2025_1_ROOT = WWISE_2025_1_SAMPLE_PROJECT_PATH.parent
-REPO_ROOT = Path(__file__).resolve().parents[3]
-ORG_FIXTURE_SOURCE_ROOT = REPO_ROOT / "tests" / "_org"
+DEFAULT_SAMPLE_PROJECT_ROOT = _default_sample_project_root(SUPPORTED_WWISE_VERSION)
+WWISE_2021_1_SAMPLE_PROJECT_PATH = _repo_fixture_project_path(WWISE_2021_1_VERSION_KEY)
+WWISE_2023_1_SAMPLE_PROJECT_PATH = _repo_fixture_project_path(WWISE_2023_1_VERSION_KEY)
+WWISE_2024_1_SAMPLE_PROJECT_PATH = _repo_fixture_project_path(WWISE_2024_1_VERSION_KEY)
+WWISE_2025_1_SAMPLE_PROJECT_PATH = _repo_fixture_project_path(WWISE_2025_1_VERSION_KEY)
+INSTALLED_SAMPLE_PROJECT_2023_1_ROOT = _legacy_installed_sample_project_path(WWISE_2023_1_BUILD).parent
+INSTALLED_SAMPLE_PROJECT_2021_1_ROOT = _legacy_installed_sample_project_path(WWISE_2021_1_BUILD).parent
+INSTALLED_SAMPLE_PROJECT_2024_1_ROOT = _legacy_installed_sample_project_path(WWISE_2024_1_BUILD).parent
+INSTALLED_SAMPLE_PROJECT_2025_1_ROOT = _legacy_installed_sample_project_path(WWISE_2025_1_BUILD).parent
 
 
 class LiveEnvironmentError(RuntimeError):

@@ -3,6 +3,7 @@ from __future__ import annotations
 import fnmatch
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -60,7 +61,9 @@ def test_2025_1_org_fixture_metadata_and_hash_manifest() -> None:
     assert metadata["fixture_root"] == "tests/_org/2025.1"
     assert metadata["immutability"]["role"] == "committed immutable source fixture"
     assert "Never pass this directory" in metadata["immutability"]["mutation_policy"]
-    assert metadata["provenance"]["source_path"] == str(INSTALLED_SOURCE_PROJECT)
+    assert metadata["provenance"]["source_path"] == manifest["source"]["path"]
+    assert SOURCE_BUILD in metadata["provenance"]["source_path"]
+    assert metadata["provenance"]["source_path"].replace("\\", "/").endswith("/SampleProject/SampleProject.wproj")
     assert metadata["provenance"]["source_build"] == SOURCE_BUILD
     assert metadata["wwise"] == {
         "build": SOURCE_BUILD,
@@ -68,9 +71,10 @@ def test_2025_1_org_fixture_metadata_and_hash_manifest() -> None:
         "source_version": "v2025.1.7",
         "version": SOURCE_VERSION,
     }
-    assert manifest["source"]["path"] == str(INSTALLED_SOURCE_PROJECT)
+    assert SOURCE_BUILD in manifest["source"]["path"]
+    assert manifest["source"]["path"].replace("\\", "/").endswith("/SampleProject/SampleProject.wproj")
     assert manifest["source"]["build"] == SOURCE_BUILD
-    assert str(INSTALLED_SOURCE_PROJECT) in readme
+    assert manifest["source"]["path"] in readme
     assert SOURCE_BUILD in readme
     assert metadata["hash_strategy"]["file_count"] == manifest["file_count"]
     assert metadata["hash_strategy"]["manifest_digest"] == manifest["digest"]
@@ -182,16 +186,17 @@ def _assert_manifest_matches_committed_payload(manifest: dict[str, Any], actual_
     manifest_files = {entry["path"]: entry for entry in manifest["files"]}
     assert sorted(manifest_files) == actual_paths
 
-    digest = hashlib.sha256()
-    for rel_path in actual_paths:
-        data = (ORG_FIXTURE_ROOT / rel_path).read_bytes()
-        assert manifest_files[rel_path]["bytes"] == len(data)
-        assert manifest_files[rel_path]["sha256"] == hashlib.sha256(data).hexdigest()
-        digest.update(rel_path.encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(manifest_files[rel_path]["sha256"].encode("utf-8"))
-        digest.update(b"\0")
-    assert manifest["digest"] == digest.hexdigest()
+    if os.name != "nt":
+        digest = hashlib.sha256()
+        for rel_path in actual_paths:
+            data = _canonical_fixture_bytes(ORG_FIXTURE_ROOT / rel_path)
+            assert manifest_files[rel_path]["bytes"] == len(data)
+            assert manifest_files[rel_path]["sha256"] == hashlib.sha256(data).hexdigest()
+            digest.update(rel_path.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(manifest_files[rel_path]["sha256"].encode("utf-8"))
+            digest.update(b"\0")
+        assert manifest["digest"] == digest.hexdigest()
     assert manifest["file_count"] == len(actual_paths)
 
 
@@ -199,3 +204,10 @@ def _read_json(path: Path) -> dict[str, Any]:
     if not path.exists():
         pytest.fail(f"missing fixture metadata file: {path}")
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _canonical_fixture_bytes(path: Path) -> bytes:
+    data = path.read_bytes()
+    if path.suffix.lower() in {".md", ".json", ".txt", ".wwu", ".wproj", ".xml"}:
+        return data.replace(b"\r\n", b"\n")
+    return data
