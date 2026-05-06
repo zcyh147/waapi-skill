@@ -17,7 +17,7 @@ Modes:
   smoke        Run focused WAAPI getInfo smoke via HeadlessLifecycle
   live         Run focused live suite for the selected version
   destructive  Run focused destructive suite for the selected version
-  matrix       Run focused live + destructive sequentially (2021.1/2023.1/2024.1/2025.1)
+  matrix       Run focused live + destructive sequentially (2021.1/2022.1/2023.1/2024.1/2025.1)
 
 Notes:
   - Environment overrides are respected if already set:
@@ -163,7 +163,7 @@ resolve_version_paths() {
       ;;
     2022.1)
       RESOLVED_CONSOLE="/Applications/Audiokinetic/Wwise2022.1.19.8584/Wwise.app/Contents/Tools/WwiseConsole.sh"
-      RESOLVED_PROJECT="/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject/SampleProject.wproj"
+      RESOLVED_PROJECT="$ROOT_DIR/tests/_org/2022.1/SampleProject.wproj"
       ;;
     2023.1)
       RESOLVED_CONSOLE="/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh"
@@ -348,8 +348,10 @@ run_live_for_version() {
         tests/live/test_2021_1_object_topics_sandbox.py::test_2021_1_live_safe_object_topics_against_sandbox
       ;;
     2022.1)
-      echo "Focused live matrix is not defined for 2022.1; use smoke mode for this version." >&2
-      exit 1
+      run_pytest \
+        tests/live/test_2022_live_prerequisites.py::test_2022_live_environment_prerequisites_fail_fast \
+        tests/live/test_2022_reflection_inventory.py::test_2022_live_reflection_inventory_runs_against_sandbox \
+        tests/live/test_2022_waql_live_matrix.py::test_2022_live_waql_object_get_matrix_runs_read_only_against_sandbox
       ;;
     2023.1)
       run_pytest \
@@ -390,8 +392,10 @@ run_destructive_for_version() {
         tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py
       ;;
     2022.1)
-      echo "Focused destructive matrix is not defined for 2022.1; use smoke mode for this version." >&2
-      exit 1
+      run_pytest \
+        tests/destructive/test_2022_project_mutation_sandbox.py \
+        tests/destructive/test_2022_soundbank_audio_sandbox.py \
+        tests/destructive/test_2022_switchcontainer_assignment_sandbox.py
       ;;
     2023.1)
       run_pytest \
@@ -419,7 +423,7 @@ run_destructive_for_version() {
 }
 
 run_matrix_all() {
-  local versions=(2021.1 2023.1 2024.1 2025.1)
+  local versions=(2021.1 2022.1 2023.1 2024.1 2025.1)
   local v
   for v in "${versions[@]}"; do
     run_live_for_version "$v"
@@ -450,7 +454,7 @@ case "$MODE" in
     ;;
   live)
     if [[ "$VERSION" == "all" ]]; then
-      for v in 2021.1 2023.1 2024.1 2025.1; do
+      for v in 2021.1 2022.1 2023.1 2024.1 2025.1; do
         run_live_for_version "$v"
       done
     else
@@ -459,7 +463,7 @@ case "$MODE" in
     ;;
   destructive)
     if [[ "$VERSION" == "all" ]]; then
-      for v in 2021.1 2023.1 2024.1 2025.1; do
+      for v in 2021.1 2022.1 2023.1 2024.1 2025.1; do
         run_destructive_for_version "$v"
       done
     else

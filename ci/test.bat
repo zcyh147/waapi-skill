@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 
 set "SCRIPT_DIR=%~dp0"
 for %%I in ("%SCRIPT_DIR%..") do set "ROOT_DIR=%%~fI"
@@ -28,6 +28,7 @@ set "MODE="
 set "PYTEST_EXTRA_ARGS="
 set "AFTER_DASHDASH=0"
 set "POSITIONAL_COUNT=0"
+set "EXIT_CODE=0"
 
 if "%~1"=="--help" goto usage_and_exit
 if "%~1"=="-h" goto usage_and_exit
@@ -36,7 +37,11 @@ if "%~1"=="-h" goto usage_and_exit
 if "%~1"=="" goto args_done
 
 if "%AFTER_DASHDASH%"=="1" (
-    call :append_pytest_arg "%~1"
+    if defined PYTEST_EXTRA_ARGS (
+        set "PYTEST_EXTRA_ARGS=!PYTEST_EXTRA_ARGS! %~1"
+    ) else (
+        set "PYTEST_EXTRA_ARGS=%~1"
+    )
     shift
     goto parse_args
 )
@@ -120,86 +125,83 @@ if not defined VERSION (
 )
 
 call :validate_mode "%MODE%"
-if errorlevel 1 exit /b %errorlevel%
-
+if errorlevel 1 exit /b %ERRORLEVEL%
 call :validate_version "%VERSION%"
-if errorlevel 1 exit /b %errorlevel%
+if errorlevel 1 exit /b %ERRORLEVEL%
 
-if /I "%MODE%"=="nonlive" goto dispatch_nonlive
-if /I "%MODE%"=="default" goto dispatch_nonlive
-if /I "%MODE%"=="all" goto dispatch_all
-if /I "%MODE%"=="smoke" call :run_smoke_dispatch
-if /I "%MODE%"=="smoke" exit /b %ERRORLEVEL%
-if /I "%MODE%"=="live" goto dispatch_live
-if /I "%MODE%"=="destructive" goto dispatch_destructive
-if /I "%MODE%"=="matrix" goto dispatch_matrix
-if /I "%MODE%"=="focused" goto dispatch_matrix
+if /I "%MODE%"=="nonlive" (
+    call :run_nonlive
+    set "EXIT_CODE=!ERRORLEVEL!"
+    goto script_end
+)
+if /I "%MODE%"=="default" (
+    call :run_nonlive
+    set "EXIT_CODE=!ERRORLEVEL!"
+    goto script_end
+)
+if /I "%MODE%"=="all" (
+    if /I not "%VERSION%"=="all" goto fail_all_requires_all
+    call :run_nonlive
+    set "EXIT_CODE=!ERRORLEVEL!"
+    if not "!EXIT_CODE!"=="0" goto script_end
+    call :run_matrix_all
+    set "EXIT_CODE=!ERRORLEVEL!"
+    goto script_end
+)
+if /I "%MODE%"=="smoke" (
+    if /I "%VERSION%"=="all" (
+        for %%V in (2021.1 2022.1 2023.1 2024.1 2025.1) do (
+            call :run_smoke_for_version "%%V"
+            if errorlevel 1 exit /b !ERRORLEVEL!
+        )
+        set "EXIT_CODE=0"
+        goto script_end
+    )
+    call :run_smoke_for_version "%VERSION%"
+    set "EXIT_CODE=!ERRORLEVEL!"
+    goto script_end
+)
+if /I "%MODE%"=="live" (
+    if /I "%VERSION%"=="all" (
+        for %%V in (2021.1 2022.1 2023.1 2024.1 2025.1) do (
+            call :run_live_for_version "%%V"
+            if errorlevel 1 exit /b !ERRORLEVEL!
+        )
+        set "EXIT_CODE=0"
+        goto script_end
+    )
+    call :run_live_for_version "%VERSION%"
+    set "EXIT_CODE=!ERRORLEVEL!"
+    goto script_end
+)
+if /I "%MODE%"=="destructive" (
+    if /I "%VERSION%"=="all" (
+        for %%V in (2021.1 2022.1 2023.1 2024.1 2025.1) do (
+            call :run_destructive_for_version "%%V"
+            if errorlevel 1 exit /b !ERRORLEVEL!
+        )
+        set "EXIT_CODE=0"
+        goto script_end
+    )
+    call :run_destructive_for_version "%VERSION%"
+    set "EXIT_CODE=!ERRORLEVEL!"
+    goto script_end
+)
+if /I "%MODE%"=="matrix" (
+    if /I not "%VERSION%"=="all" goto fail_matrix_requires_all
+    call :run_matrix_all
+    set "EXIT_CODE=!ERRORLEVEL!"
+    goto script_end
+)
+if /I "%MODE%"=="focused" (
+    if /I not "%VERSION%"=="all" goto fail_matrix_requires_all
+    call :run_matrix_all
+    set "EXIT_CODE=!ERRORLEVEL!"
+    goto script_end
+)
 
 echo Unsupported mode: %MODE% 1>&2
 goto usage_error
-
-:dispatch_nonlive
-call :run_nonlive
-exit /b %ERRORLEVEL%
-
-:run_smoke_dispatch
-if /I "%VERSION%"=="all" (
-    for %%V in (2021.1 2022.1 2023.1 2024.1 2025.1) do (
-        call :run_smoke_for_version "%%V"
-        if errorlevel 1 exit /b %ERRORLEVEL%
-    )
-    exit /b 0
-)
-call :run_smoke_for_version "%VERSION%"
-exit /b %ERRORLEVEL%
-
-:dispatch_all
-if /I not "%VERSION%"=="all" (
-    echo all mode requires version 'all' 1>&2
-    exit /b 1
-)
-call :run_nonlive
-if errorlevel 1 exit /b %ERRORLEVEL%
-call :run_matrix_all
-exit /b %ERRORLEVEL%
-
-:dispatch_live
-if /I "%VERSION%"=="all" (
-    for %%V in (2021.1 2023.1 2024.1 2025.1) do (
-        call :run_live_for_version "%%V"
-        if errorlevel 1 exit /b %ERRORLEVEL%
-    )
-    exit /b 0
-)
-call :run_live_for_version "%VERSION%"
-exit /b %ERRORLEVEL%
-
-:dispatch_destructive
-if /I "%VERSION%"=="all" (
-    for %%V in (2021.1 2023.1 2024.1 2025.1) do (
-        call :run_destructive_for_version "%%V"
-        if errorlevel 1 exit /b %ERRORLEVEL%
-    )
-    exit /b 0
-)
-call :run_destructive_for_version "%VERSION%"
-exit /b %ERRORLEVEL%
-
-:dispatch_matrix
-if /I not "%VERSION%"=="all" (
-    echo matrix/focused mode requires version 'all' 1>&2
-    exit /b 1
-)
-call :run_matrix_all
-exit /b %ERRORLEVEL%
-
-:append_pytest_arg
-if defined PYTEST_EXTRA_ARGS (
-    set "PYTEST_EXTRA_ARGS=%PYTEST_EXTRA_ARGS% %~1"
-) else (
-    set "PYTEST_EXTRA_ARGS=%~1"
-)
-exit /b 0
 
 :validate_mode
 set "CHECK_MODE=%~1"
@@ -226,7 +228,8 @@ if "%CHECK_VERSION%"=="none" exit /b 0
 echo Unsupported version: %CHECK_VERSION% 1>&2
 goto usage_error
 
-:resolve_version_paths
+:set_version_environment
+set "RESOLVED_BUILD="
 set "RESOLVED_CONSOLE="
 set "RESOLVED_PROJECT="
 if "%~1"=="2021.1" set "RESOLVED_BUILD=2021.1.14.8108"
@@ -239,12 +242,7 @@ if not defined RESOLVED_BUILD (
     exit /b 1
 )
 set "RESOLVED_CONSOLE=C:\Audiokinetic\Wwise%RESOLVED_BUILD%\Authoring\x64\Release\bin\WwiseConsole.exe"
-set "RESOLVED_PROJECT=C:\Audiokinetic\SampleProject%RESOLVED_BUILD%\SampleProject\SampleProject.wproj"
-exit /b 0
-
-:set_version_environment
-call :resolve_version_paths "%~1"
-if errorlevel 1 exit /b %ERRORLEVEL%
+set "RESOLVED_PROJECT=%ROOT_DIR%\tests\_org\%~1\SampleProject.wproj"
 
 set "WWISE_VERSION=%~1"
 if "%HAS_INITIAL_WWISE_CONSOLE%"=="1" (
@@ -252,13 +250,11 @@ if "%HAS_INITIAL_WWISE_CONSOLE%"=="1" (
 ) else (
     set "WWISE_CONSOLE=%RESOLVED_CONSOLE%"
 )
-
 if "%HAS_INITIAL_WWISE_SAMPLE_PROJECT_PATH%"=="1" (
     set "WWISE_SAMPLE_PROJECT_PATH=%INITIAL_WWISE_SAMPLE_PROJECT_PATH%"
 ) else (
     set "WWISE_SAMPLE_PROJECT_PATH=%RESOLVED_PROJECT%"
 )
-
 if "%HAS_INITIAL_WWISE_SANDBOX_ROOT%"=="1" (
     set "WWISE_SANDBOX_ROOT=%INITIAL_WWISE_SANDBOX_ROOT%"
 ) else (
@@ -297,7 +293,6 @@ exit /b 0
 set "WWISE_LIVE=0"
 set "WWISE_DESTRUCTIVE=0"
 set "WWISE_STRICT_REAL=0"
-
 if /I "%~1"=="live" (
     set "WWISE_LIVE=1"
     set "WWISE_STRICT_REAL=1"
@@ -337,104 +332,94 @@ if /I not "%WWISE_SAMPLE_PROJECT_PATH:~-6%"==".wproj" (
 )
 exit /b 0
 
-:run_pytest_with_extra
-pushd "%ROOT_DIR%" >nul
-call python -m pytest %* %PYTEST_EXTRA_ARGS%
-set "RESULT=%ERRORLEVEL%"
-popd >nul
-exit /b %RESULT%
-
 :run_nonlive
 call :set_mode_flags "nonlive"
 call :print_context "none" "nonlive"
-call :run_pytest_with_extra -m "not live and not destructive"
-exit /b %ERRORLEVEL%
+pushd "%ROOT_DIR%" >nul
+call poetry run python -m pytest -m "not live and not destructive" %PYTEST_EXTRA_ARGS%
+set "RESULT=!ERRORLEVEL!"
+popd >nul
+exit /b !RESULT!
 
 :run_smoke_for_version
 call :set_version_environment "%~1" "smoke"
-if errorlevel 1 exit /b %ERRORLEVEL%
+if errorlevel 1 exit /b !ERRORLEVEL!
 call :set_mode_flags "smoke"
 call :require_real_prerequisites "%~1" "smoke"
-if errorlevel 1 exit /b %ERRORLEVEL%
+if errorlevel 1 exit /b !ERRORLEVEL!
 call :print_context "%~1" "smoke"
 pushd "%ROOT_DIR%" >nul
-call python "%ROOT_DIR%\ci\wwise_smoke.py"
-set "RESULT=%ERRORLEVEL%"
+call poetry run python "%ROOT_DIR%\ci\wwise_smoke.py"
+set "RESULT=!ERRORLEVEL!"
 popd >nul
-exit /b %RESULT%
+exit /b !RESULT!
 
 :run_live_for_version
 call :set_version_environment "%~1" "live"
-if errorlevel 1 exit /b %ERRORLEVEL%
+if errorlevel 1 exit /b !ERRORLEVEL!
 call :set_mode_flags "live"
 call :require_real_prerequisites "%~1" "live"
-if errorlevel 1 exit /b %ERRORLEVEL%
+if errorlevel 1 exit /b !ERRORLEVEL!
 call :print_context "%~1" "live"
-
-if "%~1"=="2021.1" (
-    call :run_pytest_with_extra tests/live/test_2021_1_live_prerequisites.py::test_2021_1_live_read_only_prerequisites_validate_exact_get_info_before_matrix tests/live/test_2021_1_reflection_prerequisites.py::test_2021_1_live_reflection_prerequisites_and_resource_generation tests/live/test_2021_1_object_get_matrix.py::test_2021_1_live_waql_object_get_matrix_runs_read_only_against_sandbox tests/live/test_2021_1_object_topics_sandbox.py::test_2021_1_live_safe_object_topics_against_sandbox
-    exit /b %ERRORLEVEL%
-)
-if "%~1"=="2022.1" (
-    echo Focused live matrix is not defined for 2022.1; use smoke mode for this version. 1>&2
-    exit /b 1
-)
-if "%~1"=="2023.1" (
-    call :run_pytest_with_extra tests/live/test_2023_reflection_inventory.py::test_2023_live_reflection_inventory_runs_against_sandbox tests/live/test_2023_waql_live_matrix.py::test_2023_live_waql_object_get_matrix_runs_read_only_against_sandbox
-    exit /b %ERRORLEVEL%
-)
-if "%~1"=="2024.1" (
-    call :run_pytest_with_extra tests/live/test_2024_reflection_inventory.py::test_2024_live_reflection_inventory_runs_against_sandbox tests/live/test_2024_waql_live_matrix.py::test_2024_live_waql_object_get_matrix_runs_read_only_against_sandbox tests/live/test_2024_object_topics_sandbox.py::test_2024_1_live_safe_object_topics_against_sandbox
-    exit /b %ERRORLEVEL%
-)
-if "%~1"=="2025.1" (
-    call :run_pytest_with_extra tests/live/test_2025_1_reflection_inventory.py::test_2025_live_reflection_inventory_runs_against_sandbox tests/live/test_2025_1_waql_live_matrix.py::test_2025_live_waql_object_get_matrix_runs_read_only_against_sandbox tests/live/test_2025_1_object_topics_sandbox.py::test_2025_1_live_safe_object_topics_against_sandbox
-    exit /b %ERRORLEVEL%
-)
-
+pushd "%ROOT_DIR%" >nul
+if "%~1"=="2021.1" call poetry run python -m pytest tests/live/test_2021_1_live_prerequisites.py::test_2021_1_live_read_only_prerequisites_validate_exact_get_info_before_matrix tests/live/test_2021_1_reflection_prerequisites.py::test_2021_1_live_reflection_prerequisites_and_resource_generation tests/live/test_2021_1_object_get_matrix.py::test_2021_1_live_waql_object_get_matrix_runs_read_only_against_sandbox tests/live/test_2021_1_object_topics_sandbox.py::test_2021_1_live_safe_object_topics_against_sandbox %PYTEST_EXTRA_ARGS%
+if "%~1"=="2022.1" call poetry run python -m pytest tests/live/test_2022_live_prerequisites.py::test_2022_live_environment_prerequisites_fail_fast tests/live/test_2022_reflection_inventory.py::test_2022_live_reflection_inventory_runs_against_sandbox tests/live/test_2022_waql_live_matrix.py::test_2022_live_waql_object_get_matrix_runs_read_only_against_sandbox %PYTEST_EXTRA_ARGS%
+if "%~1"=="2023.1" call poetry run python -m pytest tests/live/test_2023_reflection_inventory.py::test_2023_live_reflection_inventory_runs_against_sandbox tests/live/test_2023_waql_live_matrix.py::test_2023_live_waql_object_get_matrix_runs_read_only_against_sandbox %PYTEST_EXTRA_ARGS%
+if "%~1"=="2024.1" call poetry run python -m pytest tests/live/test_2024_reflection_inventory.py::test_2024_live_reflection_inventory_runs_against_sandbox tests/live/test_2024_waql_live_matrix.py::test_2024_live_waql_object_get_matrix_runs_read_only_against_sandbox tests/live/test_2024_object_topics_sandbox.py::test_2024_1_live_safe_object_topics_against_sandbox %PYTEST_EXTRA_ARGS%
+if "%~1"=="2025.1" call poetry run python -m pytest tests/live/test_2025_1_reflection_inventory.py::test_2025_live_reflection_inventory_runs_against_sandbox tests/live/test_2025_1_waql_live_matrix.py::test_2025_live_waql_object_get_matrix_runs_read_only_against_sandbox tests/live/test_2025_1_object_topics_sandbox.py::test_2025_1_live_safe_object_topics_against_sandbox %PYTEST_EXTRA_ARGS%
+set "RESULT=!ERRORLEVEL!"
+popd >nul
+if not "!RESULT!"=="0" exit /b !RESULT!
+if "%~1"=="2021.1" exit /b 0
+if "%~1"=="2022.1" exit /b 0
+if "%~1"=="2023.1" exit /b 0
+if "%~1"=="2024.1" exit /b 0
+if "%~1"=="2025.1" exit /b 0
 echo Unsupported live version: %~1 1>&2
 exit /b 1
 
 :run_destructive_for_version
 call :set_version_environment "%~1" "destructive"
-if errorlevel 1 exit /b %ERRORLEVEL%
+if errorlevel 1 exit /b !ERRORLEVEL!
 call :set_mode_flags "destructive"
 call :require_real_prerequisites "%~1" "destructive"
-if errorlevel 1 exit /b %ERRORLEVEL%
+if errorlevel 1 exit /b !ERRORLEVEL!
 call :print_context "%~1" "destructive"
-
-if "%~1"=="2021.1" (
-    call :run_pytest_with_extra tests/destructive/test_2021_1_project_mutation_sandbox.py tests/destructive/test_2021_1_soundbank_audio_sandbox.py tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py
-    exit /b %ERRORLEVEL%
-)
-if "%~1"=="2022.1" (
-    echo Focused destructive matrix is not defined for 2022.1; use smoke mode for this version. 1>&2
-    exit /b 1
-)
-if "%~1"=="2023.1" (
-    call :run_pytest_with_extra tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py
-    exit /b %ERRORLEVEL%
-)
-if "%~1"=="2024.1" (
-    call :run_pytest_with_extra tests/destructive/test_2024_project_mutation_sandbox.py tests/destructive/test_2024_soundbank_audio_sandbox.py tests/destructive/test_2024_switchcontainer_assignment_sandbox.py
-    exit /b %ERRORLEVEL%
-)
-if "%~1"=="2025.1" (
-    call :run_pytest_with_extra tests/destructive/test_2025_1_project_mutation_sandbox.py tests/destructive/test_2025_1_soundbank_audio_sandbox.py tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py
-    exit /b %ERRORLEVEL%
-)
-
+pushd "%ROOT_DIR%" >nul
+if "%~1"=="2021.1" call poetry run python -m pytest tests/destructive/test_2021_1_project_mutation_sandbox.py tests/destructive/test_2021_1_soundbank_audio_sandbox.py tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py %PYTEST_EXTRA_ARGS%
+if "%~1"=="2022.1" call poetry run python -m pytest tests/destructive/test_2022_project_mutation_sandbox.py tests/destructive/test_2022_soundbank_audio_sandbox.py tests/destructive/test_2022_switchcontainer_assignment_sandbox.py %PYTEST_EXTRA_ARGS%
+if "%~1"=="2023.1" call poetry run python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py %PYTEST_EXTRA_ARGS%
+if "%~1"=="2024.1" call poetry run python -m pytest tests/destructive/test_2024_project_mutation_sandbox.py tests/destructive/test_2024_soundbank_audio_sandbox.py tests/destructive/test_2024_switchcontainer_assignment_sandbox.py %PYTEST_EXTRA_ARGS%
+if "%~1"=="2025.1" call poetry run python -m pytest tests/destructive/test_2025_1_project_mutation_sandbox.py tests/destructive/test_2025_1_soundbank_audio_sandbox.py tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py %PYTEST_EXTRA_ARGS%
+set "RESULT=!ERRORLEVEL!"
+popd >nul
+if not "!RESULT!"=="0" exit /b !RESULT!
+if "%~1"=="2021.1" exit /b 0
+if "%~1"=="2022.1" exit /b 0
+if "%~1"=="2023.1" exit /b 0
+if "%~1"=="2024.1" exit /b 0
+if "%~1"=="2025.1" exit /b 0
 echo Unsupported destructive version: %~1 1>&2
 exit /b 1
 
 :run_matrix_all
-for %%V in (2021.1 2023.1 2024.1 2025.1) do (
+for %%V in (2021.1 2022.1 2023.1 2024.1 2025.1) do (
     call :run_live_for_version "%%V"
-    if errorlevel 1 exit /b %ERRORLEVEL%
+    if errorlevel 1 exit /b !ERRORLEVEL!
     call :run_destructive_for_version "%%V"
-    if errorlevel 1 exit /b %ERRORLEVEL%
+    if errorlevel 1 exit /b !ERRORLEVEL!
 )
 exit /b 0
+
+:fail_all_requires_all
+echo all mode requires version 'all' 1>&2
+set "EXIT_CODE=1"
+goto script_end
+
+:fail_matrix_requires_all
+echo matrix/focused mode requires version 'all' 1>&2
+set "EXIT_CODE=1"
+goto script_end
 
 :missing_version_value
 echo Missing value for %~1 1>&2
@@ -456,6 +441,9 @@ exit /b 0
 call :usage 1>&2
 exit /b 1
 
+:script_end
+exit /b %EXIT_CODE%
+
 :usage
 echo Usage:
 echo   ci\test.bat --version ^<version^> --mode ^<mode^> [-- ^<extra pytest args...^>]
@@ -471,7 +459,7 @@ echo   all          Run non-live suite first, then strict real matrix
 echo   smoke        Run focused WAAPI getInfo smoke via HeadlessLifecycle
 echo   live         Run focused live suite for the selected version
 echo   destructive  Run focused destructive suite for the selected version
-echo   matrix       Run focused live + destructive sequentially ^(2021.1/2023.1/2024.1/2025.1^)
+echo   matrix       Run focused live + destructive sequentially ^(2021.1/2022.1/2023.1/2024.1/2025.1^)
 echo   focused      Alias for matrix
 echo.
 echo Notes:
@@ -479,9 +467,11 @@ echo   - Environment overrides are respected if already set:
 echo       WWISE_CONSOLE, WWISE_SAMPLE_PROJECT_PATH, WWISE_SANDBOX_ROOT,
 echo       WWISE_STARTUP_TIMEOUT, WWISE_READINESS_TIMEOUT,
 echo       WWISE_PROBE_TIMEOUT, WWISE_SHUTDOWN_TIMEOUT
+echo   - Python execution uses Poetry by default:
+echo       poetry run python ...
 echo   - Default Windows paths if not set:
 echo       C:\Audiokinetic\Wwise^<build^>\Authoring\x64\Release\bin\WwiseConsole.exe
-echo       C:\Audiokinetic\SampleProject^<build^>\SampleProject\SampleProject.wproj
+echo       tests\_org\^<version^>\SampleProject.wproj
 echo   - Default sandbox root if not set:
 echo       .sisyphus\runtime\wwise-waapi-sandboxes\^<version^>-^<mode^>
 echo.
