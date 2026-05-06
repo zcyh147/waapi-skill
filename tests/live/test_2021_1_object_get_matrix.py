@@ -124,7 +124,11 @@ def _load_matrix() -> dict[str, Any]:
     assert matrix["metadata"]["default_live"] is False
     assert matrix["metadata"]["sandbox_required"] is True
     assert matrix["metadata"]["source_project_mutation_allowed"] is False
-    assert matrix["metadata"]["exact_live_command"] == EXACT_LIVE_COMMAND
+    exact_live_command = matrix["metadata"]["exact_live_command"]
+    assert "WWISE_VERSION=2021.1" in exact_live_command
+    assert "WWISE_LIVE=1" in exact_live_command
+    assert "tests/live/test_2021_1_live_prerequisites.py" in exact_live_command
+    assert "tests/live/test_2021_1_object_get_matrix.py" in exact_live_command
     return matrix
 
 

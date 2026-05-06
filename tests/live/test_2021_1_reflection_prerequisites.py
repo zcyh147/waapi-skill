@@ -114,7 +114,7 @@ def test_2021_1_live_reflection_prerequisites_and_resource_generation() -> None:
                     "provenance": {
                         "get_info": _stable_get_info_summary(info),
                         "sample_project": {
-                            "name": EXPECTED_SAMPLE_PROJECT.parent.name,
+                            "name": EXPECTED_SAMPLE_PROJECT.stem,
                             "path": REDACTED_LOCAL_PATH,
                             "path_status": "matched-exact-expected-path",
                         },
