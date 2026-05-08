@@ -235,10 +235,15 @@ def _run_with_timeout(
     late_result_cleanup: Callable[[Any], None] | None = None,
 ) -> Any:
     result_queue: queue.Queue[tuple[str, Any]] = queue.Queue(maxsize=1)
+    timed_out = threading.Event()
 
     def target() -> None:
         try:
-            result_queue.put(("result", func()))
+            result = func()
+            if timed_out.is_set() and late_result_cleanup is not None:
+                late_result_cleanup(result)
+                return
+            result_queue.put(("result", result))
         except BaseException as exc:  # pragma: no cover - re-raised in caller thread
             result_queue.put(("error", exc))
 
@@ -247,12 +252,7 @@ def _run_with_timeout(
     try:
         kind, payload = result_queue.get(timeout=timeout)
     except queue.Empty as exc:
-        if late_result_cleanup is not None:
-            threading.Thread(
-                target=_cleanup_late_result,
-                args=(result_queue, late_result_cleanup),
-                daemon=True,
-            ).start()
+        timed_out.set()
         raise error(message) from exc
     if kind == "error":
         raise payload

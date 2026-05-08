@@ -279,7 +279,11 @@ run_pytest() {
   local -a args=("$@")
   (
     cd "$ROOT_DIR"
-    python -m pytest "${args[@]}" "${PYTEST_EXTRA_ARGS[@]}"
+    if [[ ${#PYTEST_EXTRA_ARGS[@]} -gt 0 ]]; then
+      python -m pytest "${args[@]}" "${PYTEST_EXTRA_ARGS[@]}"
+    else
+      python -m pytest "${args[@]}"
+    fi
   )
 }
 

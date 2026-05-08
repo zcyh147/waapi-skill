@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -63,6 +64,14 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
 
 
 def _run_ci_test(env: dict[str, str], *args: str) -> subprocess.CompletedProcess[str]:
+    if os.name != "nt":
+        import pytest  # pyright: ignore[reportMissingImports]
+
+        pytest.skip("ci/test.bat parity tests require a Windows cmd.exe executor")
+    if shutil.which("cmd.exe") is None:
+        import pytest  # pyright: ignore[reportMissingImports]
+
+        pytest.skip("cmd.exe is unavailable on this Windows host")
     return subprocess.run(
         ["cmd.exe", "/d", "/c", str(CI_TEST_BAT), *args],
         cwd=REPO_ROOT,
