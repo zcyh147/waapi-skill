@@ -234,3 +234,36 @@ def test_import_tab_delimited_requires_file_or_plan_and_schema_fields() -> None:
     with pytest.raises(SemanticValidationError) as bad_operation:
         builder().import_tab_delimited(import_location=None, import_language="SFX", import_operation="delete", import_file="/tmp/import.tsv")
     assert bad_operation.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+
+
+def test_audio_import_rejects_root_level_object_path_and_suggests_default_work_unit() -> None:
+    with pytest.raises(SemanticValidationError) as exc:
+        builder().audio_import(
+            [
+                {
+                    "objectPath": r"\Actor-Mixer Hierarchy\<Sound>Encoded",
+                    "audioFileBase64": "Encoded.wav|UklGRg==",
+                    "objectType": "Sound",
+                }
+            ],
+            import_operation="useExisting",
+        )
+
+    assert exc.value.error_code == SemanticErrorCode.SEMANTIC_CONTAINER_UNSUITABLE
+    assert exc.value.details["candidate_writable_parent"] == r"\Actor-Mixer Hierarchy\Default Work Unit\<Sound>Encoded"
+    assert exc.value.details["requires_user_confirmation"] is True
+
+
+def test_import_tab_delimited_rejects_root_level_import_location_and_suggests_default_work_unit() -> None:
+    plan = tab_delimited_plan([{"objectPath": r"\Actor-Mixer Hierarchy\Default Work Unit\<Sound>TabTone", "audioFile": "/tmp/tab-tone.wav"}])
+
+    with pytest.raises(SemanticValidationError) as exc:
+        builder().import_tab_delimited(
+            import_location=r"\Actor-Mixer Hierarchy",
+            import_language="SFX",
+            import_operation="createNew",
+            plan=plan,
+        )
+
+    assert exc.value.error_code == SemanticErrorCode.SEMANTIC_CONTAINER_UNSUITABLE
+    assert exc.value.details["candidate_writable_parent"] == r"\Actor-Mixer Hierarchy\Default Work Unit"

@@ -21,6 +21,7 @@ from .common import (  # pyright: ignore[reportMissingImports]
     SemanticReadbackPlan,
     SemanticValidationError,
     SourceNoteChecker,
+    candidate_writable_child_container,
 )
 from .schema import SemanticSchemaValidator  # pyright: ignore[reportMissingImports]
 from .source_notes import SemanticSourceNoteChecker  # pyright: ignore[reportMissingImports]
@@ -175,6 +176,7 @@ class ImportBuilder:
         }
         if import_location is not None:
             _require_object_arg("import_location", import_location)
+            _require_writable_import_target("import_location", import_location)
             args["importLocation"] = import_location
         if auto_add_to_source_control is not None:
             if not isinstance(auto_add_to_source_control, bool):
@@ -303,7 +305,8 @@ def _coerce_import_item(item: ImportItem | Mapping[str, Any]) -> dict[str, Any]:
 def _validate_import_item(item: Mapping[str, Any]) -> None:
     if "objectPath" not in item:
         raise SemanticValidationError(SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH, "Each audio import item requires objectPath.")
-    _non_empty_string("objectPath", item["objectPath"])
+    object_path = _non_empty_string("objectPath", item["objectPath"])
+    _require_writable_import_target("objectPath", object_path)
     sources = tuple(key for key in ("audioFile", "audioFileBase64") if key in item and _has_value(item[key]))
     if len(sources) > 1:
         raise SemanticValidationError(
@@ -446,6 +449,25 @@ def _non_empty_string(name: str, value: Any) -> str:
 def _require_object_arg(name: str, value: Any) -> None:
     if isinstance(value, bool) or not isinstance(value, (str, int)) or (isinstance(value, str) and not value.strip()):
         raise SemanticValidationError(SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH, f"{name} must be a non-empty object id/name/path value.")
+
+
+def _require_writable_import_target(field: str, value: str | int) -> None:
+    if not isinstance(value, str):
+        return
+    candidate = candidate_writable_child_container(value)
+    if candidate is None:
+        return
+    raise SemanticValidationError(
+        SemanticErrorCode.SEMANTIC_CONTAINER_UNSUITABLE,
+        f"{field} must target a writable child container instead of the management root path {value!r}.",
+        details={
+            "field": field,
+            "invalid_target_path": value,
+            "candidate_writable_parent": candidate,
+            "requires_user_confirmation": True,
+            "reason": "Use a writable child container such as Default Work Unit before import mutation.",
+        },
+    )
 
 
 def _has_value(value: Any) -> bool:
