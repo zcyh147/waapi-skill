@@ -191,7 +191,4 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def _canonical_fixture_bytes(path: Path) -> bytes:
-    data = path.read_bytes()
-    if path.suffix.lower() in {".md", ".json", ".txt", ".wwu", ".wproj", ".xml"}:
-        return data.replace(b"\r\n", b"\n")
-    return data
+    return path.read_bytes()
