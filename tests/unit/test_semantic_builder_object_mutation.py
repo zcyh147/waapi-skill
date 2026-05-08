@@ -181,6 +181,26 @@ def test_schema_and_source_note_fail_closed_before_preview() -> None:
     assert hidden_object.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
 
 
+def test_create_copy_and_move_reject_management_root_parent_paths() -> None:
+    root_parent = ObjectIdentity(path=r"\Master-Mixer Hierarchy")
+
+    with pytest.raises(SemanticValidationError) as create_error:
+        builder().create(parent=root_parent, type="Bus", name="Temp_UI_Bus")
+    assert create_error.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+    assert create_error.value.details["candidate_writable_parent"] == r"\Master-Mixer Hierarchy\Default Work Unit"
+    assert create_error.value.details["requires_user_confirmation"] is True
+
+    with pytest.raises(SemanticValidationError) as copy_error:
+        builder().copy(object=exact_id("{source}"), parent=root_parent)
+    assert copy_error.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+    assert copy_error.value.details["candidate_writable_parent"] == r"\Master-Mixer Hierarchy\Default Work Unit"
+
+    with pytest.raises(SemanticValidationError) as move_error:
+        builder().move(object=exact_id("{source}"), parent=root_parent)
+    assert move_error.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+    assert move_error.value.details["invalid_parent_path"] == r"\Master-Mixer Hierarchy"
+
+
 def test_preview_alias_accepts_uri_or_operation_name() -> None:
     preview = build_object_mutation_preview(
         "ak.wwise.core.object.delete",

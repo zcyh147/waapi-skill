@@ -12,6 +12,37 @@ from wwise_waapi.manifest import ManifestResourceMissingError, ManifestStore
 
 
 DEFAULT_MANIFEST_ROOT = Path(__file__).resolve().parents[2] / "resources" / "manifest"
+DEFAULT_WORK_UNIT_NAME = "Default Work Unit"
+KNOWN_WWISE_MANAGEMENT_ROOTS = frozenset(
+    {
+        "Actor-Mixer Hierarchy",
+        "Master-Mixer Hierarchy",
+        "Interactive Music Hierarchy",
+        "Dynamic Dialogue",
+        "SoundBanks",
+        "Switches",
+        "States",
+        "Triggers",
+        "Attenuations",
+        "Effects",
+        "Events",
+        "Game Parameters",
+        "Conversion Settings",
+        "Audio Devices",
+        "Control Surface Sessions",
+        "Modulators",
+        "Presets",
+        "Queries",
+        "Mixing Sessions",
+        "Metadata",
+        "Soundcaster Sessions",
+        "Virtual Acoustics",
+        "Containers",
+        "Busses",
+        "Devices",
+        "Sidechain Mixes",
+    }
+)
 
 
 class SemanticErrorCode(str, Enum):
@@ -27,6 +58,7 @@ class SemanticErrorCode(str, Enum):
     SEMANTIC_PROPERTY_UNSUPPORTED = "SEMANTIC_PROPERTY_UNSUPPORTED"
     UNSUPPORTED_BUILDER_FAMILY = "UNSUPPORTED_BUILDER_FAMILY"
     DESTRUCTIVE_GATE_REQUIRED = "DESTRUCTIVE_GATE_REQUIRED"
+    SEMANTIC_CONTAINER_UNSUITABLE = "SEMANTIC_CONTAINER_UNSUITABLE"
 
 
 class BuilderFamily(str, Enum):
@@ -292,3 +324,24 @@ def _schema_absence_details(uri: str, version: str) -> dict[str, Any]:
         details["status"] = "deferred"
         details["deferred_registry"] = entry.as_dict()
     return details
+
+
+def split_wwise_path(path: str) -> tuple[str, ...]:
+    return tuple(segment for segment in path.split("\\") if segment)
+
+
+def candidate_writable_child_container(path: str) -> str | None:
+    segments = split_wwise_path(path)
+    if not segments:
+        return None
+    root = segments[0]
+    if root not in KNOWN_WWISE_MANAGEMENT_ROOTS:
+        return None
+    if len(segments) == 1:
+        return f"\\{root}\\{DEFAULT_WORK_UNIT_NAME}"
+    second = segments[1]
+    if second == DEFAULT_WORK_UNIT_NAME:
+        return None
+    if second.startswith("<"):
+        return "\\" + "\\".join((root, DEFAULT_WORK_UNIT_NAME, *segments[1:]))
+    return None

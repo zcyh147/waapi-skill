@@ -11,6 +11,7 @@ from wwise_waapi.dispatcher import DEFAULT_WWISE_VERSION
 from .common import (
     BuilderContext,
     BuilderFamily,
+    DEFAULT_WORK_UNIT_NAME,
     ManifestSchemaLoader,
     SemanticEnvelope,
     SemanticErrorCode,
@@ -18,6 +19,7 @@ from .common import (
     SemanticReadbackPlan,
     SemanticValidationError,
     SourceNoteChecker,
+    candidate_writable_child_container,
 )
 from wwise_waapi.builders.identity import (  # pyright: ignore[reportMissingImports]
     OBJECT_GET_URI,
@@ -45,8 +47,6 @@ CONFLICT_POLICIES = ("rename", "replace", "fail", "merge")
 COPY_MOVE_CONFLICT_POLICIES = ("rename", "replace", "fail")
 LIST_MODES = ("replaceAll", "append")
 PASTE_MODES = ("replaceEntire", "addReplace", "addKeep")
-
-
 class ObjectMutationOperation(str, Enum):
     """Supported P1 object mutation operations."""
 
@@ -107,6 +107,7 @@ class ObjectMutationBuilder:
         auto_add_to_source_control: bool | None = None,
     ) -> SemanticPreview:
         resolved_parent = _resolve_identity("parent", parent, parent_rows)
+        _require_writable_parent_container(operation=ObjectMutationOperation.CREATE, parent=resolved_parent, object_type=type)
         _require_non_empty_string("type", type)
         _require_non_empty_string("name", name)
         _require_allowed("on_name_conflict", on_name_conflict, CONFLICT_POLICIES)
@@ -320,6 +321,7 @@ class ObjectMutationBuilder:
     ) -> SemanticPreview:
         resolved_object = _resolve_identity("object", object, object_rows)
         resolved_parent = _resolve_identity("parent", parent, parent_rows)
+        _require_writable_parent_container(operation=operation, parent=resolved_parent)
         _require_allowed("on_name_conflict", on_name_conflict, COPY_MOVE_CONFLICT_POLICIES)
         return self._build_preview(
             operation,
@@ -398,6 +400,47 @@ def _resolve_identity(
     if not isinstance(resolved, ResolvedObject):
         raise _identity_error(role, identity.as_dict())
     return resolved
+
+
+def _require_writable_parent_container(
+    *,
+    operation: ObjectMutationOperation,
+    parent: ResolvedObject,
+    object_type: str | None = None,
+) -> None:
+    parent_path = _resolved_parent_path(parent)
+    if parent_path is None:
+        return
+    candidate = candidate_writable_child_container(parent_path)
+    if candidate is None:
+        return
+    message = (
+        f"{operation.value} requires a writable child container, not the management root path {parent_path!r}."
+    )
+    if object_type is not None:
+        message = (
+            f"{operation.value} cannot place {object_type!r} directly under the management root path {parent_path!r}."
+        )
+    raise _schema_error(
+        message,
+        operation=operation.value,
+        invalid_parent_path=parent_path,
+        candidate_writable_parent=candidate,
+        requires_user_confirmation=True,
+        reason="Use a writable child container such as Default Work Unit instead of mutating the hierarchy/category root directly.",
+    )
+
+
+def _resolved_parent_path(parent: ResolvedObject) -> str | None:
+    identity_path = parent.identity.path
+    if isinstance(identity_path, str) and identity_path.strip():
+        return identity_path
+    row_path = parent.row.get("path")
+    if isinstance(row_path, str) and row_path.strip():
+        return row_path
+    if isinstance(parent.object, str) and parent.object.startswith("\\"):
+        return parent.object
+    return None
 
 
 def _set_entry(item: ObjectSetMutation | Mapping[str, Any]) -> dict[str, Any]:
