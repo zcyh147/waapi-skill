@@ -40,35 +40,14 @@ class SkillPaths:
 
 @dataclass(slots=True)
 class SkillConfig:
-    """Basic configuration for scaffolded Wwise WAAPI workflows."""
+    """Persisted public user configuration for Wwise WAAPI workflows."""
 
     skill_root: Path
     wwise_version: str | None = None
     waapi_host: str = "127.0.0.1"
     waapi_port: int | None = None
     project_modification_policy: str = "preview_then_confirm"
-    use_current_selection_for_ambiguous_queries: bool = True
     paths: SkillPaths = field(init=False)
-    coverage_minimum: int = 85
-    core_coverage_targets: dict[str, int] = field(
-        default_factory=lambda: {
-            "headless": 95,
-            "manifest": 95,
-            "dispatcher": 95,
-            "subscriptions": 95,
-            "deferred_registry": 95,
-        }
-    )
-    wwise_live_env: str = "WWISE_LIVE"
-    wwise_destructive_env: str = "WWISE_DESTRUCTIVE"
-    wwise_version_env: str = "WWISE_VERSION"
-    wwise_console_env: str = "WWISE_CONSOLE"
-    wwise_fixture_project_env: str = "WWISE_FIXTURE_PROJECT"
-    wwise_sample_project_path_env: str = "WWISE_SAMPLE_PROJECT_PATH"
-    wwise_sandbox_root_env: str = "WWISE_SANDBOX_ROOT"
-    wwise_root_env: str = "WWISEROOT"
-    default_wwise_console_macos: Path = DEFAULT_WWISE_CONSOLE_MACOS
-    windows_wwise_console_relative: Path = WINDOWS_WWISE_CONSOLE_RELATIVE
 
     def __post_init__(self) -> None:
         self.paths = SkillPaths(self.skill_root)
@@ -98,11 +77,6 @@ class SkillConfig:
             "project_modification_policy",
             default=config.project_modification_policy,
         )
-        config.use_current_selection_for_ambiguous_queries = _load_bool(
-            payload,
-            "use_current_selection_for_ambiguous_queries",
-            default=config.use_current_selection_for_ambiguous_queries,
-        )
         return config
 
     def save(self, path: Path | None = None) -> None:
@@ -115,7 +89,6 @@ class SkillConfig:
             "project_modification_policy": _validate_project_modification_policy(
                 self.project_modification_policy
             ),
-            "use_current_selection_for_ambiguous_queries": self.use_current_selection_for_ambiguous_queries,
         }
         with tempfile.NamedTemporaryFile(
             "w",
@@ -136,7 +109,6 @@ class SkillConfig:
             "waapi_host",
             "waapi_port",
             "project_modification_policy",
-            "use_current_selection_for_ambiguous_queries",
         }
         for key in changes:
             if key not in allowed_fields:
@@ -171,13 +143,6 @@ def _load_optional_int(payload: dict[str, Any], key: str) -> int | None:
         return None
     if not isinstance(value, int) or isinstance(value, bool):
         raise ValueError(f"{key} must be an integer or null")
-    return value
-
-
-def _load_bool(payload: dict[str, Any], key: str, default: bool) -> bool:
-    value = payload.get(key, default)
-    if not isinstance(value, bool):
-        raise ValueError(f"{key} must be a boolean")
     return value
 
 
