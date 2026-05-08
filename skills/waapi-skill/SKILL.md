@@ -7,6 +7,8 @@ description: Use this skill for Wwise WAAPI automation through the skill-local P
 
 Use this skill to automate Wwise through WAAPI with a Python-first workflow. The normal path is: make sure Python can run the skill-local wrapper, identify the target Wwise version, then use the dispatcher or semantic builders for the requested task.
 
+When config and live WAAPI connection details are already known, execute the live read-only query first for ordinary inspection requests. Do not start by inspecting repository files or launching documentation research unless the user explicitly asked for investigation or the live query path is blocked.
+
 Supported Wwise versions are `2021.1`, `2022.1`, `2023.1`, `2024.1`, and `2025.1`.
 
 ## Setup and runner
@@ -33,9 +35,11 @@ If the user does not specify a version, first probe the live Wwise connection wi
 
 Persist the approved version, WAAPI host, and WAAPI port in the skill-local JSON config at `data/config.json` so future runs do not depend on conversation memory. Agents should read that config first and only probe live state again when the connection needs to be verified or the saved values are missing.
 
-The saved config is user-overridable. If the user chooses a different Wwise version or WAAPI port, update the config and keep using that saved override until the user changes it again.
+The saved config is user-overridable. The stable persisted user-facing config surface is limited to `wwise_version`, `waapi_host`, `waapi_port`, and `project_modification_policy`. If the user chooses a different Wwise version or WAAPI port, update the config and keep using that saved override until the user changes it again.
 
 By default, the config leaves `wwise_version` unset, uses `127.0.0.1` for the WAAPI host, and leaves the port unset so WAAPI can use its normal default.
+
+Do not describe internal runtime defaults such as timeout constants, environment-variable wiring, coverage thresholds, default `WwiseConsole` paths, or scaffold directories as public config unless the user explicitly asks about implementation internals.
 
 On first run, the skill also stores a project modification policy in `data/config.json`:
 
@@ -131,6 +135,8 @@ request = preview.to_dispatcher_request()
 ```
 
 The raw `WwiseDispatcher` contract remains the explicit escape hatch for low-level WAAPI work or unsupported builder coverage. For unfamiliar calls, preview with `dry_run=True` first and keep timeouts bounded.
+
+If a requested mutation target path is not a valid direct writable parent for the requested object type, do not silently retarget the mutation. Explain the invalid target, identify likely writable child containers such as a `Default Work Unit` when supported by live state or grounded local evidence, and ask the user to confirm the intended writable child container before mutating.
 
 ## Safety guardrails
 
