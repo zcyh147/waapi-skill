@@ -39,6 +39,7 @@ def test_live_reflection_inventory_uses_sample_project_when_available(tmp_path: 
             probe=float(os.getenv("WWISE_PROBE_TIMEOUT", "5")),
             shutdown=float(os.getenv("WWISE_SHUTDOWN_TIMEOUT", "10")),
         ),
+        launch_env={**os.environ, "WINEPREFIX": str(tmp_path / ".wine-prefix")},
     )
     client = None
     try:
@@ -65,6 +66,7 @@ def test_live_reflection_inventory_uses_sample_project_when_available(tmp_path: 
             client.disconnect()
         lifecycle.shutdown(suppress_errors=True)
         assert lifecycle.process is None or lifecycle.process.poll() is not None
+        assert lifecycle.cleanup_report is None or lifecycle.cleanup_report.is_clean is True
 
 
 def _find_sample_project() -> Path | None:

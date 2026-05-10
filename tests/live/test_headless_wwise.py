@@ -9,7 +9,7 @@ from wwise_waapi.headless import HeadlessLifecycle, LifecycleTimeouts, WwiseCons
 
 
 @pytest.mark.live
-def test_headless_wwise_launches_waapi_and_cleans_up() -> None:
+def test_headless_wwise_launches_waapi_and_cleans_up(tmp_path: Path) -> None:
     console_path = WwiseConsolePathResolver().resolve(os.getenv("WWISE_CONSOLE"))
     if not Path(console_path).exists():
         pytest.skip(f"WwiseConsole is unavailable at {console_path}")
@@ -27,6 +27,7 @@ def test_headless_wwise_launches_waapi_and_cleans_up() -> None:
             probe=float(os.getenv("WWISE_PROBE_TIMEOUT", "5")),
             shutdown=float(os.getenv("WWISE_SHUTDOWN_TIMEOUT", "10")),
         ),
+        launch_env={**os.environ, "WINEPREFIX": str(tmp_path / ".wine-prefix")},
     )
     try:
         result = lifecycle.run_until_ready()
@@ -35,3 +36,4 @@ def test_headless_wwise_launches_waapi_and_cleans_up() -> None:
     finally:
         lifecycle.shutdown(suppress_errors=True)
         assert lifecycle.process is None or lifecycle.process.poll() is not None
+        assert lifecycle.cleanup_report is None or lifecycle.cleanup_report.is_clean is True
