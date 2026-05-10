@@ -22,6 +22,7 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
     shutdown_sandboxed_wwise,
 )
 from tests.destructive.support.live_environment import LiveEnvironmentError, require_destructive_environment  # pyright: ignore[reportMissingImports]
+from wwise_waapi.headless import CleanupReport, ResidualProcess  # pyright: ignore[reportMissingImports]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -183,8 +184,10 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
             self.process = FakeProcess()
             self.port = 31337
             self.project_path = kwargs["project_path"]
+            self.launch_env = kwargs["launch_env"]
             self.command = [str(kwargs["console_path"]), "waapi-server", str(self.project_path), "--wamp-port", str(self.port)]
             self.ready_result: object = None
+            self.cleanup_report: CleanupReport | None = None
             seen_project_paths.append(self.project_path)
 
         def run_until_ready(self) -> object:
@@ -193,6 +196,11 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
 
         def shutdown(self, suppress_errors: bool = True) -> None:
             self.process = None
+            self.cleanup_report = CleanupReport(
+                launch_pid=FakeProcess.pid,
+                wine_prefix=self.launch_env.get("WINEPREFIX"),
+                process_exited=True,
+            )
 
     monkeypatch.setattr(sandbox_fixture, "HeadlessLifecycle", FakeLifecycle)
 
@@ -207,7 +215,9 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
     assert sandbox.metadata.get_info_version == {"displayName": "fake Wwise 2024.1"}
     assert sandbox.metadata.get_info_display_name == "fake Wwise 2024.1"
     assert sandbox.metadata.identity_verified is True
+    assert sandbox.metadata.wine_prefix_path == str(sandbox.wine_prefix_path)
     assert sandbox.metadata.process_cleanup_result == "cleaned"
+    assert seen_project_paths == [sandbox.sandbox_project]
     cleanup_sandbox(sandbox)
 
 
@@ -225,8 +235,10 @@ def test_strict_real_launch_audit_is_written_after_shutdown(monkeypatch: pytest.
             self.process = FakeProcess()
             self.port = 31337
             self.project_path = kwargs["project_path"]
+            self.launch_env = kwargs["launch_env"]
             self.command = [str(kwargs["console_path"]), "waapi-server", str(self.project_path), "--wamp-port", str(self.port)]
             self.ready_result: object = None
+            self.cleanup_report: CleanupReport | None = None
 
         def run_until_ready(self) -> object:
             self.ready_result = {"version": {"displayName": "fake Wwise 2024.1", "year": 2024}}
@@ -234,6 +246,11 @@ def test_strict_real_launch_audit_is_written_after_shutdown(monkeypatch: pytest.
 
         def shutdown(self, suppress_errors: bool = True) -> None:
             self.process = None
+            self.cleanup_report = CleanupReport(
+                launch_pid=FakeProcess.pid,
+                wine_prefix=self.launch_env.get("WINEPREFIX"),
+                process_exited=True,
+            )
 
     monkeypatch.setattr(sandbox_fixture, "HeadlessLifecycle", FakeLifecycle)
 
@@ -247,12 +264,14 @@ def test_strict_real_launch_audit_is_written_after_shutdown(monkeypatch: pytest.
     assert record["pid"] == 4242
     assert record["port"] == 31337
     assert record["command"] == [str(console), "waapi-server", str(sandbox.sandbox_project), "--wamp-port", "31337"]
+    assert record["wine_prefix_path"] == str(sandbox.wine_prefix_path)
     assert record["launch_project_path"] == str(sandbox.sandbox_project)
     assert record["sandbox_project_path"] == str(sandbox.sandbox_project)
     assert record["ready_duration_seconds"] >= 0
     assert record["get_info_version"] == {"displayName": "fake Wwise 2024.1", "year": 2024}
     assert record["get_info_display_name"] == "fake Wwise 2024.1"
     assert record["cleanup_result"] == "cleaned"
+    assert record["cleanup_details"]["wine_prefix"] == str(sandbox.wine_prefix_path)
     assert isinstance(record["recorded_at_unix"], int)
     cleanup_sandbox(sandbox)
 
@@ -271,8 +290,10 @@ def test_non_strict_launch_does_not_write_persistent_audit(monkeypatch: pytest.M
             self.process = FakeProcess()
             self.port = 31337
             self.project_path = kwargs["project_path"]
+            self.launch_env = kwargs["launch_env"]
             self.command = [str(kwargs["console_path"]), "waapi-server", str(self.project_path), "--wamp-port", str(self.port)]
             self.ready_result: object = None
+            self.cleanup_report: CleanupReport | None = None
 
         def run_until_ready(self) -> object:
             self.ready_result = {"version": {"displayName": "fake Wwise 2024.1"}}
@@ -280,6 +301,11 @@ def test_non_strict_launch_does_not_write_persistent_audit(monkeypatch: pytest.M
 
         def shutdown(self, suppress_errors: bool = True) -> None:
             self.process = None
+            self.cleanup_report = CleanupReport(
+                launch_pid=FakeProcess.pid,
+                wine_prefix=self.launch_env.get("WINEPREFIX"),
+                process_exited=True,
+            )
 
     monkeypatch.setattr(sandbox_fixture, "HeadlessLifecycle", FakeLifecycle)
 
@@ -302,8 +328,10 @@ def test_launch_shuts_down_when_ready_proof_is_invalid(monkeypatch: pytest.Monke
             self.process = FakeProcess()
             self.port = 31338
             self.project_path = kwargs["project_path"]
+            self.launch_env = kwargs["launch_env"]
             self.command = [str(kwargs["console_path"]), "waapi-server", str(self.project_path), "--wamp-port", str(self.port)]
             self.ready_result: object = None
+            self.cleanup_report: CleanupReport | None = None
 
         def run_until_ready(self) -> object:
             self.ready_result = {"version": {}}
@@ -312,6 +340,11 @@ def test_launch_shuts_down_when_ready_proof_is_invalid(monkeypatch: pytest.Monke
         def shutdown(self, suppress_errors: bool = True) -> None:
             shutdown_calls.append(suppress_errors)
             self.process = None
+            self.cleanup_report = CleanupReport(
+                launch_pid=FakeProcess.pid,
+                wine_prefix=self.launch_env.get("WINEPREFIX"),
+                process_exited=True,
+            )
 
     monkeypatch.setattr(sandbox_fixture, "HeadlessLifecycle", FakeLifecycle)
 
@@ -321,6 +354,46 @@ def test_launch_shuts_down_when_ready_proof_is_invalid(monkeypatch: pytest.Monke
         assert shutdown_calls == [True]
     finally:
         cleanup_sandbox(sandbox, failed=True)
+
+
+def test_shutdown_raises_when_cleanup_report_has_residual_processes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    console = make_console(tmp_path)
+    source_project = make_sample_project(tmp_path / "source")
+    env = base_env(console, source_project, tmp_path / "sandbox-root")
+    sandbox = prepare_sample_project_sandbox(env)
+
+    class FakeLifecycle:
+        def __init__(self, **kwargs: Any) -> None:
+            self.process = FakeProcess()
+            self.port = 31337
+            self.project_path = kwargs["project_path"]
+            self.launch_env = kwargs["launch_env"]
+            self.command = [str(kwargs["console_path"]), "waapi-server", str(self.project_path), "--wamp-port", str(self.port)]
+            self.ready_result: object = None
+            self.cleanup_report: CleanupReport | None = None
+
+        def run_until_ready(self) -> object:
+            self.ready_result = {"version": {"displayName": "fake Wwise 2024.1"}}
+            return self.ready_result
+
+        def shutdown(self, suppress_errors: bool = True) -> None:
+            self.process = None
+            self.cleanup_report = CleanupReport(
+                launch_pid=FakeProcess.pid,
+                wine_prefix=self.launch_env.get("WINEPREFIX"),
+                process_exited=True,
+                residual_processes=[ResidualProcess(pid=999, command="WINEPREFIX=/tmp/test wineserver")],
+            )
+
+    monkeypatch.setattr(sandbox_fixture, "HeadlessLifecycle", FakeLifecycle)
+
+    lifecycle = launch_sandboxed_wwise(sandbox, env)
+    with pytest.raises(SandboxFixtureError, match="residual processes"):
+        shutdown_sandboxed_wwise(lifecycle, sandbox)
+
+    assert sandbox.metadata.process_cleanup_result == "residual-processes"
+    assert sandbox.metadata.process_cleanup_details is not None
+    cleanup_sandbox(sandbox, failed=True)
 
 
 def test_missing_copied_wproj_is_rejected(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

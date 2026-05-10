@@ -71,11 +71,13 @@ class SandboxMetadata:
     selected_port: int | None = None
     command: list[str] | None = None
     process_pid: int | None = None
+    wine_prefix_path: str | None = None
     launch_project_path: str | None = None
     ready_duration_seconds: float | None = None
     get_info_version: dict[str, Any] | None = None
     get_info_display_name: str | None = None
     process_cleanup_result: str | None = None
+    process_cleanup_details: dict[str, Any] | None = None
     keep_decision: str = "pending"
     metadata_path: str | None = None
     expected_project_identity: str | None = None
@@ -102,7 +104,12 @@ class SandboxProject:
         return {
             ENV_WWISE_FIXTURE_PROJECT: str(self.sandbox_project),
             ENV_WWISE_SANDBOX_ROOT: str(self.sandbox_root),
+            "WINEPREFIX": str(self.wine_prefix_path),
         }
+
+    @property
+    def wine_prefix_path(self) -> Path:
+        return self.sandbox_path / ".wine-prefix"
 
     def write_metadata(self) -> Path:
         metadata_path = self.sandbox_path / "sandbox-metadata.json"
@@ -226,6 +233,7 @@ def launch_sandboxed_wwise(
         console_path=contract.console_path,
         project_path=sandbox.sandbox_project,
         timeouts=timeouts or _timeouts_from_env(env_map),
+        launch_env=env_map,
     )
     try:
         ready_started = time.perf_counter()
@@ -236,6 +244,7 @@ def launch_sandboxed_wwise(
             sandbox.metadata.selected_port = lifecycle.port
             sandbox.metadata.command = list(lifecycle.command)
             sandbox.metadata.process_pid = getattr(lifecycle.process, "pid", None)
+            sandbox.metadata.wine_prefix_path = str(sandbox.wine_prefix_path)
             sandbox.metadata.launch_project_path = str(sandbox.sandbox_project)
             sandbox.metadata.ready_duration_seconds = ready_duration
             sandbox.metadata.get_info_version = dict(ready_info["version"])
@@ -280,9 +289,16 @@ def shutdown_sandboxed_wwise(
         sandbox.write_metadata()
         _append_strict_real_launch_audit(sandbox)
         raise
-    sandbox.metadata.process_cleanup_result = "cleaned" if lifecycle.process is None else "still-running"
+    report = lifecycle.cleanup_report
+    sandbox.metadata.process_cleanup_details = asdict(report) if report is not None else None
+    sandbox.metadata.process_cleanup_result = "cleaned" if report is not None and report.is_clean else "residual-processes"
     sandbox.write_metadata()
     _append_strict_real_launch_audit(sandbox)
+    if report is None:
+        raise SandboxFixtureError("sandboxed Wwise shutdown did not produce a cleanup report")
+    if not report.is_clean:
+        residual_summary = ", ".join(f"{item.pid}:{item.command}" for item in report.residual_processes) or "process-not-exited"
+        raise SandboxFixtureError(f"sandboxed Wwise cleanup left residual processes: {residual_summary}")
 
 
 def _append_strict_real_launch_audit(sandbox: SandboxProject) -> None:
@@ -318,12 +334,14 @@ def _strict_real_launch_audit_payload(sandbox: SandboxProject) -> dict[str, Any]
         "pid": metadata.process_pid,
         "port": metadata.selected_port,
         "command": list(metadata.command or []),
+        "wine_prefix_path": metadata.wine_prefix_path,
         "launch_project_path": metadata.launch_project_path,
         "sandbox_project_path": metadata.sandbox_project_path,
         "ready_duration_seconds": metadata.ready_duration_seconds,
         "get_info_version": metadata.get_info_version,
         "get_info_display_name": metadata.get_info_display_name,
         "cleanup_result": metadata.process_cleanup_result,
+        "cleanup_details": metadata.process_cleanup_details,
         "metadata_path": metadata.metadata_path,
     }
 
