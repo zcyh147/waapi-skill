@@ -66,6 +66,30 @@ class ShutdownTimeout(HeadlessLifecycleError):
     """Raised when graceful and forced shutdown both exceed their timeouts."""
 
 
+@dataclass(slots=True, frozen=True)
+class ResidualProcess:
+    """Residual process still owned by a launched Wine prefix."""
+
+    pid: int
+    command: str
+
+
+@dataclass(slots=True)
+class CleanupReport:
+    """Structured cleanup result for a headless lifecycle shutdown."""
+
+    launch_pid: int | None
+    wine_prefix: str | None
+    process_exited: bool
+    detached_cleanup_pids: list[int] = field(default_factory=list)
+    wineserver_commands: list[list[str]] = field(default_factory=list)
+    residual_processes: list[ResidualProcess] = field(default_factory=list)
+
+    @property
+    def is_clean(self) -> bool:
+        return self.process_exited and not self.residual_processes
+
+
 class WaapiClientProtocol(Protocol):
     """Small WAAPI client surface needed by the lifecycle gate."""
 
@@ -151,7 +175,7 @@ class ProcessOutput:
 
 def _environment_summary(env: dict[str, str] | None = None) -> dict[str, Any]:
     source = env if env is not None else os.environ
-    keys = ("WWISE_CONSOLE", "WWISECONSOLE", "WWISEROOT", "WWISE_LIVE", "WWISE_DESTRUCTIVE")
+    keys = ("WWISE_CONSOLE", "WWISECONSOLE", "WWISEROOT", "WWISE_LIVE", "WWISE_DESTRUCTIVE", "WINEPREFIX")
     summary: dict[str, Any] = {key: source.get(key) for key in keys if key in source}
     summary["PATH_present"] = bool(source.get("PATH"))
     return summary
@@ -278,11 +302,13 @@ class HeadlessLifecycle:
     waapi_client_factory: WaapiClientFactory = default_waapi_client_factory
     process_factory: ProcessFactory = _default_process_factory
     command_extra_args: list[str] = field(default_factory=list)
+    launch_env: dict[str, str] | None = None
     process: Any = field(init=False, default=None)
     output: ProcessOutput = field(init=False, default_factory=ProcessOutput)
     ready_result: Any = field(init=False, default=None)
     command: list[str] = field(init=False, default_factory=list)
     launch_cwd: Path | None = field(init=False, default=None)
+    cleanup_report: CleanupReport | None = field(init=False, default=None)
     _drainer: PipeDrainer = field(init=False)
 
     def __post_init__(self) -> None:
@@ -324,6 +350,8 @@ class HeadlessLifecycle:
             }
             if self.launch_cwd is not None:
                 kwargs["cwd"] = str(self.launch_cwd)
+            if self.launch_env is not None:
+                kwargs["env"] = dict(self.launch_env)
             if os.name != "nt":
                 kwargs["start_new_session"] = True
             return self.process_factory(self.command, **kwargs)
@@ -400,6 +428,7 @@ class HeadlessLifecycle:
         if process is None:
             return
         completed = False
+        detached_cleanup_pids: list[int] = []
         try:
             self._terminate(process)
             try:
@@ -418,9 +447,20 @@ class HeadlessLifecycle:
                             f"WwiseConsole did not exit after terminate+kill timeouts; pid={getattr(process, 'pid', 'unknown')}"
                         ) from exc
         finally:
-            self._cleanup_detached_waapi_servers()
+            detached_cleanup_pids = self._cleanup_detached_waapi_servers()
+            wineserver_commands = self._shutdown_owned_wineserver_prefix()
+            residual_processes = self._owned_wine_processes_for_prefix()
             self._drainer.join()
-            if completed or self._poll() is not None:
+            process_exited = completed or self._poll_process(process) is not None
+            self.cleanup_report = CleanupReport(
+                launch_pid=getattr(process, "pid", None),
+                wine_prefix=str(self._owned_wine_prefix()) if self._owned_wine_prefix() is not None else None,
+                process_exited=process_exited,
+                detached_cleanup_pids=detached_cleanup_pids,
+                wineserver_commands=wineserver_commands,
+                residual_processes=residual_processes,
+            )
+            if process_exited:
                 self.process = None
 
     def close(self) -> None:
@@ -471,7 +511,7 @@ class HeadlessLifecycle:
             "waapi_url": self.waapi_url if self.port is not None else None,
             "argv": list(self.command),
             "cwd": str(self.launch_cwd) if self.launch_cwd is not None else os.getcwd(),
-            "environment": _environment_summary(),
+            "environment": _environment_summary(self.launch_env),
             "pid": getattr(process, "pid", None),
             "process_state": process_state,
             "exit_code": exit_code,
@@ -542,18 +582,110 @@ class HeadlessLifecycle:
         if kill is not None:
             kill()
 
-    def _cleanup_detached_waapi_servers(self) -> None:
+    def _cleanup_detached_waapi_servers(self) -> list[int]:
         if self.port is None or os.name == "nt" or getattr(os, "kill", None) is None:
-            return
+            return []
+        signaled: list[int] = []
         for pid in self._detached_waapi_server_pids_for_port(self.port):
             if not self._signal_pid(pid, signal.SIGTERM):
                 continue
+            signaled.append(pid)
             deadline = time.monotonic() + min(0.5, max(0.0, self.timeouts.kill))
             while self._pid_exists(pid) and time.monotonic() < deadline:
                 time.sleep(min(0.05, max(0.0, deadline - time.monotonic())))
             if self._pid_exists(pid):
                 self._signal_pid(pid, 9)
+        return signaled
 
+    def _owned_wine_prefix(self) -> Path | None:
+        if self.launch_env is None:
+            return None
+        configured = self.launch_env.get("WINEPREFIX")
+        if not configured:
+            return None
+        return Path(configured).expanduser().resolve(strict=False)
+
+    def _shutdown_owned_wineserver_prefix(self) -> list[list[str]]:
+        prefix = self._owned_wine_prefix()
+        if prefix is None or os.name == "nt":
+            return []
+        commands: list[list[str]] = []
+        for args in (("-k",), ("-w",)):
+            command = self._run_wineserver(prefix, *args)
+            if command is not None:
+                commands.append(command)
+        if self._owned_wine_processes_for_prefix(prefix):
+            command = self._run_wineserver(prefix, "-k9")
+            if command is not None:
+                commands.append(command)
+        return commands
+
+    def _run_wineserver(self, prefix: Path, *args: str) -> list[str] | None:
+        env = dict(self.launch_env or os.environ)
+        env["WINEPREFIX"] = str(prefix)
+        command = ["wineserver", *args]
+        try:
+            subprocess.run(command, env=env, capture_output=True, text=True, check=False, timeout=max(self.timeouts.kill, 0.5))
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return command
+
+    def _owned_wine_processes_for_prefix(self, prefix: Path | None = None) -> list[ResidualProcess]:
+        owned_prefix = prefix or self._owned_wine_prefix()
+        if owned_prefix is None or os.name == "nt":
+            return []
+        prefix_text = str(owned_prefix)
+        current_pid = os.getpid() if getattr(os, "getpid", None) is not None else None
+        residuals: list[ResidualProcess] = []
+        for pid, command_line in self._process_rows(include_env=True):
+            if current_pid is not None and pid == current_pid:
+                continue
+            if self._is_owned_wine_process_command(command_line, prefix_text):
+                residuals.append(ResidualProcess(pid=pid, command=command_line))
+        return residuals
+
+    def _process_rows(self, *, include_env: bool) -> list[tuple[int, str]]:
+        commands: list[list[str]] = []
+        if include_env:
+            commands.append(["ps", "eww", "-axo", "pid=,command="])
+        commands.append(["ps", "-axo", "pid=,command="])
+        for command in commands:
+            try:
+                result = subprocess.run(command, capture_output=True, text=True, check=False)
+            except (OSError, subprocess.SubprocessError):
+                continue
+            if getattr(result, "returncode", 1) != 0:
+                continue
+            rows: list[tuple[int, str]] = []
+            for line in (getattr(result, "stdout", "") or "").splitlines():
+                pid_text, separator, command_line = line.strip().partition(" ")
+                if not separator:
+                    continue
+                try:
+                    pid = int(pid_text)
+                except ValueError:
+                    continue
+                rows.append((pid, command_line))
+            if rows:
+                return rows
+        return []
+
+    def _is_owned_wine_process_command(self, command_line: str, prefix_text: str) -> bool:
+        lowered = command_line.lower()
+        if prefix_text not in command_line and f"WINEPREFIX={prefix_text}" not in command_line:
+            return False
+        return self._is_wine_process_marker(lowered)
+
+    def _is_wine_process_marker(self, lowered_command: str) -> bool:
+        markers = (
+            "wineserver",
+            "wine64-preloader",
+            "winedevice.exe",
+            "winedevice",
+            "wwiseconsole.exe",
+            "wine-preloader",
+        )
+        return any(marker in lowered_command for marker in markers)
     def _detached_waapi_server_pids_for_port(self, port: int) -> list[int]:
         try:
             result = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True, check=False)
@@ -620,7 +752,62 @@ class HeadlessLifecycle:
             return False
 
 
+def emergency_cleanup_wwise_processes(prefix: Path | str | None = None, *, timeout: float = DEFAULT_KILL_TIMEOUT) -> CleanupReport:
+    """Best-effort machine-protection cleanup for residual Wwise/Wine processes.
+
+    This helper is intentionally separate from test success semantics. Callers may use
+    it after failures to protect the local machine, but they must not treat its success
+    as evidence that an individual test cleaned up correctly.
+    """
+
+    lifecycle = HeadlessLifecycle(
+        timeouts=LifecycleTimeouts(shutdown=timeout, kill=timeout),
+        launch_env={"WINEPREFIX": str(Path(prefix).expanduser().resolve(strict=False))} if prefix is not None else None,
+    )
+    if os.name == "nt":
+        return CleanupReport(launch_pid=None, wine_prefix=None, process_exited=True)
+
+    rows = lifecycle._process_rows(include_env=True)
+    scoped_prefix = lifecycle._owned_wine_prefix()
+    targets: list[ResidualProcess] = []
+    for pid, command_line in rows:
+        lowered = command_line.lower()
+        if scoped_prefix is not None:
+            if lifecycle._is_owned_wine_process_command(command_line, str(scoped_prefix)):
+                targets.append(ResidualProcess(pid=pid, command=command_line))
+            continue
+        if lifecycle._is_wine_process_marker(lowered):
+            targets.append(ResidualProcess(pid=pid, command=command_line))
+
+    terminated: list[int] = []
+    for target in targets:
+        if lifecycle._signal_pid(target.pid, signal.SIGTERM):
+            terminated.append(target.pid)
+    deadline = time.monotonic() + max(timeout, 0.5)
+    while any(lifecycle._pid_exists(pid) for pid in terminated) and time.monotonic() < deadline:
+        time.sleep(min(0.05, max(0.0, deadline - time.monotonic())))
+    for pid in terminated:
+        if lifecycle._pid_exists(pid):
+            lifecycle._signal_pid(pid, 9)
+
+    wineserver_commands = lifecycle._shutdown_owned_wineserver_prefix()
+    residual_processes = lifecycle._owned_wine_processes_for_prefix(scoped_prefix) if scoped_prefix is not None else [
+        ResidualProcess(pid=pid, command=command_line)
+        for pid, command_line in lifecycle._process_rows(include_env=True)
+        if lifecycle._is_wine_process_marker(command_line.lower())
+    ]
+    return CleanupReport(
+        launch_pid=None,
+        wine_prefix=str(scoped_prefix) if scoped_prefix is not None else None,
+        process_exited=True,
+        detached_cleanup_pids=terminated,
+        wineserver_commands=wineserver_commands,
+        residual_processes=residual_processes,
+    )
+
+
 __all__ = [
+    "CleanupReport",
     "DEFAULT_HOST",
     "EarlyProcessExit",
     "HeadlessLifecycle",
@@ -630,6 +817,7 @@ __all__ = [
     "PortUnavailable",
     "ProcessOutput",
     "ReadinessTimeout",
+    "ResidualProcess",
     "ShutdownTimeout",
     "StartupTimeout",
     "WINDOWS_WWISE_CONSOLE_SUFFIX",
@@ -638,5 +826,6 @@ __all__ = [
     "WwiseConsoleNotFound",
     "WwiseConsolePathResolver",
     "assert_port_free",
+    "emergency_cleanup_wwise_processes",
     "find_free_port",
 ]

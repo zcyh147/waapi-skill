@@ -12,6 +12,7 @@ from typing import Any
 import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.headless import (  # pyright: ignore[reportMissingImports]
+    CleanupReport,
     EarlyProcessExit,
     HeadlessLifecycle,
     HeadlessLifecycleError,
@@ -20,6 +21,7 @@ from wwise_waapi.headless import (  # pyright: ignore[reportMissingImports]
     PortUnavailable,
     ProcessOutput,
     ReadinessTimeout,
+    ResidualProcess,
     ShutdownTimeout,
     StartupTimeout,
     WwiseConsoleNotExecutable,
@@ -178,6 +180,25 @@ def test_launch_preserves_project_path_with_spaces_as_single_argument(tmp_path: 
     assert commands[0][0:3] == [str(executable), "waapi-server", str(project)]
     assert "--wamp-port" in commands[0]
     lifecycle.shutdown()
+
+
+def test_launch_passes_launch_env_to_process_factory(tmp_path: Path) -> None:
+    executable = make_executable(tmp_path)
+    seen_kwargs: list[dict[str, Any]] = []
+
+    def process_factory(command: list[str], **kwargs: Any) -> FakeProcess:
+        seen_kwargs.append(kwargs)
+        return FakeProcess()
+
+    lifecycle = HeadlessLifecycle(
+        console_path=executable,
+        launch_env={"PATH": "/usr/bin", "WINEPREFIX": str(tmp_path / ".wine-prefix")},
+        process_factory=process_factory,
+    )
+    lifecycle.launch()
+
+    assert seen_kwargs[0]["env"]["WINEPREFIX"] == str(tmp_path / ".wine-prefix")
+    lifecycle.shutdown(suppress_errors=True)
 
 
 def test_project_launch_normalizes_relative_project_path_cwd_and_diagnostics(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -543,6 +564,40 @@ def test_shutdown_detached_port_fallback_terminates_only_matching_ps_rows(monkey
 
     assert signal_calls == [(200, headless_module.signal.SIGTERM), (200, 9)]
     assert lifecycle.process is None
+
+
+def test_shutdown_records_prefix_scoped_residual_wine_processes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    if headless_module.os.name == "nt":
+        pytest.skip("Wine prefix cleanup is POSIX-only")
+    executable = make_executable(tmp_path)
+    fake_process = FakeProcess(returncode=0)
+    prefix = (tmp_path / ".wine-prefix").resolve(strict=False)
+    ps_output = f"""
+      200 /usr/bin/env WINEPREFIX={prefix} wineserver
+      201 /usr/bin/env WINEPREFIX=/other/prefix wineserver
+    """
+    seen_commands: list[list[str]] = []
+
+    def fake_run(command: list[str], **kwargs: Any) -> object:
+        seen_commands.append(command)
+        if command[:1] == ["ps"]:
+            return types.SimpleNamespace(returncode=0, stdout=ps_output)
+        return types.SimpleNamespace(returncode=0, stdout="")
+
+    monkeypatch.setattr(headless_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(headless_module.os, "killpg", lambda pid, sig: None)
+
+    lifecycle = HeadlessLifecycle(
+        console_path=executable,
+        launch_env={"PATH": "/usr/bin", "WINEPREFIX": str(prefix)},
+        process_factory=lambda command, **kwargs: fake_process,
+    )
+    lifecycle.launch()
+    lifecycle.shutdown(suppress_errors=True)
+
+    assert lifecycle.cleanup_report is not None
+    assert lifecycle.cleanup_report.wineserver_commands == [["wineserver", "-k"], ["wineserver", "-w"], ["wineserver", "-k9"]]
+    assert lifecycle.cleanup_report.residual_processes == [ResidualProcess(pid=200, command=f"/usr/bin/env WINEPREFIX={prefix} wineserver")]
 
 
 def test_shutdown_handles_process_without_poll_or_terminate(tmp_path: Path) -> None:
