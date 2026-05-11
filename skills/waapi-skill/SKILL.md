@@ -11,6 +11,22 @@ When config and live WAAPI connection details are already known, execute the liv
 
 Supported Wwise versions are `2021.1`, `2022.1`, `2023.1`, `2024.1`, and `2025.1`.
 
+## Operator protocol
+
+Use this closed decision tree before choosing scripts, builders, manifests, or docs. Choose exactly one intent family. Do not invent additional intent families.
+
+1. `operator_read`: The user asks to inspect current Wwise state without project changes. If persisted config and live WAAPI are available, execute live WAAPI first before repository, source, or documentation research. Use repo or docs only after live execution is blocked, and report the blocker.
+2. `operator_waql`: The user asks for WAQL or query-shaped object reads. If persisted config and live WAAPI are available, execute live WAAPI first before repository, source, or documentation research. Use packaged WAQL helpers to form the call, then report live results. Use repo or docs only after live execution is blocked, and report the blocker.
+3. `operator_mutation_preview`: The user asks for a project-changing action without confirmed execution. Resolve the target, build a dry-run or semantic preview, summarize the exact target identity and payload, and wait for confirmation.
+4. `operator_mutation_confirmed`: The user explicitly confirms a project-changing action after preview. Execute only the confirmed preview against the resolved target identity, then verify with readback or bounded topic evidence.
+5. `compound_read_then_confirm`: The user asks for a read that may lead to a change. Follow this concise staged contract: resolve/probe -> read -> summarize -> preview -> confirm -> execute -> verify.
+6. `research_explicit`: Use only when the user explicitly asks for research, source review, docs comparison, or repository investigation, not as a substitute for a ready live read or WAQL request.
+7. `blocked_setup`: Use when Python, persisted config, version selection, connection details, or live WAAPI are unavailable. First report the blocker, then use local packaged resources or repository docs only to unblock setup.
+
+Named invariant: Preview identity invariant. The preview-resolved target identity must be reused during confirmed execution. If the confirmed execution cannot prove it is using the same target identity, abort and re-preview.
+
+Protocol config boundary: saved public config fields are exactly `wwise_version`, `waapi_host`, `waapi_port`, and `project_modification_policy`. startup timeouts, readiness timeouts, default `WwiseConsole` paths, environment variables, scaffold directories, and legacy internal flags such as `use_current_selection_for_ambiguous_queries` are runtime or implementation details, not saved public config.
+
 ## Setup and runner
 
 Use the skill-local wrapper so dependencies and paths are handled consistently:
