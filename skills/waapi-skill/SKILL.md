@@ -5,7 +5,7 @@ description: Use this skill for Wwise WAAPI automation through the skill-local P
 
 # Wwise WAAPI Skill
 
-Use this skill to automate Wwise through WAAPI with a Python-first workflow. The normal path is: make sure Python can run the skill-local wrapper, identify the target Wwise version, then use the dispatcher or semantic builders for the requested task.
+Use this skill to automate Wwise through WAAPI with a Python-first workflow. The normal path is: make sure Python can run the skill-local wrapper, identify the target Wwise version, then extract a structured semantic intent and route it through the semantic planner.
 
 When config and live WAAPI connection details are already known, execute the live read-only query first for ordinary inspection requests. Do not start by inspecting repository files or launching documentation research unless the user explicitly asked for investigation or the live query path is blocked.
 
@@ -13,17 +13,19 @@ Supported Wwise versions are `2021.1`, `2022.1`, `2023.1`, `2024.1`, and `2025.1
 
 ## Operator protocol
 
-Use this closed decision tree before choosing scripts, builders, manifests, or docs. Choose exactly one intent family. Do not invent additional intent families.
+Use this closed semantic-intent protocol before choosing scripts, builders, manifests, or docs. Extract one structured `SemanticIntent`, call `SemanticPlanner.plan()`, present the resulting `SemanticPlan` preview, require confirmation for project-changing steps, execute only when the submitted preview hash exactly matches `SemanticPlan.preview_hash`, then verify with the plan's verification steps. Do not invent intent families.
 
-1. `operator_read`: The user asks to inspect current Wwise state without project changes. If persisted config and live WAAPI are available, execute live WAAPI first before repository, source, or documentation research. Use repo or docs only after live execution is blocked, and report the blocker.
-2. `operator_waql`: The user asks for WAQL or query-shaped object reads. If persisted config and live WAAPI are available, execute live WAAPI first before repository, source, or documentation research. Use packaged WAQL helpers to form the call, then report live results. Use repo or docs only after live execution is blocked, and report the blocker.
-3. `operator_mutation_preview`: The user asks for a project-changing action without confirmed execution. Resolve the target, build a dry-run or semantic preview, summarize the exact target identity and payload, and wait for confirmation.
-4. `operator_mutation_confirmed`: The user explicitly confirms a project-changing action after preview. Execute only the confirmed preview against the resolved target identity, then verify with readback or bounded topic evidence.
-5. `compound_read_then_confirm`: The user asks for a read that may lead to a change. Follow this concise staged contract: resolve/probe -> read -> summarize -> preview -> confirm -> execute -> verify.
-6. `research_explicit`: Use only when the user explicitly asks for research, source review, docs comparison, or repository investigation, not as a substitute for a ready live read or WAQL request.
-7. `blocked_setup`: Use when Python, persisted config, version selection, connection details, or live WAAPI are unavailable. First report the blocker, then use local packaged resources or repository docs only to unblock setup.
+1. Extract `SemanticIntent` with one family: `intent_navigation`, `crud_authoring`, `system_design_preview`, `asset_import_workflow`, `soundbank_workflow`, `switch_assignment_workflow`, `bounded_profiler_guidance`, or `unsupported_runtime_boundary`.
+2. If persisted config and live WAAPI are available for read-only navigation or WAQL-shaped requests, execute live WAAPI first. Use repository or documentation research only when the user explicitly asks for it or live execution is blocked, and report the blocker.
+3. Route CRUD requests at the semantic family level: object creation, object mutation, property/reference edits, copy/move/delete, imports, soundbanks, and switch assignments become structured intent details for the planner. Do not paste raw WAAPI payload schemas into the prompt.
+4. Present the `SemanticPlan` preview before project-changing work. Include family, step summaries, target identities, risk flags, verification plan, and `preview_hash`; do not execute from prose-only confirmation.
+5. Confirm with `confirm_semantic_plan(preview, confirmation_state, submitted_preview_hash)`. Continue only when `confirmation_state` is `confirmed` and `submitted_preview_hash` exactly matches the current preview hash. Missing or mismatched hashes require a fresh preview.
+6. Execute only the confirmed plan whose hash matched the preview shown to the user. If target identity, planned API, options, arguments, payload preview, or risk flags drift, abort and re-preview.
+7. Verify after execution using the plan's readback, bounded topic evidence, or other verification templates. Report structured failures rather than replacing them with vague prose.
 
-Named invariant: Preview identity invariant. The preview-resolved target identity must be reused during confirmed execution. If the confirmed execution cannot prove it is using the same target identity, abort and re-preview.
+Unsupported boundary requests: scheduler or delayed runtime posting, Game Object View emitter control, timed runtime or ambience playback, audio narrative sequencing, RTPC ramps over time, and cross-app MCP federation are not supported execution capabilities. Route them as `unsupported_runtime_boundary`; these plans have no execution steps, no preview id or hash, and no verification claims. Offer supported alternatives only when appropriate, such as authoring a static object or switch plan, previewing soundbank changes, or running a live read summary.
+
+Named invariant: Preview hash invariant. The preview-resolved target identity and preview artifact must be reused during confirmed execution. If confirmed execution cannot prove it is using the same `SemanticPlan.preview_hash`, abort and re-preview.
 
 Protocol config boundary: saved public config fields are exactly `wwise_version`, `waapi_host`, `waapi_port`, and `project_modification_policy`. startup timeouts, readiness timeouts, default `WwiseConsole` paths, environment variables, scaffold directories, and legacy internal flags such as `use_current_selection_for_ambiguous_queries` are runtime or implementation details, not saved public config.
 
@@ -125,16 +127,18 @@ Errors must stay structured with `ok`, `api`, `version`, `error_code`, `message`
 
 ## Semantic builders
 
-For complex WAAPI work, prefer `wwise_waapi.builders` semantic builders before hand-writing dispatcher payloads. Builders construct and validate source-grounded envelopes, previews, readback plans, and dispatcher requests; they do not open Wwise, subscribe to topics, or dispatch live calls by default.
+For complex WAAPI work, prefer the semantic planner before hand-writing dispatcher payloads. The planner maps structured semantic families to source-grounded builders, previews, readback plans, and dispatcher requests; it does not open Wwise, subscribe to topics, or dispatch live calls by default.
 
-Use builders for these task families:
+Use semantic families for these task types:
 
-1. `query`: WAQL-backed `ak.wwise.core.object.get` previews.
-2. `object-mutation`: create, set, delete, copy, move, diff, paste properties, and undo previews.
-3. `property-reference`: property, reference, curve, randomizer metadata, and setter previews.
-4. `import`: audio import, tab-delimited import, and import-topic evidence previews.
-5. `soundbank`: inclusion, generation, external source, process definition, and topic evidence previews.
-6. `switchcontainer`: assignment readback, guarded add or remove previews, and topic evidence expectations.
+1. `intent_navigation`: read-only navigation and WAQL-shaped object discovery.
+2. `crud_authoring`: create, set, delete, copy, move, property, reference, and undo-style authoring previews.
+3. `system_design_preview`: candidate design plans that may combine safe reads with project-changing preview steps.
+4. `asset_import_workflow`: audio import, tab-delimited import, and import evidence previews.
+5. `soundbank_workflow`: soundbank inclusion, generation, external source, process definition, and evidence previews.
+6. `switch_assignment_workflow`: guarded switch assignment add/remove previews and readback expectations.
+7. `bounded_profiler_guidance`: bounded profiler parameter guidance and read summaries only.
+8. `unsupported_runtime_boundary`: unsupported runtime, scheduler, Game Object View, RTPC ramp, narrative sequencing, or cross-app MCP requests.
 
 Example preview pattern:
 

@@ -13,12 +13,13 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any, Mapping, Sequence, cast
 
-from wwise_waapi.builders.common import SemanticErrorCode, SemanticValidationError
+from wwise_waapi.builders.common import ManifestSchemaLoader, SemanticErrorCode, SemanticValidationError
 from wwise_waapi.builders.profiler import extract_profiler_parameter_guidance  # pyright: ignore[reportMissingImports]
 from wwise_waapi.builders.query import QueryPredicate, build_object_get_query  # pyright: ignore[reportMissingImports]
 
 
 SEMANTIC_CONFIRMATION_STATES = ("unknown", "preview", "confirmed", "rejected")
+SUPPORTED_WWISE_VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
 SUPPORTED_SEMANTIC_FAMILIES = (
     "intent_navigation",
     "crud_authoring",
@@ -263,6 +264,7 @@ class SemanticPlan:
     unsupported_capability: bool
     verification_steps: Sequence[SemanticPlanVerification | Mapping[str, Any]]
     source_builder_refs: Sequence[str]
+    clarification: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         _require_supported_family(self.family)
@@ -291,11 +293,15 @@ class SemanticPlan:
             "unsupported_capability": self.unsupported_capability,
             "verification_steps": [step.as_dict() for step in verification_steps],
             "source_builder_refs": list(self.source_builder_refs),
+            "clarification": _json_safe_mapping(self.clarification),
         }
 
 
 class SemanticPlanner:
     """Schema-only planner boundary that accepts typed intent envelopes only."""
+
+    def __init__(self, *, manifest_loader: ManifestSchemaLoader | None = None) -> None:
+        self._manifest_loader = manifest_loader or ManifestSchemaLoader()
 
     def plan(self, intent: SemanticIntent) -> SemanticPlan:
         if not isinstance(intent, SemanticIntent):
@@ -305,6 +311,14 @@ class SemanticPlanner:
                 details={"expected": "SemanticIntent", "received": type(intent).__name__},
         )
         _require_supported_family(intent.family)
+
+        version_error = _version_support_error(intent.version, self._manifest_loader)
+        if version_error is not None:
+            return _blocked_version_plan(intent, version_error)
+
+        ambiguous_target = _ambiguous_target_clarification(intent)
+        if ambiguous_target is not None:
+            return _needs_target_clarification_plan(intent, ambiguous_target)
 
         unsupported_reason = _unsupported_boundary_capability(intent)
         if intent.family == "unsupported_runtime_boundary" or unsupported_reason:
@@ -379,6 +393,93 @@ def confirm_semantic_plan(preview: SemanticPlan, confirmation_state: str, submit
             },
         )
     return replace(preview, requires_confirmation=False)
+
+
+def _version_support_error(intent_version: str, manifest_loader: ManifestSchemaLoader) -> Mapping[str, Any] | None:
+    if intent_version not in SUPPORTED_WWISE_VERSIONS:
+        return {
+            "reason": "unsupported-wwise-version",
+            "version": intent_version,
+            "supported_versions": list(SUPPORTED_WWISE_VERSIONS),
+            "fallback_allowed": False,
+        }
+    try:
+        manifest_loader.load_manifest(intent_version)
+    except SemanticValidationError as exc:
+        if exc.error_code is not SemanticErrorCode.UNSUPPORTED_WWISE_VERSION:
+            raise
+        return {
+            "reason": "missing-version-manifest",
+            "version": intent_version,
+            "supported_versions": list(SUPPORTED_WWISE_VERSIONS),
+            "fallback_allowed": False,
+            "details": exc.as_dict(),
+        }
+    return None
+
+
+def _blocked_version_plan(intent: SemanticIntent, version_error: Mapping[str, Any]) -> SemanticPlan:
+    reason = str(version_error.get("reason") or "unsupported-wwise-version")
+    return SemanticPlan(
+        status=SemanticPlanStatus.BLOCKED,
+        family=intent.family,
+        version=intent.version,
+        steps=(),
+        preview_id="",
+        preview_hash="",
+        risk_flags=(),
+        requires_confirmation=False,
+        blocked_reason=f"{reason}; version={intent.version}; fallback_allowed=False",
+        needs_clarification=False,
+        unsupported_capability=False,
+        verification_steps=(),
+        source_builder_refs=SEMANTIC_FAMILY_BUILDER_REFS[intent.family],
+        clarification=version_error,
+    )
+
+
+def _ambiguous_target_clarification(intent: SemanticIntent) -> Mapping[str, Any] | None:
+    for target in cast(tuple[SemanticIntentTarget, ...], intent.targets):
+        candidates = _target_candidate_details(target)
+        ambiguous = target.metadata.get("ambiguous") is True or len(candidates) > 1
+        if not ambiguous:
+            continue
+        return {
+            "reason": str(target.metadata.get("ambiguity_reason") or target.metadata.get("reason") or "ambiguous-target-candidates"),
+            "target": target.as_dict(),
+            "candidates": candidates,
+            "fallback_allowed": False,
+        }
+    return None
+
+
+def _target_candidate_details(target: SemanticIntentTarget) -> list[Any]:
+    value = target.metadata.get("candidate_targets", target.metadata.get("candidates", ()))
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, Sequence) and not isinstance(value, (bytes, bytearray)):
+        return [_json_safe(item) for item in value]
+    return []
+
+
+def _needs_target_clarification_plan(intent: SemanticIntent, clarification: Mapping[str, Any]) -> SemanticPlan:
+    reason = str(clarification.get("reason") or "ambiguous-target-candidates")
+    return SemanticPlan(
+        status=SemanticPlanStatus.NEEDS_CLARIFICATION,
+        family=intent.family,
+        version=intent.version,
+        steps=(),
+        preview_id="",
+        preview_hash="",
+        risk_flags=("needs-target-clarification",),
+        requires_confirmation=False,
+        blocked_reason=f"{reason}; choose one candidate target before planning; fallback_allowed=False",
+        needs_clarification=True,
+        unsupported_capability=False,
+        verification_steps=(),
+        source_builder_refs=SEMANTIC_FAMILY_BUILDER_REFS[intent.family],
+        clarification=clarification,
+    )
 
 
 def _unsupported_boundary_plan(intent: SemanticIntent, reason_key: str) -> SemanticPlan:

@@ -14,6 +14,7 @@ from wwise_waapi.semantic_planner import (  # pyright: ignore[reportMissingImpor
     SemanticPlanStatus,
     SemanticPlanner,
     SUPPORTED_SEMANTIC_FAMILIES,
+    SUPPORTED_WWISE_VERSIONS,
     confirm_semantic_plan,
 )
 
@@ -167,6 +168,7 @@ def test_semantic_plan_serializes_preview_hash_and_verification_steps() -> None:
             }
         ],
         "source_builder_refs": ["wwise_waapi.builders.query.build_object_get_query"],
+        "clarification": {},
     }
     assert json.loads(json.dumps(plan.as_dict(), sort_keys=True))["preview_hash"] == "sha256:abc123"
 
@@ -329,6 +331,15 @@ def unsafe_semantic_intent_with_family(family: str) -> SemanticIntent:
     return intent
 
 
+class MissingManifestLoader:
+    def load_manifest(self, version: str) -> dict[str, object]:
+        raise SemanticValidationError(
+            SemanticErrorCode.UNSUPPORTED_WWISE_VERSION,
+            f"missing manifest for {version}",
+            details={"version": version, "resource_path": f"/missing/{version}/manifest.json"},
+        )
+
+
 def test_planner_routes_all_supported_families_to_builder_refs() -> None:
     planner = SemanticPlanner()
 
@@ -354,6 +365,84 @@ def test_planner_blocks_unknown_family_without_guessing() -> None:
 
     assert exc.value.error_code == SemanticErrorCode.UNSUPPORTED_BUILDER_FAMILY
     assert exc.value.details["family"] == "runtime_scheduler"
+
+
+def test_planner_rejects_unsupported_version_without_fallback() -> None:
+    assert SUPPORTED_WWISE_VERSIONS == ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
+    intent = SemanticIntent(
+        family="intent_navigation",
+        goal="List sounds for an unsupported Wwise version.",
+        version="2020.1",
+        targets=(SemanticIntentTarget("type", "Sound"),),
+        constraints=(),
+        requested_operations=("object.get",),
+        confirmation_state="preview",
+        source_prompt_excerpt="list sounds in Wwise 2020.1",
+    )
+
+    plan = SemanticPlanner().plan(intent)
+
+    assert plan.status is SemanticPlanStatus.BLOCKED
+    assert plan.version == "2020.1"
+    assert tuple(plan.steps) == ()
+    assert plan.preview_id == ""
+    assert plan.preview_hash == ""
+    assert plan.requires_confirmation is False
+    assert plan.needs_clarification is False
+    assert plan.clarification["reason"] == "unsupported-wwise-version"
+    assert plan.clarification["fallback_allowed"] is False
+    assert plan.clarification["supported_versions"] == list(SUPPORTED_WWISE_VERSIONS)
+    assert "fallback_allowed=False" in plan.blocked_reason
+
+    missing_manifest_plan = SemanticPlanner(manifest_loader=MissingManifestLoader()).plan(structured_query_intent())  # type: ignore[arg-type]
+
+    assert missing_manifest_plan.status is SemanticPlanStatus.BLOCKED
+    assert tuple(missing_manifest_plan.steps) == ()
+    assert missing_manifest_plan.clarification["reason"] == "missing-version-manifest"
+    assert missing_manifest_plan.clarification["fallback_allowed"] is False
+
+
+def test_ambiguous_target_returns_needs_clarification() -> None:
+    intent = SemanticIntent(
+        family="crud_authoring",
+        goal="Create a child under the matching UI container after target clarification.",
+        version="2022.1",
+        targets=(
+            SemanticIntentTarget(
+                "path",
+                "\\Actor-Mixer Hierarchy\\UI",
+                metadata={
+                    "ambiguous": True,
+                    "ambiguity_reason": "multiple-live-child-candidates",
+                    "candidate_targets": (
+                        "\\Actor-Mixer Hierarchy\\Default Work Unit\\UI",
+                        "\\Actor-Mixer Hierarchy\\Default Work Unit\\UI_Alt",
+                    ),
+                },
+            ),
+        ),
+        constraints=(),
+        requested_operations=("object.create",),
+        confirmation_state="preview",
+        source_prompt_excerpt="create under UI candidate",
+    )
+
+    plan = SemanticPlanner().plan(intent)
+    plan_dict = plan.as_dict()
+
+    assert plan.status is SemanticPlanStatus.NEEDS_CLARIFICATION
+    assert plan.needs_clarification is True
+    assert tuple(plan.steps) == ()
+    assert plan.requires_confirmation is False
+    assert plan.clarification["reason"] == "multiple-live-child-candidates"
+    assert plan.clarification["candidates"] == [
+        "\\Actor-Mixer Hierarchy\\Default Work Unit\\UI",
+        "\\Actor-Mixer Hierarchy\\Default Work Unit\\UI_Alt",
+    ]
+    assert plan.clarification["fallback_allowed"] is False
+    assert "choose one candidate target" in plan.blocked_reason
+    assert plan_dict["clarification"]["target"]["identifier"] == "\\Actor-Mixer Hierarchy\\UI"
+    assert plan_dict["steps"] == []
 
 
 def test_crud_authoring_routes_to_object_and_property_builders() -> None:

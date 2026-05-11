@@ -10,6 +10,7 @@ from typing import Any, Mapping, Sequence
 
 PUBLIC_CONFIG_FIELDS = frozenset({"wwise_version", "waapi_host", "waapi_port", "project_modification_policy"})
 SUPPORTED_WWISE_VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
+DEFAULT_FIRST_TEST_VERSION = "2022.1"
 RESEARCH_TERMS = (
     "repo",
     "repository",
@@ -50,6 +51,15 @@ class SemanticScenario:
     family: str
     follow_up_prompt: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        metadata = dict(self.metadata)
+        first_test_version = str(metadata.setdefault("first_test_version", DEFAULT_FIRST_TEST_VERSION))
+        if first_test_version != DEFAULT_FIRST_TEST_VERSION and not metadata.get("first_test_version_reason"):
+            raise ValueError(
+                f"scenario {self.id!r} uses first_test_version={first_test_version!r} without first_test_version_reason"
+            )
+        object.__setattr__(self, "metadata", metadata)
 
 
 @dataclass(frozen=True, slots=True)

@@ -16,10 +16,12 @@ from tests.semantic.run_opencode_semantic_batch import (  # pyright: ignore[repo
     _scenario_prompt,
 )
 from tests.semantic.scenarios import (  # pyright: ignore[reportMissingImports]
+    DEFAULT_FIRST_TEST_VERSION,
     PUBLIC_CONFIG_FIELDS,
     SEMANTIC_CAPABILITY_REQUIRED_FAMILIES,
     SEMANTIC_CAPABILITY_SCENARIO_SET,
     SUPPORTED_WWISE_VERSIONS,
+    SemanticScenario,
     evaluate_scenario_output,
     phase3_scenarios,
     scenarios_for_set,
@@ -55,6 +57,43 @@ def test_semantic_capability_scenarios_cover_required_families() -> None:
     assert tuple(scenario.family for scenario in scenarios) == SEMANTIC_CAPABILITY_REQUIRED_FAMILIES
     assert all("phase3-required" not in scenario.scenario_sets for scenario in scenarios)
     assert all("phase3-smoke" not in scenario.scenario_sets for scenario in scenarios)
+
+
+def test_semantic_capability_scenarios_default_first_test_version_to_2022() -> None:
+    scenarios = scenarios_for_set(SEMANTIC_CAPABILITY_SCENARIO_SET)
+
+    assert DEFAULT_FIRST_TEST_VERSION == "2022.1"
+    assert all(scenario.metadata["first_test_version"] == "2022.1" for scenario in scenarios)
+
+
+def test_non_2022_first_test_version_requires_reason() -> None:
+    try:
+        SemanticScenario(
+            id="semantic-capability-custom-version",
+            prompt="Custom version scenario.",
+            expected_assertions=(),
+            bug_classes=(),
+            scenario_sets=(SEMANTIC_CAPABILITY_SCENARIO_SET,),
+            family="semantic-capability-custom-version",
+            metadata={"first_test_version": "2024.1"},
+        )
+    except ValueError as exc:
+        assert "first_test_version_reason" in str(exc)
+    else:
+        raise AssertionError("non-2022 first_test_version without reason should fail")
+
+    scenario = SemanticScenario(
+        id="semantic-capability-custom-version",
+        prompt="Custom version scenario.",
+        expected_assertions=(),
+        bug_classes=(),
+        scenario_sets=(SEMANTIC_CAPABILITY_SCENARIO_SET,),
+        family="semantic-capability-custom-version",
+        metadata={"first_test_version": "2024.1", "first_test_version_reason": "version-specific API smoke"},
+    )
+
+    assert scenario.metadata["first_test_version"] == "2024.1"
+    assert scenario.metadata["first_test_version_reason"] == "version-specific API smoke"
 
 
 def test_semantic_capability_evaluator_requires_planner_facts() -> None:
