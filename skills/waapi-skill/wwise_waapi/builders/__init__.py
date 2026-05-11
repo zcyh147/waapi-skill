@@ -17,6 +17,10 @@ from .common import (
     SourceNoteChecker,
     require_source_note,
 )
+from .container_suitability import (  # pyright: ignore[reportMissingImports]
+    ContainerSuitabilityResult,
+    assess_writable_container_suitability,
+)
 from .identity import (  # pyright: ignore[reportMissingImports]
     ObjectIdentity,
     ObjectIdentityKind,
@@ -70,8 +74,20 @@ from .properties import (  # pyright: ignore[reportMissingImports]
     build_set_randomizer_preview,
     build_set_reference_preview,
 )
+from .profiler import (  # pyright: ignore[reportMissingImports]
+    PROFILER_PARAMETER_GUIDANCE_SIZE_LIMIT,
+    ProfilerParameterGuidance,
+    extract_profiler_parameter_guidance,
+)
 from .query import QueryPredicate, build_object_get_query, build_query_preview, object_get_query  # pyright: ignore[reportMissingImports]
-from .schema import SchemaValidationResult, SemanticSchemaValidator, validate_semantic_payload  # pyright: ignore[reportMissingImports]
+from .schema import (  # pyright: ignore[reportMissingImports]
+    SEMANTIC_CONSTRAINT_FACTS_SIZE_LIMIT,
+    SchemaValidationResult,
+    SemanticConstraintFacts,
+    SemanticSchemaValidator,
+    extract_semantic_constraint_facts,
+    validate_semantic_payload,
+)
 from .soundbank import (  # pyright: ignore[reportMissingImports]
     ExternalSourceConversion,
     SoundBankBuilder,
@@ -112,6 +128,7 @@ __all__ = [
     "AttenuationCurveMetadataRecord",
     "BuilderContext",
     "BuilderFamily",
+    "ContainerSuitabilityResult",
     "CurvePoint",
     "EXPECTED_SOURCE_NOTE_URI_INVENTORY",
     "ExternalSourceConversion",
@@ -131,15 +148,19 @@ __all__ = [
     "PropertyReferenceBuilder",
     "PropertyReferenceNameRecord",
     "PropertyReferenceOperation",
+    "PROFILER_PARAMETER_GUIDANCE_SIZE_LIMIT",
     "QueryPredicate",
     "ResolutionPlan",
     "ResolvedObject",
     "SchemaValidationResult",
+    "SEMANTIC_CONSTRAINT_FACTS_SIZE_LIMIT",
+    "SemanticConstraintFacts",
     "SemanticEnvelope",
     "SemanticErrorCode",
     "SemanticPreview",
     "SemanticReadbackPlan",
     "SemanticSchemaValidator",
+    "ProfilerParameterGuidance",
     "SemanticSourceNoteChecker",
     "SemanticSourceNoteResource",
     "SemanticValidationError",
@@ -156,6 +177,7 @@ __all__ = [
     "TopicExpectation",
     "TopicExpectationPlan",
     "build_add_assignment_preview",
+    "assess_writable_container_suitability",
     "build_assignment_added_expectation",
     "build_assignment_removed_expectation",
     "build_audio_import_preview",
@@ -180,7 +202,9 @@ __all__ = [
     "build_set_property_preview",
     "build_set_randomizer_preview",
     "build_set_reference_preview",
+    "extract_profiler_parameter_guidance",
     "expect_audio_imported_topic",
+    "extract_semantic_constraint_facts",
     "load_semantic_source_notes",
     "object_get_query",
     "parse_get_assignments_result",
