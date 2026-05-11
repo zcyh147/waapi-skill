@@ -186,19 +186,23 @@ def test_create_copy_and_move_reject_management_root_parent_paths() -> None:
 
     with pytest.raises(SemanticValidationError) as create_error:
         builder().create(parent=root_parent, type="Bus", name="Temp_UI_Bus")
-    assert create_error.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+    assert create_error.value.error_code == SemanticErrorCode.SEMANTIC_CONTAINER_UNSUITABLE
     assert create_error.value.details["candidate_writable_parent"] == r"\Master-Mixer Hierarchy\Default Work Unit"
     assert create_error.value.details["requires_user_confirmation"] is True
+    assert create_error.value.details["reason_code"] == "management-root-not-directly-writable"
+    assert create_error.value.details["container_suitability"]["candidate_targets"] == [r"\Master-Mixer Hierarchy\Default Work Unit"]
 
     with pytest.raises(SemanticValidationError) as copy_error:
         builder().copy(object=exact_id("{source}"), parent=root_parent)
-    assert copy_error.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+    assert copy_error.value.error_code == SemanticErrorCode.SEMANTIC_CONTAINER_UNSUITABLE
     assert copy_error.value.details["candidate_writable_parent"] == r"\Master-Mixer Hierarchy\Default Work Unit"
+    assert copy_error.value.details["reason_code"] == "management-root-not-directly-writable"
 
     with pytest.raises(SemanticValidationError) as move_error:
         builder().move(object=exact_id("{source}"), parent=root_parent)
-    assert move_error.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+    assert move_error.value.error_code == SemanticErrorCode.SEMANTIC_CONTAINER_UNSUITABLE
     assert move_error.value.details["invalid_parent_path"] == r"\Master-Mixer Hierarchy"
+    assert move_error.value.details["container_suitability"]["requires_user_confirmation"] is True
 
 
 def test_preview_alias_accepts_uri_or_operation_name() -> None:

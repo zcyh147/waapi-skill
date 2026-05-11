@@ -252,6 +252,8 @@ def test_audio_import_rejects_root_level_object_path_and_suggests_default_work_u
     assert exc.value.error_code == SemanticErrorCode.SEMANTIC_CONTAINER_UNSUITABLE
     assert exc.value.details["candidate_writable_parent"] == r"\Actor-Mixer Hierarchy\Default Work Unit\<Sound>Encoded"
     assert exc.value.details["requires_user_confirmation"] is True
+    assert exc.value.details["reason_code"] == "type-segment-not-directly-writable"
+    assert exc.value.details["container_suitability"]["candidate_targets"] == [r"\Actor-Mixer Hierarchy\Default Work Unit\<Sound>Encoded"]
 
 
 def test_import_tab_delimited_rejects_root_level_import_location_and_suggests_default_work_unit() -> None:
@@ -267,3 +269,5 @@ def test_import_tab_delimited_rejects_root_level_import_location_and_suggests_de
 
     assert exc.value.error_code == SemanticErrorCode.SEMANTIC_CONTAINER_UNSUITABLE
     assert exc.value.details["candidate_writable_parent"] == r"\Actor-Mixer Hierarchy\Default Work Unit"
+    assert exc.value.details["reason_code"] == "management-root-not-directly-writable"
+    assert exc.value.details["container_suitability"]["requires_user_confirmation"] is True

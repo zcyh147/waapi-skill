@@ -21,7 +21,10 @@ from .common import (  # pyright: ignore[reportMissingImports]
     SemanticReadbackPlan,
     SemanticValidationError,
     SourceNoteChecker,
-    candidate_writable_child_container,
+)
+from .container_suitability import (  # pyright: ignore[reportMissingImports]
+    ContainerSuitabilityResult,
+    assess_writable_container_suitability,
 )
 from .schema import SemanticSchemaValidator  # pyright: ignore[reportMissingImports]
 from .source_notes import SemanticSourceNoteChecker  # pyright: ignore[reportMissingImports]
@@ -139,9 +142,11 @@ class ImportBuilder:
         auto_add_to_source_control: bool | None = None,
         return_fields: Sequence[str] = DEFAULT_IMPORT_RETURN_FIELDS,
     ) -> SemanticPreview:
-        items = [_coerce_import_item(item) for item in imports]
-        if not items:
+        item_targets = [_coerce_import_item_with_target(index, item) for index, item in enumerate(imports)]
+        if not item_targets:
             raise SemanticValidationError(SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH, "audio.import requires at least one import item.")
+        items = [item for item, _target_identity in item_targets]
+        target_identities = {f"imports[{index}].objectPath": target_identity for index, (_item, target_identity) in enumerate(item_targets)}
         args: dict[str, Any] = {"imports": items}
         if import_operation is not None:
             args["importOperation"] = _import_operation(import_operation)
@@ -151,7 +156,7 @@ class ImportBuilder:
             if not isinstance(auto_add_to_source_control, bool):
                 raise SemanticValidationError(SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH, "autoAddToSourceControl must be a boolean.")
             args["autoAddToSourceControl"] = auto_add_to_source_control
-        return self._build_preview(AUDIO_IMPORT_URI, args, _return_options(return_fields), "audio-import-objects")
+        return self._build_preview(AUDIO_IMPORT_URI, args, _return_options(return_fields), "audio-import-objects", target_identities=target_identities)
 
     def import_tab_delimited(
         self,
@@ -174,16 +179,24 @@ class ImportBuilder:
             "importOperation": _import_operation(import_operation),
             "importFile": str(import_file) if import_file is not None else plan_filename(plan),
         }
+        target_identities: dict[str, Any] = {}
         if import_location is not None:
             _require_object_arg("import_location", import_location)
-            _require_writable_import_target("import_location", import_location)
+            target_identities["importLocation"] = _require_writable_import_target("import_location", import_location)
             args["importLocation"] = import_location
         if auto_add_to_source_control is not None:
             if not isinstance(auto_add_to_source_control, bool):
                 raise SemanticValidationError(SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH, "autoAddToSourceControl must be a boolean.")
             args["autoAddToSourceControl"] = auto_add_to_source_control
         metadata_extra = {"tab_delimited_plan": plan.as_dict()} if plan is not None else {}
-        return self._build_preview(AUDIO_IMPORT_TAB_DELIMITED_URI, args, _return_options(return_fields), "tab-delimited-import-objects", metadata_extra)
+        return self._build_preview(
+            AUDIO_IMPORT_TAB_DELIMITED_URI,
+            args,
+            _return_options(return_fields),
+            "tab-delimited-import-objects",
+            metadata_extra,
+            target_identities=target_identities,
+        )
 
     def imported_topic(self, *, return_fields: Sequence[str] = DEFAULT_IMPORT_RETURN_FIELDS) -> SemanticPreview:
         return self._build_preview(AUDIO_IMPORTED_TOPIC_URI, {}, _return_options(return_fields), "audio-imported-topic")
@@ -195,6 +208,7 @@ class ImportBuilder:
         options: Mapping[str, Any],
         expectation: str,
         metadata_extra: Mapping[str, Any] | None = None,
+        target_identities: Mapping[str, Any] | None = None,
     ) -> SemanticPreview:
         context = BuilderContext(
             BuilderFamily.IMPORT,
@@ -205,18 +219,22 @@ class ImportBuilder:
         context.require_supported_family()
         source_note = context.require_source_note()
         validation = SemanticSchemaValidator(manifest_loader=context.manifest_loader, version=context.version).validate(uri, args, options)
+        metadata = {
+            "builder_family": BuilderFamily.IMPORT.value,
+            "source_note": source_note.as_dict(),
+            "schema_validation": validation.as_dict(),
+            "return_expectation": _return_expectation(expectation),
+            "destructive_behavior": "preview-only; caller must provide live/destructive gate before dispatch",
+            **dict(metadata_extra or {}),
+        }
+        preview_target_identity = _preview_target_identity(target_identities or {})
+        if preview_target_identity["roles"]:
+            metadata["preview_target_identity"] = preview_target_identity
         envelope = SemanticEnvelope(
             uri,
             args=dict(args),
             options=dict(options),
-            metadata={
-                "builder_family": BuilderFamily.IMPORT.value,
-                "source_note": source_note.as_dict(),
-                "schema_validation": validation.as_dict(),
-                "return_expectation": _return_expectation(expectation),
-                "destructive_behavior": "preview-only; caller must provide live/destructive gate before dispatch",
-                **dict(metadata_extra or {}),
-            },
+            metadata=metadata,
         )
         return SemanticPreview(
             envelope=envelope,
@@ -295,11 +313,17 @@ def plan_filename(plan: TabDelimitedImportPlan | None) -> str:
 
 
 def _coerce_import_item(item: ImportItem | Mapping[str, Any]) -> dict[str, Any]:
+    return _coerce_import_item_with_target(0, item)[0]
+
+
+def _coerce_import_item_with_target(index: int, item: ImportItem | Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     if isinstance(item, ImportItem):
-        return item.as_import()
-    normalized = _normalized_overrides(item, context="import item")
-    _validate_import_item(normalized)
-    return normalized
+        normalized = item.as_import()
+    else:
+        normalized = _normalized_overrides(item, context="import item")
+        _validate_import_item(normalized)
+    target_identity = _import_item_target_identity(index, normalized)
+    return normalized, target_identity
 
 
 def _validate_import_item(item: Mapping[str, Any]) -> None:
@@ -451,23 +475,67 @@ def _require_object_arg(name: str, value: Any) -> None:
         raise SemanticValidationError(SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH, f"{name} must be a non-empty object id/name/path value.")
 
 
-def _require_writable_import_target(field: str, value: str | int) -> None:
-    if not isinstance(value, str):
-        return
-    candidate = candidate_writable_child_container(value)
-    if candidate is None:
-        return
-    raise SemanticValidationError(
-        SemanticErrorCode.SEMANTIC_CONTAINER_UNSUITABLE,
-        f"{field} must target a writable child container instead of the management root path {value!r}.",
-        details={
-            "field": field,
-            "invalid_target_path": value,
-            "candidate_writable_parent": candidate,
-            "requires_user_confirmation": True,
-            "reason": "Use a writable child container such as Default Work Unit before import mutation.",
-        },
+def _require_writable_import_target(field: str, value: str | int) -> dict[str, Any]:
+    suitability_target: str | int = value
+    if field == "import_location" and isinstance(value, str) and not value.startswith("\\"):
+        suitability_target = 0
+    suitability = assess_writable_container_suitability(suitability_target)
+    if suitability.valid:
+        return _target_identity_from_value(field, value, suitability)
+    raise _container_error(
+        f"{field} must target a writable child container instead of the target path {value!r}.",
+        field=field,
+        invalid_target=value,
+        suitability=suitability,
     )
+
+
+def _import_item_target_identity(index: int, item: Mapping[str, Any]) -> dict[str, Any]:
+    object_path = _non_empty_string("objectPath", item["objectPath"])
+    return _require_writable_import_target(f"imports[{index}].objectPath", object_path)
+
+
+def _preview_target_identity(target_identities: Mapping[str, Any]) -> dict[str, Any]:
+    roles = {str(role): dict(identity) for role, identity in target_identities.items() if isinstance(identity, Mapping)}
+    return {
+        "roles": roles,
+        "confirmed_execution": {
+            "required": True,
+            "abort_on_mismatch": True,
+            "mismatch_status": "repreview_required",
+            "reason": "confirmed execution must reuse the preview-resolved target identity",
+        },
+    }
+
+
+def _target_identity_from_value(field: str, value: str | int, suitability: ContainerSuitabilityResult) -> dict[str, Any]:
+    target = {
+        "field": field,
+        "object": value,
+        "target_key": [str(value)],
+        "container_suitability": suitability.as_dict(),
+        "candidate_targets": list(suitability.candidate_targets),
+    }
+    if suitability.resolved_identity is not None:
+        target["candidate_resolved_identity"] = dict(suitability.resolved_identity)
+    return target
+
+
+def _container_error(message: str, *, field: str, invalid_target: str | int, suitability: ContainerSuitabilityResult) -> SemanticValidationError:
+    details: dict[str, Any] = {
+        "field": field,
+        "invalid_target": invalid_target,
+        "container_suitability": suitability.as_dict(),
+        "candidate_targets": list(suitability.candidate_targets),
+        "requires_user_confirmation": suitability.requires_user_confirmation,
+        "requires_live_verification": suitability.requires_live_verification,
+        "reason_code": suitability.reason,
+    }
+    if isinstance(invalid_target, str):
+        details["invalid_target_path"] = invalid_target
+    if suitability.candidate_targets:
+        details["candidate_writable_parent"] = suitability.candidate_targets[0]
+    return SemanticValidationError(SemanticErrorCode.SEMANTIC_CONTAINER_UNSUITABLE, message, details=details)
 
 
 def _has_value(value: Any) -> bool:

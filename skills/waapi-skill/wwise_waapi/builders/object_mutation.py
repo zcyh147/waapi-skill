@@ -19,7 +19,10 @@ from .common import (
     SemanticReadbackPlan,
     SemanticValidationError,
     SourceNoteChecker,
-    candidate_writable_child_container,
+)
+from .container_suitability import (  # pyright: ignore[reportMissingImports]
+    ContainerSuitabilityResult,
+    assess_writable_container_suitability,
 )
 from wwise_waapi.builders.identity import (  # pyright: ignore[reportMissingImports]
     OBJECT_GET_URI,
@@ -107,7 +110,7 @@ class ObjectMutationBuilder:
         auto_add_to_source_control: bool | None = None,
     ) -> SemanticPreview:
         resolved_parent = _resolve_identity("parent", parent, parent_rows)
-        _require_writable_parent_container(operation=ObjectMutationOperation.CREATE, parent=resolved_parent, object_type=type)
+        parent_target_identity = _require_writable_parent_container(operation=ObjectMutationOperation.CREATE, parent=resolved_parent, object_type=type)
         _require_non_empty_string("type", type)
         _require_non_empty_string("name", name)
         _require_allowed("on_name_conflict", on_name_conflict, CONFLICT_POLICIES)
@@ -121,6 +124,7 @@ class ObjectMutationBuilder:
             args,
             {},
             identities={"parent": resolved_parent.as_dict()},
+            target_identities={"parent": parent_target_identity},
             readback=_created_object_readback(name=name, parent=resolved_parent.object),
             cleanup={"kind": "delete-created-object", "identity": "created object id from object.create result"},
             expectation="create one object under the resolved parent; read back created id/name/type/path and delete it during cleanup if still present",
@@ -321,13 +325,14 @@ class ObjectMutationBuilder:
     ) -> SemanticPreview:
         resolved_object = _resolve_identity("object", object, object_rows)
         resolved_parent = _resolve_identity("parent", parent, parent_rows)
-        _require_writable_parent_container(operation=operation, parent=resolved_parent)
+        parent_target_identity = _require_writable_parent_container(operation=operation, parent=resolved_parent)
         _require_allowed("on_name_conflict", on_name_conflict, COPY_MOVE_CONFLICT_POLICIES)
         return self._build_preview(
             operation,
             {"object": resolved_object.object, "parent": resolved_parent.object, "onNameConflict": on_name_conflict},
             {},
             identities={"object": resolved_object.as_dict(), "parent": resolved_parent.as_dict()},
+            target_identities={"object": _target_identity_from_resolved(resolved_object), "parent": parent_target_identity},
             readback=(_object_readback(resolved_object.object, f"read back {operation.value} source/created object"),),
             cleanup={"kind": "delete-or-move-back", "reason": f"caller must clean up or restore the object after {operation.value}"},
             expectation=f"{operation.value} exactly one resolved object to an explicit resolved parent and verify readback",
@@ -344,6 +349,7 @@ class ObjectMutationBuilder:
         cleanup: Mapping[str, Any],
         expectation: str,
         partial_success_risk: bool = False,
+        target_identities: Mapping[str, Any] | None = None,
     ) -> SemanticPreview:
         context = BuilderContext(
             BuilderFamily.OBJECT_MUTATION,
@@ -359,7 +365,7 @@ class ObjectMutationBuilder:
             uri,
             args=dict(args),
             options=dict(options),
-            metadata=_preview_metadata(operation, identities, schema_validation, source_note.as_dict(), cleanup, expectation, partial_success_risk),
+            metadata=_preview_metadata(operation, identities, schema_validation, source_note.as_dict(), cleanup, expectation, partial_success_risk, target_identities),
         )
         return SemanticPreview(
             envelope=envelope,
@@ -407,28 +413,123 @@ def _require_writable_parent_container(
     operation: ObjectMutationOperation,
     parent: ResolvedObject,
     object_type: str | None = None,
-) -> None:
+) -> dict[str, Any]:
     parent_path = _resolved_parent_path(parent)
-    if parent_path is None:
-        return
-    candidate = candidate_writable_child_container(parent_path)
-    if candidate is None:
-        return
-    message = (
-        f"{operation.value} requires a writable child container, not the management root path {parent_path!r}."
-    )
+    target_value: str | int = parent_path if parent_path is not None else parent.object
+    suitability_target: str | int = target_value
+    if isinstance(target_value, str) and not target_value.startswith("\\"):
+        suitability_target = 0
+    suitability = assess_writable_container_suitability(suitability_target)
+    if suitability.valid:
+        return _target_identity_from_resolved(parent, container_suitability=suitability)
+    message = f"{operation.value} requires a writable child container, not the target path {target_value!r}."
     if object_type is not None:
-        message = (
-            f"{operation.value} cannot place {object_type!r} directly under the management root path {parent_path!r}."
-        )
-    raise _schema_error(
+        message = f"{operation.value} cannot place {object_type!r} directly under the target path {target_value!r}."
+    raise _container_error(
         message,
+        field="parent",
         operation=operation.value,
-        invalid_parent_path=parent_path,
-        candidate_writable_parent=candidate,
-        requires_user_confirmation=True,
-        reason="Use a writable child container such as Default Work Unit instead of mutating the hierarchy/category root directly.",
+        invalid_target=target_value,
+        suitability=suitability,
     )
+
+
+def _preview_target_identity(target_identities: Mapping[str, Any]) -> dict[str, Any]:
+    roles = {str(role): dict(identity) for role, identity in target_identities.items() if isinstance(identity, Mapping)}
+    return {
+        "roles": roles,
+        "confirmed_execution": {
+            "required": True,
+            "abort_on_mismatch": True,
+            "mismatch_status": "repreview_required",
+            "reason": "confirmed execution must reuse the preview-resolved target identity",
+        },
+    }
+
+
+def _target_identity_from_resolved(resolved: ResolvedObject, *, container_suitability: ContainerSuitabilityResult | None = None) -> dict[str, Any]:
+    identity = resolved.as_dict()
+    target: dict[str, Any] = {
+        "resolved": identity,
+        "object": resolved.object,
+        "target_key": list(_target_key_from_mapping(identity)),
+    }
+    if container_suitability is not None:
+        target["container_suitability"] = container_suitability.as_dict()
+        target["candidate_targets"] = list(container_suitability.candidate_targets)
+        if container_suitability.resolved_identity is not None:
+            target["candidate_resolved_identity"] = dict(container_suitability.resolved_identity)
+    return target
+
+
+def _target_identity_from_mapping(identity: Mapping[str, Any]) -> dict[str, Any]:
+    target = {"resolved": dict(identity), "target_key": list(_target_key_from_mapping(identity))}
+    if "object" in identity:
+        target["object"] = identity["object"]
+    return target
+
+
+def _target_key_from_mapping(identity: Any) -> tuple[str, ...]:
+    if isinstance(identity, (str, int)) and not isinstance(identity, bool):
+        return (str(identity),)
+    if not isinstance(identity, Mapping):
+        return ()
+    target_key = identity.get("target_key")
+    if isinstance(target_key, Sequence) and not isinstance(target_key, (str, bytes)):
+        return tuple(str(item) for item in target_key)
+    resolved = identity.get("resolved")
+    if isinstance(resolved, Mapping):
+        resolved_key = _target_key_from_mapping(resolved)
+        if resolved_key:
+            return resolved_key
+    object_value = identity.get("object")
+    if isinstance(object_value, (str, int)) and not isinstance(object_value, bool):
+        return (str(object_value),)
+    row = identity.get("row")
+    if isinstance(row, Mapping):
+        for key in ("id", "path", "name"):
+            value = row.get(key)
+            if isinstance(value, (str, int)) and not isinstance(value, bool):
+                return (str(value),)
+    nested_identity = identity.get("identity")
+    if isinstance(nested_identity, Mapping):
+        for key in ("id", "path", "name"):
+            value = nested_identity.get(key)
+            if isinstance(value, (str, int)) and not isinstance(value, bool):
+                return (str(value),)
+    return ()
+
+
+def _provided_target_roles(execution_target_identity: Mapping[str, Any], expected_roles: Mapping[str, Any]) -> dict[str, Any]:
+    roles = execution_target_identity.get("roles")
+    if isinstance(roles, Mapping):
+        return {str(role): value for role, value in roles.items() if isinstance(value, Mapping)}
+    matching_roles = {str(role): execution_target_identity[role] for role in expected_roles if role in execution_target_identity and isinstance(execution_target_identity[role], Mapping)}
+    if matching_roles:
+        return matching_roles
+    if len(expected_roles) == 1:
+        role = next(iter(expected_roles))
+        return {str(role): dict(execution_target_identity)}
+    return {}
+
+
+def _container_error(message: str, *, field: str, operation: str, invalid_target: str | int, suitability: ContainerSuitabilityResult) -> SemanticValidationError:
+    details: dict[str, Any] = {
+        "field": field,
+        "operation": operation,
+        "invalid_target": invalid_target,
+        "container_suitability": suitability.as_dict(),
+        "candidate_targets": list(suitability.candidate_targets),
+        "requires_user_confirmation": suitability.requires_user_confirmation,
+        "requires_live_verification": suitability.requires_live_verification,
+        "reason_code": suitability.reason,
+    }
+    if isinstance(invalid_target, str):
+        details["invalid_parent_path"] = invalid_target
+        details["invalid_target_path"] = invalid_target
+    if suitability.candidate_targets:
+        details["candidate_writable_parent"] = suitability.candidate_targets[0]
+    raise SemanticValidationError(SemanticErrorCode.SEMANTIC_CONTAINER_UNSUITABLE, message, details=details)
 
 
 def _resolved_parent_path(parent: ResolvedObject) -> str | None:
@@ -503,8 +604,9 @@ def _preview_metadata(
     cleanup: Mapping[str, Any],
     expectation: str,
     partial_success_risk: bool,
+    target_identities: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return {
+    metadata = {
         "builder_family": BuilderFamily.OBJECT_MUTATION.value,
         "operation": operation.value,
         "source_note": dict(source_note),
@@ -516,6 +618,58 @@ def _preview_metadata(
         "cleanup_expectation": dict(cleanup),
         "partial_success_risk": partial_success_risk,
         "atomicity": "not-claimed" if partial_success_risk else "single-waapi-call-only",
+    }
+    preview_target_identity = _preview_target_identity(target_identities or {role: _target_identity_from_mapping(identity) for role, identity in identities.items()})
+    if preview_target_identity["roles"]:
+        metadata["preview_target_identity"] = preview_target_identity
+    return metadata
+
+
+def confirm_preview_target_identity(preview: SemanticPreview, execution_target_identity: Mapping[str, Any]) -> dict[str, Any]:
+    """Compare confirmed execution targets with preview metadata and fail closed."""
+
+    preview_target_identity = preview.envelope.metadata.get("preview_target_identity")
+    if not isinstance(preview_target_identity, Mapping):
+        return {
+            "status": "repreview_required",
+            "repreview_required": True,
+            "executed": False,
+            "verified": False,
+            "reason": "preview target identity metadata is missing",
+            "expected_target_identity": {},
+            "provided_target_identity": dict(execution_target_identity),
+        }
+    expected_roles = preview_target_identity.get("roles")
+    if not isinstance(expected_roles, Mapping) or not expected_roles:
+        return {
+            "status": "repreview_required",
+            "repreview_required": True,
+            "executed": False,
+            "verified": False,
+            "reason": "preview target identity metadata has no comparable roles",
+            "expected_target_identity": {},
+            "provided_target_identity": dict(execution_target_identity),
+        }
+    provided_roles = _provided_target_roles(execution_target_identity, expected_roles)
+    expected_keys = {str(role): _target_key_from_mapping(identity) for role, identity in expected_roles.items()}
+    provided_keys = {str(role): _target_key_from_mapping(identity) for role, identity in provided_roles.items()}
+    if expected_keys != provided_keys:
+        return {
+            "status": "repreview_required",
+            "repreview_required": True,
+            "executed": False,
+            "verified": False,
+            "reason": "confirmed execution target identity differs from preview target identity",
+            "expected_target_identity": expected_keys,
+            "provided_target_identity": provided_keys,
+        }
+    return {
+        "status": "target_identity_confirmed",
+        "repreview_required": False,
+        "executed": False,
+        "verified": False,
+        "expected_target_identity": expected_keys,
+        "provided_target_identity": provided_keys,
     }
 
 
