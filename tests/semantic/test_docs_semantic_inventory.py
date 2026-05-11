@@ -17,6 +17,21 @@ SMOKE_ALL_COMMAND = (
     "--scenario-set phase3-smoke --wwise-version all --archive-root "
     ".sisyphus/evidence/waapi-opencode-semantic-runs --prefer-live"
 )
+CAPABILITY_REQUIRED_COMMAND = (
+    "python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test "
+    "--scenario-set semantic-capability-required --wwise-version 2022.1 --archive-root "
+    ".sisyphus/evidence/waapi-opencode-semantic-runs --require-live"
+)
+CAPABILITY_ALL_COMMAND = (
+    "python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test "
+    "--scenario-set semantic-capability-all --wwise-version all --archive-root "
+    ".sisyphus/evidence/waapi-opencode-semantic-runs --require-live"
+)
+CAPABILITY_BOUNDARY_COMMAND = (
+    "python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test "
+    "--scenario-set semantic-capability-boundary --wwise-version all --archive-root "
+    ".sisyphus/evidence/waapi-opencode-semantic-runs --require-live"
+)
 
 
 def test_phase3_required_commands_stay_documented() -> None:
@@ -26,6 +41,22 @@ def test_phase3_required_commands_stay_documented() -> None:
     for command in (REQUIRED_2022_COMMAND, SMOKE_ALL_COMMAND):
         assert command in readme
         assert command in inventory
+
+
+def test_semantic_capability_commands_are_documented() -> None:
+    readme = SEMANTIC_README.read_text(encoding="utf-8")
+    inventory = TEST_INVENTORY.read_text(encoding="utf-8")
+
+    for command in (CAPABILITY_REQUIRED_COMMAND, CAPABILITY_ALL_COMMAND, CAPABILITY_BOUNDARY_COMMAND):
+        assert command in readme
+        assert command in inventory
+
+    for phrase in (
+        "product semantic capability validation",
+        "testing evidence",
+        "does not prove product capability by itself",
+    ):
+        assert phrase in readme
 
 
 def test_inventory_count_matches_latest_nonlive_result_without_collect_only_overclaim() -> None:

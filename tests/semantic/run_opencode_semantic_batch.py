@@ -22,6 +22,8 @@ if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
 from tests.semantic.scenarios import (  # pyright: ignore[reportMissingImports]  # noqa: E402
+    DEFAULT_FIRST_TEST_VERSION,
+    SEMANTIC_CAPABILITY_SCENARIO_SET,
     SUPPORTED_WWISE_VERSIONS,
     SemanticScenario,
     evaluate_scenario_output,
@@ -43,10 +45,20 @@ from tests.semantic.support.opencode_harness import (  # pyright: ignore[reportM
 
 SUMMARY_2022_PATH = REPO_ROOT / ".sisyphus" / "evidence" / "task-10-live-2022-semantic-batch.json"
 SUMMARY_MULTIVERSION_PATH = REPO_ROOT / ".sisyphus" / "evidence" / "task-10-multiversion-smoke.json"
+SUMMARY_SEMANTIC_CAPABILITY_REQUIRED_PATH = REPO_ROOT / ".sisyphus" / "evidence" / "task-semantic-capability-required-2022.json"
+SUMMARY_SEMANTIC_CAPABILITY_ALL_PATH = REPO_ROOT / ".sisyphus" / "evidence" / "task-semantic-capability-all-versions.json"
+SUMMARY_SEMANTIC_CAPABILITY_BOUNDARY_PATH = REPO_ROOT / ".sisyphus" / "evidence" / "task-semantic-capability-boundary-all-versions.json"
 DEFAULT_ARCHIVE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "waapi-opencode-semantic-runs"
 DEFAULT_WORKSPACE = Path("/Users/xiye/Documents/Git/waapi_skill_test")
 SUMMARY_2022_FILENAME = SUMMARY_2022_PATH.name
 SUMMARY_MULTIVERSION_FILENAME = SUMMARY_MULTIVERSION_PATH.name
+SUMMARY_SEMANTIC_CAPABILITY_REQUIRED_FILENAME = SUMMARY_SEMANTIC_CAPABILITY_REQUIRED_PATH.name
+SUMMARY_SEMANTIC_CAPABILITY_ALL_FILENAME = SUMMARY_SEMANTIC_CAPABILITY_ALL_PATH.name
+SUMMARY_SEMANTIC_CAPABILITY_BOUNDARY_FILENAME = SUMMARY_SEMANTIC_CAPABILITY_BOUNDARY_PATH.name
+SEMANTIC_CAPABILITY_REQUIRED_SET = "semantic-capability-required"
+SEMANTIC_CAPABILITY_ALL_SET = "semantic-capability-all"
+SEMANTIC_CAPABILITY_BOUNDARY_SET = "semantic-capability-boundary"
+UNSUPPORTED_SEMANTIC_FAMILY = "unsupported_runtime_boundary"
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,7 +97,6 @@ def run_batch(
     harness_factory: HarnessFactory | None = None,
 ) -> int:
     args = _parse_args(argv)
-    scenarios = scenarios_for_set(args.scenario_set)
     versions = _selected_versions(args.wwise_version)
     archive_root = Path(args.archive_root).expanduser().resolve(strict=False)
     workspace = Path(args.workspace).expanduser().resolve(strict=False)
@@ -93,6 +104,7 @@ def run_batch(
     records: list[BatchRecord] = []
 
     for version in versions:
+        scenarios = _scenarios_for_batch(args.scenario_set, version)
         prerequisites = checker(version, workspace)
         live_requested = args.require_live or args.prefer_live
         if live_requested and not prerequisites.available:
@@ -207,6 +219,7 @@ def _run_scenarios(
                     command_line=result.command,
                     command_exit_status=result.exit_status,
                     failure_notes=verdict.failure_notes,
+                    planner_facts=_archive_planner_facts(scenario, verdict.facts),
                     run_id=result.session_id,
                 )
                 records.append(
@@ -282,6 +295,7 @@ def _write_attempted_command_failure_record(
         command_line=error.command,
         command_exit_status=error.exit_status,
         failure_notes=(reason,),
+        planner_facts=_archive_planner_facts(scenario),
         run_id=session_id,
     )
     return BatchRecord(
@@ -322,6 +336,7 @@ def _write_non_execution_record(
         command_line=(),
         command_exit_status=None,
         failure_notes=(reason,),
+        planner_facts=_archive_planner_facts(scenario),
         run_id=session_id,
     )
     return BatchRecord(
@@ -420,6 +435,9 @@ def _mocked_runner(command: list[str], **_: Any) -> subprocess.CompletedProcess[
 
 def _mocked_semantic_output(prompt: str) -> str:
     lowered = prompt.lower()
+    capability_facts = _mocked_capability_facts(lowered)
+    if capability_facts is not None:
+        return f"Session: ses_semantic_mock\nSEMANTIC_RESULT_JSON: {json.dumps(capability_facts, sort_keys=True)}\n"
     facts: dict[str, Any]
     if "what do i need to configure" in lowered:
         facts = {
@@ -472,6 +490,64 @@ def _mocked_semantic_output(prompt: str) -> str:
     return f"Session: ses_semantic_mock\nSEMANTIC_RESULT_JSON: {json.dumps(facts, sort_keys=True)}\n"
 
 
+def _mocked_capability_facts(lowered_prompt: str) -> dict[str, Any] | None:
+    supported_cases = (
+        ("summarize where dialogue, music, sfx, and buses live", "intent_navigation", False, False, "query"),
+        ("prepare a preview to create a small sfx container", "crud_authoring", True, False, "object_mutation"),
+        ("create a tiny temporary sfx container", "crud_authoring", True, True, "object_mutation"),
+        ("design a safe hierarchy plan", "system_design_preview", True, False, "common"),
+        ("plan an audio import workflow", "asset_import_workflow", True, False, "import"),
+        ("plan the soundbank setup", "soundbank_workflow", True, False, "soundbank"),
+        ("plan how to assign footstep switch values", "switch_assignment_workflow", True, False, "switch_assignment"),
+        ("guide me through checking profiler evidence", "bounded_profiler_guidance", False, False, "profiler"),
+    )
+    for phrase, semantic_family, requires_hash, allows_confirmed, builder_name in supported_cases:
+        if phrase not in lowered_prompt:
+            continue
+        facts: dict[str, Any] = {
+            "structured_intent_extracted": True,
+            "semantic_family": semantic_family,
+            "semantic_planner_invoked": True,
+            "semantic_plan_status": "preview_ready",
+            "builder_backed_plan_produced": True,
+            "source_builder_refs": [f"wwise_waapi.builders.{builder_name}"],
+            "live_waapi_ready": True,
+            "live_waapi_before_research": True,
+            "mutation_executed_before_confirmation": False,
+            "mutation_executed": False,
+            "verification_status": "preview_only",
+        }
+        if requires_hash:
+            facts["preview_hash"] = "sha256:semantic-preview"
+        if allows_confirmed:
+            facts.update(
+                {
+                    "confirmation_observed": True,
+                    "mutation_executed": True,
+                    "verification_status": "verified",
+                }
+            )
+        return facts
+    if "schedule runtime event sequencing" in lowered_prompt:
+        return _mocked_unsupported_capability_facts("runtime event sequencing is outside WAAPI authoring")
+    if "federate through another app" in lowered_prompt:
+        return _mocked_unsupported_capability_facts("cross-app MCP federation is outside this WAAPI skill boundary")
+    return None
+
+
+def _mocked_unsupported_capability_facts(reason: str) -> dict[str, Any]:
+    return {
+        "structured_intent_extracted": True,
+        "semantic_family": UNSUPPORTED_SEMANTIC_FAMILY,
+        "semantic_planner_invoked": True,
+        "semantic_plan_status": "unsupported",
+        "unsupported_boundary_returned": True,
+        "unsupported_boundary_reason": reason,
+        "mutation_executed": False,
+        "verification_status": "unsupported",
+    }
+
+
 def _scenario_prompt(
     scenario: SemanticScenario,
     *,
@@ -498,7 +574,9 @@ def _scenario_prompt(
         "Include behavioral facts when relevant: live_waapi_attempted, waapi_calls, live_waapi_before_research, "
         "mutation_executed, mutation_executed_before_confirmation, read_stage_completed, "
         "read_stage_completed_before_mutation, preview_ready, confirmation_required, candidate_target_explained, "
-        "preview_target_identity, execution_target_identity, verification_status, and public_config_fields. "
+        "preview_target_identity, execution_target_identity, verification_status, public_config_fields, "
+        "structured_intent_extracted, semantic_family, semantic_planner_invoked, semantic_plan_status, "
+        "preview_hash, source_builder_refs, unsupported_boundary_returned, and unsupported_boundary_reason. "
         "Do not include internal_config_fields unless explicitly asked for the public-config boundary scenario; "
         "when included there, it must be an empty array unless you are reporting an actual policy violation."
     )
@@ -602,6 +680,24 @@ def _selected_versions(raw: str) -> tuple[str, ...]:
     return (raw,)
 
 
+def _scenarios_for_batch(scenario_set: str, version: str) -> tuple[SemanticScenario, ...]:
+    if scenario_set == SEMANTIC_CAPABILITY_ALL_SET:
+        return scenarios_for_set(SEMANTIC_CAPABILITY_SCENARIO_SET)
+    if scenario_set == SEMANTIC_CAPABILITY_BOUNDARY_SET:
+        return tuple(
+            scenario
+            for scenario in scenarios_for_set(SEMANTIC_CAPABILITY_SCENARIO_SET)
+            if scenario.metadata.get("semantic_family") == UNSUPPORTED_SEMANTIC_FAMILY
+        )
+    if scenario_set == SEMANTIC_CAPABILITY_REQUIRED_SET:
+        return tuple(
+            scenario
+            for scenario in scenarios_for_set(SEMANTIC_CAPABILITY_SCENARIO_SET)
+            if str(scenario.metadata.get("first_test_version", DEFAULT_FIRST_TEST_VERSION)) == version
+        )
+    return scenarios_for_set(scenario_set)
+
+
 def _version_paths(version: str) -> dict[str, str]:
     builds = {
         "2021.1": "2021.1.14.8108",
@@ -631,9 +727,56 @@ def _summary_path(args: argparse.Namespace) -> Path:
         if archive_root == canonical_archive_root:
             return SUMMARY_MULTIVERSION_PATH
         return archive_root / SUMMARY_MULTIVERSION_FILENAME
+    if scenario_set == SEMANTIC_CAPABILITY_REQUIRED_SET and version == "2022.1" and args.require_live:
+        if archive_root == canonical_archive_root:
+            return SUMMARY_SEMANTIC_CAPABILITY_REQUIRED_PATH
+        return archive_root / SUMMARY_SEMANTIC_CAPABILITY_REQUIRED_FILENAME
+    if scenario_set == SEMANTIC_CAPABILITY_ALL_SET and version == "all" and args.require_live:
+        if archive_root == canonical_archive_root:
+            return SUMMARY_SEMANTIC_CAPABILITY_ALL_PATH
+        return archive_root / SUMMARY_SEMANTIC_CAPABILITY_ALL_FILENAME
+    if scenario_set == SEMANTIC_CAPABILITY_BOUNDARY_SET and version == "all" and args.require_live:
+        if archive_root == canonical_archive_root:
+            return SUMMARY_SEMANTIC_CAPABILITY_BOUNDARY_PATH
+        return archive_root / SUMMARY_SEMANTIC_CAPABILITY_BOUNDARY_FILENAME
     mode = "require-live" if args.require_live else "prefer-live" if args.prefer_live else "mocked"
     safe = f"task-10-{scenario_set}-{version.replace('.', '-')}-{mode}.json"
     return archive_root / safe
+
+
+def _archive_planner_facts(scenario: SemanticScenario, facts: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    raw = dict(facts or {})
+    semantic_family = str(
+        raw.get("semantic_family")
+        or raw.get("intent_family")
+        or scenario.metadata.get("semantic_family")
+        or ""
+    )
+    unsupported = (
+        semantic_family == UNSUPPORTED_SEMANTIC_FAMILY
+        or raw.get("semantic_plan_status") == "unsupported"
+        or raw.get("unsupported_boundary_returned") is True
+        or raw.get("unsupported_capability") is True
+    )
+    supported = bool(semantic_family) and not unsupported
+    return {
+        "support_status": "unsupported" if unsupported else "supported" if supported else "",
+        "plan_family": semantic_family,
+        "preview_hash": str(raw.get("preview_hash") or raw.get("semantic_preview_hash") or ""),
+        "builder_refs": _string_tuple(raw.get("source_builder_refs") or raw.get("builder_refs") or raw.get("plan_builder_refs") or ()),
+        "unsupported_boundary_reason": str(raw.get("unsupported_boundary_reason") or raw.get("blocked_reason") or ""),
+        "verification_status": str(raw.get("verification_status") or ""),
+    }
+
+
+def _string_tuple(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        return (value,) if value else ()
+    if isinstance(value, Sequence):
+        return tuple(str(item) for item in value if str(item))
+    return (str(value),) if str(value) else ()
 
 
 def _write_summary(path: Path, *, args: argparse.Namespace, records: Sequence[BatchRecord]) -> None:
@@ -653,7 +796,17 @@ def _write_summary(path: Path, *, args: argparse.Namespace, records: Sequence[Ba
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--scenario-set", choices=("phase3-required", "phase3-smoke"), required=True)
+    parser.add_argument(
+        "--scenario-set",
+        choices=(
+            "phase3-required",
+            "phase3-smoke",
+            SEMANTIC_CAPABILITY_REQUIRED_SET,
+            SEMANTIC_CAPABILITY_ALL_SET,
+            SEMANTIC_CAPABILITY_BOUNDARY_SET,
+        ),
+        required=True,
+    )
     parser.add_argument("--wwise-version", choices=(*SUPPORTED_WWISE_VERSIONS, "all"), required=True)
     parser.add_argument("--workspace", default=str(DEFAULT_WORKSPACE))
     parser.add_argument("--archive-root", default=str(DEFAULT_ARCHIVE_ROOT))

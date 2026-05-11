@@ -8,6 +8,12 @@ from typing import Any
 from tests.semantic.run_opencode_semantic_batch import (  # pyright: ignore[reportMissingImports]
     SUMMARY_2022_FILENAME,
     SUMMARY_2022_PATH,
+    SUMMARY_SEMANTIC_CAPABILITY_ALL_FILENAME,
+    SUMMARY_SEMANTIC_CAPABILITY_ALL_PATH,
+    SUMMARY_SEMANTIC_CAPABILITY_BOUNDARY_FILENAME,
+    SUMMARY_SEMANTIC_CAPABILITY_BOUNDARY_PATH,
+    SUMMARY_SEMANTIC_CAPABILITY_REQUIRED_FILENAME,
+    SUMMARY_SEMANTIC_CAPABILITY_REQUIRED_PATH,
     SUMMARY_MULTIVERSION_FILENAME,
     SUMMARY_MULTIVERSION_PATH,
     VersionPrerequisites,
@@ -817,6 +823,84 @@ def test_temp_archive_runs_do_not_overwrite_repo_task_10_summaries(tmp_path: Pat
     assert smoke_archive_root.joinpath(SUMMARY_MULTIVERSION_FILENAME).is_file()
     assert _read_optional_bytes(SUMMARY_2022_PATH) == before_required
     assert _read_optional_bytes(SUMMARY_MULTIVERSION_PATH) == before_smoke
+
+
+def test_semantic_capability_runner_accepts_new_sets(tmp_path: Path) -> None:
+    workspace = _workspace_with_symlink(tmp_path)
+    required_archive_root = tmp_path / "capability-required"
+    all_archive_root = tmp_path / "capability-all"
+    boundary_archive_root = tmp_path / "capability-boundary"
+    before_required = _read_optional_bytes(SUMMARY_SEMANTIC_CAPABILITY_REQUIRED_PATH)
+    before_all = _read_optional_bytes(SUMMARY_SEMANTIC_CAPABILITY_ALL_PATH)
+    before_boundary = _read_optional_bytes(SUMMARY_SEMANTIC_CAPABILITY_BOUNDARY_PATH)
+
+    def unavailable(version: str, checked_workspace: Path) -> VersionPrerequisites:
+        assert checked_workspace == workspace.resolve(strict=False)
+        return VersionPrerequisites(
+            version=version,
+            console_path=f"/missing/{version}/WwiseConsole.sh",
+            sample_project_path=f"/missing/{version}/SampleProject.wproj",
+            available=False,
+            missing=(f"missing executable WwiseConsole for {version}",),
+        )
+
+    required_exit = run_batch(
+        [
+            "--scenario-set",
+            "semantic-capability-required",
+            "--wwise-version",
+            "2022.1",
+            "--workspace",
+            str(workspace),
+            "--archive-root",
+            str(required_archive_root),
+            "--require-live",
+        ],
+        prerequisite_checker=unavailable,
+    )
+    all_exit = run_batch(
+        [
+            "--scenario-set",
+            "semantic-capability-all",
+            "--wwise-version",
+            "all",
+            "--workspace",
+            str(workspace),
+            "--archive-root",
+            str(all_archive_root),
+            "--require-live",
+        ],
+        prerequisite_checker=unavailable,
+    )
+    boundary_exit = run_batch(
+        [
+            "--scenario-set",
+            "semantic-capability-boundary",
+            "--wwise-version",
+            "all",
+            "--workspace",
+            str(workspace),
+            "--archive-root",
+            str(boundary_archive_root),
+            "--require-live",
+        ],
+        prerequisite_checker=unavailable,
+    )
+
+    assert required_exit == 1
+    assert all_exit == 1
+    assert boundary_exit == 1
+    assert required_archive_root.joinpath(SUMMARY_SEMANTIC_CAPABILITY_REQUIRED_FILENAME).is_file()
+    assert all_archive_root.joinpath(SUMMARY_SEMANTIC_CAPABILITY_ALL_FILENAME).is_file()
+    assert boundary_archive_root.joinpath(SUMMARY_SEMANTIC_CAPABILITY_BOUNDARY_FILENAME).is_file()
+    assert len(list(required_archive_root.glob("*/semantic-capability-*/record.json"))) == len(SEMANTIC_CAPABILITY_REQUIRED_FAMILIES)
+    assert len(list(all_archive_root.glob("*/semantic-capability-*/record.json"))) == len(SUPPORTED_WWISE_VERSIONS) * len(
+        SEMANTIC_CAPABILITY_REQUIRED_FAMILIES
+    )
+    assert len(list(boundary_archive_root.glob("*/semantic-capability-*/record.json"))) == len(SUPPORTED_WWISE_VERSIONS) * 2
+    assert _read_optional_bytes(SUMMARY_SEMANTIC_CAPABILITY_REQUIRED_PATH) == before_required
+    assert _read_optional_bytes(SUMMARY_SEMANTIC_CAPABILITY_ALL_PATH) == before_all
+    assert _read_optional_bytes(SUMMARY_SEMANTIC_CAPABILITY_BOUNDARY_PATH) == before_boundary
 
 
 def test_prefer_live_returns_nonzero_for_semantic_fail_verdicts(tmp_path: Path) -> None:

@@ -28,6 +28,7 @@ REQUIRED_RECORD_FIELDS = {
     "expected_assertions",
     "failure_notes",
     "opencode_session_id",
+    "planner_facts",
     "prompt",
     "run_id",
     "sandbox_metadata_path",
@@ -168,6 +169,41 @@ def test_task_9_archive_excludes_copied_artifacts_and_keeps_archives_local(tmp_p
     assert DEFAULT_ARCHIVE_ROOT.parts[:2] == (".sisyphus", "evidence")
     assert ".sisyphus/" in (REPO_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
     _assert_git_ignores_default_archive(relative_default_record)
+
+
+def test_semantic_capability_archive_carries_planner_facts(tmp_path: Path) -> None:
+    record_path = write_semantic_archive_record(
+        archive_root=tmp_path,
+        scenario_id="semantic-capability-crud-preview",
+        prompt="Prepare a preview to create a small SFX container.",
+        expected_assertions=["planner facts are archived"],
+        assistant_output="SEMANTIC_RESULT_JSON: {}",
+        verdict="pass",
+        wwise_version="2022.1",
+        waapi_host="127.0.0.1",
+        waapi_port=8080,
+        opencode_session_id="ses_capability_planner_facts",
+        sandbox_metadata_path="tests/_sandboxes/sample/sandbox-metadata.json",
+        planner_facts={
+            "support_status": "supported",
+            "plan_family": "crud_authoring",
+            "preview_hash": "sha256:semantic-preview",
+            "builder_refs": ["wwise_waapi.builders.object_mutation"],
+            "unsupported_boundary_reason": "",
+            "verification_status": "preview_only",
+        },
+        run_id="task-9-capability-planner-facts",
+    )
+
+    payload = _read_json(record_path)
+    assert payload["planner_facts"] == {
+        "support_status": "supported",
+        "plan_family": "crud_authoring",
+        "preview_hash": "sha256:semantic-preview",
+        "builder_refs": ["wwise_waapi.builders.object_mutation"],
+        "unsupported_boundary_reason": "",
+        "verification_status": "preview_only",
+    }
 
 
 def _write_fake_excluded_artifacts(sandbox: Path, metadata_path: Path) -> None:

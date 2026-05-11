@@ -16,6 +16,24 @@ Run the all-version smoke batch, preferring live execution where prerequisites a
 python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test --scenario-set phase3-smoke --wwise-version all --archive-root .sisyphus/evidence/waapi-opencode-semantic-runs --prefer-live
 ```
 
+Run the required 2022.1 product semantic capability validation batch:
+
+```bash
+python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test --scenario-set semantic-capability-required --wwise-version 2022.1 --archive-root .sisyphus/evidence/waapi-opencode-semantic-runs --require-live
+```
+
+Run the full all-version product semantic capability validation batch:
+
+```bash
+python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test --scenario-set semantic-capability-all --wwise-version all --archive-root .sisyphus/evidence/waapi-opencode-semantic-runs --require-live
+```
+
+Run the all-version unsupported runtime and cross-app boundary capability batch:
+
+```bash
+python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test --scenario-set semantic-capability-boundary --wwise-version all --archive-root .sisyphus/evidence/waapi-opencode-semantic-runs --require-live
+```
+
 ## Environment and workspace expectations
 
 - The workspace must be `/Users/xiye/Documents/Git/waapi_skill_test` unless the command is intentionally pointed elsewhere.
@@ -32,6 +50,8 @@ python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Doc
 - Archive records reference sandbox metadata, dispatcher evidence, command lines, OpenCode session ids, output, status, and failure notes. They do not copy sandboxes, full OpenCode databases, caches, virtual environments, or wholesale logs.
 - Current live Task 10 evidence for the required 2022.1 semantic batch passes with `pass: 6`, `fail: 0`, `blocked: 0`, and `skip: 0` in `.sisyphus/evidence/task-10-live-2022-semantic-batch.json`.
 - Current all-version smoke evidence is also accounted for with `pass: 10`, `fail: 0`, `blocked: 0`, and `skip: 0` in `.sisyphus/evidence/task-10-multiversion-smoke.json`.
+- Product semantic capability validation writes canonical summaries to `.sisyphus/evidence/task-semantic-capability-required-2022.json`, `.sisyphus/evidence/task-semantic-capability-all-versions.json`, and `.sisyphus/evidence/task-semantic-capability-boundary-all-versions.json` when the strict `--require-live` commands above use the canonical archive root.
+- testing evidence records what scenarios ran, which planner facts were archived, and whether the assistant output met assertions; mocked pytest does not prove product capability by itself.
 
 ## Mocked and nonlive checks
 

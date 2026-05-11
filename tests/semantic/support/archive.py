@@ -45,6 +45,7 @@ def build_semantic_archive_record(
     command_exit_status: int | None = None,
     timestamps: Mapping[str, str | None] | None = None,
     failure_notes: Sequence[str] = (),
+    planner_facts: Mapping[str, Any] | None = None,
     run_id: str | None = None,
     archive_path: str | Path | None = None,
 ) -> dict[str, Any]:
@@ -73,6 +74,7 @@ def build_semantic_archive_record(
         "command_exit_status": command_exit_status,
         "timestamps": _timestamps(timestamps),
         "failure_notes": [str(note) for note in failure_notes],
+        "planner_facts": _planner_facts(planner_facts),
         "archive_path": _path_string(archive_path),
         "archive_policy": {
             "copies_artifacts": False,
@@ -147,6 +149,28 @@ def _timestamps(timestamps: Mapping[str, str | None] | None) -> dict[str, str | 
     if timestamps:
         payload.update({str(key): value for key, value in timestamps.items()})
     return payload
+
+
+def _planner_facts(planner_facts: Mapping[str, Any] | None) -> dict[str, Any]:
+    raw = dict(planner_facts or {})
+    return {
+        "support_status": str(raw.get("support_status") or ""),
+        "plan_family": str(raw.get("plan_family") or raw.get("semantic_family") or ""),
+        "preview_hash": str(raw.get("preview_hash") or raw.get("semantic_preview_hash") or ""),
+        "builder_refs": _string_list(raw.get("builder_refs") or raw.get("source_builder_refs") or raw.get("plan_builder_refs") or ()),
+        "unsupported_boundary_reason": str(raw.get("unsupported_boundary_reason") or raw.get("blocked_reason") or ""),
+        "verification_status": str(raw.get("verification_status") or ""),
+    }
+
+
+def _string_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value] if value else []
+    if isinstance(value, Sequence):
+        return [str(item) for item in value if str(item)]
+    return [str(value)] if str(value) else []
 
 
 def _utc_now() -> str:
