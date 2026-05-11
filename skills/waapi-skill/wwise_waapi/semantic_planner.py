@@ -7,11 +7,15 @@ dispatch WAAPI requests.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping, Sequence, cast
 
 from wwise_waapi.builders.common import SemanticErrorCode, SemanticValidationError
+from wwise_waapi.builders.profiler import extract_profiler_parameter_guidance  # pyright: ignore[reportMissingImports]
+from wwise_waapi.builders.query import QueryPredicate, build_object_get_query  # pyright: ignore[reportMissingImports]
 
 
 SEMANTIC_CONFIRMATION_STATES = ("unknown", "preview", "confirmed", "rejected")
@@ -174,6 +178,13 @@ class SemanticPlanStep:
     preview: SemanticPlanPreview | Mapping[str, Any] | None = None
     inputs: Mapping[str, Any] = field(default_factory=dict)
     source_builder_ref: str = ""
+    builder_ref: str = ""
+    api: str = ""
+    args_preview: Mapping[str, Any] = field(default_factory=dict)
+    options_preview: Mapping[str, Any] = field(default_factory=dict)
+    target_identity: Mapping[str, Any] = field(default_factory=dict)
+    read_only: bool = False
+    project_changing: bool = False
 
     def __post_init__(self) -> None:
         _require_supported_family(self.family)
@@ -189,6 +200,13 @@ class SemanticPlanStep:
             "preview": preview.as_dict() if preview is not None else None,
             "inputs": _json_safe_mapping(self.inputs),
             "source_builder_ref": self.source_builder_ref,
+            "builder_ref": self.builder_ref or self.source_builder_ref,
+            "api": self.api,
+            "args_preview": _json_safe_mapping(self.args_preview),
+            "options_preview": _json_safe_mapping(self.options_preview),
+            "target_identity": _json_safe_mapping(self.target_identity),
+            "read_only": self.read_only,
+            "project_changing": self.project_changing,
         }
 
 
@@ -269,21 +287,396 @@ class SemanticPlanner:
                 source_builder_refs=(),
             )
 
+        if intent.family == "intent_navigation":
+            steps = _navigation_steps(intent)
+        elif intent.family == "system_design_preview":
+            steps = _system_design_candidate_steps(intent)
+        elif intent.family == "bounded_profiler_guidance":
+            steps = _profiler_guidance_steps(intent)
+        else:
+            steps = _candidate_steps(intent)
+
+        status = SemanticPlanStatus.READY
+        needs_clarification = False
+        blocked_reason = ""
+        if any(_step_missing_input(step) for step in steps):
+            status = SemanticPlanStatus.NEEDS_CLARIFICATION
+            needs_clarification = True
+            blocked_reason = "structured intent is missing concrete builder inputs required for preview construction"
+
+        preview_id = f"semantic-preview:{intent.family}:{_stable_intent_suffix(intent)}"
+        preview_hash = _stable_preview_hash(intent, steps)
+        project_changing = any(step.project_changing for step in steps)
+
         return SemanticPlan(
-            status=SemanticPlanStatus.BLOCKED,
+            status=status,
             family=intent.family,
             version=intent.version,
-            steps=(),
-            preview_id="",
-            preview_hash="",
-            risk_flags=(),
-            requires_confirmation=intent.confirmation_state != "confirmed",
-            blocked_reason="semantic planner routing skeleton records allowed builders but does not execute builder previews",
-            needs_clarification=False,
+            steps=steps,
+            preview_id=preview_id,
+            preview_hash=preview_hash,
+            risk_flags=_risk_flags(steps),
+            requires_confirmation=project_changing and intent.confirmation_state != "confirmed",
+            blocked_reason=blocked_reason,
+            needs_clarification=needs_clarification,
             unsupported_capability=False,
-            verification_steps=(),
+            verification_steps=_verification_steps(steps, preview_hash),
             source_builder_refs=SEMANTIC_FAMILY_BUILDER_REFS[intent.family],
         )
+
+
+def _navigation_steps(intent: SemanticIntent) -> tuple[SemanticPlanStep, ...]:
+    target = _first_target(intent)
+    return_fields = _return_fields(target, default=("id", "name", "path", "type"))
+    source_kwargs = _query_source_kwargs(target)
+    missing = [name for name, value in source_kwargs.items() if value is None]
+    if len(source_kwargs) != 1 or missing:
+        return (
+            _missing_step(
+                intent,
+                step_id="intent-navigation-object-get",
+                operation="object.get",
+                builder_ref="wwise_waapi.builders.query.build_object_get_query",
+                api="ak.wwise.core.object.get",
+                missing_inputs=("exactly one query source target: type, path, object_id, search, or query",),
+                read_only=True,
+            ),
+        )
+    preview = build_object_get_query(
+        **source_kwargs,
+        where=tuple(QueryPredicate(field=constraint.field, operator=constraint.operator, value=constraint.value) for constraint in cast(tuple[SemanticIntentConstraint, ...], intent.constraints)),
+        select=_metadata_sequence(target, "select"),
+        take=_metadata_int(target, "take"),
+        return_fields=return_fields,
+        version=intent.version,
+    )
+    return (_step_from_preview(intent, "intent-navigation-object-get", "object.get", "wwise_waapi.builders.query.build_object_get_query", preview, target),)
+
+
+def _candidate_steps(intent: SemanticIntent) -> tuple[SemanticPlanStep, ...]:
+    operations = tuple(intent.requested_operations) or _default_operations(intent.family)
+    return tuple(_candidate_step(intent, index, operation) for index, operation in enumerate(operations, start=1))
+
+
+def _system_design_candidate_steps(intent: SemanticIntent) -> tuple[SemanticPlanStep, ...]:
+    target = _first_target(intent)
+    target_identity = target.as_dict() if target is not None else {}
+    candidates = (
+        ("system-design-discover-parent", "object.get", "wwise_waapi.builders.query.build_object_get_query", "ak.wwise.core.object.get", True, False),
+        ("system-design-create-container", "object.create", "wwise_waapi.builders.object_mutation.build_object_mutation_preview", "ak.wwise.core.object.create", False, True),
+        ("system-design-annotate-container", "setNotes", "wwise_waapi.builders.properties.build_set_notes_preview", "ak.wwise.core.object.setNotes", False, True),
+        ("system-design-import-assets", "audio.import", "wwise_waapi.builders.imports.build_audio_import_preview", "ak.wwise.core.audio.import", False, True),
+    )
+    return tuple(
+        _preview_shell_step(
+            intent,
+            step_id=step_id,
+            operation=operation,
+            builder_ref=builder_ref,
+            api=api,
+            read_only=read_only,
+            project_changing=project_changing,
+            target_identity=target_identity,
+            inputs={
+                "candidate_only": True,
+                "confirmation_required": project_changing,
+                "missing_structured_input": ["explicit parent identity", "object names/types", "asset file paths"] if project_changing else ["query source target"],
+            },
+        )
+        for step_id, operation, builder_ref, api, read_only, project_changing in candidates
+    )
+
+
+def _profiler_guidance_steps(intent: SemanticIntent) -> tuple[SemanticPlanStep, ...]:
+    uri = _profiler_uri(intent)
+    builder_ref = "wwise_waapi.builders.profiler.extract_profiler_parameter_guidance"
+    if not uri:
+        return (
+            _missing_step(
+                intent,
+                step_id="bounded-profiler-guidance",
+                operation="profiler.guidance",
+                builder_ref=builder_ref,
+                api="",
+                missing_inputs=("profiler/log WAAPI uri",),
+                read_only=True,
+            ),
+        )
+    guidance = extract_profiler_parameter_guidance(uri, version=intent.version).as_dict()
+    return (
+        _preview_shell_step(
+            intent,
+            step_id="bounded-profiler-guidance",
+            operation="profiler.guidance",
+            builder_ref=builder_ref,
+            api=uri,
+            read_only=True,
+            project_changing=False,
+            args_preview={"uri": uri},
+            options_preview={},
+            target_identity={"uri": uri},
+            inputs={"guidance_preview": guidance},
+        ),
+    )
+
+
+def _candidate_step(intent: SemanticIntent, index: int, operation: str) -> SemanticPlanStep:
+    builder_ref, api, read_only, project_changing, missing = _candidate_metadata(intent.family, operation)
+    target = _first_target(intent)
+    return _preview_shell_step(
+        intent,
+        step_id=f"{intent.family}-{index}",
+        operation=operation,
+        builder_ref=builder_ref,
+        api=api,
+        read_only=read_only,
+        project_changing=project_changing,
+        target_identity=target.as_dict() if target is not None else {},
+        inputs={"missing_structured_input": list(missing), "candidate_only": True},
+    )
+
+
+def _step_from_preview(
+    intent: SemanticIntent,
+    step_id: str,
+    operation: str,
+    builder_ref: str,
+    preview: Any,
+    target: SemanticIntentTarget | None,
+) -> SemanticPlanStep:
+    preview_dict = preview.as_dict()
+    envelope = _mapping_value(preview_dict["envelope"])
+    metadata = _mapping_value(envelope.get("metadata", {}))
+    read_only = bool(metadata.get("read_only", not preview_dict.get("requires_destructive_gate", False)))
+    project_changing = not read_only or bool(preview_dict.get("requires_destructive_gate", False))
+    return _preview_shell_step(
+        intent,
+        step_id=step_id,
+        operation=operation,
+        builder_ref=builder_ref,
+        api=str(envelope.get("uri", "")),
+        args_preview=_mapping_value(envelope.get("args", {})),
+        options_preview=_mapping_value(envelope.get("options", {})),
+        target_identity=target.as_dict() if target is not None else _preview_target_identity(metadata),
+        read_only=read_only,
+        project_changing=project_changing,
+        inputs={"builder_preview": preview_dict},
+    )
+
+
+def _preview_shell_step(
+    intent: SemanticIntent,
+    *,
+    step_id: str,
+    operation: str,
+    builder_ref: str,
+    api: str,
+    read_only: bool,
+    project_changing: bool,
+    args_preview: Mapping[str, Any] | None = None,
+    options_preview: Mapping[str, Any] | None = None,
+    target_identity: Mapping[str, Any] | None = None,
+    inputs: Mapping[str, Any] | None = None,
+) -> SemanticPlanStep:
+    payload = {
+        "api": api,
+        "args_preview": dict(args_preview or {}),
+        "options_preview": dict(options_preview or {}),
+        "target_identity": dict(target_identity or {}),
+        "read_only": read_only,
+        "project_changing": project_changing,
+    }
+    return SemanticPlanStep(
+        step_id=step_id,
+        operation=operation,
+        family=intent.family,
+        preview=SemanticPlanPreview(
+            preview_id=f"{step_id}:preview",
+            preview_hash=_stable_hash(payload),
+            summary=f"{operation} preview via {builder_ref}",
+            payload=payload,
+        ),
+        inputs=inputs or {},
+        source_builder_ref=builder_ref,
+        builder_ref=builder_ref,
+        api=api,
+        args_preview=args_preview or {},
+        options_preview=options_preview or {},
+        target_identity=target_identity or {},
+        read_only=read_only,
+        project_changing=project_changing,
+    )
+
+
+def _missing_step(
+    intent: SemanticIntent,
+    *,
+    step_id: str,
+    operation: str,
+    builder_ref: str,
+    api: str,
+    missing_inputs: Sequence[str],
+    read_only: bool,
+) -> SemanticPlanStep:
+    target = _first_target(intent)
+    return _preview_shell_step(
+        intent,
+        step_id=step_id,
+        operation=operation,
+        builder_ref=builder_ref,
+        api=api,
+        read_only=read_only,
+        project_changing=not read_only,
+        target_identity=target.as_dict() if target is not None else {},
+        inputs={"missing_structured_input": list(missing_inputs), "candidate_only": True},
+    )
+
+
+def _first_target(intent: SemanticIntent) -> SemanticIntentTarget | None:
+    targets = cast(tuple[SemanticIntentTarget, ...], intent.targets)
+    return targets[0] if targets else None
+
+
+def _query_source_kwargs(target: SemanticIntentTarget | None) -> dict[str, Any]:
+    if target is None:
+        return {}
+    key_by_kind = {
+        "path": "path",
+        "object_id": "object_id",
+        "id": "object_id",
+        "type": "type",
+        "search": "search",
+        "query": "query",
+        "waql": "query",
+    }
+    key = key_by_kind.get(target.kind)
+    if key is None:
+        metadata_source = target.metadata.get("query_source")
+        if isinstance(metadata_source, str):
+            key = key_by_kind.get(metadata_source)
+    return {key: target.identifier} if key is not None and target.identifier else {}
+
+
+def _return_fields(target: SemanticIntentTarget | None, *, default: Sequence[str]) -> tuple[str, ...]:
+    fields = _metadata_sequence(target, "return")
+    return tuple(fields or default)
+
+
+def _metadata_sequence(target: SemanticIntentTarget | None, key: str) -> tuple[str, ...]:
+    if target is None:
+        return ()
+    value = target.metadata.get(key)
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        return (value,)
+    if isinstance(value, Sequence):
+        return tuple(str(item) for item in value)
+    return ()
+
+
+def _metadata_int(target: SemanticIntentTarget | None, key: str) -> int | None:
+    if target is None:
+        return None
+    value = target.metadata.get(key)
+    return value if isinstance(value, int) else None
+
+
+def _default_operations(family: str) -> tuple[str, ...]:
+    defaults = {
+        "crud_authoring": ("object.create", "object.set", "setName", "setProperty"),
+        "asset_import_workflow": ("audio.import", "audio.importTabDelimited"),
+        "soundbank_workflow": ("getInclusions", "setInclusions", "generate"),
+        "switch_assignment_workflow": ("getAssignments", "addAssignment", "removeAssignment"),
+    }
+    return defaults.get(family, ())
+
+
+def _candidate_metadata(family: str, operation: str) -> tuple[str, str, bool, bool, tuple[str, ...]]:
+    table = {
+        "object.create": ("wwise_waapi.builders.object_mutation.build_object_mutation_preview", "ak.wwise.core.object.create", False, True, ("parent identity", "object type", "object name")),
+        "object.set": ("wwise_waapi.builders.object_mutation.build_object_mutation_preview", "ak.wwise.core.object.set", False, True, ("resolved object identity", "field values")),
+        "object.delete": ("wwise_waapi.builders.object_mutation.build_object_mutation_preview", "ak.wwise.core.object.delete", False, True, ("resolved object identity",)),
+        "object.copy": ("wwise_waapi.builders.object_mutation.build_object_mutation_preview", "ak.wwise.core.object.copy", False, True, ("source object identity", "parent identity")),
+        "object.move": ("wwise_waapi.builders.object_mutation.build_object_mutation_preview", "ak.wwise.core.object.move", False, True, ("source object identity", "parent identity")),
+        "setName": ("wwise_waapi.builders.properties.build_set_name_preview", "ak.wwise.core.object.setName", False, True, ("resolved object identity", "new name")),
+        "setNotes": ("wwise_waapi.builders.properties.build_set_notes_preview", "ak.wwise.core.object.setNotes", False, True, ("resolved object identity", "notes value")),
+        "setProperty": ("wwise_waapi.builders.properties.build_set_property_preview", "ak.wwise.core.object.setProperty", False, True, ("resolved object identity", "property metadata", "property value")),
+        "audio.import": ("wwise_waapi.builders.imports.build_audio_import_preview", "ak.wwise.core.audio.import", False, True, ("import items", "object paths", "audio file paths")),
+        "audio.importTabDelimited": ("wwise_waapi.builders.imports.build_import_tab_delimited_preview", "ak.wwise.core.audio.importTabDelimited", False, True, ("import file or tab-delimited plan", "language", "import operation")),
+        "getInclusions": ("wwise_waapi.builders.soundbank.build_get_inclusions_preview", "ak.wwise.core.soundbank.getInclusions", True, False, ("soundbank identity",)),
+        "setInclusions": ("wwise_waapi.builders.soundbank.build_set_inclusions_preview", "ak.wwise.core.soundbank.setInclusions", False, True, ("soundbank identity", "inclusion rows", "operation")),
+        "generate": ("wwise_waapi.builders.soundbank.build_generate_preview", "ak.wwise.core.soundbank.generate", False, True, ("soundbank generation request",)),
+        "getAssignments": ("wwise_waapi.builders.switchcontainer.build_get_assignments_preview", "ak.wwise.core.switchContainer.getAssignments", True, False, ("switch container identity",)),
+        "addAssignment": ("wwise_waapi.builders.switchcontainer.build_add_assignment_preview", "ak.wwise.core.switchContainer.addAssignment", False, True, ("switch container identity", "child identity", "state or switch identity", "existing assignments")),
+        "removeAssignment": ("wwise_waapi.builders.switchcontainer.build_remove_assignment_preview", "ak.wwise.core.switchContainer.removeAssignment", False, True, ("switch container identity", "child identity", "state or switch identity", "existing assignments")),
+    }
+    if operation in table:
+        return table[operation]
+    module_ref = SEMANTIC_FAMILY_BUILDER_REFS[family][0]
+    return (module_ref, "", False, True, ("supported operation-specific structured inputs",))
+
+
+def _profiler_uri(intent: SemanticIntent) -> str:
+    target = _first_target(intent)
+    if target is not None and target.kind in {"uri", "api"} and target.identifier.startswith("ak."):
+        return target.identifier
+    constraints = cast(tuple[SemanticIntentConstraint, ...], intent.constraints)
+    for constraint in constraints:
+        if constraint.field in {"uri", "api"} and isinstance(constraint.value, str) and constraint.value.startswith("ak."):
+            return constraint.value
+    return ""
+
+
+def _preview_target_identity(metadata: Mapping[str, Any]) -> Mapping[str, Any]:
+    value = metadata.get("preview_target_identity") or metadata.get("identity_resolution")
+    return value if isinstance(value, Mapping) else {}
+
+
+def _step_missing_input(step: SemanticPlanStep) -> bool:
+    missing = step.inputs.get("missing_structured_input")
+    return isinstance(missing, Sequence) and not isinstance(missing, str) and len(missing) > 0
+
+
+def _risk_flags(steps: Sequence[SemanticPlanStep]) -> tuple[str, ...]:
+    flags: list[str] = []
+    if all(step.read_only for step in steps):
+        flags.append("read-only")
+    if any(step.project_changing for step in steps):
+        flags.append("project-changing")
+    if any(_step_missing_input(step) for step in steps):
+        flags.append("needs-structured-input")
+    return tuple(flags)
+
+
+def _verification_steps(steps: Sequence[SemanticPlanStep], preview_hash: str) -> tuple[SemanticPlanVerification, ...]:
+    verifications: list[SemanticPlanVerification] = []
+    for step in steps:
+        if not step.api:
+            continue
+        kind = "readback" if step.read_only else "post-mutation-readback"
+        verifications.append(
+            SemanticPlanVerification(
+                kind=kind,
+                description=f"Verify {step.operation} preview for {step.api} before any live dispatch.",
+                preview_hash=preview_hash,
+                readback_plan={"uri": step.api, "args": step.args_preview, "options": step.options_preview},
+            )
+        )
+    return tuple(verifications)
+
+
+def _stable_intent_suffix(intent: SemanticIntent) -> str:
+    return _stable_hash({"family": intent.family, "goal": intent.goal, "version": intent.version})[7:19]
+
+
+def _stable_preview_hash(intent: SemanticIntent, steps: Sequence[SemanticPlanStep]) -> str:
+    return _stable_hash({"intent": intent.as_dict(), "steps": [step.as_dict() for step in steps]})
+
+
+def _stable_hash(value: Mapping[str, Any]) -> str:
+    encoded = json.dumps(_json_safe_mapping(value), sort_keys=True, separators=(",", ":"))
+    return "sha256:" + hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 def _require_supported_family(family: str) -> None:
@@ -358,6 +751,13 @@ def _plan_step(value: SemanticPlanStep | Mapping[str, Any]) -> SemanticPlanStep:
         preview=value.get("preview"),
         inputs=_mapping_value(value.get("inputs", {})),
         source_builder_ref=str(value.get("source_builder_ref", "")),
+        builder_ref=str(value.get("builder_ref", value.get("source_builder_ref", ""))),
+        api=str(value.get("api", "")),
+        args_preview=_mapping_value(value.get("args_preview", {})),
+        options_preview=_mapping_value(value.get("options_preview", {})),
+        target_identity=_mapping_value(value.get("target_identity", {})),
+        read_only=bool(value.get("read_only", False)),
+        project_changing=bool(value.get("project_changing", False)),
     )
 
 

@@ -97,6 +97,13 @@ def test_semantic_plan_serializes_preview_hash_and_verification_steps() -> None:
                 },
                 "inputs": {"type": "Sound"},
                 "source_builder_ref": "wwise_waapi.builders.query.build_object_get_query",
+                "builder_ref": "wwise_waapi.builders.query.build_object_get_query",
+                "api": "ak.wwise.core.object.get",
+                "args_preview": {"waql": "from type Sound"},
+                "options_preview": {"return": ("id", "name")},
+                "target_identity": {"kind": "type", "identifier": "Sound"},
+                "read_only": True,
+                "project_changing": False,
             },
         ),
         preview_id="preview-query-sounds",
@@ -134,6 +141,13 @@ def test_semantic_plan_serializes_preview_hash_and_verification_steps() -> None:
                 },
                 "inputs": {"type": "Sound"},
                 "source_builder_ref": "wwise_waapi.builders.query.build_object_get_query",
+                "builder_ref": "wwise_waapi.builders.query.build_object_get_query",
+                "api": "ak.wwise.core.object.get",
+                "args_preview": {"waql": "from type Sound"},
+                "options_preview": {"return": ["id", "name"]},
+                "target_identity": {"kind": "type", "identifier": "Sound"},
+                "read_only": True,
+                "project_changing": False,
             }
         ],
         "preview_id": "preview-query-sounds",
@@ -198,24 +212,24 @@ def test_semantic_intent_rejects_unknown_confirmation_state() -> None:
     assert exc.value.details["confirmation_state"] == "approved"
 
 
-def test_schema_only_planner_returns_blocked_structured_plan_for_valid_intent() -> None:
+def test_navigation_intent_builds_object_get_step() -> None:
     plan = SemanticPlanner().plan(structured_query_intent())
 
-    assert plan.as_dict() == {
-        "status": "blocked",
-        "family": "intent_navigation",
-        "version": "2022.1",
-        "steps": [],
-        "preview_id": "",
-        "preview_hash": "",
-        "risk_flags": [],
-        "requires_confirmation": True,
-        "blocked_reason": "semantic planner routing skeleton records allowed builders but does not execute builder previews",
-        "needs_clarification": False,
-        "unsupported_capability": False,
-        "verification_steps": [],
-        "source_builder_refs": ["wwise_waapi.builders.query"],
-    }
+    assert plan.status is SemanticPlanStatus.READY
+    assert plan.requires_confirmation is False
+    assert plan.needs_clarification is False
+    assert plan.preview_hash.startswith("sha256:")
+    assert tuple(plan.source_builder_refs) == ("wwise_waapi.builders.query",)
+
+    step = plan.as_dict()["steps"][0]
+    assert step["builder_ref"] == "wwise_waapi.builders.query.build_object_get_query"
+    assert step["source_builder_ref"] == "wwise_waapi.builders.query.build_object_get_query"
+    assert step["api"] == "ak.wwise.core.object.get"
+    assert step["args_preview"] == {"waql": "from type Sound where @Volume < 0"}
+    assert step["options_preview"] == {"return": ["id", "name", "path"]}
+    assert step["target_identity"]["kind"] == "type"
+    assert step["read_only"] is True
+    assert step["project_changing"] is False
 
 
 def semantic_intent_for_family(family: str, *, confirmation_state: str = "preview") -> SemanticIntent:
@@ -252,14 +266,13 @@ def test_planner_routes_all_supported_families_to_builder_refs() -> None:
         plan = planner.plan(semantic_intent_for_family(family))
 
         assert plan.family == family
-        assert tuple(plan.steps) == ()
-        assert tuple(plan.verification_steps) == ()
         assert tuple(plan.source_builder_refs) == SEMANTIC_FAMILY_BUILDER_REFS[family]
         if family == "unsupported_runtime_boundary":
             assert plan.status is SemanticPlanStatus.UNSUPPORTED
             assert plan.unsupported_capability is True
+            assert tuple(plan.steps) == ()
         else:
-            assert plan.status is SemanticPlanStatus.BLOCKED
+            assert plan.status in {SemanticPlanStatus.READY, SemanticPlanStatus.NEEDS_CLARIFICATION}
             assert plan.unsupported_capability is False
             assert plan.source_builder_refs
 
@@ -275,13 +288,68 @@ def test_planner_blocks_unknown_family_without_guessing() -> None:
 def test_crud_authoring_routes_to_object_and_property_builders() -> None:
     plan = SemanticPlanner().plan(semantic_intent_for_family("crud_authoring", confirmation_state="confirmed"))
 
-    assert plan.status is SemanticPlanStatus.BLOCKED
-    assert tuple(plan.steps) == ()
+    assert plan.status is SemanticPlanStatus.NEEDS_CLARIFICATION
     assert plan.requires_confirmation is False
+    assert {step.builder_ref for step in plan.steps} == {
+        "wwise_waapi.builders.object_mutation.build_object_mutation_preview",
+        "wwise_waapi.builders.properties.build_set_name_preview",
+        "wwise_waapi.builders.properties.build_set_property_preview",
+    }
+    assert all(step.project_changing for step in plan.steps)
     assert tuple(plan.source_builder_refs) == (
         "wwise_waapi.builders.object_mutation",
         "wwise_waapi.builders.properties",
     )
+
+
+def test_system_design_preview_decomposes_into_safe_candidate_steps() -> None:
+    intent = SemanticIntent(
+        family="system_design_preview",
+        goal="Plan a foley ambience system preview.",
+        version="2022.1",
+        targets=(SemanticIntentTarget("path", "\\Actor-Mixer Hierarchy\\Default Work Unit", metadata={"design_type": "foley"}),),
+        constraints=(),
+        requested_operations=(),
+        confirmation_state="preview",
+        source_prompt_excerpt="plan foley ambience system",
+    )
+
+    plan = SemanticPlanner().plan(intent)
+    steps = plan.as_dict()["steps"]
+
+    assert plan.status is SemanticPlanStatus.NEEDS_CLARIFICATION
+    assert plan.requires_confirmation is True
+    assert [step["operation"] for step in steps] == ["object.get", "object.create", "setNotes", "audio.import"]
+    assert steps[0]["read_only"] is True
+    assert all(step["inputs"]["candidate_only"] is True for step in steps)
+    assert all("missing_structured_input" in step["inputs"] for step in steps)
+    assert not any(step["inputs"].get("live_dispatch") for step in steps)
+
+
+def test_planner_steps_have_builder_provenance() -> None:
+    planner = SemanticPlanner()
+    families = (
+        "intent_navigation",
+        "crud_authoring",
+        "asset_import_workflow",
+        "soundbank_workflow",
+        "switch_assignment_workflow",
+        "bounded_profiler_guidance",
+    )
+
+    for family in families:
+        intent = structured_query_intent() if family == "intent_navigation" else semantic_intent_for_family(family)
+        plan = planner.plan(intent)
+
+        assert plan.steps
+        for step in plan.as_dict()["steps"]:
+            assert step["builder_ref"]
+            assert step["source_builder_ref"] == step["builder_ref"]
+            assert "args_preview" in step
+            assert "options_preview" in step
+            assert "target_identity" in step
+            assert isinstance(step["read_only"], bool)
+            assert isinstance(step["project_changing"], bool)
 
 
 def test_runtime_scheduler_family_returns_unsupported_plan() -> None:
