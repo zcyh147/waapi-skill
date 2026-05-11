@@ -44,6 +44,42 @@ SEMANTIC_FAMILY_BUILDER_REFS: Mapping[str, tuple[str, ...]] = {
     "bounded_profiler_guidance": ("wwise_waapi.builders.profiler",),
     "unsupported_runtime_boundary": (),
 }
+UNSUPPORTED_BOUNDARY_ALTERNATIVES: Mapping[str, str] = {
+    "scheduler_delayed_event_posting": "preview_supported_authoring_plan",
+    "rtpc_ramp_over_time": "preview_supported_authoring_plan",
+    "game_object_view_emitter_movement": "live_read_summary",
+    "timed_ambience_playback": "preview_supported_authoring_plan",
+    "audio_narrative_sequencing": "preview_supported_authoring_plan",
+    "cross_app_mcp_federation": "live_read_summary",
+    "runtime_orchestration": "preview_supported_authoring_plan",
+}
+UNSUPPORTED_BOUNDARY_REASONS: Mapping[str, str] = {
+    "scheduler_delayed_event_posting": (
+        "scheduler delayed event posting is runtime orchestration outside the WAAPI authoring planner boundary"
+    ),
+    "rtpc_ramp_over_time": "RTPC ramps over time are runtime automation outside the WAAPI authoring planner boundary",
+    "game_object_view_emitter_movement": (
+        "Game Object View emitter movement/control is foreground runtime UI behavior outside the WAAPI authoring planner boundary"
+    ),
+    "timed_ambience_playback": "timed ambience playback is runtime transport orchestration outside the WAAPI authoring planner boundary",
+    "audio_narrative_sequencing": "audio narrative sequencing is runtime event choreography outside the WAAPI authoring planner boundary",
+    "cross_app_mcp_federation": "cross-app MCP federation is outside the local WAAPI authoring planner boundary",
+    "runtime_orchestration": "runtime orchestration capabilities are outside the WAAPI authoring planner boundary",
+}
+UNSUPPORTED_BOUNDARY_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("scheduler_delayed_event_posting", ("scheduler", "schedule", "scheduled", "delayed event", "delayed_event", "post_later", "post later")),
+    ("rtpc_ramp_over_time", ("rtpc ramp", "rtpc_ramp", "ramp over time", "ramp_over_time", "runtime rtpc", "automate rtpc")),
+    (
+        "game_object_view_emitter_movement",
+        ("game object view", "game_object_view", "emitter movement", "emitter_movement", "move emitter", "emitter control"),
+    ),
+    ("timed_ambience_playback", ("timed ambience", "timed_ambience", "ambience playback", "ambient playback", "play ambience")),
+    (
+        "audio_narrative_sequencing",
+        ("narrative sequencing", "narrative_sequence", "event sequencing", "runtime sequencing", "sequence audio", "audio narrative"),
+    ),
+    ("cross_app_mcp_federation", ("cross-app mcp", "cross_app_mcp", "mcp federation", "federation", "multi-app mcp", "external mcp")),
+)
 
 
 class SemanticPlanStatus(str, Enum):
@@ -267,25 +303,12 @@ class SemanticPlanner:
                 SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
                 "Semantic planner input must be a structured SemanticIntent.",
                 details={"expected": "SemanticIntent", "received": type(intent).__name__},
-            )
+        )
         _require_supported_family(intent.family)
 
-        if intent.family == "unsupported_runtime_boundary":
-            return SemanticPlan(
-                status=SemanticPlanStatus.UNSUPPORTED,
-                family=intent.family,
-                version=intent.version,
-                steps=(),
-                preview_id="",
-                preview_hash="",
-                risk_flags=(),
-                requires_confirmation=False,
-                blocked_reason="runtime orchestration capabilities are outside the WAAPI authoring planner boundary",
-                needs_clarification=False,
-                unsupported_capability=True,
-                verification_steps=(),
-                source_builder_refs=(),
-            )
+        unsupported_reason = _unsupported_boundary_capability(intent)
+        if intent.family == "unsupported_runtime_boundary" or unsupported_reason:
+            return _unsupported_boundary_plan(intent, unsupported_reason or "runtime_orchestration")
 
         if intent.family == "intent_navigation":
             steps = _navigation_steps(intent)
@@ -323,6 +346,63 @@ class SemanticPlanner:
             verification_steps=_verification_steps(steps, preview_hash),
             source_builder_refs=SEMANTIC_FAMILY_BUILDER_REFS[intent.family],
         )
+
+
+def _unsupported_boundary_plan(intent: SemanticIntent, reason_key: str) -> SemanticPlan:
+    reason = UNSUPPORTED_BOUNDARY_REASONS.get(reason_key, UNSUPPORTED_BOUNDARY_REASONS["runtime_orchestration"])
+    alternative = UNSUPPORTED_BOUNDARY_ALTERNATIVES.get(reason_key, UNSUPPORTED_BOUNDARY_ALTERNATIVES["runtime_orchestration"])
+    return SemanticPlan(
+        status=SemanticPlanStatus.UNSUPPORTED,
+        family="unsupported_runtime_boundary",
+        version=intent.version,
+        steps=(),
+        preview_id="",
+        preview_hash="",
+        risk_flags=(),
+        requires_confirmation=False,
+        blocked_reason=f"{reason}; no project-changing steps or execution claims are produced; supported_alternative={alternative}",
+        needs_clarification=False,
+        unsupported_capability=True,
+        verification_steps=(),
+        source_builder_refs=(),
+    )
+
+
+def _unsupported_boundary_capability(intent: SemanticIntent) -> str:
+    tokens = tuple(_structured_intent_tokens(intent))
+    for reason_key, patterns in UNSUPPORTED_BOUNDARY_PATTERNS:
+        if any(pattern in token for token in tokens for pattern in patterns):
+            return reason_key
+    return ""
+
+
+def _structured_intent_tokens(intent: SemanticIntent) -> tuple[str, ...]:
+    values: list[str] = [intent.family]
+    values.extend(str(operation) for operation in intent.requested_operations)
+    for target in cast(tuple[SemanticIntentTarget, ...], intent.targets):
+        values.extend((target.kind, target.identifier, target.display_name))
+        values.extend(_flatten_token_values(target.metadata))
+    for constraint in cast(tuple[SemanticIntentConstraint, ...], intent.constraints):
+        values.extend((constraint.field, constraint.operator, constraint.reason))
+        values.extend(_flatten_token_values(constraint.value))
+    return tuple(value.strip().lower().replace("-", "_") for value in values if value)
+
+
+def _flatten_token_values(value: Any) -> tuple[str, ...]:
+    if isinstance(value, Mapping):
+        flattened: list[str] = []
+        for key, item in value.items():
+            flattened.append(str(key))
+            flattened.extend(_flatten_token_values(item))
+        return tuple(flattened)
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        flattened = []
+        for item in value:
+            flattened.extend(_flatten_token_values(item))
+        return tuple(flattened)
+    if value is None:
+        return ()
+    return (str(value),)
 
 
 def _navigation_steps(intent: SemanticIntent) -> tuple[SemanticPlanStep, ...]:

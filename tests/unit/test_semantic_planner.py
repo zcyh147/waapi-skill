@@ -361,3 +361,66 @@ def test_runtime_scheduler_family_returns_unsupported_plan() -> None:
     assert tuple(plan.source_builder_refs) == ()
     assert tuple(plan.risk_flags) == ()
     assert plan.requires_confirmation is False
+
+
+def test_scheduler_runtime_intent_returns_unsupported_boundary() -> None:
+    intent = SemanticIntent(
+        family="crud_authoring",
+        goal="Represent a delayed event request without executing runtime playback.",
+        version="2022.1",
+        targets=(SemanticIntentTarget("event", "Play_Ambience", metadata={"capability": "scheduler_delayed_event_posting"}),),
+        constraints=(SemanticIntentConstraint("delay_seconds", ">", 0, reason="runtime scheduler delay"),),
+        requested_operations=("scheduler.post_delayed_event",),
+        confirmation_state="confirmed",
+        source_prompt_excerpt="schedule event playback later",
+    )
+
+    plan = SemanticPlanner().plan(intent)
+    plan_dict = plan.as_dict()
+
+    assert plan.status is SemanticPlanStatus.UNSUPPORTED
+    assert plan.family == "unsupported_runtime_boundary"
+    assert plan.unsupported_capability is True
+    assert "scheduler delayed event posting" in plan.blocked_reason
+    assert "supported_alternative=preview_supported_authoring_plan" in plan.blocked_reason
+    assert plan_dict["steps"] == []
+    assert plan_dict["verification_steps"] == []
+    assert plan_dict["source_builder_refs"] == []
+    assert plan_dict["preview_id"] == ""
+    assert plan_dict["preview_hash"] == ""
+    assert not any(step.get("project_changing") for step in plan_dict["steps"])
+    assert "execution complete" not in json.dumps(plan_dict).lower()
+
+
+def test_cross_app_mcp_intent_returns_unsupported_boundary() -> None:
+    intent = SemanticIntent(
+        family="intent_navigation",
+        goal="Summarize cross-application MCP relationships without federation execution.",
+        version="2022.1",
+        targets=(
+            SemanticIntentTarget(
+                "integration",
+                "external-mcp-hub",
+                metadata={"boundary": "cross_app_mcp", "requested_capability": "mcp federation"},
+            ),
+        ),
+        constraints=(SemanticIntentConstraint("federation", "=", "cross-app MCP", reason="external app bridge"),),
+        requested_operations=("mcp.federate",),
+        confirmation_state="preview",
+        source_prompt_excerpt="connect Wwise MCP to other apps",
+    )
+
+    plan = SemanticPlanner().plan(intent)
+    plan_dict = plan.as_dict()
+
+    assert plan.status is SemanticPlanStatus.UNSUPPORTED
+    assert plan.family == "unsupported_runtime_boundary"
+    assert plan.unsupported_capability is True
+    assert "cross-app MCP federation" in plan.blocked_reason
+    assert "supported_alternative=live_read_summary" in plan.blocked_reason
+    assert plan_dict["steps"] == []
+    assert plan_dict["verification_steps"] == []
+    assert plan_dict["source_builder_refs"] == []
+    assert plan_dict["risk_flags"] == []
+    assert not any(step.get("project_changing") for step in plan_dict["steps"])
+    assert "mcp federation execution complete" not in json.dumps(plan_dict).lower()
