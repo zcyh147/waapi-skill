@@ -2,6 +2,8 @@
 
 from .phase3 import (
     PUBLIC_CONFIG_FIELDS,
+    SEMANTIC_CAPABILITY_REQUIRED_FAMILIES,
+    SEMANTIC_CAPABILITY_SCENARIO_SET,
     SUPPORTED_WWISE_VERSIONS,
     SemanticScenario,
     ScenarioVerdict,
@@ -12,6 +14,8 @@ from .phase3 import (
 
 __all__ = [
     "PUBLIC_CONFIG_FIELDS",
+    "SEMANTIC_CAPABILITY_REQUIRED_FAMILIES",
+    "SEMANTIC_CAPABILITY_SCENARIO_SET",
     "SUPPORTED_WWISE_VERSIONS",
     "SemanticScenario",
     "ScenarioVerdict",

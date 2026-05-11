@@ -17,6 +17,8 @@ from tests.semantic.run_opencode_semantic_batch import (  # pyright: ignore[repo
 )
 from tests.semantic.scenarios import (  # pyright: ignore[reportMissingImports]
     PUBLIC_CONFIG_FIELDS,
+    SEMANTIC_CAPABILITY_REQUIRED_FAMILIES,
+    SEMANTIC_CAPABILITY_SCENARIO_SET,
     SUPPORTED_WWISE_VERSIONS,
     evaluate_scenario_output,
     phase3_scenarios,
@@ -44,6 +46,79 @@ def test_phase3_required_scenarios_load_all_must_cover_cases() -> None:
     }
     smoke_ids = {scenario.id for scenario in scenarios_for_set("phase3-smoke")}
     assert smoke_ids == {"phase3-readonly-bus-listing", "phase3-waql-master-mixer-ui-descendants"}
+
+
+def test_semantic_capability_scenarios_cover_required_families() -> None:
+    scenarios = scenarios_for_set(SEMANTIC_CAPABILITY_SCENARIO_SET)
+
+    assert tuple(scenario.id for scenario in scenarios) == SEMANTIC_CAPABILITY_REQUIRED_FAMILIES
+    assert tuple(scenario.family for scenario in scenarios) == SEMANTIC_CAPABILITY_REQUIRED_FAMILIES
+    assert all("phase3-required" not in scenario.scenario_sets for scenario in scenarios)
+    assert all("phase3-smoke" not in scenario.scenario_sets for scenario in scenarios)
+
+
+def test_semantic_capability_evaluator_requires_planner_facts() -> None:
+    supported = _scenario("semantic-capability-crud-preview")
+    unsupported = _scenario("semantic-capability-runtime-unsupported")
+
+    prose_only = evaluate_scenario_output(
+        supported,
+        "I can prepare a safe preview plan with no mutation, using the right Wwise builders.",
+    )
+    missing_builder = evaluate_scenario_output(
+        supported,
+        "SEMANTIC_RESULT_JSON: "
+        + json.dumps(
+            {
+                "structured_intent_extracted": True,
+                "semantic_family": "crud_authoring",
+                "semantic_planner_invoked": True,
+                "semantic_plan_status": "preview_ready",
+                "preview_hash": "sha256:preview",
+                "mutation_executed": False,
+            }
+        ),
+    )
+    supported_pass = evaluate_scenario_output(supported, _capability_facts(supported))
+    unsupported_missing_boundary = evaluate_scenario_output(
+        unsupported,
+        "SEMANTIC_RESULT_JSON: "
+        + json.dumps(
+            {
+                "structured_intent_extracted": True,
+                "semantic_family": "unsupported_runtime_boundary",
+                "semantic_planner_invoked": True,
+                "mutation_executed": False,
+            }
+        ),
+    )
+    unsupported_execution_claim = evaluate_scenario_output(
+        unsupported,
+        "SEMANTIC_RESULT_JSON: "
+        + json.dumps(
+            {
+                "structured_intent_extracted": True,
+                "semantic_family": "unsupported_runtime_boundary",
+                "semantic_planner_invoked": True,
+                "unsupported_boundary_returned": True,
+                "scheduler_executed": True,
+                "mutation_executed": False,
+            }
+        ),
+    )
+    unsupported_pass = evaluate_scenario_output(unsupported, _capability_facts(unsupported))
+
+    assert prose_only.verdict == "fail"
+    assert any("structured intent" in note for note in prose_only.failure_notes)
+    assert any("semantic planner" in note for note in prose_only.failure_notes)
+    assert missing_builder.verdict == "fail"
+    assert any("builder provenance" in note for note in missing_builder.failure_notes)
+    assert supported_pass.verdict == "pass"
+    assert unsupported_missing_boundary.verdict == "fail"
+    assert any("unsupported capability boundary" in note for note in unsupported_missing_boundary.failure_notes)
+    assert unsupported_execution_claim.verdict == "fail"
+    assert any("unsupported runtime/cross-app execution" in note for note in unsupported_execution_claim.failure_notes)
+    assert unsupported_pass.verdict == "pass"
 
 
 def test_read_only_and_waql_verdicts_fail_on_repo_doc_first_drift() -> None:
@@ -981,6 +1056,44 @@ def _passing_semantic_output(prompt: str) -> str:
             "mutation_executed": False,
         }
     return "Session: ses_test\nSEMANTIC_RESULT_JSON: " + json.dumps(facts, sort_keys=True) + "\n"
+
+
+def _capability_facts(scenario) -> str:
+    facts = {
+        "structured_intent_extracted": True,
+        "semantic_family": scenario.metadata["semantic_family"],
+        "semantic_planner_invoked": True,
+        "live_waapi_ready": True,
+        "live_waapi_before_research": True,
+        "mutation_executed_before_confirmation": False,
+        "mutation_executed": False,
+    }
+    if scenario.id.endswith("unsupported"):
+        facts.update(
+            {
+                "semantic_plan_status": "unsupported",
+                "unsupported_boundary_returned": True,
+            }
+        )
+    else:
+        facts.update(
+            {
+                "semantic_plan_status": "preview_ready",
+                "builder_backed_plan_produced": True,
+                "source_builder_refs": ["wwise_waapi.builders.common"],
+            }
+        )
+        if scenario.metadata.get("requires_preview_hash"):
+            facts["preview_hash"] = "sha256:semantic-preview"
+        if scenario.metadata.get("allows_confirmed_mutation"):
+            facts.update(
+                {
+                    "confirmation_observed": True,
+                    "mutation_executed": True,
+                    "verification_status": "verified",
+                }
+            )
+    return "SEMANTIC_RESULT_JSON: " + json.dumps(facts, sort_keys=True)
 
 
 def _scenario(scenario_id: str):

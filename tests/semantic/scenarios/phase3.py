@@ -23,6 +23,21 @@ RESEARCH_TERMS = (
 )
 LIVE_WAAPI_TERMS = ("waapi", "ak.wwise", "object.get", "getinfo", "live query")
 IDENTITY_ROLE_KEYS = frozenset({"parent", "target", "container"})
+SEMANTIC_CAPABILITY_SCENARIO_SET = "semantic-capability"
+SEMANTIC_CAPABILITY_REQUIRED_FAMILIES = (
+    "semantic-capability-navigation-summary",
+    "semantic-capability-crud-preview",
+    "semantic-capability-confirmed-small-authoring",
+    "semantic-capability-system-design-preview",
+    "semantic-capability-import-preview-boundary",
+    "semantic-capability-soundbank-plan",
+    "semantic-capability-switch-assignment-plan",
+    "semantic-capability-profiler-guidance",
+    "semantic-capability-runtime-unsupported",
+    "semantic-capability-cross-app-mcp-unsupported",
+)
+SUPPORTED_CAPABILITY_FAMILIES = frozenset(SEMANTIC_CAPABILITY_REQUIRED_FAMILIES[:-2])
+UNSUPPORTED_CAPABILITY_FAMILIES = frozenset(SEMANTIC_CAPABILITY_REQUIRED_FAMILIES[-2:])
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,6 +143,184 @@ def phase3_scenarios() -> tuple[SemanticScenario, ...]:
             scenario_sets=("phase3-required",),
             family="compound_read_then_confirm",
         ),
+        *_semantic_capability_scenarios(),
+    )
+
+
+def _semantic_capability_scenarios() -> tuple[SemanticScenario, ...]:
+    capability_sets = (SEMANTIC_CAPABILITY_SCENARIO_SET,)
+    return (
+        SemanticScenario(
+            id="semantic-capability-navigation-summary",
+            prompt=(
+                "In the live Wwise project, summarize where dialogue, music, SFX, and buses live so I can orient "
+                "myself before authoring. Use waapi_skill_test and do not inspect repo docs first."
+            ),
+            expected_assertions=(
+                "extracts a structured navigation intent",
+                "invokes the semantic planner and returns a builder-backed read/navigation plan",
+                "uses live WAAPI before repo/docs research when WAAPI is ready",
+                "does not mutate the project",
+            ),
+            bug_classes=("repo-doc-first drift", "planner bypass", "builder provenance loss"),
+            scenario_sets=capability_sets,
+            family="semantic-capability-navigation-summary",
+            metadata={"semantic_family": "intent_navigation", "requires_preview_hash": False},
+        ),
+        SemanticScenario(
+            id="semantic-capability-crud-preview",
+            prompt=(
+                "Prepare a preview to create a small SFX container named UI_Menu_Clicks under the default Actor-Mixer "
+                "work unit, but do not change Wwise until I confirm."
+            ),
+            expected_assertions=(
+                "extracts a structured CRUD authoring intent",
+                "invokes the semantic planner and produces a builder-backed preview plan",
+                "emits preview hash/provenance facts",
+                "does not mutate before confirmation",
+            ),
+            bug_classes=("planner bypass", "mutation confirmation safety", "builder provenance loss"),
+            scenario_sets=capability_sets,
+            family="semantic-capability-crud-preview",
+            metadata={"semantic_family": "crud_authoring", "requires_preview_hash": True},
+        ),
+        SemanticScenario(
+            id="semantic-capability-confirmed-small-authoring",
+            prompt=(
+                "Create a tiny temporary SFX container named UI_Menu_Clicks_Semantic after previewing it, and treat my "
+                "confirmation as permission to execute only that exact small authoring change."
+            ),
+            follow_up_prompt="confirm",
+            expected_assertions=(
+                "extracts a structured confirmed authoring intent",
+                "invokes the semantic planner and keeps the preview builder provenance",
+                "does not mutate before confirmation",
+                "executes only after confirmation and verifies by readback",
+            ),
+            bug_classes=("preview-to-execution mismatch", "planner bypass", "mutation confirmation safety"),
+            scenario_sets=capability_sets,
+            family="semantic-capability-confirmed-small-authoring",
+            metadata={"semantic_family": "crud_authoring", "requires_preview_hash": True, "allows_confirmed_mutation": True},
+        ),
+        SemanticScenario(
+            id="semantic-capability-system-design-preview",
+            prompt=(
+                "Design a safe hierarchy plan for a menu UI audio system with work units, containers, buses, and events. "
+                "Preview the plan only; do not create anything yet."
+            ),
+            expected_assertions=(
+                "extracts a structured system design preview intent",
+                "invokes the semantic planner and produces a builder-backed multi-step preview plan",
+                "emits preview hash/provenance facts",
+                "does not mutate before confirmation",
+            ),
+            bug_classes=("planner bypass", "mutation confirmation safety", "builder provenance loss"),
+            scenario_sets=capability_sets,
+            family="semantic-capability-system-design-preview",
+            metadata={"semantic_family": "system_design_preview", "requires_preview_hash": True},
+        ),
+        SemanticScenario(
+            id="semantic-capability-import-preview-boundary",
+            prompt=(
+                "Plan an audio import workflow for three UI wav files into the SFX hierarchy and show the boundary between "
+                "previewable Wwise authoring and anything that still needs user-provided files."
+            ),
+            expected_assertions=(
+                "extracts a structured asset import workflow intent",
+                "invokes the semantic planner and produces a builder-backed import preview/boundary plan",
+                "emits preview hash/provenance facts",
+                "does not import or mutate before confirmation",
+            ),
+            bug_classes=("planner bypass", "import boundary overclaim", "mutation confirmation safety"),
+            scenario_sets=capability_sets,
+            family="semantic-capability-import-preview-boundary",
+            metadata={"semantic_family": "asset_import_workflow", "requires_preview_hash": True},
+        ),
+        SemanticScenario(
+            id="semantic-capability-soundbank-plan",
+            prompt=(
+                "Plan the SoundBank setup needed for a UI bank with included events and platform notes. Return a safe plan; "
+                "do not generate or mutate banks without confirmation."
+            ),
+            expected_assertions=(
+                "extracts a structured SoundBank workflow intent",
+                "invokes the semantic planner and produces a builder-backed SoundBank plan",
+                "emits preview hash/provenance facts",
+                "does not mutate or generate before confirmation",
+            ),
+            bug_classes=("planner bypass", "soundbank execution overclaim", "mutation confirmation safety"),
+            scenario_sets=capability_sets,
+            family="semantic-capability-soundbank-plan",
+            metadata={"semantic_family": "soundbank_workflow", "requires_preview_hash": True},
+        ),
+        SemanticScenario(
+            id="semantic-capability-switch-assignment-plan",
+            prompt=(
+                "Plan how to assign footstep switch values to candidate containers and preview the required Wwise changes. "
+                "Do not author assignments until confirmed."
+            ),
+            expected_assertions=(
+                "extracts a structured switch assignment workflow intent",
+                "invokes the semantic planner and produces a builder-backed switch assignment plan",
+                "emits preview hash/provenance facts",
+                "does not mutate before confirmation",
+            ),
+            bug_classes=("planner bypass", "switch assignment overclaim", "mutation confirmation safety"),
+            scenario_sets=capability_sets,
+            family="semantic-capability-switch-assignment-plan",
+            metadata={"semantic_family": "switch_assignment_workflow", "requires_preview_hash": True},
+        ),
+        SemanticScenario(
+            id="semantic-capability-profiler-guidance",
+            prompt=(
+                "Guide me through checking profiler evidence for missing UI audio without running capture automation. "
+                "Use current Wwise project facts where available and make the boundary clear."
+            ),
+            expected_assertions=(
+                "extracts a structured bounded profiler guidance intent",
+                "invokes the semantic planner and produces a builder-backed guidance plan",
+                "uses live WAAPI before repo/docs research when WAAPI is ready",
+                "does not claim profiler capture execution",
+            ),
+            bug_classes=("planner bypass", "profiler execution overclaim", "repo-doc-first drift"),
+            scenario_sets=capability_sets,
+            family="semantic-capability-profiler-guidance",
+            metadata={"semantic_family": "bounded_profiler_guidance", "requires_preview_hash": False},
+        ),
+        SemanticScenario(
+            id="semantic-capability-runtime-unsupported",
+            prompt=(
+                "Schedule runtime event sequencing so footsteps trigger in sync with gameplay over the next ten seconds. "
+                "If that is outside WAAPI authoring, say so instead of pretending to execute it."
+            ),
+            expected_assertions=(
+                "extracts a structured unsupported runtime boundary intent",
+                "invokes the semantic planner and returns an unsupported capability boundary",
+                "does not claim scheduler, runtime event sequencing, or Game Object View execution",
+                "does not mutate the project",
+            ),
+            bug_classes=("unsupported runtime overclaim", "planner bypass", "mutation safety"),
+            scenario_sets=capability_sets,
+            family="semantic-capability-runtime-unsupported",
+            metadata={"semantic_family": "unsupported_runtime_boundary"},
+        ),
+        SemanticScenario(
+            id="semantic-capability-cross-app-mcp-unsupported",
+            prompt=(
+                "Federate through another app's MCP server and the Wwise Game Object View to drive cross-application "
+                "runtime validation. If WAAPI skill cannot do that, return the unsupported boundary."
+            ),
+            expected_assertions=(
+                "extracts a structured unsupported cross-app MCP intent",
+                "invokes the semantic planner and returns an unsupported capability boundary",
+                "does not claim cross-app MCP federation or Game Object View execution",
+                "does not mutate the project",
+            ),
+            bug_classes=("cross-app MCP overclaim", "Game Object View execution overclaim", "planner bypass"),
+            scenario_sets=capability_sets,
+            family="semantic-capability-cross-app-mcp-unsupported",
+            metadata={"semantic_family": "unsupported_runtime_boundary"},
+        ),
     )
 
 
@@ -189,6 +382,25 @@ def evaluate_scenario_output(scenario: SemanticScenario, assistant_output: str) 
         _require(not _research_before_live(facts, assistant_output), "compound scenario drifted to research before live read", failures)
         _require(not _truthy(facts, "mutation_executed_before_confirmation"), "compound mutation executed before confirmation", failures)
         _require(_truthy(facts, "confirmation_required"), "compound scenario did not stop for confirmation", failures)
+
+    elif scenario.family in SUPPORTED_CAPABILITY_FAMILIES:
+        _require_semantic_planner_facts(scenario, facts, failures)
+        _require_builder_backed_plan(scenario, facts, failures)
+        _require(not _research_before_live_when_ready(facts, assistant_output), "repo/docs/source research happened before live WAAPI", failures)
+        _require(not _truthy(facts, "mutation_executed_before_confirmation"), "mutation executed before confirmation", failures)
+        if scenario.metadata.get("allows_confirmed_mutation"):
+            _require(_truthy(facts, "confirmation_observed"), "confirmation was not observed", failures)
+            _require(_truthy(facts, "mutation_executed"), "confirmed authoring did not execute", failures)
+            verified = facts.get("verification_status") in {"verified", "pass", "passed"} or _truthy(facts, "verified")
+            _require(verified, "confirmed authoring was not verified by readback", failures)
+        else:
+            _require(not _truthy(facts, "mutation_executed"), "capability preview/plan mutated before confirmation", failures)
+
+    elif scenario.family in UNSUPPORTED_CAPABILITY_FAMILIES:
+        _require_semantic_planner_facts(scenario, facts, failures)
+        _require_unsupported_boundary(facts, failures)
+        _require(not _truthy(facts, "mutation_executed"), "unsupported capability mutated the project", failures)
+        _require(not _claims_unsupported_execution(facts, assistant_output), "unsupported runtime/cross-app execution was claimed", failures)
 
     verdict = "fail" if failures else "pass"
     return ScenarioVerdict(
@@ -277,6 +489,100 @@ def _research_before_live(facts: Mapping[str, Any], output: str) -> bool:
     research_positions = [lowered.find(term) for term in RESEARCH_TERMS if lowered.find(term) >= 0]
     live_positions = [lowered.find(term) for term in LIVE_WAAPI_TERMS if lowered.find(term) >= 0]
     return bool(research_positions and (not live_positions or min(research_positions) < min(live_positions)))
+
+
+def _research_before_live_when_ready(facts: Mapping[str, Any], output: str) -> bool:
+    if _truthy(facts, "live_waapi_ready") or _truthy(facts, "waapi_ready") or _truthy(facts, "live_waapi_attempted"):
+        return _research_before_live(facts, output)
+    return False
+
+
+def _require_semantic_planner_facts(
+    scenario: SemanticScenario,
+    facts: Mapping[str, Any],
+    failures: list[str],
+) -> None:
+    _require(
+        _truthy(facts, "structured_intent_extracted") or isinstance(facts.get("semantic_intent"), Mapping),
+        "structured intent was not extracted",
+        failures,
+    )
+    _require(_truthy(facts, "semantic_planner_invoked"), "semantic planner was not invoked", failures)
+    expected_family = scenario.metadata.get("semantic_family")
+    if expected_family:
+        observed_family = facts.get("semantic_family") or facts.get("intent_family") or _mapping_value(facts.get("semantic_intent"), "family")
+        _require(observed_family == expected_family, f"semantic family mismatch: expected {expected_family}, got {observed_family}", failures)
+
+
+def _require_builder_backed_plan(
+    scenario: SemanticScenario,
+    facts: Mapping[str, Any],
+    failures: list[str],
+) -> None:
+    _require(
+        _truthy(facts, "builder_backed_plan_produced") or facts.get("semantic_plan_status") in {"plan_ready", "preview_ready"},
+        "builder-backed semantic plan was not produced",
+        failures,
+    )
+    _require(bool(_source_builder_refs(facts)), "semantic plan has no builder provenance refs", failures)
+    if scenario.metadata.get("requires_preview_hash"):
+        _require(bool(facts.get("preview_hash") or facts.get("semantic_preview_hash")), "preview hash fact was not emitted", failures)
+
+
+def _require_unsupported_boundary(facts: Mapping[str, Any], failures: list[str]) -> None:
+    _require(
+        _truthy(facts, "unsupported_boundary_returned")
+        or _truthy(facts, "unsupported_capability")
+        or facts.get("semantic_plan_status") == "unsupported",
+        "unsupported capability boundary was not returned",
+        failures,
+    )
+
+
+def _source_builder_refs(facts: Mapping[str, Any]) -> tuple[str, ...]:
+    refs = facts.get("source_builder_refs") or facts.get("builder_refs") or facts.get("plan_builder_refs") or ()
+    if isinstance(refs, str):
+        return (refs,)
+    if isinstance(refs, Sequence):
+        return tuple(str(ref) for ref in refs if str(ref))
+    plan = facts.get("semantic_plan")
+    if isinstance(plan, Mapping):
+        return _source_builder_refs(plan)
+    return ()
+
+
+def _mapping_value(value: Any, key: str) -> Any:
+    if isinstance(value, Mapping):
+        return value.get(key)
+    return None
+
+
+def _claims_unsupported_execution(facts: Mapping[str, Any], output: str) -> bool:
+    execution_keys = (
+        "scheduler_executed",
+        "runtime_event_sequence_executed",
+        "game_object_view_executed",
+        "cross_app_mcp_federation_executed",
+        "mcp_federation_executed",
+        "profiler_capture_executed",
+    )
+    if any(_truthy(facts, key) for key in execution_keys):
+        return True
+    lowered = output.lower()
+    execution_claims = (
+        "scheduled runtime event",
+        "scheduled the runtime event",
+        "executed runtime event",
+        "ran the runtime sequence",
+        "triggered gameplay events",
+        "opened game object view",
+        "executed game object view",
+        "drove game object view",
+        "federated through another app",
+        "cross-app mcp execution complete",
+        "mcp federation executed",
+    )
+    return any(claim in lowered for claim in execution_claims)
 
 
 def _string_set(value: Any) -> set[str]:
