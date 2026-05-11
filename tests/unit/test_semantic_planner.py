@@ -6,10 +6,12 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.builders.common import SemanticErrorCode, SemanticValidationError  # pyright: ignore[reportMissingImports]
 from wwise_waapi.semantic_planner import (  # pyright: ignore[reportMissingImports]
+    SEMANTIC_FAMILY_BUILDER_REFS,
     SemanticIntent,
     SemanticIntentConstraint,
     SemanticIntentTarget,
     SemanticPlan,
+    SemanticPlanStatus,
     SemanticPlanner,
     SUPPORTED_SEMANTIC_FAMILIES,
 )
@@ -200,7 +202,7 @@ def test_schema_only_planner_returns_blocked_structured_plan_for_valid_intent() 
     plan = SemanticPlanner().plan(structured_query_intent())
 
     assert plan.as_dict() == {
-        "status": "needs_clarification",
+        "status": "blocked",
         "family": "intent_navigation",
         "version": "2022.1",
         "steps": [],
@@ -208,9 +210,86 @@ def test_schema_only_planner_returns_blocked_structured_plan_for_valid_intent() 
         "preview_hash": "",
         "risk_flags": [],
         "requires_confirmation": True,
-        "blocked_reason": "schema-only planner has not routed intent to a builder",
-        "needs_clarification": True,
+        "blocked_reason": "semantic planner routing skeleton records allowed builders but does not execute builder previews",
+        "needs_clarification": False,
         "unsupported_capability": False,
         "verification_steps": [],
-        "source_builder_refs": [],
+        "source_builder_refs": ["wwise_waapi.builders.query"],
     }
+
+
+def semantic_intent_for_family(family: str, *, confirmation_state: str = "preview") -> SemanticIntent:
+    return SemanticIntent(
+        family=family,
+        goal=f"Route {family} intent.",
+        version="2022.1",
+        targets=(),
+        constraints=(),
+        requested_operations=(),
+        confirmation_state=confirmation_state,
+        source_prompt_excerpt="structured semantic planner test",
+    )
+
+
+def unsafe_semantic_intent_with_family(family: str) -> SemanticIntent:
+    intent = object.__new__(SemanticIntent)
+    object.__setattr__(intent, "family", family)
+    object.__setattr__(intent, "goal", "Bypass constructor to test planner fail-closed routing.")
+    object.__setattr__(intent, "version", "2022.1")
+    object.__setattr__(intent, "targets", ())
+    object.__setattr__(intent, "constraints", ())
+    object.__setattr__(intent, "requested_operations", ())
+    object.__setattr__(intent, "confirmation_state", "preview")
+    object.__setattr__(intent, "source_prompt_excerpt", "unknown family")
+    return intent
+
+
+def test_planner_routes_all_supported_families_to_builder_refs() -> None:
+    planner = SemanticPlanner()
+
+    assert tuple(SEMANTIC_FAMILY_BUILDER_REFS) == SUPPORTED_SEMANTIC_FAMILIES
+    for family in SUPPORTED_SEMANTIC_FAMILIES:
+        plan = planner.plan(semantic_intent_for_family(family))
+
+        assert plan.family == family
+        assert tuple(plan.steps) == ()
+        assert tuple(plan.verification_steps) == ()
+        assert tuple(plan.source_builder_refs) == SEMANTIC_FAMILY_BUILDER_REFS[family]
+        if family == "unsupported_runtime_boundary":
+            assert plan.status is SemanticPlanStatus.UNSUPPORTED
+            assert plan.unsupported_capability is True
+        else:
+            assert plan.status is SemanticPlanStatus.BLOCKED
+            assert plan.unsupported_capability is False
+            assert plan.source_builder_refs
+
+
+def test_planner_blocks_unknown_family_without_guessing() -> None:
+    with pytest.raises(SemanticValidationError) as exc:
+        SemanticPlanner().plan(unsafe_semantic_intent_with_family("runtime_scheduler"))
+
+    assert exc.value.error_code == SemanticErrorCode.UNSUPPORTED_BUILDER_FAMILY
+    assert exc.value.details["family"] == "runtime_scheduler"
+
+
+def test_crud_authoring_routes_to_object_and_property_builders() -> None:
+    plan = SemanticPlanner().plan(semantic_intent_for_family("crud_authoring", confirmation_state="confirmed"))
+
+    assert plan.status is SemanticPlanStatus.BLOCKED
+    assert tuple(plan.steps) == ()
+    assert plan.requires_confirmation is False
+    assert tuple(plan.source_builder_refs) == (
+        "wwise_waapi.builders.object_mutation",
+        "wwise_waapi.builders.properties",
+    )
+
+
+def test_runtime_scheduler_family_returns_unsupported_plan() -> None:
+    plan = SemanticPlanner().plan(semantic_intent_for_family("unsupported_runtime_boundary"))
+
+    assert plan.status is SemanticPlanStatus.UNSUPPORTED
+    assert plan.unsupported_capability is True
+    assert tuple(plan.steps) == ()
+    assert tuple(plan.source_builder_refs) == ()
+    assert tuple(plan.risk_flags) == ()
+    assert plan.requires_confirmation is False

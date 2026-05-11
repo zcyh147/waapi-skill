@@ -25,6 +25,21 @@ SUPPORTED_SEMANTIC_FAMILIES = (
     "bounded_profiler_guidance",
     "unsupported_runtime_boundary",
 )
+SEMANTIC_FAMILY_BUILDER_REFS: Mapping[str, tuple[str, ...]] = {
+    "intent_navigation": ("wwise_waapi.builders.query",),
+    "crud_authoring": ("wwise_waapi.builders.object_mutation", "wwise_waapi.builders.properties"),
+    "system_design_preview": (
+        "wwise_waapi.builders.query",
+        "wwise_waapi.builders.object_mutation",
+        "wwise_waapi.builders.properties",
+        "wwise_waapi.builders.imports",
+    ),
+    "asset_import_workflow": ("wwise_waapi.builders.imports",),
+    "soundbank_workflow": ("wwise_waapi.builders.soundbank",),
+    "switch_assignment_workflow": ("wwise_waapi.builders.switchcontainer",),
+    "bounded_profiler_guidance": ("wwise_waapi.builders.profiler",),
+    "unsupported_runtime_boundary": (),
+}
 
 
 class SemanticPlanStatus(str, Enum):
@@ -235,9 +250,27 @@ class SemanticPlanner:
                 "Semantic planner input must be a structured SemanticIntent.",
                 details={"expected": "SemanticIntent", "received": type(intent).__name__},
             )
+        _require_supported_family(intent.family)
+
+        if intent.family == "unsupported_runtime_boundary":
+            return SemanticPlan(
+                status=SemanticPlanStatus.UNSUPPORTED,
+                family=intent.family,
+                version=intent.version,
+                steps=(),
+                preview_id="",
+                preview_hash="",
+                risk_flags=(),
+                requires_confirmation=False,
+                blocked_reason="runtime orchestration capabilities are outside the WAAPI authoring planner boundary",
+                needs_clarification=False,
+                unsupported_capability=True,
+                verification_steps=(),
+                source_builder_refs=(),
+            )
 
         return SemanticPlan(
-            status=SemanticPlanStatus.NEEDS_CLARIFICATION,
+            status=SemanticPlanStatus.BLOCKED,
             family=intent.family,
             version=intent.version,
             steps=(),
@@ -245,11 +278,11 @@ class SemanticPlanner:
             preview_hash="",
             risk_flags=(),
             requires_confirmation=intent.confirmation_state != "confirmed",
-            blocked_reason="schema-only planner has not routed intent to a builder",
-            needs_clarification=True,
+            blocked_reason="semantic planner routing skeleton records allowed builders but does not execute builder previews",
+            needs_clarification=False,
             unsupported_capability=False,
             verification_steps=(),
-            source_builder_refs=(),
+            source_builder_refs=SEMANTIC_FAMILY_BUILDER_REFS[intent.family],
         )
 
 
