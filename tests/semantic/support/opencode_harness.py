@@ -21,6 +21,7 @@ DEFAULT_WAAPI_HOST = "127.0.0.1"
 DEFAULT_WAAPI_PORT = 8080
 DEFAULT_WWISE_VERSION = "2022.1"
 DEFAULT_OPENCODE_SERVE_PORT = 4096
+DEFAULT_OPENCODE_RUN_TIMEOUT_SECONDS = 600.0
 
 
 class OpenCodeHarnessError(RuntimeError):
@@ -145,6 +146,7 @@ class OpenCodeHarnessConfig:
     opencode_binary: str = "opencode"
     serve_host: str = "127.0.0.1"
     serve_port: int = DEFAULT_OPENCODE_SERVE_PORT
+    opencode_run_timeout_seconds: float | None = DEFAULT_OPENCODE_RUN_TIMEOUT_SECONDS
 
 
 class OpenCodeSemanticHarness:
@@ -203,14 +205,25 @@ class OpenCodeSemanticHarness:
         if attach_session_id:
             command.extend(["--session", attach_session_id])
         command.append(prompt)
-        completed = self._runner(
-            command,
-            cwd=workspace,
-            env=self._env,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        try:
+            completed = self._runner(
+                command,
+                cwd=workspace,
+                env=self._env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=self.config.opencode_run_timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as exc:
+            timeout = exc.timeout if exc.timeout is not None else self.config.opencode_run_timeout_seconds
+            timeout_label = f"{float(timeout):g}" if timeout is not None else "configured"
+            raise OpenCodeCommandError(
+                f"OpenCode attached run timed out after {timeout_label} seconds",
+                command=command,
+                output=_combined_timeout_output(exc),
+                exit_status=124,
+            ) from exc
         output = _combined_output(completed)
         session_id = explicit_session_id or extract_opencode_session_id(output) or attach_session_id
         if not session_id:
@@ -343,6 +356,23 @@ def _combined_output(completed: subprocess.CompletedProcess[str]) -> str:
     return stdout or stderr
 
 
+def _combined_timeout_output(exc: subprocess.TimeoutExpired) -> str:
+    stdout = _coerce_timeout_output(getattr(exc, "output", None))
+    stderr = _coerce_timeout_output(getattr(exc, "stderr", None))
+    parts = [part for part in (stdout, stderr) if part]
+    timeout = f"{float(exc.timeout):g}" if exc.timeout is not None else "configured"
+    parts.append(f"OpenCode attached run timed out after {timeout} seconds.")
+    return "\n".join(parts)
+
+
+def _coerce_timeout_output(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
 def _output_summary(output: str, *, limit: int = 500) -> str:
     normalized = re.sub(r"\s+", " ", output.strip())
     if len(normalized) <= limit:
@@ -358,6 +388,7 @@ __all__ = [
     "DEFAULT_WAAPI_PORT",
     "DEFAULT_WWISE_VERSION",
     "DEFAULT_OPENCODE_SERVE_PORT",
+    "DEFAULT_OPENCODE_RUN_TIMEOUT_SECONDS",
     "OpenCodeArchiveCapture",
     "OpenCodeCommandError",
     "OpenCodeCommandResult",

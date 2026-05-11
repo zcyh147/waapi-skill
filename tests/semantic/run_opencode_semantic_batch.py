@@ -124,7 +124,17 @@ def run_batch(
 
         live = live_requested and prerequisites.available
         harness = (harness_factory or _default_harness_factory)(version, workspace, live)
-        records.extend(_run_scenarios(harness, scenarios, version, archive_root, live=live))
+        version_records = _run_scenarios(
+            harness,
+            scenarios,
+            version,
+            archive_root,
+            live=live,
+            fail_fast_on_command_error=args.require_live,
+        )
+        records.extend(version_records)
+        if args.require_live and _has_attempted_command_blocker(version_records):
+            break
 
     summary_path = _summary_path(args)
     _write_summary(summary_path, args=args, records=records)
@@ -138,6 +148,10 @@ def _batch_has_failing_exit(records: Sequence[BatchRecord], *, require_live: boo
         if record.verdict == "blocked" and (require_live or record.live):
             return True
     return False
+
+
+def _has_attempted_command_blocker(records: Sequence[BatchRecord]) -> bool:
+    return any(record.verdict == "blocked" and bool(record.command_line) for record in records)
 
 
 def check_version_prerequisites(version: str, workspace: Path) -> VersionPrerequisites:
@@ -170,6 +184,7 @@ def _run_scenarios(
     archive_root: Path,
     *,
     live: bool,
+    fail_fast_on_command_error: bool = False,
 ) -> list[BatchRecord]:
     records: list[BatchRecord] = []
     serve_handle = None
@@ -246,6 +261,8 @@ def _run_scenarios(
                         prompt=prompt,
                     )
                 )
+                if fail_fast_on_command_error:
+                    return records
             except (OpenCodeHarnessError, OSError, subprocess.SubprocessError, RuntimeError) as exc:
                 records.append(
                     _write_non_execution_record(

@@ -1117,7 +1117,7 @@ def test_post_command_missing_session_blocked_archive_keeps_command_output_and_s
 
     assert exit_code == 1
     payloads = [json.loads(path.read_text(encoding="utf-8")) for path in sorted(archive_root.glob("*/phase3-*/record.json"))]
-    assert len(payloads) == 6
+    assert len(payloads) == 1
     assert {payload["verdict"] for payload in payloads} == {"blocked"}
     for payload in payloads:
         assert payload["command_line"][:4] == ["opencode", "run", "--attach", "http://127.0.0.1:4096"]
@@ -1126,6 +1126,79 @@ def test_post_command_missing_session_blocked_archive_keeps_command_output_and_s
         assert "attach stderr details" in payload["assistant_output"]
         assert payload["command_exit_status"] == 9
         assert any("output_summary=" in note and "ConnectionRefusedError" in note for note in payload["failure_notes"])
+
+
+def test_opencode_run_timeout_writes_blocked_record_summary_and_stops_strict_live_batch(tmp_path: Path) -> None:
+    workspace = _workspace_with_symlink(tmp_path)
+    archive_root = tmp_path / "archive"
+
+    def available(version: str, checked_workspace: Path) -> VersionPrerequisites:
+        assert checked_workspace == workspace.resolve(strict=False)
+        return VersionPrerequisites(
+            version=version,
+            console_path="/mock/WwiseConsole.sh",
+            sample_project_path="/mock/SampleProject.wproj",
+            available=True,
+            missing=(),
+        )
+
+    runner_calls: list[list[str]] = []
+
+    def harness_factory(version: str, checked_workspace: Path, live: bool) -> OpenCodeSemanticHarness:
+        assert live is True
+        install = checked_workspace / ".agents" / "skills" / "waapi-skill"
+        source = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+
+        def runner(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+            runner_calls.append(command)
+            assert kwargs["timeout"] == 0.1
+            raise subprocess.TimeoutExpired(
+                cmd=command,
+                timeout=kwargs["timeout"],
+                output="ConnectionRefusedError(61, connect failed) before hang\n",
+                stderr="opencode stderr before timeout\n",
+            )
+
+        return OpenCodeSemanticHarness(
+            OpenCodeHarnessConfig(
+                workspace=checked_workspace,
+                skill_requirement=SkillSymlinkRequirement(install_path=install, source_path=source),
+                wwise=WwiseSandboxMetadata(wwise_version=version, sandbox_metadata_path=tmp_path / "sandbox-metadata.json"),
+                live=False,
+                opencode_run_timeout_seconds=0.1,
+            ),
+            runner=runner,
+        )
+
+    exit_code = run_batch(
+        [
+            "--scenario-set",
+            "phase3-required",
+            "--wwise-version",
+            "2022.1",
+            "--workspace",
+            str(workspace),
+            "--archive-root",
+            str(archive_root),
+            "--require-live",
+        ],
+        prerequisite_checker=available,
+        harness_factory=harness_factory,
+    )
+
+    assert exit_code == 1
+    assert len(runner_calls) == 1
+    summary = json.loads((archive_root / SUMMARY_2022_FILENAME).read_text(encoding="utf-8"))
+    assert summary["counts"] == {"blocked": 1, "fail": 0, "pass": 0, "skip": 0}
+    payloads = [json.loads(path.read_text(encoding="utf-8")) for path in sorted(archive_root.glob("*/phase3-*/record.json"))]
+    assert len(payloads) == 1
+    assert {payload["verdict"] for payload in payloads} == {"blocked"}
+    for payload in payloads:
+        assert "ConnectionRefusedError" in payload["assistant_output"]
+        assert "opencode stderr before timeout" in payload["assistant_output"]
+        assert "timed out after 0.1 seconds" in payload["assistant_output"]
+        assert payload["command_exit_status"] == 124
+        assert any("OpenCode attached run timed out" in note for note in payload["failure_notes"])
 
 
 def _passing_semantic_output(prompt: str) -> str:

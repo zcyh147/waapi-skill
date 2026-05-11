@@ -93,12 +93,13 @@ def test_source_note_required_field_strings_match_reflected_behavior() -> None:
 def test_skill_docs_prefer_builders_without_claiming_live_execution() -> None:
     text = SKILL_MD.read_text(encoding="utf-8")
 
-    assert "prefer `wwise_waapi.builders` semantic builders" in text
-    assert "Builders construct and validate source-grounded envelopes" in text
-    assert "they do not open Wwise, subscribe to topics, or dispatch live calls by default" in text
+    assert "prefer the semantic planner before hand-writing dispatcher payloads" in text
+    assert "source-grounded builders, previews, readback plans, and dispatcher requests" in text
+    assert "it does not open Wwise, subscribe to topics, or dispatch live calls by default" in text
     assert "raw `WwiseDispatcher` contract remains the explicit escape hatch" in text
+    assert "Packaged semantic builder source-note families" not in text
     for family in INCLUDED_FAMILIES:
-        assert f"`{family}`" in text
+        assert f"`{family}`" not in text
     forbidden_claims = (
         "builders execute live Wwise by default",
         "semantic builders dispatch live calls by default",

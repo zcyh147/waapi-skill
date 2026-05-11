@@ -250,6 +250,29 @@ def test_missing_session_error_preserves_attempted_command_output_and_status(tmp
     assert "output_summary=" in str(error)
 
 
+def test_run_attached_timeout_preserves_partial_output_and_status(tmp_path: Path) -> None:
+    def runner(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        assert kwargs["timeout"] == 0.25
+        raise subprocess.TimeoutExpired(
+            cmd=command,
+            timeout=kwargs["timeout"],
+            output="partial stdout before hang\n",
+            stderr=b"partial stderr before hang\n",
+        )
+
+    harness = _mock_harness(tmp_path, runner=runner, opencode_run_timeout_seconds=0.25)
+
+    with pytest.raises(OpenCodeCommandError) as raised:
+        harness.run_attached(prompt="List all buses.")
+
+    error = raised.value
+    assert error.exit_status == 124
+    assert "partial stdout before hang" in error.output
+    assert "partial stderr before hang" in error.output
+    assert "timed out after 0.25 seconds" in error.output
+    assert "timed out after 0.25 seconds" in str(error)
+
+
 @pytest.mark.parametrize(
     ("output", "expected"),
     [
@@ -272,17 +295,22 @@ def _mock_harness(
     live: bool = False,
     sandbox_launcher: Any | None = None,
     process_factory: Any | None = None,
+    opencode_run_timeout_seconds: float | None = None,
 ) -> OpenCodeSemanticHarness:
     source = tmp_path / "repo" / "skills" / "waapi-skill"
     install = tmp_path / "workspace" / ".agents" / "skills" / "waapi-skill"
     source.mkdir(parents=True)
     install.parent.mkdir(parents=True)
     install.symlink_to(source, target_is_directory=True)
+    config_options = {}
+    if opencode_run_timeout_seconds is not None:
+        config_options["opencode_run_timeout_seconds"] = opencode_run_timeout_seconds
     config = OpenCodeHarnessConfig(
         workspace=tmp_path / "workspace",
         skill_requirement=SkillSymlinkRequirement(install_path=install, source_path=source),
         wwise=wwise or WwiseSandboxMetadata(),
         live=live,
+        **config_options,
     )
     return OpenCodeSemanticHarness(
         config,
