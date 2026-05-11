@@ -14,6 +14,7 @@ from wwise_waapi.semantic_planner import (  # pyright: ignore[reportMissingImpor
     SemanticPlanStatus,
     SemanticPlanner,
     SUPPORTED_SEMANTIC_FAMILIES,
+    confirm_semantic_plan,
 )
 
 
@@ -230,6 +231,76 @@ def test_navigation_intent_builds_object_get_step() -> None:
     assert step["target_identity"]["kind"] == "type"
     assert step["read_only"] is True
     assert step["project_changing"] is False
+
+
+def test_preview_hash_changes_when_target_identity_changes() -> None:
+    planner = SemanticPlanner()
+    sound_plan = planner.plan(structured_query_intent())
+    bus_plan = planner.plan(
+        SemanticIntent(
+            family="intent_navigation",
+            goal="List quiet sounds for review.",
+            version="2022.1",
+            targets=(SemanticIntentTarget("type", "Bus", metadata={"return": ("id", "name", "path")}),),
+            constraints=(SemanticIntentConstraint("@Volume", "<", 0, reason="find quiet sounds"),),
+            requested_operations=("object.get",),
+            confirmation_state="preview",
+            source_prompt_excerpt="list quiet Sound objects",
+        )
+    )
+
+    assert sound_plan.as_dict()["steps"][0]["target_identity"]["identifier"] == "Sound"
+    assert bus_plan.as_dict()["steps"][0]["target_identity"]["identifier"] == "Bus"
+    assert sound_plan.preview_hash != bus_plan.preview_hash
+
+
+def test_preview_hash_changes_when_payload_preview_changes() -> None:
+    planner = SemanticPlanner()
+    default_return_plan = planner.plan(structured_query_intent())
+    id_only_return_plan = planner.plan(
+        SemanticIntent(
+            family="intent_navigation",
+            goal="List quiet sounds for review.",
+            version="2022.1",
+            targets=(SemanticIntentTarget("type", "Sound", metadata={"return": ("id",)}),),
+            constraints=(SemanticIntentConstraint("@Volume", "<", 0, reason="find quiet sounds"),),
+            requested_operations=("object.get",),
+            confirmation_state="preview",
+            source_prompt_excerpt="list quiet Sound objects",
+        )
+    )
+
+    assert default_return_plan.as_dict()["steps"][0]["options_preview"] == {"return": ["id", "name", "path"]}
+    assert id_only_return_plan.as_dict()["steps"][0]["options_preview"] == {"return": ["id"]}
+    assert default_return_plan.preview_hash != id_only_return_plan.preview_hash
+
+
+def test_confirmed_semantic_plan_requires_matching_preview_hash() -> None:
+    preview = SemanticPlanner().plan(semantic_intent_for_family("crud_authoring"))
+
+    confirmed = confirm_semantic_plan(preview, "confirmed", preview.preview_hash)
+
+    assert confirmed is not preview
+    assert preview.requires_confirmation is True
+    assert confirmed.requires_confirmation is False
+    assert confirmed.preview_hash == preview.preview_hash
+    assert tuple(confirmed.steps) == tuple(preview.steps)
+
+    with pytest.raises(SemanticValidationError) as missing_hash:
+        confirm_semantic_plan(preview, "confirmed", "")
+    assert missing_hash.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+    assert missing_hash.value.details["expected_preview_hash"] == preview.preview_hash
+
+    with pytest.raises(SemanticValidationError) as mismatch:
+        confirm_semantic_plan(preview, "confirmed", "sha256:not-the-current-preview")
+    assert mismatch.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+    assert mismatch.value.details["status"] == "repreview_required"
+    assert mismatch.value.details["executed"] is False
+
+    with pytest.raises(SemanticValidationError) as not_confirmed:
+        confirm_semantic_plan(preview, "preview", preview.preview_hash)
+    assert not_confirmed.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+    assert not_confirmed.value.details == {"confirmation_state": "preview", "required": "confirmed"}
 
 
 def semantic_intent_for_family(family: str, *, confirmation_state: str = "preview") -> SemanticIntent:

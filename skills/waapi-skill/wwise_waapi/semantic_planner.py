@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any, Mapping, Sequence, cast
 
@@ -327,9 +327,11 @@ class SemanticPlanner:
             needs_clarification = True
             blocked_reason = "structured intent is missing concrete builder inputs required for preview construction"
 
-        preview_id = f"semantic-preview:{intent.family}:{_stable_intent_suffix(intent)}"
-        preview_hash = _stable_preview_hash(intent, steps)
         project_changing = any(step.project_changing for step in steps)
+        risk_flags = _risk_flags(steps)
+        preview_id = f"semantic-preview:{intent.family}:{_stable_intent_suffix(intent)}"
+        verification_step_templates = _verification_steps(steps, preview_hash="")
+        preview_hash = _stable_preview_hash(intent.family, intent.version, steps, risk_flags, verification_step_templates)
 
         return SemanticPlan(
             status=status,
@@ -338,7 +340,7 @@ class SemanticPlanner:
             steps=steps,
             preview_id=preview_id,
             preview_hash=preview_hash,
-            risk_flags=_risk_flags(steps),
+            risk_flags=risk_flags,
             requires_confirmation=project_changing and intent.confirmation_state != "confirmed",
             blocked_reason=blocked_reason,
             needs_clarification=needs_clarification,
@@ -346,6 +348,37 @@ class SemanticPlanner:
             verification_steps=_verification_steps(steps, preview_hash),
             source_builder_refs=SEMANTIC_FAMILY_BUILDER_REFS[intent.family],
         )
+
+
+def confirm_semantic_plan(preview: SemanticPlan, confirmation_state: str, submitted_preview_hash: str) -> SemanticPlan:
+    """Return a confirmed plan only when the caller confirms the exact preview artifact."""
+
+    _require_confirmation_state(confirmation_state)
+    if confirmation_state != "confirmed":
+        raise SemanticValidationError(
+            SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+            "Semantic plan confirmation requires an explicit confirmed state.",
+            details={"confirmation_state": confirmation_state, "required": "confirmed"},
+        )
+    if not submitted_preview_hash:
+        raise SemanticValidationError(
+            SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+            "Semantic plan confirmation requires the submitted preview hash.",
+            details={"submitted_preview_hash": submitted_preview_hash, "expected_preview_hash": preview.preview_hash},
+        )
+    if submitted_preview_hash != preview.preview_hash:
+        raise SemanticValidationError(
+            SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+            "Submitted preview hash differs from the current semantic preview artifact; re-preview is required.",
+            details={
+                "status": "repreview_required",
+                "submitted_preview_hash": submitted_preview_hash,
+                "expected_preview_hash": preview.preview_hash,
+                "executed": False,
+                "verified": False,
+            },
+        )
+    return replace(preview, requires_confirmation=False)
 
 
 def _unsupported_boundary_plan(intent: SemanticIntent, reason_key: str) -> SemanticPlan:
@@ -750,8 +783,48 @@ def _stable_intent_suffix(intent: SemanticIntent) -> str:
     return _stable_hash({"family": intent.family, "goal": intent.goal, "version": intent.version})[7:19]
 
 
-def _stable_preview_hash(intent: SemanticIntent, steps: Sequence[SemanticPlanStep]) -> str:
-    return _stable_hash({"intent": intent.as_dict(), "steps": [step.as_dict() for step in steps]})
+def _stable_preview_hash(
+    family: str,
+    version: str,
+    steps: Sequence[SemanticPlanStep],
+    risk_flags: Sequence[str],
+    verification_steps: Sequence[SemanticPlanVerification],
+) -> str:
+    return _stable_hash(
+        {
+            "version": version,
+            "family": family,
+            "steps": [_preview_artifact_step(step) for step in steps],
+            "risk_flags": list(risk_flags),
+            "verification_steps": [_preview_artifact_verification(step) for step in verification_steps],
+        }
+    )
+
+
+def _preview_artifact_step(step: SemanticPlanStep) -> dict[str, Any]:
+    preview = cast(SemanticPlanPreview | None, step.preview)
+    preview_payload = preview.payload if preview is not None else {}
+    return {
+        "step_id": step.step_id,
+        "operation": step.operation,
+        "family": step.family,
+        "builder_ref": step.builder_ref or step.source_builder_ref,
+        "api": step.api,
+        "args_preview": _json_safe_mapping(step.args_preview),
+        "options_preview": _json_safe_mapping(step.options_preview),
+        "target_identity": _json_safe_mapping(step.target_identity),
+        "payload_preview": _json_safe_mapping(preview_payload),
+        "read_only": step.read_only,
+        "project_changing": step.project_changing,
+    }
+
+
+def _preview_artifact_verification(step: SemanticPlanVerification) -> dict[str, Any]:
+    return {
+        "kind": step.kind,
+        "description": step.description,
+        "readback_plan": _json_safe_mapping(step.readback_plan),
+    }
 
 
 def _stable_hash(value: Mapping[str, Any]) -> str:
