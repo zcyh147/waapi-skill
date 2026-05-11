@@ -1,6 +1,6 @@
 # Test inventory
 
-This inventory is grouped for human review. `python -m pytest --collect-only -q` collected 807 pytest items, including parameterized cases that expand at collection time, so broad unit coverage is summarized by file or module instead of listing every item instance.
+This inventory is grouped for human review. The latest Atlas non-live verification reported `837 passed, 76 skipped, 24 deselected`; broad unit coverage is summarized by file or module instead of listing every item instance. This count is a non-live run result, not a fresh full `--collect-only` recount.
 
 ## Runner modes and strict real behavior
 
@@ -14,9 +14,13 @@ This inventory is grouped for human review. `python -m pytest --collect-only -q`
 | 2022 live focused run | Live | `ci/test.sh --version 2022.1 --mode live -- -q -ra` | Read-only 2022.1 prerequisites, reflection inventory, and WAQL object get behavior against the immutable `tests/_org/2022.1` fixture copy | Yes |
 | 2022 destructive focused run | Destructive | `ci/test.sh --version 2022.1 --mode destructive -- -q -ra` | 2022.1 copied sandbox mutation, undo, soundbank/audio, and SwitchContainer assignment behavior using a per-test copy of `tests/_org/2022.1` | Yes |
 | Smoke | Strict real launch probe | `ci/test.sh --version all --mode smoke` | HeadlessLifecycle starts WwiseConsole, waits for WAAPI readiness, calls `ak.wwise.core.getInfo`, and shuts down | Yes |
+| Phase 3 required semantic batch | Live OpenCode semantic | `python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test --scenario-set phase3-required --wwise-version 2022.1 --archive-root .sisyphus/evidence/waapi-opencode-semantic-runs --require-live` | Runs the required 2022.1 OpenCode semantic scenarios against a symlinked workspace and archives pass, fail, or blocked records | Yes |
+| Phase 3 all-version semantic smoke | Prefer-live OpenCode semantic | `python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test --scenario-set phase3-smoke --wwise-version all --archive-root .sisyphus/evidence/waapi-opencode-semantic-runs --prefer-live` | Runs read-only and WAQL smoke scenarios for every supported Wwise version, using live runs when available and explicit skips when prerequisites are missing | Yes when prerequisites are present |
 | Audit check | Evidence inspection | `wc -l .sisyphus/evidence/waapi-test-remediation/real-wwise-launches.jsonl` and `tail -n 4 .sisyphus/evidence/waapi-test-remediation/real-wwise-launches.jsonl` | Confirms real launch proof was appended, including pid, port, command, sandbox project, `getInfo` version, `ready_duration_seconds`, and cleanup result | Uses existing evidence |
 
 Strict real modes are `live`, `destructive`, `smoke`, and `matrix`. `all` is a composite runner: it executes non-live first, then the strict real matrix. Strict real modes require an executable `WWISE_CONSOLE` and an existing `.wproj` at `WWISE_SAMPLE_PROJECT_PATH`; missing prerequisites fail before pytest execution. `ready_duration_seconds` measures WAAPI readiness, not the total foreground GUI or plugin warning lifetime.
+
+Phase 3 semantic OpenCode runs are documented in `tests/semantic/README.md`. They require a symlinked OpenCode workspace install, write local untracked archives under `.sisyphus/evidence/waapi-opencode-semantic-runs`, and distinguish `pass`, `fail`, `skip`, and `blocked` records. Mocked/nonlive pytest coverage is CI-safe but is not a live WwiseConsole validation substitute.
 
 ## Strict real matrix node inventory
 
@@ -111,5 +115,5 @@ Collected with `ci/test.sh --version all --mode matrix -- --collect-only -q`. Th
 
 | Command | Result | Notes |
 | --- | --- | --- |
-| `python -m pytest --collect-only -q` | Completed, 807 tests collected | Output is large. Parameterized tests are listed by pytest as expanded item instances, so this document groups them by file and feature area. Collection reported live and destructive module-level skips where the required opt-in flags were not set. |
+| `ci/test.sh --mode nonlive -- -q -ra` | Latest Atlas verification reported 837 passed, 76 skipped, 24 deselected | This is the current non-live result used to keep the inventory count honest. It is not a fresh full `--collect-only` recount; parameterized tests are still grouped by file and feature area for readability. |
 | `ci/test.sh --version all --mode matrix -- --collect-only -q` | Completed, 40 tests collected across focused live and destructive matrix nodes | This command checked strict real prerequisites through the runner, then collected node IDs without running test bodies. |
