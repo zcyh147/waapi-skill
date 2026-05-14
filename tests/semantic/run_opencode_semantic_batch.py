@@ -35,12 +35,14 @@ from tests.semantic.support.opencode_harness import (  # pyright: ignore[reportM
     DEFAULT_WAAPI_HOST,
     DEFAULT_WAAPI_PORT,
     OpenCodeCommandError,
+    OpenCodeCommandResult,
     OpenCodeHarnessConfig,
     OpenCodeHarnessError,
     OpenCodeSemanticHarness,
     SkillSymlinkRequirement,
     WwiseSandboxMetadata,
 )
+from wwise_waapi.headless import CleanupReport, emergency_cleanup_wwise_processes  # pyright: ignore[reportMissingImports]  # noqa: E402
 
 
 SUMMARY_2022_PATH = REPO_ROOT / ".sisyphus" / "evidence" / "task-10-live-2022-semantic-batch.json"
@@ -212,10 +214,13 @@ def _run_scenarios(
                 semantic_object_name=semantic_object_names.get(scenario.id),
             )
             try:
-                result = harness.run_attached(
+                result = _run_attached_with_timeout_retry(
+                    harness,
                     prompt=prompt,
                     attach_url=serve_handle.server_url,
                     explicit_session_id=None if live else f"mock-{version}-{scenario.id}",
+                    retry_on_timeout=live,
+                    retry_on_session_not_found=live,
                 )
                 verdict = evaluate_scenario_output(scenario, result.output)
                 archive_path = write_semantic_archive_record(
@@ -280,7 +285,88 @@ def _run_scenarios(
         cleanup = getattr(harness, "cleanup_semantic_live_sandbox", None)
         if callable(cleanup):
             cleanup()
+            if live and scenarios:
+                prefix = _semantic_live_wine_prefix(harness)
+                if not prefix:
+                    records.append(
+                        _write_non_execution_record(
+                            scenario=scenarios[0],
+                            version=version,
+                            verdict="blocked",
+                            reason=(
+                                "Live semantic cleanup guard requires a scoped sandbox WINEPREFIX; "
+                                "prefix was unavailable after harness cleanup, so unscoped emergency cleanup was skipped"
+                            ),
+                            archive_root=archive_root,
+                            live=live,
+                        )
+                    )
+                else:
+                    cleanup_report = emergency_cleanup_wwise_processes(prefix=prefix)
+                    if not cleanup_report.is_clean:
+                        residual_reason = _cleanup_residual_block_reason(cleanup_report)
+                        records.append(
+                            _write_non_execution_record(
+                                scenario=scenarios[0],
+                                version=version,
+                                verdict="blocked",
+                                reason=residual_reason,
+                                archive_root=archive_root,
+                                live=live,
+                            )
+                        )
     return records
+
+
+def _cleanup_residual_block_reason(report: CleanupReport) -> str:
+    if report.is_clean:
+        return ""
+    residual_descriptions = [f"{item.pid}:{item.command}" for item in report.residual_processes]
+    residual_summary = "; ".join(residual_descriptions[:10])
+    if len(residual_descriptions) > 10:
+        residual_summary += f"; ... ({len(residual_descriptions) - 10} more)"
+    prefix_note = f"wine_prefix={report.wine_prefix}" if report.wine_prefix else "wine_prefix=unscoped"
+    return (
+        "Live semantic cleanup detected residual Wwise/Wine helper processes after harness cleanup: "
+        f"{prefix_note}; residuals={residual_summary or 'none'}"
+    )
+
+
+def _semantic_live_wine_prefix(harness: OpenCodeSemanticHarness) -> str | None:
+    value = getattr(harness, "semantic_live_wine_prefix", None)
+    if callable(value):
+        value = value()
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    return normalized or None
+
+
+def _run_attached_with_timeout_retry(
+    harness: OpenCodeSemanticHarness,
+    *,
+    prompt: str,
+    attach_url: str,
+    explicit_session_id: str | None,
+    retry_on_timeout: bool,
+    retry_on_session_not_found: bool = False,
+) -> OpenCodeCommandResult:
+    try:
+        return harness.run_attached(prompt=prompt, attach_url=attach_url, explicit_session_id=explicit_session_id)
+    except OpenCodeCommandError as exc:
+        timeout_retry = retry_on_timeout and exc.exit_status == 124
+        session_retry = retry_on_session_not_found and _is_transient_session_not_found_error(exc)
+        if not (timeout_retry or session_retry):
+            raise
+    return harness.run_attached(prompt=prompt, attach_url=attach_url, explicit_session_id=explicit_session_id)
+
+
+def _is_transient_session_not_found_error(error: OpenCodeCommandError) -> bool:
+    return (
+        error.exit_status == 1
+        and "OpenCode session id was not found in attached run output or explicit metadata" in str(error)
+        and "session not found" in error.output.lower()
+    )
 
 
 def _write_attempted_command_failure_record(
@@ -381,6 +467,7 @@ def _default_harness_factory(version: str, workspace: Path, live: bool) -> OpenC
             env=live_sandbox.env,
         )
         setattr(harness, "cleanup_semantic_live_sandbox", live_sandbox.cleanup)
+        setattr(harness, "semantic_live_wine_prefix", live_sandbox.semantic_live_wine_prefix)
         return harness
     return OpenCodeSemanticHarness(
         OpenCodeHarnessConfig(
@@ -442,6 +529,14 @@ class _LiveSandbox:
             cleanup_sandbox(self._sandbox, failed=False)
         if self._lock is not None:
             self._lock.__exit__(None, None, None)
+
+    def semantic_live_wine_prefix(self) -> str | None:
+        if self._sandbox is None:
+            return None
+        prefix = getattr(self._sandbox, "wine_prefix_path", None)
+        if prefix is None:
+            return None
+        return str(prefix)
 
 
 def _mocked_runner(command: list[str], **_: Any) -> subprocess.CompletedProcess[str]:
@@ -605,10 +700,81 @@ def _scenario_prompt(
 def _scenario_prompt_text(scenario: SemanticScenario, *, semantic_object_name: str | None) -> str:
     if semantic_object_name is None:
         return scenario.prompt
-    return scenario.prompt.replace("Temp_UI_Bus", semantic_object_name)
+    text = scenario.prompt.replace("Temp_UI_Bus", semantic_object_name)
+    return text.replace("UI_Menu_Clicks_Semantic", semantic_object_name)
 
 
 def _scenario_live_directive(scenario: SemanticScenario, *, semantic_object_name: str | None) -> str:
+    semantic_family = str(scenario.metadata.get("semantic_family") or "")
+    semantic_family_hint = f"- Set semantic_family to {semantic_family}.\n" if semantic_family else ""
+    if scenario.family == "semantic-capability-confirmed-small-authoring":
+        return (
+            "\n\nSEMANTIC CAPABILITY CONFIRMED-AUTHORING CONSTRAINTS:\n"
+            f"{semantic_family_hint}"
+            "- SemanticPlanner is the Python module wwise_waapi.semantic_planner, not an external tool; do not report it as unavailable.\n"
+            "- Do not spawn research, explore, librarian, documentation, planning, Oracle, or background subagents.\n"
+            "- Do not wait on background tasks.\n"
+            "- Extract structured semantic intent and call SemanticPlanner.plan() before the final answer.\n"
+            "- Live WAAPI may supplement or verify the plan, but it does not replace planner facts.\n"
+            "- Treat `SEMANTIC FOLLOW-UP: confirm` as explicit validation confirmation for the exact generated preview hash in this run.\n"
+            "- For the previewable plan that emits preview_hash and source_builder_refs, set semantic_plan_status=\"preview_ready\" or \"plan_ready\"; do not use semantic_plan_status=\"needs_clarification\" for a concrete preview.\n"
+            "- Execute only the exact preview whose hash matches the submitted confirmation hash, then verify with live readback.\n"
+            "- Because execution happens only after `SEMANTIC FOLLOW-UP: confirm`, report mutation_executed_before_confirmation=false.\n"
+            "- Report confirmation_observed=true, mutation_executed=true, and verification_status=\"verified\" only if those steps actually happened.\n"
+            "- Include structured_intent_extracted, semantic_family, semantic_planner_invoked, semantic_plan_status, preview_hash, "
+            "source_builder_refs, mutation_executed_before_confirmation, mutation_executed, and verification_status in SEMANTIC_RESULT_JSON.\n"
+        )
+    if scenario.family == "semantic-capability-import-preview-boundary":
+        return (
+            "\n\nSEMANTIC CAPABILITY IMPORT-BOUNDARY CONSTRAINTS:\n"
+            f"{semantic_family_hint}"
+            "- SemanticPlanner is the Python module wwise_waapi.semantic_planner, not an external tool; do not report it as unavailable.\n"
+            "- Do not spawn research, explore, librarian, documentation, planning, Oracle, or background subagents.\n"
+            "- Do not wait on background tasks.\n"
+            "- Attempt the live read-only WAAPI target check before any repo/docs/source research; report live_waapi_before_research=true only if that ordering actually happened.\n"
+            "- Extract structured semantic intent and call SemanticPlanner.plan() before the final answer.\n"
+            "- Live WAAPI may supplement or verify the plan, but it does not replace planner facts.\n"
+            "- For an import preview that emits preview_hash and source_builder_refs, set semantic_plan_status=\"preview_ready\" or \"plan_ready\" even when source WAV files still require user provision; do not use semantic_plan_status=\"needs_clarification\" for that preview.\n"
+            "- If source WAV files are missing or user-provided, include explicit source-file boundary facts such as source_file_boundary_returned=true and missing_source_files or source_files_required.\n"
+            "- Immediately emit final SEMANTIC_RESULT_JSON after the live read and preview/boundary classification.\n"
+            "- Include structured_intent_extracted, semantic_family, semantic_planner_invoked, semantic_plan_status, live_waapi_before_research, source_builder_refs, preview_hash, source_file_boundary_returned, missing_source_files or source_files_required, mutation_executed_before_confirmation, and mutation_executed.\n"
+        )
+    if scenario.family in {
+        "semantic-capability-navigation-summary",
+        "semantic-capability-crud-preview",
+        "semantic-capability-confirmed-small-authoring",
+        "semantic-capability-system-design-preview",
+        "semantic-capability-soundbank-plan",
+        "semantic-capability-switch-assignment-plan",
+        "semantic-capability-profiler-guidance",
+    }:
+        return (
+            "\n\nSEMANTIC CAPABILITY CONSTRAINTS:\n"
+            f"{semantic_family_hint}"
+            "- SemanticPlanner is the Python module wwise_waapi.semantic_planner, not an external tool; do not report it as unavailable.\n"
+            "- Do not spawn research, explore, librarian, documentation, planning, Oracle, or background subagents.\n"
+            "- Do not wait on background tasks.\n"
+            "- Extract structured semantic intent and call SemanticPlanner.plan() before the final answer.\n"
+            "- Live WAAPI may supplement or verify the plan, but it does not replace planner facts.\n"
+            "- For supported previewable plans that emit preview_hash and source_builder_refs, set semantic_plan_status=\"preview_ready\" or \"plan_ready\"; reserve semantic_plan_status=\"needs_clarification\" for true missing-input blockers such as user-provided import source files.\n"
+            "- Immediately emit final SEMANTIC_RESULT_JSON after the live read or preview.\n"
+            "- Include structured_intent_extracted, semantic_family, semantic_planner_invoked, semantic_plan_status, "
+            "source_builder_refs, and preview_hash when required.\n"
+        )
+    if scenario.family in {"semantic-capability-runtime-unsupported", "semantic-capability-cross-app-mcp-unsupported"}:
+        return (
+            "\n\nSEMANTIC CAPABILITY CONSTRAINTS:\n"
+            f"{semantic_family_hint}"
+            "- SemanticPlanner is the Python module wwise_waapi.semantic_planner, not an external tool; do not report it as unavailable.\n"
+            "- Do not spawn research, explore, librarian, documentation, planning, Oracle, or background subagents.\n"
+            "- Do not wait on background tasks.\n"
+            "- Extract structured semantic intent and call SemanticPlanner.plan() before the final answer.\n"
+            "- Route unsupported runtime or cross-app requests through unsupported_runtime_boundary; do not attempt execution.\n"
+            "- Set semantic_plan_status=\"unsupported\" for unsupported runtime or cross-app boundaries.\n"
+            "- Immediately emit final SEMANTIC_RESULT_JSON after classification.\n"
+            "- Include structured_intent_extracted, semantic_family, semantic_planner_invoked, semantic_plan_status, "
+            "unsupported_boundary_returned, unsupported_boundary_reason, source_builder_refs, and preview_hash when present.\n"
+        )
     if scenario.family in {"read_only_bus_listing", "waql_descendant_query"}:
         return (
             "\n\nLIVE READ CONSTRAINTS:\n"
@@ -633,11 +799,16 @@ def _scenario_live_directive(scenario: SemanticScenario, *, semantic_object_name
         return (
             "\n\nCONFIRMED MUTATION CONSTRAINTS:\n"
             f"- Use the exact object name `{name}` for both preview and confirmed execution in this run.\n"
-            "- Treat `SEMANTIC FOLLOW-UP: confirm` as the explicit user confirmation for this scenario.\n"
+            "- Do not spawn research, explore, librarian, documentation, planning, Oracle, or background subagents.\n"
+            "- Do not wait on background tasks.\n"
+            "- Extract structured semantic intent and call SemanticPlanner.plan() before the final answer.\n"
+            "- Treat `SEMANTIC FOLLOW-UP: confirm` as the explicit validation confirmation for the exact generated preview hash in this run.\n"
             "- First establish the same preview target identity, then execute the confirmed create against that identity, "
             "then verify with live readback.\n"
             "- Report confirmation_observed=true, mutation_executed=true, matching preview_target_identity and "
-            "execution_target_identity, and verification_status=\"verified\" only if those steps actually happened."
+            "execution_target_identity, and verification_status=\"verified\" only if those steps actually happened.\n"
+            "- Do not execute if the preview hash does not match the submitted confirmation hash.\n"
+            "- Immediately emit final SEMANTIC_RESULT_JSON after preview, confirmed execution, and live readback.\n"
         )
     if scenario.family == "invalid_parent_mutation_preview":
         name = semantic_object_name or "the requested semantic bus"
@@ -680,13 +851,15 @@ def _semantic_object_names(scenarios: Sequence[SemanticScenario]) -> dict[str, s
             "invalid_parent_mutation_preview",
             "confirm_live_mutation_verify",
             "compound_read_then_confirm",
+            "semantic-capability-confirmed-small-authoring",
         }
     }
 
 
 def _semantic_object_name(scenario_id: str, *, run_id: str) -> str:
     slug = scenario_id.removeprefix("phase3-").replace("-", "_")
-    return f"Temp_UI_Bus_{slug}_{run_id}"
+    prefix = "UI_Menu_Clicks_Semantic" if scenario_id == "semantic-capability-confirmed-small-authoring" else "Temp_UI_Bus"
+    return f"{prefix}_{slug}_{run_id}"
 
 
 def _selected_versions(raw: str) -> tuple[str, ...]:

@@ -38,6 +38,7 @@ from tests.semantic.support.opencode_harness import (  # pyright: ignore[reportM
     SkillSymlinkRequirement,
     WwiseSandboxMetadata,
 )
+from wwise_waapi.headless import CleanupReport, ResidualProcess  # pyright: ignore[reportMissingImports]
 
 
 def test_phase3_required_scenarios_load_all_must_cover_cases() -> None:
@@ -164,6 +165,152 @@ def test_semantic_capability_evaluator_requires_planner_facts() -> None:
     assert unsupported_execution_claim.verdict == "fail"
     assert any("unsupported runtime/cross-app execution" in note for note in unsupported_execution_claim.failure_notes)
     assert unsupported_pass.verdict == "pass"
+
+
+def test_semantic_capability_concrete_preview_needs_clarification_fails() -> None:
+    supported = _scenario("semantic-capability-crud-preview")
+
+    verdict = evaluate_scenario_output(
+        supported,
+        "SEMANTIC_RESULT_JSON: "
+        + json.dumps(
+            {
+                "structured_intent_extracted": True,
+                "semantic_family": "crud_authoring",
+                "semantic_planner_invoked": True,
+                "semantic_plan_status": "needs_clarification",
+                "preview_ready": True,
+                "preview_hash": "sha256:preview-ready-needs-clarification",
+                "source_builder_refs": ["wwise_waapi.builders.common"],
+                "mutation_executed_before_confirmation": False,
+                "mutation_executed": False,
+            }
+        ),
+    )
+
+    assert verdict.verdict == "fail"
+    assert any("needs_clarification" in note for note in verdict.failure_notes)
+
+
+def test_semantic_capability_import_source_file_boundary_clarification_can_pass() -> None:
+    supported = _scenario("semantic-capability-import-preview-boundary")
+
+    verdict = evaluate_scenario_output(
+        supported,
+        "SEMANTIC_RESULT_JSON: "
+        + json.dumps(
+            {
+                "structured_intent_extracted": True,
+                "semantic_family": "asset_import_workflow",
+                "semantic_planner_invoked": True,
+                "semantic_plan_status": "needs_clarification",
+                "preview_hash": "sha256:import-source-file-boundary",
+                "source_builder_refs": ["wwise_waapi.builders.importer"],
+                "source_file_boundary_returned": True,
+                "missing_source_files": ["/tmp/ui_confirm.wav", "/tmp/ui_cancel.wav", "/tmp/ui_hover.wav"],
+                "clarification": {"reason": "source files must be user-provided before import execution"},
+                "mutation_executed_before_confirmation": False,
+                "mutation_executed": False,
+            }
+        ),
+    )
+
+    assert verdict.verdict == "pass"
+
+
+def test_unsupported_execution_scan_ignores_opencode_tool_input_echoes() -> None:
+    unsupported = _scenario("semantic-capability-cross-app-mcp-unsupported")
+    tool_event = {
+        "type": "tool_use",
+        "part": {
+            "type": "tool",
+            "tool": "bash",
+            "state": {
+                "input": {
+                    "command": "python classify.py --goal 'Classify runtime validation federated through another app MCP server'",
+                    "text": "mcp federation executed",
+                }
+            },
+        },
+    }
+    final_event = {
+        "type": "text",
+        "part": {
+            "type": "text",
+            "text": "SEMANTIC_RESULT_JSON: "
+            + json.dumps(
+                {
+                    "structured_intent_extracted": True,
+                    "semantic_family": "unsupported_runtime_boundary",
+                    "semantic_planner_invoked": True,
+                    "semantic_plan_status": "unsupported",
+                    "unsupported_boundary_returned": True,
+                    "unsupported_boundary_reason": "cross-app MCP federation is outside this WAAPI skill boundary",
+                    "mutation_executed": False,
+                }
+            ),
+        },
+    }
+
+    verdict = evaluate_scenario_output(unsupported, json.dumps(tool_event) + "\n" + json.dumps(final_event))
+
+    assert verdict.verdict == "pass"
+
+
+def test_unsupported_execution_scan_fails_final_opencode_text_event_execution_claims() -> None:
+    unsupported = _scenario("semantic-capability-cross-app-mcp-unsupported")
+    tool_event = {
+        "type": "tool_use",
+        "part": {
+            "type": "tool",
+            "tool": "bash",
+            "state": {"input": {"text": "mcp federation executed"}},
+        },
+    }
+    final_event = {
+        "type": "text",
+        "part": {
+            "type": "text",
+            "text": "mcp federation executed\nSEMANTIC_RESULT_JSON: "
+            + json.dumps(
+                {
+                    "structured_intent_extracted": True,
+                    "semantic_family": "unsupported_runtime_boundary",
+                    "semantic_planner_invoked": True,
+                    "semantic_plan_status": "unsupported",
+                    "unsupported_boundary_returned": True,
+                    "mutation_executed": False,
+                }
+            ),
+        },
+    }
+
+    verdict = evaluate_scenario_output(unsupported, json.dumps(tool_event) + "\n" + json.dumps(final_event))
+
+    assert verdict.verdict == "fail"
+    assert any("unsupported runtime/cross-app execution" in note for note in verdict.failure_notes)
+
+
+def test_unsupported_execution_scan_fails_final_assistant_execution_claims() -> None:
+    unsupported = _scenario("semantic-capability-cross-app-mcp-unsupported")
+
+    verdict = evaluate_scenario_output(
+        unsupported,
+        "mcp federation executed\nSEMANTIC_RESULT_JSON: "
+        + json.dumps(
+            {
+                "structured_intent_extracted": True,
+                "semantic_family": "unsupported_runtime_boundary",
+                "semantic_planner_invoked": True,
+                "semantic_plan_status": "unsupported",
+                "unsupported_boundary_returned": True,
+                "mutation_executed": False,
+            }
+        ),
+    )
+
+    assert verdict.verdict == "fail"
+    assert any("unsupported runtime/cross-app execution" in note for note in verdict.failure_notes)
 
 
 def test_read_only_and_waql_verdicts_fail_on_repo_doc_first_drift() -> None:
@@ -632,7 +779,125 @@ def test_live_confirmed_mutation_prompt_uses_repeatable_generated_name() -> None
     assert "called Temp_UI_Bus_abcd1234" in prompt
     assert "called Temp_UI_Bus." not in prompt
     assert "Use the exact object name `Temp_UI_Bus_abcd1234`" in prompt
-    assert "Treat `SEMANTIC FOLLOW-UP: confirm` as the explicit user confirmation" in prompt
+    assert "Do not spawn research, explore, librarian, documentation, planning, Oracle, or background subagents" in prompt
+    assert "Do not wait on background tasks" in prompt
+    assert "Extract structured semantic intent and call SemanticPlanner.plan() before the final answer" in prompt
+    assert "Treat `SEMANTIC FOLLOW-UP: confirm` as the explicit validation confirmation for the exact generated preview hash in this run" in prompt
+    assert "Do not execute if the preview hash does not match the submitted confirmation hash" in prompt
+    assert "Immediately emit final SEMANTIC_RESULT_JSON after preview, confirmed execution, and live readback" in prompt
+
+
+def test_live_semantic_capability_confirmed_prompt_uses_repeatable_generated_name() -> None:
+    prompt = _scenario_prompt(
+        _scenario("semantic-capability-confirmed-small-authoring"),
+        live_metadata=WwiseSandboxMetadata(wwise_version="2021.1", waapi_host="127.0.0.1", waapi_port=64503),
+        semantic_object_name="UI_Menu_Clicks_Semantic_abcd1234",
+    )
+
+    assert "UI_Menu_Clicks_Semantic_abcd1234" in prompt
+    assert "named UI_Menu_Clicks_Semantic after previewing it" not in prompt
+    assert "Treat `SEMANTIC FOLLOW-UP: confirm` as explicit validation confirmation for the exact generated preview hash in this run" in prompt
+    assert "set semantic_plan_status=\"preview_ready\" or \"plan_ready\"" in prompt
+    assert "do not use semantic_plan_status=\"needs_clarification\" for a concrete preview" in prompt
+    assert "Execute only the exact preview whose hash matches the submitted confirmation hash" in prompt
+    assert "report mutation_executed_before_confirmation=false" in prompt
+
+
+def test_semantic_capability_live_prompts_require_planner_facts_and_no_subagents() -> None:
+    navigation = _scenario_prompt(
+        _scenario("semantic-capability-navigation-summary"),
+        live_metadata=WwiseSandboxMetadata(wwise_version="2022.1", waapi_host="127.0.0.1", waapi_port=64502),
+    )
+    system_design = _scenario_prompt(
+        _scenario("semantic-capability-system-design-preview"),
+        live_metadata=WwiseSandboxMetadata(wwise_version="2022.1", waapi_host="127.0.0.1", waapi_port=64502),
+    )
+    soundbank_plan = _scenario_prompt(
+        _scenario("semantic-capability-soundbank-plan"),
+        live_metadata=WwiseSandboxMetadata(wwise_version="2022.1", waapi_host="127.0.0.1", waapi_port=64502),
+    )
+    import_preview = _scenario_prompt(
+        _scenario("semantic-capability-import-preview-boundary"),
+        live_metadata=WwiseSandboxMetadata(wwise_version="2022.1", waapi_host="127.0.0.1", waapi_port=64502),
+    )
+    switch_preview = _scenario_prompt(
+        _scenario("semantic-capability-switch-assignment-plan"),
+        live_metadata=WwiseSandboxMetadata(wwise_version="2022.1", waapi_host="127.0.0.1", waapi_port=64502),
+    )
+    profiler_guidance = _scenario_prompt(
+        _scenario("semantic-capability-profiler-guidance"),
+        live_metadata=WwiseSandboxMetadata(wwise_version="2022.1", waapi_host="127.0.0.1", waapi_port=64502),
+    )
+    confirmed = _scenario_prompt(
+        _scenario("semantic-capability-confirmed-small-authoring"),
+        live_metadata=WwiseSandboxMetadata(wwise_version="2022.1", waapi_host="127.0.0.1", waapi_port=64502),
+    )
+    unsupported = _scenario_prompt(
+        _scenario("semantic-capability-cross-app-mcp-unsupported"),
+        live_metadata=WwiseSandboxMetadata(wwise_version="2022.1", waapi_host="127.0.0.1", waapi_port=64502),
+    )
+
+    for prompt in (navigation, system_design, soundbank_plan, import_preview, switch_preview, profiler_guidance, confirmed):
+        assert "SemanticPlanner is the Python module wwise_waapi.semantic_planner, not an external tool; do not report it as unavailable" in prompt
+        assert "Do not spawn research, explore, librarian, documentation, planning, Oracle, or background subagents" in prompt
+        assert "Do not wait on background tasks" in prompt
+        assert "Extract structured semantic intent and call SemanticPlanner.plan() before the final answer" in prompt
+        assert "Live WAAPI may supplement or verify the plan, but it does not replace planner facts" in prompt
+        assert "SEMANTIC_RESULT_JSON" in prompt
+
+    for prompt in (navigation, system_design, soundbank_plan, switch_preview, profiler_guidance):
+        assert "set semantic_plan_status=\"preview_ready\" or \"plan_ready\"" in prompt
+        assert "reserve semantic_plan_status=\"needs_clarification\" for true missing-input blockers" in prompt
+
+    assert "set semantic_plan_status=\"preview_ready\" or \"plan_ready\"" in confirmed
+    assert "do not use semantic_plan_status=\"needs_clarification\" for a concrete preview" in confirmed
+    assert "report mutation_executed_before_confirmation=false" in confirmed
+
+    assert "structured_intent_extracted" in navigation
+    assert "semantic_family" in navigation
+    assert "semantic_planner_invoked" in navigation
+    assert "Set semantic_family to intent_navigation" in navigation
+    assert "\\Actor-Mixer Hierarchy\\Default Work Unit" in system_design
+    assert "UI_Menu_WorkUnit" in system_design
+    assert "UI_Menu_SFX" in system_design
+    assert "UI_Master_Bus" in system_design
+    assert "Play_UI_Click" in system_design
+    assert "Play_UI_Hover" in system_design
+    assert "Play_UI_Open" in system_design
+    assert "UI SoundBank object plan named UI_SoundBank" in soundbank_plan
+    assert "If the live project exposes no UI events, still produce a previewable UI SoundBank object plan" in soundbank_plan
+    assert "do not generate or mutate banks without confirmation" in soundbank_plan
+    assert "Set semantic_family to soundbank_workflow" in soundbank_plan
+    assert "source_builder_refs" in import_preview
+    assert "Attempt the live read-only WAAPI target check before any repo/docs/source research" in import_preview
+    assert "live_waapi_before_research=true only if that ordering actually happened" in import_preview
+    assert "set semantic_plan_status=\"preview_ready\" or \"plan_ready\" even when source WAV files still require user provision" in import_preview
+    assert "do not use semantic_plan_status=\"needs_clarification\" for that preview" in import_preview
+    assert "source_file_boundary_returned=true" in import_preview
+    assert "missing_source_files or source_files_required" in import_preview
+    assert "preview_hash when required" in switch_preview
+    assert "Set semantic_family to asset_import_workflow" in import_preview
+    assert "\\Actor-Mixer Hierarchy\\Default Work Unit" in import_preview
+    assert "/tmp/ui_confirm.wav" in import_preview
+    assert "/tmp/ui_cancel.wav" in import_preview
+    assert "/tmp/ui_hover.wav" in import_preview
+    assert "Footstep_Types" in switch_preview
+    assert "Set semantic_family to switch_assignment_workflow" in switch_preview
+    assert "exact generated preview hash" in confirmed
+    assert "confirmation_observed=true" in confirmed
+    assert "verification_status=\"verified\" only if those steps actually happened" in confirmed
+
+    assert "Do not spawn research, explore, librarian, documentation, planning, Oracle, or background subagents" in unsupported
+    assert "Do not wait on background tasks" in unsupported
+    assert "SemanticPlanner is the Python module wwise_waapi.semantic_planner, not an external tool; do not report it as unavailable" in unsupported
+    assert "Extract structured semantic intent and call SemanticPlanner.plan() before the final answer" in unsupported
+    assert "Route unsupported runtime or cross-app requests through unsupported_runtime_boundary" in unsupported
+    assert "Set semantic_family to unsupported_runtime_boundary" in unsupported
+    assert "Set semantic_plan_status=\"unsupported\"" in unsupported
+    assert "unsupported_boundary_returned" in unsupported
+    assert "unsupported_boundary_reason" in unsupported
+    assert "unsupported_runtime_boundary" in unsupported
+    assert "SEMANTIC_RESULT_JSON" in unsupported
 
 
 def test_live_invalid_preview_prompt_forbids_research_and_requires_immediate_preview_json() -> None:
@@ -1187,7 +1452,7 @@ def test_opencode_run_timeout_writes_blocked_record_summary_and_stops_strict_liv
     )
 
     assert exit_code == 1
-    assert len(runner_calls) == 1
+    assert len(runner_calls) == 2
     summary = json.loads((archive_root / SUMMARY_2022_FILENAME).read_text(encoding="utf-8"))
     assert summary["counts"] == {"blocked": 1, "fail": 0, "pass": 0, "skip": 0}
     payloads = [json.loads(path.read_text(encoding="utf-8")) for path in sorted(archive_root.glob("*/phase3-*/record.json"))]
@@ -1199,6 +1464,383 @@ def test_opencode_run_timeout_writes_blocked_record_summary_and_stops_strict_liv
         assert "timed out after 0.1 seconds" in payload["assistant_output"]
         assert payload["command_exit_status"] == 124
         assert any("OpenCode attached run timed out" in note for note in payload["failure_notes"])
+
+
+def test_strict_live_batch_retries_timeout_once_before_success(tmp_path: Path, monkeypatch) -> None:
+    workspace = _workspace_with_symlink(tmp_path)
+    archive_root = tmp_path / "archive"
+    scenario = _scenario("semantic-capability-navigation-summary")
+    attempts: list[int] = []
+
+    monkeypatch.setattr(
+        "tests.semantic.run_opencode_semantic_batch._scenarios_for_batch",
+        lambda scenario_set, version: (scenario,),
+    )
+
+    def available(version: str, checked_workspace: Path) -> VersionPrerequisites:
+        assert checked_workspace == workspace.resolve(strict=False)
+        return VersionPrerequisites(
+            version=version,
+            console_path="/mock/WwiseConsole.sh",
+            sample_project_path="/mock/SampleProject.wproj",
+            available=True,
+            missing=(),
+        )
+
+    def harness_factory(version: str, checked_workspace: Path, live: bool) -> OpenCodeSemanticHarness:
+        assert live is True
+        install = checked_workspace / ".agents" / "skills" / "waapi-skill"
+        source = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+
+        def runner(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+            attempts.append(1)
+            assert kwargs["timeout"] == 0.1
+            if len(attempts) == 1:
+                raise subprocess.TimeoutExpired(
+                    cmd=command,
+                    timeout=kwargs["timeout"],
+                    output="first timeout stdout\n",
+                    stderr="first timeout stderr\n",
+                )
+            return subprocess.CompletedProcess(command, 0, stdout=f"Session: ses_retry\n{_capability_facts(scenario)}", stderr="")
+
+        return OpenCodeSemanticHarness(
+            OpenCodeHarnessConfig(
+                workspace=checked_workspace,
+                skill_requirement=SkillSymlinkRequirement(install_path=install, source_path=source),
+                wwise=WwiseSandboxMetadata(wwise_version=version, sandbox_metadata_path=tmp_path / "sandbox-metadata.json"),
+                live=False,
+                opencode_run_timeout_seconds=0.1,
+            ),
+            runner=runner,
+        )
+
+    exit_code = run_batch(
+        [
+            "--scenario-set",
+            "semantic-capability-required",
+            "--wwise-version",
+            "2022.1",
+            "--workspace",
+            str(workspace),
+            "--archive-root",
+            str(archive_root),
+            "--require-live",
+        ],
+        prerequisite_checker=available,
+        harness_factory=harness_factory,
+    )
+
+    assert exit_code == 0
+    assert len(attempts) == 2
+    summary = json.loads((archive_root / SUMMARY_SEMANTIC_CAPABILITY_REQUIRED_FILENAME).read_text(encoding="utf-8"))
+    assert summary["counts"] == {"blocked": 0, "fail": 0, "pass": 1, "skip": 0}
+    payloads = [json.loads(path.read_text(encoding="utf-8")) for path in sorted(archive_root.glob("*/semantic-capability-*/record.json"))]
+    assert len(payloads) == 1
+    assert payloads[0]["verdict"] == "pass"
+
+
+def test_strict_live_batch_blocks_after_two_timeout_attempts(tmp_path: Path, monkeypatch) -> None:
+    workspace = _workspace_with_symlink(tmp_path)
+    archive_root = tmp_path / "archive"
+    scenario = _scenario("semantic-capability-navigation-summary")
+    attempts: list[int] = []
+
+    monkeypatch.setattr(
+        "tests.semantic.run_opencode_semantic_batch._scenarios_for_batch",
+        lambda scenario_set, version: (scenario,),
+    )
+
+    def available(version: str, checked_workspace: Path) -> VersionPrerequisites:
+        assert checked_workspace == workspace.resolve(strict=False)
+        return VersionPrerequisites(
+            version=version,
+            console_path="/mock/WwiseConsole.sh",
+            sample_project_path="/mock/SampleProject.wproj",
+            available=True,
+            missing=(),
+        )
+
+    def harness_factory(version: str, checked_workspace: Path, live: bool) -> OpenCodeSemanticHarness:
+        assert live is True
+        install = checked_workspace / ".agents" / "skills" / "waapi-skill"
+        source = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+
+        def runner(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+            attempts.append(1)
+            assert kwargs["timeout"] == 0.1
+            raise subprocess.TimeoutExpired(
+                cmd=command,
+                timeout=kwargs["timeout"],
+                output="timed stdout\n",
+                stderr="timed stderr\n",
+            )
+
+        return OpenCodeSemanticHarness(
+            OpenCodeHarnessConfig(
+                workspace=checked_workspace,
+                skill_requirement=SkillSymlinkRequirement(install_path=install, source_path=source),
+                wwise=WwiseSandboxMetadata(wwise_version=version, sandbox_metadata_path=tmp_path / "sandbox-metadata.json"),
+                live=False,
+                opencode_run_timeout_seconds=0.1,
+            ),
+            runner=runner,
+        )
+
+    exit_code = run_batch(
+        [
+            "--scenario-set",
+            "semantic-capability-required",
+            "--wwise-version",
+            "2022.1",
+            "--workspace",
+            str(workspace),
+            "--archive-root",
+            str(archive_root),
+            "--require-live",
+        ],
+        prerequisite_checker=available,
+        harness_factory=harness_factory,
+    )
+
+    assert exit_code == 1
+    assert len(attempts) == 2
+    summary = json.loads((archive_root / SUMMARY_SEMANTIC_CAPABILITY_REQUIRED_FILENAME).read_text(encoding="utf-8"))
+    assert summary["counts"] == {"blocked": 1, "fail": 0, "pass": 0, "skip": 0}
+    payloads = [json.loads(path.read_text(encoding="utf-8")) for path in sorted(archive_root.glob("*/semantic-capability-*/record.json"))]
+    assert len(payloads) == 1
+    assert payloads[0]["verdict"] == "blocked"
+    assert payloads[0]["command_exit_status"] == 124
+
+
+def test_strict_live_batch_retries_session_not_found_once_before_success(tmp_path: Path, monkeypatch) -> None:
+    workspace = _workspace_with_symlink(tmp_path)
+    archive_root = tmp_path / "archive"
+    scenario = _scenario("semantic-capability-navigation-summary")
+    attempts: list[int] = []
+
+    monkeypatch.setattr(
+        "tests.semantic.run_opencode_semantic_batch._scenarios_for_batch",
+        lambda scenario_set, version: (scenario,),
+    )
+
+    def available(version: str, checked_workspace: Path) -> VersionPrerequisites:
+        assert checked_workspace == workspace.resolve(strict=False)
+        return VersionPrerequisites(
+            version=version,
+            console_path="/mock/WwiseConsole.sh",
+            sample_project_path="/mock/SampleProject.wproj",
+            available=True,
+            missing=(),
+        )
+
+    def harness_factory(version: str, checked_workspace: Path, live: bool) -> OpenCodeSemanticHarness:
+        assert live is True
+        install = checked_workspace / ".agents" / "skills" / "waapi-skill"
+        source = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+
+        def runner(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+            attempts.append(1)
+            assert kwargs["timeout"] == 0.1
+            if len(attempts) == 1:
+                return subprocess.CompletedProcess(command, 1, stdout="Error: Session not found\n", stderr="")
+            return subprocess.CompletedProcess(command, 0, stdout=f"Session: ses_retry\n{_capability_facts(scenario)}", stderr="")
+
+        return OpenCodeSemanticHarness(
+            OpenCodeHarnessConfig(
+                workspace=checked_workspace,
+                skill_requirement=SkillSymlinkRequirement(install_path=install, source_path=source),
+                wwise=WwiseSandboxMetadata(wwise_version=version, sandbox_metadata_path=tmp_path / "sandbox-metadata.json"),
+                live=False,
+                opencode_run_timeout_seconds=0.1,
+            ),
+            runner=runner,
+        )
+
+    exit_code = run_batch(
+        [
+            "--scenario-set",
+            "semantic-capability-required",
+            "--wwise-version",
+            "2022.1",
+            "--workspace",
+            str(workspace),
+            "--archive-root",
+            str(archive_root),
+            "--require-live",
+        ],
+        prerequisite_checker=available,
+        harness_factory=harness_factory,
+    )
+
+    assert exit_code == 0
+    assert len(attempts) == 2
+    summary = json.loads((archive_root / SUMMARY_SEMANTIC_CAPABILITY_REQUIRED_FILENAME).read_text(encoding="utf-8"))
+    assert summary["counts"] == {"blocked": 0, "fail": 0, "pass": 1, "skip": 0}
+    payloads = [json.loads(path.read_text(encoding="utf-8")) for path in sorted(archive_root.glob("*/semantic-capability-*/record.json"))]
+    assert len(payloads) == 1
+    assert payloads[0]["verdict"] == "pass"
+
+
+def test_strict_live_batch_blocks_when_cleanup_leaves_residual_wine_helpers(tmp_path: Path, monkeypatch) -> None:
+    workspace = _workspace_with_symlink(tmp_path)
+    archive_root = tmp_path / "archive"
+    scenario = _scenario("semantic-capability-navigation-summary")
+    expected_prefix = str(tmp_path / "sandbox-wine-prefix")
+    captured_prefixes: list[str | None] = []
+
+    monkeypatch.setattr(
+        "tests.semantic.run_opencode_semantic_batch._scenarios_for_batch",
+        lambda scenario_set, version: (scenario,),
+    )
+    monkeypatch.setattr(
+        "tests.semantic.run_opencode_semantic_batch.emergency_cleanup_wwise_processes",
+        lambda prefix=None: (
+            captured_prefixes.append(str(prefix) if prefix is not None else None),
+            CleanupReport(
+                launch_pid=None,
+                wine_prefix="/tmp/fake-wine-prefix",
+                process_exited=True,
+                detached_cleanup_pids=[1234],
+                wineserver_commands=[["wineserver", "-k"]],
+                residual_processes=[
+                    ResidualProcess(pid=4321, command="wine64-preloader"),
+                    ResidualProcess(pid=4322, command="wineserver"),
+                    ResidualProcess(pid=4323, command="winedevice.exe"),
+                ],
+            ),
+        )[1],
+    )
+
+    def available(version: str, checked_workspace: Path) -> VersionPrerequisites:
+        assert checked_workspace == workspace.resolve(strict=False)
+        return VersionPrerequisites(
+            version=version,
+            console_path="/mock/WwiseConsole.sh",
+            sample_project_path="/mock/SampleProject.wproj",
+            available=True,
+            missing=(),
+        )
+
+    def harness_factory(version: str, checked_workspace: Path, live: bool) -> OpenCodeSemanticHarness:
+        assert live is True
+        install = checked_workspace / ".agents" / "skills" / "waapi-skill"
+        source = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+        harness = OpenCodeSemanticHarness(
+            OpenCodeHarnessConfig(
+                workspace=checked_workspace,
+                skill_requirement=SkillSymlinkRequirement(install_path=install, source_path=source),
+                wwise=WwiseSandboxMetadata(wwise_version=version, sandbox_metadata_path=tmp_path / "sandbox-metadata.json"),
+                live=False,
+                opencode_run_timeout_seconds=0.1,
+            ),
+            runner=lambda command, **kwargs: subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=f"Session: ses_cleanup_guard\n{_capability_facts(scenario)}",
+                stderr="",
+            ),
+        )
+        setattr(harness, "cleanup_semantic_live_sandbox", lambda: None)
+        setattr(harness, "semantic_live_wine_prefix", lambda: expected_prefix)
+        return harness
+
+    exit_code = run_batch(
+        [
+            "--scenario-set",
+            "semantic-capability-required",
+            "--wwise-version",
+            "2022.1",
+            "--workspace",
+            str(workspace),
+            "--archive-root",
+            str(archive_root),
+            "--require-live",
+        ],
+        prerequisite_checker=available,
+        harness_factory=harness_factory,
+    )
+
+    assert exit_code == 1
+    assert captured_prefixes == [expected_prefix]
+    summary = json.loads((archive_root / SUMMARY_SEMANTIC_CAPABILITY_REQUIRED_FILENAME).read_text(encoding="utf-8"))
+    assert summary["counts"] == {"blocked": 1, "fail": 0, "pass": 1, "skip": 0}
+    payloads = [json.loads(path.read_text(encoding="utf-8")) for path in sorted(archive_root.glob("*/semantic-capability-*/record.json"))]
+    assert len(payloads) == 2
+    blocked_payload = next(payload for payload in payloads if payload["verdict"] == "blocked")
+    assert any("wine64-preloader" in note for note in blocked_payload["failure_notes"])
+    assert any("wineserver" in note for note in blocked_payload["failure_notes"])
+    assert any("winedevice.exe" in note for note in blocked_payload["failure_notes"])
+
+
+def test_strict_live_batch_blocks_after_two_session_not_found_attempts(tmp_path: Path, monkeypatch) -> None:
+    workspace = _workspace_with_symlink(tmp_path)
+    archive_root = tmp_path / "archive"
+    scenario = _scenario("semantic-capability-navigation-summary")
+    attempts: list[int] = []
+
+    monkeypatch.setattr(
+        "tests.semantic.run_opencode_semantic_batch._scenarios_for_batch",
+        lambda scenario_set, version: (scenario,),
+    )
+
+    def available(version: str, checked_workspace: Path) -> VersionPrerequisites:
+        assert checked_workspace == workspace.resolve(strict=False)
+        return VersionPrerequisites(
+            version=version,
+            console_path="/mock/WwiseConsole.sh",
+            sample_project_path="/mock/SampleProject.wproj",
+            available=True,
+            missing=(),
+        )
+
+    def harness_factory(version: str, checked_workspace: Path, live: bool) -> OpenCodeSemanticHarness:
+        assert live is True
+        install = checked_workspace / ".agents" / "skills" / "waapi-skill"
+        source = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+
+        def runner(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+            attempts.append(1)
+            assert kwargs["timeout"] == 0.1
+            return subprocess.CompletedProcess(command, 1, stdout="Error: Session not found\n", stderr="")
+
+        return OpenCodeSemanticHarness(
+            OpenCodeHarnessConfig(
+                workspace=checked_workspace,
+                skill_requirement=SkillSymlinkRequirement(install_path=install, source_path=source),
+                wwise=WwiseSandboxMetadata(wwise_version=version, sandbox_metadata_path=tmp_path / "sandbox-metadata.json"),
+                live=False,
+                opencode_run_timeout_seconds=0.1,
+            ),
+            runner=runner,
+        )
+
+    exit_code = run_batch(
+        [
+            "--scenario-set",
+            "semantic-capability-required",
+            "--wwise-version",
+            "2022.1",
+            "--workspace",
+            str(workspace),
+            "--archive-root",
+            str(archive_root),
+            "--require-live",
+        ],
+        prerequisite_checker=available,
+        harness_factory=harness_factory,
+    )
+
+    assert exit_code == 1
+    assert len(attempts) == 2
+    summary = json.loads((archive_root / SUMMARY_SEMANTIC_CAPABILITY_REQUIRED_FILENAME).read_text(encoding="utf-8"))
+    assert summary["counts"] == {"blocked": 1, "fail": 0, "pass": 0, "skip": 0}
+    payloads = [json.loads(path.read_text(encoding="utf-8")) for path in sorted(archive_root.glob("*/semantic-capability-*/record.json"))]
+    assert len(payloads) == 1
+    assert payloads[0]["verdict"] == "blocked"
+    assert payloads[0]["command_exit_status"] == 1
+    assert "Session not found" in payloads[0]["assistant_output"]
+    assert any("OpenCode session id was not found" in note for note in payloads[0]["failure_notes"])
 
 
 def _passing_semantic_output(prompt: str) -> str:

@@ -15,13 +15,40 @@ Supported Wwise versions are `2021.1`, `2022.1`, `2023.1`, `2024.1`, and `2025.1
 
 Use this closed semantic-intent protocol before choosing scripts, builders, manifests, or docs. Extract one structured `SemanticIntent`, call `SemanticPlanner.plan()`, present the resulting `SemanticPlan` preview, require confirmation for project-changing steps, execute only when the submitted preview hash exactly matches `SemanticPlan.preview_hash`, then verify with the plan's verification steps. Do not invent intent families.
 
+```python
+from wwise_waapi.semantic_planner import SemanticIntent, SemanticIntentTarget, SemanticPlanner, confirm_semantic_plan
+
+intent = SemanticIntent(...)
+plan = SemanticPlanner().plan(intent)
+verification_steps = list(plan.verification_steps)
+facts = {
+    "structured_intent_extracted": True,
+    "semantic_family": intent.family,
+    "semantic_planner_invoked": True,
+    "semantic_plan_status": str(plan.status),
+    "preview_hash": plan.preview_hash,
+    "source_builder_refs": list(plan.source_builder_refs),
+    "unsupported_boundary_returned": plan.unsupported_capability,
+    "unsupported_boundary_reason": plan.blocked_reason,
+    "mutation_executed": False,
+    "mutation_executed_before_confirmation": False,
+    "verification_status": "not_applicable_unsupported_boundary" if plan.unsupported_capability else "planned",
+}
+submitted_preview_hash = confirmation_response.preview_hash
+confirmed = confirm_semantic_plan(
+    plan,
+    confirmation_state=confirmation_response.state,
+    submitted_preview_hash=submitted_preview_hash,
+)
+```
+
 1. Extract `SemanticIntent` with one family: `intent_navigation`, `crud_authoring`, `system_design_preview`, `asset_import_workflow`, `soundbank_workflow`, `switch_assignment_workflow`, `bounded_profiler_guidance`, or `unsupported_runtime_boundary`.
-2. If persisted config and live WAAPI are available for read-only navigation or WAQL-shaped requests, execute live WAAPI first. Use repository or documentation research only when the user explicitly asks for it or live execution is blocked, and report the blocker.
+2. Even read-only navigation and unsupported boundary requests still pass through `SemanticPlanner.plan()`. If persisted config and live WAAPI are available, live WAAPI may supplement or verify the plan, but it does not replace planner facts. Use repository or documentation research only when the user explicitly asks for it or live execution is blocked, and report the blocker.
 3. Route CRUD requests at the semantic family level: object creation, object mutation, property/reference edits, copy/move/delete, imports, soundbanks, and switch assignments become structured intent details for the planner. Do not paste raw WAAPI payload schemas into the prompt.
 4. Present the `SemanticPlan` preview before project-changing work. Include family, step summaries, target identities, risk flags, verification plan, and `preview_hash`; do not execute from prose-only confirmation.
-5. Confirm with `confirm_semantic_plan(preview, confirmation_state, submitted_preview_hash)`. Continue only when `confirmation_state` is `confirmed` and `submitted_preview_hash` exactly matches the current preview hash. Missing or mismatched hashes require a fresh preview.
+5. Confirm with `confirm_semantic_plan(preview, confirmation_state, submitted_preview_hash)`, where `submitted_preview_hash` is read from the user's confirmation response, not copied from the preview object by construction. Continue only when `confirmation_state` is `confirmed` and `submitted_preview_hash` exactly matches the current preview hash. Missing or mismatched hashes require a fresh preview.
 6. Execute only the confirmed plan whose hash matched the preview shown to the user. If target identity, planned API, options, arguments, payload preview, or risk flags drift, abort and re-preview.
-7. Verify after execution using the plan's readback, bounded topic evidence, or other verification templates. Report structured failures rather than replacing them with vague prose.
+7. Verify after execution using the plan's readback, bounded topic evidence, or other verification templates. Semantic capability runs must emit one machine-readable `SEMANTIC_RESULT_JSON` object with at least `structured_intent_extracted`, `semantic_family`, `semantic_planner_invoked`, `semantic_plan_status`, `preview_hash` when present or required, `source_builder_refs`, `unsupported_boundary_returned`, `unsupported_boundary_reason`, `mutation_executed`, `mutation_executed_before_confirmation`, and `verification_status`. Report structured failures rather than replacing them with vague prose.
 
 Unsupported boundary requests: scheduler or delayed runtime posting, Game Object View emitter control, timed runtime or ambience playback, audio narrative sequencing, RTPC ramps over time, and cross-app MCP federation are not supported execution capabilities. Route them as `unsupported_runtime_boundary`; these plans have no execution steps, no preview id or hash, and no verification claims. Offer supported alternatives only when appropriate, such as authoring a static object or switch plan, previewing soundbank changes, or running a live read summary.
 

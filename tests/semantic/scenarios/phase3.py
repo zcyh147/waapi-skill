@@ -215,8 +215,9 @@ def _semantic_capability_scenarios() -> tuple[SemanticScenario, ...]:
         SemanticScenario(
             id="semantic-capability-system-design-preview",
             prompt=(
-                "Design a safe hierarchy plan for a menu UI audio system with work units, containers, buses, and events. "
-                "Preview the plan only; do not create anything yet."
+                "Design a safe hierarchy plan for a menu UI audio system using the concrete placeholders `\\Actor-Mixer "
+                "Hierarchy\\Default Work Unit`, `UI_Menu_WorkUnit`, `UI_Menu_SFX`, `UI_Master_Bus`, `Play_UI_Click`, "
+                "`Play_UI_Hover`, and `Play_UI_Open`. Preview the plan only; do not create anything yet."
             ),
             expected_assertions=(
                 "extracts a structured system design preview intent",
@@ -232,8 +233,9 @@ def _semantic_capability_scenarios() -> tuple[SemanticScenario, ...]:
         SemanticScenario(
             id="semantic-capability-import-preview-boundary",
             prompt=(
-                "Plan an audio import workflow for three UI wav files into the SFX hierarchy and show the boundary between "
-                "previewable Wwise authoring and anything that still needs user-provided files."
+                "Plan an audio import workflow for three UI wav files into \\Actor-Mixer Hierarchy\\Default Work Unit and show "
+                "the boundary between previewable Wwise authoring and anything that still needs user-provided files. Use the "
+                "placeholder source files /tmp/ui_confirm.wav, /tmp/ui_cancel.wav, and /tmp/ui_hover.wav."
             ),
             expected_assertions=(
                 "extracts a structured asset import workflow intent",
@@ -249,8 +251,10 @@ def _semantic_capability_scenarios() -> tuple[SemanticScenario, ...]:
         SemanticScenario(
             id="semantic-capability-soundbank-plan",
             prompt=(
-                "Plan the SoundBank setup needed for a UI bank with included events and platform notes. Return a safe plan; "
-                "do not generate or mutate banks without confirmation."
+                "Plan the SoundBank setup needed for a UI SoundBank object plan named UI_SoundBank with included events and "
+                "platform notes. If the live project exposes no UI events, still produce a previewable UI SoundBank object plan "
+                "using the named UI bank and the available platform notes. Return a safe plan; do not generate or mutate banks "
+                "without confirmation."
             ),
             expected_assertions=(
                 "extracts a structured SoundBank workflow intent",
@@ -266,7 +270,8 @@ def _semantic_capability_scenarios() -> tuple[SemanticScenario, ...]:
         SemanticScenario(
             id="semantic-capability-switch-assignment-plan",
             prompt=(
-                "Plan how to assign footstep switch values to candidate containers and preview the required Wwise changes. "
+                "Plan how to assign footstep switch values into the concrete `Footstep_Types` switch container and preview the "
+                "required Wwise changes. "
                 "Do not author assignments until confirmed."
             ),
             expected_assertions=(
@@ -383,7 +388,7 @@ def evaluate_scenario_output(scenario: SemanticScenario, assistant_output: str) 
         _require(_truthy(facts, "confirmation_observed"), "confirmation was not observed", failures)
         _require(_truthy(facts, "mutation_executed"), "confirmed mutation did not execute", failures)
         _require(_identity_matches(facts), "preview target identity differs from execution target identity", failures)
-        verified = facts.get("verification_status") in {"verified", "pass", "passed"} or _truthy(facts, "verified")
+        verified = _verification_status_matches(facts, {"verified", "pass", "passed"}) or _truthy(facts, "verified")
         _require(verified, "confirmed mutation was not verified by readback", failures)
 
     elif scenario.family == "compound_read_then_confirm":
@@ -401,7 +406,7 @@ def evaluate_scenario_output(scenario: SemanticScenario, assistant_output: str) 
         if scenario.metadata.get("allows_confirmed_mutation"):
             _require(_truthy(facts, "confirmation_observed"), "confirmation was not observed", failures)
             _require(_truthy(facts, "mutation_executed"), "confirmed authoring did not execute", failures)
-            verified = facts.get("verification_status") in {"verified", "pass", "passed"} or _truthy(facts, "verified")
+            verified = _verification_status_matches(facts, {"verified", "pass", "passed"}) or _truthy(facts, "verified")
             _require(verified, "confirmed authoring was not verified by readback", failures)
         else:
             _require(not _truthy(facts, "mutation_executed"), "capability preview/plan mutated before confirmation", failures)
@@ -457,6 +462,57 @@ def _candidate_text_streams(output: str) -> tuple[str, ...]:
             continue
         streams.extend(_nested_text_values(event))
     return tuple(streams)
+
+
+def _assistant_text_streams(output: str) -> tuple[str, ...]:
+    streams: list[str] = []
+    saw_json_event = False
+    for line in output.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("{"):
+            continue
+        try:
+            event = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        saw_json_event = True
+        streams.extend(_assistant_event_text_values(event))
+    if saw_json_event:
+        return tuple(streams)
+    return (output,)
+
+
+def _assistant_event_text_values(event: Any) -> tuple[str, ...]:
+    if not isinstance(event, Mapping):
+        return ()
+
+    part = event.get("part")
+    if event.get("type") == "text":
+        return _text_part_values(part if part is not None else event)
+
+    if isinstance(part, Mapping) and part.get("type") == "text":
+        return _text_part_values(part)
+
+    if event.get("role") == "assistant" or event.get("type") in {"message", "assistant_message"}:
+        return _text_part_values(event.get("parts") or event.get("content") or ())
+
+    return ()
+
+
+def _text_part_values(value: Any) -> tuple[str, ...]:
+    texts: list[str] = []
+    if isinstance(value, dict):
+        if value.get("type") == "text" and isinstance(value.get("text"), str):
+            texts.append(value["text"])
+        elif "type" not in value:
+            for child in value.values():
+                if isinstance(child, (dict, list)):
+                    texts.extend(_text_part_values(child))
+    elif isinstance(value, list):
+        for item in value:
+            if isinstance(item, (dict, list)):
+                texts.extend(_text_part_values(item))
+    return tuple(texts)
 
 
 def _nested_text_values(value: Any) -> tuple[str, ...]:
@@ -529,14 +585,52 @@ def _require_builder_backed_plan(
     facts: Mapping[str, Any],
     failures: list[str],
 ) -> None:
+    refs = _source_builder_refs(facts)
+    semantic_plan_status = facts.get("semantic_plan_status")
+    source_file_boundary_clarification = _allows_import_source_file_boundary_clarification(scenario, facts)
+    if semantic_plan_status == "needs_clarification" and not source_file_boundary_clarification:
+        _require(
+            False,
+            "concrete preview scenario returned needs_clarification instead of preview_ready/plan_ready",
+            failures,
+        )
+    preview_ready = (
+        semantic_plan_status != "needs_clarification"
+        and (_truthy(facts, "preview_ready") or semantic_plan_status in {"plan_ready", "preview_ready"})
+    )
+    acceptable_plan = preview_ready or source_file_boundary_clarification
     _require(
-        _truthy(facts, "builder_backed_plan_produced") or facts.get("semantic_plan_status") in {"plan_ready", "preview_ready"},
+        _truthy(facts, "builder_backed_plan_produced") or (acceptable_plan and bool(refs)),
         "builder-backed semantic plan was not produced",
         failures,
     )
-    _require(bool(_source_builder_refs(facts)), "semantic plan has no builder provenance refs", failures)
+    _require(bool(refs), "semantic plan has no builder provenance refs", failures)
     if scenario.metadata.get("requires_preview_hash"):
         _require(bool(facts.get("preview_hash") or facts.get("semantic_preview_hash")), "preview hash fact was not emitted", failures)
+
+
+def _allows_import_source_file_boundary_clarification(scenario: SemanticScenario, facts: Mapping[str, Any]) -> bool:
+    if scenario.id != "semantic-capability-import-preview-boundary":
+        return False
+    if facts.get("semantic_plan_status") != "needs_clarification":
+        return False
+    if facts.get("semantic_family") != "asset_import_workflow":
+        return False
+
+    boundary_returned = (
+        _truthy(facts, "source_file_boundary_returned")
+        or _truthy(facts, "user_file_boundary_returned")
+        or _truthy(facts, "missing_source_files_boundary")
+    )
+    missing_files = facts.get("missing_source_files") or facts.get("source_files_required")
+    clarification = facts.get("clarification")
+    if isinstance(clarification, Mapping):
+        clarification_text = " ".join(str(value) for value in clarification.values())
+    else:
+        clarification_text = str(clarification or facts.get("blocked_reason") or "")
+    boundary_text = clarification_text.lower()
+    file_boundary_reason = "source" in boundary_text and ("file" in boundary_text or "user-provided" in boundary_text)
+    return boundary_returned and (bool(missing_files) or file_boundary_reason)
 
 
 def _require_unsupported_boundary(facts: Mapping[str, Any], failures: list[str]) -> None:
@@ -567,6 +661,13 @@ def _mapping_value(value: Any, key: str) -> Any:
     return None
 
 
+def _verification_status_matches(facts: Mapping[str, Any], expected: set[str]) -> bool:
+    status = facts.get("verification_status")
+    if isinstance(status, Mapping):
+        status = status.get("status") or status.get("value") or status.get("state")
+    return str(status or "") in expected
+
+
 def _claims_unsupported_execution(facts: Mapping[str, Any], output: str) -> bool:
     execution_keys = (
         "scheduler_executed",
@@ -578,7 +679,6 @@ def _claims_unsupported_execution(facts: Mapping[str, Any], output: str) -> bool
     )
     if any(_truthy(facts, key) for key in execution_keys):
         return True
-    lowered = output.lower()
     execution_claims = (
         "scheduled runtime event",
         "scheduled the runtime event",
@@ -592,7 +692,7 @@ def _claims_unsupported_execution(facts: Mapping[str, Any], output: str) -> bool
         "cross-app mcp execution complete",
         "mcp federation executed",
     )
-    return any(claim in lowered for claim in execution_claims)
+    return any(claim in stream.lower() for stream in _assistant_text_streams(output) for claim in execution_claims)
 
 
 def _string_set(value: Any) -> set[str]:
