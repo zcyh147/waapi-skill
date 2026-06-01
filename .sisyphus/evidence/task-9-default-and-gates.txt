@@ -1,6 +1,0 @@
-Task 9 acceptance summary
-
-- Default suite: `python -m pytest -q` → 486 passed, 29 skipped; no WwiseConsole required.
-- Destructive gate check: `WWISE_VERSION=2023.1 python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py -q` → safe module-level skip before WwiseConsole launch.
-- Cross-version audit: `python -m pytest tests/unit/test_2023_cross_version_audit.py -q` → 5 passed.
-- Result: default dispatcher remains 2022.1 and explicit 2023.1 destructive work stays opt-in behind live/destructive gates.

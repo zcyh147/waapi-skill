@@ -1,5 +1,0 @@
-GIT_MASTER=1 git status --short -- .sisyphus/runtime
-(no output)
-
-GIT_MASTER=1 git ls-files .sisyphus/runtime
-(no output)

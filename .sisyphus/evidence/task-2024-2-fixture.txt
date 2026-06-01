@@ -1,5 +1,0 @@
-Command: python -m pytest tests/unit/test_2024_fixture_inventory.py -q
-
-Output:
-.....                                                                    [100%]
-5 passed in 0.07s

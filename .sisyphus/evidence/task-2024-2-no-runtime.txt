@@ -1,7 +1,0 @@
-Command: python -m pytest tests/unit/test_2024_fixture_inventory.py -q
-
-Output:
-.....                                                                    [100%]
-5 passed in 0.07s
-
-Runtime check: .sisyphus/runtime existed before this task; no files matching **/*2024* were found under .sisyphus/runtime after fixture creation.

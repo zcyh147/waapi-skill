@@ -1,6 +1,0 @@
-Task 2025-13 default suite verification
-command: python -m pytest -q
-exit_status: 0
-output_summary: 646 passed, 57 skipped in 1.78s
-skip_summary: live/destructive tests skipped by opt-in gates (`WWISE_LIVE=1` / `WWISE_DESTRUCTIVE=1`)
-status: passed

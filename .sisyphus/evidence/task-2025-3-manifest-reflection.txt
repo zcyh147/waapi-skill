@@ -1,5 +1,0 @@
-Task 3 evidence: generated 2025.1 live reflection manifest resources.
-
-Verified outputs include explicit `resources/manifest/2025.1/*.json` resources and the 2024 cross-version audit now rejects bare `resources/manifest/2025/` payloads.
-
-Validation summary: unit coverage for the 2025.1 manifest resources and cross-version audit passed before commit.

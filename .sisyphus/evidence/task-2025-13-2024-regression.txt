@@ -1,5 +1,0 @@
-Task 2025-13 2024 regression verification
-command: python -m pytest tests/unit/test_2024_destructive_safety.py tests/unit/test_2024_docs_contract.py tests/unit/test_2024_live_coverage_matrix.py -q
-exit_status: 0
-output_summary: 26 passed in 0.06s
-status: passed

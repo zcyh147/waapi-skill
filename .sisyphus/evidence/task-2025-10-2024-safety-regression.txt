@@ -1,8 +1,0 @@
-Task 10: 2024 destructive safety regression
-
-Command: python -m pytest tests/unit/test_2024_destructive_safety.py -q
-Exit status: 0
-Pytest summary: 15 passed in 0.05s
-
-Regression summary: the existing 2024.1 destructive runtime and safety tests still pass
-after adding the separate 2025.1 destructive sandbox safety wrapper and tests.
