@@ -9,7 +9,7 @@ from typing import Any, cast
 REFERENCE_ROOT = Path("references") / "semantic" / "2024.1"
 SOURCE_NOTES = Path("skills") / "waapi-skill" / "resources" / "semantic" / "2024.1" / "source_notes.json"
 GATE_PATH = REFERENCE_ROOT / "semantic-builder-notebooklm-gate.md"
-TASK_5_NOTEBOOKLM_EVIDENCE = Path(".sisyphus") / "evidence" / "task-2024-5-notebooklm-gate.txt"
+TASK_5_NOTEBOOKLM_EVIDENCE = Path("references") / "evidence" / "task-2024-5-notebooklm-gate.txt"
 VERSION_2024 = "2024.1"
 NOTEBOOK_2024 = "wwise-2024.1-docs"
 FAMILIES = (

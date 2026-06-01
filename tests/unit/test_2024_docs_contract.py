@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 EVALS_JSON = ROOT / "tests" / "support" / "evals.json"
 REFERENCE_ROOT = ROOT / "references"
 SEMANTIC_2024_REFERENCES = REFERENCE_ROOT / "semantic" / "2024.1"
-TASK11_REVIEW_PACKET = ROOT / ".sisyphus" / "evidence" / "wwise-2024-waapi-integration-coverage" / "parity-review-packet.md"
+TASK11_REVIEW_PACKET = ROOT / "references" / "review-packets" / "wwise-2024.1-parity-review-packet.md"
 DOC_PATHS = (
     ROOT / "skills" / "waapi-skill" / "SKILL.md",
     *sorted(REFERENCE_ROOT.glob("*.md")),

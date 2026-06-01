@@ -12,7 +12,7 @@ DOC_PATHS = (
     ROOT / "references" / "phase2-user-review-packet.md",
 )
 EVALS_JSON = ROOT / "tests" / "support" / "evals.json"
-TASK8_REVIEW_PACKET = ROOT / ".sisyphus" / "evidence" / "wwise-2023-test-parity" / "parity-review-packet.md"
+TASK8_REVIEW_PACKET = ROOT / "references" / "review-packets" / "wwise-2023.1-parity-review-packet.md"
 
 WWISE_2023_CONSOLE = "/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh"
 WWISE_2023_SAMPLE_PROJECT = "/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj"
