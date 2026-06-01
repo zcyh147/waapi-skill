@@ -1,0 +1,24 @@
+Task 5 NotebookLM gate evidence
+
+- Notebook id: wwise-2025.1-docs
+- Gate status: open
+- Auth result: success
+- List result: success
+- Query result: success
+
+Auth status snapshot:
+- Authenticated: Yes
+- State file: omitted (local auth artifact)
+
+Notebook selection snapshot:
+- Wwise 2025.1 Docs [ACTIVE]
+- ID: wwise-2025.1-docs
+
+Local command evidence:
+- python scripts/run.py auth_manager.py status
+- python scripts/run.py notebook_manager.py list
+- python scripts/run.py ask.py --notebook-id wwise-2025.1-docs "Summarize the 2025.1 WAAPI semantic-builder evidence families."
+
+Safety notes:
+- Source-grounded answers were captured for the 2025.1 semantic builder families; runtime builders must not query NotebookLM.
+- Local authentication material, browser profiles, persisted state data, and private notebook links are intentionally omitted.
