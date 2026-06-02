@@ -7,7 +7,19 @@ description: Use this skill for Wwise WAAPI automation through the skill-local P
 
 Use this skill to automate Wwise through WAAPI with a Python-first workflow. The normal path is: make sure Python can run the skill-local wrapper, identify the target Wwise version, then extract a structured semantic intent and route it through the semantic planner.
 
-When config and live WAAPI connection details are already known, execute the live read-only query first for ordinary inspection requests. Do not start by inspecting repository files or launching documentation research unless the user explicitly asked for investigation or the live query path is blocked.
+When config and currently connectable WAAPI details are already known, execute the direct read-only query first for ordinary inspection requests. Do not start by inspecting repository files or launching documentation research unless the user explicitly asked for investigation or the direct connection path is blocked.
+
+## Welcome/status UX for Wwise version detection
+
+For simple user-facing questions such as "which Wwise version is open?", "what project is currently open?", or any first action that needs to choose the matching WAAPI version, treat the first visible reply as the skill's welcome surface. Start with the skill, connection endpoint, and version-detection purpose, not with a generic safety preamble or developer-facing reasoning. This improves UX because the user immediately sees that the Wwise-specific skill is active, which endpoint is being checked, and why version detection matters before any WAAPI work continues.
+
+Use this sequence:
+
+1. Immediately tell the user that `waapi-skill` is loaded and state the host/port you will try first to detect the current Wwise version and choose the compatible WAAPI support version. Use the saved `data/config.json` host/port when present; otherwise say the default WAAPI endpoint such as `127.0.0.1:8080`. Example: `waapi-skill is loaded. I will use 127.0.0.1:8080 to detect the current Wwise version so I can select the compatible WAAPI support version.`
+2. Connect to Wwise with `ak.wwise.core.getInfo`. If the saved config already has a host, port, and version, name each value clearly before connecting. Example: `The saved config has WAAPI endpoint 127.0.0.1:8080 and the previously recorded Wwise version 2022.1. I will connect to Wwise now to confirm the correct configuration.` If the saved port fails and no user-provided port was required, try the normal WAAPI default/fallback candidates before giving up, and report the port that actually worked.
+3. On success, report: `Found Wwise on <host>:<port>; the detected version is <display/version>. I updated the config active Wwise version to <supported-version>.` Then answer the user's actual question, adding project details from `ak.wwise.core.getProjectInfo` when needed.
+4. On failure to detect any connectable Wwise endpoint, stop the WAAPI request path and say directly: `No running Wwise instance with a connectable WAAPI endpoint was detected, so this request cannot continue.` Include the tried host/ports briefly, but do not answer from saved config or process-path guesses as if they were the current connected Wwise state.
+5. Avoid opening with phrases like `This is a read-only query...`, `I will directly call WAAPI...this will not modify the project`, `live WAAPI`, `old config`, or `current project fact`. Safety can be mentioned later only if it helps explain a mutation guardrail; for welcome UX, users first need to know which skill, endpoint, detected version, and config update state are active.
 
 Supported Wwise versions are `2021.1`, `2022.1`, `2023.1`, `2024.1`, and `2025.1`.
 
@@ -43,7 +55,7 @@ confirmed = confirm_semantic_plan(
 ```
 
 1. Extract `SemanticIntent` with one family: `intent_navigation`, `crud_authoring`, `system_design_preview`, `asset_import_workflow`, `soundbank_workflow`, `switch_assignment_workflow`, `bounded_profiler_guidance`, or `unsupported_runtime_boundary`.
-2. Even read-only navigation and unsupported boundary requests still pass through `SemanticPlanner.plan()`. If persisted config and live WAAPI are available, live WAAPI may supplement or verify the plan, but it does not replace planner facts. Use repository or documentation research only when the user explicitly asks for it or live execution is blocked, and report the blocker.
+2. Even read-only navigation and unsupported boundary requests still pass through `SemanticPlanner.plan()`. If persisted config and a currently connectable WAAPI session are available, that connection may supplement or verify the plan, but it does not replace planner facts. Use repository or documentation research only when the user explicitly asks for it or direct execution is blocked, and report the blocker.
 3. Route CRUD requests at the semantic family level: object creation, object mutation, property/reference edits, copy/move/delete, imports, soundbanks, and switch assignments become structured intent details for the planner. Do not paste raw WAAPI payload schemas into the prompt.
 4. Present the `SemanticPlan` preview before project-changing work. Include family, step summaries, target identities, risk flags, verification plan, and `preview_hash`; do not execute from prose-only confirmation.
 5. Confirm with `confirm_semantic_plan(preview, confirmation_state, submitted_preview_hash)`, where `submitted_preview_hash` is read from the user's confirmation response, not copied from the preview object by construction. Continue only when `confirmation_state` is `confirmed` and `submitted_preview_hash` exactly matches the current preview hash. Missing or mismatched hashes require a fresh preview.
@@ -76,9 +88,9 @@ For task work, call the Python layer instead of inventing shell commands. The ma
 
 Prefer an explicit user-provided Wwise version when the task depends on exact API behavior. Pass one of `2021.1`, `2022.1`, `2023.1`, `2024.1`, or `2025.1` to the dispatcher or builder flow when known.
 
-If the user does not specify a version, first probe the live Wwise connection with `ak.wwise.core.getInfo` through the runner or dispatcher, and also record the live WAAPI host/port that worked for this session. Infer the nearest supported version from the returned Wwise version when possible. If probing is unavailable or the version cannot be mapped safely, ask the user for the target version or use the documented fallback only for dry-run or low-risk read-only work.
+If the user does not specify a version, first connect to the currently running Wwise instance with `ak.wwise.core.getInfo` through the runner or dispatcher, and also record the WAAPI host/port that worked for this session. Infer the nearest supported version from the returned Wwise version when possible. If detection is unavailable or the version cannot be mapped safely, ask the user for the target version or use the documented fallback only for dry-run or low-risk read-only work.
 
-Persist the approved version, WAAPI host, and WAAPI port in the skill-local JSON config at `data/config.json` so future runs do not depend on conversation memory. Agents should read that config first and only probe live state again when the connection needs to be verified or the saved values are missing.
+Persist the approved version, WAAPI host, and WAAPI port in the skill-local JSON config at `data/config.json` so future runs do not depend on conversation memory. Agents should read that config first and only reconnect to Wwise when the connection needs to be verified or the saved values are missing.
 
 The saved config is user-overridable. The stable persisted user-facing config surface is limited to `wwise_version`, `waapi_host`, `waapi_port`, and `project_modification_policy`. If the user chooses a different Wwise version or WAAPI port, update the config and keep using that saved override until the user changes it again.
 
