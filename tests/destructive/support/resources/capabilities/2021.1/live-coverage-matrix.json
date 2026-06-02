@@ -1089,8 +1089,8 @@
         "destructive_opt_in": false,
         "risk_level": "low"
       },
-      "evidence_path": "resources/waql/2021.1/object-get-live-matrix.json",
-      "evidence_standard": "2021.1 read-only live sandbox evidence under .sisyphus/evidence/wwise-2021-waapi-integration-coverage/ plus resources/waql/2021.1/object-get-live-matrix.json counts as behavioral/live proof for ak.wwise.core.object.get only.",
+      "evidence_path": "resources/waql/2021.1/object-get-examples.json",
+      "evidence_standard": "2021.1 read-only live sandbox evidence under .sisyphus/evidence/wwise-2021-waapi-integration-coverage/ plus resources/waql/2021.1/object-get-examples.json counts as behavioral/live proof for ak.wwise.core.object.get only.",
       "fixture_prerequisites": [
         "WWISE_VERSION=2021.1",
         "WWISE_CONSOLE exact 2021.1.14.8108 path",

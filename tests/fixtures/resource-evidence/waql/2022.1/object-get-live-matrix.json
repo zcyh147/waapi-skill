@@ -1,0 +1,449 @@
+{
+  "fail_closed_gaps": [
+    {
+      "blocked_behavior": "Do not generate helpers that depend on a stable malformed-WAQL error payload schema.",
+      "category": "invalid syntax",
+      "counts_as_live_coverage": false,
+      "example_query": "from type Sound where",
+      "id": "invalid_syntax_error_payload_schema",
+      "reason": "Sources do not document WAAPI JSON error shapes for WAQL syntax or compilation errors.",
+      "references": [
+        "resources/waql/2022.1/object-get-live-matrix.json#fail_closed_gaps.invalid_syntax_error_payload_schema",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get",
+        "task-8-waql-missing.md lines 5-8"
+      ],
+      "status": "fail-closed"
+    },
+    {
+      "blocked_behavior": "Do not treat mutating words in WAQL as supported or safe.",
+      "category": "mutation rejection",
+      "counts_as_live_coverage": false,
+      "example_query": "from type Sound delete",
+      "id": "mutation_semantics_rejection",
+      "reason": "Stored examples and source notes cover read-only object.get queries only.",
+      "references": [
+        "resources/waql/2022.1/object-get-live-matrix.json#fail_closed_gaps.mutation_semantics_rejection",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get",
+        "task-8-waql-missing.md line 9"
+      ],
+      "status": "fail-closed"
+    },
+    {
+      "blocked_behavior": "Do not synthesize raw WAQL string-literal escaping rules for embedded quotes or special characters beyond normal JSON escaping.",
+      "category": "quoted strings and JSON escaping",
+      "counts_as_live_coverage": false,
+      "example_query": "from search \"name with embedded raw quote\"",
+      "id": "raw_quote_escaping_beyond_json",
+      "reason": "Sources document JSON escaping for the WAAPI string but not exhaustive raw WAQL literal escaping.",
+      "references": [
+        "resources/waql/2022.1/object-get-live-matrix.json#fail_closed_gaps.raw_quote_escaping_beyond_json",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get",
+        "task-8-waql-missing.md line 5"
+      ],
+      "status": "fail-closed"
+    },
+    {
+      "blocked_behavior": "Do not generate exhaustive per-object-type property/reference helpers from the WAQL notes.",
+      "category": "property/reference gaps",
+      "counts_as_live_coverage": false,
+      "example_query": "from type Sound where @UndocumentedProperty = 1",
+      "id": "exhaustive_property_reference_inventory",
+      "reason": "References explain property/reference prefixes but do not list every property/reference per Wwise type.",
+      "references": [
+        "resources/waql/2022.1/object-get-live-matrix.json#fail_closed_gaps.exhaustive_property_reference_inventory",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get",
+        "task-8-waql-missing.md line 6"
+      ],
+      "status": "fail-closed"
+    },
+    {
+      "blocked_behavior": "Do not claim timeout, memory, recursion depth, or pagination semantics for WAQL transforms.",
+      "category": "performance/limit semantics",
+      "counts_as_live_coverage": false,
+      "example_query": "from project select descendants",
+      "id": "performance_limit_semantics",
+      "reason": "Sources explicitly omit execution timeout, memory, recursion, and pagination limit rules beyond legacy range transforms.",
+      "references": [
+        "resources/waql/2022.1/object-get-live-matrix.json#fail_closed_gaps.performance_limit_semantics",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get",
+        "task-8-waql-missing.md line 8"
+      ],
+      "status": "fail-closed"
+    }
+  ],
+  "live_cases": [
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\""
+      },
+      "assertions": [
+        "returned object identity matches the Actor-Mixer Hierarchy path"
+      ],
+      "category": "path queries",
+      "evidence_path": ".sisyphus/evidence/wwise-2022-test-parity/live-read-only/path_actor_mixer_root.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "identity": {
+          "name": "Actor-Mixer Hierarchy",
+          "path": "\\Actor-Mixer Hierarchy"
+        },
+        "result_count": {
+          "count": 1,
+          "policy": "exact"
+        }
+      },
+      "id": "path_actor_mixer_root",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ]
+      },
+      "sources": [
+        "resources/waql/2022.1/object-get-live-matrix.json#live_cases.path_actor_mixer_root",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from object \"{actor_mixer_root_id}\""
+      },
+      "assertions": [
+        "returned object id equals the previously discovered root GUID"
+      ],
+      "category": "GUID queries",
+      "evidence_path": ".sisyphus/evidence/wwise-2022-test-parity/live-read-only/guid_actor_mixer_root.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "identity": {
+          "id": "{actor_mixer_root_id}",
+          "name": "Actor-Mixer Hierarchy"
+        },
+        "result_count": {
+          "count": 1,
+          "policy": "exact"
+        }
+      },
+      "id": "guid_actor_mixer_root",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ]
+      },
+      "placeholders": {
+        "actor_mixer_root_id": "path_actor_mixer_root.return[0].id"
+      },
+      "sources": [
+        "resources/waql/2022.1/object-get-live-matrix.json#live_cases.guid_actor_mixer_root",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from type Sound where type = \"Sound\" take 1"
+      },
+      "assertions": [
+        "non-empty results, when present, have type Sound"
+      ],
+      "category": "name/type filters",
+      "evidence_path": ".sisyphus/evidence/wwise-2022-test-parity/live-read-only/sound_name_type_filter.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "type"
+        ],
+        "result_count": {
+          "allow_empty": true,
+          "count": 1,
+          "policy": "at_most"
+        },
+        "type": "Sound"
+      },
+      "id": "sound_name_type_filter",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type"
+        ]
+      },
+      "sources": [
+        "resources/waql/2022.1/object-get-live-matrix.json#live_cases.sound_name_type_filter",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from search \"Default Work Unit\" where name = \"Default Work Unit\" take 1"
+      },
+      "assertions": [
+        "JSON-escaped WAQL string literal is accepted; any returned row has the expected name"
+      ],
+      "category": "quoted strings and JSON escaping",
+      "evidence_path": ".sisyphus/evidence/wwise-2022-test-parity/live-read-only/quoted_search_default_work_unit.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "path"
+        ],
+        "identity": {
+          "name": "Default Work Unit"
+        },
+        "result_count": {
+          "allow_empty": true,
+          "count": 1,
+          "policy": "at_most"
+        }
+      },
+      "id": "quoted_search_default_work_unit",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "path"
+        ]
+      },
+      "sources": [
+        "resources/waql/2022.1/object-get-live-matrix.json#live_cases.quoted_search_default_work_unit",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\" select descendants take 1"
+      },
+      "assertions": [
+        "descendant rows, when present, remain under the Actor-Mixer Hierarchy path"
+      ],
+      "category": "descendant traversal",
+      "evidence_path": ".sisyphus/evidence/wwise-2022-test-parity/live-read-only/descendant_traversal_actor_mixer.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "path"
+        ],
+        "path_prefix": "\\Actor-Mixer Hierarchy\\",
+        "result_count": {
+          "allow_empty": true,
+          "count": 1,
+          "policy": "at_most"
+        }
+      },
+      "id": "descendant_traversal_actor_mixer",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "path"
+        ]
+      },
+      "sources": [
+        "resources/waql/2022.1/object-get-live-matrix.json#live_cases.descendant_traversal_actor_mixer",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from object \"{actor_mixer_descendant_id}\" select ancestors where name = \"Actor-Mixer Hierarchy\""
+      },
+      "assertions": [
+        "ancestor traversal from a discovered descendant returns the Actor-Mixer Hierarchy root"
+      ],
+      "category": "ancestor traversal",
+      "evidence_path": ".sisyphus/evidence/wwise-2022-test-parity/live-read-only/ancestor_traversal_from_discovered_descendant.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "path"
+        ],
+        "identity": {
+          "name": "Actor-Mixer Hierarchy",
+          "path": "\\Actor-Mixer Hierarchy"
+        },
+        "result_count": {
+          "count": 1,
+          "policy": "exact"
+        }
+      },
+      "id": "ancestor_traversal_from_discovered_descendant",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "path"
+        ]
+      },
+      "placeholders": {
+        "actor_mixer_descendant_id": "descendant_traversal_actor_mixer.return[0].id"
+      },
+      "skip_if_placeholder_missing": true,
+      "sources": [
+        "resources/waql/2022.1/object-get-live-matrix.json#live_cases.ancestor_traversal_from_discovered_descendant",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\" where childrenCount >= 0"
+      },
+      "assertions": [
+        "childrenCount is returned and satisfies the documented numeric comparison"
+      ],
+      "category": "property comparisons",
+      "evidence_path": ".sisyphus/evidence/wwise-2022-test-parity/live-read-only/children_count_property_comparison.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "childrenCount"
+        ],
+        "identity": {
+          "name": "Actor-Mixer Hierarchy"
+        },
+        "property": {
+          "comparison": ">=",
+          "name": "childrenCount",
+          "value": 0
+        },
+        "result_count": {
+          "count": 1,
+          "policy": "exact"
+        }
+      },
+      "id": "children_count_property_comparison",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "childrenCount"
+        ]
+      },
+      "sources": [
+        "resources/waql/2022.1/object-get-live-matrix.json#live_cases.children_count_property_comparison",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\""
+      },
+      "assertions": [
+        "returned row is constrained to the requested return fields"
+      ],
+      "category": "return/options selection",
+      "evidence_path": ".sisyphus/evidence/wwise-2022-test-parity/live-read-only/return_options_selection.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name"
+        ],
+        "forbidden_fields": [
+          "path",
+          "childrenCount"
+        ],
+        "identity": {
+          "name": "Actor-Mixer Hierarchy"
+        },
+        "result_count": {
+          "count": 1,
+          "policy": "exact"
+        }
+      },
+      "id": "return_options_selection",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name"
+        ]
+      },
+      "sources": [
+        "resources/waql/2022.1/object-get-live-matrix.json#live_cases.return_options_selection",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from project where name = \"__waapi_skills_missing_object__\""
+      },
+      "assertions": [
+        "documented query shape returns an empty result array for a deliberately absent name"
+      ],
+      "category": "empty results",
+      "evidence_path": ".sisyphus/evidence/wwise-2022-test-parity/live-read-only/empty_results_missing_name.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name"
+        ],
+        "result_count": {
+          "count": 0,
+          "policy": "exact"
+        }
+      },
+      "id": "empty_results_missing_name",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name"
+        ]
+      },
+      "sources": [
+        "resources/waql/2022.1/object-get-live-matrix.json#live_cases.empty_results_missing_name",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    }
+  ],
+  "metadata": {
+    "default_live": false,
+    "gap_evidence": ".sisyphus/evidence/task-8-waql-missing.md",
+    "name": "WAQL live sandbox matrix for ak.wwise.core.object.get",
+    "notes": [
+      "Live cases are read-only ak.wwise.core.object.get WAQL calls executed against Task 3 sandbox copies only.",
+      "Expected assertions use returned object identity/type/property fields; WAAPI success alone is not coverage.",
+      "Fail-closed gaps are intentionally excluded from live behavioral coverage until source documentation exists."
+    ],
+    "reference": "resources/waql/2022.1/object-get-live-matrix.json",
+    "sandbox_required": true,
+    "schema_source": "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get",
+    "source_project_mutation_allowed": false,
+    "uri": "ak.wwise.core.object.get",
+    "wwise_version_target": "2022.1"
+  }
+}

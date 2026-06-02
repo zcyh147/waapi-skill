@@ -51,9 +51,12 @@ export PYTHONPATH="$SKILL_DIR${PYTHONPATH:+:$PYTHONPATH}"
 INITIAL_WWISE_CONSOLE=""
 INITIAL_WWISE_SAMPLE_PROJECT_PATH=""
 INITIAL_WWISE_SANDBOX_ROOT=""
+INITIAL_WWISE_TEST_CONFIG=""
+RESOLVED_TEST_CONFIG=""
 HAS_INITIAL_WWISE_CONSOLE="0"
 HAS_INITIAL_WWISE_SAMPLE_PROJECT_PATH="0"
 HAS_INITIAL_WWISE_SANDBOX_ROOT="0"
+HAS_INITIAL_WWISE_TEST_CONFIG="0"
 
 if [[ -n "${WWISE_CONSOLE+x}" ]]; then
   INITIAL_WWISE_CONSOLE="$WWISE_CONSOLE"
@@ -66,6 +69,10 @@ fi
 if [[ -n "${WWISE_SANDBOX_ROOT+x}" ]]; then
   INITIAL_WWISE_SANDBOX_ROOT="$WWISE_SANDBOX_ROOT"
   HAS_INITIAL_WWISE_SANDBOX_ROOT="1"
+fi
+if [[ -n "${WWISE_TEST_CONFIG+x}" ]]; then
+  INITIAL_WWISE_TEST_CONFIG="$WWISE_TEST_CONFIG"
+  HAS_INITIAL_WWISE_TEST_CONFIG="1"
 fi
 
 declare -a PYTEST_EXTRA_ARGS=()
@@ -156,6 +163,8 @@ esac
 
 resolve_version_paths() {
   local v="$1"
+  RESOLVED_SANDBOX=""
+  RESOLVED_TEST_CONFIG=""
   case "$v" in
     2021.1)
       RESOLVED_CONSOLE="/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh"
@@ -182,6 +191,56 @@ resolve_version_paths() {
       exit 1
       ;;
   esac
+  load_version_config_paths "$v"
+}
+
+load_version_config_paths() {
+  local v="$1"
+  local config_path="${INITIAL_WWISE_TEST_CONFIG:-${WWISE_TEST_CONFIG:-$ROOT_DIR/tests/fixtures/local/live-environment.json}}"
+  if [[ ! -f "$config_path" ]]; then
+    return 0
+  fi
+  RESOLVED_TEST_CONFIG="$config_path"
+  while IFS='=' read -r key value; do
+    case "$key" in
+      WWISE_CONSOLE) RESOLVED_CONSOLE="$value" ;;
+      WWISE_SAMPLE_PROJECT_PATH) RESOLVED_PROJECT="$value" ;;
+      WWISE_SANDBOX_ROOT) RESOLVED_SANDBOX="$value" ;;
+    esac
+  done < <(python3 - "$config_path" "$v" "$ROOT_DIR" <<'PYCONFIG'
+from __future__ import annotations
+import json
+import sys
+from pathlib import Path
+
+config_path = Path(sys.argv[1]).expanduser().resolve(strict=False)
+version = sys.argv[2]
+repo_root = Path(sys.argv[3]).resolve(strict=False)
+payload = json.loads(config_path.read_text(encoding="utf-8"))
+entry = payload.get("versions", {}).get(version, {}) if isinstance(payload, dict) else {}
+if not isinstance(entry, dict):
+    entry = {}
+
+def path_value(*keys: str) -> str | None:
+    for key in keys:
+        value = entry.get(key)
+        if isinstance(value, str) and value:
+            path = Path(value).expanduser()
+            if not path.is_absolute():
+                path = repo_root / path
+            return str(path.resolve(strict=False))
+    return None
+
+values = {
+    "WWISE_CONSOLE": path_value("wwise_console", "console_path"),
+    "WWISE_SAMPLE_PROJECT_PATH": path_value("sample_project", "sample_project_path"),
+    "WWISE_SANDBOX_ROOT": path_value("sandbox_root"),
+}
+for key, value in values.items():
+    if value is not None:
+        print(f"{key}={value}")
+PYCONFIG
+  )
 }
 
 set_version_environment() {
@@ -204,8 +263,15 @@ set_version_environment() {
 
   if [[ "$HAS_INITIAL_WWISE_SANDBOX_ROOT" == "1" ]]; then
     export WWISE_SANDBOX_ROOT="$INITIAL_WWISE_SANDBOX_ROOT"
+  elif [[ -n "$RESOLVED_SANDBOX" ]]; then
+    export WWISE_SANDBOX_ROOT="$RESOLVED_SANDBOX"
   else
     export WWISE_SANDBOX_ROOT="$DEFAULT_SANDBOX_BASE/${v}-${m}"
+  fi
+  if [[ "$HAS_INITIAL_WWISE_TEST_CONFIG" == "1" ]]; then
+    export WWISE_TEST_CONFIG="$INITIAL_WWISE_TEST_CONFIG"
+  elif [[ -n "$RESOLVED_TEST_CONFIG" ]]; then
+    export WWISE_TEST_CONFIG="$RESOLVED_TEST_CONFIG"
   fi
 }
 
@@ -304,10 +370,10 @@ run_smoke_for_version() {
     python - <<'PY'
 import os
 
+from tests.destructive.support.sandbox_fixture import cleanup_sandbox, prepare_sample_project_sandbox
 from wwise_waapi.headless import HeadlessLifecycle, LifecycleTimeouts, default_waapi_client_factory
 
-console_path = os.environ["WWISE_CONSOLE"]
-project_path = os.environ["WWISE_SAMPLE_PROJECT_PATH"]
+env = dict(os.environ)
 timeouts = LifecycleTimeouts(
     startup=float(os.getenv("WWISE_STARTUP_TIMEOUT", "10")),
     readiness=float(os.getenv("WWISE_READINESS_TIMEOUT", "60")),
@@ -315,23 +381,40 @@ timeouts = LifecycleTimeouts(
     shutdown=float(os.getenv("WWISE_SHUTDOWN_TIMEOUT", "10")),
 )
 
+sandbox = prepare_sample_project_sandbox(env, hash_strategy="bounded")
+fixed_port = os.getenv("WWISE_WAAPI_PORT")
 lifecycle = HeadlessLifecycle(
-    console_path=console_path,
-    project_path=project_path,
+    console_path=env["WWISE_CONSOLE"],
+    project_path=sandbox.sandbox_project,
+    port=int(fixed_port) if fixed_port else None,
     timeouts=timeouts,
+    launch_env={**env, **sandbox.env},
 )
 client = None
+failed = True
 try:
-    lifecycle.run_until_ready()
+    lifecycle.launch()
+    print(f"smoke project: {sandbox.sandbox_project}", flush=True)
+    print(f"smoke argv: {lifecycle.command!r}", flush=True)
+    print(f"smoke cwd: {str(lifecycle.launch_cwd)!r}", flush=True)
+    print(f"smoke waapi_url: {lifecycle.waapi_url}", flush=True)
+    lifecycle.wait_ready()
     client = default_waapi_client_factory(lifecycle.waapi_url)
     info = client.call("ak.wwise.core.getInfo")
     display_name = info.get("displayName") if isinstance(info, dict) else None
     version = info.get("version") if isinstance(info, dict) else None
     print(f"smoke ok: displayName={display_name!r} version={version!r}")
+    failed = False
+except BaseException as exc:
+    print(f"smoke failed: {type(exc).__name__}: {exc}", flush=True)
+    print(f"smoke stdout_tail: {lifecycle.output.tail('stdout', 80)!r}", flush=True)
+    print(f"smoke stderr_tail: {lifecycle.output.tail('stderr', 80)!r}", flush=True)
+    raise
 finally:
     if client is not None:
         client.disconnect()
     lifecycle.shutdown(suppress_errors=True)
+    cleanup_sandbox(sandbox, failed=failed)
 PY
   )
 }

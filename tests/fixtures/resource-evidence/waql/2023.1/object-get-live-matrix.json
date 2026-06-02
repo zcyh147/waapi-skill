@@ -1,0 +1,382 @@
+{
+  "live_cases": [
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\""
+      },
+      "assertions": [
+        "returned object identity matches the Actor-Mixer Hierarchy path",
+        "returned fields stay within the requested return option set"
+      ],
+      "category": "path queries",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/path_actor_mixer_root_2023_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "identity": {
+          "name": "Actor-Mixer Hierarchy",
+          "path": "\\Actor-Mixer Hierarchy"
+        },
+        "result_count": {
+          "count": 1,
+          "policy": "exact"
+        }
+      },
+      "id": "path_actor_mixer_root_2023_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/path_actor_mixer_root_2023_contract.json",
+      "promotion_required_evidence": "2023.1 live sandbox JSON with returned object identity/type/path assertions.",
+      "sources": [
+        "resources/waql/2022.1/object-get-live-matrix.json format only",
+        "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+        "2022.1 WAQL path query live case"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from object \"{actor_mixer_root_id}\""
+      },
+      "assertions": [
+        "returned object id equals the root GUID discovered earlier in the same sandbox run"
+      ],
+      "category": "GUID queries",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/guid_actor_mixer_root_2023_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "identity": {
+          "id": "{actor_mixer_root_id}",
+          "name": "Actor-Mixer Hierarchy"
+        },
+        "result_count": {
+          "count": 1,
+          "policy": "exact"
+        }
+      },
+      "id": "guid_actor_mixer_root_2023_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ]
+      },
+      "placeholders": {
+        "actor_mixer_root_id": "path_actor_mixer_root_2023_contract.return[0].id"
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/guid_actor_mixer_root_2023_contract.json",
+      "promotion_required_evidence": "2023.1 live sandbox JSON proving stable object identity through GUID readback.",
+      "sources": [
+        "resources/waql/2022.1/object-get-live-matrix.json format only",
+        "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+        "2022.1 WAQL GUID placeholder live case"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from type Sound where type = \"Sound\" take 1"
+      },
+      "assertions": [
+        "non-empty results, when present, have type Sound",
+        "schema-safe empty results are allowed for SampleProject variance"
+      ],
+      "category": "type filters",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/type_sound_filter_2023_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "type"
+        ],
+        "result_count": {
+          "allow_empty": true,
+          "count": 1,
+          "policy": "at_most"
+        },
+        "type": "Sound"
+      },
+      "id": "type_sound_filter_2023_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/type_sound_filter_2023_contract.json",
+      "promotion_required_evidence": "2023.1 live sandbox JSON proving any returned rows have type Sound.",
+      "sources": [
+        "resources/waql/2022.1/object-get-live-matrix.json format only",
+        "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+        "2022.1 WAQL type filter live case"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from search \"Default Work Unit\" where name = \"Default Work Unit\" take 1"
+      },
+      "assertions": [
+        "JSON-escaped WAQL string literal is accepted",
+        "any returned row has the expected name"
+      ],
+      "category": "quoted strings and JSON escaping",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/quoted_search_default_work_unit_2023_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "path"
+        ],
+        "identity": {
+          "name": "Default Work Unit"
+        },
+        "result_count": {
+          "allow_empty": true,
+          "count": 1,
+          "policy": "at_most"
+        }
+      },
+      "id": "quoted_search_default_work_unit_2023_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "path"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/quoted_search_default_work_unit_2023_contract.json",
+      "promotion_required_evidence": "2023.1 live sandbox JSON proving quoted string query handling with bounded result assertions.",
+      "sources": [
+        "resources/waql/2022.1/object-get-live-matrix.json format only",
+        "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+        "2022.1 WAQL quoted search live case"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\" select descendants take 1"
+      },
+      "assertions": [
+        "descendant rows, when present, remain under the Actor-Mixer Hierarchy path"
+      ],
+      "category": "descendant traversal",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/descendant_traversal_actor_mixer_2023_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "path"
+        ],
+        "path_prefix": "\\Actor-Mixer Hierarchy\\",
+        "result_count": {
+          "allow_empty": true,
+          "count": 1,
+          "policy": "at_most"
+        }
+      },
+      "id": "descendant_traversal_actor_mixer_2023_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "path"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/descendant_traversal_actor_mixer_2023_contract.json",
+      "promotion_required_evidence": "2023.1 live sandbox JSON proving read-only descendant traversal is bounded and schema-safe.",
+      "sources": [
+        "resources/waql/2022.1/object-get-live-matrix.json format only",
+        "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+        "2022.1 WAQL descendant traversal live case"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\" where childrenCount >= 0"
+      },
+      "assertions": [
+        "childrenCount is returned and satisfies the numeric comparison"
+      ],
+      "category": "property comparisons",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/children_count_property_comparison_2023_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name",
+          "childrenCount"
+        ],
+        "identity": {
+          "name": "Actor-Mixer Hierarchy"
+        },
+        "property": {
+          "comparison": ">=",
+          "name": "childrenCount",
+          "value": 0
+        },
+        "result_count": {
+          "count": 1,
+          "policy": "exact"
+        }
+      },
+      "id": "children_count_property_comparison_2023_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "childrenCount"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/children_count_property_comparison_2023_contract.json",
+      "promotion_required_evidence": "2023.1 live sandbox JSON proving property return and comparison assertion readback.",
+      "sources": [
+        "resources/waql/2022.1/object-get-live-matrix.json format only",
+        "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+        "2022.1 WAQL property comparison live case"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\""
+      },
+      "assertions": [
+        "returned row is constrained to the requested return fields",
+        "forbidden fields are absent from the readback payload"
+      ],
+      "category": "return/options selection",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/return_options_selection_2023_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name"
+        ],
+        "forbidden_fields": [
+          "path",
+          "childrenCount"
+        ],
+        "identity": {
+          "name": "Actor-Mixer Hierarchy"
+        },
+        "result_count": {
+          "count": 1,
+          "policy": "exact"
+        }
+      },
+      "id": "return_options_selection_2023_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/return_options_selection_2023_contract.json",
+      "promotion_required_evidence": "2023.1 live sandbox JSON proving return option field limiting.",
+      "sources": [
+        "resources/waql/2022.1/object-get-live-matrix.json format only",
+        "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+        "2022.1 WAQL return options live case"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from project where name = \"__waapi_skills_missing_object__\""
+      },
+      "assertions": [
+        "deliberately absent object name returns an empty result array without relying on error payloads"
+      ],
+      "category": "empty results",
+      "coverage_status": "live-tested",
+      "evidence_path": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/empty_results_missing_name_2023_contract.json",
+      "expected": {
+        "fields": [
+          "id",
+          "name"
+        ],
+        "result_count": {
+          "count": 0,
+          "policy": "exact"
+        }
+      },
+      "id": "empty_results_missing_name_2023_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name"
+        ]
+      },
+      "promotion_evidence": ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/empty_results_missing_name_2023_contract.json",
+      "promotion_required_evidence": "2023.1 live sandbox JSON proving schema-safe empty-result handling.",
+      "sources": [
+        "resources/waql/2022.1/object-get-live-matrix.json format only",
+        "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+        "2022.1 WAQL empty result live case"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    }
+  ],
+  "metadata": {
+    "comparison_only_sources": [
+      "resources/waql/2022.1/object-get-live-matrix.json format only",
+      "No 2022.1 evidence paths are reused as 2023.1 proof."
+    ],
+    "default_live": false,
+    "live_command_evidence": ".sisyphus/evidence/task-3-live-read-only.txt",
+    "mutation_guard_evidence": ".sisyphus/evidence/task-3-read-only-guard.txt",
+    "name": "WAQL 2023.1 object.get contract matrix",
+    "notes": [
+      "Manifest/schema presence for ak.wwise.core.object.get is not behavioral WAQL support.",
+      "Live evidence is written only by the 2023.1 sandbox command under .sisyphus/evidence/wwise-2023-test-parity/live-read-only/.",
+      "No profiler, transport, soundengine, UI, CLI, remote, debug, or environment-sensitive event topics are subscribed by these read-only cases."
+    ],
+    "sandbox_required": true,
+    "schema_source": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+    "source_project_mutation_allowed": false,
+    "status_policy": "Live-tested: the exact 2023.1 live sandbox command passed and recorded readback assertion JSON for each case.",
+    "uri": "ak.wwise.core.object.get",
+    "wwise_build": "2023.1.19.8928",
+    "wwise_version_target": "2023.1"
+  },
+  "summary": {
+    "case_count": 8,
+    "coverage_status": "live-tested",
+    "live_tested_cases": 8,
+    "version": "2023.1"
+  }
+}

@@ -370,7 +370,7 @@ def _sanitize_for_manifest(value: Any) -> Any:
         return [_sanitize_for_manifest(item) for item in value]
     if isinstance(value, str):
         if LOCAL_PATH_PATTERN.search(value):
-            return LOCAL_PATH_PATTERN.sub("<local-path-redacted>", value)
+            return LOCAL_PATH_PATTERN.sub("<path>", value)
         return value
     return value
 

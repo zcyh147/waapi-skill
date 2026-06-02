@@ -93,7 +93,7 @@ def test_2024_coverage_entries_have_required_versioned_metadata() -> None:
             assert evidence["manifest_reflection_only"] is False
             assert evidence["counts_as_behavioral"] is True
             assert evidence["counts_as_live_behavioral"] is True
-            assert evidence["evidence_path"] == "resources/waql/2024.1/object-get-live-matrix.json"
+            assert evidence["evidence_path"] == "resources/waql/2024.1/object-get-examples.json"
             assert ".sisyphus/evidence/wwise-2024-waapi-integration-coverage/" in json.dumps(evidence)
         elif entry["uri"] in SANDBOX_MUTATING_TESTED_URIS:
             assert entry["coverage_status"] == "sandbox-mutating-tested"

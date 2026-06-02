@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import platform
 from dataclasses import dataclass
@@ -28,9 +29,11 @@ ENV_WWISE_CONSOLE = "WWISE_CONSOLE"
 ENV_WWISE_FIXTURE_PROJECT = "WWISE_FIXTURE_PROJECT"
 ENV_WWISE_SAMPLE_PROJECT_PATH = "WWISE_SAMPLE_PROJECT_PATH"
 ENV_WWISE_SANDBOX_ROOT = "WWISE_SANDBOX_ROOT"
+ENV_WWISE_TEST_CONFIG = "WWISE_TEST_CONFIG"
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ORG_FIXTURE_SOURCE_ROOT = REPO_ROOT / "tests" / "_org"
+DEFAULT_LIVE_ENVIRONMENT_CONFIG = REPO_ROOT / "tests" / "fixtures" / "local" / "live-environment.json"
 
 SUPPORTED_WWISE_VERSION = "2022.1"
 WWISE_2022_1_BUILD = "2022.1.19.8584"
@@ -116,6 +119,7 @@ class _LiveVersionPaths:
     console_path: Path
     sample_project_path: Path
     require_exact_paths: bool = False
+    sandbox_root: Path | None = None
 
 
 LIVE_VERSION_PATHS: dict[str, _LiveVersionPaths] = {
@@ -151,6 +155,73 @@ LIVE_VERSION_PATHS: dict[str, _LiveVersionPaths] = {
 }
 
 
+def _live_version_paths(env: Mapping[str, str], version: str) -> _LiveVersionPaths | None:
+    configured = _configured_live_version_paths(env, version)
+    if configured is not None:
+        return configured
+    return LIVE_VERSION_PATHS.get(version)
+
+
+def _configured_live_version_paths(env: Mapping[str, str], version: str) -> _LiveVersionPaths | None:
+    config_path = _live_environment_config_path(env)
+    if config_path is None or not config_path.exists():
+        return None
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, Mapping):
+        raise LiveEnvironmentError(f"{config_path} must contain a JSON object")
+    versions = payload.get("versions")
+    if not isinstance(versions, Mapping):
+        return None
+    raw_entry = versions.get(version)
+    if not isinstance(raw_entry, Mapping):
+        return None
+
+    base = LIVE_VERSION_PATHS.get(version)
+    console_raw = env.get(ENV_WWISE_CONSOLE) or _first_string(raw_entry, "wwise_console", "console_path")
+    project_raw = env.get(ENV_WWISE_SAMPLE_PROJECT_PATH) or _first_string(raw_entry, "sample_project", "sample_project_path")
+    sandbox_raw = env.get(ENV_WWISE_SANDBOX_ROOT) or _first_string(raw_entry, "sandbox_root")
+    console_path = _config_path(console_raw, config_path) if console_raw is not None else base.console_path if base else None
+    sample_project_path = (
+        _canonical_project_path(_config_path(project_raw, config_path))
+        if project_raw is not None
+        else base.sample_project_path if base else None
+    )
+    if console_path is None or sample_project_path is None:
+        raise LiveEnvironmentError(f"{config_path} version {version} must define wwise_console and sample_project")
+    sandbox_root = _config_path(sandbox_raw, config_path) if sandbox_raw is not None else None
+    return _LiveVersionPaths(
+        version=version,
+        console_path=console_path,
+        sample_project_path=sample_project_path,
+        require_exact_paths=base.require_exact_paths if base is not None else False,
+        sandbox_root=sandbox_root,
+    )
+
+
+def _live_environment_config_path(env: Mapping[str, str]) -> Path | None:
+    configured = env.get(ENV_WWISE_TEST_CONFIG)
+    if configured:
+        return Path(configured).expanduser().resolve(strict=False)
+    return None
+
+
+def _first_string(mapping: Mapping[str, object], *keys: str) -> str | None:
+    for key in keys:
+        value = mapping.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _config_path(raw: str, config_path: Path) -> Path:
+    candidate = Path(raw).expanduser()
+    if candidate.is_absolute():
+        return candidate.resolve(strict=False)
+    # Keep test configs repo-portable: relative paths are repository-root relative.
+    del config_path
+    return (REPO_ROOT / candidate).resolve(strict=False)
+
+
 def parse_live_environment(env: Mapping[str, str] | None = None) -> LiveEnvironmentContract:
     """Parse and canonicalize Phase 2 Wwise test-tier environment variables."""
 
@@ -158,10 +229,13 @@ def parse_live_environment(env: Mapping[str, str] | None = None) -> LiveEnvironm
     live_enabled = env_map.get(ENV_WWISE_LIVE) == "1"
     destructive_enabled = live_enabled and env_map.get(ENV_WWISE_DESTRUCTIVE) == "1"
     version = env_map.get(ENV_WWISE_VERSION, SUPPORTED_WWISE_VERSION)
+    version_paths = _live_version_paths(env_map, version)
     console_path = resolve_wwise_console_path(env_map, version)
     sample_source = resolve_sample_project_source(env_map)
     fixture_project = _canonical_optional_path(env_map.get(ENV_WWISE_FIXTURE_PROJECT))
     sandbox_root = _canonical_optional_path(env_map.get(ENV_WWISE_SANDBOX_ROOT))
+    if sandbox_root is None and version_paths is not None:
+        sandbox_root = version_paths.sandbox_root
     return LiveEnvironmentContract(
         live_enabled=live_enabled,
         destructive_enabled=destructive_enabled,
@@ -178,15 +252,18 @@ def resolve_sample_project_source(env: Mapping[str, str] | None = None) -> Path 
 
     env_map = env if env is not None else os.environ
     version = env_map.get(ENV_WWISE_VERSION, SUPPORTED_WWISE_VERSION)
-    version_paths = LIVE_VERSION_PATHS.get(version)
     configured = env_map.get(ENV_WWISE_SAMPLE_PROJECT_PATH)
     if configured:
         return _canonical_project_path(Path(configured).expanduser())
-    if version_paths is None:
-        return None
+    configured_paths = _configured_live_version_paths(env_map, version)
+    if configured_paths is not None:
+        return _canonical_project_path(configured_paths.sample_project_path)
     if version == SUPPORTED_WWISE_VERSION:
         if DEFAULT_SAMPLE_PROJECT_ROOT.exists():
             return _canonical_project_path(DEFAULT_SAMPLE_PROJECT_ROOT)
+        return None
+    version_paths = LIVE_VERSION_PATHS.get(version)
+    if version_paths is None:
         return None
     if version_paths.require_exact_paths:
         return version_paths.sample_project_path
@@ -200,7 +277,7 @@ def resolve_wwise_console_path(env: Mapping[str, str] | None = None, version: st
 
     env_map = env if env is not None else os.environ
     requested_version = version or env_map.get(ENV_WWISE_VERSION, SUPPORTED_WWISE_VERSION)
-    version_paths = LIVE_VERSION_PATHS.get(requested_version)
+    version_paths = _live_version_paths(env_map, requested_version)
     if version_paths is None:
         return None
     resolver = WwiseConsolePathResolver(env=dict(env_map), macos_default=version_paths.console_path)
@@ -214,7 +291,7 @@ def require_live_environment(env: Mapping[str, str] | None = None) -> LiveEnviro
     if not contract.live_enabled:
         return contract
     errors: list[str] = []
-    version_paths = LIVE_VERSION_PATHS.get(contract.version)
+    version_paths = _live_version_paths(env if env is not None else os.environ, contract.version)
     if version_paths is None:
         errors.append(
             f"{ENV_WWISE_VERSION} must be one of {sorted(LIVE_VERSION_PATHS)!r}; got {contract.version!r}"
@@ -317,7 +394,7 @@ def _immutable_sample_project_roots() -> tuple[Path, ...]:
 def _default_sample_project_message_path(version: str) -> Path:
     if version == SUPPORTED_WWISE_VERSION:
         return DEFAULT_SAMPLE_PROJECT_ROOT
-    version_paths = LIVE_VERSION_PATHS.get(version)
+    version_paths = _live_version_paths(os.environ, version)
     if version_paths is None:
         return DEFAULT_SAMPLE_PROJECT_ROOT
     return version_paths.sample_project_path
@@ -348,6 +425,7 @@ __all__ = [
     "ENV_WWISE_LIVE",
     "ENV_WWISE_SAMPLE_PROJECT_PATH",
     "ENV_WWISE_SANDBOX_ROOT",
+    "ENV_WWISE_TEST_CONFIG",
     "ENV_WWISE_VERSION",
     "INSTALLED_SAMPLE_PROJECT_2021_1_ROOT",
     "INSTALLED_SAMPLE_PROJECT_2023_1_ROOT",
@@ -356,6 +434,7 @@ __all__ = [
     "LIVE_VERSION_PATHS",
     "LiveEnvironmentContract",
     "LiveEnvironmentError",
+    "DEFAULT_LIVE_ENVIRONMENT_CONFIG",
     "ORG_FIXTURE_SOURCE_ROOT",
     "SUPPORTED_WWISE_VERSION",
     "WWISE_2022_1_BUILD",

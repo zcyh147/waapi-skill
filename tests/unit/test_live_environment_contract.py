@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest  # pyright: ignore[reportMissingImports]
@@ -26,6 +27,7 @@ def make_project(root: Path, name: str = "SampleProject.wproj") -> Path:
 
 def make_console(tmp_path: Path) -> Path:
     console = tmp_path / "WwiseConsole.sh"
+    console.parent.mkdir(parents=True, exist_ok=True)
     console.write_text("#!/bin/sh\n", encoding="utf-8")
     console.chmod(0o755)
     return console
@@ -56,6 +58,78 @@ def test_sample_project_path_is_immutable_source_and_defaults_only_when_present(
 
     monkeypatch.setattr(live_env, "DEFAULT_SAMPLE_PROJECT_ROOT", tmp_path / "MissingDefault")
     assert resolve_sample_project_source({}) is None
+
+
+def test_live_environment_reads_versioned_local_json_config(tmp_path: Path) -> None:
+    console = make_console(tmp_path / "configured")
+    sample_project = make_project(tmp_path / "configured")
+    sandbox_root = tmp_path / "configured-sandbox"
+    config_path = tmp_path / "live-environment.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "versions": {
+                    "2024.1": {
+                        "wwise_console": str(console),
+                        "sample_project": str(sample_project),
+                        "sandbox_root": str(sandbox_root),
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    contract = require_live_environment(
+        {
+            "WWISE_LIVE": "1",
+            "WWISE_VERSION": "2024.1",
+            "WWISE_TEST_CONFIG": str(config_path),
+        }
+    )
+
+    assert contract.console_path == console.resolve(strict=False)
+    assert contract.sample_project_source == sample_project.resolve(strict=False)
+    assert contract.sandbox_root == sandbox_root.resolve(strict=False)
+
+
+def test_live_environment_env_overrides_versioned_json_config_for_exact_versions(tmp_path: Path) -> None:
+    configured_console = make_console(tmp_path / "configured" / "WwiseConsole.sh")
+    configured_project = make_project(tmp_path / "configured" / "SampleProject.wproj")
+    configured_sandbox = tmp_path / "configured-sandbox"
+    override_console = make_console(tmp_path / "override" / "WwiseConsole.sh")
+    override_project = make_project(tmp_path / "override" / "SampleProject.wproj")
+    override_sandbox = tmp_path / "override-sandbox"
+    config_path = tmp_path / "live-environment.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "versions": {
+                    "2024.1": {
+                        "wwise_console": str(configured_console),
+                        "sample_project": str(configured_project),
+                        "sandbox_root": str(configured_sandbox),
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    contract = require_live_environment(
+        {
+            "WWISE_LIVE": "1",
+            "WWISE_VERSION": "2024.1",
+            "WWISE_TEST_CONFIG": str(config_path),
+            "WWISE_CONSOLE": str(override_console),
+            "WWISE_SAMPLE_PROJECT_PATH": str(override_project),
+            "WWISE_SANDBOX_ROOT": str(override_sandbox),
+        }
+    )
+
+    assert contract.console_path == override_console.resolve(strict=False)
+    assert contract.sample_project_source == override_project.resolve(strict=False)
+    assert contract.sandbox_root == override_sandbox.resolve(strict=False)
 
 
 def test_fixture_project_is_read_only_live_project_not_destructive_without_sandbox(tmp_path: Path) -> None:

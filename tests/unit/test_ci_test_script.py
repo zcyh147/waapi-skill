@@ -136,3 +136,129 @@ def test_ci_test_all_stops_when_nonlive_fails(tmp_path: Path) -> None:
     assert result.returncode != 0
     calls = log_path.read_text(encoding="utf-8").splitlines()
     assert len(calls) == 1
+
+def test_ci_test_sh_reads_versioned_live_environment_config(tmp_path: Path) -> None:
+    if os.name == "nt":
+        import pytest  # pyright: ignore[reportMissingImports]
+
+        pytest.skip("ci/test.sh JSON config test is for the POSIX shell runner")
+
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    log_path = tmp_path / "python.log"
+    _write_fake_python(bin_dir)
+
+    console_path = tmp_path / "configured" / "WwiseConsole.sh"
+    console_path.parent.mkdir(parents=True)
+    console_path.write_text("#!/bin/sh\n", encoding="utf-8")
+    console_path.chmod(0o755)
+    project_path = tmp_path / "configured" / "SampleProject.wproj"
+    project_path.write_text("<Project />\n", encoding="utf-8")
+    sandbox_root = tmp_path / "configured" / "sandbox"
+    config_path = tmp_path / "live-environment.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "versions": {
+                    "2024.1": {
+                        "wwise_console": str(console_path),
+                        "sample_project": str(project_path),
+                        "sandbox_root": str(sandbox_root),
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{bin_dir}{os.pathsep}{env.get('PATH', '')}",
+            "CI_TEST_LOG": str(log_path),
+            "WWISE_TEST_CONFIG": str(config_path),
+        }
+    )
+    env.pop("WWISE_CONSOLE", None)
+    env.pop("WWISE_SAMPLE_PROJECT_PATH", None)
+    env.pop("WWISE_SANDBOX_ROOT", None)
+
+    result = _run_ci_test(env, "--version", "2024.1", "--mode", "live", "--", "--collect-only", "-q")
+
+    assert result.returncode == 0, result.stderr
+    assert f"console:      {console_path}" in result.stdout
+    assert f"project:      {project_path}" in result.stdout
+    assert f"sandbox_root: {sandbox_root}" in result.stdout
+    calls = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+    assert len(calls) == 1
+    assert "--collect-only" in _pytest_argv(calls[0])
+
+
+def test_ci_test_sh_env_overrides_versioned_live_environment_config(tmp_path: Path) -> None:
+    if os.name == "nt":
+        import pytest  # pyright: ignore[reportMissingImports]
+
+        pytest.skip("ci/test.sh JSON config test is for the POSIX shell runner")
+
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    log_path = tmp_path / "python.log"
+    _write_fake_python(bin_dir)
+
+    configured_root = tmp_path / "configured"
+    configured_console = configured_root / "WwiseConsole.sh"
+    configured_console.parent.mkdir(parents=True)
+    configured_console.write_text("#!/bin/sh\n", encoding="utf-8")
+    configured_console.chmod(0o755)
+    configured_project = configured_root / "SampleProject.wproj"
+    configured_project.write_text("<Project />\n", encoding="utf-8")
+    configured_sandbox = configured_root / "sandbox"
+
+    override_root = tmp_path / "override"
+    override_console = override_root / "WwiseConsole.sh"
+    override_console.parent.mkdir(parents=True)
+    override_console.write_text("#!/bin/sh\n", encoding="utf-8")
+    override_console.chmod(0o755)
+    override_project = override_root / "SampleProject.wproj"
+    override_project.write_text("<Project />\n", encoding="utf-8")
+    override_sandbox = override_root / "sandbox"
+
+    config_path = tmp_path / "live-environment.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "versions": {
+                    "2024.1": {
+                        "wwise_console": str(configured_console),
+                        "sample_project": str(configured_project),
+                        "sandbox_root": str(configured_sandbox),
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{bin_dir}{os.pathsep}{env.get('PATH', '')}",
+            "CI_TEST_LOG": str(log_path),
+            "WWISE_TEST_CONFIG": str(config_path),
+            "WWISE_CONSOLE": str(override_console),
+            "WWISE_SAMPLE_PROJECT_PATH": str(override_project),
+            "WWISE_SANDBOX_ROOT": str(override_sandbox),
+        }
+    )
+
+    result = _run_ci_test(env, "--version", "2024.1", "--mode", "live", "--", "--collect-only", "-q")
+
+    assert result.returncode == 0, result.stderr
+    assert f"console:      {override_console}" in result.stdout
+    assert f"project:      {override_project}" in result.stdout
+    assert f"sandbox_root: {override_sandbox}" in result.stdout
+    assert str(configured_console) not in result.stdout
+    assert str(configured_project) not in result.stdout
+    calls = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+    assert len(calls) == 1
+    assert "--collect-only" in _pytest_argv(calls[0])

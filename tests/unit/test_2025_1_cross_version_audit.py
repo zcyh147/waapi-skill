@@ -211,7 +211,7 @@ def test_2025_coverage_policy_deferred_source_notes_docs_and_optional_waql_recon
     ("case_name", "evidence_update"),
     [
         ("stale-2022-path", {"evidence_path": ".sisyphus/evidence/wwise-2022-live/object-get.txt"}),
-        ("stale-2023-path", {"evidence_path": "resources/waql/2023.1/object-get-live-matrix.json"}),
+        ("stale-2023-path", {"evidence_path": "resources/waql/2023.1/object-get-examples.json"}),
         ("stale-2024-text", {"evidence_path": "resources/waql/2025.1/object-get-live.json", "fixture_prerequisites": ["2024.1 copied sandbox proof"]}),
         ("bare-2025-coverage-path", {"evidence_path": "tests/destructive/support/resources/capabilities/2025/object-get-live.json"}),
         ("bare-2025-waql-path", {"evidence_path": "resources/waql/2025/object-get-live.json"}),
@@ -270,7 +270,7 @@ def test_2025_promoted_behavior_evidence_requires_approved_2025_root_and_fresh_b
         deferred,
         uri,
         {
-            "evidence_path": "resources/waql/2025.1/object-get-live-matrix.json",
+            "evidence_path": "resources/waql/2025.1/object-get-examples.json",
             "evidence_standard": "Fresh 2025.1 live behavior evidence from read-only WAQL execution.",
             "fixture_prerequisites": [
                 ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live/object-get.txt"

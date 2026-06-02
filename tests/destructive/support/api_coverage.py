@@ -230,7 +230,7 @@ class ApiCoverageBuilder:
         if uri == WAQL_API_URI:
             return {
                 "coverage": "fake-route-tested-and-waql-resource-gated",
-                "evidence": f"resources/waql/{version}/object-get-live-matrix.json",
+                "evidence": f"resources/waql/{version}/object-get-examples.json",
                 "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime",
             }
         return {
@@ -315,7 +315,7 @@ class ApiCoverageBuilder:
         if deferred:
             guidance["notes"] = "Treat registry evidence as substitute coverage only; do not claim complete behavior until a live-safe behavioral test exists."
         if is_waql:
-            guidance["waql_reference"] = f"resources/waql/{version}/object-get-live-matrix.json"
+            guidance["waql_reference"] = f"resources/waql/{version}/object-get-examples.json"
             guidance["waql_gate"] = "wwise_waapi.waql.require_waql_helper_generation"
         if category == "soundengine":
             guidance["fixture_requirement"] = "Requires initialized sound engine/game-object state before live behavioral assertions."
@@ -343,7 +343,7 @@ class ApiCoverageBuilder:
             ],
             "sort_key": "uri",
             "version": version,
-            "waql_reference": f"resources/waql/{version}/object-get-live-matrix.json",
+            "waql_reference": f"resources/waql/{version}/object-get-examples.json",
         }
 
     def _summary(self, version: str, entries: Sequence[Mapping[str, Any]], manifest: Mapping[str, Any]) -> CoverageSummary:

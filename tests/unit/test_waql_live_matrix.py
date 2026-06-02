@@ -13,14 +13,14 @@ from wwise_waapi.waql import WAQL_API_URI, validate_waql_example  # pyright: ign
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MATRIX_PATH = (
     REPO_ROOT
-    / "skills"
-    / "waapi-skill"
-    / "resources"
+    / "tests"
+    / "fixtures"
+    / "resource-evidence"
     / "waql"
     / "2022.1"
     / "object-get-live-matrix.json"
 )
-RESOURCE_REFERENCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "waql" / "2022.1" / "object-get-live-matrix.json"
+RESOURCE_REFERENCE = MATRIX_PATH
 GAP_EVIDENCE_PATH = REPO_ROOT / ".sisyphus" / "evidence" / "task-8-waql-missing.md"
 MANIFEST_PATH = (
     REPO_ROOT

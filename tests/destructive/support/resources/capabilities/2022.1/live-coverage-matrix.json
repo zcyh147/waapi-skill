@@ -1601,12 +1601,12 @@
       "fixture_prerequisites": [
         "sandbox fixture project",
         "read-only WAQL query examples",
-        "resources/waql/2022.1/object-get-live-matrix.json"
+        "resources/waql/2022.1/object-get-examples.json"
       ],
       "item_type": "function",
       "phase1_behavioral_evidence": {
         "coverage": "fake-route-tested-and-waql-resource-gated",
-        "evidence": "resources/waql/2022.1/object-get-live-matrix.json",
+        "evidence": "resources/waql/2022.1/object-get-examples.json",
         "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
       },
       "phase1_inventory_status": "reflected-schema-ok",

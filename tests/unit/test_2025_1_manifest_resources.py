@@ -13,10 +13,7 @@ from wwise_waapi.manifest import (  # pyright: ignore[reportMissingImports]
 RESOURCE_ROOT = Path("skills") / "waapi-skill" / "resources" / "manifest"
 VERSION = "2025.1"
 BUILD = "2025.1.7.9143"
-CONSOLE_PATH = "/Applications/Audiokinetic/Wwise2025.1.7.9143/Wwise.app/Contents/Tools/WwiseConsole.sh"
-SAMPLE_PROJECT_PATH = (
-    "/Applications/Audiokinetic/SampleProject2025.1.7.9143/SampleProject/SampleProject.wproj"
-)
+FORBIDDEN_RUNTIME_METADATA_FIELDS = {"wwise_console_path", "wwise_console_path_status"}
 SOURCE_URIS = [
     "ak.wwise.waapi.getFunctions",
     "ak.wwise.waapi.getTopics",
@@ -59,7 +56,7 @@ def _load_split_file(filename: str) -> dict[str, Any]:
     return json.loads((RESOURCE_ROOT / VERSION / filename).read_text(encoding="utf-8"))
 
 
-def test_2025_1_manifest_files_exist_and_metadata_records_live_provenance() -> None:
+def test_2025_1_manifest_files_exist_and_metadata_stays_runtime_focused() -> None:
     payloads = {
         filename: _load_split_file(filename)
         for filename in ("manifest.json", "functions.json", "topics.json", "schemas.json")
@@ -70,15 +67,12 @@ def test_2025_1_manifest_files_exist_and_metadata_records_live_provenance() -> N
         assert metadata["version_key"] == VERSION
         assert metadata["wwise_version_target"] == VERSION
         assert metadata["wwise_build"] == BUILD
-        assert metadata["wwise_console_path"] == CONSOLE_PATH
+        assert FORBIDDEN_RUNTIME_METADATA_FIELDS.isdisjoint(metadata)
         assert metadata["inventory_source"] == "live-reflection-2025.1-sandbox-manifest"
         assert metadata["source_uris"] == SOURCE_URIS
         assert metadata["schema_source_uri"] == "ak.wwise.waapi.getSchema"
         assert metadata["schema_source_uris"] == ["ak.wwise.waapi.getSchema"]
-        assert metadata["provenance"]["sample_project"] == {
-            "name": "SampleProject",
-            "path": SAMPLE_PROJECT_PATH,
-        }
+        assert metadata["provenance"]["sample_project"] == {"name": "SampleProject"}
 
     audit = payloads["manifest.json"]["audit"]
     assert audit["counts_match"] is True
@@ -130,7 +124,6 @@ def test_2025_1_manifest_reflection_payloads_do_not_expose_local_paths() -> None
     assert "Z:\\\\Applications" not in serialized
     assert "Y:\\\\" not in serialized
     assert ".sisyphus/runtime" not in serialized
-    assert SAMPLE_PROJECT_PATH not in serialized
 
 
 def test_2025_1_manifest_serialization_is_deterministic() -> None:

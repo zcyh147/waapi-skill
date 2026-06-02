@@ -7,7 +7,7 @@ description: Use this skill for Wwise WAAPI automation through the skill-local P
 
 Use this skill to automate Wwise through WAAPI with a Python-first workflow. The normal path is: make sure Python can run the skill-local wrapper, identify the target Wwise version, then extract a structured semantic intent and route it through the semantic planner.
 
-When config and currently connectable WAAPI details are already known, execute the direct read-only query first for ordinary inspection requests. Here, direct means direct through the skill-local runner and manifest-backed `WwiseDispatcher`, not hand-written one-off `WaapiClient.call(...)` business logic. Do not start by inspecting repository files or launching documentation research unless the user explicitly asked for investigation or the direct connection path is blocked.
+When config and live WAAPI connection details are already known, execute the live read-only query first for ordinary inspection requests. Here, direct means direct through the skill-local runner and manifest-backed `WwiseDispatcher`, not hand-written one-off `WaapiClient.call(...)` business logic. Do not start by inspecting repository files or launching documentation research unless the user explicitly asked for investigation or the direct connection path is blocked.
 
 ## Welcome/status UX for Wwise version detection
 
@@ -55,7 +55,7 @@ confirmed = confirm_semantic_plan(
 ```
 
 1. Extract `SemanticIntent` with one family: `intent_navigation`, `crud_authoring`, `system_design_preview`, `asset_import_workflow`, `soundbank_workflow`, `switch_assignment_workflow`, `bounded_profiler_guidance`, or `unsupported_runtime_boundary`.
-2. Even read-only navigation and unsupported boundary requests still pass through `SemanticPlanner.plan()`. If persisted config and a currently connectable WAAPI session are available, that connection may supplement or verify the plan, but it does not replace planner facts. Use repository or documentation research only when the user explicitly asks for it or direct execution is blocked, and report the blocker.
+2. Even read-only navigation and unsupported boundary requests still pass through `SemanticPlanner.plan()`. If persisted config and a currently connectable WAAPI session are available, live WAAPI may supplement or verify the plan, but it does not replace planner facts. Use repository or documentation research only when the user explicitly asks for it or direct execution is blocked, and report the blocker.
 3. Route CRUD requests at the semantic family level: object creation, object mutation, property/reference edits, copy/move/delete, imports, soundbanks, and switch assignments become structured intent details for the planner. Do not paste raw WAAPI payload schemas into the prompt.
 4. Present the `SemanticPlan` preview before project-changing work. Include family, step summaries, target identities, risk flags, verification plan, and `preview_hash`; do not execute from prose-only confirmation.
 5. Confirm with `confirm_semantic_plan(preview, confirmation_state, submitted_preview_hash)`, where `submitted_preview_hash` is read from the user's confirmation response, not copied from the preview object by construction. Continue only when `confirmation_state` is `confirmed` and `submitted_preview_hash` exactly matches the current preview hash. Missing or mismatched hashes require a fresh preview.

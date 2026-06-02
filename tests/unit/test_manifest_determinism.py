@@ -91,7 +91,8 @@ def test_manifest_contains_no_local_absolute_paths() -> None:
 
     assert "/Applications/Audiokinetic" not in serialized
     assert "C:\\\\Users" not in serialized
-    assert "<local-path-redacted>" in serialized
+    assert "<local-path-redacted>" not in serialized
+    assert "<path>" in serialized
 
 
 def test_schema_json_pointer_refs_are_preserved_while_paths_are_redacted() -> None:
@@ -102,6 +103,8 @@ def test_schema_json_pointer_refs_are_preserved_while_paths_are_redacted() -> No
     schema = manifest.schemas[0]["schema"]
 
     assert schema["$ref"] == "#/definitions/ak.wwise.core.object"
-    assert schema["examplePath"] == "<local-path-redacted>"
-    assert schema["windowsPath"] == "<local-path-redacted>"
-    assert "#<local-path-redacted>" not in json.dumps(manifest.as_dict(), sort_keys=True)
+    assert schema["examplePath"] == "<path>"
+    assert schema["windowsPath"] == "<path>"
+    serialized = json.dumps(manifest.as_dict(), sort_keys=True)
+    assert "#<path>" not in serialized
+    assert "<local-path-redacted>" not in serialized

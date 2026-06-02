@@ -73,7 +73,7 @@ def test_2024_live_matrix_promotes_only_fresh_2024_evidence() -> None:
             assert entry["achieved_status"] == "live-tested"
             assert entry["counts_as_behavioral"] is True
             assert entry["counts_as_live_behavioral"] is True
-            assert entry["evidence_path"] == "resources/waql/2024.1/object-get-live-matrix.json"
+            assert entry["evidence_path"] == "resources/waql/2024.1/object-get-examples.json"
             assert ".sisyphus/evidence/task-2024-8-live-read-only.txt" in entry["fixture_prerequisites"]
         elif entry["uri"] in SANDBOX_MUTATING_TESTED_URIS:
             assert entry["parity_bucket"] == "sandbox-mutating-tested"

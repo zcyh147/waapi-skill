@@ -13,10 +13,7 @@ from wwise_waapi.manifest import (  # pyright: ignore[reportMissingImports]
 RESOURCE_ROOT = Path("skills") / "waapi-skill" / "resources" / "manifest"
 VERSION = "2023.1"
 BUILD = "2023.1.19.8928"
-CONSOLE_PATH = "/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh"
-SAMPLE_PROJECT_PATH = (
-    "/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj"
-)
+FORBIDDEN_RUNTIME_METADATA_FIELDS = {"wwise_console_path", "wwise_console_path_status"}
 
 
 class GuardedManifestPath(type(Path())):
@@ -37,7 +34,7 @@ def _load_split_file(filename: str) -> dict[str, Any]:
     return json.loads((RESOURCE_ROOT / VERSION / filename).read_text(encoding="utf-8"))
 
 
-def test_2023_manifest_files_exist_and_metadata_records_build_and_provenance() -> None:
+def test_2023_manifest_files_exist_and_metadata_stays_runtime_focused() -> None:
     payloads = {
         filename: _load_split_file(filename)
         for filename in ("manifest.json", "functions.json", "topics.json", "schemas.json")
@@ -48,11 +45,8 @@ def test_2023_manifest_files_exist_and_metadata_records_build_and_provenance() -
         assert metadata["version_key"] == VERSION
         assert metadata["wwise_version_target"] == VERSION
         assert metadata["wwise_build"] == BUILD
-        assert metadata["wwise_console_path"] == CONSOLE_PATH
-        assert metadata["provenance"]["sample_project"] == {
-            "name": "SampleProject",
-            "path": SAMPLE_PROJECT_PATH,
-        }
+        assert FORBIDDEN_RUNTIME_METADATA_FIELDS.isdisjoint(metadata)
+        assert metadata["provenance"]["sample_project"] == {"name": "SampleProject"}
 
     assert payloads["manifest.json"]["audit"]["counts_match"] is True
     assert payloads["functions.json"]["functions"]

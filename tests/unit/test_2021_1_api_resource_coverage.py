@@ -90,7 +90,7 @@ def test_2021_entries_are_deferred_or_excluded_without_behavioral_promotion() ->
             assert entry["deferred"]["status"] is False
             assert evidence["counts_as_behavioral"] is True
             assert evidence["counts_as_live_behavioral"] is True
-            assert evidence["evidence_path"] == "resources/waql/2021.1/object-get-live-matrix.json"
+            assert evidence["evidence_path"] == "resources/waql/2021.1/object-get-examples.json"
             assert evidence["live_command_evidence"] == (
                 ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-7-waql-matrix.json"
             )
@@ -192,7 +192,7 @@ def test_2021_matrix_summary_and_policy_match_coverage_accounting() -> None:
         if entry["uri"] == LIVE_TESTED_OBJECT_GET:
             assert entry["counts_as_behavioral"] is True
             assert entry["counts_as_live_behavioral"] is True
-            assert entry["evidence_path"] == "resources/waql/2021.1/object-get-live-matrix.json"
+            assert entry["evidence_path"] == "resources/waql/2021.1/object-get-examples.json"
             assert entry["coverage_status"] == "live-tested"
         elif entry["uri"] in SANDBOX_MUTATING_TESTED_URIS:
             assert entry["counts_as_behavioral"] is True

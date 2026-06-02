@@ -68,7 +68,7 @@ def test_eval_metadata_covers_safety_and_gating_requirements() -> None:
 
     waql = by_id["waql-query-gated"]
     assert "ak.wwise.core.object.get" in waql["expected_output"]
-    assert _entry_mentions(waql, "object-get-live-matrix.json")
+    assert _entry_mentions(waql, "object-get-examples.json")
     assert _entry_mentions(waql, "source-grounded")
     assert any("invent" in assertion["text"] for assertion in waql["assertions"])
 

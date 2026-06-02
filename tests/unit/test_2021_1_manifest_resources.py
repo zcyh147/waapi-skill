@@ -19,7 +19,7 @@ TASK_REFLECTION_EVIDENCE = EVIDENCE_ROOT / "task-4-reflection.json"
 RAW_REFLECTION_EVIDENCE = EVIDENCE_ROOT / "reflection" / "raw-reflection.json"
 VERSION = "2021.1"
 BUILD = "2021.1.14.8108"
-REDACTED_LOCAL_PATH = "<local-path-redacted>"
+FORBIDDEN_RUNTIME_METADATA_FIELDS = {"wwise_console_path", "wwise_console_path_status"}
 SOURCE_URIS = [
     "ak.wwise.waapi.getFunctions",
     "ak.wwise.waapi.getTopics",
@@ -54,7 +54,7 @@ def _load_split_file(filename: str) -> dict[str, Any]:
     return json.loads((RESOURCE_ROOT / VERSION / filename).read_text(encoding="utf-8"))
 
 
-def test_2021_1_manifest_files_exist_and_metadata_records_live_provenance() -> None:
+def test_2021_1_manifest_files_exist_and_metadata_stays_runtime_focused() -> None:
     payloads = {
         filename: _load_split_file(filename)
         for filename in ("manifest.json", "functions.json", "topics.json", "schemas.json")
@@ -65,28 +65,13 @@ def test_2021_1_manifest_files_exist_and_metadata_records_live_provenance() -> N
         assert metadata["version_key"] == VERSION
         assert metadata["wwise_version_target"] == VERSION
         assert metadata["wwise_build"] == BUILD
-        assert metadata["wwise_console_path"] == REDACTED_LOCAL_PATH
-        assert metadata["wwise_console_path_status"] == "matched-exact-expected-path"
+        assert FORBIDDEN_RUNTIME_METADATA_FIELDS.isdisjoint(metadata)
         assert metadata["inventory_source"] == "live-reflection-2021.1-sandbox-manifest"
         assert metadata["source_uris"] == SOURCE_URIS
         assert metadata["schema_source_uri"] == "ak.wwise.waapi.getSchema"
         assert metadata["schema_source_uris"] == ["ak.wwise.waapi.getSchema"]
-        assert metadata["provenance"]["sample_project"] == {
-            "name": "SampleProject",
-            "path": REDACTED_LOCAL_PATH,
-            "path_status": "matched-exact-expected-path",
-        }
-        get_info = metadata["provenance"]["get_info"]
-        assert get_info["branch"] == "wwise_v2021.1"
-        assert get_info["isCommandLine"] is True
-        assert get_info["version"] == {
-            "build": 8108,
-            "displayName": "v2021.1.14",
-            "major": 1,
-            "minor": 14,
-            "schema": 103,
-            "year": 2021,
-        }
+        assert metadata["provenance"]["sample_project"] == {"name": "SampleProject"}
+        assert "get_info" not in metadata["provenance"]
 
     audit = payloads["manifest.json"]["audit"]
     assert audit["counts_match"] is True

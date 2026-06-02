@@ -5222,7 +5222,7 @@
         "counts_as_behavioral": true,
         "counts_as_live_behavioral": true,
         "coverage": "live-tested",
-        "evidence": ".sisyphus/evidence/task-3-live-read-only.txt; .sisyphus/evidence/task-3-read-only-guard.txt; resources/waql/2023.1/object-get-live-matrix.json; per-case JSON under .sisyphus/evidence/wwise-2023-test-parity/live-read-only/",
+        "evidence": ".sisyphus/evidence/task-3-live-read-only.txt; .sisyphus/evidence/task-3-read-only-guard.txt; resources/waql/2023.1/object-get-examples.json; per-case JSON under .sisyphus/evidence/wwise-2023-test-parity/live-read-only/",
         "evidence_command": "WWISE_VERSION=2023.1 WWISE_CONSOLE=\"/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh\" WWISE_SAMPLE_PROJECT_PATH=\"/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj\" WWISE_LIVE=1 python -m pytest tests/live/test_2023_live_prerequisites.py tests/live/test_2023_reflection_inventory.py tests/live/test_2023_waql_live_matrix.py -q",
         "evidence_path": ".sisyphus/evidence/task-3-live-read-only.txt",
         "evidence_standard": "2023.1 live sandbox read-only object.get WAQL cases passed with exact readback assertions, source hash/mtime guard, sandbox cleanup proof, and pre-call mutation rejection.",
@@ -5253,7 +5253,7 @@
       "safety": {
         "classification": "read-only-live-tested",
         "deterministic_default": true,
-        "reason": ".sisyphus/evidence/task-3-live-read-only.txt; .sisyphus/evidence/task-3-read-only-guard.txt; resources/waql/2023.1/object-get-live-matrix.json; per-case JSON under .sisyphus/evidence/wwise-2023-test-parity/live-read-only/"
+        "reason": ".sisyphus/evidence/task-3-live-read-only.txt; .sisyphus/evidence/task-3-read-only-guard.txt; resources/waql/2023.1/object-get-examples.json; per-case JSON under .sisyphus/evidence/wwise-2023-test-parity/live-read-only/"
       },
       "schema_mapping": {
         "manifest_uri": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
@@ -5288,7 +5288,7 @@
       "usage_guidance": {
         "default_path": "live-read-only-sandbox",
         "notes": "Use only read-only WAQL object.get calls covered by the 2023.1 sandbox matrix; mutating WAQL tokens are rejected before WAAPI calls.",
-        "waql_matrix": "resources/waql/2023.1/object-get-live-matrix.json"
+        "waql_matrix": "resources/waql/2023.1/object-get-examples.json"
       },
       "version": "2023.1"
     },

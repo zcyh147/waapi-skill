@@ -549,7 +549,7 @@ class Phase2CoverageSummaryBuilder:
                 "tests/destructive/support/resources/capabilities/2022.1/task-6-process-definition-files-plan.json",
                 "tests/destructive/support/resources/capabilities/2022.1/task-7-switchcontainer-assignment-plan.json",
                 "tests/destructive/support/resources/capabilities/2022.1/task-8-soundbank-audio-sandbox-plan.json",
-                "resources/waql/2022.1/object-get-live-matrix.json",
+                "resources/waql/2022.1/object-get-examples.json",
                 "tests/destructive/support/resources/capabilities/2022.1/task-6-object-topic-live-plan.json",
                 "tests/destructive/support/resources/capabilities/2022.1/task-7-project-mutation-sandbox-plan.json",
                 "tests/destructive/support/resources/capabilities/2022.1/task-9-profiler-soundengine-feasibility.json",

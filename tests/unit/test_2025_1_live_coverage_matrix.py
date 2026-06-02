@@ -64,7 +64,7 @@ def test_2025_live_matrix_promotes_only_fresh_object_get_and_destructive_evidenc
             assert entry["counts_as_behavioral"] == evidence["counts_as_behavioral"] is True, entry["uri"]
             assert entry["counts_as_live_behavioral"] == evidence["counts_as_live_behavioral"] is True, entry["uri"]
             assert entry["achieved_status"] == "live-tested", entry["uri"]
-            assert entry["evidence_path"] == "resources/waql/2025.1/object-get-live-matrix.json", entry["uri"]
+            assert entry["evidence_path"] == "resources/waql/2025.1/object-get-examples.json", entry["uri"]
             continue
         if entry["uri"] in SANDBOX_MUTATING_TESTED_URIS:
             assert entry["counts_as_behavioral"] == evidence["counts_as_behavioral"] is True, entry["uri"]

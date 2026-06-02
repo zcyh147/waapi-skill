@@ -11,13 +11,13 @@ from wwise_waapi.waql import (  # pyright: ignore[reportMissingImports]
     WaqlReferenceGate,
     require_waql_helper_generation,
     waql_api_uris,
-    validate_waql_live_matrix,
+    validate_waql_reference,
 )
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_ROOT = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "manifest"
-WAQL_REFERENCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "waql" / "2022.1" / "object-get-live-matrix.json"
+WAQL_REFERENCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "waql" / "2022.1" / "object-get-examples.json"
 
 
 def test_default_waql_reference_opens_helper_generation_gate() -> None:
@@ -51,7 +51,7 @@ def test_missing_waql_reference_blocks_helper_generation(tmp_path: Path) -> None
 def test_incomplete_waql_reference_blocks_helper_generation(tmp_path: Path) -> None:
     reference = tmp_path / "waql.json"
     reference.write_text(
-        '{"metadata":{"name":"WAQL live sandbox matrix","uri":"ak.wwise.core.object.get","schema_source":"resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"},"live_cases":[{"id":"broken","uri":"ak.wwise.core.object.get","args":{"waql":"from type Sound"},"options":{"return":["id"]},"no_mutation":false,"sources":[]}]}',
+        '{"metadata":{"name":"WAQL runtime examples","uri":"ak.wwise.core.object.get","schema_source":"resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get","reference":"resources/waql/2022.1/object-get-examples.json"},"examples":[{"id":"broken","uri":"ak.wwise.core.object.get","args":{"waql":"from type Sound"},"options":{"return":["id"]},"no_mutation":false,"sources":[]}]}',
         encoding="utf-8",
     )
     manifest = {"schemas": [{"uri": WAQL_API_URI, "schema": {"argsSchema": {"properties": {"waql": {}}}}}]}
@@ -64,12 +64,12 @@ def test_incomplete_waql_reference_blocks_helper_generation(tmp_path: Path) -> N
         require_waql_helper_generation(manifest, reference)
 
 
-def test_live_matrix_keeps_required_resource_fields_and_source_names() -> None:
-    matrix = WAQL_REFERENCE.read_text(encoding="utf-8")
+def test_runtime_waql_reference_keeps_required_resource_fields_and_source_names() -> None:
+    reference = WAQL_REFERENCE.read_text(encoding="utf-8")
 
-    validate_waql_live_matrix(json.loads(matrix))
-    assert "waql-2022.1.md" not in matrix
-    assert "resources/waql/2022.1/object-get-live-matrix.json" in matrix
+    validate_waql_reference(json.loads(reference))
+    assert "waql-2022.1.md" not in reference
+    assert "resources/waql/2022.1/object-get-examples.json" in reference
 
 
 def test_no_waql_api_does_not_require_docs_generation(tmp_path: Path) -> None:

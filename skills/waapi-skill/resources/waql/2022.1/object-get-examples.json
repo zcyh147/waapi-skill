@@ -1,0 +1,204 @@
+{
+  "examples": [
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\""
+      },
+      "category": "path queries",
+      "id": "path_actor_mixer_root",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ]
+      },
+      "sources": [
+        "resources/waql/2022.1/object-get-examples.json#examples.path_actor_mixer_root",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from object \"{actor_mixer_root_id}\""
+      },
+      "category": "GUID queries",
+      "id": "guid_actor_mixer_root",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ]
+      },
+      "placeholders": {
+        "actor_mixer_root_id": "path_actor_mixer_root.return[0].id"
+      },
+      "sources": [
+        "resources/waql/2022.1/object-get-examples.json#examples.guid_actor_mixer_root",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from type Sound where type = \"Sound\" take 1"
+      },
+      "category": "name/type filters",
+      "id": "sound_name_type_filter",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type"
+        ]
+      },
+      "sources": [
+        "resources/waql/2022.1/object-get-examples.json#examples.sound_name_type_filter",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from search \"Default Work Unit\" where name = \"Default Work Unit\" take 1"
+      },
+      "category": "quoted strings and JSON escaping",
+      "id": "quoted_search_default_work_unit",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "path"
+        ]
+      },
+      "sources": [
+        "resources/waql/2022.1/object-get-examples.json#examples.quoted_search_default_work_unit",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\" select descendants take 1"
+      },
+      "category": "descendant traversal",
+      "id": "descendant_traversal_actor_mixer",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "path"
+        ]
+      },
+      "sources": [
+        "resources/waql/2022.1/object-get-examples.json#examples.descendant_traversal_actor_mixer",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from object \"{actor_mixer_descendant_id}\" select ancestors where name = \"Actor-Mixer Hierarchy\""
+      },
+      "category": "ancestor traversal",
+      "id": "ancestor_traversal_from_discovered_descendant",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "path"
+        ]
+      },
+      "placeholders": {
+        "actor_mixer_descendant_id": "descendant_traversal_actor_mixer.return[0].id"
+      },
+      "skip_if_placeholder_missing": true,
+      "sources": [
+        "resources/waql/2022.1/object-get-examples.json#examples.ancestor_traversal_from_discovered_descendant",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\" where childrenCount >= 0"
+      },
+      "category": "property comparisons",
+      "id": "children_count_property_comparison",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "childrenCount"
+        ]
+      },
+      "sources": [
+        "resources/waql/2022.1/object-get-examples.json#examples.children_count_property_comparison",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\""
+      },
+      "category": "return/options selection",
+      "id": "return_options_selection",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name"
+        ]
+      },
+      "sources": [
+        "resources/waql/2022.1/object-get-examples.json#examples.return_options_selection",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from project where name = \"__waapi_skills_missing_object__\""
+      },
+      "category": "empty results",
+      "id": "empty_results_missing_name",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name"
+        ]
+      },
+      "sources": [
+        "resources/waql/2022.1/object-get-examples.json#examples.empty_results_missing_name",
+        "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    }
+  ],
+  "metadata": {
+    "default_live": false,
+    "name": "WAQL runtime examples for ak.wwise.core.object.get (2022.1)",
+    "notes": [
+      "Live cases are read-only ak.wwise.core.object.get WAQL calls executed against Task 3 sandbox copies only."
+    ],
+    "reference": "resources/waql/2022.1/object-get-examples.json",
+    "sandbox_required": true,
+    "schema_source": "resources/manifest/2022.1/schemas.json#ak.wwise.core.object.get",
+    "source_project_mutation_allowed": false,
+    "uri": "ak.wwise.core.object.get",
+    "wwise_version_target": "2022.1"
+  }
+}

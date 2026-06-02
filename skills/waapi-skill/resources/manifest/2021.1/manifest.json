@@ -12,25 +12,8 @@
     "generator": "wwise_waapi.manifest.ReflectionManifestBuilder",
     "inventory_source": "live-reflection-2021.1-sandbox-manifest",
     "provenance": {
-      "get_info": {
-        "apiVersion": 1,
-        "branch": "wwise_v2021.1",
-        "configuration": "release",
-        "isCommandLine": true,
-        "platform": "x64",
-        "version": {
-          "build": 8108,
-          "displayName": "v2021.1.14",
-          "major": 1,
-          "minor": 14,
-          "schema": 103,
-          "year": 2021
-        }
-      },
       "sample_project": {
-        "name": "SampleProject",
-        "path": "<local-path-redacted>",
-        "path_status": "matched-exact-expected-path"
+        "name": "SampleProject"
       }
     },
     "schema_source_uri": "ak.wwise.waapi.getSchema",
@@ -44,8 +27,6 @@
     ],
     "version_key": "2021.1",
     "wwise_build": "2021.1.14.8108",
-    "wwise_console_path": "<local-path-redacted>",
-    "wwise_console_path_status": "matched-exact-expected-path",
     "wwise_version_target": "2021.1"
   }
 }

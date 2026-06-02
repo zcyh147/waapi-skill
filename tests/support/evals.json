@@ -50,9 +50,9 @@
       "id": "waql-query-gated",
       "category": "WAQL query",
       "prompt": "Build a Wwise 2022.1 WAAPI query that finds Sound objects with negative direct Volume and returns id, name, path, type, and @Volume. Use WAQL only if the source-grounded WAQL reference supports it.",
-      "expected_output": "Uses the WAQL resource gate and ak.wwise.core.object.get with args.waql, cites or references the packaged live WAQL matrix, returns the requested fields, and avoids inventing WAQL operators or unsupported semantics.",
+      "expected_output": "Uses the WAQL resource gate and ak.wwise.core.object.get with args.waql, cites or references the packaged WAQL examples reference, returns the requested fields, and avoids inventing WAQL operators or unsupported semantics.",
       "files": [
-        "skills/waapi-skill/resources/waql/2022.1/object-get-live-matrix.json",
+        "skills/waapi-skill/resources/waql/2022.1/object-get-examples.json",
         "SKILL.md"
       ],
       "assertions": [
@@ -60,7 +60,7 @@
           "name": "uses_waql_reference_gate",
           "text": "Output says WAQL helper behavior is gated by the stored WAQL reference before relying on semantics.",
           "required_terms": [
-            "object-get-live-matrix.json"
+            "object-get-examples.json"
           ],
           "required_terms_any": [
             "WAQL resource gate",
@@ -523,7 +523,7 @@
         "resources/manifest/2021.1/functions.json",
         "tests/destructive/support/resources/capabilities/2021.1/api-coverage.json",
         "resources/deferred/2021.1.json",
-        "resources/waql/2021.1/object-get-live-matrix.json"
+        "resources/waql/2021.1/object-get-examples.json"
       ],
       "assertions": [
         {
@@ -722,7 +722,7 @@
         "resources/manifest/2024.1/functions.json",
         "tests/destructive/support/resources/capabilities/2024.1/api-coverage.json",
         "resources/deferred/2024.1.json",
-        "resources/waql/2024.1/object-get-live-matrix.json"
+        "resources/waql/2024.1/object-get-examples.json"
       ],
       "assertions": [
         {
@@ -820,7 +820,7 @@
         "resources/manifest/2025.1/functions.json",
         "tests/destructive/support/resources/capabilities/2025.1/api-coverage.json",
         "resources/deferred/2025.1.json",
-        "resources/waql/2025.1/object-get-live-matrix.json"
+        "resources/waql/2025.1/object-get-examples.json"
       ],
       "assertions": [
         {

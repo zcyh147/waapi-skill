@@ -1774,7 +1774,7 @@
       "evidence_paths": [
         ".sisyphus/evidence/task-3-live-read-only.txt",
         ".sisyphus/evidence/task-3-read-only-guard.txt",
-        "resources/waql/2023.1/object-get-live-matrix.json",
+        "resources/waql/2023.1/object-get-examples.json",
         ".sisyphus/evidence/wwise-2023-test-parity/live-read-only/"
       ]
     },

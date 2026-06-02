@@ -1049,8 +1049,7 @@
     "inventory_source": "live-reflection:SampleProject",
     "provenance": {
       "sample_project": {
-        "name": "SampleProject",
-        "path": "/Applications/Audiokinetic/SampleProject2023.1.19.8928/SampleProject/SampleProject.wproj"
+        "name": "SampleProject"
       }
     },
     "schema_source_uri": "ak.wwise.waapi.getSchema",
@@ -1064,7 +1063,6 @@
     ],
     "version_key": "2023.1",
     "wwise_build": "2023.1.19.8928",
-    "wwise_console_path": "/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh",
     "wwise_version_target": "2023.1"
   }
 }

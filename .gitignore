@@ -58,3 +58,5 @@ session*.json
 .idea/
 .vscode/
 *~
+# Local real-Wwise test configuration (machine-specific)
+tests/fixtures/local/live-environment.json

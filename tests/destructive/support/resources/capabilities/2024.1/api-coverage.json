@@ -4339,8 +4339,8 @@
         "counts_as_live_behavioral": true,
         "coverage": "live-tested",
         "evidence": "Exact 2024.1 live sandbox WAQL matrix passed all 8 read-only object.get cases without mutating the installed SampleProject or committed fixture.",
-        "evidence_path": "resources/waql/2024.1/object-get-live-matrix.json",
-        "evidence_standard": "2024.1 read-only live sandbox evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/ plus resources/waql/2024.1/object-get-live-matrix.json counts as behavioral/live proof for ak.wwise.core.object.get only.",
+        "evidence_path": "resources/waql/2024.1/object-get-examples.json",
+        "evidence_standard": "2024.1 read-only live sandbox evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/ plus resources/waql/2024.1/object-get-examples.json counts as behavioral/live proof for ak.wwise.core.object.get only.",
         "live_command_evidence": ".sisyphus/evidence/task-2024-8-live-read-only.txt",
         "manifest_reflection_only": false,
         "mutation_guard_evidence": ".sisyphus/evidence/task-2024-8-read-only-guard.txt",
@@ -4354,13 +4354,13 @@
         "behavioral_coverage": "live-tested",
         "blocking_condition": "Cleared by exact 2024.1 read-only live sandbox evidence for ak.wwise.core.object.get only.",
         "coverage_status": "live-tested",
-        "evidence_source": "resources/waql/2024.1/object-get-live-matrix.json",
+        "evidence_source": "resources/waql/2024.1/object-get-examples.json",
         "review_trigger": "When object.get WAQL read-only contract behavior changes or 2024.1 evidence is refreshed.",
         "status": false,
         "substitute_test": "Not deferred; covered by tests/live/test_2024_waql_live_matrix.py."
       },
       "destructive_opt_in": false,
-      "evidence_standard": "2024.1 read-only live sandbox evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/ plus resources/waql/2024.1/object-get-live-matrix.json counts as behavioral/live proof for ak.wwise.core.object.get only.",
+      "evidence_standard": "2024.1 read-only live sandbox evidence under .sisyphus/evidence/wwise-2024-waapi-integration-coverage/ plus resources/waql/2024.1/object-get-examples.json counts as behavioral/live proof for ak.wwise.core.object.get only.",
       "item_type": "function",
       "parity_bucket": "live-tested",
       "risk_level": "low",
@@ -4387,7 +4387,7 @@
       "uri": "ak.wwise.core.object.get",
       "usage_guidance": {
         "default_path": "read-only-live-tested",
-        "notes": "Use ak.wwise.core.object.get as 2024.1 read-only live-tested only for the WAQL shapes covered by resources/waql/2024.1/object-get-live-matrix.json."
+        "notes": "Use ak.wwise.core.object.get as 2024.1 read-only live-tested only for the WAQL shapes covered by resources/waql/2024.1/object-get-examples.json."
       },
       "version": "2024.1"
     },

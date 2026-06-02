@@ -4488,8 +4488,8 @@
         "counts_as_live_behavioral": true,
         "coverage": "live-tested",
         "evidence": "Exact 2021.1.14 build 8108 live sandbox WAQL matrix passed all 9 read-only object.get cases, including hierarchy preflight, without mutating the installed SampleProject.",
-        "evidence_path": "resources/waql/2021.1/object-get-live-matrix.json",
-        "evidence_standard": "2021.1 read-only live sandbox evidence under .sisyphus/evidence/wwise-2021-waapi-integration-coverage/ plus resources/waql/2021.1/object-get-live-matrix.json counts as behavioral/live proof for ak.wwise.core.object.get only.",
+        "evidence_path": "resources/waql/2021.1/object-get-examples.json",
+        "evidence_standard": "2021.1 read-only live sandbox evidence under .sisyphus/evidence/wwise-2021-waapi-integration-coverage/ plus resources/waql/2021.1/object-get-examples.json counts as behavioral/live proof for ak.wwise.core.object.get only.",
         "live_command_evidence": ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/task-7-waql-matrix.json",
         "manifest_reflection_only": false,
         "parity_bucket": "live-tested",
@@ -4509,7 +4509,7 @@
         "blocking_condition": "Cleared by exact 2021.1 read-only live sandbox evidence for ak.wwise.core.object.get only.",
         "coverage_status": "live-tested",
         "destructive_applicability": "not-destructive-by-uri-risk",
-        "evidence_source": "resources/waql/2021.1/object-get-live-matrix.json",
+        "evidence_source": "resources/waql/2021.1/object-get-examples.json",
         "live_applicability": "fresh-2021.1-live-read-only-evidence",
         "reflection_evidence_path": "resources/manifest/2021.1/functions.json#ak.wwise.core.object.get",
         "review_trigger": "When object.get WAQL read-only contract behavior changes or 2021.1 evidence is refreshed.",
@@ -4518,7 +4518,7 @@
         "substitute_test": "Not deferred; covered by tests/live/test_2021_1_object_get_matrix.py."
       },
       "destructive_opt_in": false,
-      "evidence_standard": "2021.1 read-only live sandbox evidence under .sisyphus/evidence/wwise-2021-waapi-integration-coverage/ plus resources/waql/2021.1/object-get-live-matrix.json counts as behavioral/live proof for ak.wwise.core.object.get only.",
+      "evidence_standard": "2021.1 read-only live sandbox evidence under .sisyphus/evidence/wwise-2021-waapi-integration-coverage/ plus resources/waql/2021.1/object-get-examples.json counts as behavioral/live proof for ak.wwise.core.object.get only.",
       "family": "query",
       "item_type": "function",
       "parity_bucket": "live-tested",
@@ -4568,7 +4568,7 @@
       "uri": "ak.wwise.core.object.get",
       "usage_guidance": {
         "default_path": "read-only-live-tested",
-        "notes": "Use ak.wwise.core.object.get as 2021.1 read-only live-tested only for the WAQL shapes covered by resources/waql/2021.1/object-get-live-matrix.json."
+        "notes": "Use ak.wwise.core.object.get as 2021.1 read-only live-tested only for the WAQL shapes covered by resources/waql/2021.1/object-get-examples.json."
       },
       "version": "2021.1"
     },

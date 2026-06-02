@@ -1084,8 +1084,7 @@
     "inventory_source": "live-reflection-2025.1-sandbox-manifest",
     "provenance": {
       "sample_project": {
-        "name": "SampleProject",
-        "path": "/Applications/Audiokinetic/SampleProject2025.1.7.9143/SampleProject/SampleProject.wproj"
+        "name": "SampleProject"
       }
     },
     "schema_source_uri": "ak.wwise.waapi.getSchema",
@@ -1099,7 +1098,6 @@
     ],
     "version_key": "2025.1",
     "wwise_build": "2025.1.7.9143",
-    "wwise_console_path": "/Applications/Audiokinetic/Wwise2025.1.7.9143/Wwise.app/Contents/Tools/WwiseConsole.sh",
     "wwise_version_target": "2025.1"
   }
 }

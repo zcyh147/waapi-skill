@@ -1954,8 +1954,8 @@
         "destructive_opt_in": false,
         "risk_level": "low"
       },
-      "evidence_path": "resources/waql/2025.1/object-get-live-matrix.json",
-      "evidence_standard": "Fresh 2025.1 live sandbox behavior evidence under .sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/ plus resources/waql/2025.1/object-get-live-matrix.json counts as behavioral/live proof for ak.wwise.core.object.get only.",
+      "evidence_path": "resources/waql/2025.1/object-get-examples.json",
+      "evidence_standard": "Fresh 2025.1 live sandbox behavior evidence under .sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/ plus resources/waql/2025.1/object-get-examples.json counts as behavioral/live proof for ak.wwise.core.object.get only.",
       "fixture_prerequisites": [
         ".sisyphus/evidence/task-2025-9-live-read-only.txt",
         ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/"

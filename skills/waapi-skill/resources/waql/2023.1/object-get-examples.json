@@ -1,0 +1,189 @@
+{
+  "examples": [
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\""
+      },
+      "category": "path queries",
+      "id": "path_actor_mixer_root_2023_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ]
+      },
+      "sources": [
+        "resources/waql/2023.1/object-get-examples.json#examples.path_actor_mixer_root_2023_contract",
+        "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+        "2022.1 WAQL path query live case"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from object \"{actor_mixer_root_id}\""
+      },
+      "category": "GUID queries",
+      "id": "guid_actor_mixer_root_2023_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ]
+      },
+      "placeholders": {
+        "actor_mixer_root_id": "path_actor_mixer_root_2023_contract.return[0].id"
+      },
+      "sources": [
+        "resources/waql/2023.1/object-get-examples.json#examples.guid_actor_mixer_root_2023_contract",
+        "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+        "2022.1 WAQL GUID placeholder live case"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from type Sound where type = \"Sound\" take 1"
+      },
+      "category": "type filters",
+      "id": "type_sound_filter_2023_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type"
+        ]
+      },
+      "sources": [
+        "resources/waql/2023.1/object-get-examples.json#examples.type_sound_filter_2023_contract",
+        "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+        "2022.1 WAQL type filter live case"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from search \"Default Work Unit\" where name = \"Default Work Unit\" take 1"
+      },
+      "category": "quoted strings and JSON escaping",
+      "id": "quoted_search_default_work_unit_2023_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "path"
+        ]
+      },
+      "sources": [
+        "resources/waql/2023.1/object-get-examples.json#examples.quoted_search_default_work_unit_2023_contract",
+        "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+        "2022.1 WAQL quoted search live case"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\" select descendants take 1"
+      },
+      "category": "descendant traversal",
+      "id": "descendant_traversal_actor_mixer_2023_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "path"
+        ]
+      },
+      "sources": [
+        "resources/waql/2023.1/object-get-examples.json#examples.descendant_traversal_actor_mixer_2023_contract",
+        "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+        "2022.1 WAQL descendant traversal live case"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\" where childrenCount >= 0"
+      },
+      "category": "property comparisons",
+      "id": "children_count_property_comparison_2023_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "childrenCount"
+        ]
+      },
+      "sources": [
+        "resources/waql/2023.1/object-get-examples.json#examples.children_count_property_comparison_2023_contract",
+        "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+        "2022.1 WAQL property comparison live case"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "\"\\Actor-Mixer Hierarchy\""
+      },
+      "category": "return/options selection",
+      "id": "return_options_selection_2023_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name"
+        ]
+      },
+      "sources": [
+        "resources/waql/2023.1/object-get-examples.json#examples.return_options_selection_2023_contract",
+        "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+        "2022.1 WAQL return options live case"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    },
+    {
+      "args": {
+        "waql": "from project where name = \"__waapi_skills_missing_object__\""
+      },
+      "category": "empty results",
+      "id": "empty_results_missing_name_2023_contract",
+      "no_mutation": true,
+      "options": {
+        "return": [
+          "id",
+          "name"
+        ]
+      },
+      "sources": [
+        "resources/waql/2023.1/object-get-examples.json#examples.empty_results_missing_name_2023_contract",
+        "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+        "2022.1 WAQL empty result live case"
+      ],
+      "uri": "ak.wwise.core.object.get"
+    }
+  ],
+  "metadata": {
+    "default_live": false,
+    "name": "WAQL runtime examples for ak.wwise.core.object.get (2023.1)",
+    "notes": [
+      "Manifest/schema presence for ak.wwise.core.object.get is not behavioral WAQL support.",
+      "No profiler, transport, soundengine, UI, CLI, remote, debug, or environment-sensitive event topics are subscribed by these read-only cases."
+    ],
+    "reference": "resources/waql/2023.1/object-get-examples.json",
+    "sandbox_required": true,
+    "schema_source": "resources/manifest/2023.1/schemas.json#ak.wwise.core.object.get",
+    "source_project_mutation_allowed": false,
+    "uri": "ak.wwise.core.object.get",
+    "wwise_version_target": "2023.1"
+  }
+}

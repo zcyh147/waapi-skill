@@ -1,4 +1,4 @@
-"""Fail-closed WAQL resource gate and read-only examples."""
+"""Fail-closed WAQL resource gate and read-only runtime examples."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Any, Mapping
 
 WAQL_API_URI = "ak.wwise.core.object.get"
-DEFAULT_WAQL_REFERENCE = Path("resources/waql/2022.1/object-get-live-matrix.json")
-REQUIRED_WAQL_MATRIX_METADATA = ("name", "uri", "schema_source", "reference")
+DEFAULT_WAQL_REFERENCE = Path("resources/waql/2022.1/object-get-examples.json")
+REQUIRED_WAQL_REFERENCE_METADATA = ("name", "uri", "schema_source", "reference")
 
 WAQL_EXAMPLES: tuple[dict[str, Any], ...] = (
     {
@@ -69,7 +69,7 @@ class WaqlReferenceGate:
             return WaqlReferenceStatus(False, f"WAQL resource evidence could not be read: {exc}", self.reference_path)
 
         try:
-            validate_waql_live_matrix(payload)
+            validate_waql_reference(payload)
             validate_stored_waql_examples()
         except ValueError as exc:
             return WaqlReferenceStatus(False, f"WAQL resource evidence is incomplete: {exc}", self.reference_path)
@@ -78,9 +78,9 @@ class WaqlReferenceGate:
 
 
 def waql_matrix_path(version: str) -> Path:
-    """Return the packaged WAQL matrix resource for a Wwise version."""
+    """Return the packaged WAQL runtime example resource for a Wwise version."""
 
-    return Path("resources") / "waql" / version / "object-get-live-matrix.json"
+    return Path("resources") / "waql" / version / "object-get-examples.json"
 
 
 def waql_api_uris(manifest: Mapping[str, Any]) -> tuple[str, ...]:
@@ -156,25 +156,25 @@ def validate_stored_waql_examples(examples: tuple[Mapping[str, Any], ...] = WAQL
         validate_waql_example(example)
 
 
-def validate_waql_live_matrix(matrix: Mapping[str, Any]) -> None:
-    """Validate the packaged live WAQL matrix resource."""
+def validate_waql_reference(matrix: Mapping[str, Any]) -> None:
+    """Validate the packaged runtime WAQL example resource."""
 
     metadata = matrix.get("metadata")
     if not isinstance(metadata, Mapping):
-        raise ValueError("WAQL matrix metadata must be a mapping")
-    for key in REQUIRED_WAQL_MATRIX_METADATA:
+        raise ValueError("WAQL reference metadata must be a mapping")
+    for key in REQUIRED_WAQL_REFERENCE_METADATA:
         if key not in metadata:
-            raise ValueError(f"WAQL matrix metadata is missing {key}")
+            raise ValueError(f"WAQL reference metadata is missing {key}")
     if metadata.get("uri") != WAQL_API_URI:
-        raise ValueError("WAQL matrix metadata must target ak.wwise.core.object.get")
+        raise ValueError("WAQL reference metadata must target ak.wwise.core.object.get")
 
-    live_cases = matrix.get("live_cases")
-    if not isinstance(live_cases, list) or not live_cases:
-        raise ValueError("WAQL matrix live_cases must be a non-empty list")
+    examples = matrix.get("examples")
+    if not isinstance(examples, list) or not examples:
+        raise ValueError("WAQL reference examples must be a non-empty list")
 
-    for case in live_cases:
+    for case in examples:
         if not isinstance(case, Mapping):
-            raise ValueError("WAQL matrix live case must be a mapping")
+            raise ValueError("WAQL reference example must be a mapping")
         synthesized = {
             "name": case.get("id"),
             "uri": case.get("uri"),
@@ -184,12 +184,31 @@ def validate_waql_live_matrix(matrix: Mapping[str, Any]) -> None:
         }
         validate_waql_example(synthesized)
         if case.get("no_mutation") is not True:
-            raise ValueError("WAQL live cases must remain read-only")
+            raise ValueError("WAQL examples must remain read-only")
         sources = case.get("sources")
         if not isinstance(sources, list) or not sources:
-            raise ValueError("WAQL live cases must include source evidence")
+            raise ValueError("WAQL examples must include source references")
         if not all(isinstance(source, str) for source in sources):
-            raise ValueError("WAQL live case sources must be strings")
+            raise ValueError("WAQL example sources must be strings")
+
+
+def validate_waql_live_matrix(matrix: Mapping[str, Any]) -> None:
+    """Validate a test-only live WAQL matrix fixture."""
+
+    metadata = matrix.get("metadata")
+    if not isinstance(metadata, Mapping):
+        raise ValueError("WAQL matrix metadata must be a mapping")
+    for key in REQUIRED_WAQL_REFERENCE_METADATA:
+        if key not in metadata:
+            raise ValueError(f"WAQL matrix metadata is missing {key}")
+    if metadata.get("uri") != WAQL_API_URI:
+        raise ValueError("WAQL matrix metadata must target ak.wwise.core.object.get")
+
+    live_cases = matrix.get("live_cases")
+    if not isinstance(live_cases, list) or not live_cases:
+        raise ValueError("WAQL matrix live_cases must be a non-empty list")
+
+    validate_waql_reference({"metadata": metadata, "examples": live_cases})
 
 
 def _looks_mutating(waql: str) -> bool:

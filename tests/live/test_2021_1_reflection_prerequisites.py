@@ -109,14 +109,9 @@ def test_2021_1_live_reflection_prerequisites_and_resource_generation() -> None:
             manifest.metadata.update(
                 {
                     "version_key": EXPECTED_WWISE_VERSION,
-                    "wwise_console_path": REDACTED_LOCAL_PATH,
-                    "wwise_console_path_status": "matched-exact-expected-path",
                     "provenance": {
-                        "get_info": _stable_get_info_summary(info),
                         "sample_project": {
                             "name": EXPECTED_SAMPLE_PROJECT.stem,
-                            "path": REDACTED_LOCAL_PATH,
-                            "path_status": "matched-exact-expected-path",
                         },
                     },
                 }
