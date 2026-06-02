@@ -7,7 +7,7 @@ description: Use this skill for Wwise WAAPI automation through the skill-local P
 
 Use this skill to automate Wwise through WAAPI with a Python-first workflow. The normal path is: make sure Python can run the skill-local wrapper, identify the target Wwise version, then extract a structured semantic intent and route it through the semantic planner.
 
-When config and currently connectable WAAPI details are already known, execute the direct read-only query first for ordinary inspection requests. Do not start by inspecting repository files or launching documentation research unless the user explicitly asked for investigation or the direct connection path is blocked.
+When config and currently connectable WAAPI details are already known, execute the direct read-only query first for ordinary inspection requests. Here, direct means direct through the skill-local runner and manifest-backed `WwiseDispatcher`, not hand-written one-off `WaapiClient.call(...)` business logic. Do not start by inspecting repository files or launching documentation research unless the user explicitly asked for investigation or the direct connection path is blocked.
 
 ## Welcome/status UX for Wwise version detection
 
@@ -83,6 +83,23 @@ For task work, call the Python layer instead of inventing shell commands. The ma
 2. `wwise_waapi.dispatcher`: validates WAAPI functions and topics against versioned manifests, then calls WAAPI or waits for bounded topic events.
 3. `resources/manifest/<version>/`, `resources/semantic/<version>/`, `resources/waql/<version>/`, and `resources/deferred/<version>.json`: loaded on demand for the selected version and task. Semantic builders validate the packaged `source_notes.json` metadata for the selected version; root `references/` markdown remains repository development/source evidence and is not a packaged runtime dependency.
 4. `wwise_waapi.builders`: semantic builders for common query, object mutation, import, soundbank, property, reference, and switch container tasks.
+
+## Read-only inspection scaffolding
+
+Ordinary inspection tasks such as current Wwise version, current project info, current selection, object lookup, or hierarchy browsing should reuse the skill scaffolding. After the welcome/status line, analyze the user's intent, select the supported semantic family when one applies, and load the versioned runtime resources needed for that intent: `resources/semantic/<version>/source_notes.json`, `resources/waql/<version>/`, `resources/deferred/<version>.json`, and `resources/manifest/<version>/`. A short connection harness is acceptable when needed, but API selection, args, options, timeout, version, and evidence handling must come from those resources and route through `WwiseDispatcher` or an existing semantic builder. Do not generate disposable business logic that calls `WaapiClient.call(...)` directly for common inspection requests.
+
+Do not hard-code a fixed API map in this skill prompt. For current selection questions such as "what object is selected?", resolve the selection capability from the detected version's manifest and deferred resources before choosing a WAAPI URI. Keep return fields explicit when a resource-backed request is selected, but pass them as dispatcher `options`, not as raw positional arguments to `WaapiClient.call`.
+
+Use this pattern for read-only inspection work:
+
+1. Load `data/config.json` for `wwise_version`, `waapi_host`, and `waapi_port`; verify the connection if needed.
+2. Extract the user's inspection intent and choose the semantic family/resource path before choosing a WAAPI URI.
+3. Load only the versioned semantic, WAQL, deferred, and manifest resources needed for that intent.
+4. Create the WAAPI client only as the transport layer.
+5. Dispatch the resource-selected operation through `WwiseDispatcher(client=client).dispatch(...)` with the detected or configured version.
+6. Report the structured dispatcher result or a clear blocker. If the dispatcher cannot cover the resource-selected URI because the manifest lacks it for the selected version, say so and only then use a minimal raw WAAPI escape hatch.
+
+If an escape hatch is required, state it explicitly in the final answer: `The skill dispatcher did not cover <uri> for <version>, so I used a minimal raw WAAPI fallback.` Do not present raw fallback code as the normal skill workflow.
 
 ## Version selection
 
