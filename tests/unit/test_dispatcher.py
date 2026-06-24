@@ -40,6 +40,15 @@ class FakeSubscriptionManager:
         return SubscriptionEvent(topic=topic, args=({"event": "payload"},), kwargs={"sequence": 1})
 
 
+class KeywordOnlyOptionsClient:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, Mapping[str, Any] | None, Mapping[str, Any] | None]] = []
+
+    def call(self, uri: str, args: Mapping[str, Any] | None = None, *, options: Mapping[str, Any] | None = None) -> Any:
+        self.calls.append((uri, args, options))
+        return {"ok": "keyword-options"}
+
+
 def manifest_store() -> ManifestStore:
     store = ManifestStore()
     store.record(
@@ -72,6 +81,22 @@ def test_dispatch_function_validates_manifest_and_calls_injected_client() -> Non
     assert result["item_type"] == "function"
     assert result["category"] == "core"
     assert result["result"] == {"displayName": "Wwise"}
+    assert client.calls == [("ak.wwise.core.getInfo", {"platform": "Mac"}, {"return": ["displayName"]})]
+
+
+def test_dispatch_function_passes_options_as_keyword_argument() -> None:
+    client = KeywordOnlyOptionsClient()
+    dispatcher = WwiseDispatcher(client=client, manifest_store=manifest_store())
+
+    result = dispatcher.dispatch(
+        "ak.wwise.core.getInfo",
+        args={"platform": "Mac"},
+        options={"return": ["displayName"]},
+        timeout=0.5,
+    )
+
+    assert result["ok"] is True
+    assert result["result"] == {"ok": "keyword-options"}
     assert client.calls == [("ak.wwise.core.getInfo", {"platform": "Mac"}, {"return": ["displayName"]})]
 
 

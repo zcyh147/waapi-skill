@@ -335,7 +335,7 @@ def _call_with_timeout(
 
     def target() -> None:
         try:
-            result_queue.put((True, client.call(api, args, options)))
+            result_queue.put((True, client.call(api, args, options=options)))
         except BaseException as exc:  # noqa: BLE001 - transferred to caller thread
             result_queue.put((False, exc))
 

@@ -25,7 +25,7 @@ Supported Wwise versions are `2021.1`, `2022.1`, `2023.1`, `2024.1`, and `2025.1
 
 ## Operator protocol
 
-Use this closed semantic-intent protocol before choosing scripts, builders, manifests, or docs. Extract one structured `SemanticIntent`, call `SemanticPlanner.plan()`, present the resulting `SemanticPlan` preview, require confirmation for project-changing steps, execute only when the submitted preview hash exactly matches `SemanticPlan.preview_hash`, then verify with the plan's verification steps. Do not invent intent families.
+Use this closed semantic-intent protocol before choosing scripts, builders, manifests, or docs. Extract one structured `SemanticIntent`, call `SemanticPlanner.plan()`, present the resulting `SemanticPlan` preview, require clear user confirmation for project-changing steps, execute only when the confirmed plan still matches `SemanticPlan.preview_hash`, then verify with the plan's verification steps. Do not invent intent families.
 
 ```python
 from wwise_waapi.semantic_planner import SemanticIntent, SemanticIntentTarget, SemanticPlanner, confirm_semantic_plan
@@ -46,10 +46,10 @@ facts = {
     "mutation_executed_before_confirmation": False,
     "verification_status": "not_applicable_unsupported_boundary" if plan.unsupported_capability else "planned",
 }
-submitted_preview_hash = confirmation_response.preview_hash
+submitted_preview_hash = confirmation_state.preview_hash_seen_by_agent
 confirmed = confirm_semantic_plan(
     plan,
-    confirmation_state=confirmation_response.state,
+    confirmation_state=confirmation_state.state,
     submitted_preview_hash=submitted_preview_hash,
 )
 ```
@@ -57,10 +57,10 @@ confirmed = confirm_semantic_plan(
 1. Extract `SemanticIntent` with one family: `intent_navigation`, `crud_authoring`, `system_design_preview`, `asset_import_workflow`, `soundbank_workflow`, `switch_assignment_workflow`, `bounded_profiler_guidance`, or `unsupported_runtime_boundary`.
 2. Even read-only navigation and unsupported boundary requests still pass through `SemanticPlanner.plan()`. If persisted config and a currently connectable WAAPI session are available, live WAAPI may supplement or verify the plan, but it does not replace planner facts. Use repository or documentation research only when the user explicitly asks for it or direct execution is blocked, and report the blocker.
 3. Route CRUD requests at the semantic family level: object creation, object mutation, property/reference edits, copy/move/delete, imports, soundbanks, and switch assignments become structured intent details for the planner. Do not paste raw WAAPI payload schemas into the prompt.
-4. Present the `SemanticPlan` preview before project-changing work. Include family, step summaries, target identities, risk flags, verification plan, and `preview_hash`; do not execute from prose-only confirmation.
-5. Confirm with `confirm_semantic_plan(preview, confirmation_state, submitted_preview_hash)`, where `submitted_preview_hash` is read from the user's confirmation response, not copied from the preview object by construction. Continue only when `confirmation_state` is `confirmed` and `submitted_preview_hash` exactly matches the current preview hash. Missing or mismatched hashes require a fresh preview.
+4. Present the `SemanticPlan` preview before project-changing work. Include family, step summaries, target identities, risk flags, verification plan, and a short preview id or hash for traceability. Do not ask the user to type the hash, checksum, JSON, or a magic phrase.
+5. Confirm with `confirm_semantic_plan(preview, confirmation_state, submitted_preview_hash)`, where `confirmation_state` is derived from the user's natural-language consent and `submitted_preview_hash` is the preview hash the agent most recently showed and retained internally. Continue only when the user gives clear affirmative confirmation such as “同意”, “可以”, “OK”, “yes”, “go ahead”, or equivalent, and the retained `submitted_preview_hash` exactly matches the current preview hash. If the user asks for changes, gives ambiguous consent, or the retained hash does not match, show a fresh preview instead of executing.
 6. Execute only the confirmed plan whose hash matched the preview shown to the user. If target identity, planned API, options, arguments, payload preview, or risk flags drift, abort and re-preview.
-7. Verify after execution using the plan's readback, bounded topic evidence, or other verification templates. Semantic capability runs must emit one machine-readable `SEMANTIC_RESULT_JSON` object with at least `structured_intent_extracted`, `semantic_family`, `semantic_planner_invoked`, `semantic_plan_status`, `preview_hash` when present or required, `source_builder_refs`, `unsupported_boundary_returned`, `unsupported_boundary_reason`, `mutation_executed`, `mutation_executed_before_confirmation`, and `verification_status`. Report structured failures rather than replacing them with vague prose.
+7. Verify after execution using the plan's readback, bounded topic evidence, or other verification templates. Semantic capability runs should keep one machine-readable `SEMANTIC_RESULT_JSON` object in local evidence/log output with at least `structured_intent_extracted`, `semantic_family`, `semantic_planner_invoked`, `semantic_plan_status`, `preview_hash` when present or required, `source_builder_refs`, `unsupported_boundary_returned`, `unsupported_boundary_reason`, `mutation_executed`, `mutation_executed_before_confirmation`, and `verification_status`. Do not dump this JSON to the user unless they explicitly ask for raw evidence; summarize the user-facing result in natural language and report structured failures without vague prose.
 
 Unsupported boundary requests: scheduler or delayed runtime posting, Game Object View emitter control, timed runtime or ambience playback, audio narrative sequencing, RTPC ramps over time, and cross-app MCP federation are not supported execution capabilities. Route them as `unsupported_runtime_boundary`; these plans have no execution steps, no preview id or hash, and no verification claims. Offer supported alternatives only when appropriate, such as authoring a static object or switch plan, previewing soundbank changes, or running a live read summary.
 
@@ -181,6 +181,27 @@ Every dispatcher result is structured and safe to log:
 
 Errors must stay structured with `ok`, `api`, `version`, `error_code`, `message`, and `evidence_path`. Do not replace dispatcher failures with vague prose.
 
+### WAAPI client call shape
+
+`WwiseDispatcher` owns the compatibility boundary between its normalized dispatcher request and the concrete WAAPI transport client. Native `waapi.WaapiClient.call()` expects `options` as a keyword argument: `call(uri, args, options=options)`. Do not ask the user to understand this distinction, and do not add task-local glue code unless an external client has a truly different contract.
+
+When constructing a client directly, keep the client as a transport only:
+
+```python
+from waapi import WaapiClient
+from wwise_waapi import WwiseDispatcher
+
+with WaapiClient(url=url) as client:
+    result = WwiseDispatcher(client=client).dispatch(
+        "ak.wwise.core.getInfo",
+        version="2025.1",
+        args={},
+        options={"return": ["version.displayName"]},
+    )
+```
+
+The dispatcher must pass `options` to the client by keyword. Agents should not create a separate adapter for the normal `waapi.WaapiClient` case, and user-facing reports should describe the skill/dispatcher path rather than internal call-shape glue.
+
 ## Semantic builders
 
 For complex WAAPI work, prefer the semantic planner before hand-writing dispatcher payloads. The planner maps structured semantic families to source-grounded builders, previews, readback plans, and dispatcher requests; it does not open Wwise, subscribe to topics, or dispatch live calls by default.
@@ -219,6 +240,12 @@ If a requested mutation target path is not a valid direct writable parent for th
 Project-changing and destructive operations are blocked by default. Only pass `allow_destructive=True` for a clearly requested change, after previewing when possible, and only against a project the user intentionally chose for that operation. Do not casually target a user's active production project.
 
 Treat operations such as object deletion, object creation, property mutation, imports, soundbank changes, switch container assignment changes, and undo-group mutations as potentially destructive. Prefer read-only queries and dry runs until the requested edit is clear.
+
+WAAPI is the primary authoring surface. Direct `.wproj` or `.wwu` XML edits are an exceptional offline fallback, not a normal continuation when a WAAPI command is missing. Before proposing XML edits, first prove one of these conditions: the selected Wwise version manifest and semantic resources do not expose the needed authoring capability; the capability is explicitly marked unsupported/deferred; Wwise is unavailable and the user explicitly asked for offline project-file surgery; or the user explicitly requested XML editing.
+
+If XML editing is used, treat it as project-changing and preview it with the same natural-language confirmation flow. The preview must name the exact files, object identities, generated IDs, and verification steps. Never imply that XML fallback support comes from the versioned manifest unless the manifest/resource evidence actually covers that API path.
+
+For XML-created or XML-cloned Wwise objects, generate fresh GUIDs and ShortIDs, then check for collisions before writing. At minimum, scan the target project files for the candidate GUID and ShortID; when a live WAAPI session is available, also query by candidate GUID and candidate ShortID through `ak.wwise.core.object.get` or the version-appropriate object lookup before committing the XML edit. If any collision is found, regenerate and recheck. After writing, reopen or reload through Wwise/WAAPI when possible and read back the created objects.
 
 Keep runtime data, logs, auth state, and evidence artifacts out of git unless the user or plan explicitly asks for committed evidence. Do not claim Windows validation has passed unless the task provides real Windows-host evidence.
 
