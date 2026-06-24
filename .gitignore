@@ -1,5 +1,6 @@
 .agents/
 .sisyphus/
+.omo
 skills-lock.json
 
 # Python / test artifacts
