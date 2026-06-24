@@ -12,6 +12,7 @@ from .platform_paths import (  # pyright: ignore[reportMissingImports]
     windows_wwise_console_path,
 )
 from .subscriptions import SubscriptionManager
+from .xml_backup import WAAPI_SKILL_BACKUP_DIR, create_xml_edit_backup, project_root_from_project_info
 from .waql import (  # pyright: ignore[reportMissingImports]
     WAQL_EXAMPLES,
     WaqlReferenceGate,
@@ -38,7 +39,10 @@ __all__ = [
     "WaqlReferenceGate",
     "WaqlReferenceStatus",
     "WwiseDispatcher",
+    "WAAPI_SKILL_BACKUP_DIR",
     "build_wwise_console_command",
+    "create_xml_edit_backup",
+    "project_root_from_project_info",
     "require_waql_helper_generation",
     "resolve_windows_wwise_console_from_env",
     "validate_stored_waql_examples",

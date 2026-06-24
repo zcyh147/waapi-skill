@@ -36,6 +36,20 @@ def semantic_builders_section() -> str:
     return text[start:end]
 
 
+def welcome_section() -> str:
+    text = skill_text()
+    start = text.index("## Welcome/status UX for Wwise version detection")
+    end = text.index("Supported Wwise versions")
+    return text[start:end]
+
+
+def safety_section() -> str:
+    text = skill_text()
+    start = text.index("## Safety guardrails")
+    end = text.index("## Resources and documentation")
+    return text[start:end]
+
+
 def test_semantic_protocol_is_closed_and_before_implementation_details() -> None:
     text = skill_text()
     protocol = protocol_section()
@@ -63,7 +77,7 @@ def test_protocol_documents_intent_to_planner_to_preview_to_confirm_to_verify() 
         "Route CRUD requests at the semantic family level",
         "Present the `SemanticPlan` preview",
         "Confirm with `confirm_semantic_plan(preview, confirmation_state, submitted_preview_hash)`",
-        "Execute only the confirmed plan whose hash matched the preview shown to the user",
+        "Execute only the confirmed plan whose internally retained hash still matches the preview artifact shown to the user",
         "Verify after execution",
     ]
 
@@ -76,16 +90,24 @@ def test_project_changing_steps_require_matching_preview_hash() -> None:
 
     assert "before project-changing work" in protocol
     assert "`preview_hash`" in protocol
-    assert "submitted_preview_hash = confirmation_response.preview_hash" in protocol
+    assert "submitted_preview_hash = confirmation_state.preview_hash_seen_by_agent" in protocol
     assert "submitted_preview_hash=plan.preview_hash" not in protocol
-    assert "not copied from the preview object by construction" in protocol
-    assert "`confirmation_state` is `confirmed`" in protocol
-    assert "`submitted_preview_hash` exactly matches the current preview hash" in protocol
-    assert "Missing or mismatched hashes require a fresh preview" in protocol
+    assert "Do not display `preview_hash`" in protocol
+    assert "the user gives clear affirmative confirmation" in protocol
+    assert "retained `submitted_preview_hash` exactly matches the current preview hash" in protocol
+    assert "the retained hash does not match, show a fresh preview" in protocol
     assert "target identity" in protocol
     assert "planned API" in protocol
     assert "payload preview" in protocol
     assert "abort and re-preview" in protocol
+
+
+def test_preview_hash_is_internal_not_user_visible() -> None:
+    protocol = protocol_section()
+
+    assert "Do not display `preview_hash`, checksums, JSON, or magic phrases in user-facing text" in protocol
+    assert "Do not ask the user to type the hash" not in protocol
+    assert "short preview id or hash for traceability" not in protocol
 
 
 def test_semantic_runs_must_emit_machine_readable_planner_facts() -> None:
@@ -170,6 +192,40 @@ def test_public_config_surface_excludes_internal_runtime_constants() -> None:
     assert "saved public config fields include `startup" not in text
     assert "saved public config fields include `readiness" not in text
     assert "saved public config fields include `WwiseConsole" not in text
+
+
+def test_welcome_surface_mentions_project_modification_policy() -> None:
+    welcome = welcome_section()
+
+    assert "state the current `project_modification_policy`" in welcome
+    assert "Current project modification policy: preview_then_confirm" in welcome
+    assert "never, preview_then_confirm, or allow_with_notice" in welcome
+    assert "one-time session onboarding" in welcome
+    assert "first visible `waapi-skill` response after loading the skill" in welcome
+    assert "after making the first WAAPI connection in the current conversation" in welcome
+    assert "If you are not certain the current conversation already displayed the policy, display it" in welcome
+    assert "even when the first task is read-only" in welcome
+    assert "even when the user directly specified the query behavior" in welcome
+    assert "当前工程修改模式：preview_then_confirm" in welcome
+    assert "Never answer a first connection summary with only" in welcome
+    assert "Wwise is v2022.1.19" in welcome
+    assert "do not repeat it in every final connection/project summary" in welcome
+    assert "Repeat it only when the user changes the policy" in welcome
+    assert "asks about mutation safety/config" in welcome
+    assert "preview or execute project-changing work" in welcome
+    assert "current conversation already displayed the policy" in welcome
+    assert "final summaries may simply say which project and Wwise version were used without repeating the policy" in welcome
+    assert "repeat the active policy in that same summary" not in welcome
+
+
+def test_xml_backup_guidance_uses_project_root_dot_directory() -> None:
+    safety = safety_section()
+
+    assert "ak.wwise.core.getProjectInfo" in safety
+    assert "prefer `directories.root`" in safety
+    assert ".waapi_skill_backups/<timestamp>/" in safety
+    assert "create_xml_edit_backup()" in safety
+    assert "instead of writing sibling `.bak` files" in safety
 
 
 def _unsupported_boundary_paragraph(text: str) -> str:
