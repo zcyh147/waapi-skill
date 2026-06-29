@@ -36,6 +36,13 @@ def semantic_builders_section() -> str:
     return text[start:end]
 
 
+def read_only_scaffold_section() -> str:
+    text = skill_text()
+    start = text.index("## Read-only inspection scaffolding")
+    end = text.index("## Version selection")
+    return text[start:end]
+
+
 def welcome_section() -> str:
     text = skill_text()
     start = text.index("## Welcome/status UX for Wwise version detection")
@@ -199,6 +206,7 @@ def test_welcome_surface_mentions_project_modification_policy() -> None:
 
     assert "state the current `project_modification_policy`" in welcome
     assert "Current project modification policy: preview_then_confirm" in welcome
+    assert "You can ask me to switch it to never, preview_then_confirm, or allow_with_notice" in welcome
     assert "never, preview_then_confirm, or allow_with_notice" in welcome
     assert "one-time session onboarding" in welcome
     assert "first visible `waapi-skill` response after loading the skill" in welcome
@@ -206,9 +214,12 @@ def test_welcome_surface_mentions_project_modification_policy() -> None:
     assert "If you are not certain the current conversation already displayed the policy, display it" in welcome
     assert "even when the first task is read-only" in welcome
     assert "even when the user directly specified the query behavior" in welcome
-    assert "当前工程修改模式：preview_then_confirm" in welcome
     assert "Never answer a first connection summary with only" in welcome
     assert "Wwise is v2022.1.19" in welcome
+    assert "live WAAPI confirmed the current project and Wwise version" in welcome
+    assert "any localized equivalent without the policy-and-switchable-values line" in welcome
+    assert "Do not reduce the onboarding to only" in welcome
+    assert "project modification policy preview_then_confirm" in welcome
     assert "do not repeat it in every final connection/project summary" in welcome
     assert "Repeat it only when the user changes the policy" in welcome
     assert "asks about mutation safety/config" in welcome
@@ -216,6 +227,18 @@ def test_welcome_surface_mentions_project_modification_policy() -> None:
     assert "current conversation already displayed the policy" in welcome
     assert "final summaries may simply say which project and Wwise version were used without repeating the policy" in welcome
     assert "repeat the active policy in that same summary" not in welcome
+    assert "当前工程修改模式" not in welcome
+    assert "For Chinese output" not in welcome
+
+
+def test_read_only_result_cannot_skip_first_policy_notice() -> None:
+    scaffold = read_only_scaffold_section()
+
+    assert "first visible live WAAPI result in the current conversation" in scaffold
+    assert "Current project modification policy: <policy>" in scaffold
+    assert "You can ask me to switch it to never, preview_then_confirm, or allow_with_notice" in scaffold
+    assert "Do not let a read-only result summary be the first visible WAAPI output" in scaffold
+    assert "only says the current project and Wwise version" in scaffold
 
 
 def test_xml_backup_guidance_uses_project_root_dot_directory() -> None:
