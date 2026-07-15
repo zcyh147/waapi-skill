@@ -12,6 +12,31 @@ WAQL_API_URI = "ak.wwise.core.object.get"
 DEFAULT_WAQL_REFERENCE = Path("resources/waql/2022.1/object-get-examples.json")
 REQUIRED_WAQL_REFERENCE_METADATA = ("name", "uri", "schema_source", "reference")
 
+
+def escape_waql_literal_content(value: str) -> str:
+    """Validate one closed WAQL string-literal value without changing paths.
+
+    Wwise hierarchy separators are literal backslashes in WAQL. JSON/WAMP
+    serialization escapes them for transport later.  Packaged evidence does
+    not establish embedded-quote escaping semantics, so quotes and line/control
+    characters fail closed instead of being synthesized here.
+    """
+
+    if not isinstance(value, str) or not value:
+        raise ValueError("WAQL literal values must be non-empty strings")
+    if '"' in value:
+        raise ValueError("WAQL literal values with embedded quotes are outside the packaged evidence boundary")
+    if any(ord(character) < 32 or ord(character) == 127 or character in {"\u2028", "\u2029"} for character in value):
+        raise ValueError("WAQL literal values must not contain control or line-separator characters")
+    return value
+
+
+def quote_waql_literal(value: str) -> str:
+    """Return one quoted WAQL literal with path separators preserved."""
+
+    return f'"{escape_waql_literal_content(value)}"'
+
+
 WAQL_EXAMPLES: tuple[dict[str, Any], ...] = (
     {
         "name": "sounds_by_type",

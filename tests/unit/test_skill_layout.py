@@ -13,6 +13,7 @@ SKILL_ARTIFACT_ENTRIES = (
     "SKILL.md",
     "wwise_waapi",
     "resources",
+    "references",
     "scripts",
     "requirements.txt",
 )
@@ -64,10 +65,15 @@ def test_semantic_source_note_references_remain_root_source_evidence_metadata() 
             )
 
 
-def test_packaged_skill_contains_no_runtime_reference_markdown() -> None:
+def test_packaged_skill_contains_only_routed_runtime_reference_markdown() -> None:
     references_dir = SKILL_ROOT / "references"
 
-    assert not list(references_dir.glob("**/*.md"))
+    assert {path.name for path in references_dir.glob("*.md")} == {
+        "waapi-setup.md",
+        "waapi-query.md",
+        "waapi-operate.md",
+    }
+    assert not list(references_dir.glob("*/*.md"))
 
 
 def test_project_metadata_does_not_point_at_nested_skill_root() -> None:

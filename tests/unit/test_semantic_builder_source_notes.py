@@ -20,6 +20,7 @@ from wwise_waapi.builders.source_notes import (  # pyright: ignore[reportMissing
     SemanticSourceNoteChecker,
     source_note_uri_inventory,
 )
+from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 
 
 EXPECTED_INVENTORY = EXPECTED_SOURCE_NOTE_URI_INVENTORY
@@ -220,3 +221,32 @@ def test_markdown_source_notes_exist_for_human_review() -> None:
         text = path.read_text(encoding="utf-8")
         assert "NotebookLM gate evidence" in text or name == "protocol"
         assert "wwise-2022.1-docs" in text
+
+
+def test_source_note_uri_inventory_accepts_every_packaged_version_specific_endpoint_set() -> None:
+    root = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill" / "resources" / "semantic"
+
+    counts = {
+        version: sum(len(uris) for uris in source_note_uri_inventory(root / version / "source_notes.json").values())
+        for version in SUPPORTED_WWISE_VERSION_KEYS
+    }
+
+    assert counts == {"2021.1": 37, "2022.1": 37, "2023.1": 37, "2024.1": 38, "2025.1": 38}
+
+
+def test_every_packaged_source_note_has_a_versioned_runtime_mirror_inside_the_skill() -> None:
+    skill_root = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+    semantic_root = skill_root / "resources" / "semantic"
+
+    for version in SUPPORTED_WWISE_VERSION_KEYS:
+        payload = json.loads((semantic_root / version / "source_notes.json").read_text(encoding="utf-8"))
+        source_paths = [payload["protocol"]]
+        for family, note in payload["notes"].items():
+            source_paths.extend(note["source_urls"])
+        for relative_path in source_paths:
+            mirror = (
+                skill_root / "references" / "semantic" / version / Path(relative_path).name
+                if relative_path.startswith("references/")
+                else skill_root / relative_path
+            )
+            assert mirror.is_file(), (version, relative_path, mirror)

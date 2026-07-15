@@ -18,7 +18,6 @@ from .common import (  # pyright: ignore[reportMissingImports]
     SemanticEnvelope,
     SemanticErrorCode,
     SemanticPreview,
-    SemanticReadbackPlan,
     SemanticValidationError,
     SourceNoteChecker,
 )
@@ -140,6 +139,7 @@ class ImportBuilder:
         import_operation: str | None = None,
         defaults: Mapping[str, Any] | None = None,
         auto_add_to_source_control: bool | None = None,
+        auto_check_out_to_source_control: bool | None = None,
         return_fields: Sequence[str] = DEFAULT_IMPORT_RETURN_FIELDS,
     ) -> SemanticPreview:
         item_targets = [_coerce_import_item_with_target(index, item) for index, item in enumerate(imports)]
@@ -156,6 +156,10 @@ class ImportBuilder:
             if not isinstance(auto_add_to_source_control, bool):
                 raise SemanticValidationError(SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH, "autoAddToSourceControl must be a boolean.")
             args["autoAddToSourceControl"] = auto_add_to_source_control
+        if auto_check_out_to_source_control is not None:
+            if not isinstance(auto_check_out_to_source_control, bool):
+                raise SemanticValidationError(SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH, "autoCheckOutToSourceControl must be a boolean.")
+            args["autoCheckOutToSourceControl"] = auto_check_out_to_source_control
         return self._build_preview(AUDIO_IMPORT_URI, args, _return_options(return_fields), "audio-import-objects", target_identities=target_identities)
 
     def import_tab_delimited(
@@ -167,6 +171,7 @@ class ImportBuilder:
         import_file: str | Path | None = None,
         plan: TabDelimitedImportPlan | None = None,
         auto_add_to_source_control: bool | None = None,
+        auto_check_out_to_source_control: bool | None = None,
         return_fields: Sequence[str] = DEFAULT_IMPORT_RETURN_FIELDS,
     ) -> SemanticPreview:
         if import_file is None and plan is None:
@@ -188,6 +193,10 @@ class ImportBuilder:
             if not isinstance(auto_add_to_source_control, bool):
                 raise SemanticValidationError(SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH, "autoAddToSourceControl must be a boolean.")
             args["autoAddToSourceControl"] = auto_add_to_source_control
+        if auto_check_out_to_source_control is not None:
+            if not isinstance(auto_check_out_to_source_control, bool):
+                raise SemanticValidationError(SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH, "autoCheckOutToSourceControl must be a boolean.")
+            args["autoCheckOutToSourceControl"] = auto_check_out_to_source_control
         metadata_extra = {"tab_delimited_plan": plan.as_dict()} if plan is not None else {}
         return self._build_preview(
             AUDIO_IMPORT_TAB_DELIMITED_URI,
@@ -230,6 +239,8 @@ class ImportBuilder:
         preview_target_identity = _preview_target_identity(target_identities or {})
         if preview_target_identity["roles"]:
             metadata["preview_target_identity"] = preview_target_identity
+        result_readback_binding = _import_result_readback_binding(uri)
+        metadata["execution_result_readback_binding"] = result_readback_binding
         envelope = SemanticEnvelope(
             uri,
             args=dict(args),
@@ -240,11 +251,14 @@ class ImportBuilder:
             envelope=envelope,
             source_note_family=BuilderFamily.IMPORT.value,
             version=self.version,
-            readback_plan=_import_readback_plan(uri, args, options),
+            # The imported object ids do not exist until this envelope has
+            # executed.  Emitting a SemanticReadbackPlan here would either
+            # replay the destructive import or expose an unbound pseudo-call.
+            readback_plan=(),
             evidence_plan=(
                 {"kind": "source-note", "family": BuilderFamily.IMPORT.value, "status": source_note.as_dict()},
                 {"kind": "schema", "validation": validation.as_dict()},
-                {"kind": "created-object-readback", "uri": "ak.wwise.core.object.get", "return": list(DEFAULT_IMPORT_RETURN_FIELDS)},
+                {"kind": "execution-result-readback-binding", **result_readback_binding},
                 {"kind": "cleanup-source-immutability", "requires_sandbox": True, "refuse_source_outputs": True},
                 {"kind": "artifact-evidence", "capture": ["import-result", "object-readback", "cleanup", "source-immutability"]},
             ),
@@ -428,16 +442,21 @@ def _return_expectation(kind: str) -> dict[str, Any]:
     }
 
 
-def _import_readback_plan(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> tuple[SemanticReadbackPlan, ...]:
-    return (
-        SemanticReadbackPlan(uri, args=dict(args), options=dict(options), description="capture import result objects requested by options.return"),
-        SemanticReadbackPlan(
-            "ak.wwise.core.object.get",
-            args={"waql": "from object <imported object ids from result>"},
-            options={"return": list(DEFAULT_IMPORT_RETURN_FIELDS)},
-            description="read back each created imported object by returned id before cleanup",
-        ),
-    )
+def _import_result_readback_binding(uri: str) -> dict[str, Any]:
+    """Describe the deferred result-to-readback binding without a pseudo-call."""
+
+    return {
+        "source": {"uri": uri, "result_path": "objects[].id"},
+        "target": {
+            "uri": "ak.wwise.core.object.get",
+            "argument_path": "args.from.id[0]",
+            "options": {"return": list(DEFAULT_IMPORT_RETURN_FIELDS)},
+        },
+        "fan_out": {"mode": "one-call-per-value", "value_contract": "wwise-guid"},
+        "requires_source_result": True,
+        "executable_before_binding": False,
+        "must_execute_after": uri,
+    }
 
 
 def _root_path(root: str) -> str:

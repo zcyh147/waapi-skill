@@ -40,6 +40,8 @@ def test_wwise_console_command_is_shell_safe_argument_list_with_spaces() -> None
         str(project_path),
         "--wamp-port",
         "26443",
+        "--http-port",
+        "0",
         "--verbose",
     ]
     assert isinstance(command, list)

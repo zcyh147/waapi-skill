@@ -1,272 +1,181 @@
 ---
 name: waapi-skill
-description: Use this skill for Wwise WAAPI automation through the skill-local Python runner, versioned manifests, semantic builders, bounded subscriptions, and safe dispatcher calls. Always use this skill when the task mentions Wwise, WAAPI, Audiokinetic APIs, generated manifests, topic subscriptions, Wwise version selection, or destructive Wwise guardrails.
+description: Use this skill for Wwise and WAAPI work through the existing skill-local Python runtime, versioned manifests, semantic builders, bounded subscriptions, and safe dispatcher calls. Always use this skill when the user asks about the current Wwise project or version, current selection, object lookup, hierarchy browsing, properties, imports, soundbanks, switch assignments, topic waits, WAAPI connection/setup, or Wwise project changes, even if they do not explicitly say “WAAPI”.
 ---
 
 # Wwise WAAPI Skill
 
-Use this skill to automate Wwise through WAAPI with a Python-first workflow. The normal path is: make sure Python can run the skill-local wrapper, identify the target Wwise version, then extract a structured semantic intent and route it through the semantic planner.
-
-When config and live WAAPI connection details are already known, execute the live read-only query first for ordinary inspection requests. Here, direct means direct through the skill-local runner and manifest-backed `WwiseDispatcher`, not hand-written one-off `WaapiClient.call(...)` business logic. Do not start by inspecting repository files or launching documentation research unless the user explicitly asked for investigation or the direct connection path is blocked.
-
-## Welcome/status UX for Wwise version detection
-
-For simple user-facing questions such as "which Wwise version is open?", "what project is currently open?", direct read-only queries, or any first action that needs to choose the matching WAAPI version, treat the first visible reply as the skill's welcome surface. Start with the skill, connection endpoint, current project modification policy, and version-detection purpose, not with a generic safety preamble or developer-facing reasoning. This improves UX because the user immediately sees that the Wwise-specific skill is active, which endpoint is being checked, which mutation mode is active, and why version detection matters before any WAAPI work continues.
-
-The current project modification policy is one-time session onboarding, not repeated status boilerplate. Include the current policy and the available policy values in the first visible `waapi-skill` response after loading the skill or after making the first WAAPI connection in the current conversation, even when the first task is read-only and even when the user directly specified the query behavior. Use an English source template such as `Current project modification policy: preview_then_confirm. You can ask me to switch it to never, preview_then_confirm, or allow_with_notice.` If you are not certain the current conversation already displayed the policy, display it. After the policy has been visibly shown in the current conversation, do not repeat it in every final connection/project summary. Repeat it only when the user changes the policy, asks about mutation safety/config, or the next step will preview or execute project-changing work. Never answer a first connection summary with only `I connected to 127.0.0.1:8080; Wwise is v2022.1.19`, `current project is SampleProject; Wwise is v2022.1.19`, `live WAAPI confirmed the current project and Wwise version`, or any localized equivalent without the policy-and-switchable-values line. Do not reduce the onboarding to only `project modification policy preview_then_confirm` without the switchable values.
-
-Use this sequence:
-
-1. Immediately tell the user that `waapi-skill` is loaded, state the host/port you will try first, and state the current `project_modification_policy` from `data/config.json`. Use the saved host/port and policy when present; otherwise say the default WAAPI endpoint such as `127.0.0.1:8080` and the default policy `preview_then_confirm`. Example: `waapi-skill is loaded. I will use 127.0.0.1:8080 to detect the current Wwise version. Current project modification policy: preview_then_confirm. You can ask me to switch it to never, preview_then_confirm, or allow_with_notice.`
-2. Connect to Wwise with `ak.wwise.core.getInfo`. If the saved config already has a host, port, and version, name each value clearly before connecting. Example: `The saved config has WAAPI endpoint 127.0.0.1:8080 and the previously recorded Wwise version 2022.1. I will connect to Wwise now to confirm the correct configuration.` If the saved port fails and no user-provided port was required, try the normal WAAPI default/fallback candidates before giving up, and report the port that actually worked.
-3. On success, report: `Found Wwise on <host>:<port>; the detected version is <display/version>. I updated the config active Wwise version to <supported-version>. Current project modification policy: <policy>.` Then answer the user's actual question, adding project details from `ak.wwise.core.getProjectInfo` when needed. If the current conversation already displayed the policy and the task is read-only, final summaries may simply say which project and Wwise version were used without repeating the policy.
-4. On failure to detect any connectable Wwise endpoint, stop the WAAPI request path and say directly: `No running Wwise instance with a connectable WAAPI endpoint was detected, so this request cannot continue.` Include the tried host/ports briefly, but do not answer from saved config or process-path guesses as if they were the current connected Wwise state.
-5. Avoid opening with phrases like `This is a read-only query...`, `I will directly call WAAPI...this will not modify the project`, `live WAAPI`, `old config`, or `current project fact`. Safety can be mentioned later only if it helps explain a mutation guardrail; for welcome UX, users first need to know which skill, endpoint, detected version, and config update state are active.
+Use this skill to automate Wwise through its packaged, version-aware WAAPI runtime. The executable gateway is the interface. Do not replace it with temporary scripts, inline Python, direct `WaapiClient` calls, or repository archaeology.
 
 Supported Wwise versions are `2021.1`, `2022.1`, `2023.1`, `2024.1`, and `2025.1`.
 
-## Operator protocol
+## When this skill should trigger
 
-Use this closed semantic-intent protocol before choosing scripts, builders, manifests, or docs. Extract one structured `SemanticIntent`, call `SemanticPlanner.plan()`, present the resulting `SemanticPlan` preview, require clear user confirmation for project-changing steps, execute only when the confirmed plan still matches `SemanticPlan.preview_hash`, then verify with the plan's verification steps. Do not invent intent families.
+Use this skill whenever the user is trying to do Wwise work such as:
 
-```python
-from wwise_waapi.semantic_planner import SemanticIntent, SemanticIntentTarget, SemanticPlanner, confirm_semantic_plan
+- checking which Wwise project or version is currently open
+- checking the current selection or browsing hierarchy
+- finding events, busses, sounds, work units, properties, references, or object paths
+- importing audio or tab-delimited data
+- previewing or changing Wwise objects, properties, soundbanks, or switch assignments
+- waiting on bounded WAAPI topics or object/topic events
+- diagnosing WAAPI host, port, version, or connection state
+- asking whether a Wwise authoring operation is supported
 
-intent = SemanticIntent(...)
-plan = SemanticPlanner().plan(intent)
-verification_steps = list(plan.verification_steps)
-facts = {
-    "structured_intent_extracted": True,
-    "semantic_family": intent.family,
-    "semantic_planner_invoked": True,
-    "semantic_plan_status": str(plan.status),
-    "preview_hash": plan.preview_hash,
-    "source_builder_refs": list(plan.source_builder_refs),
-    "unsupported_boundary_returned": plan.unsupported_capability,
-    "unsupported_boundary_reason": plan.blocked_reason,
-    "mutation_executed": False,
-    "mutation_executed_before_confirmation": False,
-    "verification_status": "not_applicable_unsupported_boundary" if plan.unsupported_capability else "planned",
-}
-submitted_preview_hash = confirmation_state.preview_hash_seen_by_agent
-confirmed = confirm_semantic_plan(
-    plan,
-    confirmation_state=confirmation_state.state,
-    submitted_preview_hash=submitted_preview_hash,
-)
+Technical trigger words still count: `Wwise`, `WAAPI`, `Audiokinetic`, `topic subscription`, `manifest`, `semantic builder`, `dispatcher`, and version-specific WAAPI behavior.
+
+## Entry rules
+
+1. Route the request into **setup**, **query**, or **operate** from the user's words.
+2. For the common live reads below, run the matching gateway command immediately. Derive the absolute Skill directory from the injected absolute `SKILL.md` locator and invoke its absolute `scripts/run.py` path; do not rely on an unrecorded shell working directory. Do this before `ls`, `find`, `rg`, documentation research, or reading implementation files.
+3. Use connection settings in this order: explicit gateway flags, `WWISE_WAAPI_HOST` / `WWISE_WAAPI_PORT` / `WWISE_VERSION`, then the external saved config reported by `config-show`. Put the runtime version selector after `gateway.py` and before its subcommand. The exact full shape is `python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2022.1 operation-schema object.copy`; `--wwise-version` is accepted in that gateway-global position as a compatibility alias and is also the saved-config field after `config-set`. Do not inspect or hand-edit config files. Do not scan unrelated ports or processes.
+4. Treat gateway JSON as authoritative. On a structured error or boundary, report it; do not improvise another WAAPI client or write a helper.
+5. Read one lane reference only when the fixed command table does not fully answer the request.
+6. After this entry file has been loaded, read any later named lane reference exactly once with `cat /absolute/path/to/waapi-skill/references/<file>.md` as its own shell tool call. Never run `wc -l`, `ls`, `rg`, `find`, `stat`, `test`, or another length, existence, or path probe before a reference read, and never split one reference across multiple reads. Make every gateway invocation its own later shell tool call. A host may bootstrap the initial complete `SKILL.md` load with exactly `wc -l <SKILL.md> && sed -n '1,<enough-lines>p' <SKILL.md>` against that same absolute file; this is the only combined read allowed. Never combine a reference read, gateway invocation, or any other commands with `&&`, `;`, a pipe, command substitution, or a multi-command shell string because those actions are not independently auditable.
+
+## Fixed gateway commands
+
+The snippets below use `scripts/run.py` as readable shorthand. In the actual tool call, replace it with the absolute path derived from this injected `SKILL.md` locator, for example `python /absolute/path/to/waapi-skill/scripts/run.py gateway.py status`. Never execute the relative `scripts/run.py` spelling in an automated agent run.
+
+```bash
+python scripts/run.py gateway.py status
+python scripts/run.py gateway.py config-show
+python scripts/run.py gateway.py config-set --wwise-version 2022.1 --waapi-host 127.0.0.1 --waapi-port 8080 --project-modification-policy preview_then_confirm
+python scripts/run.py gateway.py config-set --reset
+python scripts/run.py gateway.py buses
+python scripts/run.py gateway.py selected
+python scripts/run.py gateway.py capabilities --all-versions --summary-only
+python scripts/run.py gateway.py capabilities --all-versions --query object.get --limit 20
+python scripts/run.py gateway.py describe <uri> --all-versions
+python scripts/run.py gateway.py --version <supported-version> call ak.wwise.waapi.getFunctions --args-json '{}' --options-json '{}'
+python scripts/run.py gateway.py --version <supported-version> call ak.wwise.waapi.getTopics --args-json '{}' --options-json '{}'
+python scripts/run.py gateway.py query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path
+python scripts/run.py gateway.py query-object --type Event --take 100
+python scripts/run.py gateway.py metadata types --summary-only
+python scripts/run.py gateway.py --timeout 10 wait-topic <topic-uri>
+python scripts/run.py gateway.py operations
+python scripts/run.py gateway.py operation-schema object.create
+python scripts/run.py gateway.py operation-schema audio.import
+python scripts/run.py gateway.py --version 2022.1 operation-schema object.copy
 ```
 
-1. Extract `SemanticIntent` with one family: `intent_navigation`, `crud_authoring`, `system_design_preview`, `asset_import_workflow`, `soundbank_workflow`, `switch_assignment_workflow`, `bounded_profiler_guidance`, or `unsupported_runtime_boundary`.
-2. Even read-only navigation and unsupported boundary requests still pass through `SemanticPlanner.plan()`. If persisted config and a currently connectable WAAPI session are available, live WAAPI may supplement or verify the plan, but it does not replace planner facts. Use repository or documentation research only when the user explicitly asks for it or direct execution is blocked, and report the blocker.
-3. Route CRUD requests at the semantic family level: object creation, object mutation, property/reference edits, copy/move/delete, imports, soundbanks, and switch assignments become structured intent details for the planner. Do not paste raw WAAPI payload schemas into the prompt.
-4. Present the `SemanticPlan` preview before project-changing work. Include family, step summaries, target identities, risk flags, and verification plan. Do not display `preview_hash`, checksums, JSON, or magic phrases in user-facing text unless the user explicitly asks for raw evidence.
-5. Confirm with `confirm_semantic_plan(preview, confirmation_state, submitted_preview_hash)`, where `confirmation_state` is derived from the user's natural-language consent and `submitted_preview_hash` is the preview hash the agent most recently showed and retained internally. Continue only when the user gives clear affirmative confirmation such as “同意”, “可以”, “OK”, “yes”, “go ahead”, or equivalent, and the retained `submitted_preview_hash` exactly matches the current preview hash. If the user asks for changes, gives ambiguous consent, or the retained hash does not match, show a fresh preview instead of executing.
-6. Execute only the confirmed plan whose internally retained hash still matches the preview artifact shown to the user. If target identity, planned API, options, arguments, payload preview, or risk flags drift, abort and re-preview.
-7. Verify after execution using the plan's readback, bounded topic evidence, or other verification templates. Semantic capability runs should keep one machine-readable `SEMANTIC_RESULT_JSON` object in local evidence/log output with at least `structured_intent_extracted`, `semantic_family`, `semantic_planner_invoked`, `semantic_plan_status`, `preview_hash` when present or required, `source_builder_refs`, `unsupported_boundary_returned`, `unsupported_boundary_reason`, `mutation_executed`, `mutation_executed_before_confirmation`, and `verification_status`. Do not dump this JSON to the user unless they explicitly ask for raw evidence; summarize the user-facing result in natural language and report structured failures without vague prose.
+Use exactly one command for the corresponding intent:
 
-Unsupported boundary requests: scheduler or delayed runtime posting, Game Object View emitter control, timed runtime or ambience playback, audio narrative sequencing, RTPC ramps over time, and cross-app MCP federation are not supported execution capabilities. Route them as `unsupported_runtime_boundary`; these plans have no execution steps, no preview id or hash, and no verification claims. Offer supported alternatives only when appropriate, such as authoring a static object or switch plan, previewing soundbank changes, or running a live read summary.
+| User intent | Command | Live WAAPI evidence |
+| --- | --- | --- |
+| current Wwise version, endpoint, or project | `status` | `getInfo` plus `getProjectInfo` (2022.1+) or manifest-backed `object.get` (2021.1) |
+| inspect or save connection/version/policy config | `config-show` / `config-set` | offline external config contract; no Wwise connection |
+| list current project Buses | `buses` | `ak.wwise.core.object.get` |
+| current UI selection | `selected` | `ak.wwise.ui.getSelectedObjects` |
+| inspect packaged API support, schema, route, or boundary | `capabilities` / `describe` | offline versioned resources; no Wwise connection |
+| call the exact reviewed reflection inventory `ak.wwise.waapi.getFunctions` or `ak.wwise.waapi.getTopics` | `call` with empty args/options | bounded live inventory plus packaged-manifest comparison |
+| object lookup by path, id, type, search, or query object | `query-object` | semantic query builder plus `ak.wwise.core.object.get` |
+| object type/property/reference metadata | `metadata` | fixed metadata builder and typed result parser |
+| wait for one topic event | `wait-topic` | bounded subscription, optional JSON payload match, guaranteed unsubscribe |
+| inspect project-changing operation support | `operations` / `operation-schema` | offline closed request schema and explicit executable boundary |
 
-Named invariant: Preview hash invariant. The preview-resolved target identity and preview artifact must be reused during confirmed execution. If confirmed execution cannot prove it is using the same `SemanticPlan.preview_hash`, abort and re-preview.
+Each command prints one JSON document. Summarize its actual values in the user's language. Do not paste the whole JSON unless asked.
 
-Protocol config boundary: saved public config fields are exactly `wwise_version`, `waapi_host`, `waapi_port`, and `project_modification_policy`. startup timeouts, readiness timeouts, default `WwiseConsole` paths, environment variables, scaffold directories, and legacy internal flags such as `use_current_selection_for_ambiguous_queries` are runtime or implementation details, not saved public config.
+Exact reflection-call fast route: when the user explicitly asks to call `ak.wwise.waapi.getFunctions` or `ak.wwise.waapi.getTopics` with empty args and options, run exactly one matching `call` command from the table, replacing `<supported-version>` with the exact requested or connected Wwise version. Do not run `describe` or `capabilities` first, and do not read the query reference before or after the call. The reviewed route is already fixed by this Skill. If that one gateway invocation is rejected or fails, stop and report the result; never retry it with another command.
 
-## Setup and runner
+For capability discovery, start with `capabilities --all-versions --summary-only`, then add `--query`, `--category`, `--item-type`, `--family`, or `--route` and request only the needed rows. The list defaults to at most 50 compact rows; `--limit 0` is an explicit all-row opt-in, and `--detail` is only for nested interface, schema-summary, policy, or evidence auditing. When a URI is already known, use `describe <uri>` instead of listing the matrix, except for an explicit exact reflection call covered by the fast route above. For operations, use the compact `operations` inventory only for a genuinely broad inventory question; use `operation-schema <name>` directly for any named operation, and reserve `operations --detail` for an explicit full-catalog contract audit.
 
-Use the skill-local wrapper so dependencies and paths are handled consistently:
+Broad `query-object` sources and every `--select` require `--take N` with `0 <= N <= 1000`; use `--all-results` only when the user explicitly asks for an unbounded result. The fixed `buses` command is bounded to 1000 rows and reports that bound plus whether truncation is possible. Never route `ak.wwise.core.object.get` through the generic `call` command: the gateway returns `QUERY_OBJECT_REQUIRED` so all object discovery stays inside `query-object`. Other fixed-command URIs return `FIXED_COMMAND_REQUIRED`, and topic URIs return `WAIT_TOPIC_REQUIRED`; use the command named by that boundary instead of retrying `call`.
+
+When the requested answer is machine-readable and any successful gateway payload contains `agent_result`, compact-serialize exactly that object as the result body and stop. This rule applies to fixed reads as well as transactions. Do not reconstruct its fields from the prompt, `normalized`, summaries, or verification evidence; do not alter JSON escaping or add/remove keys; and do not run another command after receiving it. If the required envelope is `WAAPI_RESULT_JSON=<json>`, append the compact serialization of `agent_result` directly after the prefix. Failed, deferred, indeterminate, or boundary payloads intentionally have no successful `agent_result`; report their actual state instead of inventing one. For a normal natural-language answer, use the complete gateway evidence rather than only the compact projection.
+
+## Routing
+
+### Setup lane
+
+Use setup when the task is about connection state, version detection, host/port issues, saved config, first-run onboarding, or “what Wwise instance is this talking to?”.
+
+Examples:
+- “Which Wwise version is open?”
+- “What project is currently open?”
+- “WAAPI isn’t connecting.”
+- “What endpoint are you using?”
+
+Read: `references/waapi-setup.md`
+
+### Query lane
+
+Use query for read-only inspection: selection, object lookup, hierarchy browsing, property reads, WAQL-shaped discovery, project facts, bounded topic waits, and other non-mutating inspection.
+
+Examples:
+- “What object is selected right now?”
+- “Find this Event.”
+- “Show me the current project structure under this Work Unit.”
+- “Wait for object.created once, then report it.”
+
+Default result shape: return the resolved structured result, not just “I called WAAPI”.
+
+Fast route from this entry file: when the user supplies one exact object path and asks whether that object exists or asks for its standard identity, run exactly one `query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path` command. For one exact GUID, use the same command with `--object-id '<exact-guid>'` in place of `--path`. Keep all four return fields explicit even though they are gateway defaults. This fixed route is complete: do not read the query reference before or after it, and do not retry a rejected or failed gateway invocation.
+
+For current-selection questions, prefer the live selected-object query path first. If the connected endpoint is a headless or command-line Wwise instance where the UI selection API is unavailable, report that boundary clearly instead of drifting into repo/docs research or pretending a selection result exists.
+
+For `query-object --where-json`, translate the user's comparison literally: `"operator":"="` means exact equality, while `"operator":":"` is a contains/match predicate. A request to search and then restrict `name` to the exact same value therefore uses `--search '<value>'` plus `--where-json '{"field":"name","operator":"=","value":"<value>"}'`; `:` does not satisfy an exact-name request.
+
+Conditional read for a query not fully covered by the fixed commands, exact-identity fast route, or exact reflection-call fast route: `references/waapi-query.md`
+
+### Operate lane
+
+Use operate for project-changing work: create, move, copy, delete, property/reference edits, imports, soundbanks, switch assignments, design previews, or guarded fallbacks such as XML editing.
+
+Examples:
+- “Create a new Event under this Work Unit.”
+- “Import these files.”
+- “Generate or update this soundbank setup.”
+- “Assign this object to the Switch Container.”
+
+Choose the transaction phase before choosing a command. An existing transaction continuation takes precedence over the named-operation rule, but it requires the transaction id; an artifact hash alone is not a transaction lookup key. When the user confirms, checks, or continues an already previewed transaction and its transaction id is available from the message or conversation, read the operate reference and run `transaction-show <transaction-id> --summary-only` first. Do not call `operations`, `operation-schema`, or `preview` before that show call; the immutable preview already contains the closed request and schema. A status or check request stops after `transaction-show`. User intent authorizes every later action; the returned state only constrains which actions are legal and never authorizes `confirm`, `execute`, `verify`, or `reject` by itself.
+
+For a new change request with no existing transaction, run `operation-schema <name>` directly to obtain its closed JSON contract. Do not run `operations` first. Reserve `operations` for broad inventory questions such as “what changes can this Skill make?”. Then use the packaged `preview` transaction command, wait for a later explicit confirmation, bind that confirmation with `confirm`, execute the immutable transaction once, and run its operation-specific `verify`. Never invoke planner/builder classes or construct a raw mutation.
+
+`verify` already performs the operation-specific live readback and returns that evidence in its gateway payload. Treat that payload as the terminal authority: after `verify` returns `verified` or another terminal verification state, stop the gateway sequence and report it. Do not add `query-object`, `call`, or another gateway command to double-check the same mutation.
+
+In ordinary agent use, omit `--state-dir` and let the caller or broker inject the transaction store implicitly. Never run `env`, `printenv`, shell expansion, or another environment-inspection command to discover `WAAPI_SKILL_STATE_DIR`, and never guess or search for a state directory. Pass `--state-dir` only when the user or trusted caller explicitly supplied a trusted absolute path. If the gateway returns a structured state-directory error or boundary, report it and stop instead of probing the environment or filesystem.
+
+Fast route from this entry file:
+
+- Closed transaction operations are `object.create`, `object.delete`, `object.setName`, `object.setNotes`, `object.setProperty`, `object.setReference`, `audio.import`, `soundbank.setInclusions`, `switchContainer.addAssignment`, and `switchContainer.removeAssignment`. For a new request, read `references/waapi-operate.md` in its own tool call, then run the named `operation-schema` and transaction commands as separate tool calls. For an existing transaction continuation, read the same reference but skip `operation-schema` and `preview`; start with `transaction-show`.
+- Known packaged boundaries are `object.set`, `object.copy`, `object.move`, `audio.importTabDelimited`, `soundbank.generate`, `soundbank.convertExternalSources`, and `soundbank.processDefinitionFiles`. For these, do not read the longer operate reference: run the named `operation-schema` immediately in its own tool call, report the returned boundary, and stop.
+
+Conditional read for a closed transaction: `references/waapi-operate.md`
+
+## Runner and packaged runtime
+
+Use the skill-local wrapper so dependencies and paths stay consistent:
 
 ```bash
 python scripts/run.py --help
-python scripts/run.py setup_environment.py
+python scripts/run.py gateway.py --help
 ```
 
-For task work, call the Python layer instead of inventing shell commands. The main pieces are:
-
-1. `scripts/run.py`: runs skill-local helper scripts with the right import path.
-2. `wwise_waapi.dispatcher`: validates WAAPI functions and topics against versioned manifests, then calls WAAPI or waits for bounded topic events.
-3. `resources/manifest/<version>/`, `resources/semantic/<version>/`, `resources/waql/<version>/`, and `resources/deferred/<version>.json`: loaded on demand for the selected version and task. Semantic builders validate the packaged `source_notes.json` metadata for the selected version; root `references/` markdown remains repository development/source evidence and is not a packaged runtime dependency.
-4. `wwise_waapi.builders`: semantic builders for common query, object mutation, import, soundbank, property, reference, and switch container tasks.
-
-## Read-only inspection scaffolding
-
-Ordinary inspection tasks such as current Wwise version, current project info, current selection, object lookup, or hierarchy browsing should reuse the skill scaffolding. After the welcome/status line, analyze the user's intent, select the supported semantic family when one applies, and load the versioned runtime resources needed for that intent: `resources/semantic/<version>/source_notes.json`, `resources/waql/<version>/`, `resources/deferred/<version>.json`, and `resources/manifest/<version>/`. A short connection harness is acceptable when needed, but API selection, args, options, timeout, version, and evidence handling must come from those resources and route through `WwiseDispatcher` or an existing semantic builder. Do not generate disposable business logic that calls `WaapiClient.call(...)` directly for common inspection requests.
-
-Do not hard-code a fixed API map in this skill prompt. For current selection questions such as "what object is selected?", resolve the selection capability from the detected version's manifest and deferred resources before choosing a WAAPI URI. Keep return fields explicit when a resource-backed request is selected, but pass them as dispatcher `options`, not as raw positional arguments to `WaapiClient.call`.
-
-Use this pattern for read-only inspection work:
-
-1. Load `data/config.json` for `wwise_version`, `waapi_host`, and `waapi_port`; verify the connection if needed.
-2. Extract the user's inspection intent and choose the semantic family/resource path before choosing a WAAPI URI.
-3. Load only the versioned semantic, WAQL, deferred, and manifest resources needed for that intent.
-4. Create the WAAPI client only as the transport layer.
-5. Dispatch the resource-selected operation through `WwiseDispatcher(client=client).dispatch(...)` with the detected or configured version.
-6. Report the structured dispatcher result or a clear blocker. If this is the first visible live WAAPI result in the current conversation and the policy has not already been shown, include `Current project modification policy: <policy>. You can ask me to switch it to never, preview_then_confirm, or allow_with_notice.` before or beside the project/version result. Do not let a read-only result summary be the first visible WAAPI output if it only says the current project and Wwise version. If the dispatcher cannot cover the resource-selected URI because the manifest lacks it for the selected version, say so and only then use a minimal raw WAAPI escape hatch.
-
-If an escape hatch is required, state it explicitly in the final answer: `The skill dispatcher did not cover <uri> for <version>, so I used a minimal raw WAAPI fallback.` Do not present raw fallback code as the normal skill workflow.
-
-## Version selection
-
-Prefer an explicit user-provided Wwise version when the task depends on exact API behavior. Pass one of `2021.1`, `2022.1`, `2023.1`, `2024.1`, or `2025.1` to the dispatcher or builder flow when known.
-
-If the user does not specify a version, first connect to the currently running Wwise instance with `ak.wwise.core.getInfo` through the runner or dispatcher, and also record the WAAPI host/port that worked for this session. Infer the nearest supported version from the returned Wwise version when possible. If detection is unavailable or the version cannot be mapped safely, ask the user for the target version or use the documented fallback only for dry-run or low-risk read-only work.
-
-Persist the approved version, WAAPI host, and WAAPI port in the skill-local JSON config at `data/config.json` so future runs do not depend on conversation memory. Agents should read that config first and only reconnect to Wwise when the connection needs to be verified or the saved values are missing.
-
-The saved config is user-overridable. The stable persisted user-facing config surface is limited to `wwise_version`, `waapi_host`, `waapi_port`, and `project_modification_policy`. If the user chooses a different Wwise version or WAAPI port, update the config and keep using that saved override until the user changes it again.
-
-By default, the config leaves `wwise_version` unset, uses `127.0.0.1` for the WAAPI host, and leaves the port unset so WAAPI can use its normal default.
-
-Do not describe internal runtime defaults such as timeout constants, environment-variable wiring, coverage thresholds, default `WwiseConsole` paths, or scaffold directories as public config unless the user explicitly asks about implementation internals.
-
-On first run, the skill also stores a project modification policy in `data/config.json`:
-
-1. `never`: never execute project-changing operations.
-2. `preview_then_confirm`: preview project changes first, then execute only after confirmation.
-3. `allow_with_notice`: allow project changes for the configured project, but report each change.
-
-The default policy is `preview_then_confirm`, and it persists with the rest of the user config.
-
-Example dispatcher shape:
-
-```python
-from wwise_waapi import WwiseDispatcher
-
-result = WwiseDispatcher(client=waapi_client).dispatch(
-    "ak.wwise.core.getInfo",
-    version="2025.1",
-    args={},
-    options={},
-    timeout=10.0,
-    dry_run=False,
-    allow_destructive=False,
-    evidence_dir=".sisyphus/evidence/waapi",
-)
-```
-
-Topic waits use the same dispatcher rather than a separate topic skill:
-
-```python
-result = WwiseDispatcher(client=waapi_client).dispatch(
-    "ak.wwise.core.object.created",
-    version="2025.1",
-    timeout=5.0,
-    topic_mode="wait",
-)
-```
-
-## Dispatch model
-
-The dispatcher input is a small, explicit contract:
-
-1. `api`: reflected WAAPI URI such as `ak.wwise.core.getInfo`.
-2. `version`: manifest version, selected explicitly or inferred from `getInfo` when possible.
-3. `args` and `options`: JSON-like mappings passed to function calls or topic subscriptions.
-4. `timeout`: finite call or wait timeout. Prefer 5 to 10 seconds unless there is a clear reason to wait longer.
-5. `dry_run`: validates and previews the action without calling WAAPI.
-6. `allow_destructive`: per-call opt-in for project-changing or destructive operations.
-7. `evidence_dir`: optional location for structured JSON evidence.
-8. `topic_mode`: use `wait` for bounded topic dispatch. Use `SubscriptionManager` directly only when the caller owns listener cleanup.
-
-Every dispatcher result is structured and safe to log:
-
-```json
-{
-  "ok": true,
-  "api": "ak.wwise.core.getInfo",
-  "version": "2025.1",
-  "item_type": "function",
-  "result": {},
-  "error_code": null,
-  "message": "ok",
-  "evidence_path": null
-}
-```
-
-Errors must stay structured with `ok`, `api`, `version`, `error_code`, `message`, and `evidence_path`. Do not replace dispatcher failures with vague prose.
-
-### WAAPI client call shape
-
-`WwiseDispatcher` owns the compatibility boundary between its normalized dispatcher request and the concrete WAAPI transport client. Native `waapi.WaapiClient.call()` expects `options` as a keyword argument: `call(uri, args, options=options)`. Do not ask the user to understand this distinction, and do not add task-local glue code unless an external client has a truly different contract.
-
-When constructing a client directly, keep the client as a transport only:
-
-```python
-from waapi import WaapiClient
-from wwise_waapi import WwiseDispatcher
-
-with WaapiClient(url=url) as client:
-    result = WwiseDispatcher(client=client).dispatch(
-        "ak.wwise.core.getInfo",
-        version="2025.1",
-        args={},
-        options={"return": ["version.displayName"]},
-    )
-```
-
-The dispatcher must pass `options` to the client by keyword. Agents should not create a separate adapter for the normal `waapi.WaapiClient` case, and user-facing reports should describe the skill/dispatcher path rather than internal call-shape glue.
-
-## Semantic builders
-
-For complex WAAPI work, prefer the semantic planner before hand-writing dispatcher payloads. The planner maps structured semantic families to source-grounded builders, previews, readback plans, and dispatcher requests; it does not open Wwise, subscribe to topics, or dispatch live calls by default.
-
-Use semantic families for these task types:
-
-1. `intent_navigation`: read-only navigation and WAQL-shaped object discovery.
-2. `crud_authoring`: create, set, delete, copy, move, property, reference, and undo-style authoring previews.
-3. `system_design_preview`: candidate design plans that may combine safe reads with project-changing preview steps.
-4. `asset_import_workflow`: audio import, tab-delimited import, and import evidence previews.
-5. `soundbank_workflow`: soundbank inclusion, generation, external source, process definition, and evidence previews.
-6. `switch_assignment_workflow`: guarded switch assignment add/remove previews and readback expectations.
-7. `bounded_profiler_guidance`: bounded profiler parameter guidance and read summaries only.
-8. `unsupported_runtime_boundary`: unsupported runtime, scheduler, Game Object View, RTPC ramp, narrative sequencing, or cross-app MCP requests.
-
-Example preview pattern:
-
-```python
-from wwise_waapi.builders import QueryPredicate, build_object_get_query
-
-preview = build_object_get_query(
-    type="Sound",
-    where=QueryPredicate("@Volume", "<", 0),
-    return_fields=("id", "name", "path", "type", "@Volume"),
-)
-payload = preview.dispatch_payload()
-request = preview.to_dispatcher_request()
-```
-
-The raw `WwiseDispatcher` contract remains the explicit escape hatch for low-level WAAPI work or unsupported builder coverage. For unfamiliar calls, preview with `dry_run=True` first and keep timeouts bounded.
-
-If a requested mutation target path is not a valid direct writable parent for the requested object type, do not silently retarget the mutation. Explain the invalid target, identify likely writable child containers such as a `Default Work Unit` when supported by live state or grounded local evidence, and ask the user to confirm the intended writable child container before mutating.
-
-## Safety guardrails
-
-Project-changing and destructive operations are blocked by default. Only pass `allow_destructive=True` for a clearly requested change, after previewing when possible, and only against a project the user intentionally chose for that operation. Do not casually target a user's active production project.
-
-Treat operations such as object deletion, object creation, property mutation, imports, soundbank changes, switch container assignment changes, and undo-group mutations as potentially destructive. Prefer read-only queries and dry runs until the requested edit is clear.
-
-WAAPI is the primary authoring surface. Direct `.wproj` or `.wwu` XML edits are an exceptional offline fallback, not a normal continuation when a WAAPI command is missing. Before proposing XML edits, first prove one of these conditions: the selected Wwise version manifest and semantic resources do not expose the needed authoring capability; the capability is explicitly marked unsupported/deferred; Wwise is unavailable and the user explicitly asked for offline project-file surgery; or the user explicitly requested XML editing.
-
-If XML editing is used, treat it as project-changing and preview it with the same natural-language confirmation flow. The preview must name the exact files, object identities, generated IDs, backup plan, and verification steps, but must not show a preview hash by default. Never imply that XML fallback support comes from the versioned manifest unless the manifest/resource evidence actually covers that API path.
-
-Before editing XML, resolve the project root from `ak.wwise.core.getProjectInfo`: prefer `directories.root`; fall back to the parent directory of the returned WPROJ `path`. Store XML backups under the project root in `.waapi_skill_backups/<timestamp>/`, mirroring the edited file's project-relative path and adding `.bak` to the file name, for example `<SampleProject>/.waapi_skill_backups/20260625-000952/Actor-Mixer Hierarchy/NYC Ambience.wwu.bak`. Use `wwise_waapi.xml_backup.create_xml_edit_backup()` for this instead of writing sibling `.bak` files next to `.wwu` or `.wproj` files. In user-facing output, report the backup directory or backup file only after execution or rollback; do not scatter backups beside source work units.
-
-For XML-created or XML-cloned Wwise objects, generate fresh GUIDs and ShortIDs, then check for collisions before writing. At minimum, scan the target project files for the candidate GUID and ShortID; when a live WAAPI session is available, also query by candidate GUID and candidate ShortID through `ak.wwise.core.object.get` or the version-appropriate object lookup before committing the XML edit. If any collision is found, regenerate and recheck. After writing, reopen or reload through Wwise/WAAPI when possible and read back the created objects.
-
-Keep runtime data, logs, auth state, and evidence artifacts out of git unless the user or plan explicitly asks for committed evidence. Do not claim Windows validation has passed unless the task provides real Windows-host evidence.
-
-## Resources and documentation
-
-The prompt should not load every reference file up front. Python code reads versioned manifests, semantic source notes, WAQL resources, and deferred registries for the selected version and task. The structured `resources/semantic/<version>/source_notes.json` files are the runtime semantic source-note resource.
-
-Their `protocol` and `source_urls` fields point back to repository source-evidence history, which lives in root `references/` as development material outside the packaged runtime path. Runtime dispatcher and builder flows should rely on local packaged resources, not large prompt-loaded 2025 reference files.
-
-## Skill layout
-
-Key paths:
+Key runtime pieces:
 
 1. `scripts/run.py`: skill-local script runner.
-2. `wwise_waapi/dispatcher.py`: generic WAAPI function and topic dispatcher.
-3. `wwise_waapi/subscriptions.py`: bounded topic waits and cancellable listeners.
+2. `wwise_waapi/dispatcher.py`: validated WAAPI function and topic dispatch.
+3. `wwise_waapi/builders/`: semantic builders and preview objects.
 4. `wwise_waapi/manifest.py`: versioned manifest loading and reflection helpers.
-5. `wwise_waapi/builders/`: semantic builders and preview objects.
-6. `resources/manifest/<version>/`: generated API manifests.
-7. `resources/semantic/<version>/`, `resources/waql/<version>/`, and `resources/deferred/<version>.json`: versioned runtime supporting resources loaded only when needed. Root `references/` and `references/semantic/<version>/` keep historical source-evidence markdown for development review outside the packaged runtime path.
+5. `resources/manifest/<version>/`, `resources/semantic/<version>/`, `resources/waql/<version>/`, and `resources/deferred/<version>.json`: packaged runtime resources loaded on demand.
+6. `wwise_waapi/operation_registry.py`, `transaction_runtime.py`, and `transactions.py`: closed operation requests, live preflight/verifiers, immutable artifacts, and the durable state machine.
+
+The catalog commands are offline and distinguish manifest availability, executable route, safety gate, runtime profile, schema-validation level, and evidence status. `capabilities` and `operations` return compact inventories by default while retaining safety and transaction boundaries. Use their `--detail` flags only for an explicit whole-row audit. `describe` returns a compact schema summary by default; use `describe <uri> --full-schema` only when the complete reflected schema is necessary. Evidence status never substitutes for interface availability, and manifest reflection never counts as live behavioral proof. The immutable reviewed allowlists are the permission boundary. The generic `call` route contains exactly `ak.wwise.waapi.getFunctions` and `ak.wwise.waapi.getTopics`; both have zero-input and strict bounded result contracts. All other reflected reads stay behind a fixed command or structured unsupported boundary until they receive URI-specific work and result validation. Reviewed topics remain bounded waits. A future URI whose name starts with `get`, `is`, `verify`, or `dump` is not inferred safe from its spelling.
+
+## Boundaries
+
+- Do not invent fixed API maps in the prompt when the runtime resources can resolve the correct URI.
+- Never write disposable business logic for a user Wwise task. No heredoc script, inline Python, new `.py`/`.js`/`.sh` helper, or direct client construction.
+- `scripts/run.py` and the environment helper accept only their immutable packaged script allowlist. Never attempt another runner target or temporary script path.
+- The generic `call` path accepts only catalog rows whose preferred route is `manifest_dispatch`. Fixed functions require their packaged command, reviewed topics require `wait-topic`, closed mutations require their transaction route, and all other rows remain unsupported. `--dry-run`, `--allow-destructive`, and `WWISE_DESTRUCTIVE=1` do not bypass any of those route boundaries.
+- Do not search the repository to recover from a gateway error. A structured failure is the result unless the user explicitly asked to develop or debug this Skill itself.
+- If a capability has no packaged executable path, return a clear `unsupported_by_skill_interface` boundary instead of synthesizing code.
+- Do not treat XML editing as a normal first-line path. It is a guarded fallback inside the operate lane.
+- Editing this Skill's implementation is allowed only when the user's task is Skill development, testing, or debugging—not as a way to complete an ordinary Wwise request.
+
+## Detailed references
+
+- `references/waapi-setup.md` — connection, version, config, status, and first-run behavior
+- `references/waapi-query.md` — read-only inspection, selection/object lookup, bounded topic waits, and no-code failure rules
+- `references/waapi-operate.md` — closed operation JSON, durable preview/confirm/execute/verify, retry rules, and explicit boundaries

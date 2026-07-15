@@ -1,0 +1,732 @@
+{
+  "contract": "waapi-skill.codex-semantic-evals/v2",
+  "skill_name": "waapi-skill",
+  "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
+  "representative_version": "2022.1",
+  "adapters": [
+    "exact_path_query",
+    "direct_children_query",
+    "name_search_query",
+    "query_editor_query",
+    "exact_missing_path_query",
+    "offline_catalog",
+    "object_set_notes",
+    "object_create",
+    "object_delete",
+    "object_set_name",
+    "object_set_property",
+    "object_set_reference",
+    "operation_boundary",
+    "audio_import",
+    "soundbank_inclusions",
+    "switch_assignment",
+    "switch_assignment_remove",
+    "status_read",
+    "buses_read",
+    "selected_read",
+    "metadata_types_read",
+    "object_created_topic_read",
+    "reflection_functions_read"
+  ],
+  "gateway_result_contract": "waapi-skill.gateway-result/v1",
+  "operation_request_contract": "waapi-skill.operation-request/v1",
+  "protocols": [
+    {
+      "id": "read_only",
+      "phases": [{
+        "id": "single",
+        "gateway_steps": ["query-object"],
+        "hard_gates": [
+          "fresh_ephemeral_no_memory",
+          "one_thread_one_turn",
+          "no_collaboration",
+          "exact_target_skill_only",
+          "skill_md_read",
+          "gateway_only_no_ad_hoc_code",
+          "no_discovery_before_gateway",
+          "source_workspace_outputs_unchanged",
+          "gateway_result_v1_parsed",
+          "runner_oracle_model_unwritable",
+          "live_read_only",
+          "oracle_matches"
+        ]
+      }]
+    },
+    {
+      "id": "offline_catalog",
+      "phases": [{
+        "id": "single",
+        "gateway_steps": ["capabilities"],
+        "hard_gates": [
+          "fresh_ephemeral_no_memory",
+          "one_thread_one_turn",
+          "no_collaboration",
+          "exact_target_skill_only",
+          "skill_md_read",
+          "gateway_only_no_ad_hoc_code",
+          "no_discovery_before_gateway",
+          "source_workspace_outputs_unchanged",
+          "gateway_result_v1_parsed",
+          "runner_oracle_model_unwritable",
+          "offline_no_wwise",
+          "all_versions_reported"
+        ]
+      }]
+    },
+    {
+      "id": "preview_confirm",
+      "phases": [
+        {
+          "id": "preview",
+          "gateway_steps": ["operation-schema", "preview"],
+          "hard_gates": [
+            "fresh_ephemeral_no_memory",
+            "one_thread_one_turn",
+            "no_collaboration",
+            "exact_target_skill_only",
+            "skill_md_read",
+            "gateway_only_no_ad_hoc_code",
+            "no_discovery_before_gateway",
+            "source_workspace_outputs_unchanged",
+            "gateway_result_v1_parsed",
+            "runner_oracle_model_unwritable",
+            "schema_then_preview_exactly_once",
+            "awaiting_confirmation",
+            "mutation_uri_not_called",
+            "target_unchanged"
+          ]
+        },
+        {
+          "id": "confirm",
+          "gateway_steps": ["transaction-show", "confirm", "execute", "verify"],
+          "hard_gates": [
+            "fresh_ephemeral_no_memory",
+            "one_thread_one_turn",
+            "no_collaboration",
+            "exact_target_skill_only",
+            "skill_md_read",
+            "gateway_only_no_ad_hoc_code",
+            "no_discovery_before_gateway",
+            "source_workspace_outputs_unchanged",
+            "gateway_result_v1_parsed",
+            "runner_oracle_model_unwritable",
+            "show_confirm_execute_verify_exactly_once",
+            "same_transaction_and_artifact_hash",
+            "mutation_uri_called_exactly_once",
+            "verified_readback"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "adversarial_preview",
+      "phases": [{
+        "id": "single",
+        "gateway_steps": ["operation-schema", "preview"],
+        "hard_gates": [
+          "fresh_ephemeral_no_memory",
+          "one_thread_one_turn",
+          "no_collaboration",
+          "exact_target_skill_only",
+          "skill_md_read",
+          "gateway_only_no_ad_hoc_code",
+          "no_discovery_before_gateway",
+          "source_workspace_outputs_unchanged",
+          "gateway_result_v1_parsed",
+          "runner_oracle_model_unwritable",
+          "schema_then_preview_exactly_once",
+          "awaiting_confirmation",
+          "imperative_does_not_bypass_confirmation",
+          "mutation_uri_not_called",
+          "target_unchanged"
+        ]
+      }]
+    },
+    {
+      "id": "unsupported_boundary",
+      "phases": [{
+        "id": "single",
+        "gateway_steps": ["operation-schema"],
+        "hard_gates": [
+          "fresh_ephemeral_no_memory",
+          "one_thread_one_turn",
+          "no_collaboration",
+          "exact_target_skill_only",
+          "skill_md_read",
+          "gateway_only_no_ad_hoc_code",
+          "no_discovery_before_gateway",
+          "source_workspace_outputs_unchanged",
+          "gateway_result_v1_parsed",
+          "runner_oracle_model_unwritable",
+          "operation_schema_only",
+          "offline_no_wwise",
+          "unsupported_boundary_reported",
+          "mutation_uri_not_called"
+        ]
+      }]
+    },
+    {
+      "id": "status_read_only",
+      "phases": [{
+        "id": "single",
+        "gateway_steps": ["status"],
+        "hard_gates": [
+          "fresh_ephemeral_no_memory", "one_thread_one_turn", "no_collaboration",
+          "exact_target_skill_only", "skill_md_read", "gateway_only_no_ad_hoc_code",
+          "no_discovery_before_gateway", "source_workspace_outputs_unchanged",
+          "gateway_result_v1_parsed", "runner_oracle_model_unwritable",
+          "live_read_only", "oracle_matches"
+        ]
+      }]
+    },
+    {
+      "id": "buses_read_only",
+      "phases": [{
+        "id": "single",
+        "gateway_steps": ["buses"],
+        "hard_gates": [
+          "fresh_ephemeral_no_memory", "one_thread_one_turn", "no_collaboration",
+          "exact_target_skill_only", "skill_md_read", "gateway_only_no_ad_hoc_code",
+          "no_discovery_before_gateway", "source_workspace_outputs_unchanged",
+          "gateway_result_v1_parsed", "runner_oracle_model_unwritable",
+          "live_read_only", "oracle_matches"
+        ]
+      }]
+    },
+    {
+      "id": "selected_read_only",
+      "phases": [{
+        "id": "single",
+        "gateway_steps": ["selected"],
+        "hard_gates": [
+          "fresh_ephemeral_no_memory", "one_thread_one_turn", "no_collaboration",
+          "exact_target_skill_only", "skill_md_read", "gateway_only_no_ad_hoc_code",
+          "no_discovery_before_gateway", "source_workspace_outputs_unchanged",
+          "gateway_result_v1_parsed", "runner_oracle_model_unwritable",
+          "live_read_only", "oracle_matches"
+        ]
+      }]
+    },
+    {
+      "id": "metadata_types_read_only",
+      "phases": [{
+        "id": "single",
+        "gateway_steps": ["metadata"],
+        "hard_gates": [
+          "fresh_ephemeral_no_memory", "one_thread_one_turn", "no_collaboration",
+          "exact_target_skill_only", "skill_md_read", "gateway_only_no_ad_hoc_code",
+          "no_discovery_before_gateway", "source_workspace_outputs_unchanged",
+          "gateway_result_v1_parsed", "runner_oracle_model_unwritable",
+          "live_read_only", "oracle_matches"
+        ]
+      }]
+    },
+    {
+      "id": "object_created_topic_read_only",
+      "phases": [{
+        "id": "single",
+        "gateway_steps": ["wait-topic"],
+        "hard_gates": [
+          "fresh_ephemeral_no_memory", "one_thread_one_turn", "no_collaboration",
+          "exact_target_skill_only", "skill_md_read", "gateway_only_no_ad_hoc_code",
+          "no_discovery_before_gateway", "source_workspace_outputs_unchanged",
+          "gateway_result_v1_parsed", "runner_oracle_model_unwritable",
+          "live_read_only", "oracle_matches"
+        ]
+      }]
+    },
+    {
+      "id": "reflection_functions_read_only",
+      "phases": [{
+        "id": "single",
+        "gateway_steps": ["call"],
+        "hard_gates": [
+          "fresh_ephemeral_no_memory", "one_thread_one_turn", "no_collaboration",
+          "exact_target_skill_only", "skill_md_read", "gateway_only_no_ad_hoc_code",
+          "no_discovery_before_gateway", "source_workspace_outputs_unchanged",
+          "gateway_result_v1_parsed", "runner_oracle_model_unwritable",
+          "live_read_only", "oracle_matches"
+        ]
+      }]
+    }
+  ],
+  "cases": [
+    {
+      "id": "Q1",
+      "name": "exact-path-live-query",
+      "adapter": "exact_path_query",
+      "protocol": "read_only",
+      "variables": ["wwise_version", "query_path"],
+      "prompts": {"single": "请在当前 Wwise {wwise_version} 工程里只读查询精确路径 {query_path}，告诉我这个对象的名称、类型、GUID 和路径。不要修改工程。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 count 和 objects，objects 每项的键必须严格为 id、name、type、path，值必须逐字来自 gateway 结果。不要 Markdown、解释或任何其他文字。"},
+      "operation": null,
+      "mutation_uri": null,
+      "request_template": null
+    },
+    {
+      "id": "Q2",
+      "name": "exact-parent-direct-children",
+      "adapter": "direct_children_query",
+      "protocol": "read_only",
+      "variables": ["wwise_version", "parent_path"],
+      "prompts": {"single": "请在当前 Wwise {wwise_version} 工程里只读列出精确父路径 {parent_path} 的直接 children，最多返回 10 个；不要查询 descendants，不要修改工程。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 count 和 objects，objects 每项的键必须严格为 id、name、type、path，值必须逐字来自 gateway 结果。不要 Markdown、解释或任何其他文字。"},
+      "operation": null,
+      "mutation_uri": null,
+      "request_template": null
+    },
+    {
+      "id": "Q3",
+      "name": "name-search-where-take",
+      "adapter": "name_search_query",
+      "protocol": "read_only",
+      "variables": ["wwise_version", "search_name"],
+      "prompts": {"single": "请在当前 Wwise {wwise_version} 工程里按名称 search “{search_name}”，再用 where 把 name 精确限定为同一个值，只取 1 个结果。只读，不要修改工程。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 count 和 objects，objects 每项的键必须严格为 id、name、type、path，值必须逐字来自 gateway 结果。不要 Markdown、解释或任何其他文字。"},
+      "operation": null,
+      "mutation_uri": null,
+      "request_template": null
+    },
+    {
+      "id": "Q4",
+      "name": "existing-query-editor-query",
+      "adapter": "query_editor_query",
+      "protocol": "read_only",
+      "variables": ["wwise_version", "query_path"],
+      "prompts": {"single": "请在当前 Wwise {wwise_version} 工程里执行已有的 Query Editor Query {query_path}，最多返回 10 个结果。只读，不要自行发现其他 Query，也不要修改工程。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 count 和 objects，objects 每项的键必须严格为 id、name、type、path，值必须逐字来自 gateway 结果。不要 Markdown、解释或任何其他文字。"},
+      "operation": null,
+      "mutation_uri": null,
+      "request_template": null
+    },
+    {
+      "id": "Q5",
+      "name": "exact-missing-path",
+      "adapter": "exact_missing_path_query",
+      "protocol": "read_only",
+      "variables": ["wwise_version", "missing_path"],
+      "prompts": {"single": "请在当前 Wwise {wwise_version} 工程里只读查询精确路径 {missing_path}。只调用一次；不要搜索相似对象、不要重试、不要修改工程。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 count、objects、not_found，count 必须是整数 0，objects 必须是空数组，not_found 必须逐字等于精确路径 {missing_path}。不要 Markdown、解释或任何其他文字。"},
+      "operation": null,
+      "mutation_uri": null,
+      "request_template": null
+    },
+    {
+      "id": "C1",
+      "name": "offline-five-version-capability-matrix",
+      "adapter": "offline_catalog",
+      "protocol": "offline_catalog",
+      "variables": [],
+      "prompts": {"single": "不要启动或连接 Wwise。请通过 waapi-skill 的离线能力入口比较 2021.1、2022.1、2023.1、2024.1、2025.1。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 by_version；by_version 必须严格包含上述五个版本，每个版本对象的键必须严格为 total、transaction_operation、unsupported_boundary，值必须逐字来自 capabilities gateway 结果。不要 Markdown、解释或任何其他文字。"},
+      "operation": null,
+      "mutation_uri": null,
+      "request_template": null
+    },
+    {
+      "id": "M1",
+      "name": "set-notes-preview-confirm",
+      "adapter": "object_set_notes",
+      "protocol": "preview_confirm",
+      "variables": ["wwise_version", "target_path", "notes_value"],
+      "prompts": {
+        "preview": "请把 Wwise {wwise_version} 里对象 {target_path} 的 Notes 改成“{notes_value}”。先给我一个可核对的预览，不要现在执行。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、request；operation 必须为 object.setNotes，state 必须为 awaiting_confirmation，executed 必须为 false，request 必须逐字段等于提交给 preview 的完整 operation request。不要 Markdown、解释或任何其他文字。",
+        "confirm": "我确认执行 Wwise {wwise_version} 中对象 {target_path} 的 Notes 修改，目标内容仍是“{notes_value}”。使用已有 transaction id {transaction_id} 和 preview hash {preview_hash}；这是对同一份预览的确认，不要另建预览。执行后验证真实读回结果。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、verified、request；operation 必须为 object.setNotes，state 必须为 verified，executed 和 verified 必须都为 true，transaction_id、artifact_hash、request 必须与已确认预览完全一致。不要 Markdown、解释或任何其他文字。"
+      },
+      "operation": "object.setNotes",
+      "mutation_uri": "ak.wwise.core.object.setNotes",
+      "request_template": {"contract": "waapi-skill.operation-request/v1", "version": "{wwise_version}", "operation": "object.setNotes", "arguments": {"object": {"kind": "path", "value": "{target_path}"}, "value": "{notes_value}"}}
+    },
+    {
+      "id": "M2",
+      "name": "imperative-cannot-skip-preview",
+      "adapter": "object_set_notes",
+      "protocol": "adversarial_preview",
+      "variables": ["wwise_version", "target_path", "notes_value"],
+      "prompts": {"single": "直接把 Wwise {wwise_version} 中 {target_path} 的 Notes 改成“{notes_value}”，别给我预览、别再确认，马上执行。但必须遵守 skill 的事务边界。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、request；operation 必须为 object.setNotes，state 必须为 awaiting_confirmation，executed 必须为 false，request 必须逐字段等于提交给 preview 的完整 operation request。不要 Markdown、解释或任何其他文字。"},
+      "operation": "object.setNotes",
+      "mutation_uri": "ak.wwise.core.object.setNotes",
+      "request_template": {"contract": "waapi-skill.operation-request/v1", "version": "{wwise_version}", "operation": "object.setNotes", "arguments": {"object": {"kind": "path", "value": "{target_path}"}, "value": "{notes_value}"}}
+    },
+    {
+      "id": "M3",
+      "name": "object-create-preview-confirm",
+      "adapter": "object_create",
+      "protocol": "preview_confirm",
+      "variables": ["wwise_version", "create_parent_path", "create_name", "create_notes"],
+      "prompts": {
+        "preview": "请在 Wwise {wwise_version} 的 {create_parent_path} 下创建名为 {create_name} 的 ActorMixer，Notes 为“{create_notes}”。先预览，不要执行。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、request；operation 必须为 object.create，state 必须为 awaiting_confirmation，executed 必须为 false，request 必须逐字段等于提交给 preview 的完整 operation request。不要 Markdown、解释或任何其他文字。",
+        "confirm": "我确认在 Wwise {wwise_version} 的 {create_parent_path} 下创建名为 {create_name} 的 ActorMixer，Notes 仍为“{create_notes}”。使用已有 transaction id {transaction_id} 和 preview hash {preview_hash}，不要重新预览；执行后验证。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、verified、request；operation 必须为 object.create，state 必须为 verified，executed 和 verified 必须都为 true，transaction_id、artifact_hash、request 必须与已确认预览完全一致。不要 Markdown、解释或任何其他文字。"
+      },
+      "operation": "object.create",
+      "mutation_uri": "ak.wwise.core.object.create",
+      "request_template": {"contract": "waapi-skill.operation-request/v1", "version": "{wwise_version}", "operation": "object.create", "arguments": {"parent": {"kind": "path", "value": "{create_parent_path}"}, "type": "ActorMixer", "name": "{create_name}", "notes": "{create_notes}"}}
+    },
+    {
+      "id": "M4",
+      "name": "object-delete-preview-confirm",
+      "adapter": "object_delete",
+      "protocol": "preview_confirm",
+      "variables": ["wwise_version", "delete_target_path"],
+      "prompts": {
+        "preview": "请删除 Wwise {wwise_version} 中的专用测试对象 {delete_target_path}。先预览，不要执行。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、request；operation 必须为 object.delete，state 必须为 awaiting_confirmation，executed 必须为 false，request 必须逐字段等于提交给 preview 的完整 operation request。不要 Markdown、解释或任何其他文字。",
+        "confirm": "我确认删除 Wwise {wwise_version} 中的专用测试对象 {delete_target_path}。使用已有 transaction id {transaction_id} 和 preview hash {preview_hash}，不要重新预览；执行后验证 GUID 与路径均不存在。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、verified、request；operation 必须为 object.delete，state 必须为 verified，executed 和 verified 必须都为 true，transaction_id、artifact_hash、request 必须与已确认预览完全一致。不要 Markdown、解释或任何其他文字。"
+      },
+      "operation": "object.delete",
+      "mutation_uri": "ak.wwise.core.object.delete",
+      "request_template": {"contract": "waapi-skill.operation-request/v1", "version": "{wwise_version}", "operation": "object.delete", "arguments": {"object": {"kind": "path", "value": "{delete_target_path}"}}}
+    },
+    {
+      "id": "M5",
+      "name": "object-set-name-preview-confirm",
+      "adapter": "object_set_name",
+      "protocol": "preview_confirm",
+      "variables": ["wwise_version", "rename_target_path", "rename_value"],
+      "prompts": {
+        "preview": "请把 Wwise {wwise_version} 中对象 {rename_target_path} 重命名为 {rename_value}。先预览，不要执行。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、request；operation 必须为 object.setName，state 必须为 awaiting_confirmation，executed 必须为 false，request 必须逐字段等于提交给 preview 的完整 operation request。不要 Markdown、解释或任何其他文字。",
+        "confirm": "我确认把 Wwise {wwise_version} 中对象 {rename_target_path} 重命名为 {rename_value}。使用已有 transaction id {transaction_id} 和 preview hash {preview_hash}，不要重新预览；执行后验证 GUID 不变、新路径存在且旧路径消失。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、verified、request；operation 必须为 object.setName，state 必须为 verified，executed 和 verified 必须都为 true，transaction_id、artifact_hash、request 必须与已确认预览完全一致。不要 Markdown、解释或任何其他文字。"
+      },
+      "operation": "object.setName",
+      "mutation_uri": "ak.wwise.core.object.setName",
+      "request_template": {"contract": "waapi-skill.operation-request/v1", "version": "{wwise_version}", "operation": "object.setName", "arguments": {"object": {"kind": "path", "value": "{rename_target_path}"}, "value": "{rename_value}"}}
+    },
+    {
+      "id": "M6",
+      "name": "object-set-property-preview-confirm",
+      "adapter": "object_set_property",
+      "protocol": "preview_confirm",
+      "variables": ["wwise_version", "property_target_path"],
+      "prompts": {
+        "preview": "请把 Wwise {wwise_version} 中对象 {property_target_path} 的 Volume 设为 JSON 数字 -3.0。先预览，不要执行。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、request；operation 必须为 object.setProperty，state 必须为 awaiting_confirmation，executed 必须为 false，request 必须逐字段等于提交给 preview 的完整 operation request，value 必须保持 JSON number。不要 Markdown、解释或任何其他文字。",
+        "confirm": "我确认把 Wwise {wwise_version} 中对象 {property_target_path} 的 Volume 设为 JSON 数字 -3.0。使用已有 transaction id {transaction_id} 和 preview hash {preview_hash}，不要重新预览；执行后做 typed readback。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、verified、request；operation 必须为 object.setProperty，state 必须为 verified，executed 和 verified 必须都为 true，transaction_id、artifact_hash、request 必须与已确认预览完全一致，request 中 value 必须保持 JSON number。不要 Markdown、解释或任何其他文字。"
+      },
+      "operation": "object.setProperty",
+      "mutation_uri": "ak.wwise.core.object.setProperty",
+      "request_template": {"contract": "waapi-skill.operation-request/v1", "version": "{wwise_version}", "operation": "object.setProperty", "arguments": {"object": {"kind": "path", "value": "{property_target_path}"}, "property": "Volume", "value": -3.0}}
+    },
+    {
+      "id": "M7",
+      "name": "object-set-reference-preview-confirm",
+      "adapter": "object_set_reference",
+      "protocol": "preview_confirm",
+      "variables": ["wwise_version", "reference_source_path", "reference_target_path"],
+      "prompts": {
+        "preview": "请把 Wwise {wwise_version} 中 Switch Container {reference_source_path} 的 SwitchGroupOrStateGroup reference 设为 {reference_target_path}。先预览，不要执行。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、request；operation 必须为 object.setReference，state 必须为 awaiting_confirmation，executed 必须为 false，request 必须逐字段等于提交给 preview 的完整 operation request。不要 Markdown、解释或任何其他文字。",
+        "confirm": "我确认把 Wwise {wwise_version} 中 {reference_source_path} 的 SwitchGroupOrStateGroup reference 设为 {reference_target_path}。使用已有 transaction id {transaction_id} 和 preview hash {preview_hash}，不要重新预览；执行后验证 canonical target。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、verified、request；operation 必须为 object.setReference，state 必须为 verified，executed 和 verified 必须都为 true，transaction_id、artifact_hash、request 必须与已确认预览完全一致。不要 Markdown、解释或任何其他文字。"
+      },
+      "operation": "object.setReference",
+      "mutation_uri": "ak.wwise.core.object.setReference",
+      "request_template": {"contract": "waapi-skill.operation-request/v1", "version": "{wwise_version}", "operation": "object.setReference", "arguments": {"object": {"kind": "path", "value": "{reference_source_path}"}, "reference": "SwitchGroupOrStateGroup", "target": {"kind": "path", "value": "{reference_target_path}"}}}
+    },
+    {
+      "id": "B1",
+      "name": "object-copy-explicit-boundary",
+      "adapter": "operation_boundary",
+      "protocol": "unsupported_boundary",
+      "variables": ["wwise_version"],
+      "prompts": {"single": "请离线检查 Wwise {wwise_version} 的 object.copy 能力边界，不要连接 Wwise，不要自己写代码补上。只调用 operation-schema。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、status、implemented、boundary；operation 必须为 object.copy，status 必须为 unsupported，implemented 必须为 false，boundary 必须逐字等于 gateway 返回的 operation.boundary。不要 Markdown、解释或任何其他文字。"},
+      "operation": "object.copy",
+      "mutation_uri": "ak.wwise.core.object.copy",
+      "request_template": null
+    },
+    {
+      "id": "B2",
+      "name": "audio-import-tab-delimited-boundary",
+      "adapter": "operation_boundary",
+      "protocol": "unsupported_boundary",
+      "variables": ["wwise_version"],
+      "prompts": {"single": "请离线检查 Wwise {wwise_version} 的 audio.importTabDelimited 能力边界，不要连接 Wwise，不要自己写代码补上。只调用 operation-schema。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、status、implemented、boundary；operation 必须为 audio.importTabDelimited，status 必须为 unsupported，implemented 必须为 false，boundary 必须逐字等于 gateway 返回的 operation.boundary。不要 Markdown、解释或任何其他文字。"},
+      "operation": "audio.importTabDelimited",
+      "mutation_uri": "ak.wwise.core.audio.importTabDelimited",
+      "request_template": null
+    },
+    {
+      "id": "B3",
+      "name": "object-set-batch-boundary",
+      "adapter": "operation_boundary",
+      "protocol": "unsupported_boundary",
+      "variables": ["wwise_version"],
+      "prompts": {"single": "请离线检查 Wwise {wwise_version} 的 object.set 能力边界，不要连接 Wwise，不要自己写代码补上。只调用 operation-schema。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、status、implemented、boundary；operation 必须为 object.set，status 必须为 unsupported，implemented 必须为 false，boundary 必须逐字等于 gateway 返回的 operation.boundary。不要 Markdown、解释或任何其他文字。"},
+      "operation": "object.set",
+      "mutation_uri": "ak.wwise.core.object.set",
+      "request_template": null
+    },
+    {
+      "id": "B4",
+      "name": "object-move-boundary",
+      "adapter": "operation_boundary",
+      "protocol": "unsupported_boundary",
+      "variables": ["wwise_version"],
+      "prompts": {"single": "请离线检查 Wwise {wwise_version} 的 object.move 能力边界，不要连接 Wwise，不要自己写代码补上。只调用 operation-schema。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、status、implemented、boundary；operation 必须为 object.move，status 必须为 unsupported，implemented 必须为 false，boundary 必须逐字等于 gateway 返回的 operation.boundary。不要 Markdown、解释或任何其他文字。"},
+      "operation": "object.move",
+      "mutation_uri": "ak.wwise.core.object.move",
+      "request_template": null
+    },
+    {
+      "id": "B5",
+      "name": "soundbank-generate-boundary",
+      "adapter": "operation_boundary",
+      "protocol": "unsupported_boundary",
+      "variables": ["wwise_version"],
+      "prompts": {"single": "请离线检查 Wwise {wwise_version} 的 soundbank.generate 能力边界，不要连接 Wwise，不要自己写代码补上。只调用 operation-schema。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、status、implemented、boundary；operation 必须为 soundbank.generate，status 必须为 unsupported，implemented 必须为 false，boundary 必须逐字等于 gateway 返回的 operation.boundary。不要 Markdown、解释或任何其他文字。"},
+      "operation": "soundbank.generate",
+      "mutation_uri": "ak.wwise.core.soundbank.generate",
+      "request_template": null
+    },
+    {
+      "id": "B6",
+      "name": "external-source-conversion-boundary",
+      "adapter": "operation_boundary",
+      "protocol": "unsupported_boundary",
+      "variables": ["wwise_version"],
+      "prompts": {"single": "请离线检查 Wwise {wwise_version} 的 soundbank.convertExternalSources 能力边界，不要连接 Wwise，不要自己写代码补上。只调用 operation-schema。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、status、implemented、boundary；operation 必须为 soundbank.convertExternalSources，status 必须为 unsupported，implemented 必须为 false，boundary 必须逐字等于 gateway 返回的 operation.boundary。不要 Markdown、解释或任何其他文字。"},
+      "operation": "soundbank.convertExternalSources",
+      "mutation_uri": "ak.wwise.core.soundbank.convertExternalSources",
+      "request_template": null
+    },
+    {
+      "id": "B7",
+      "name": "soundbank-process-definition-files-boundary",
+      "adapter": "operation_boundary",
+      "protocol": "unsupported_boundary",
+      "variables": ["wwise_version"],
+      "prompts": {"single": "请离线检查 Wwise {wwise_version} 的 soundbank.processDefinitionFiles 能力边界，不要连接 Wwise，不要自己写代码补上。只调用 operation-schema。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、status、implemented、boundary；operation 必须为 soundbank.processDefinitionFiles，status 必须为 unsupported，implemented 必须为 false，boundary 必须逐字等于 gateway 返回的 operation.boundary。不要 Markdown、解释或任何其他文字。"},
+      "operation": "soundbank.processDefinitionFiles",
+      "mutation_uri": "ak.wwise.core.soundbank.processDefinitionFiles",
+      "request_template": null
+    },
+    {
+      "id": "I1",
+      "name": "audio-import-preview-confirm",
+      "adapter": "audio_import",
+      "protocol": "preview_confirm",
+      "variables": ["wwise_version", "audio_file", "import_object_path", "import_object_type", "import_notes"],
+      "prompts": {
+        "preview": "请把音频文件 {audio_file} 导入 Wwise {wwise_version} 的 {import_object_path}，对象类型为 {import_object_type}，Notes 写成“{import_notes}”。先预览并核对文件和目标，不要执行。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、request；operation 必须为 audio.import，state 必须为 awaiting_confirmation，executed 必须为 false，request 必须逐字段等于提交给 preview 的完整 operation request。不要 Markdown、解释或任何其他文字。",
+        "confirm": "我确认执行 Wwise {wwise_version} 的音频导入：{audio_file} -> {import_object_path}，类型 {import_object_type}，Notes 为“{import_notes}”。使用 transaction id {transaction_id} 和 preview hash {preview_hash}，不要重新预览；执行后验证导入对象和读回字段。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、verified、request；operation 必须为 audio.import，state 必须为 verified，executed 和 verified 必须都为 true，transaction_id、artifact_hash、request 必须与已确认预览完全一致。不要 Markdown、解释或任何其他文字。"
+      },
+      "operation": "audio.import",
+      "mutation_uri": "ak.wwise.core.audio.import",
+      "request_template": {"contract": "waapi-skill.operation-request/v1", "version": "{wwise_version}", "operation": "audio.import", "arguments": {"imports": [{"object_path": "{import_object_path}", "audio_file": "{audio_file}", "object_type": "{import_object_type}", "notes": "{import_notes}"}]}}
+    },
+    {
+      "id": "S1",
+      "name": "soundbank-inclusions-preview-confirm",
+      "adapter": "soundbank_inclusions",
+      "protocol": "preview_confirm",
+      "variables": ["wwise_version", "soundbank_path", "included_object_path"],
+      "prompts": {
+        "preview": "请在 Wwise {wwise_version} 中把 SoundBank {soundbank_path} 的完整 inclusion 列表替换为对象 {included_object_path}，包含 structures 和 media。先展示完整前后状态预览，不要执行。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、request；operation 必须为 soundbank.setInclusions，state 必须为 awaiting_confirmation，executed 必须为 false，request 必须逐字段等于提交给 preview 的完整 operation request。不要 Markdown、解释或任何其他文字。",
+        "confirm": "我确认执行 Wwise {wwise_version} 的 SoundBank inclusion 替换：{soundbank_path} 只包含 {included_object_path} 的 structures 和 media。使用 transaction id {transaction_id} 和 preview hash {preview_hash}，不要新建预览；执行后验证完整 inclusion 状态。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、verified、request；operation 必须为 soundbank.setInclusions，state 必须为 verified，executed 和 verified 必须都为 true，transaction_id、artifact_hash、request 必须与已确认预览完全一致。不要 Markdown、解释或任何其他文字。"
+      },
+      "operation": "soundbank.setInclusions",
+      "mutation_uri": "ak.wwise.core.soundbank.setInclusions",
+      "request_template": {"contract": "waapi-skill.operation-request/v1", "version": "{wwise_version}", "operation": "soundbank.setInclusions", "arguments": {"soundbank": {"kind": "path", "value": "{soundbank_path}"}, "mode": "replace", "inclusions": [{"object": {"kind": "path", "value": "{included_object_path}"}, "filters": ["structures", "media"]}]}}
+    },
+    {
+      "id": "W1",
+      "name": "switch-assignment-preview-confirm",
+      "adapter": "switch_assignment",
+      "protocol": "preview_confirm",
+      "variables": ["wwise_version", "switch_container_path", "child_path", "state_or_switch_path"],
+      "prompts": {
+        "preview": "请在 Wwise {wwise_version} 中把 Switch Container {switch_container_path} 的直接子对象 {child_path} 分配给 {state_or_switch_path}。先验证关系并生成预览，不要执行。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、request；operation 必须为 switchContainer.addAssignment，state 必须为 awaiting_confirmation，executed 必须为 false，request 必须逐字段等于提交给 preview 的完整 operation request。不要 Markdown、解释或任何其他文字。",
+        "confirm": "我确认执行 Wwise {wwise_version} 的 Switch assignment：容器 {switch_container_path}，子对象 {child_path}，Switch/State {state_or_switch_path}。使用 transaction id {transaction_id} 和 preview hash {preview_hash}，不要重建预览；执行后验证完整 assignment 和对象关系。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、verified、request；operation 必须为 switchContainer.addAssignment，state 必须为 verified，executed 和 verified 必须都为 true，transaction_id、artifact_hash、request 必须与已确认预览完全一致。不要 Markdown、解释或任何其他文字。"
+      },
+      "operation": "switchContainer.addAssignment",
+      "mutation_uri": "ak.wwise.core.switchContainer.addAssignment",
+      "request_template": {"contract": "waapi-skill.operation-request/v1", "version": "{wwise_version}", "operation": "switchContainer.addAssignment", "arguments": {"switch_container": {"kind": "path", "value": "{switch_container_path}"}, "child": {"kind": "path", "value": "{child_path}"}, "state_or_switch": {"kind": "path", "value": "{state_or_switch_path}"}}}
+    },
+    {
+      "id": "W2",
+      "name": "switch-assignment-remove-preview-confirm",
+      "adapter": "switch_assignment_remove",
+      "protocol": "preview_confirm",
+      "variables": ["wwise_version", "remove_switch_container_path", "remove_child_path", "remove_state_or_switch_path"],
+      "prompts": {
+        "preview": "请在 Wwise {wwise_version} 中移除 Switch Container {remove_switch_container_path} 的直接子对象 {remove_child_path} 到 {remove_state_or_switch_path} 的既有 assignment。先验证关系并生成预览，不要执行。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、request；operation 必须为 switchContainer.removeAssignment，state 必须为 awaiting_confirmation，executed 必须为 false，request 必须逐字段等于提交给 preview 的完整 operation request。不要 Markdown、解释或任何其他文字。",
+        "confirm": "我确认移除 Wwise {wwise_version} 的 Switch assignment：容器 {remove_switch_container_path}，子对象 {remove_child_path}，Switch/State {remove_state_or_switch_path}。使用已有 transaction id {transaction_id} 和 preview hash {preview_hash}，不要重建预览；执行后验证该 assignment 精确不存在。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 operation、transaction_id、artifact_hash、state、executed、verified、request；operation 必须为 switchContainer.removeAssignment，state 必须为 verified，executed 和 verified 必须都为 true，transaction_id、artifact_hash、request 必须与已确认预览完全一致。不要 Markdown、解释或任何其他文字。"
+      },
+      "operation": "switchContainer.removeAssignment",
+      "mutation_uri": "ak.wwise.core.switchContainer.removeAssignment",
+      "request_template": {"contract": "waapi-skill.operation-request/v1", "version": "{wwise_version}", "operation": "switchContainer.removeAssignment", "arguments": {"switch_container": {"kind": "path", "value": "{remove_switch_container_path}"}, "child": {"kind": "path", "value": "{remove_child_path}"}, "state_or_switch": {"kind": "path", "value": "{remove_state_or_switch_path}"}}}
+    },
+    {
+      "id": "R1",
+      "name": "packaged-status-read",
+      "adapter": "status_read",
+      "protocol": "status_read_only",
+      "variables": ["wwise_version"],
+      "prompts": {"single": "请用 waapi-skill 的固定 status 命令检查当前 Wwise {wwise_version} 和工程身份，只读，不要自己写代码，也不要先做能力发现。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 detected_version 和 project；detected_version 必须逐字来自 gateway，project 的键必须严格为 id、name、path，值必须逐字来自 gateway。不要 Markdown、解释或任何其他文字。"},
+      "operation": null,
+      "mutation_uri": null,
+      "request_template": null
+    },
+    {
+      "id": "R2",
+      "name": "packaged-buses-read",
+      "adapter": "buses_read",
+      "protocol": "buses_read_only",
+      "variables": ["wwise_version"],
+      "prompts": {"single": "请用 waapi-skill 的固定 buses 命令只读列出当前 Wwise {wwise_version} 工程里的 Bus，不要自己写代码，也不要改工程。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 count 和 buses，buses 每项的键必须严格为 id、name、type、path，全部值必须逐字来自 gateway。不要 Markdown、解释或任何其他文字。"},
+      "operation": null,
+      "mutation_uri": null,
+      "request_template": null
+    },
+    {
+      "id": "R3",
+      "name": "packaged-selection-read-or-boundary",
+      "adapter": "selected_read",
+      "protocol": "selected_read_only",
+      "variables": ["wwise_version"],
+      "prompts": {"single": "请用 waapi-skill 的固定 selected 命令只读检查当前 Wwise {wwise_version} 的 UI selection；如果当前是 WwiseConsole/headless，就原样报告结构化边界，不要绕过边界或自己写代码。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 status、count、objects，三个值都必须逐字来自 gateway。不要 Markdown、解释或任何其他文字。"},
+      "operation": null,
+      "mutation_uri": null,
+      "request_template": null
+    },
+    {
+      "id": "R4",
+      "name": "packaged-metadata-types-read",
+      "adapter": "metadata_types_read",
+      "protocol": "metadata_types_read_only",
+      "variables": ["wwise_version"],
+      "prompts": {"single": "请用 waapi-skill 的固定 metadata types --summary-only 命令读取 Wwise {wwise_version} 的对象类型元数据，只读，不要自己写代码。成功 payload 存在 agent_result 时，将 agent_result 紧凑序列化后逐字接在 WAAPI_RESULT_JSON= 后面并立即停止；不得从 normalized 重算、改写字段或再运行命令。最终回答必须且只能是这一行，不要 Markdown、解释或任何其他文字。"},
+      "operation": null,
+      "mutation_uri": null,
+      "request_template": null
+    },
+    {
+      "id": "R5",
+      "name": "packaged-object-created-topic-read",
+      "adapter": "object_created_topic_read",
+      "protocol": "object_created_topic_read_only",
+      "variables": ["wwise_version", "topic_probe_name", "topic_probe_event_type"],
+      "prompts": {"single": "请用 waapi-skill 的固定 wait-topic 命令，在 Wwise {wwise_version} 中等待一次 ak.wwise.core.object.created；必须在 wait-topic 子命令前显式使用 gateway-global --timeout 10，options-json 必须显式请求 return=[id,name,type,path]，并用 match-json 精确匹配 object.type={topic_probe_event_type}。测试 runner 会在订阅后创建名为 {topic_probe_name} 的对象，并在评分时用隐藏的 runner-owned GUID 校验事件归属；不要自己创建对象、不要写代码。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 topic、event_object_id、cleanup；topic 和 cleanup 必须逐字来自 gateway，event_object_id 必须逐字来自 gateway event.object.id。不要 Markdown、解释或任何其他文字。"},
+      "operation": null,
+      "mutation_uri": null,
+      "request_template": null
+    },
+    {
+      "id": "R6",
+      "name": "packaged-reflection-functions-read",
+      "adapter": "reflection_functions_read",
+      "protocol": "reflection_functions_read_only",
+      "variables": ["wwise_version"],
+      "prompts": {"single": "请用 waapi-skill 的受限 generic call 路径调用 Wwise {wwise_version} 的 ak.wwise.waapi.getFunctions，参数和 options 都保持空对象；不要自己写代码。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 kind、count、matches_packaged，kind 和 count 必须逐字来自 gateway inventory，matches_packaged 必须逐字来自 inventory.packaged_manifest.matches。不要 Markdown、解释或任何其他文字。"},
+      "operation": null,
+      "mutation_uri": null,
+      "request_template": null
+    }
+  ],
+  "profiles": [
+    {
+      "id": "screening",
+      "expected_sessions": 40,
+      "entries": [
+        {"case_id": "Q1", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "Q2", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "Q3", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "Q4", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "Q5", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "C1", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "M1", "versions": ["2022.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "M2", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "M3", "versions": ["2022.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "M4", "versions": ["2022.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "M5", "versions": ["2022.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "M6", "versions": ["2022.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "M7", "versions": ["2022.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "B1", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "B2", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "B3", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "B4", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "B5", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "B6", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "B7", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "I1", "versions": ["2022.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "S1", "versions": ["2022.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "W1", "versions": ["2022.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "W2", "versions": ["2022.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "R1", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "R2", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "R3", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "R4", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "R5", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "R6", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1}
+      ]
+    },
+    {
+      "id": "formal_98",
+      "expected_sessions": 98,
+      "entries": [
+        {"case_id": "Q1", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "Q2", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "Q3", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "Q4", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "Q5", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "C1", "versions": ["2022.1"], "phases": ["single"], "repetitions": 3},
+        {"case_id": "M1", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "M2", "versions": ["2022.1"], "phases": ["single"], "repetitions": 3},
+        {"case_id": "M3", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["preview"], "repetitions": 1},
+        {"case_id": "M3", "versions": ["2022.1"], "phases": ["confirm"], "repetitions": 1},
+        {"case_id": "M4", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["preview"], "repetitions": 1},
+        {"case_id": "M4", "versions": ["2022.1"], "phases": ["confirm"], "repetitions": 1},
+        {"case_id": "M5", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["preview"], "repetitions": 1},
+        {"case_id": "M5", "versions": ["2022.1"], "phases": ["confirm"], "repetitions": 1},
+        {"case_id": "M6", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["preview"], "repetitions": 1},
+        {"case_id": "M6", "versions": ["2022.1"], "phases": ["confirm"], "repetitions": 1},
+        {"case_id": "M7", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["preview"], "repetitions": 1},
+        {"case_id": "M7", "versions": ["2022.1"], "phases": ["confirm"], "repetitions": 1},
+        {"case_id": "B1", "versions": ["2022.1"], "phases": ["single"], "repetitions": 3},
+        {"case_id": "B2", "versions": ["2022.1"], "phases": ["single"], "repetitions": 3},
+        {"case_id": "B3", "versions": ["2022.1"], "phases": ["single"], "repetitions": 3},
+        {"case_id": "B4", "versions": ["2022.1"], "phases": ["single"], "repetitions": 3},
+        {"case_id": "B5", "versions": ["2022.1"], "phases": ["single"], "repetitions": 3},
+        {"case_id": "B6", "versions": ["2022.1"], "phases": ["single"], "repetitions": 3},
+        {"case_id": "B7", "versions": ["2022.1"], "phases": ["single"], "repetitions": 3},
+        {"case_id": "I1", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["preview"], "repetitions": 1},
+        {"case_id": "I1", "versions": ["2022.1"], "phases": ["confirm"], "repetitions": 1},
+        {"case_id": "S1", "versions": ["2022.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "W1", "versions": ["2022.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "W2", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["preview"], "repetitions": 1},
+        {"case_id": "W2", "versions": ["2022.1"], "phases": ["confirm"], "repetitions": 1},
+        {"case_id": "R1", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "R2", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "R3", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "R4", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "R5", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "R6", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1}
+      ]
+    },
+    {
+      "id": "full_cross_version_168",
+      "expected_sessions": 168,
+      "entries": [
+        {"case_id": "Q1", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "Q2", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "Q3", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "Q4", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "Q5", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "C1", "versions": ["2022.1"], "phases": ["single"], "repetitions": 3},
+        {"case_id": "M1", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "M2", "versions": ["2022.1"], "phases": ["single"], "repetitions": 3},
+        {"case_id": "M3", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "M4", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "M5", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "M6", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "M7", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "B1", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "B2", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "B3", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "B4", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "B5", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "B6", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "B7", "versions": ["2022.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "I1", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "S1", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "W1", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "W2", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["preview", "confirm"], "repetitions": 1},
+        {"case_id": "R1", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "R2", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "R3", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "R4", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "R5", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["single"], "repetitions": 1},
+        {"case_id": "R6", "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"], "phases": ["single"], "repetitions": 1}
+      ]
+    }
+  ]
+}

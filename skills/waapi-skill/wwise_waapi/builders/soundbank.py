@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence, cast
 
 from wwise_waapi.dispatcher import DEFAULT_WWISE_VERSION  # pyright: ignore[reportMissingImports]
+from wwise_waapi.waql import quote_waql_literal  # pyright: ignore[reportMissingImports]
 
 from .common import (  # pyright: ignore[reportMissingImports]
     BuilderContext,
@@ -174,10 +175,14 @@ class SoundBankBuilder:
     ) -> SemanticPreview:
         source_note, validator = self._validated_context()
         resolved = _resolve_required_exact(soundbank, role="soundbank", destructive_use=True)
+        normalized_operation = _set_inclusion_operation(operation)
         rows = [_coerce_set_inclusion(item) for item in inclusions]
-        if not rows:
-            raise SemanticValidationError(SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH, "setInclusions requires at least one inclusion row.")
-        args = {"soundbank": resolved.object, "operation": _set_inclusion_operation(operation), "inclusions": rows}
+        if not rows and normalized_operation != "replace":
+            raise SemanticValidationError(
+                SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+                "Empty setInclusions rows are allowed only with replace, where they clear the captured inclusion state.",
+            )
+        args = {"soundbank": resolved.object, "operation": normalized_operation, "inclusions": rows}
         options: dict[str, Any] = {}
         validation = validator.validate(SET_INCLUSIONS_URI, args=args, options=options)
         preflight = SemanticReadbackPlan(GET_INCLUSIONS_URI, args={"soundbank": resolved.object}, options={}, description="preflight getInclusions must capture existing SoundBank inclusions before mutation")
@@ -242,7 +247,7 @@ class SoundBankBuilder:
         options: dict[str, Any] = {}
         validation = validator.validate(GENERATE_URI, args=args, options=options)
         artifact_plan = _generate_artifact_plan(args, output_root_hint=output_root_hint)
-        readback = SemanticReadbackPlan(GENERATE_URI, args=args, options=options, description="capture SoundBank generation logs without claiming artifact completion")
+        result_evidence = _execution_result_evidence(GENERATE_URI, capture="generation-result")
         envelope = SemanticEnvelope(
             GENERATE_URI,
             args=args,
@@ -255,6 +260,7 @@ class SoundBankBuilder:
                 "read_only": False,
                 "destructive_gate": _destructive_gate(),
                 "artifact_evidence_plan": artifact_plan,
+                "execution_result_evidence": result_evidence,
                 "topic_expectations": [
                     "generated and generationDone are evidence expectations only",
                     "generationDone is not claimed as proof that all artifacts are complete",
@@ -264,9 +270,10 @@ class SoundBankBuilder:
         return self._preview(
             envelope,
             validation_uri=GENERATE_URI,
-            readback_plan=(readback,),
+            readback_plan=(),
             requires_destructive_gate=True,
             evidence_extra=(
+                {"kind": "execution-result-evidence", **result_evidence},
                 {"kind": "artifact-evidence", "plan": artifact_plan, "writes_files_by_preview": False},
                 {"kind": "topic-evidence", "topics": [GENERATED_TOPIC_URI, GENERATION_DONE_TOPIC_URI], "hidden_subscription": False},
                 {"kind": "cleanup-source-immutability", "requires_sandbox": True, "refuse_source_outputs": True},
@@ -281,7 +288,8 @@ class SoundBankBuilder:
         args = {"sources": rows}
         options: dict[str, Any] = {}
         validation = validator.validate(CONVERT_EXTERNAL_SOURCES_URI, args=args, options=options)
-        readback = SemanticReadbackPlan(CONVERT_EXTERNAL_SOURCES_URI, args=args, options=options, description="capture external-source conversion result without filesystem writes by preview")
+        result_evidence = _execution_result_evidence(CONVERT_EXTERNAL_SOURCES_URI, capture="conversion-result")
+        artifact_plan = {"expected_outputs": [row.get("output", "WwiseProject/.cache/ExternalSources/<platform>") for row in rows], "writes_files_by_preview": False}
         envelope = SemanticEnvelope(
             CONVERT_EXTERNAL_SOURCES_URI,
             args=args,
@@ -293,15 +301,19 @@ class SoundBankBuilder:
                 "schema_validation": validation.as_dict(),
                 "read_only": False,
                 "destructive_gate": _destructive_gate(),
-                "artifact_evidence_plan": {"expected_outputs": [row.get("output", "WwiseProject/.cache/ExternalSources/<platform>") for row in rows], "writes_files_by_preview": False},
+                "execution_result_evidence": result_evidence,
+                "artifact_evidence_plan": artifact_plan,
             },
         )
         return self._preview(
             envelope,
             validation_uri=CONVERT_EXTERNAL_SOURCES_URI,
-            readback_plan=(readback,),
+            readback_plan=(),
             requires_destructive_gate=True,
-            evidence_extra=({"kind": "artifact-evidence", "capture": ["external-source-output"], "writes_files_by_preview": False},),
+            evidence_extra=(
+                {"kind": "execution-result-evidence", **result_evidence},
+                {"kind": "artifact-evidence", "capture": ["external-source-output"], "plan": artifact_plan, "writes_files_by_preview": False},
+            ),
         )
 
     def process_definition_files(
@@ -315,11 +327,15 @@ class SoundBankBuilder:
         file_args = [_non_empty_string("definition_file", str(path)) for path in files]
         if not file_args:
             raise SemanticValidationError(SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH, "processDefinitionFiles requires at least one definition file.")
+        soundbank_names = _non_empty_strings(
+            "expected_soundbank_names",
+            _sequence_arg("expected_soundbank_names", expected_soundbank_names),
+        )
         _reject_bad_process_definition_proof(process_result_proof)
         args = {"files": file_args}
         options: dict[str, Any] = {}
         validation = validator.validate(PROCESS_DEFINITION_FILES_URI, args=args, options=options)
-        readback = SemanticReadbackPlan("ak.wwise.core.object.get", args={"waql": "from type SoundBank where name in <definition ShortName values>"}, options={"return": list(DEFAULT_SOUNDBANK_RETURN_FIELDS)}, description="read back SoundBank objects created from definition file ShortName values")
+        readbacks = tuple(_soundbank_name_readback(name) for name in soundbank_names)
         envelope = SemanticEnvelope(
             PROCESS_DEFINITION_FILES_URI,
             args=args,
@@ -333,17 +349,25 @@ class SoundBankBuilder:
                 "destructive_gate": _destructive_gate(high_risk=True),
                 "risk": "high",
                 "proof_policy": "reject call-success-only, empty mapping, and ak.wwise.file_error proof claims; require SoundBank readback tied to definition ShortName",
-                "expected_soundbank_names": list(_non_empty_strings("expected_soundbank_names", expected_soundbank_names)) if expected_soundbank_names else [],
+                "expected_soundbank_names": list(soundbank_names),
             },
         )
         return self._preview(
             envelope,
             validation_uri=PROCESS_DEFINITION_FILES_URI,
-            readback_plan=(readback,),
+            readback_plan=readbacks,
             requires_destructive_gate=True,
             evidence_extra=(
                 {"kind": "high-risk-guard", "rejects": ["empty-mapping", "ak.wwise.file_error", "call-success-only"]},
-                {"kind": "readback", "uri": "ak.wwise.core.object.get", "must_execute_after": PROCESS_DEFINITION_FILES_URI},
+                *tuple(
+                    {
+                        "kind": "readback",
+                        "uri": "ak.wwise.core.object.get",
+                        "expected_soundbank_name": name,
+                        "must_execute_after": PROCESS_DEFINITION_FILES_URI,
+                    }
+                    for name in soundbank_names
+                ),
                 {"kind": "cleanup-source-immutability", "requires_sandbox": True, "refuse_source_outputs": True},
             ),
         )
@@ -556,6 +580,37 @@ def _generate_inclusions(values: Sequence[Any]) -> list[str]:
             details={"inclusions": inclusions, "unsupported": list(unsupported), "supported": list(SUPPORTED_GENERATE_INCLUSIONS)},
         )
     return inclusions
+
+
+def _execution_result_evidence(uri: str, *, capture: str) -> dict[str, Any]:
+    """Describe evidence captured from the original dispatch, never a replay."""
+
+    return {
+        "source_uri": uri,
+        "capture": capture,
+        "source": "single-dispatch-result",
+        "replay_for_evidence": False,
+        "executable_readback": False,
+    }
+
+
+def _soundbank_name_readback(name: str) -> SemanticReadbackPlan:
+    """Build one executable, exact-name SoundBank readback."""
+
+    try:
+        literal = quote_waql_literal(name)
+    except ValueError as exc:
+        raise SemanticValidationError(
+            SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+            str(exc),
+            details={"expected_soundbank_name": name, "boundary": "packaged-waql-literal-evidence"},
+        ) from exc
+    return SemanticReadbackPlan(
+        "ak.wwise.core.object.get",
+        args={"waql": f"from type SoundBank where name = {literal}"},
+        options={"return": list(DEFAULT_SOUNDBANK_RETURN_FIELDS)},
+        description=f"read back the SoundBank whose definition ShortName is {name!r}",
+    )
 
 
 def _generate_artifact_plan(args: Mapping[str, Any], *, output_root_hint: str | Path) -> dict[str, Any]:

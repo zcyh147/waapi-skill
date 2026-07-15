@@ -3,60 +3,55 @@ from __future__ import annotations
 from pathlib import Path
 
 
-SKILL_MD = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill" / "SKILL.md"
+SKILL_ROOT = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
 
 
-def skill_text() -> str:
-    return SKILL_MD.read_text(encoding="utf-8")
+def doc_text(*relative_paths: str) -> str:
+    return "\n".join((SKILL_ROOT / path).read_text(encoding="utf-8") for path in relative_paths)
 
 
-def test_skill_contract_documents_runner_and_dispatcher() -> None:
-    text = skill_text()
+def test_skill_contract_documents_fixed_runner_and_versioned_runtime() -> None:
+    text = doc_text("SKILL.md")
 
-    assert "scripts/run.py" in text
-    assert "WwiseDispatcher" in text
-    assert "SubscriptionManager" in text
-    assert "resources/manifest/<version>/" in text
-    assert "resources/semantic/<version>/" in text
-    assert "resources/waql/<version>/" in text
-    assert "resources/deferred/<version>.json" in text
-    assert "references/semantic/<version>/" in text
+    for command in (
+        "python scripts/run.py gateway.py status",
+        "python scripts/run.py gateway.py buses",
+        "python scripts/run.py gateway.py selected",
+        "python scripts/run.py gateway.py query-object --type Event --take 100",
+        "python scripts/run.py gateway.py metadata types --summary-only",
+    ):
+        assert command in text
+    for resource in (
+        "resources/manifest/<version>/",
+        "resources/semantic/<version>/",
+        "resources/waql/<version>/",
+        "resources/deferred/<version>.json",
+    ):
+        assert resource in text
 
 
-def test_skill_contract_documents_inputs_outputs_and_safety() -> None:
-    text = skill_text()
+def test_skill_contract_documents_gateway_inputs_outputs_and_failure_boundary() -> None:
+    text = doc_text("SKILL.md", "references/waapi-query.md")
 
-    for required in ("api", "version", "args", "options", "timeout", "dry_run", "allow_destructive", "evidence_dir"):
+    for required in ("<uri>", "--args-json", "--options-json", "--timeout", "--dry-run", "--allow-destructive"):
         assert required in text
-    for required in ("project modification policy", "never", "preview_then_confirm", "allow_with_notice"):
+    for required in ("API_NOT_FOUND", "MANIFEST_NOT_FOUND", "TRANSACTION_REQUIRED", "unsupported_by_skill_interface"):
         assert required in text
-    for required in ("ok", "api", "version", "error_code", "message", "evidence_path"):
-        assert f'"{required}"' in text or f"`{required}`" in text
-    assert "blocked by default" in text
-    assert "Do not claim Windows validation has passed" in text
-    assert "Treat operations such as object deletion, object creation" in text
+    assert "There is no raw-client fallback" in text
 
 
-def test_skill_contract_stays_user_facing_and_local_resource_oriented() -> None:
-    text = skill_text()
+def test_skill_contract_prefers_fixed_live_query_before_discovery() -> None:
+    text = doc_text("SKILL.md")
 
-    assert "local packaged resources" in text
-    assert "large prompt-loaded 2025 reference files" in text
-    legacy_path = "resources/" + "coverage/<version>/"
-    assert legacy_path not in text
-
-
-def test_skill_contract_prefers_live_read_only_execution_before_research() -> None:
-    text = skill_text()
-
-    assert "When config and live WAAPI connection details are already known" in text
-    assert "execute the live read-only query first" in text
-    assert "Do not start by inspecting repository files or launching documentation research" in text
+    assert "run the matching gateway command immediately" in text
+    assert "before `ls`, `find`, `rg`" in text
+    assert "Do not scan unrelated ports or processes" in text
+    assert "Do not search the repository to recover from a gateway error" in text
 
 
 def test_skill_contract_requires_confirmation_before_retargeting_invalid_parent() -> None:
-    text = skill_text()
+    text = doc_text("references/waapi-operate.md")
 
-    assert "If a requested mutation target path is not a valid direct writable parent" in text
+    assert "not a valid direct writable parent" in text
     assert "do not silently retarget the mutation" in text
     assert "ask the user to confirm the intended writable child container" in text

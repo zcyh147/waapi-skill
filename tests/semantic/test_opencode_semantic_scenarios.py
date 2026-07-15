@@ -57,6 +57,98 @@ def test_phase3_required_scenarios_load_all_must_cover_cases() -> None:
     assert smoke_ids == {"phase3-readonly-bus-listing", "phase3-waql-master-mixer-ui-descendants"}
 
 
+def test_phase3_selected_object_scenario_set_contains_selection_query() -> None:
+    scenarios = scenarios_for_set("phase3-selected-object")
+
+    assert tuple(scenario.id for scenario in scenarios) == (
+        "phase3-selected-object-query",
+        "phase3-selected-object-path-type",
+        "phase3-selected-object-empty-clarity",
+    )
+
+
+def test_selected_object_query_verdict_accepts_live_selection_and_empty_selection() -> None:
+    scenario = _scenario("phase3-selected-object-query")
+
+    no_live_attempt = evaluate_scenario_output(
+        scenario,
+        "SEMANTIC_RESULT_JSON: "
+        + json.dumps(
+            {
+                "selection_query_attempted": False,
+                "mutation_executed": False,
+            }
+        ),
+    )
+    wrong_call = evaluate_scenario_output(
+        scenario,
+        "SEMANTIC_RESULT_JSON: "
+        + json.dumps(
+            {
+                "live_waapi_attempted": True,
+                "selection_query_attempted": True,
+                "waapi_calls": ["ak.wwise.core.object.get"],
+                "mutation_executed": False,
+            }
+        ),
+    )
+    selected_pass = evaluate_scenario_output(
+        scenario,
+        "SEMANTIC_RESULT_JSON: "
+        + json.dumps(
+            {
+                "live_waapi_attempted": True,
+                "selection_query_attempted": True,
+                "live_waapi_before_research": True,
+                "waapi_calls": ["ak.wwise.ui.getSelectedObjects", "ak.wwise.core.object.get"],
+                "selection_result_reported": True,
+                "selected_objects_count": 1,
+                "mutation_executed": False,
+            }
+        ),
+    )
+    empty_selection_pass = evaluate_scenario_output(
+        scenario,
+        "SEMANTIC_RESULT_JSON: "
+        + json.dumps(
+            {
+                "live_waapi_attempted": True,
+                "selection_query_attempted": True,
+                "live_waapi_before_research": True,
+                "waapi_calls": ["ak.wwise.ui.getSelectedObjects"],
+                "selection_result_reported": True,
+                "selected_objects_count": 0,
+                "selection_empty": True,
+                "mutation_executed": False,
+            }
+        ),
+    )
+    headless_boundary_pass = evaluate_scenario_output(
+        scenario,
+        "SEMANTIC_RESULT_JSON: "
+        + json.dumps(
+            {
+                "live_waapi_attempted": True,
+                "selection_query_attempted": True,
+                "live_waapi_before_research": True,
+                "waapi_calls": ["ak.wwise.ui.getSelectedObjects"],
+                "unsupported_boundary_returned": True,
+                "unsupported_boundary_reason": "Connected WAAPI endpoint is a command-line WwiseConsole instance, so ak.wwise.ui.getSelectedObjects is unavailable.",
+                "verification_status": "live_read_completed_selection_api_unavailable_on_command_line_instance",
+                "mutation_executed": False,
+            }
+        ),
+    )
+
+    assert no_live_attempt.verdict == "fail"
+    assert any("live WAAPI was not attempted" in note for note in no_live_attempt.failure_notes)
+    assert wrong_call.verdict == "fail"
+    assert any("getSelectedObjects" in note for note in wrong_call.failure_notes)
+    assert selected_pass.verdict == "pass"
+    assert empty_selection_pass.verdict == "pass"
+    assert headless_boundary_pass.verdict == "pass"
+
+
 def test_semantic_capability_scenarios_cover_required_families() -> None:
     scenarios = scenarios_for_set(SEMANTIC_CAPABILITY_SCENARIO_SET)
 

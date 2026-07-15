@@ -7,6 +7,7 @@ from enum import Enum
 from typing import Any, Mapping, Sequence
 
 from wwise_waapi.dispatcher import DEFAULT_WWISE_VERSION
+from wwise_waapi.waql import escape_waql_literal_content  # pyright: ignore[reportMissingImports]
 
 from .common import (
     BuilderContext,
@@ -569,7 +570,12 @@ def _created_object_readback(*, name: str, parent: str | int) -> tuple[SemanticR
     return (
         SemanticReadbackPlan(
             OBJECT_GET_URI,
-            args={"waql": f'from object "{_escape_waql(str(parent))}" transform select children where name = "{_escape_waql(name)}"'},
+            args={
+                "waql": (
+                    f'from object "{_escape_waql(str(parent))}" '
+                    f'select children where name = "{_escape_waql(name)}"'
+                )
+            },
             options={"return": list(DEFAULT_MUTATION_RETURN_FIELDS)},
             description="read back newly created child by resolved parent and name",
         ),
@@ -716,4 +722,11 @@ def _schema_error(message: str, **details: Any) -> SemanticValidationError:
 
 
 def _escape_waql(value: str) -> str:
-    return value.replace("\\", "\\\\").replace('"', '\\"')
+    try:
+        return escape_waql_literal_content(value)
+    except ValueError as exc:
+        raise _schema_error(
+            str(exc),
+            literal=value,
+            boundary="packaged-waql-literal-evidence",
+        ) from exc

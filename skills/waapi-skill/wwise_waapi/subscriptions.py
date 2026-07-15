@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import queue
 import threading
+import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Mapping, Protocol
 
 DEFAULT_WAIT_TIMEOUT = 5.0
 DEFAULT_QUEUE_SIZE = 1
@@ -218,8 +219,9 @@ class SubscriptionManager:
         timeout: float = DEFAULT_WAIT_TIMEOUT,
         options: dict[str, Any] | None = None,
         queue_size: int = DEFAULT_QUEUE_SIZE,
+        predicate: Callable[[SubscriptionEvent], bool] | None = None,
     ) -> SubscriptionEvent:
-        """Block for one topic event, bounded by ``timeout``, and always unsubscribe."""
+        """Block for one matching event, bounded by ``timeout``, and always unsubscribe."""
 
         if timeout < 0:
             raise ValueError("timeout must be non-negative")
@@ -228,13 +230,21 @@ class SubscriptionManager:
         def callback(*args: Any, **kwargs: Any) -> None:
             _put_bounded(event_queue, SubscriptionEvent(topic=topic, args=args, kwargs=dict(kwargs)))
 
+        # Subscription setup is part of the advertised timeout; starting the
+        # deadline afterward could wait ``setup + timeout`` wall-clock time.
+        deadline = time.monotonic() + timeout
         handle = self.subscribe(topic, callback=callback, options=options)
         if handle is None:
             raise SubscriptionUnavailable("A WAAPI client is required for bounded topic waits")
         try:
-            return event_queue.get(timeout=timeout)
-        except queue.Empty as exc:
-            raise SubscriptionTimeout(f"Timed out waiting {timeout:.3f}s for WAAPI topic {topic}") from exc
+            while True:
+                remaining = max(0.0, deadline - time.monotonic())
+                try:
+                    event = event_queue.get(timeout=remaining)
+                except queue.Empty as exc:
+                    raise SubscriptionTimeout(f"Timed out waiting {timeout:.3f}s for WAAPI topic {topic}") from exc
+                if predicate is None or predicate(event):
+                    return event
         finally:
             handle.unsubscribe()
 
@@ -302,3 +312,17 @@ def _put_bounded(event_queue: queue.Queue[SubscriptionEvent], event: Subscriptio
         event_queue.put_nowait(event)
     except queue.Full:
         pass
+
+
+def payload_matches(payload: Any, expected: Any) -> bool:
+    """Return whether ``payload`` recursively contains the expected JSON subset."""
+
+    if isinstance(expected, Mapping):
+        if not isinstance(payload, Mapping):
+            return False
+        return all(key in payload and payload_matches(payload[key], value) for key, value in expected.items())
+    if isinstance(expected, list):
+        if not isinstance(payload, (list, tuple)) or len(payload) != len(expected):
+            return False
+        return all(payload_matches(actual, wanted) for actual, wanted in zip(payload, expected))
+    return payload == expected

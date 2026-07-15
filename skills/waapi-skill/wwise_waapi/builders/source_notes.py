@@ -67,6 +67,10 @@ EXPECTED_SOURCE_NOTE_URI_INVENTORY: dict[str, tuple[str, ...]] = {
         "ak.wwise.core.switchContainer.assignmentRemoved",
     ),
 }
+VERSION_SPECIFIC_SOURCE_NOTE_URI_ADDITIONS: dict[str, dict[str, tuple[str, ...]]] = {
+    "2024.1": {BuilderFamily.PROPERTY_REFERENCE.value: ("ak.wwise.core.object.isLinked",)},
+    "2025.1": {BuilderFamily.PROPERTY_REFERENCE.value: ("ak.wwise.core.object.isLinked",)},
+}
 
 REQUIRED_SOURCE_NOTE_FIELDS = (
     "family",
@@ -249,7 +253,9 @@ def source_note_uri_inventory(resource_path: Path = DEFAULT_SEMANTIC_SOURCE_NOTE
     inventory: dict[str, tuple[str, ...]] = {}
     for family in expected:
         endpoints = _string_tuple(resource.notes[family].get("endpoints"))
-        expected_endpoints = EXPECTED_SOURCE_NOTE_URI_INVENTORY[family]
+        expected_endpoints = EXPECTED_SOURCE_NOTE_URI_INVENTORY[family] + VERSION_SPECIFIC_SOURCE_NOTE_URI_ADDITIONS.get(
+            resource.version, {}
+        ).get(family, ())
         if not endpoints or len(endpoints) != len(set(endpoints)) or endpoints != expected_endpoints:
             raise SemanticValidationError(
                 SemanticErrorCode.SOURCE_NOTE_INCOMPLETE,
@@ -315,4 +321,3 @@ def _string_tuple(value: Any) -> tuple[str, ...]:
     if not isinstance(value, list):
         return ()
     return tuple(item for item in value if isinstance(item, str) and item.strip())
-

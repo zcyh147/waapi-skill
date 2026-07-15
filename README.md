@@ -2,7 +2,7 @@
 
 # Wwise WAAPI Skill
 
-Use this skill to automate **Wwise Authoring through WAAPI** with a version-aware, Python-first workflow.
+Use this skill to automate **Wwise Authoring through WAAPI** with a version-aware, gateway-first workflow.
 
 It is designed for **any local agent or tool runner** that can load a skill directory plus helper scripts. It is not tied to a specific coding assistant, and it does not depend on a separate MCP server.
 
@@ -13,12 +13,12 @@ It is designed for **any local agent or tool runner** that can load a skill dire
 This skill helps an agent work with Wwise safely and efficiently when the task involves:
 
 - querying Wwise objects and project state
-- building WAAPI requests from structured intent instead of ad hoc payload guessing
+- routing structured intent through packaged gateway commands instead of ad hoc payload guessing
 - handling multiple Wwise versions with version-scoped resources
 - previewing project-changing operations before execution
 - validating behavior with real tests instead of documentation-only claims
 
-In practice, it gives an agent a **skill-local WAAPI toolchain**: a runner, versioned manifests, semantic builders, dispatcher helpers, bounded subscriptions, and safety rules.
+In practice, it gives an agent a **skill-local WAAPI interface**: a runner, one packaged gateway, versioned manifests, bounded topic waits, closed transaction operations, and safety rules.
 
 ## Why this skill exists
 
@@ -71,7 +71,7 @@ The skill supports:
 
 - read-only first paths for ordinary inspection
 - preview-then-confirm mutation flow
-- preview hash confirmation for semantic plans
+- preview artifact hash confirmation for closed transactions
 - bounded destructive opt-in
 - post-action verification and readback
 
@@ -130,14 +130,14 @@ Choose a Wwise MCP server when you specifically need:
 
 The skill uses reflected manifests and versioned semantic notes so an agent can operate against the correct WAAPI surface without pretending all versions behave identically.
 
-### Semantic planner + dispatcher model
+### Packaged gateway execution model
 
 The normal flow is:
 
 1. detect or select the Wwise version
-2. extract structured semantic intent
-3. build a semantic preview or direct read-only plan
-4. dispatch safely through the validated WAAPI layer
+2. choose the fixed packaged gateway route for that intent
+3. run a direct read-only command or create an immutable mutation preview
+4. confirm and execute only through the closed transaction route
 5. verify the result
 
 ### Read-first behavior for safe inspection
@@ -146,7 +146,7 @@ When config and connection details are already known, ordinary inspection reques
 
 ### Bounded topic handling
 
-Topic waits are supported with explicit bounded behavior instead of loose long-lived listener assumptions.
+Topic waits are supported with explicit bounded behavior instead of loose long-lived listener assumptions. The command timeout is an end-to-end budget, so the event wait reserves a small part of it for unsubscribe, evidence publication, and transport close. A successful `wait-topic` result exposes the validated WAAPI publish payload directly under `event`, while the dispatcher-only callback envelope remains private. Do not match `object.created` by the requested final name: the notification is emitted before naming completes. For the packaged ActorMixer probe, Wwise 2021.1-2024.1 reports `ActorMixer` at notification time and Wwise 2025.1 reports its underlying `PropertyContainer`; correlate the returned object GUID with a trusted publisher when exact event ownership matters.
 
 ### Explicit unsupported boundaries
 
@@ -171,13 +171,23 @@ python scripts/run.py --help
 python scripts/run.py setup_environment.py
 ```
 
+The runner accepts only the packaged `gateway.py` and `setup_environment.py` entry points. Unknown, absolute, traversing, or symlinked script targets are rejected even if a helper file exists locally.
+
 ### 2. Configure version and WAAPI endpoint
 
-The persisted config lives at:
+Normal persisted config lives outside the installed Skill. The gateway resolves
+the first applicable path in this order:
 
 ```text
-skills/waapi-skill/data/config.json
+$WAAPI_SKILL_CONFIG_PATH
+$XDG_CONFIG_HOME/waapi-skill/config.json
+$HOME/.config/waapi-skill/config.json
 ```
+
+Inspect or change it through `gateway.py config-show` and `gateway.py
+config-set`; do not hand-edit it. `skills/waapi-skill/data/config.json` is only
+a read-only legacy fallback when no external config exists, and is never the
+normal write target.
 
 Public persisted fields are intentionally small:
 
@@ -186,27 +196,33 @@ Public persisted fields are intentionally small:
 - `waapi_port`
 - `project_modification_policy`
 
-### 3. Use the skill-local runner
+### 3. Run read-only work through the gateway
 
-Typical low-level example:
+Check the live version/project and query objects without composing WAAPI code:
 
-```python
-from wwise_waapi import WwiseDispatcher
-
-result = WwiseDispatcher(client=waapi_client).dispatch(
-    "ak.wwise.core.getInfo",
-    version="2025.1",
-    args={},
-    options={},
-    timeout=10.0,
-    dry_run=False,
-    allow_destructive=False,
-)
+```bash
+python scripts/run.py gateway.py status
+python scripts/run.py gateway.py query-object \
+  --path '\Events\Default Work Unit' \
+  --return-field id --return-field name --return-field type --return-field path
 ```
 
-### 4. Prefer semantic planning for non-trivial work
+### 4. Use the closed transaction lane for project changes
 
-For authoring, imports, soundbanks, switch assignments, or structured multi-step tasks, use the semantic planner path instead of hand-writing raw WAAPI payloads from scratch.
+Inspect the packaged request contract first. `preview` returns the transaction id and artifact hash that must be reused unchanged by the remaining commands:
+
+```bash
+python scripts/run.py gateway.py operation-schema object.setNotes
+python scripts/run.py gateway.py preview \
+  --request-json '{"contract":"waapi-skill.operation-request/v1","operation":"object.setNotes","arguments":{"object":{"kind":"path","value":"\\Events\\Default Work Unit\\Target"},"value":"Reviewed"}}'
+python scripts/run.py gateway.py confirm <transaction-id> --artifact-hash <artifact-hash>
+python scripts/run.py gateway.py execute <transaction-id>
+python scripts/run.py gateway.py verify <transaction-id>
+```
+
+The gateway is the public interface. Do not import internal runtime modules, construct a `WaapiClient`, create a one-off helper script, or use inline Python to complete a Wwise task. If the gateway reports no packaged route, return that unsupported boundary instead of synthesizing code.
+
+Manifest reflection is discovery, not permission. The generic `call` route exposes only the two zero-input, strictly validated reflection lists (`ak.wwise.waapi.getFunctions` and `ak.wwise.waapi.getTopics`). Other reads require a dedicated bounded command; fixed commands and topic waits are exposed only for exact URIs in immutable reviewed allowlists. New or unreviewed functions and topics fail closed regardless of names such as `get`, `verify`, or `dump`; `--dry-run` cannot bypass a fixed, transaction, topic, or unsupported route boundary.
 
 ---
 
@@ -214,8 +230,9 @@ For authoring, imports, soundbanks, switch assignments, or structured multi-step
 
 - destructive operations are blocked by default
 - project-changing steps should be previewed before execution
-- confirmation must match the active preview artifact for semantic plans
+- confirmation must match the active immutable preview artifact
 - unsupported runtime boundaries should fail clearly, not pretend to execute
+- reflected functions and topics require an explicit reviewed public route
 - evidence, runtime data, and local auth state should stay local unless explicitly promoted
 
 This skill is optimized for **honest boundaries and reproducible behavior**, not for “always say yes.”
@@ -256,9 +273,10 @@ Important paths:
 
 - `skills/waapi-skill/SKILL.md` — the skill contract
 - `skills/waapi-skill/scripts/run.py` — skill-local runner
-- `skills/waapi-skill/wwise_waapi/dispatcher.py` — validated WAAPI dispatch
-- `skills/waapi-skill/wwise_waapi/semantic_planner.py` — structured semantic planning
-- `skills/waapi-skill/wwise_waapi/builders/` — preview-oriented builders
+- `skills/waapi-skill/scripts/gateway.py` — the public packaged WAAPI interface
+- `skills/waapi-skill/references/` — lane-specific gateway guidance loaded on demand
+- `skills/waapi-skill/wwise_waapi/capabilities.py` — offline public-route catalog
+- `skills/waapi-skill/wwise_waapi/operation_registry.py` — closed transaction operations and explicit boundaries
 - `skills/waapi-skill/resources/manifest/<version>/` — reflected versioned manifests
 - `skills/waapi-skill/resources/semantic/<version>/` — semantic source-note resources
 - `skills/waapi-skill/resources/waql/<version>/` — WAQL guidance resources
@@ -284,7 +302,7 @@ Use it when the task mentions:
 
 ### Is this tied to one coding agent?
 
-No. It is written as a local skill package with Python helpers and markdown guidance. Any local agent workflow that can load and follow a skill directory can use it.
+No. It is written as a local skill package with a packaged runner/gateway and markdown guidance. Any local agent workflow that can load and follow a skill directory can use it.
 
 ### Is this an MCP server?
 
@@ -308,7 +326,7 @@ Its strengths are:
 
 - **on-demand loading**
 - **multi-version support**
-- **structured semantic planning**
+- **closed, agent-executable gateway routes**
 - **safer mutation flow**
 - **strong validation coverage**
 

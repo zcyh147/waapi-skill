@@ -47,12 +47,18 @@ def assert_import_preview(preview: Any, uri: str, args: dict[str, Any]) -> None:
     assert preview.to_dispatcher_request().dry_run is True
     assert preview.envelope.metadata["builder_family"] == BuilderFamily.IMPORT.value
     assert preview.envelope.metadata["schema_validation"]["uri"] == uri
-    assert preview.readback_plan[0].uri == uri
-    assert preview.readback_plan[1].uri == "ak.wwise.core.object.get"
+    assert preview.readback_plan == ()
+    binding = preview.envelope.metadata["execution_result_readback_binding"]
+    assert binding["source"] == {"uri": uri, "result_path": "objects[].id"}
+    assert binding["target"]["uri"] == "ak.wwise.core.object.get"
+    assert binding["target"]["argument_path"] == "args.from.id[0]"
+    assert binding["fan_out"] == {"mode": "one-call-per-value", "value_contract": "wwise-guid"}
+    assert binding["requires_source_result"] is True
+    assert binding["executable_before_binding"] is False
     assert [plan["kind"] for plan in preview.as_dict()["evidence_plan"]] == [
         "source-note",
         "schema",
-        "created-object-readback",
+        "execution-result-readback-binding",
         "cleanup-source-immutability",
         "artifact-evidence",
     ]
@@ -130,6 +136,87 @@ def test_audio_import_envelope_supports_base64_source_and_mapping_items() -> Non
     )
 
 
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("method", ("audio_import", "import_tab_delimited"))
+def test_import_builders_emit_explicit_false_for_supported_auto_checkout_versions(version: str, method: str) -> None:
+    versioned_builder = ImportBuilder(version=version, source_note_checker=FakeSourceNoteChecker())
+
+    if method == "audio_import":
+        preview = versioned_builder.audio_import(
+            [ImportItem(object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\<Sound>CheckedOut")],
+            auto_check_out_to_source_control=False,
+        )
+    else:
+        preview = versioned_builder.import_tab_delimited(
+            import_location=None,
+            import_language="SFX",
+            import_operation="createNew",
+            import_file="/tmp/import.tsv",
+            auto_check_out_to_source_control=False,
+        )
+
+    assert preview.envelope.args["autoCheckOutToSourceControl"] is False
+    assert preview.envelope.metadata["schema_validation"]["version"] == version
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1"))
+@pytest.mark.parametrize("method", ("audio_import", "import_tab_delimited"))
+def test_import_builders_reject_auto_checkout_when_version_manifest_does_not_support_it(version: str, method: str) -> None:
+    versioned_builder = ImportBuilder(version=version, source_note_checker=FakeSourceNoteChecker())
+
+    with pytest.raises(SemanticValidationError) as exc:
+        if method == "audio_import":
+            versioned_builder.audio_import(
+                [ImportItem(object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\<Sound>UnsupportedCheckout")],
+                auto_check_out_to_source_control=False,
+            )
+        else:
+            versioned_builder.import_tab_delimited(
+                import_location=None,
+                import_language="SFX",
+                import_operation="createNew",
+                import_file="/tmp/import.tsv",
+                auto_check_out_to_source_control=False,
+            )
+
+    assert exc.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+    assert exc.value.details["unknown_fields"] == ["autoCheckOutToSourceControl"]
+    assert exc.value.details["version"] == version
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_import_builders_omit_auto_checkout_when_not_requested(version: str) -> None:
+    versioned_builder = ImportBuilder(version=version, source_note_checker=FakeSourceNoteChecker())
+    audio_preview = versioned_builder.audio_import(
+        [ImportItem(object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\<Sound>DefaultCheckout")]
+    )
+    tab_preview = versioned_builder.import_tab_delimited(
+        import_location=None,
+        import_language="SFX",
+        import_operation="createNew",
+        import_file="/tmp/import.tsv",
+    )
+
+    assert "autoCheckOutToSourceControl" not in audio_preview.envelope.args
+    assert "autoCheckOutToSourceControl" not in tab_preview.envelope.args
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_import_readback_is_never_an_unbound_pseudo_call_or_destructive_replay(version: str) -> None:
+    preview = ImportBuilder(version=version, source_note_checker=FakeSourceNoteChecker()).audio_import(
+        [ImportItem(object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\<Sound>DeferredReadback")]
+    )
+
+    assert preview.readback_plan == ()
+    binding = preview.evidence_plan[2]
+    assert binding["kind"] == "execution-result-readback-binding"
+    assert binding["source"]["result_path"] == "objects[].id"
+    assert binding["target"]["uri"] == "ak.wwise.core.object.get"
+    assert binding["fan_out"]["mode"] == "one-call-per-value"
+    assert binding["executable_before_binding"] is False
+    assert "<imported object ids" not in str(preview.as_dict())
+
+
 def test_object_path_builder_is_deterministic_and_rejects_ambiguous_segments() -> None:
     assert build_object_path("Actor-Mixer Hierarchy", "Default Work Unit", ("Sound", "Tone")) == r"\Actor-Mixer Hierarchy\Default Work Unit\<Sound>Tone"
     assert build_object_path(r"\Actor-Mixer Hierarchy\Default Work Unit") == r"\Actor-Mixer Hierarchy\Default Work Unit"
@@ -200,6 +287,7 @@ def test_audio_imported_topic_expectation_validates_options() -> None:
     assert preview.dispatch_payload() == {"uri": AUDIO_IMPORTED_TOPIC_URI, "args": {}, "options": {"return": ["id", "name"]}}
     assert preview.requires_destructive_gate is True
     assert preview.envelope.metadata["return_expectation"]["shape"] == "topic-payload-with-objects-array"
+    assert preview.readback_plan == ()
     assert checker.calls == [(BuilderFamily.IMPORT.value, "2022.1")]
 
     alias = expect_audio_imported_topic(return_fields=("id",))

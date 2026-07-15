@@ -6,6 +6,7 @@ from typing import Any, Mapping
 
 from wwise_waapi.dispatcher import WwiseDispatcher  # pyright: ignore[reportMissingImports]
 from wwise_waapi.manifest import ManifestStore  # pyright: ignore[reportMissingImports]
+from wwise_waapi.safety import requires_destructive_gate  # pyright: ignore[reportMissingImports]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -44,15 +45,21 @@ def test_every_non_deferred_api_routes_with_fake_runtime() -> None:
     )
 
     assert non_deferred, "No fake-route APIs were generated"
+    expected_calls: list[str] = []
     for entry in non_deferred:
         result = dispatcher.dispatch(entry["uri"], timeout=0.25)
-        assert result["ok"] is True, entry["uri"]
+        if requires_destructive_gate(entry["uri"], "function", entry["category"]):
+            assert result["ok"] is False, entry["uri"]
+            assert result["error_code"] == "DESTRUCTIVE_BLOCKED"
+        else:
+            assert result["ok"] is True, entry["uri"]
+            expected_calls.append(entry["uri"])
         assert result["api"] == entry["uri"]
         assert result["item_type"] == "function"
         assert result["category"] == entry["category"]
         assert result["risk_level"] == entry["risk_level"]
 
-    assert [call[0] for call in client.calls] == [entry["uri"] for entry in non_deferred]
+    assert [call[0] for call in client.calls] == expected_calls
     assert subscriptions.waits == []
 
 

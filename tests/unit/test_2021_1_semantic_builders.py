@@ -114,7 +114,8 @@ def test_2021_import_helper_accepts_version_and_requires_mutation_evidence() -> 
 
     assert_2021_preview(preview, family=BuilderFamily.IMPORT, uri=AUDIO_IMPORT_URI, destructive=True)
     assert preview.envelope.metadata["destructive_behavior"].startswith("preview-only")
-    assert [plan.uri for plan in preview.readback_plan] == [AUDIO_IMPORT_URI, "ak.wwise.core.object.get"]
+    assert preview.readback_plan == ()
+    assert preview.envelope.metadata["execution_result_readback_binding"]["source"]["result_path"] == "objects[].id"
 
 
 def test_2021_soundbank_helper_accepts_version_and_defers_absent_uris() -> None:

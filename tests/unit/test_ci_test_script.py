@@ -103,6 +103,8 @@ def test_ci_test_all_runs_nonlive_before_matrix(tmp_path: Path) -> None:
     assert len(calls) == 11
     assert _pytest_argv(calls[0]) == ["-m", "pytest", "-m", "not live and not destructive", "-q", "-ra"]
     assert _pytest_argv(calls[1])[0:4] == ["-m", "pytest", "tests/live/test_2021_1_live_prerequisites.py::test_2021_1_live_read_only_prerequisites_validate_exact_get_info_before_matrix", "tests/live/test_2021_1_reflection_prerequisites.py::test_2021_1_live_reflection_prerequisites_and_resource_generation"]
+    assert "tests/destructive/test_gateway_transaction_matrix.py" in _pytest_argv(calls[2])
+    assert "tests/destructive/test_gateway_workflow_transaction_matrix.py" in _pytest_argv(calls[2])
     assert _pytest_argv(calls[3])[0:4] == ["-m", "pytest", "tests/live/test_2022_live_prerequisites.py::test_2022_live_environment_prerequisites_fail_fast", "tests/live/test_2022_reflection_inventory.py::test_2022_live_reflection_inventory_runs_against_sandbox"]
 
 

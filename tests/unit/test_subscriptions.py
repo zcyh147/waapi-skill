@@ -16,6 +16,7 @@ from wwise_waapi.subscriptions import (  # pyright: ignore[reportMissingImports]
     SubscriptionTimeout,
     SubscriptionUnavailable,
     _put_bounded,
+    payload_matches,
 )
 
 
@@ -128,6 +129,65 @@ def test_wait_for_event_timeout_unsubscribes_once() -> None:
     assert client.unsubscribe_calls == 1
     assert len(client.handlers) == 0
     assert manager.active_topics == set()
+
+
+def test_wait_for_event_timeout_includes_subscription_setup_time() -> None:
+    class SlowSubscribeClient(FakeSubscriptionClient):
+        def subscribe(
+            self,
+            uri: str,
+            callback_or_handler: Callable[..., None] | None = None,
+            *args: Any,
+            **kwargs: Any,
+        ) -> FakeEventHandler | None:
+            time.sleep(0.03)
+            return super().subscribe(uri, callback_or_handler, *args, **kwargs)
+
+    client = SlowSubscribeClient()
+    manager = SubscriptionManager(client)
+    started_at = time.monotonic()
+
+    with pytest.raises(SubscriptionTimeout, match="Timed out"):
+        manager.wait_for_event("ak.never", timeout=0.04)
+
+    assert time.monotonic() - started_at < 0.065
+    assert client.unsubscribe_calls == 1
+    assert manager.active_topics == set()
+
+
+def test_wait_for_event_ignores_nonmatching_payload_then_returns_match() -> None:
+    client = FakeSubscriptionClient()
+    manager = SubscriptionManager(client)
+
+    def publish() -> None:
+        while not client.handlers:
+            time.sleep(0.001)
+        handler = client.handlers[0]
+        handler.emit({"object": {"id": "wrong"}, "kind": "created"})
+        handler.emit({"object": {"id": "wanted", "name": "UI"}, "kind": "created"})
+
+    publisher = threading.Thread(target=publish)
+    publisher.start()
+    event = manager.wait_for_event(
+        "ak.wwise.core.object.created",
+        timeout=0.5,
+        queue_size=4,
+        predicate=lambda item: payload_matches(item.payload, {"object": {"id": "wanted"}}),
+    )
+    publisher.join(0.5)
+
+    assert event.payload["object"]["name"] == "UI"
+    assert client.unsubscribe_calls == 1
+    assert manager.active_topics == set()
+
+
+def test_payload_match_uses_recursive_mapping_subset_and_exact_arrays() -> None:
+    payload = {"object": {"id": "wanted", "path": "\\Events\\UI"}, "values": [1, {"ok": True}]}
+
+    assert payload_matches(payload, {"object": {"id": "wanted"}}) is True
+    assert payload_matches(payload, {"object": {"id": "other"}}) is False
+    assert payload_matches(payload, {"values": [1, {"ok": True}]}) is True
+    assert payload_matches(payload, {"values": [1]}) is False
 
 
 def test_wait_for_event_callback_only_hands_off_to_queue_not_client() -> None:

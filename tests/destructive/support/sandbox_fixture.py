@@ -239,21 +239,46 @@ def launch_sandboxed_wwise(
         ready_started = time.perf_counter()
         lifecycle.run_until_ready()
         ready_duration = time.perf_counter() - ready_started
+        ready_info = require_lifecycle_ready_proof(lifecycle)
+        sandbox.metadata.selected_port = lifecycle.port
+        sandbox.metadata.command = list(lifecycle.command)
+        sandbox.metadata.process_pid = getattr(lifecycle.process, "pid", None)
+        sandbox.metadata.wine_prefix_path = str(sandbox.wine_prefix_path)
+        sandbox.metadata.launch_project_path = str(sandbox.sandbox_project)
+        sandbox.metadata.ready_duration_seconds = ready_duration
+        sandbox.metadata.get_info_version = dict(ready_info["version"])
+        sandbox.metadata.get_info_display_name = _get_info_display_name(ready_info)
+        sandbox.metadata.identity_verified = verify_project_identity(sandbox)
+        return lifecycle
+    except BaseException:
+        process_pid_before_cleanup = getattr(lifecycle.process, "pid", None)
+        cleanup_error: BaseException | None = None
         try:
-            ready_info = require_lifecycle_ready_proof(lifecycle)
-            sandbox.metadata.selected_port = lifecycle.port
-            sandbox.metadata.command = list(lifecycle.command)
-            sandbox.metadata.process_pid = getattr(lifecycle.process, "pid", None)
-            sandbox.metadata.wine_prefix_path = str(sandbox.wine_prefix_path)
-            sandbox.metadata.launch_project_path = str(sandbox.sandbox_project)
-            sandbox.metadata.ready_duration_seconds = ready_duration
-            sandbox.metadata.get_info_version = dict(ready_info["version"])
-            sandbox.metadata.get_info_display_name = _get_info_display_name(ready_info)
-            sandbox.metadata.identity_verified = verify_project_identity(sandbox)
-            return lifecycle
-        except BaseException:
             lifecycle.shutdown(suppress_errors=True)
-            raise
+        except BaseException as exc:
+            # Preserve the launch/readiness failure even if best-effort cleanup
+            # unexpectedly fails despite suppress_errors=True.
+            cleanup_error = exc
+        cleanup_report = lifecycle.cleanup_report
+        sandbox.metadata.selected_port = lifecycle.port
+        sandbox.metadata.command = list(lifecycle.command)
+        sandbox.metadata.process_pid = (
+            cleanup_report.launch_pid
+            if cleanup_report is not None and cleanup_report.launch_pid is not None
+            else process_pid_before_cleanup
+        )
+        sandbox.metadata.wine_prefix_path = str(sandbox.wine_prefix_path)
+        sandbox.metadata.launch_project_path = str(sandbox.sandbox_project)
+        sandbox.metadata.process_cleanup_details = asdict(cleanup_report) if cleanup_report is not None else None
+        if cleanup_error is not None:
+            sandbox.metadata.process_cleanup_result = (
+                f"error:{type(cleanup_error).__name__}:{cleanup_error}"
+            )
+        else:
+            sandbox.metadata.process_cleanup_result = (
+                "cleaned" if cleanup_report is not None and cleanup_report.is_clean else "residual-processes"
+            )
+        raise
     finally:
         sandbox.write_metadata()
 

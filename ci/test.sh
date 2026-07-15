@@ -432,30 +432,35 @@ run_live_for_version() {
         tests/live/test_2021_1_live_prerequisites.py::test_2021_1_live_read_only_prerequisites_validate_exact_get_info_before_matrix \
         tests/live/test_2021_1_reflection_prerequisites.py::test_2021_1_live_reflection_prerequisites_and_resource_generation \
         tests/live/test_2021_1_object_get_matrix.py::test_2021_1_live_waql_object_get_matrix_runs_read_only_against_sandbox \
-        tests/live/test_2021_1_object_topics_sandbox.py::test_2021_1_live_safe_object_topics_against_sandbox
+        tests/live/test_2021_1_object_topics_sandbox.py::test_2021_1_live_safe_object_topics_against_sandbox \
+        tests/live/test_gateway_live_matrix.py::test_gateway_read_only_matrix_runs_once_against_copied_sandbox
       ;;
     2022.1)
       run_pytest \
         tests/live/test_2022_live_prerequisites.py::test_2022_live_environment_prerequisites_fail_fast \
         tests/live/test_2022_reflection_inventory.py::test_2022_live_reflection_inventory_runs_against_sandbox \
-        tests/live/test_2022_waql_live_matrix.py::test_2022_live_waql_object_get_matrix_runs_read_only_against_sandbox
+        tests/live/test_2022_waql_live_matrix.py::test_2022_live_waql_object_get_matrix_runs_read_only_against_sandbox \
+        tests/live/test_gateway_live_matrix.py::test_gateway_read_only_matrix_runs_once_against_copied_sandbox
       ;;
     2023.1)
       run_pytest \
         tests/live/test_2023_reflection_inventory.py::test_2023_live_reflection_inventory_runs_against_sandbox \
-        tests/live/test_2023_waql_live_matrix.py::test_2023_live_waql_object_get_matrix_runs_read_only_against_sandbox
+        tests/live/test_2023_waql_live_matrix.py::test_2023_live_waql_object_get_matrix_runs_read_only_against_sandbox \
+        tests/live/test_gateway_live_matrix.py::test_gateway_read_only_matrix_runs_once_against_copied_sandbox
       ;;
     2024.1)
       run_pytest \
         tests/live/test_2024_reflection_inventory.py::test_2024_live_reflection_inventory_runs_against_sandbox \
         tests/live/test_2024_waql_live_matrix.py::test_2024_live_waql_object_get_matrix_runs_read_only_against_sandbox \
-        tests/live/test_2024_object_topics_sandbox.py::test_2024_1_live_safe_object_topics_against_sandbox
+        tests/live/test_2024_object_topics_sandbox.py::test_2024_1_live_safe_object_topics_against_sandbox \
+        tests/live/test_gateway_live_matrix.py::test_gateway_read_only_matrix_runs_once_against_copied_sandbox
       ;;
     2025.1)
       run_pytest \
         tests/live/test_2025_1_reflection_inventory.py::test_2025_live_reflection_inventory_runs_against_sandbox \
         tests/live/test_2025_1_waql_live_matrix.py::test_2025_live_waql_object_get_matrix_runs_read_only_against_sandbox \
-        tests/live/test_2025_1_object_topics_sandbox.py::test_2025_1_live_safe_object_topics_against_sandbox
+        tests/live/test_2025_1_object_topics_sandbox.py::test_2025_1_live_safe_object_topics_against_sandbox \
+        tests/live/test_gateway_live_matrix.py::test_gateway_read_only_matrix_runs_once_against_copied_sandbox
       ;;
     *)
       echo "Unsupported live version: $v" >&2
@@ -476,31 +481,41 @@ run_destructive_for_version() {
       run_pytest \
         tests/destructive/test_2021_1_project_mutation_sandbox.py \
         tests/destructive/test_2021_1_soundbank_audio_sandbox.py \
-        tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py
+        tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py \
+        tests/destructive/test_gateway_transaction_matrix.py \
+        tests/destructive/test_gateway_workflow_transaction_matrix.py
       ;;
     2022.1)
       run_pytest \
         tests/destructive/test_2022_project_mutation_sandbox.py \
         tests/destructive/test_2022_soundbank_audio_sandbox.py \
-        tests/destructive/test_2022_switchcontainer_assignment_sandbox.py
+        tests/destructive/test_2022_switchcontainer_assignment_sandbox.py \
+        tests/destructive/test_gateway_transaction_matrix.py \
+        tests/destructive/test_gateway_workflow_transaction_matrix.py
       ;;
     2023.1)
       run_pytest \
         tests/destructive/test_2023_project_mutation_sandbox.py \
         tests/destructive/test_2023_soundbank_audio_sandbox.py \
-        tests/destructive/test_2023_switchcontainer_assignment_sandbox.py
+        tests/destructive/test_2023_switchcontainer_assignment_sandbox.py \
+        tests/destructive/test_gateway_transaction_matrix.py \
+        tests/destructive/test_gateway_workflow_transaction_matrix.py
       ;;
     2024.1)
       run_pytest \
         tests/destructive/test_2024_project_mutation_sandbox.py \
         tests/destructive/test_2024_soundbank_audio_sandbox.py \
-        tests/destructive/test_2024_switchcontainer_assignment_sandbox.py
+        tests/destructive/test_2024_switchcontainer_assignment_sandbox.py \
+        tests/destructive/test_gateway_transaction_matrix.py \
+        tests/destructive/test_gateway_workflow_transaction_matrix.py
       ;;
     2025.1)
       run_pytest \
         tests/destructive/test_2025_1_project_mutation_sandbox.py \
         tests/destructive/test_2025_1_soundbank_audio_sandbox.py \
-        tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py
+        tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py \
+        tests/destructive/test_gateway_transaction_matrix.py \
+        tests/destructive/test_gateway_workflow_transaction_matrix.py
       ;;
     *)
       echo "Unsupported destructive version: $v" >&2

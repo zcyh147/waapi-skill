@@ -109,7 +109,8 @@ def test_2023_import_helper_accepts_version_and_requires_mutation_evidence() -> 
 
     assert_2023_preview(preview, family=BuilderFamily.IMPORT, uri=AUDIO_IMPORT_URI, destructive=True)
     assert preview.envelope.metadata["destructive_behavior"].startswith("preview-only")
-    assert [plan.uri for plan in preview.readback_plan] == [AUDIO_IMPORT_URI, "ak.wwise.core.object.get"]
+    assert preview.readback_plan == ()
+    assert preview.envelope.metadata["execution_result_readback_binding"]["source"]["result_path"] == "objects[].id"
     assert_destructive_evidence(preview)
 
 
@@ -125,7 +126,8 @@ def test_2023_soundbank_helper_accepts_version_and_keeps_artifact_evidence_only(
     assert_2023_preview(preview, family=BuilderFamily.SOUNDBANK, uri=GENERATE_URI, destructive=True)
     assert preview.envelope.metadata["destructive_gate"]["required"] is True
     assert preview.envelope.metadata["artifact_evidence_plan"]["writes_files_by_preview"] is False
-    assert preview.evidence_plan[3]["hidden_subscription"] is False
+    assert preview.readback_plan == ()
+    assert preview.evidence_plan[4]["hidden_subscription"] is False
     assert_destructive_evidence(preview)
 
 

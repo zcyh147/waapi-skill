@@ -52,6 +52,7 @@ SUMMARY_SEMANTIC_CAPABILITY_ALL_PATH = REPO_ROOT / ".sisyphus" / "evidence" / "t
 SUMMARY_SEMANTIC_CAPABILITY_BOUNDARY_PATH = REPO_ROOT / ".sisyphus" / "evidence" / "task-semantic-capability-boundary-all-versions.json"
 DEFAULT_ARCHIVE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "waapi-opencode-semantic-runs"
 DEFAULT_WORKSPACE = Path("/Users/xiye/Documents/Git/waapi_skill_test")
+PHASE3_SELECTED_OBJECT_SET = "phase3-selected-object"
 SUMMARY_2022_FILENAME = SUMMARY_2022_PATH.name
 SUMMARY_MULTIVERSION_FILENAME = SUMMARY_MULTIVERSION_PATH.name
 SUMMARY_SEMANTIC_CAPABILITY_REQUIRED_FILENAME = SUMMARY_SEMANTIC_CAPABILITY_REQUIRED_PATH.name
@@ -784,6 +785,19 @@ def _scenario_live_directive(scenario: SemanticScenario, *, semantic_object_name
             "- After that live read completes, immediately provide the final answer and SEMANTIC_RESULT_JSON; "
             "do not wait on background research."
         )
+    if scenario.family == "selected_object_query":
+        return (
+            "\n\nSELECTED-OBJECT QUERY CONSTRAINTS:\n"
+            "- Do not spawn research, explore, librarian, or documentation subagents for this scenario.\n"
+            "- Do not inspect repository/source/docs before the live WAAPI read.\n"
+            "- Perform the live read-only ak.wwise.ui.getSelectedObjects call first using the provided host and port.\n"
+            "- If objects are selected, report the selected object rows clearly.\n"
+            "- If no objects are selected, report that explicit empty-selection result rather than treating it as failure.\n"
+            "- You may enrich the result with a follow-up read-only object lookup when needed, but do not mutate anything.\n"
+            "- Immediately provide the final answer and SEMANTIC_RESULT_JSON after the live read; do not wait on background research.\n"
+            "- Set selection_query_attempted=true only if the selected-object query really ran.\n"
+            "- Set selection_result_reported=true only if you actually reported the selected object result or explicit empty selection."
+        )
     if scenario.family == "public_config_boundary":
         return (
             "\n\nPUBLIC CONFIG BOUNDARY CONSTRAINTS:\n"
@@ -991,6 +1005,7 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         choices=(
             "phase3-required",
             "phase3-smoke",
+            PHASE3_SELECTED_OBJECT_SET,
             SEMANTIC_CAPABILITY_REQUIRED_SET,
             SEMANTIC_CAPABILITY_ALL_SET,
             SEMANTIC_CAPABILITY_BOUNDARY_SET,

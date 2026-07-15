@@ -119,7 +119,12 @@ def test_prompt_only_descendant_query_uses_builder_path_select_and_name_prefix(t
     assert client.calls == [
         (
             "ak.wwise.core.object.get",
-            {"waql": '"\\\\Master-Mixer Hierarchy" select descendants where name : "UI_*"'},
+            {
+                "waql": (
+                    r'from object "\Master-Mixer Hierarchy" '
+                    'select descendants where name : "UI_*"'
+                )
+            },
             {"return": ["id", "name", "type", "path"]},
         )
     ]
