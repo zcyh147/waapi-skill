@@ -86,7 +86,9 @@ from .schema import (  # pyright: ignore[reportMissingImports]
     SemanticConstraintFacts,
     SemanticSchemaValidator,
     extract_semantic_constraint_facts,
+    validate_semantic_event,
     validate_semantic_payload,
+    validate_semantic_result,
 )
 from .soundbank import (  # pyright: ignore[reportMissingImports]
     ExternalSourceConversion,
@@ -219,6 +221,8 @@ __all__ = [
     "resolve_resolution_plan",
     "source_note_uri_inventory",
     "tab_delimited_plan",
+    "validate_semantic_event",
     "validate_semantic_payload",
+    "validate_semantic_result",
     "write_tab_delimited_import_file",
 ]

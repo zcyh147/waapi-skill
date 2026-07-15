@@ -28,13 +28,18 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
         "python scripts/run.py gateway.py --timeout 10 wait-topic <topic-uri>",
         "python scripts/run.py gateway.py operations",
         "python scripts/run.py gateway.py operation-schema object.create",
+        "python scripts/run.py gateway.py operation-schema waapi.call",
+        "python scripts/run.py gateway.py operation-schema waapi.undoGroup",
         "python scripts/run.py gateway.py --version 2022.1 operation-schema object.copy",
     ):
         assert command in skill
     assert "before `ls`, `find`, `rg`" in skill
     assert "inline Python" in skill
     assert "unsupported_by_skill_interface" in skill
-    assert "immutable reviewed allowlists" in skill
+    assert "A fail-closed execution registry assigns all 814 reflected version/API rows" in skill
+    assert "769 executable rows and 45 explicit exclusions" in skill
+    assert "each `transaction_operation` row requires immutable preview/confirmation through its declared closed operation" in skill
+    assert "`waapi.undoGroup` for the three Undo members, `waapi.call` otherwise" in skill
     assert "FIXED_COMMAND_REQUIRED" in skill
     assert "WAIT_TOPIC_REQUIRED" in skill
     assert "--dry-run" in skill
@@ -68,7 +73,8 @@ def test_query_reference_has_no_raw_client_fallback() -> None:
     assert "WAIT_TOPIC_REQUIRED" in query_reference
     assert "UNSUPPORTED_BY_SKILL_INTERFACE" in query_reference
     assert "preferred_route: manifest_dispatch" in query_reference
-    assert "reflection or a `get`-shaped name" in query_reference.lower()
+    assert "broader reads return `TRANSACTION_REQUIRED` rather than being inferred safe from a `get`-shaped name" in query_reference
+    assert "not an open raw-call surface" in query_reference
     assert "gateway.py query-object" in query_reference
     assert "gateway.py wait-topic" in query_reference
     assert "`--query` means an existing Wwise Query Editor object" in query_reference
@@ -87,8 +93,7 @@ def test_query_reference_has_no_raw_client_fallback() -> None:
     assert "--path '\\\\Events\\\\Default Work Unit'" not in query_reference
     assert "--search 'ExactName' --where-json '{\"field\":\"name\",\"operator\":\"=\",\"value\":\"ExactName\"}' --take 1" in query_reference
     assert "`=` is exact equality and `:` is a contains/match predicate" in query_reference
-    assert "run that `call` directly as the first and only gateway command" in query_reference
-    assert "do not run `describe` or `capabilities` first" in query_reference
+    assert "run that one `call` directly without `describe` or `capabilities`" in query_reference
     assert "only when `describe` reports" not in query_reference
     assert "metadata types --summary-only" in query_reference
     assert "compact-serialize that object exactly" in query_reference

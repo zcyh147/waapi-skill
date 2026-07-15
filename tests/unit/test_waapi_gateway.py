@@ -12,7 +12,7 @@ from typing import Any, Mapping
 import pytest  # pyright: ignore[reportMissingImports]
 
 import wwise_waapi.dispatcher as dispatcher_module
-from wwise_waapi.safety import BOUNDED_CALL_CANDIDATES, IMMEDIATE_UNSUPPORTED_CALL_URIS
+from wwise_waapi.safety import EXPLICIT_UNSUPPORTED_TOPIC_URIS, IMMEDIATE_UNSUPPORTED_CALL_URIS
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS, version_key_from_get_info
 
 
@@ -38,7 +38,24 @@ CAPABILITY_COMPACT_KEYS = {
     "transaction_operations",
     "transaction_boundaries",
     "read_only",
+    "execution_contract",
 }
+EXPECTED_EXCLUDED_FUNCTION_URIS = frozenset(
+    {
+        "ak.wwise.cli.executeLuaScript",
+        "ak.wwise.core.executeLuaScript",
+        "ak.wwise.debug.enableAsserts",
+        "ak.wwise.debug.enableAutomationMode",
+        "ak.wwise.debug.getWalTree",
+        "ak.wwise.debug.restartWaapiServers",
+        "ak.wwise.debug.testAssert",
+        "ak.wwise.debug.testCrash",
+        "ak.wwise.debug.validateCall",
+        "ak.wwise.ui.commands.register",
+        "ak.wwise.ui.commands.execute",
+    }
+)
+EXPECTED_EXCLUDED_TOPIC_URIS = frozenset({"ak.wwise.debug.assertFailed"})
 
 
 class FakeEventHandler:
@@ -1357,12 +1374,17 @@ def test_capability_matrix_is_available_offline_without_config_or_client(tmp_pat
     assert payload["offline"] is True
     assert payload["summary"]["totals"]["total"] == 814
     assert payload["summary"]["totals"]["schema_status"] == {"ok": 814}
+    assert payload["summary"]["totals"]["interface_status"] == {
+        "available": 247,
+        "available_via_transaction": 522,
+        "unsupported_by_skill_interface": 45,
+    }
     assert payload["summary"]["totals"]["preferred_routes"] == {
-        "bounded_topic_wait": 141,
+        "bounded_topic_wait": 147,
         "fixed_command": 42,
-        "manifest_dispatch": 10,
-        "transaction_operation": 50,
-        "unsupported_boundary": 571,
+        "manifest_dispatch": 58,
+        "transaction_operation": 522,
+        "unsupported_boundary": 45,
     }
     assert payload["match_count"] == 814
     assert payload["returned_count"] == 0
@@ -1386,7 +1408,7 @@ def test_capabilities_default_to_fifty_compact_rows_and_explicit_zero_returns_al
     assert len(default_payload["capabilities"]) == 50
     assert all(set(row) == CAPABILITY_COMPACT_KEYS for row in default_payload["capabilities"])
     default_json = json.dumps(default_payload, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8")
-    assert len(default_json) < 35_000
+    assert len(default_json) < 70_000
 
     exit_code, all_payload = waapi_gateway.execute_gateway(
         ["capabilities", "--all-versions", "--limit", "0"],
@@ -1400,7 +1422,7 @@ def test_capabilities_default_to_fifty_compact_rows_and_explicit_zero_returns_al
     assert all_payload["truncated"] is False
     assert len(all_payload["capabilities"]) == 814
     all_json = json.dumps(all_payload, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8")
-    assert len(all_json) < 400_000
+    assert len(all_json) < 1_000_000
 
 
 def test_capabilities_detail_is_explicit_and_compact_rows_keep_transaction_boundaries(tmp_path: Path) -> None:
@@ -1417,6 +1439,9 @@ def test_capabilities_detail_is_explicit_and_compact_rows_keep_transaction_bound
     compact = compact_payload["capabilities"][0]
     assert set(compact) == CAPABILITY_COMPACT_KEYS
     assert compact["transaction_boundaries"][0]["operation"] == "object.copy"
+    assert compact["execution_contract"]["contract"] == "waapi-skill.public-execution-contract/v1"
+    assert compact["execution_contract"]["route"] == "transaction"
+    assert compact["execution_contract"]["executable"] is True
 
     exit_code, detail_payload = waapi_gateway.execute_gateway(
         ["capabilities", *filters, "--detail"],
@@ -1426,7 +1451,7 @@ def test_capabilities_detail_is_explicit_and_compact_rows_keep_transaction_bound
 
     assert exit_code == 0
     detail = detail_payload["capabilities"][0]
-    assert {"risk_level", "interface", "schema", "policy", "behavioral_evidence"} <= set(detail)
+    assert {"risk_level", "interface", "execution_contract", "schema", "policy", "behavioral_evidence"} <= set(detail)
     assert "risk" not in detail
     assert detail["interface"]["transaction_boundaries"][0]["operation"] == "object.copy"
     assert detail["schema"]["status"] == "ok"
@@ -1542,22 +1567,23 @@ def test_generic_reflection_call_is_schema_validated_and_normalized(tmp_path: Pa
 
 
 @pytest.mark.parametrize(
-    "result",
+    ("result", "expected_error"),
     (
-        None,
-        {},
-        {"functions": "ak.wwise.core.getInfo"},
-        {"functions": [1]},
-        {"functions": ["not-a-waapi-uri"]},
-        {"functions": ["ak.duplicate", "ak.duplicate"]},
-        {"functions": [], "unexpected": []},
-        {"functions": ["ak." + ("x" * 513)]},
-        {"functions": [f"ak.test.{index}" for index in range(4097)]},
+        (None, "SemanticValidationError"),
+        ({}, "INVALID_REFLECTION_RESULT"),
+        ({"functions": "ak.wwise.core.getInfo"}, "SemanticValidationError"),
+        ({"functions": [1]}, "SemanticValidationError"),
+        ({"functions": ["not-a-waapi-uri"]}, "INVALID_REFLECTION_RESULT"),
+        ({"functions": ["ak.duplicate", "ak.duplicate"]}, "INVALID_REFLECTION_RESULT"),
+        ({"functions": [], "unexpected": []}, "SemanticValidationError"),
+        ({"functions": ["ak." + ("x" * 513)]}, "INVALID_REFLECTION_RESULT"),
+        ({"functions": [f"ak.test.{index}" for index in range(4097)]}, "INVALID_REFLECTION_RESULT"),
     ),
 )
 def test_generic_reflection_call_rejects_shape_drift(
     tmp_path: Path,
     result: Any,
+    expected_error: str,
 ) -> None:
     client = FakeClient(
         {
@@ -1573,8 +1599,14 @@ def test_generic_reflection_call_rejects_shape_drift(
     )
 
     assert exit_code == 2
-    assert payload["error_code"] == "INVALID_REFLECTION_RESULT"
-    assert payload["details"]["api"] == "ak.wwise.waapi.getFunctions"
+    assert payload["ok"] is False
+    assert payload["status"] == "error"
+    assert payload["error_code"] == expected_error
+    if expected_error == "SemanticValidationError":
+        assert payload["details"]["uri"] == "ak.wwise.waapi.getFunctions"
+        assert payload["details"]["section"].startswith("result")
+    else:
+        assert payload["details"]["api"] == "ak.wwise.waapi.getFunctions"
 
 
 @pytest.mark.parametrize("command", ("call", "wait-topic"))
@@ -1691,8 +1723,8 @@ def test_unreflected_uri_is_structured_unsupported_after_live_version_detection(
     assert client.disconnected is True
 
 
-@pytest.mark.parametrize("api", sorted(set(BOUNDED_CALL_CANDIDATES) | IMMEDIATE_UNSUPPORTED_CALL_URIS))
-def test_audited_non_generic_reads_are_boundaries_before_connecting(
+@pytest.mark.parametrize("api", sorted(EXPECTED_EXCLUDED_FUNCTION_URIS))
+def test_all_eleven_excluded_functions_are_rejected_before_connecting(
     tmp_path: Path,
     api: str,
 ) -> None:
@@ -1701,7 +1733,9 @@ def test_audited_non_generic_reads_are_boundaries_before_connecting(
     def client_factory(url: str) -> FakeClient:
         nonlocal called
         called = True
-        raise AssertionError(f"audited boundary must not connect to {url}")
+        raise AssertionError(f"excluded function must not connect to {url}")
+
+    assert IMMEDIATE_UNSUPPORTED_CALL_URIS == EXPECTED_EXCLUDED_FUNCTION_URIS
 
     exit_code, payload = waapi_gateway.execute_gateway(
         ["call", api, "--dry-run"],
@@ -1769,29 +1803,30 @@ def test_public_generic_call_rejects_object_get_and_points_to_query_object(tmp_p
 
 
 @pytest.mark.parametrize(
-    ("api", "reason_fragment"),
+    ("version", "api", "execution_mode"),
     (
-        ("ak.wwise.cli.dumpObjects", "external file"),
-        ("ak.wwise.cli.verify", "project-path confinement"),
-        ("ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion", "result-size"),
-        ("ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion", "result-size"),
-        ("ak.wwise.core.mediaPool.get", "path-scope"),
-        ("ak.wwise.core.sourceControl.getSourceFiles", "pagination"),
-        ("ak.wwise.core.sourceControl.getStatus", "provider"),
-        ("ak.wwise.debug.getWalTree", "debug-data"),
+        ("2022.1", "ak.wwise.cli.dumpObjects", "isolated_transaction"),
+        ("2022.1", "ak.wwise.cli.verify", "isolated_transaction"),
+        ("2025.1", "ak.wwise.core.mediaPool.get", "transaction"),
+        ("2023.1", "ak.wwise.core.sourceControl.getSourceFiles", "isolated_transaction"),
+        ("2023.1", "ak.wwise.core.sourceControl.getStatus", "isolated_transaction"),
     ),
 )
-def test_public_generic_call_rejects_explicit_safety_boundaries_before_connecting(
+def test_public_generic_call_redirects_guarded_apis_to_transaction_before_connecting(
     tmp_path: Path,
+    version: str,
     api: str,
-    reason_fragment: str,
+    execution_mode: str,
 ) -> None:
     called = False
 
     def client_factory(url: str) -> FakeClient:
         nonlocal called
         called = True
-        raise AssertionError(f"explicit safety boundary must not connect to {url}")
+        raise AssertionError(f"transaction redirect must not connect to {url}")
+
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = version
 
     exit_code, payload = waapi_gateway.execute_gateway(
         [
@@ -1801,16 +1836,46 @@ def test_public_generic_call_rejects_explicit_safety_boundaries_before_connectin
             "{}",
             "--dry-run",
         ],
-        env=gateway_env(tmp_path),
+        env=env,
         client_factory=client_factory,
     )
 
     assert exit_code == 2
-    assert payload["status"] == "unsupported_by_skill_interface"
-    assert payload["error_code"] == "UNSUPPORTED_BY_SKILL_INTERFACE"
+    assert payload["status"] == "transaction_required"
+    assert payload["error_code"] == "TRANSACTION_REQUIRED"
     assert payload["executed"] is False
-    assert reason_fragment in payload["message"]
+    assert payload["verified"] is False
+    assert payload["capability"]["interface"]["transaction_operations"] == ["waapi.call"]
+    assert payload["capability"]["execution_contract"]["route"] == execution_mode
     assert called is False
+
+
+@pytest.mark.parametrize(
+    "api",
+    (
+        "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
+        "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
+    ),
+)
+def test_bounded_direct_calls_reject_invalid_payload_without_business_dispatch(
+    tmp_path: Path,
+    api: str,
+) -> None:
+    client = FakeClient({"ak.wwise.core.getInfo": live_info()})
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["call", api, "--args-json", "{}", "--dry-run"],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["ok"] is False
+    assert payload["status"] == "error"
+    assert payload["error_code"] == "SemanticValidationError"
+    assert payload["details"]["uri"] == api
+    assert payload["details"]["missing_args"]
+    assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo"]
 
 
 def test_generic_call_rejects_schema_mismatch_before_business_dispatch(tmp_path: Path) -> None:
@@ -1868,13 +1933,13 @@ def test_public_generic_call_cannot_bypass_closed_transaction_route(
     assert called is False
 
 
-def test_public_generic_call_rejects_unregistered_mutation_as_unsupported(tmp_path: Path) -> None:
+def test_public_generic_call_redirects_generic_soundbank_mutation_to_transaction(tmp_path: Path) -> None:
     called = False
 
     def client_factory(url: str) -> FakeClient:
         nonlocal called
         called = True
-        raise AssertionError(f"unsupported mutation must not connect to {url}")
+        raise AssertionError(f"transaction-only mutation must not connect to {url}")
 
     exit_code, payload = waapi_gateway.execute_gateway(
         [
@@ -1889,9 +1954,12 @@ def test_public_generic_call_rejects_unregistered_mutation_as_unsupported(tmp_pa
     )
 
     assert exit_code == 2
-    assert payload["status"] == "unsupported_by_skill_interface"
-    assert payload["error_code"] == "UNSUPPORTED_BY_SKILL_INTERFACE"
+    assert payload["status"] == "transaction_required"
+    assert payload["error_code"] == "TRANSACTION_REQUIRED"
     assert payload["executed"] is False
+    assert payload["verified"] is False
+    assert payload["capability"]["interface"]["transaction_operations"] == ["waapi.call"]
+    assert payload["capability"]["execution_contract"]["route"] == "isolated_transaction"
     assert called is False
 
 
@@ -2897,24 +2965,18 @@ def test_public_generic_call_routes_reviewed_topics_to_wait_topic_before_connect
     assert called is False
 
 
-@pytest.mark.parametrize(
-    "topic",
-    (
-        "ak.wwise.debug.assertFailed",
-        "ak.wwise.ui.commands.executed",
-        "ak.wwise.ui.selectionChanged",
-    ),
-)
-def test_wait_topic_rejects_unreviewed_topic_before_connecting_or_subscribing(
+def test_wait_topic_rejects_debug_assert_topic_before_connecting_or_subscribing(
     tmp_path: Path,
-    topic: str,
 ) -> None:
+    topic = "ak.wwise.debug.assertFailed"
     called = False
 
     def client_factory(url: str) -> FakeClient:
         nonlocal called
         called = True
-        raise AssertionError(f"unreviewed topic must not connect or subscribe to {url}")
+        raise AssertionError(f"excluded topic must not connect or subscribe to {url}")
+
+    assert frozenset(EXPLICIT_UNSUPPORTED_TOPIC_URIS) == EXPECTED_EXCLUDED_TOPIC_URIS
 
     exit_code, payload = waapi_gateway.execute_gateway(
         ["wait-topic", topic],
@@ -2927,6 +2989,40 @@ def test_wait_topic_rejects_unreviewed_topic_before_connecting_or_subscribing(
     assert payload["error_code"] == "UNSUPPORTED_BY_SKILL_INTERFACE"
     assert payload["executed"] is False
     assert called is False
+
+
+@pytest.mark.parametrize(
+    ("topic", "event"),
+    (
+        (
+            "ak.wwise.ui.commands.executed",
+            {"command": "project.save", "objects": [], "platforms": []},
+        ),
+        ("ak.wwise.ui.selectionChanged", {"objects": []}),
+    ),
+)
+def test_wait_topic_executes_reviewed_ui_topics_and_unsubscribes(
+    tmp_path: Path,
+    topic: str,
+    event: Mapping[str, Any],
+) -> None:
+    client = FakeClient(
+        {"ak.wwise.core.getInfo": live_info()},
+        subscription_events={topic: [event]},
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["--timeout", "0.5", "wait-topic", topic],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0
+    assert payload["ok"] is True
+    assert payload["topic"] == topic
+    assert payload["event"] == event
+    assert payload["cleanup"] == "unsubscribed"
+    assert client.handlers[0].unsubscribe_calls == 1
 
 
 def test_wait_topic_timeout_unsubscribes_on_transport_owner_thread(tmp_path: Path) -> None:

@@ -1,13 +1,13 @@
 # WAAPI operate lane
 
-Use this reference for project-changing work. The only normal execution path is the packaged transaction CLI. Do not import builders or planners from inline Python, create a helper script, construct a raw WAAPI mutation, or use the generic `call` command for live mutation. Run each reference read and each gateway command as its own shell tool call; never combine a read and gateway invocation with `&&`, `;`, pipes, command substitution, or another multi-command shell string.
+Use this reference for project-changing work. The only normal execution path is the packaged transaction CLI. Do not import builders or planners from inline Python, create a helper script, construct a raw WAAPI mutation, or use the direct `call` command for live mutation. The closed `waapi.call` operation can execute a manifest-registered transaction route after immutable preview and explicit confirmation. The three Undo Group member URIs are the exception: they can run only inside the closed `waapi.undoGroup` same-connection composite, never as independent calls. Run each reference read and each gateway command as its own shell tool call; never combine a read and gateway invocation with `&&`, `;`, pipes, command substitution, or another multi-command shell string.
 
 ## Choose the transaction phase first
 
 An existing transaction continuation outranks the named-operation rule because its immutable preview already seals the request schema, target, value, endpoint, and artifact hash.
 
 - **Existing transaction:** the user confirms, checks, rejects, executes, or verifies an already previewed transaction, and its transaction id is available from the message or conversation. A transaction id is required: an artifact hash alone is not a lookup key and is insufficient for continuation. Ask for the transaction id and stop; do not search transaction files or state directories. With the id, continue as a transaction. The first gateway command is `transaction-show <transaction-id> --summary-only`. Do not call `operations`, `operation-schema`, or `preview` first.
-- **New change request:** no transaction exists yet. Run `operation-schema <name>` directly, construct its closed request, and call `preview`. Do not call `operations` first: that command is only for broad capability-inventory questions and returns a compact inventory by default.
+- **New change request:** no transaction exists yet. Prefer `operation-schema <semantic-name>` when a dedicated operation exists. Otherwise run `describe <uri>`; only a row reporting `transaction_operation` may use the exact operation named in its `transaction_operations`. The Undo member rows require `operation-schema waapi.undoGroup`; all other such rows require `operation-schema waapi.call`. Construct that closed request and call `preview`. Do not call `operations` first: that command is only for broad capability-inventory questions and returns a compact inventory by default.
 
 The user's current intent authorizes actions; the returned transaction state only constrains which actions are legal and never authorizes an action by itself:
 
@@ -17,7 +17,7 @@ The user's current intent authorizes actions; the returned transaction state onl
 - An explicit verify-only request may call `verify` only from an applicable executed state; it never calls `execute`.
 - Terminal states are reported without another mutation.
 
-Use `operations --detail` only for an explicit audit of every nested request contract. A named unsupported operation must resolve in one offline `operation-schema` call and be reported as the structured boundary; do not probe a second route.
+Use `operations --detail` only for an explicit audit of every nested request contract. A named semantic operation may still report a narrower verifier boundary while its underlying URI has a packaged `waapi.call` route. In that case use the URI route only when `describe` explicitly reports `transaction_operation`; never infer or probe it from the operation name.
 
 ## Closed transaction flow
 
@@ -72,12 +72,51 @@ All request levels are closed: unknown fields fail. Identity shapes are exactly:
 - `{"kind":"waql","value":"from ..."}`
 - `{"kind":"scoped-name","name":"Name","type":"Sound","parent":{"kind":"id","value":"{GUID}"}}`
 
-Never supply identity rows, `property_info`, `reference_info`, schema objects, dispatcher args/options, or a WAAPI URI. The runtime obtains those from live read-only preflight and versioned packaged resources.
+For dedicated semantic operations, never supply identity rows, `property_info`, `reference_info`, schema objects, dispatcher args/options, or a WAAPI URI. The runtime obtains those from live read-only preflight and versioned packaged resources.
+
+The generic packaged transaction has one intentionally different shape:
+
+```json
+{
+  "contract": "waapi-skill.operation-request/v1",
+  "version": "2024.1",
+  "operation": "waapi.call",
+  "arguments": {
+    "api": "ak.wwise.core.project.save",
+    "args": {},
+    "options": {}
+  }
+}
+```
+
+The exact URI must be reflected in that version and assigned to `transaction`, `managed_transaction`, or `isolated_transaction`; fixed/direct/topic/excluded rows are rejected. `args` and `options` are recursively checked against the packaged reflected schema. For an isolated route, add `"io_root":"/absolute/trusted/root"` when the I/O audit requires it. Read paths must be absolute and are recorded; every explicit write path must resolve inside that root, including through existing symlinks. Wwise-managed implicit outputs are disclosed as `implicit_write_confinement_proven:false` rather than falsely claimed to be physically confined. Custom CLI command fields such as `custom-pre-gen-cmd` and `custom-post-gen-cmd` are never accepted.
+
+Undo Group members use a compound request instead of `waapi.call`:
+
+```json
+{
+  "contract": "waapi-skill.operation-request/v1",
+  "version": "2024.1",
+  "operation": "waapi.undoGroup",
+  "arguments": {
+    "display_name": "Batch property update",
+    "calls": [{
+      "api": "ak.wwise.core.object.setNotes",
+      "args": {"object": "{OBJECT-GUID}", "value": "Reviewed note"},
+      "options": {}
+    }]
+  }
+}
+```
+
+Obtain the current version's inner-call allowlist from `operation-schema waapi.undoGroup`; never guess it. The runtime validates the complete request and immutable execution plan before confirmation. If an inner call fails, it attempts `cancelGroup` on the same connection. `execution_cancelled` means that cancel returned successfully but rollback was not independently verified. Any uncertain begin/end/cancel outcome is terminal `indeterminate`, and no phase is automatically retried. Phase evidence has a 256 KiB aggregate ceiling and appears once, under `dispatch_result.result.phases`; an oversized inner result is reduced to a bounded failure record before same-connection cancellation.
 
 If the requested target is not a valid direct writable parent for that object type, do not silently retarget the mutation. Report the structured container-suitability evidence and ask the user to confirm the intended writable child container before creating a new preview.
 
 ## Currently executable closed operations
 
+- `waapi.call`: one exact version-reflected API plus reflected `args`/`options`; accepted only for a catalog transaction route. It provides immutable confirmation, bounded dispatch, result-schema verification, isolated path auditing where applicable, and no model-authored code. It does not invent URI-specific business readbacks.
+- `waapi.undoGroup`: one display name plus 1–32 version-allowlisted project-mutation calls. It keeps `beginGroup`, every inner call, and `endGroup`/`cancelGroup` on the same dispatcher and WAAPI client. It never retries, and successful verification proves reflected result shapes only—not that a rollback or final business state was read back.
 - `object.create`: `parent`, `type`, `name`, optional `notes`; conflict behavior is fixed to `fail`, and source-control auto-add is explicitly disabled across versions.
 - `object.delete`: one non-protected `object`; Project roots and default work units are rejected.
 - `object.setName`: one `object` and non-empty `value`.
@@ -88,7 +127,7 @@ If the requested target is not a valid direct writable parent for that object ty
 - `soundbank.setInclusions`: one live `soundbank`, `mode` (`add`, `remove`, or `replace`), and inclusion rows containing one live `object` and unique `filters` from `events`, `structures`, and `media`. `add` upserts the requested object's complete filter row while preserving other objects; it does not union filters with an existing row. `remove` is accepted only when the requested filter row exactly matches live state, then removes that object inclusion. `replace` sets the complete list and may use an empty list for an exact clear. Preview captures the complete normalized state; execution and verification require exact full-state transitions.
 - `switchContainer.addAssignment` and `switchContainer.removeAssignment`: one live `switch_container`, direct `child`, and `state_or_switch`. Preview proves the container type, direct-child relation, bound Switch/State Group, group membership, and complete assignment pre-state; verification proves the exact complete assignment post-state, unchanged group reference, and unchanged object relationships. The closed add policy rejects a child that already has any assignment instead of guessing whether reassignment was intended.
 
-Run `operation-schema <name>` directly for a named operation instead of relying on this list. Use compact `operations` only when the user asks for the broad operation inventory; use `operations --detail` only when the entire nested catalog is itself the requested artifact. The catalog reports `object.set`, `object.copy`, `object.move`, `audio.importTabDelimited`, `soundbank.generate`, `soundbank.convertExternalSources`, and `soundbank.processDefinitionFiles` as explicit boundaries until their partial-success, artifact, output-containment, and cleanup verifiers are closed. Do not bridge those gaps with generated code.
+Run `operation-schema <name>` directly for a named operation instead of relying on this list. Use compact `operations` only when the user asks for the broad operation inventory; use `operations --detail` only when the entire nested catalog is itself the requested artifact. Older semantic names such as `object.copy`, `object.move`, `audio.importTabDelimited`, or `soundbank.generate` may still report that their richer operation-specific verifier is incomplete. That boundary does not authorize code generation. If and only if `describe <underlying-uri>` reports a packaged `transaction_operation`, use the exact declared transaction operation. This is normally `waapi.call`; the three Undo Group members declare only `waapi.undoGroup`. Disclose result-schema-only verification whenever no operation-specific readback exists.
 
 ### Closed workflow request shapes
 
@@ -149,14 +188,16 @@ For Wwise `2025.1`, authored audio lives below `\\Containers`; for `2021.1` thro
 - A target, project, runtime, or pre-state drift becomes `repreview_required` before any mutation.
 - The public generic `call` route cannot execute a mutation, even with `--allow-destructive` or `WWISE_DESTRUCTIVE=1`.
 - Once state reaches `executing`, the mutation is never automatically retried. A lost/ambiguous result becomes terminal `indeterminate`.
-- Successful dispatch becomes `executed_unverified`; it is not success until `verify` reaches `verified`.
-- Verification uses operation-specific readback. A transient read-only verification error returns `verification_deferred`, keeps `executed_unverified`, and permits a later manual `verify`; it never re-executes the mutation.
-- The `verify` payload is the terminal authority for the requested mutation because it already contains the operation-specific live readbacks and assertions. After any terminal verification response, stop. Never append `query-object`, generic `call`, or another gateway command to double-check the same result.
-- Successful preview and successful `verified` responses expose `agent_result`. For a machine-readable answer, serialize only that exact object without reconstruction or an extra command. Failure, `verification_deferred`, `verification_failed`, `repreview_required`, and `indeterminate` responses do not expose a successful projection; never fabricate one. Natural-language reporting still uses the complete gateway payload and its evidence rather than discarding readback, assertions, risks, or cleanup details.
+- Successful dispatch normally becomes `executed_unverified`; it is not terminal until `verify` reaches `verified`, `result_schema_checked`, or an explicit failure/indeterminate state. If WAAPI succeeds but the local completion journal cannot be written, the response is `execution_succeeded_persistence_failed`, preserves `executed: true`, the dispatch and cleanup evidence, and `automatic_retry: false`; never replay that mutation.
+- Dedicated semantic operations use operation-specific readback. Generic `waapi.call` verifies the returned value against the packaged reflected result schema and must not be described as live business-state proof. A transient read-only verification error returns `verification_deferred`, keeps `executed_unverified`, and permits a later manual `verify`; it never re-executes the mutation.
+- The `verify` payload is the terminal authority for the selected contract: dedicated operations contain live readbacks, while generic `waapi.call` and `waapi.undoGroup` contain reflected result-schema assertions. After any terminal verification response, stop. Never append `query-object`, direct `call`, or another gateway command to double-check the same result.
+- Successful preview and successful terminal `verified` or `result_schema_checked` responses expose `agent_result`. For a machine-readable answer, serialize only that exact object without reconstruction or an extra command. Failure, `verification_deferred`, `verification_failed`, `execution_cancelled`, `execution_succeeded_persistence_failed`, `repreview_required`, and `indeterminate` responses do not expose a successful projection; never fabricate one. Natural-language reporting still uses the complete gateway payload and its evidence rather than discarding readback, assertions, risks, or cleanup details.
 
 For `object.create`, verification uses the GUID returned by execution, not a name search. Delete proves GUID absence. Rename proves the same GUID, new name/path, unchanged parent, and old-path absence. Notes are exact. Numeric properties use typed tolerance. References must normalize to the target identity or return an explicit indeterminate boundary.
 
 For `audio.import`, every input file is bound by absolute canonical path, size, and SHA-256 at preview and is re-hashed before execution; every canonical target must remain absent. For Wwise 2023.1 and later, the returned `log`, `files`, and `objects` shape is validated and any error/fatal log is a failed postcondition. Older versions use their reflected `objects` result shape. SoundBank inclusion and Switch assignment operations re-read their complete normalized pre-state immediately before dispatch and require exact post-state evidence.
+
+Some managed calls open resources that need a later packaged companion: bank load/unload, Game Object register/unregister, Profiler capture start/stop, meter register/unregister, Remote connect/disconnect, and Transport create/destroy. Their immutable cleanup spec is preserved in preview, execute, verify, `transaction-show`, and `agent_result`: opener preview is `not_started`, successful execution/verification is `pending`, and an ambiguous execution is `unknown`. Transport destroy binds only to the validated ID returned by create. A closer has `not_required` for any further cleanup. Work Unit load/unload is reported separately as `available_reversal`, never required or automatic cleanup, because either action clears Undo history and unload can fail with unsaved changes. Undo Group cleanup occurs only inside its same-connection composite. UI command register/execute are excluded entirely. Do not hide these states or replace a companion with code; use a separately confirmed packaged transaction when the user's workflow reaches an actual cleanup obligation.
 
 ## Result handling
 
@@ -164,6 +205,9 @@ For `audio.import`, every input file is bound by absolute canonical path, size, 
 - `confirmed`: confirmation was hash-bound; execution has not happened.
 - `executed_unverified`: run `verify`, not `execute` again.
 - `verified`: report the transaction id, `executed` and `verified` state, every requested target/value, and the actual readback evidence from this payload, then stop without an extra query. Never let a negated or failed execution/verification message sound like completion.
+- `result_schema_checked`: the reflected return shape passed, but business state was not independently verified. Report that weaker evidence and stop without an extra query.
+- `execution_cancelled`: same-connection `cancelGroup` returned successfully after an Undo inner failure; rollback remains unverified, and the transaction must not be retried.
+- `execution_succeeded_persistence_failed`: WAAPI returned success but the local completion journal did not. Preserve the returned execution and cleanup evidence, never retry automatically, and repair or inspect the transaction store before any later manual decision.
 - `verification_failed`: report which assertion failed; do not claim completion or retry mutation.
 - `verification_deferred`: a read-only verification attempt failed; a later manual `verify` is safe.
 - `repreview_required`: live state changed before execution; create a new preview.
@@ -178,4 +222,4 @@ For a requested `WAAPI_RESULT_JSON=<json>` answer, when the successful preview o
 
 XML editing is not an automatic fallback. Only consider it in a separate, explicit offline project-file task after the user asks for XML editing and a packaged, previewable path exists. For an ordinary Wwise request, return `unsupported_by_skill_interface` instead of editing project files or authoring an XML helper.
 
-Runtime playback scheduling, Game Object View control, timed posting, RTPC ramps, narrative sequencing, unsafe debug calls, and cross-app MCP federation are execution boundaries unless a future packaged operation explicitly closes them.
+Only the explicit catalog exclusions and route-specific input policies are interface boundaries. Arbitrary Lua, assert/crash/private debug endpoints, unrestricted UI command registration/execution, custom external command hooks, and cross-app MCP federation are never substituted for a packaged route.

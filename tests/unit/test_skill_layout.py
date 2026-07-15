@@ -69,11 +69,14 @@ def test_packaged_skill_contains_only_routed_runtime_reference_markdown() -> Non
     references_dir = SKILL_ROOT / "references"
 
     assert {path.name for path in references_dir.glob("*.md")} == {
+        "waapi-coverage.md",
         "waapi-setup.md",
         "waapi-query.md",
         "waapi-operate.md",
     }
     assert not list(references_dir.glob("*/*.md"))
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    assert "read `references/waapi-coverage.md` once" in skill
 
 
 def test_project_metadata_does_not_point_at_nested_skill_root() -> None:

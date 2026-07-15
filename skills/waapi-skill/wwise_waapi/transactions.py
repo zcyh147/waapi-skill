@@ -87,7 +87,9 @@ class TransactionState(str, Enum):
     CONFIRMED = "confirmed"
     REJECTED = "rejected"
     EXECUTING = "executing"
+    EXECUTION_CANCELLED = "execution_cancelled"
     EXECUTED_UNVERIFIED = "executed_unverified"
+    RESULT_SCHEMA_CHECKED = "result_schema_checked"
     VERIFIED = "verified"
     VERIFICATION_FAILED = "verification_failed"
     INDETERMINATE = "indeterminate"
@@ -104,17 +106,24 @@ ALLOWED_TRANSITIONS: Mapping[TransactionState, frozenset[TransactionState]] = {
     ),
     TransactionState.REJECTED: frozenset(),
     TransactionState.EXECUTING: frozenset(
-        {TransactionState.EXECUTED_UNVERIFIED, TransactionState.INDETERMINATE}
+        {
+            TransactionState.EXECUTION_CANCELLED,
+            TransactionState.EXECUTED_UNVERIFIED,
+            TransactionState.INDETERMINATE,
+        }
     ),
+    TransactionState.EXECUTION_CANCELLED: frozenset(),
     TransactionState.EXECUTED_UNVERIFIED: frozenset(
         {
             TransactionState.VERIFIED,
+            TransactionState.RESULT_SCHEMA_CHECKED,
             TransactionState.VERIFICATION_FAILED,
             TransactionState.INDETERMINATE,
             TransactionState.REPREVIEW_REQUIRED,
         }
     ),
     TransactionState.VERIFIED: frozenset(),
+    TransactionState.RESULT_SCHEMA_CHECKED: frozenset(),
     TransactionState.VERIFICATION_FAILED: frozenset(),
     TransactionState.INDETERMINATE: frozenset(),
     TransactionState.REPREVIEW_REQUIRED: frozenset(),
@@ -404,6 +413,19 @@ class TransactionStore:
             details=details,
         )
 
+    def mark_execution_cancelled(
+        self, transaction_id: str, *, details: Mapping[str, Any] | None = None
+    ) -> TransactionRecord:
+        """Record a successful same-session cancel without claiming rollback proof."""
+
+        return self.transition(
+            transaction_id,
+            TransactionState.EXECUTION_CANCELLED,
+            expected_state=TransactionState.EXECUTING,
+            event_type="execution_cancelled",
+            details=details,
+        )
+
     def record_verification(
         self,
         transaction_id: str,
@@ -414,13 +436,15 @@ class TransactionStore:
         target = _coerce_state(outcome, field="outcome")
         allowed = {
             TransactionState.VERIFIED,
+            TransactionState.RESULT_SCHEMA_CHECKED,
             TransactionState.VERIFICATION_FAILED,
             TransactionState.INDETERMINATE,
             TransactionState.REPREVIEW_REQUIRED,
         }
         if target not in allowed:
             raise InvalidTransition(
-                "verification outcome must be verified, verification_failed, indeterminate, or repreview_required"
+                "verification outcome must be verified, result_schema_checked, verification_failed, "
+                "indeterminate, or repreview_required"
             )
         return self.transition(
             transaction_id,

@@ -8,6 +8,14 @@ from typing import Any, Iterable, Mapping
 from wwise_waapi.deferred_registry import ApiClassifier, DeferredEntry, DeferredRegistry  # pyright: ignore[reportMissingImports]
 
 
+EXECUTION_POLICY_STATUSES = frozenset(
+    {
+        "guarded-execution",
+        "isolated-transaction",
+        "managed-transaction",
+        "selective-execution",
+    }
+)
 PHASE2_ACHIEVED_STATUSES = frozenset(
     {
         "fake-route-tested",
@@ -20,6 +28,7 @@ PHASE2_ACHIEVED_STATUSES = frozenset(
         "skipped-approved",
         "conformance-only-skip",
         "still-deferred-with-evidence",
+        *EXECUTION_POLICY_STATUSES,
     }
 )
 PHASE21_EVIDENCE_CLASSES = frozenset(
@@ -27,6 +36,7 @@ PHASE21_EVIDENCE_CLASSES = frozenset(
         "live_behavioral_waapi",
         "live_behavioral_profiler",
         "conformance_only_skip",
+        "program_tested_packaged_execution",
         "still_deferred_with_evidence",
     }
 )
@@ -41,7 +51,9 @@ LIVE_EVIDENCE_REQUIRED_STATUSES = frozenset(
         "soundengine-backed-tested",
     }
 )
-EVIDENCE_PATH_REQUIRED_STATUSES = LIVE_EVIDENCE_REQUIRED_STATUSES | {STILL_DEFERRED_STATUS}
+EVIDENCE_PATH_REQUIRED_STATUSES = LIVE_EVIDENCE_REQUIRED_STATUSES | EXECUTION_POLICY_STATUSES | {
+    STILL_DEFERRED_STATUS
+}
 LIVE_BEHAVIOR_STATUSES = frozenset(
     {
         "live-smoke-tested",
@@ -50,7 +62,8 @@ LIVE_BEHAVIOR_STATUSES = frozenset(
         "soundengine-backed-tested",
     }
 )
-POLICY_APPROVED_NON_BEHAVIOR_STATUSES = frozenset({"wrapper-only", "skipped-approved", "conformance-only-skip"})
+EXCLUDED_STATUSES = frozenset({"wrapper-only", "skipped-approved", "conformance-only-skip"})
+POLICY_APPROVED_NON_BEHAVIOR_STATUSES = EXCLUDED_STATUSES | EXECUTION_POLICY_STATUSES
 
 
 @dataclass(slots=True, frozen=True)
@@ -167,6 +180,11 @@ class Phase2CoverageStatusRecord:
             raise ValueError(
                 f"Phase 2 coverage record {self.uri} status {status!r} requires evidence class 'conformance_only_skip'"
             )
+        if status in EXECUTION_POLICY_STATUSES and evidence_class != "program_tested_packaged_execution":
+            raise ValueError(
+                f"Phase 2 coverage record {self.uri} status {status!r} requires evidence class "
+                "'program_tested_packaged_execution'"
+            )
         if status == STILL_DEFERRED_STATUS and evidence_class != "still_deferred_with_evidence":
             raise ValueError(
                 f"Phase 2 coverage record {self.uri} status {status!r} requires evidence class 'still_deferred_with_evidence'"
@@ -279,7 +297,7 @@ class ApiCoverageAuditor:
                     live_behavioral_count += 1
                 if phase2.status == "fake-route-tested":
                     substitute_count += 1
-                if phase2.status in POLICY_APPROVED_NON_BEHAVIOR_STATUSES:
+                if phase2.status in EXCLUDED_STATUSES:
                     excluded_count += 1
                 if phase2.status == STILL_DEFERRED_STATUS:
                     deferred_count += 1

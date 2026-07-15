@@ -76,7 +76,7 @@ def test_inventory_count_matches_latest_nonlive_result_without_collect_only_over
 
     assert "807 pytest items" not in inventory
     assert "807 tests collected" not in inventory
-    assert "1888 passed, 77 skipped, 27 deselected" in inventory
+    assert "2938 passed, 77 skipped, 27 deselected" in inventory
     assert "not a fresh full `--collect-only` recount" in inventory
 
 

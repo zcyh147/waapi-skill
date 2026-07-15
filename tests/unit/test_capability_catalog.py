@@ -11,11 +11,11 @@ from wwise_waapi.capabilities import (
     CapabilityCatalog,
     CapabilityCatalogError,
     CapabilityNotFoundError,
-    CapabilityRecord,
 )
 from wwise_waapi.safety import (
     BOUNDED_CALL_CANDIDATES,
     EXPLICIT_UNSUPPORTED_LIVE_URIS,
+    EXPLICIT_UNSUPPORTED_TOPIC_URIS,
     IMMEDIATE_UNSUPPORTED_CALL_URIS,
     REVIEWED_FIXED_FUNCTION_URIS,
     REVIEWED_PUBLIC_CALL_URIS,
@@ -63,29 +63,23 @@ def test_catalog_separates_route_safety_and_evidence_without_overclaiming() -> N
     assert read.safety.read_only is True
     assert read.safety.requires_destructive_gate is False
     assert closed_mutation.preferred_route == "transaction_operation"
-    assert closed_mutation.transaction_operations == ("object.create",)
-    assert closed_mutation.gateway_commands == (
-        "operation-schema",
-        "preview",
-        "transaction-show",
-        "confirm",
-        "reject",
-        "execute",
-        "verify",
-    )
+    assert closed_mutation.transaction_operations == ("object.create", "waapi.call")
+    assert closed_mutation.gateway_commands == ("preview", "confirm", "execute", "verify")
     assert closed_mutation.safety.interface_status == "available_via_transaction"
     assert mutation.semantic_family == "soundbank"
     assert mutation.safety.requires_destructive_gate is True
     assert mutation.safety.requires_confirmation is True
-    assert mutation.preferred_route == "unsupported_boundary"
-    assert mutation.safety.interface_status == "unsupported_by_skill_interface"
+    assert mutation.preferred_route == "transaction_operation"
+    assert mutation.transaction_operations == ("waapi.call",)
+    assert mutation.safety.interface_status == "available_via_transaction"
     assert assignment.safety.requires_destructive_gate is True
+    assert assignment.transaction_operations == ("switchContainer.addAssignment", "waapi.call")
     assert unsafe.preferred_route == "unsupported_boundary"
     assert unsafe.safety.interface_status == "unsupported_by_skill_interface"
     assert read.evidence["registry_status"] in {"deferred", "not_listed_in_packaged_deferred_registry"}
 
 
-def test_catalog_uses_closed_operation_registry_as_mutation_interface_truth() -> None:
+def test_catalog_keeps_specific_builder_boundaries_while_exposing_generic_transactions() -> None:
     catalog = CapabilityCatalog()
 
     create = catalog.describe("2021.1", "ak.wwise.core.object.create")
@@ -95,10 +89,10 @@ def test_catalog_uses_closed_operation_registry_as_mutation_interface_truth() ->
     audio_import = catalog.describe("2025.1", "ak.wwise.core.audio.import")
     tab_import = catalog.describe("2025.1", "ak.wwise.core.audio.importTabDelimited")
 
-    assert create.transaction_operations == ("object.create",)
-    assert set_name.transaction_operations == ("object.setName",)
+    assert create.transaction_operations == ("object.create", "waapi.call")
+    assert set_name.transaction_operations == ("object.setName", "waapi.call")
     assert create.preferred_route == set_name.preferred_route == "transaction_operation"
-    assert batch.transaction_operations == ()
+    assert batch.transaction_operations == ("waapi.call",)
     assert batch.transaction_boundaries == (
         {
             "operation": "object.set",
@@ -106,46 +100,51 @@ def test_catalog_uses_closed_operation_registry_as_mutation_interface_truth() ->
         },
     )
     assert copy.transaction_boundaries[0]["operation"] == "object.copy"
-    assert audio_import.transaction_operations == ("audio.import",)
+    assert copy.transaction_operations == ("waapi.call",)
+    assert audio_import.transaction_operations == ("audio.import", "waapi.call")
     assert audio_import.preferred_route == "transaction_operation"
-    assert tab_import.transaction_operations == ()
+    assert tab_import.transaction_operations == ("waapi.call",)
     assert tab_import.transaction_boundaries[0]["operation"] == "audio.importTabDelimited"
-    for unsupported in (batch, copy, tab_import):
-        assert unsupported.preferred_route == "unsupported_boundary"
-        assert unsupported.safety.interface_status == "unsupported_by_skill_interface"
+    for generic in (batch, copy, tab_import):
+        assert generic.preferred_route == "transaction_operation"
+        assert generic.gateway_commands == ("preview", "confirm", "execute", "verify")
+        assert generic.safety.interface_status == "available_via_transaction"
+        assert generic.safety.requires_confirmation is True
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
-def test_only_reviewed_topics_expose_a_bounded_wait_route(version: str) -> None:
+def test_all_topics_except_debug_assert_failed_expose_a_bounded_wait_route(version: str) -> None:
     topics = CapabilityCatalog().select(version, item_type="topic")
     reviewed = [entry for entry in topics if entry.uri in REVIEWED_TOPIC_URIS]
     unsupported = [entry for entry in topics if entry.uri not in REVIEWED_TOPIC_URIS]
 
     assert topics
-    assert {entry.execution_mode for entry in topics} == {"bounded_topic_wait"}
+    assert {entry.execution_mode for entry in topics} == {"bounded_topic_wait", "excluded"}
     assert reviewed
     assert all(entry.preferred_route == "bounded_topic_wait" for entry in reviewed)
     assert all(entry.gateway_commands == ("wait-topic",) for entry in reviewed)
     assert all(entry.safety.read_only for entry in reviewed)
     assert all(not entry.safety.requires_destructive_gate for entry in reviewed)
     assert all(entry.preferred_route == "unsupported_boundary" for entry in unsupported)
+    assert {entry.uri for entry in unsupported} == {"ak.wwise.debug.assertFailed"}
     assert all(entry.gateway_commands == () for entry in unsupported)
     assert all(not entry.safety.read_only for entry in unsupported)
     assert all(entry.safety.requires_destructive_gate for entry in unsupported)
 
 
-def test_semantic_inventory_is_version_aware_and_bounded_candidates_stay_closed() -> None:
+def test_semantic_inventory_is_version_aware_and_bounded_reads_are_public() -> None:
     catalog = CapabilityCatalog()
 
     with pytest.raises(CapabilityNotFoundError, match="not reflected"):
         catalog.describe("2021.1", "ak.wwise.core.object.set")
     linked = catalog.describe("2025.1", "ak.wwise.core.object.isLinked")
     assert linked.semantic_family == "property-reference"
-    assert linked.safety.read_only is False
-    assert linked.safety.interface_status == "unsupported_by_skill_interface"
-    assert linked.preferred_route == "unsupported_boundary"
-    assert linked.gateway_commands == ()
-    assert linked.safety.reason == BOUNDED_CALL_CANDIDATES[linked.uri]
+    assert linked.safety.read_only is True
+    assert linked.safety.interface_status == "available"
+    assert linked.preferred_route == "manifest_dispatch"
+    assert linked.gateway_commands == ("call",)
+    assert linked.execution_contract["timeout_seconds"] == 10.0
+    assert linked.execution_contract["result_limit_bytes"] == 256 * 1024
 
 
 def test_catalog_summary_reconciles_all_five_version_totals() -> None:
@@ -156,16 +155,16 @@ def test_catalog_summary_reconciles_all_five_version_totals() -> None:
     assert summary["totals"]["total"] == 814
     assert summary["totals"]["schema_status"] == {"ok": 814}
     assert summary["totals"]["interface_status"] == {
-        "available": 193,
-        "available_via_transaction": 50,
-        "unsupported_by_skill_interface": 571,
+        "available": 247,
+        "available_via_transaction": 522,
+        "unsupported_by_skill_interface": 45,
     }
     assert summary["totals"]["preferred_routes"] == {
-        "bounded_topic_wait": 141,
+        "bounded_topic_wait": 147,
         "fixed_command": 42,
-        "manifest_dispatch": 10,
-        "transaction_operation": 50,
-        "unsupported_boundary": 571,
+        "manifest_dispatch": 58,
+        "transaction_operation": 522,
+        "unsupported_boundary": 45,
     }
     assert "semantic_builder" not in summary["totals"]["preferred_routes"]
     for version, (functions, topics) in EXPECTED_COUNTS.items():
@@ -178,10 +177,11 @@ def test_all_semantic_read_records_resolve_to_public_gateway_routes() -> None:
     entries = [entry for version in SUPPORTED_WWISE_VERSION_KEYS for entry in catalog.entries(version)]
     semantic_reads = [entry for entry in entries if entry.semantic_family is not None and entry.safety.read_only]
 
-    assert len(semantic_reads) == 55
+    assert len(semantic_reads) == 71
     assert sum(entry.preferred_route == "fixed_command" for entry in semantic_reads) == 30
     assert sum(entry.preferred_route == "bounded_topic_wait" for entry in semantic_reads) == 25
-    assert sum(entry.preferred_route == "manifest_dispatch" for entry in semantic_reads) == 0
+    assert sum(entry.preferred_route == "manifest_dispatch" for entry in semantic_reads) == 6
+    assert sum(entry.preferred_route == "transaction_operation" for entry in semantic_reads) == 10
     assert all(entry.preferred_route != "semantic_builder" for entry in entries)
     assert all(
         entry.gateway_commands
@@ -196,9 +196,11 @@ def test_all_semantic_read_records_resolve_to_public_gateway_routes() -> None:
     assert object_get.gateway_commands == ("query-object", "buses")
     assert property_info.gateway_commands == ("metadata property-info",)
     assert imported.gateway_commands == ("wait-topic",)
-    assert inclusions.gateway_commands == ()
-    assert inclusions.preferred_route == "unsupported_boundary"
-    assert inclusions.safety.reason == BOUNDED_CALL_CANDIDATES[inclusions.uri]
+    assert inclusions.gateway_commands == ("preview", "confirm", "execute", "verify")
+    assert inclusions.preferred_route == "transaction_operation"
+    assert inclusions.transaction_operations == ("waapi.call",)
+    assert inclusions.safety.read_only is True
+    assert inclusions.safety.requires_confirmation is True
 
     public = object_get.as_dict(detail=True)["interface"]
     assert "semantic_builder_ref" not in public
@@ -214,7 +216,19 @@ def test_public_manifest_dispatch_is_exactly_the_immutable_reviewed_call_allowli
 
     assert REVIEWED_PUBLIC_CALL_URIS == frozenset(
         {
+            "ak.soundengine.getState",
+            "ak.soundengine.getSwitch",
+            "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
+            "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
+            "ak.wwise.core.object.diff",
+            "ak.wwise.core.object.isLinked",
+            "ak.wwise.core.ping",
+            "ak.wwise.core.profiler.getCursorTime",
+            "ak.wwise.core.remote.getConnectionStatus",
+            "ak.wwise.core.transport.getState",
+            "ak.wwise.ui.commands.getCommands",
             "ak.wwise.waapi.getFunctions",
+            "ak.wwise.waapi.getSchema",
             "ak.wwise.waapi.getTopics",
         }
     )
@@ -229,70 +243,45 @@ def test_public_manifest_dispatch_is_exactly_the_immutable_reviewed_call_allowli
     )
 
 
-def test_audited_non_generic_reads_are_exact_disjoint_structured_boundaries() -> None:
-    expected_candidates = {
-        "ak.soundengine.getState",
-        "ak.soundengine.getSwitch",
-        "ak.wwise.core.blendContainer.getAssignments",
-        "ak.wwise.core.mediaPool.getFields",
-        "ak.wwise.core.object.diff",
-        "ak.wwise.core.object.isLinked",
-        "ak.wwise.core.ping",
-        "ak.wwise.core.profiler.getAudioObjects",
-        "ak.wwise.core.profiler.getBusses",
-        "ak.wwise.core.profiler.getCursorTime",
-        "ak.wwise.core.profiler.getPerformanceMonitor",
-        "ak.wwise.core.profiler.getVoiceContributions",
-        "ak.wwise.core.profiler.getVoices",
-        "ak.wwise.core.remote.getConnectionStatus",
-        "ak.wwise.core.soundbank.getInclusions",
-        "ak.wwise.core.switchContainer.getAssignments",
-        "ak.wwise.core.transport.getList",
-        "ak.wwise.core.transport.getState",
-        "ak.wwise.ui.commands.getCommands",
-        "ak.wwise.waapi.getSchema",
-    }
-    expected_immediate = {
-        "ak.wwise.core.log.get",
-        "ak.wwise.core.profiler.getCpuUsage",
-        "ak.wwise.core.profiler.getGameObjects",
-        "ak.wwise.core.profiler.getLoadedMedia",
-        "ak.wwise.core.profiler.getMeters",
-        "ak.wwise.core.profiler.getRTPCs",
-        "ak.wwise.core.profiler.getStreamedMedia",
-        "ak.wwise.core.remote.getAvailableConsoles",
+def test_exact_exclusion_registry_is_disjoint_and_accounts_for_all_45_rows() -> None:
+    expected_function_exclusions = {
+        "ak.wwise.cli.executeLuaScript",
+        "ak.wwise.core.executeLuaScript",
+        "ak.wwise.debug.enableAsserts",
+        "ak.wwise.debug.enableAutomationMode",
+        "ak.wwise.debug.getWalTree",
+        "ak.wwise.debug.restartWaapiServers",
+        "ak.wwise.debug.testAssert",
+        "ak.wwise.debug.testCrash",
         "ak.wwise.debug.validateCall",
+        "ak.wwise.ui.commands.register",
+        "ak.wwise.ui.commands.execute",
     }
+    expected_topic_exclusions = {"ak.wwise.debug.assertFailed"}
 
-    assert set(BOUNDED_CALL_CANDIDATES) == expected_candidates
-    assert IMMEDIATE_UNSUPPORTED_CALL_URIS == expected_immediate
-    assert expected_immediate <= set(EXPLICIT_UNSUPPORTED_LIVE_URIS)
-    assert not (REVIEWED_PUBLIC_CALL_URIS & expected_candidates)
-    assert not (REVIEWED_PUBLIC_CALL_URIS & expected_immediate)
-    assert not (expected_candidates & expected_immediate)
+    assert BOUNDED_CALL_CANDIDATES == {}
+    assert set(EXPLICIT_UNSUPPORTED_LIVE_URIS) == expected_function_exclusions
+    assert IMMEDIATE_UNSUPPORTED_CALL_URIS == expected_function_exclusions
+    assert set(EXPLICIT_UNSUPPORTED_TOPIC_URIS) == expected_topic_exclusions
+    assert not (REVIEWED_PUBLIC_CALL_URIS & expected_function_exclusions)
+    assert not (REVIEWED_TOPIC_URIS & expected_topic_exclusions)
 
-    catalog = CapabilityCatalog()
-    records_by_uri: dict[str, list[CapabilityRecord]] = {
-        uri: [] for uri in expected_candidates | expected_immediate
-    }
-    for version in SUPPORTED_WWISE_VERSION_KEYS:
-        for record in catalog.entries(version):
-            if record.uri in records_by_uri:
-                records_by_uri[record.uri].append(record)
-
-    assert all(records_by_uri.values())
-    for uri, records in records_by_uri.items():
-        expected_reason = (
-            BOUNDED_CALL_CANDIDATES[uri]
-            if uri in BOUNDED_CALL_CANDIDATES
-            else EXPLICIT_UNSUPPORTED_LIVE_URIS[uri]
-        )
-        for record in records:
-            assert record.safety.interface_status == "unsupported_by_skill_interface"
-            assert record.safety.read_only is False
-            assert record.preferred_route == "unsupported_boundary"
-            assert record.gateway_commands == ()
-            assert record.safety.reason == expected_reason
+    entries = [
+        entry
+        for version in SUPPORTED_WWISE_VERSION_KEYS
+        for entry in CapabilityCatalog().entries(version)
+    ]
+    excluded = [
+        entry
+        for entry in entries
+        if entry.safety.interface_status == "unsupported_by_skill_interface"
+    ]
+    assert len(excluded) == 45
+    assert {entry.uri for entry in excluded} == expected_function_exclusions | expected_topic_exclusions
+    assert all(entry.preferred_route == "unsupported_boundary" for entry in excluded)
+    assert all(entry.execution_mode == "excluded" for entry in excluded)
+    assert all(entry.gateway_commands == () for entry in excluded)
+    assert all(entry.execution_contract["executable"] is False for entry in excluded)
 
 
 @pytest.mark.parametrize("operation", ("getUnreviewed", "verifyUnreviewed", "dumpUnreviewed"))
@@ -324,13 +313,8 @@ def test_future_name_shaped_manifest_function_fails_closed(
     )
     schemas_path.write_text(json.dumps(schemas_payload), encoding="utf-8")
 
-    record = CapabilityCatalog(manifest_root=manifest_root).describe("2022.1", uri)
-
-    assert record.safety.read_only is False
-    assert record.safety.interface_status == "unsupported_by_skill_interface"
-    assert record.preferred_route == "unsupported_boundary"
-    assert record.gateway_commands == ()
-    assert "not in the immutable reviewed read-only function allowlist" in record.safety.reason
+    with pytest.raises(CapabilityCatalogError, match="execution-contract counts changed"):
+        CapabilityCatalog(manifest_root=manifest_root).describe("2022.1", uri)
 
 
 def test_future_manifest_topic_fails_closed_until_explicitly_reviewed(tmp_path: Path) -> None:
@@ -357,13 +341,8 @@ def test_future_manifest_topic_fails_closed_until_explicitly_reviewed(tmp_path: 
     )
     schemas_path.write_text(json.dumps(schemas_payload), encoding="utf-8")
 
-    record = CapabilityCatalog(manifest_root=manifest_root).describe("2022.1", uri)
-
-    assert record.safety.read_only is False
-    assert record.safety.interface_status == "unsupported_by_skill_interface"
-    assert record.preferred_route == "unsupported_boundary"
-    assert record.gateway_commands == ()
-    assert "not in the immutable reviewed topic allowlist" in record.safety.reason
+    with pytest.raises(CapabilityCatalogError, match="execution-contract counts changed"):
+        CapabilityCatalog(manifest_root=manifest_root).describe("2022.1", uri)
 
 
 def test_compact_capability_representation_is_stable_and_keeps_boundaries_visible() -> None:
@@ -384,24 +363,32 @@ def test_compact_capability_representation_is_stable_and_keeps_boundaries_visibl
         "transaction_operations",
         "transaction_boundaries",
         "read_only",
+        "execution_contract",
     }
-    assert compact["interface_status"] == "unsupported_by_skill_interface"
-    assert compact["preferred_route"] == "unsupported_boundary"
-    assert compact["transaction_operations"] == []
+    assert compact["interface_status"] == "available_via_transaction"
+    assert compact["preferred_route"] == "transaction_operation"
+    assert compact["transaction_operations"] == ["waapi.call"]
     assert compact["transaction_boundaries"][0]["operation"] == "object.copy"
     assert "returned copy GUID" in compact["transaction_boundaries"][0]["boundary"]
+    assert compact["execution_contract"]["contract"] == "waapi-skill.public-execution-contract/v1"
+    assert compact["execution_contract"]["route"] == "transaction"
+    assert compact["execution_contract"]["executable"] is True
+    assert compact["execution_contract"]["requires_confirmation"] is True
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
-def test_dump_objects_external_file_write_is_an_explicit_boundary(version: str) -> None:
+def test_dump_objects_external_file_write_is_an_isolated_confirmed_transaction(version: str) -> None:
     record = CapabilityCatalog().describe(version, "ak.wwise.cli.dumpObjects")
 
     assert record.safety.read_only is False
-    assert record.safety.interface_status == "unsupported_by_skill_interface"
-    assert record.preferred_route == "unsupported_boundary"
-    assert record.gateway_commands == ()
-    assert "output path" in record.safety.reason
-    assert "external file" in record.safety.reason
+    assert record.safety.interface_status == "available_via_transaction"
+    assert record.safety.requires_confirmation is True
+    assert record.preferred_route == "transaction_operation"
+    assert record.execution_mode == "isolated_transaction"
+    assert record.gateway_commands == ("preview", "confirm", "execute", "verify")
+    assert record.transaction_operations == ("waapi.call",)
+    assert record.execution_contract["timeout_seconds"] == 120.0
+    assert record.execution_contract["result_limit_bytes"] == 1024 * 1024
 
 
 def test_all_explicit_function_safety_boundaries_are_reflected_and_non_executable() -> None:

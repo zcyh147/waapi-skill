@@ -18,20 +18,21 @@ import json
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-from types import MappingProxyType
 from typing import Any, Iterable, Mapping
 
 from .builders.source_notes import load_semantic_source_notes
 from .category_policy import category_policy
 from .deferred_registry import ApiClassifier
+from .execution_contracts import (
+    ExecutionContract,
+    ExecutionContractError,
+    ExecutionContractRegistry,
+    FIXED_COMMANDS_BY_URI,
+    UNDO_GROUP_MEMBER_URIS,
+)
 from .manifest import ManifestStore
 from .operation_registry import OPERATION_SPECS
-from .safety import (
-    ApiSafety,
-    REVIEWED_FIXED_FUNCTION_URIS,
-    REVIEWED_PUBLIC_CALL_URIS,
-    classify_api_safety,
-)
+from .safety import ApiSafety, REVIEWED_FIXED_FUNCTION_URIS, classify_api_safety
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 
 
@@ -40,33 +41,10 @@ MANIFEST_ROOT = SKILL_ROOT / "resources" / "manifest"
 SEMANTIC_ROOT = SKILL_ROOT / "resources" / "semantic"
 DEFERRED_ROOT = SKILL_ROOT / "resources" / "deferred"
 
-FIXED_COMMANDS_BY_URI: Mapping[str, tuple[str, ...]] = MappingProxyType({
-    "ak.wwise.core.getInfo": ("status",),
-    "ak.wwise.core.getProjectInfo": ("status",),
-    "ak.wwise.core.object.get": ("query-object", "buses"),
-    "ak.wwise.core.object.getAttenuationCurve": ("metadata attenuation-curve",),
-    "ak.wwise.core.object.getPropertyAndReferenceNames": ("metadata names",),
-    "ak.wwise.core.object.getPropertyInfo": ("metadata property-info",),
-    "ak.wwise.core.object.getTypes": ("metadata types",),
-    "ak.wwise.core.object.isPropertyEnabled": ("metadata property-enabled",),
-    "ak.wwise.ui.getSelectedObjects": ("selected",),
-})
-
 if frozenset(FIXED_COMMANDS_BY_URI) != REVIEWED_FIXED_FUNCTION_URIS:
     raise RuntimeError(
         "The fixed gateway command map and immutable reviewed fixed-function allowlist must match exactly"
     )
-
-TRANSACTION_GATEWAY_COMMANDS = (
-    "operation-schema",
-    "preview",
-    "transaction-show",
-    "confirm",
-    "reject",
-    "execute",
-    "verify",
-)
-
 
 class CapabilityCatalogError(ValueError):
     """Base error for invalid catalog requests or packaged resources."""
@@ -97,6 +75,7 @@ class CapabilityRecord:
     transaction_boundaries: tuple[Mapping[str, Any], ...] = ()
     policy: Mapping[str, Any] | None = None
     evidence: Mapping[str, Any] = field(default_factory=dict)
+    execution_contract: Mapping[str, Any] = field(default_factory=dict)
 
     def as_compact_dict(self) -> dict[str, Any]:
         """Return the stable agent-facing inventory row.
@@ -119,6 +98,7 @@ class CapabilityRecord:
             "transaction_operations": list(self.transaction_operations),
             "transaction_boundaries": [_json_safe(item) for item in self.transaction_boundaries],
             "read_only": self.safety.read_only,
+            "execution_contract": _compact_execution_contract(self.execution_contract),
         }
 
     def as_dict(self, *, detail: bool = False) -> dict[str, Any]:
@@ -143,9 +123,10 @@ class CapabilityRecord:
                 "requires_live_wwise": True,
                 "manifest_runtime_profile": "wwise-console",
                 "authoring_ui_profile": "not_reflected_separately",
-                "schema_validation_level": "conservative_top_level",
+                "schema_validation_level": "bounded_recursive_reflection",
                 **self.safety.as_dict(),
             },
+            "execution_contract": _json_safe(self.execution_contract),
             "schema": schema_summary,
             "policy": _json_safe(self.policy) if self.policy is not None else None,
             "behavioral_evidence": _json_safe(self.evidence),
@@ -160,6 +141,22 @@ class CapabilityCatalog:
     semantic_root: Path = SEMANTIC_ROOT
     deferred_root: Path = DEFERRED_ROOT
     classifier: ApiClassifier = field(default_factory=ApiClassifier)
+    execution_registry: ExecutionContractRegistry = field(default_factory=ExecutionContractRegistry)
+
+    def __post_init__(self) -> None:
+        """Keep reflected schemas and executable contracts on one fail-closed root."""
+
+        manifest_root = Path(self.manifest_root)
+        registry_root = self.execution_registry.manifest_store.root
+        if registry_root == MANIFEST_ROOT and manifest_root != MANIFEST_ROOT:
+            self.execution_registry = ExecutionContractRegistry(
+                manifest_store=ManifestStore(root=manifest_root)
+            )
+            return
+        if registry_root is None or Path(registry_root) != manifest_root:
+            raise CapabilityCatalogError(
+                "Capability manifest_root and execution-contract manifest root must match"
+            )
 
     def versions(self) -> tuple[str, ...]:
         return tuple(SUPPORTED_WWISE_VERSION_KEYS)
@@ -174,6 +171,14 @@ class CapabilityCatalog:
         }
         semantic_families = self._semantic_families(version)
         deferred = self._deferred_entries(version)
+        try:
+            registry_entries = self.execution_registry.entries(version)
+        except ExecutionContractError as exc:
+            raise CapabilityCatalogError(str(exc)) from exc
+        execution_contracts = {
+            (entry.item_type, entry.uri): entry
+            for entry in registry_entries
+        }
         records: list[CapabilityRecord] = []
         seen: set[tuple[str, str]] = set()
         for item_type, section in (("function", "functions"), ("topic", "topics")):
@@ -187,31 +192,32 @@ class CapabilityCatalog:
                 seen.add(key)
                 classification = self.classifier.classify(uri, item_type)
                 reflected_safety = classify_api_safety(uri, item_type, classification.category)
+                try:
+                    execution_contract = execution_contracts[(item_type, uri)]
+                except KeyError as exc:
+                    raise CapabilityCatalogError(
+                        f"No public execution contract exists for reflected {item_type} {uri} in Wwise {version}"
+                    ) from exc
                 family = semantic_families.get(uri)
                 fixed_commands = FIXED_COMMANDS_BY_URI.get(uri, ())
                 transaction_operations, transaction_boundaries = _transaction_routes(version, uri)
-                safety = _interface_safety(
-                    reflected_safety,
-                    uri=uri,
-                    transaction_operations=transaction_operations,
-                )
+                if uri in UNDO_GROUP_MEMBER_URIS:
+                    transaction_operations = ("waapi.undoGroup",)
+                    transaction_boundaries = ()
+                safety = reflected_safety
+                if execution_contract.route in {
+                    "transaction",
+                    "managed_transaction",
+                    "isolated_transaction",
+                }:
+                    transaction_operations = tuple(sorted({*transaction_operations, "waapi.call"}))
                 schema_entry = schemas.get(uri, {})
                 schema_status = str(schema_entry.get("status") or "missing")
                 raw_schema = schema_entry.get("schema")
                 schema = raw_schema if isinstance(raw_schema, Mapping) else {}
                 policy_record = _policy_record(classification.category)
-                preferred_route = _preferred_route(
-                    safety=safety,
-                    item_type=item_type,
-                    fixed_commands=fixed_commands,
-                    transaction_operations=transaction_operations,
-                )
-                gateway_commands = _gateway_commands(
-                    safety=safety,
-                    item_type=item_type,
-                    fixed_commands=fixed_commands,
-                    transaction_operations=transaction_operations,
-                )
+                preferred_route = _preferred_route(execution_contract)
+                gateway_commands = execution_contract.gateway_commands
                 records.append(
                     CapabilityRecord(
                         version=version,
@@ -223,7 +229,7 @@ class CapabilityCatalog:
                         schema=schema,
                         safety=safety,
                         preferred_route=preferred_route,
-                        execution_mode="function_call" if item_type == "function" else "bounded_topic_wait",
+                        execution_mode=execution_contract.route,
                         semantic_family=family,
                         fixed_commands=tuple(fixed_commands),
                         gateway_commands=gateway_commands,
@@ -231,9 +237,10 @@ class CapabilityCatalog:
                         transaction_boundaries=transaction_boundaries,
                         policy=policy_record,
                         evidence=_evidence_record(deferred.get(uri)),
+                        execution_contract=execution_contract.as_dict(),
                     )
                 )
-        _validate_manifest_dispatch_invariant(version, records)
+        _validate_execution_contract_invariant(version, records)
         return tuple(sorted(records, key=lambda item: (item.uri, item.item_type)))
 
     def describe(self, version: str, uri: str) -> CapabilityRecord:
@@ -324,91 +331,41 @@ class CapabilityCatalog:
             )
 
 
-def _preferred_route(
-    *,
-    safety: ApiSafety,
-    item_type: str,
-    fixed_commands: tuple[str, ...],
-    transaction_operations: tuple[str, ...],
-) -> str:
-    if safety.interface_status == "unsupported_by_skill_interface":
-        return "unsupported_boundary"
-    if transaction_operations:
-        return "transaction_operation"
-    if item_type == "topic":
-        return "bounded_topic_wait"
-    if fixed_commands:
-        return "fixed_command"
-    return "manifest_dispatch"
+def _preferred_route(contract: ExecutionContract) -> str:
+    return {
+        "excluded": "unsupported_boundary",
+        "fixed_command": "fixed_command",
+        "bounded_call": "manifest_dispatch",
+        "bounded_topic_wait": "bounded_topic_wait",
+        "transaction": "transaction_operation",
+        "managed_transaction": "transaction_operation",
+        "isolated_transaction": "transaction_operation",
+        "compound_transaction_member": "transaction_operation",
+    }[contract.route]
 
 
-def _validate_manifest_dispatch_invariant(
+def _validate_execution_contract_invariant(
     version: str,
     records: Iterable[CapabilityRecord],
 ) -> None:
-    """Prove that generic dispatch is exactly the reflected public allowlist.
-
-    This is intentionally checked inside the packaged catalog rather than only
-    in repository tests.  A future reflected function, evidence-policy change,
-    or route refactor must therefore fail closed instead of silently acquiring
-    the generic ``call`` route.
-    """
+    """Prove every reflected row projects the registry's one public lane."""
 
     materialized = tuple(records)
-    reflected_functions = frozenset(
-        record.uri for record in materialized if record.item_type == "function"
-    )
-    expected = REVIEWED_PUBLIC_CALL_URIS & reflected_functions
-    actual = frozenset(
-        record.uri for record in materialized if record.preferred_route == "manifest_dispatch"
-    )
-    if actual != expected:
-        raise CapabilityCatalogError(
-            f"Manifest-dispatch invariant failed for Wwise {version}: "
-            f"expected={sorted(expected)!r}, actual={sorted(actual)!r}"
-        )
     invalid = tuple(
         record.uri
         for record in materialized
-        if record.preferred_route == "manifest_dispatch"
-        and (
-            record.item_type != "function"
-            or not record.safety.read_only
-            or record.safety.interface_status != "available"
-            or record.gateway_commands != ("call",)
-        )
+        if not isinstance(record.execution_contract, Mapping)
+        or record.execution_contract.get("version") != version
+        or record.execution_contract.get("uri") != record.uri
+        or tuple(record.execution_contract.get("gateway_commands", ())) != record.gateway_commands
+        or bool(record.execution_contract.get("executable"))
+        != (record.safety.interface_status != "unsupported_by_skill_interface")
     )
     if invalid:
         raise CapabilityCatalogError(
-            f"Manifest-dispatch rows lack the closed public call contract in Wwise {version}: "
+            f"Capability rows do not match the public execution contract in Wwise {version}: "
             f"{sorted(invalid)!r}"
         )
-
-
-def _gateway_commands(
-    *,
-    safety: ApiSafety,
-    item_type: str,
-    fixed_commands: tuple[str, ...],
-    transaction_operations: tuple[str, ...],
-) -> tuple[str, ...]:
-    """Return only packaged gateway commands that an agent may execute.
-
-    Semantic families describe implementation knowledge; they are not public
-    execution routes. Unsupported capabilities therefore expose no executable
-    command, while every available capability resolves to a closed gateway
-    lane without requiring imports or disposable code.
-    """
-
-    if safety.interface_status == "unsupported_by_skill_interface":
-        return ()
-    if transaction_operations:
-        return TRANSACTION_GATEWAY_COMMANDS
-    if item_type == "topic":
-        return ("wait-topic",)
-    if fixed_commands:
-        return fixed_commands
-    return ("call",)
 
 
 def _transaction_routes(
@@ -425,45 +382,6 @@ def _transaction_routes(
         else:
             boundaries.append({"operation": spec.name, "boundary": spec.boundary})
     return tuple(sorted(executable)), tuple(sorted(boundaries, key=lambda item: str(item["operation"])))
-
-
-def _interface_safety(
-    reflected: ApiSafety,
-    *,
-    uri: str,
-    transaction_operations: tuple[str, ...],
-) -> ApiSafety:
-    """Refine mutation safety using the closed transaction registry.
-
-    Reflection and an internal semantic builder are not an executable Skill
-    interface.  A mutating URI is exposed only when at least one registered
-    operation has a closed request, preflight, confirmation, dispatch, and
-    operation-specific verifier.
-    """
-
-    if reflected.read_only or reflected.interface_status == "unsupported_by_skill_interface":
-        return reflected
-    if transaction_operations:
-        return ApiSafety(
-            read_only=False,
-            requires_destructive_gate=True,
-            requires_confirmation=True,
-            interface_status="available_via_transaction",
-            reason=(
-                f"{uri} is exposed only through closed transaction operation(s): "
-                f"{', '.join(transaction_operations)}."
-            ),
-        )
-    return ApiSafety(
-        read_only=False,
-        requires_destructive_gate=True,
-        requires_confirmation=True,
-        interface_status="unsupported_by_skill_interface",
-        reason=(
-            f"{reflected.reason} The URI is reflected, but no closed packaged operation currently provides "
-            "request validation, live preflight, confirmation binding, and specific verification."
-        ),
-    )
 
 
 def _policy_record(category: str) -> dict[str, str] | None:
@@ -501,7 +419,12 @@ def _schema_summary(status: str, schema: Mapping[str, Any]) -> dict[str, Any]:
     if status != "ok":
         return result
     result["description"] = schema.get("description")
-    for source, target in (("argsSchema", "args"), ("optionsSchema", "options"), ("resultSchema", "result")):
+    for source, target in (
+        ("argsSchema", "args"),
+        ("optionsSchema", "options"),
+        ("resultSchema", "result"),
+        ("publishSchema", "event"),
+    ):
         section = schema.get(source)
         if not isinstance(section, Mapping):
             result[target] = {"type": "unknown", "required": [], "properties": []}
@@ -538,3 +461,25 @@ def _json_safe(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return [_json_safe(item) for item in value]
     return value
+
+
+def _compact_execution_contract(contract: Mapping[str, Any]) -> dict[str, Any]:
+    """Remove fields already present on the compact capability row."""
+
+    fields = (
+        "contract",
+        "route",
+        "effect",
+        "timeout_seconds",
+        "result_limit_bytes",
+        "verification_strategy",
+        "requires_confirmation",
+        "lifecycle_strategy",
+        "companion_uris",
+        "executable",
+    )
+    return {
+        field_name: _json_safe(contract[field_name])
+        for field_name in fields
+        if field_name in contract
+    }

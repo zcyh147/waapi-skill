@@ -41,7 +41,11 @@ from wwise_waapi.builders.query import (  # noqa: E402  # pyright: ignore[report
     SUPPORTED_SELECTS,
     build_object_get_query,
 )
-from wwise_waapi.builders.schema import validate_semantic_payload  # noqa: E402  # pyright: ignore[reportMissingImports]
+from wwise_waapi.builders.schema import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    validate_semantic_event,
+    validate_semantic_payload,
+    validate_semantic_result,
+)
 from wwise_waapi.config import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     ResolvedSkillConfig,
     SkillConfig,
@@ -54,8 +58,16 @@ from wwise_waapi.dispatcher import (  # noqa: E402  # pyright: ignore[reportMiss
     _safe_exception_attribute as safe_exception_attribute,
     _safe_type_name as safe_type_name,
 )
+from wwise_waapi.execution_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    PROJECT_GUARD_INVARIANT,
+    PROJECT_GUARD_MODES,
+    PROJECT_GUARD_TRANSITION_TO_PATH,
+)
 from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    PACKAGED_TRANSACTION_READBACK_URIS,
     OperationContractError,
+    VerificationResult,
+    build_undo_group_execution_plan,
     describe_operation,
     list_operation_specs,
     validate_prepared_roles,
@@ -69,10 +81,17 @@ from wwise_waapi.safety import (  # noqa: E402  # pyright: ignore[reportMissingI
 )
 from wwise_waapi.transaction_runtime import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     DEFAULT_PREVIEW_TTL_SECONDS,
+    PROJECT_GUARD_PHASE_POST_VERIFICATION,
     TransactionGuardError,
     build_project_guard,
     build_transaction_artifact,
     validate_transaction_guards,
+)
+from wwise_waapi.transaction_cleanup import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    CLEANUP_PROJECTION_CONTRACT,
+    CLEANUP_SPEC_CONTRACT,
+    TransactionCleanupError,
+    project_transaction_cleanup,
 )
 from wwise_waapi.transactions import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     STATE_DIRECTORY_ENV,
@@ -88,6 +107,7 @@ from wwise_waapi.versions import (  # noqa: E402  # pyright: ignore[reportMissin
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_TIMEOUT = 10.0
+DEFAULT_TRANSACTION_TIMEOUT = 150.0
 TRANSPORT_CLEANUP_GRACE_SECONDS = 0.05
 TOPIC_CLEANUP_RESERVE_MAX_SECONDS = 0.25
 TOPIC_CLEANUP_RESERVE_RATIO = 0.20
@@ -123,6 +143,13 @@ MAX_GATEWAY_JSON_INPUT_BYTES = 256 * 1024
 MAX_GATEWAY_JSON_DEPTH = 32
 MAX_GATEWAY_JSON_NODES = 10_000
 MAX_GATEWAY_JSON_STRING_BYTES = 64 * 1024
+UNDO_GROUP_CANCEL_RESERVE_MIN_SECONDS = 2.0
+UNDO_GROUP_CANCEL_RESERVE_MAX_SECONDS = 10.0
+UNDO_GROUP_CANCEL_RESERVE_RATIO = 0.20
+# Keep the authoritative pretty-printed phase document well below the public
+# 1 MiB gateway envelope.  The remaining space is reserved for the transaction
+# identity, project/role guard summaries, cleanup projection, and JSON framing.
+UNDO_GROUP_MAX_ACCUMULATED_RESULT_BYTES = 256 * 1024
 REFLECTION_INVENTORY_CALLS = {
     "ak.wwise.waapi.getFunctions": ("functions", "function"),
     "ak.wwise.waapi.getTopics": ("topics", "topic"),
@@ -620,7 +647,15 @@ def build_parser() -> argparse.ArgumentParser:
         dest="version",
         help=f"Expected Wwise year.major; defaults to ${ENV_VERSION}, then saved config, then live detection",
     )
-    parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=None,
+        help=(
+            f"Whole-command deadline in seconds; defaults to {DEFAULT_TIMEOUT:g} for reads/topics "
+            f"and {DEFAULT_TRANSACTION_TIMEOUT:g} for preview/execute/verify transactions"
+        ),
+    )
     parser.add_argument("--evidence-dir", help=f"Dispatcher evidence directory; defaults to ${ENV_EVIDENCE_DIR}")
     parser.add_argument("--state-dir", help=f"Transaction state directory; defaults to ${STATE_DIRECTORY_ENV}")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -1745,9 +1780,18 @@ def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> G
         if evidence_text
         else None
     )
-    if not math.isfinite(args.timeout) or args.timeout <= 0:
+    raw_timeout = (
+        args.timeout
+        if args.timeout is not None
+        else (
+            DEFAULT_TRANSACTION_TIMEOUT
+            if args.command in {"preview", "execute", "verify"}
+            else DEFAULT_TIMEOUT
+        )
+    )
+    if not math.isfinite(raw_timeout) or raw_timeout <= 0:
         raise GatewayInputError("timeout must be finite and greater than zero")
-    timeout = float(args.timeout)
+    timeout = float(raw_timeout)
     return GatewayConnection(
         host=host,
         port=port,
@@ -2046,9 +2090,18 @@ def dispatch_command(
             version=detected_version,
             options=request_options,
             topic_match=match or None,
-            operation_timeout=reserved_topic_wait_timeout(connection),
+            operation_timeout=min(
+                reserved_topic_wait_timeout(connection),
+                float(capability.execution_contract["timeout_seconds"]),
+            ),
+            result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
         )
         event = normalize_topic_event_result(result, expected_topic=args.api) if result.get("ok") else None
+        event_validation = (
+            validate_semantic_event(args.api, event, version=detected_version)
+            if event is not None
+            else None
+        )
         return {
             "ok": bool(result.get("ok")),
             "status": "ok" if result.get("ok") else "error",
@@ -2057,6 +2110,7 @@ def dispatch_command(
             "match": match or None,
             "call": dispatch_call_summary(result),
             "event": event,
+            "event_validation": event_validation.as_dict() if event_validation is not None else None,
             "cleanup": (
                 "unsubscribed"
                 if result.get("ok")
@@ -2110,6 +2164,17 @@ def dispatch_command(
             allow_destructive=False,
             topic_mode=args.topic_mode,
             live_behavior=args.live_behavior,
+            operation_timeout=float(capability.execution_contract["timeout_seconds"]),
+            result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
+        )
+        result_validation = (
+            validate_semantic_result(
+                args.api,
+                result.get("result"),
+                version=detected_version,
+            )
+            if result.get("ok") and not args.dry_run
+            else None
         )
         inventory = (
             normalize_reflection_inventory_result(
@@ -2126,6 +2191,8 @@ def dispatch_command(
             **common,
             "call": dispatch_call_summary(result),
             "schema_validation": validation.as_dict(),
+            "result_validation": result_validation.as_dict() if result_validation is not None else None,
+            "agent_result": inventory if inventory is not None else result.get("result"),
             "inventory": inventory,
         }
     raise GatewayInputError(f"unsupported command: {args.command}")
@@ -2148,19 +2215,32 @@ def dispatch_transaction_command(
     )
     if args.command == "preview":
         request_payload = parse_json_object(args.request_json, "--request-json")
+        project_guard_mode, target_project_path = transaction_project_guard_spec(
+            request_payload,
+            version=detected_version,
+        )
         project, project_call = current_project(
             dispatcher,
             connection=connection,
             version=detected_version,
+            allow_none=project_guard_mode != PROJECT_GUARD_INVARIANT,
         )
         state_dir = resolve_transaction_state_directory(args, env=env)
-        require_runtime_directory_outside_project(state_dir, project=project)
+        if project is not None:
+            require_runtime_directory_outside_project(state_dir, project=project)
+        if target_project_path is not None:
+            require_runtime_directory_outside_project(
+                state_dir,
+                project={"path": target_project_path},
+            )
         store = TransactionStore(state_dir)
         project_guard = build_project_guard(
             endpoint=common["endpoint"],
             version=detected_version,
             live_info=live_info,
             project=project,
+            project_guard_mode=project_guard_mode,
+            target_project_path=target_project_path,
         )
         artifact = build_transaction_artifact(
             request_payload,
@@ -2174,12 +2254,14 @@ def dispatch_transaction_command(
         created = store.create_preview(transaction_id, artifact)
         awaiting = store.submit_for_confirmation(transaction_id)
         prepared = artifact["prepared_operation"]
+        cleanup = transaction_cleanup_payload(prepared, phase="preview")
         agent_result = transaction_agent_result(
             request=require_mapping(artifact.get("request"), "transaction request"),
             transaction_id=transaction_id,
             artifact_hash=created.artifact_hash,
             state=awaiting.state.value,
             executed=False,
+            cleanup=cleanup,
         )
         return {
             "ok": True,
@@ -2194,7 +2276,7 @@ def dispatch_transaction_command(
                 "resolved_roles": prepared["resolved_roles"],
                 "pre_state": prepared["pre_state"],
                 "verification_plan": prepared["verification_plan"],
-                "cleanup": prepared["cleanup"],
+                "cleanup": cleanup,
                 "project_guard_fingerprint": project_guard["fingerprint"],
                 "runtime_guard_fingerprint": artifact["runtime_guard"]["fingerprint"],
                 "expires_at": artifact["expires_at"],
@@ -2202,12 +2284,18 @@ def dispatch_transaction_command(
             "project_call": project_call,
             "executed": False,
             "verified": False,
+            "cleanup": cleanup,
             "agent_result": agent_result,
         }
 
     store = resolve_transaction_store(args, env=env)
     transaction_id = args.transaction_id
     record = store.load(transaction_id)
+    preview = store.load_preview(transaction_id)
+    artifact = preview.artifact
+    if not isinstance(artifact, Mapping):
+        raise GatewayInputError("transaction preview artifact must be a JSON object")
+    prepared = require_mapping(artifact.get("prepared_operation"), "prepared operation")
     if record.state is TransactionState.EXECUTING:
         recovered = store.mark_execution_indeterminate(
             transaction_id,
@@ -2223,29 +2311,33 @@ def dispatch_transaction_command(
             "transaction_id": transaction_id,
             "state": recovered.state.value,
             "message": "The previous execution attempt is indeterminate and will not be retried automatically.",
+            "cleanup": transaction_cleanup_payload(prepared, phase="indeterminate"),
             "automatic_retry": False,
         }
-
-    preview = store.load_preview(transaction_id)
-    artifact = preview.artifact
-    if not isinstance(artifact, Mapping):
-        raise GatewayInputError("transaction preview artifact must be a JSON object")
 
     if args.command == "execute":
         if record.state is not TransactionState.CONFIRMED:
             raise InvalidTransition(
                 f"Transaction {transaction_id!r} must be confirmed before execution; current state is {record.state.value!r}."
             )
+        request_payload = require_mapping(artifact.get("request"), "transaction request")
+        project_guard_mode, target_project_path = transaction_project_guard_spec(
+            request_payload,
+            version=detected_version,
+        )
         project, project_call = current_project(
             dispatcher,
             connection=connection,
             version=detected_version,
+            allow_none=project_guard_mode != PROJECT_GUARD_INVARIANT,
         )
         current_guard = build_project_guard(
             endpoint=common["endpoint"],
             version=detected_version,
             live_info=live_info,
             project=project,
+            project_guard_mode=project_guard_mode,
+            target_project_path=target_project_path,
         )
         try:
             guard_validation = validate_transaction_guards(
@@ -2267,8 +2359,8 @@ def dispatch_transaction_command(
                 "guard_validation": exc.as_dict(),
                 "executed": False,
                 "verified": False,
+                "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
             }
-        prepared = require_mapping(artifact.get("prepared_operation"), "prepared operation")
         role_validation = validate_prepared_roles(prepared, read_call=read_call)
         if role_validation.get("ok") is not True:
             repreview = store.require_repreview(
@@ -2285,21 +2377,188 @@ def dispatch_transaction_command(
                 "role_validation": role_validation,
                 "executed": False,
                 "verified": False,
+                "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
             }
         dispatch_payload = require_mapping(prepared.get("dispatch"), "prepared dispatch")
-        request_payload = require_mapping(artifact.get("request"), "transaction request")
         operation = str(request_payload.get("operation"))
         spec = describe_operation(operation)
-        if dispatch_payload.get("uri") != spec.uri:
+        call_uri = dispatch_payload.get("uri")
+        if not isinstance(call_uri, str):
+            raise OperationContractError(
+                "PREVIEW_DISPATCH_MISMATCH",
+                "Immutable prepared dispatch lacks a WAAPI URI.",
+            )
+        if operation != "waapi.call" and call_uri != spec.uri:
             raise OperationContractError(
                 "PREVIEW_DISPATCH_MISMATCH",
                 "Immutable prepared dispatch URI does not match its closed operation registry entry.",
                 details={"operation": operation, "expected": spec.uri, "actual": dispatch_payload.get("uri")},
             )
+        capability = CapabilityCatalog().describe(detected_version, call_uri)
+        if operation == "waapi.call" and capability.preferred_route != "transaction_operation":
+            raise OperationContractError(
+                "PREVIEW_DISPATCH_MISMATCH",
+                "waapi.call preview no longer resolves to a reviewed transaction route.",
+                details={"operation": operation, "uri": call_uri, "route": capability.preferred_route},
+            )
+        if operation == "waapi.undoGroup":
+            request_arguments = request_payload.get("arguments")
+            if not isinstance(request_arguments, Mapping):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "Immutable waapi.undoGroup request lacks its arguments object.",
+                )
+            execution_plan = build_undo_group_execution_plan(
+                detected_version,
+                request_arguments,
+            )
+            stored_pre_state = prepared.get("pre_state")
+            stored_plan = (
+                stored_pre_state.get("execution_plan")
+                if isinstance(stored_pre_state, Mapping)
+                else None
+            )
+            if stored_plan != execution_plan:
+                raise OperationContractError(
+                    "PREVIEW_DISPATCH_MISMATCH",
+                    "Immutable waapi.undoGroup execution plan no longer matches its request.",
+                )
+            role_validation_output = undo_group_role_validation_summary(role_validation)
+            require_project_modification_policy(env=env, action="execution")
+            store.begin_execution(transaction_id)
+            try:
+                compound = dispatch_undo_group_execution_plan(
+                    dispatcher,
+                    connection=connection,
+                    version=detected_version,
+                    execution_plan=execution_plan,
+                )
+            except Exception as exc:  # noqa: BLE001 - begin may already have reached Wwise
+                indeterminate = store.mark_execution_indeterminate(
+                    transaction_id,
+                    details={
+                        "reason": "exception during same-connection Undo Group execution",
+                        "error_type": type(exc).__name__,
+                        "message": str(exc),
+                        "automatic_retry": False,
+                    },
+                )
+                return {
+                    "ok": False,
+                    "status": "indeterminate",
+                    **common,
+                    "transaction_id": transaction_id,
+                    "state": indeterminate.state.value,
+                    "message": str(exc),
+                    "same_connection": True,
+                    "cleanup": transaction_cleanup_payload(prepared, phase="indeterminate"),
+                    "automatic_retry": False,
+                }
+            if compound["status"] == "execution_cancelled":
+                cancelled = store.mark_execution_cancelled(
+                    transaction_id,
+                    details={"compound_execution": compound, "automatic_retry": False},
+                )
+                return {
+                    "ok": False,
+                    "status": "execution_cancelled",
+                    **common,
+                    "transaction_id": transaction_id,
+                    "state": cancelled.state.value,
+                    "artifact_hash": preview.artifact_hash,
+                    "compound_execution": compound,
+                    "role_validation": role_validation_output,
+                    "guard_validation": guard_validation,
+                    "project_call": project_call,
+                    "executed": True,
+                    "cancelled": True,
+                    "rollback_verified": False,
+                    "verified": False,
+                    "cleanup": transaction_cleanup_payload(prepared, phase="execution_cancelled"),
+                    "automatic_retry": False,
+                }
+            if compound["status"] == "indeterminate":
+                indeterminate = store.mark_execution_indeterminate(
+                    transaction_id,
+                    details={"compound_execution": compound, "automatic_retry": False},
+                )
+                return {
+                    "ok": False,
+                    "status": "indeterminate",
+                    **common,
+                    "transaction_id": transaction_id,
+                    "state": indeterminate.state.value,
+                    "artifact_hash": preview.artifact_hash,
+                    "compound_execution": compound,
+                    "role_validation": role_validation_output,
+                    "guard_validation": guard_validation,
+                    "project_call": project_call,
+                    "executed": True,
+                    "verified": False,
+                    "cleanup": transaction_cleanup_payload(prepared, phase="indeterminate"),
+                    "automatic_retry": False,
+                }
+            result = require_mapping(compound.get("dispatch_result"), "Undo Group dispatch result")
+            compound_summary = {
+                "status": compound["status"],
+                "same_connection": compound["same_connection"],
+                "automatic_retry": compound["automatic_retry"],
+                "phase_count": len(
+                    require_mapping(result.get("result"), "Undo Group result").get("phases", ())
+                ),
+                "authoritative_phases": "dispatch_result.result.phases",
+            }
+            try:
+                executed = store.mark_executed_unverified(
+                    transaction_id,
+                    details={"dispatch_result": result, "automatic_retry": False},
+                )
+            except Exception as exc:  # noqa: BLE001 - same-session success must not become replayable
+                persistence_payload = execution_success_persistence_failure_payload(
+                    common,
+                    store=store,
+                    transaction_id=transaction_id,
+                    artifact_hash=preview.artifact_hash,
+                    prepared=prepared,
+                    dispatch_result=result,
+                    exc=exc,
+                )
+                persistence_payload.update(
+                    {
+                        "compound_execution": compound_summary,
+                        "role_validation": role_validation_output,
+                        "guard_validation": guard_validation,
+                        "project_call": project_call,
+                        "same_connection": True,
+                    }
+                )
+                return persistence_payload
+            return {
+                "ok": True,
+                "status": "executed_unverified",
+                **common,
+                "transaction_id": transaction_id,
+                "state": executed.state.value,
+                "artifact_hash": preview.artifact_hash,
+                "dispatch_result": result,
+                "compound_execution": compound_summary,
+                "role_validation": role_validation_output,
+                "guard_validation": guard_validation,
+                "project_call": project_call,
+                "executed": True,
+                "verified": False,
+                "same_connection": True,
+                "cleanup": transaction_cleanup_payload(
+                    prepared,
+                    phase="executed",
+                    execution_result=result,
+                ),
+                "automatic_retry": False,
+            }
         call_args = require_mapping(dispatch_payload.get("args", {}), "prepared dispatch args")
         call_options = require_mapping(dispatch_payload.get("options", {}), "prepared dispatch options")
         schema_validation = validate_semantic_payload(
-            spec.uri,
+            call_uri,
             call_args,
             call_options,
             version=detected_version,
@@ -2311,12 +2570,14 @@ def dispatch_transaction_command(
         try:
             result = dispatch(
                 dispatcher,
-                spec.uri,
+                call_uri,
                 connection=connection,
                 version=detected_version,
                 args=call_args,
                 options=call_options,
                 allow_destructive=True,
+                operation_timeout=float(capability.execution_contract["timeout_seconds"]),
+                result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
             )
         except Exception as exc:  # noqa: BLE001 - execution may already have reached Wwise
             indeterminate = store.mark_execution_indeterminate(
@@ -2335,6 +2596,7 @@ def dispatch_transaction_command(
                 "transaction_id": transaction_id,
                 "state": indeterminate.state.value,
                 "message": str(exc),
+                "cleanup": transaction_cleanup_payload(prepared, phase="indeterminate"),
                 "automatic_retry": False,
             }
         if result.get("ok") is not True:
@@ -2351,12 +2613,37 @@ def dispatch_transaction_command(
                 "dispatch_result": result,
                 "role_validation": role_validation,
                 "guard_validation": guard_validation,
+                "cleanup": transaction_cleanup_payload(
+                    prepared,
+                    phase="indeterminate",
+                    execution_result=result,
+                ),
                 "automatic_retry": False,
             }
-        executed = store.mark_executed_unverified(
-            transaction_id,
-            details={"dispatch_result": result, "automatic_retry": False},
-        )
+        try:
+            executed = store.mark_executed_unverified(
+                transaction_id,
+                details={"dispatch_result": result, "automatic_retry": False},
+            )
+        except Exception as exc:  # noqa: BLE001 - WAAPI success must survive a local journal failure
+            persistence_payload = execution_success_persistence_failure_payload(
+                common,
+                store=store,
+                transaction_id=transaction_id,
+                artifact_hash=preview.artifact_hash,
+                prepared=prepared,
+                dispatch_result=result,
+                exc=exc,
+            )
+            persistence_payload.update(
+                {
+                    "schema_validation": schema_validation.as_dict(),
+                    "role_validation": role_validation,
+                    "guard_validation": guard_validation,
+                    "project_call": project_call,
+                }
+            )
+            return persistence_payload
         return {
             "ok": True,
             "status": "executed_unverified",
@@ -2371,6 +2658,11 @@ def dispatch_transaction_command(
             "project_call": project_call,
             "executed": True,
             "verified": False,
+            "cleanup": transaction_cleanup_payload(
+                prepared,
+                phase="executed",
+                execution_result=result,
+            ),
             "automatic_retry": False,
         }
 
@@ -2380,23 +2672,41 @@ def dispatch_transaction_command(
                 f"Transaction {transaction_id!r} must be executed_unverified before verification; "
                 f"current state is {record.state.value!r}."
             )
+        request_payload = require_mapping(artifact.get("request"), "transaction request")
+        project_guard_mode, target_project_path = transaction_project_guard_spec(
+            request_payload,
+            version=detected_version,
+        )
+        # Load the immutable execution evidence before any live verification
+        # probe.  A guard/readback failure must not discard a result-bound
+        # lifecycle identity such as the ID returned by transport.create.
+        events = store.read_events(transaction_id)
+        execution_events = [event for event in events if event.get("event_type") == "execution_completed"]
+        event_details = execution_events[-1].get("details") if execution_events else None
+        execution_result = event_details.get("dispatch_result") if isinstance(event_details, Mapping) else None
+        if not isinstance(execution_result, Mapping):
+            execution_result = {}
         try:
             project, project_call = current_project(
                 dispatcher,
                 connection=connection,
                 version=detected_version,
+                allow_none=project_guard_mode != PROJECT_GUARD_INVARIANT,
             )
             current_guard = build_project_guard(
                 endpoint=common["endpoint"],
                 version=detected_version,
                 live_info=live_info,
                 project=project,
+                project_guard_mode=project_guard_mode,
+                target_project_path=target_project_path,
             )
             guard_validation = validate_transaction_guards(
                 artifact,
                 current_project_guard=current_guard,
                 skill_root=SKILL_ROOT,
                 check_expiry=False,
+                project_phase=PROJECT_GUARD_PHASE_POST_VERIFICATION,
             )
         except TransactionGuardError as exc:
             return {
@@ -2408,6 +2718,11 @@ def dispatch_transaction_command(
                 "error_code": exc.error_code,
                 "message": str(exc),
                 "guard_validation": exc.as_dict(),
+                "cleanup": transaction_cleanup_payload(
+                    prepared,
+                    phase="executed",
+                    execution_result=execution_result,
+                ),
                 "automatic_retry": False,
                 "manual_verification_retry_allowed": True,
             }
@@ -2417,9 +2732,12 @@ def dispatch_transaction_command(
                 transaction_id=transaction_id,
                 state=record.state.value,
                 exc=exc,
+                cleanup=transaction_cleanup_payload(
+                    prepared,
+                    phase="executed",
+                    execution_result=execution_result,
+                ),
             )
-        events = store.read_events(transaction_id)
-        execution_events = [event for event in events if event.get("event_type") == "execution_completed"]
         if not execution_events:
             indeterminate = store.record_verification(
                 transaction_id,
@@ -2433,28 +2751,36 @@ def dispatch_transaction_command(
                 "transaction_id": transaction_id,
                 "state": indeterminate.state.value,
                 "error_code": "EXECUTION_EVIDENCE_MISSING",
+                "cleanup": transaction_cleanup_payload(prepared, phase="indeterminate"),
                 "automatic_retry": False,
             }
-        event_details = execution_events[-1].get("details")
-        execution_result = event_details.get("dispatch_result") if isinstance(event_details, Mapping) else None
-        if not isinstance(execution_result, Mapping):
-            execution_result = {}
-        prepared = require_mapping(artifact.get("prepared_operation"), "prepared operation")
         try:
             verification = verify_prepared_operation(
                 prepared,
                 execution_result=execution_result,
                 read_call=read_call,
             )
+            if project_guard_mode != PROJECT_GUARD_INVARIANT:
+                verification = strengthen_project_transition_verification(
+                    verification,
+                    guard_validation=guard_validation,
+                    project_call=project_call,
+                )
         except Exception as exc:  # noqa: BLE001 - read-only verification may be retried manually
             return verification_deferred_payload(
                 common,
                 transaction_id=transaction_id,
                 state=record.state.value,
                 exc=exc,
+                cleanup=transaction_cleanup_payload(
+                    prepared,
+                    phase="executed",
+                    execution_result=execution_result,
+                ),
             )
         outcome = {
             "verified": TransactionState.VERIFIED,
+            "result_schema_checked": TransactionState.RESULT_SCHEMA_CHECKED,
             "verification_failed": TransactionState.VERIFICATION_FAILED,
             "indeterminate": TransactionState.INDETERMINATE,
         }[verification.status]
@@ -2474,20 +2800,357 @@ def dispatch_transaction_command(
             "guard_validation": guard_validation,
             "project_call": project_call,
             "executed": True,
-            "verified": verification.ok,
+            "verified": verification.business_state_verified and verification.ok,
+            "result_schema_checked": verification.status == "result_schema_checked",
+            "verification_strength": verification.verification_strength,
+            "cleanup": transaction_cleanup_payload(
+                prepared,
+                phase="verified",
+                execution_result=execution_result,
+            ),
             "automatic_retry": False,
         }
-        if verification.ok and verification.status == TransactionState.VERIFIED.value:
-            payload["agent_result"] = transaction_agent_result(
+        if verification.ok:
+            agent_result = transaction_agent_result(
                 request=require_mapping(artifact.get("request"), "transaction request"),
                 transaction_id=transaction_id,
                 artifact_hash=preview.artifact_hash,
                 state=final_record.state.value,
                 executed=True,
-                verified=True,
+                verified=verification.business_state_verified,
+                cleanup=payload["cleanup"],
             )
+            if agent_result["operation"] in {"waapi.call", "waapi.undoGroup"}:
+                agent_result["result"] = execution_result.get("result")
+            payload["agent_result"] = agent_result
         return payload
     raise GatewayInputError(f"unsupported transaction command: {args.command}")
+
+
+def dispatch_undo_group_execution_plan(
+    dispatcher: WwiseDispatcher,
+    *,
+    connection: GatewayConnection,
+    version: str,
+    execution_plan: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Execute one reviewed Undo Group plan on the existing dispatcher/client.
+
+    No phase is retried.  Only an inner-call failure attempts ``cancelGroup``;
+    uncertainty in begin/end/cancel is terminal because replay could duplicate a
+    mutation or close a different session-scoped group.
+    """
+
+    if execution_plan.get("kind") != "same_connection_undo_group":
+        raise OperationContractError(
+            "INVALID_PREVIEW",
+            "Undo Group execution plan kind is missing or unsupported.",
+        )
+    if execution_plan.get("version") != version:
+        raise OperationContractError(
+            "VERSION_MISMATCH",
+            "Undo Group execution plan version does not match live Wwise.",
+        )
+    begin = require_mapping(execution_plan.get("begin"), "Undo Group begin phase")
+    inner_calls = execution_plan.get("calls")
+    end = require_mapping(execution_plan.get("end"), "Undo Group end phase")
+    cancel = require_mapping(execution_plan.get("cancel"), "Undo Group cancel phase")
+    if not isinstance(inner_calls, list):
+        raise OperationContractError(
+            "INVALID_PREVIEW",
+            "Undo Group execution plan calls must be a JSON array.",
+        )
+
+    phases: list[dict[str, Any]] = []
+
+    def run_phase(
+        phase_name: str,
+        phase: Mapping[str, Any],
+        *,
+        index: int | None = None,
+        reserve_cancel_budget: bool = False,
+    ) -> tuple[dict[str, Any], bool]:
+        uri_value = phase.get("uri", phase.get("api"))
+        args_value = phase.get("args", {})
+        options_value = phase.get("options", {})
+        if (
+            not isinstance(uri_value, str)
+            or not isinstance(args_value, Mapping)
+            or not isinstance(options_value, Mapping)
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                f"Undo Group {phase_name} phase is malformed.",
+            )
+        validate_semantic_payload(
+            uri_value,
+            args_value,
+            options_value,
+            version=version,
+        )
+        capability = CapabilityCatalog().describe(version, uri_value)
+        remaining = connection.deadline.require_remaining(
+            f"Undo Group {phase_name} {uri_value}"
+        )
+        cancel_reserve = 0.0
+        if reserve_cancel_budget:
+            cancel_reserve = min(
+                UNDO_GROUP_CANCEL_RESERVE_MAX_SECONDS,
+                max(
+                    UNDO_GROUP_CANCEL_RESERVE_MIN_SECONDS,
+                    remaining * UNDO_GROUP_CANCEL_RESERVE_RATIO,
+                ),
+            )
+        operation_timeout = min(
+            float(capability.execution_contract["timeout_seconds"]),
+            max(0.001, remaining - cancel_reserve),
+        )
+        result = dispatch(
+            dispatcher,
+            uri_value,
+            connection=connection,
+            version=version,
+            args=args_value,
+            options=options_value,
+            allow_destructive=True,
+            operation_timeout=operation_timeout,
+            result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
+        )
+        row: dict[str, Any] = {
+            "phase": phase_name,
+            "uri": uri_value,
+            "dispatch_result": result,
+            "operation_timeout_seconds": operation_timeout,
+            "cancel_reserve_seconds": cancel_reserve,
+        }
+        if index is not None:
+            row["index"] = index
+        try:
+            accumulated_size = len(
+                json.dumps(
+                    [*phases, row],
+                    ensure_ascii=False,
+                    indent=2,
+                    allow_nan=False,
+                ).encode("utf-8")
+            )
+        except (TypeError, ValueError):
+            accumulated_size = UNDO_GROUP_MAX_ACCUMULATED_RESULT_BYTES + 1
+        if accumulated_size > UNDO_GROUP_MAX_ACCUMULATED_RESULT_BYTES:
+            row["dispatch_result"] = dispatch_call_summary(result)
+            row["failure"] = {
+                "kind": "compound_result_limit_exceeded",
+                "limit_bytes": UNDO_GROUP_MAX_ACCUMULATED_RESULT_BYTES,
+                "observed_at_least_bytes": accumulated_size,
+            }
+            phases.append(row)
+            return row, False
+        if result.get("ok") is not True:
+            row["failure"] = {
+                "kind": "dispatch_failed",
+                "error_code": result.get("error_code"),
+                "message": result.get("message"),
+            }
+            phases.append(row)
+            return row, False
+        try:
+            validate_semantic_result(
+                uri_value,
+                result.get("result"),
+                version=version,
+            )
+        except SemanticValidationError as exc:
+            row["failure"] = {
+                "kind": "result_schema_mismatch",
+                "validation": exc.as_dict(),
+            }
+            phases.append(row)
+            return row, False
+        # The immutable request plan already records request validation, and
+        # verification re-validates every recorded dispatch result.  Avoid
+        # copying both validation documents into the live phase envelope.
+        phases.append(row)
+        return row, True
+
+    def best_effort_cancel() -> tuple[Mapping[str, Any], bool]:
+        try:
+            return run_phase("cancel", cancel)
+        except Exception as exc:  # noqa: BLE001 - evidence only; caller remains indeterminate
+            return (
+                {
+                    "phase": "cancel",
+                    "failure": {
+                        "kind": "cancel_exception",
+                        "error_type": type(exc).__name__,
+                        "message": str(exc),
+                    },
+                },
+                False,
+            )
+
+    try:
+        begin_row, begin_ok = run_phase("begin", begin, reserve_cancel_budget=True)
+    except Exception as exc:  # noqa: BLE001 - begin may have reached Wwise
+        cancel_row, cancel_ok = best_effort_cancel()
+        return {
+            "status": "indeterminate",
+            "same_connection": True,
+            "automatic_retry": False,
+            "reason": "beginGroup raised and is not safely replayable",
+            "failed_phase": {
+                "phase": "begin",
+                "failure": {
+                    "kind": "begin_exception",
+                    "error_type": type(exc).__name__,
+                    "message": str(exc),
+                },
+            },
+            "cancel_phase": cancel_row,
+            "cancel_succeeded": cancel_ok,
+            "phases": phases,
+        }
+    if not begin_ok:
+        cancel_row, cancel_ok = best_effort_cancel()
+        return {
+            "status": "indeterminate",
+            "same_connection": True,
+            "automatic_retry": False,
+            "reason": "beginGroup outcome is not safely replayable",
+            "failed_phase": begin_row,
+            "cancel_phase": cancel_row,
+            "cancel_succeeded": cancel_ok,
+            "phases": phases,
+        }
+
+    for index, inner in enumerate(inner_calls):
+        if not isinstance(inner, Mapping):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                f"Undo Group inner call {index} is malformed.",
+            )
+        try:
+            inner_row, inner_ok = run_phase(
+                "inner",
+                inner,
+                index=index,
+                reserve_cancel_budget=True,
+            )
+        except Exception as exc:  # noqa: BLE001 - inner mutation outcome is uncertain
+            cancel_row, cancel_ok = best_effort_cancel()
+            return {
+                "status": "indeterminate",
+                "same_connection": True,
+                "automatic_retry": False,
+                "reason": "an inner Undo Group mutation raised and is not safely replayable",
+                "failed_phase": {
+                    "phase": "inner",
+                    "index": index,
+                    "failure": {
+                        "kind": "inner_exception",
+                        "error_type": type(exc).__name__,
+                        "message": str(exc),
+                    },
+                },
+                "cancel_phase": cancel_row,
+                "cancel_succeeded": cancel_ok,
+                "phases": phases,
+            }
+        if inner_ok:
+            continue
+        cancel_row, cancel_ok = best_effort_cancel()
+        if not cancel_ok:
+            return {
+                "status": "indeterminate",
+                "same_connection": True,
+                "automatic_retry": False,
+                "reason": "cancelGroup outcome is uncertain after an inner-call failure",
+                "failed_phase": inner_row,
+                "cancel_phase": cancel_row,
+                "phases": phases,
+            }
+        return {
+            "status": "execution_cancelled",
+            "same_connection": True,
+            "automatic_retry": False,
+            "failed_phase": inner_row,
+            "cancel_phase": cancel_row,
+            "phases": phases,
+            "rollback_verified": False,
+            "message": "The open Undo Group was cancelled on the same connection; rollback state was not verified.",
+        }
+
+    try:
+        end_row, end_ok = run_phase("end", end, reserve_cancel_budget=True)
+    except Exception as exc:  # noqa: BLE001 - best-effort cancel cannot make end certain
+        cancel_row, cancel_ok = best_effort_cancel()
+        return {
+            "status": "indeterminate",
+            "same_connection": True,
+            "automatic_retry": False,
+            "reason": "endGroup raised and is not safely replayable",
+            "failed_phase": {
+                "phase": "end",
+                "failure": {
+                    "kind": "end_exception",
+                    "error_type": type(exc).__name__,
+                    "message": str(exc),
+                },
+            },
+            "cancel_phase": cancel_row,
+            "cancel_succeeded": cancel_ok,
+            "phases": phases,
+        }
+    if not end_ok:
+        cancel_row, cancel_ok = best_effort_cancel()
+        return {
+            "status": "indeterminate",
+            "same_connection": True,
+            "automatic_retry": False,
+            "reason": "endGroup outcome is not safely replayable",
+            "failed_phase": end_row,
+            "cancel_phase": cancel_row,
+            "cancel_succeeded": cancel_ok,
+            "phases": phases,
+        }
+    dispatch_result = {
+        "ok": True,
+        "api": "waapi.undoGroup",
+        "version": version,
+        "result": {"same_connection": True, "phases": phases},
+        "error_code": None,
+        "message": "ok",
+    }
+    return {
+        "status": "completed",
+        "same_connection": True,
+        "automatic_retry": False,
+        "dispatch_result": dispatch_result,
+    }
+
+
+def undo_group_role_validation_summary(
+    role_validation: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Return the successful Undo guard facts without duplicating its plan."""
+
+    raw_assertions = role_validation.get("assertions")
+    assertions = raw_assertions if isinstance(raw_assertions, list) else []
+    return {
+        "contract": role_validation.get("contract"),
+        "operation": role_validation.get("operation"),
+        "ok": role_validation.get("ok") is True,
+        "status": role_validation.get("status"),
+        "assertions": [
+            {
+                "name": assertion.get("name"),
+                "passed": assertion.get("passed") is True,
+            }
+            for assertion in assertions
+            if isinstance(assertion, Mapping)
+        ],
+        "readbacks": [],
+        "evidence_location": "immutable transaction preview artifact",
+    }
 
 
 def dispatch(
@@ -2505,6 +3168,7 @@ def dispatch(
     live_behavior: bool = False,
     exact_object_lookup: bool = False,
     operation_timeout: float | None = None,
+    result_limit_bytes: int = MAX_GATEWAY_RESULT_JSON_BYTES,
 ) -> dict[str, Any]:
     remaining = connection.deadline.require_remaining(f"dispatch {api}")
     dispatch_timeout = (
@@ -2524,6 +3188,7 @@ def dispatch(
         topic_mode=topic_mode,
         topic_match=topic_match,
         live_behavior=live_behavior,
+        result_limit_bytes=result_limit_bytes,
     )
     if result.get("error_code") == "TIMEOUT":
         result = dict(result)
@@ -3211,6 +3876,7 @@ def transaction_agent_result(
     state: str,
     executed: bool,
     verified: bool | None = None,
+    cleanup: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Project an immutable transaction artifact into the agent JSON contract.
 
@@ -3233,7 +3899,69 @@ def transaction_agent_result(
     }
     if verified is not None:
         result["verified"] = verified
+    if cleanup is not None:
+        result["cleanup"] = dict(cleanup)
     return result
+
+
+def transaction_cleanup_payload(
+    prepared: Mapping[str, Any],
+    *,
+    phase: str,
+    execution_result: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Preserve the immutable cleanup spec and add an honest phase status."""
+
+    raw_spec = prepared.get("cleanup")
+    spec = dict(raw_spec) if isinstance(raw_spec, Mapping) else {"kind": "none"}
+    if spec.get("contract") == CLEANUP_SPEC_CONTRACT:
+        try:
+            projection = project_transaction_cleanup(
+                spec,
+                phase=phase,
+                execution_result=execution_result,
+            )
+        except TransactionCleanupError as exc:
+            projection = {
+                "contract": CLEANUP_PROJECTION_CONTRACT,
+                "phase": phase,
+                "status": "unknown",
+                "automatic_cleanup": False,
+                "automatic_retry": False,
+                "error": exc.as_dict(),
+            }
+        return {
+            "spec": spec,
+            "status": projection["status"],
+            "projection": projection,
+        }
+
+    kind = spec.get("kind")
+    if phase == "indeterminate":
+        status = "unknown"
+    elif kind in {None, "none", "none-after-delete"}:
+        status = "not_required"
+    elif kind == "same_connection_cancel_on_inner_failure":
+        status = (
+            "armed_during_execution"
+            if phase == "preview"
+            else "handled_same_connection"
+            if phase == "execution_cancelled"
+            else "not_required"
+        )
+    elif phase == "preview":
+        status = "not_started"
+    else:
+        status = "pending"
+    projection = {
+        "contract": CLEANUP_PROJECTION_CONTRACT,
+        "phase": phase,
+        "status": status,
+        "kind": kind,
+        "automatic_cleanup": bool(spec.get("automatic_cleanup") is True),
+        "automatic_retry": False,
+    }
+    return {"spec": spec, "status": status, "projection": projection}
 
 
 def transaction_show_summary(
@@ -3257,6 +3985,37 @@ def transaction_show_summary(
         }
         for event in events
     ]
+    current_state = next(
+        (
+            str(event.get("to_state"))
+            for event in reversed(events)
+            if isinstance(event.get("to_state"), str)
+        ),
+        TransactionState.DRAFT.value,
+    )
+    cleanup_phase = {
+        TransactionState.EXECUTING.value: "indeterminate",
+        TransactionState.INDETERMINATE.value: "indeterminate",
+        TransactionState.EXECUTED_UNVERIFIED.value: "executed",
+        TransactionState.VERIFIED.value: "verified",
+        TransactionState.RESULT_SCHEMA_CHECKED.value: "verified",
+        TransactionState.VERIFICATION_FAILED.value: "verified",
+        TransactionState.EXECUTION_CANCELLED.value: "execution_cancelled",
+    }.get(current_state, "preview")
+    execution_result: Mapping[str, Any] | None = None
+    for event in reversed(events):
+        if event.get("event_type") != "execution_completed":
+            continue
+        details = event.get("details")
+        candidate = details.get("dispatch_result") if isinstance(details, Mapping) else None
+        if isinstance(candidate, Mapping):
+            execution_result = candidate
+        break
+    cleanup = transaction_cleanup_payload(
+        prepared,
+        phase=cleanup_phase,
+        execution_result=execution_result,
+    )
     return {
         "summary_only": True,
         "preview_summary": {
@@ -3266,7 +4025,7 @@ def transaction_show_summary(
             "resolved_roles": prepared.get("resolved_roles"),
             "pre_state": prepared.get("pre_state"),
             "verification_plan": prepared.get("verification_plan"),
-            "cleanup": prepared.get("cleanup"),
+            "cleanup": cleanup,
             "project_guard_fingerprint": project_guard.get("fingerprint"),
             "runtime_guard_fingerprint": runtime_guard.get("fingerprint"),
             "expires_at": artifact_map.get("expires_at"),
@@ -3282,11 +4041,12 @@ def verification_deferred_payload(
     transaction_id: str,
     state: str,
     exc: Exception,
+    cleanup: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     structured = exc.as_dict() if hasattr(exc, "as_dict") and callable(exc.as_dict) else {}
     error_code = structured.get("error_code") if isinstance(structured, Mapping) else None
     details = structured.get("details") if isinstance(structured, Mapping) else None
-    return {
+    payload = {
         "ok": False,
         "status": "verification_deferred",
         **common,
@@ -3298,6 +4058,140 @@ def verification_deferred_payload(
         "automatic_retry": False,
         "manual_verification_retry_allowed": True,
     }
+    if cleanup is not None:
+        payload["cleanup"] = dict(cleanup)
+    return payload
+
+
+def execution_success_persistence_failure_payload(
+    common: Mapping[str, Any],
+    *,
+    store: TransactionStore,
+    transaction_id: str,
+    artifact_hash: str,
+    prepared: Mapping[str, Any],
+    dispatch_result: Mapping[str, Any],
+    exc: BaseException,
+) -> dict[str, Any]:
+    """Preserve a completed mutation when its terminal journal write fails.
+
+    Retrying a successful WAAPI mutation merely because the local completion
+    record failed can duplicate work.  This response therefore keeps the
+    execution and cleanup evidence, reports the best durable state we can read,
+    and explicitly forbids automatic replay.
+    """
+
+    persistence_error = normalize_gateway_exception(exc)
+    observed_state: str | None = None
+    observation_error: dict[str, Any] | None = None
+    try:
+        observed_state = store.load(transaction_id).state.value
+    except BaseException as state_exc:  # noqa: BLE001 - report, never mask, the primary write failure
+        observation_error = normalize_gateway_exception(state_exc)
+    details: dict[str, Any] = {
+        "attempted_transition": TransactionState.EXECUTED_UNVERIFIED.value,
+        "persistence_error": persistence_error,
+        "durable_state_observed": observed_state is not None,
+        "retry_warning": "The WAAPI call succeeded; replay could duplicate the mutation.",
+    }
+    if observed_state is not None:
+        details["observed_durable_state"] = observed_state
+    if observation_error is not None:
+        details["state_observation_error"] = observation_error
+    payload: dict[str, Any] = {
+        "ok": False,
+        "status": "execution_succeeded_persistence_failed",
+        **common,
+        "transaction_id": transaction_id,
+        "artifact_hash": artifact_hash,
+        "error_code": "TRANSACTION_PERSISTENCE_FAILED",
+        "message": (
+            "The WAAPI mutation succeeded, but its durable transaction completion "
+            "could not be recorded. Do not retry it automatically."
+        ),
+        "details": details,
+        "dispatch_result": dict(dispatch_result),
+        "executed": True,
+        "verified": False,
+        "cleanup": transaction_cleanup_payload(
+            prepared,
+            phase="executed",
+            execution_result=dispatch_result,
+        ),
+        "automatic_retry": False,
+    }
+    if observed_state is not None:
+        payload["state"] = observed_state
+    return payload
+
+
+def transaction_project_guard_spec(
+    request: Mapping[str, Any],
+    *,
+    version: str,
+) -> tuple[str, str | None]:
+    """Resolve the immutable project guard mode from the public API contract."""
+
+    if request.get("operation") != "waapi.call":
+        return PROJECT_GUARD_INVARIANT, None
+    arguments = request.get("arguments")
+    if not isinstance(arguments, Mapping):
+        return PROJECT_GUARD_INVARIANT, None
+    api = arguments.get("api")
+    if not isinstance(api, str):
+        return PROJECT_GUARD_INVARIANT, None
+    capability = CapabilityCatalog().describe(version, api)
+    mode = capability.execution_contract.get("project_guard_mode", PROJECT_GUARD_INVARIANT)
+    if not isinstance(mode, str) or mode not in PROJECT_GUARD_MODES:
+        raise GatewayInputError(
+            f"Execution contract for {api!r} has unsupported project_guard_mode {mode!r}"
+        )
+    target_project_path: str | None = None
+    if mode == PROJECT_GUARD_TRANSITION_TO_PATH:
+        call_args = arguments.get("args")
+        target_value = call_args.get("path") if isinstance(call_args, Mapping) else None
+        if not isinstance(target_value, str) or not target_value.strip():
+            raise GatewayInputError(
+                f"Project transition {api!r} requires an explicit target WPROJ path"
+            )
+        target_project_path = target_value
+    return mode, target_project_path
+
+
+def strengthen_project_transition_verification(
+    verification: VerificationResult,
+    *,
+    guard_validation: Mapping[str, Any],
+    project_call: Mapping[str, Any],
+) -> VerificationResult:
+    """Upgrade a generic result-schema receipt after a proven project transition."""
+
+    if not verification.ok:
+        return verification
+    transition = guard_validation.get("project_transition")
+    if not isinstance(transition, Mapping) or transition.get("matched") is not True:
+        raise GatewayInputError(
+            "Project transition verification requires one matched structured postcondition"
+        )
+    assertion = {
+        "name": "live project matches the immutable transition postcondition",
+        "passed": True,
+        "evidence": dict(transition),
+    }
+    readback = {
+        "kind": "project-transition-observation",
+        "call": dispatch_call_summary(project_call),
+        "project": transition.get("actual"),
+    }
+    return VerificationResult(
+        operation=verification.operation,
+        status="verified",
+        assertions=(*verification.assertions, assertion),
+        readbacks=(*verification.readbacks, readback),
+        message="The returned WAAPI payload and live project transition postcondition both passed.",
+        verification_strength=f"{verification.verification_strength}+project_transition_readback",
+        business_state_verified=True,
+    )
 
 
 def current_project(
@@ -3305,7 +4199,42 @@ def current_project(
     *,
     connection: GatewayConnection,
     version: str,
-) -> tuple[Mapping[str, Any], Mapping[str, Any]]:
+    allow_none: bool = False,
+) -> tuple[Mapping[str, Any] | None, Mapping[str, Any]]:
+    if allow_none:
+        # A successful bounded object query with zero Project rows is the only
+        # accepted no-project observation.  WAAPI errors and malformed payloads
+        # stay failures because their cross-version no-project shape is not a
+        # safe contract to guess.
+        project_call = dispatch(
+            dispatcher,
+            OBJECT_GET_URI,
+            connection=connection,
+            version=version,
+            args={"waql": "from type Project take 2"},
+            options={"return": ["id", "name", "type", "path"]},
+        )
+        if project_call.get("ok") is not True:
+            raise GatewayInputError(
+                "Project transition probe failed; refusing to infer that no project is open"
+            )
+        rows = strict_object_get_rows(
+            project_call,
+            command="transaction project transition guard",
+            maximum_rows=1,
+            error_code="INVALID_PROJECT_RESULT",
+        )
+        if not rows:
+            return None, project_call
+        project = require_single_result_row(
+            rows,
+            command="transaction project transition guard",
+            error_code="INVALID_PROJECT_RESULT",
+        )
+        return require_project_identity(
+            project,
+            command="transaction project transition guard",
+        ), project_call
     if version == "2021.1":
         project_call = dispatch(
             dispatcher,
@@ -3356,6 +4285,12 @@ def transaction_read_call(
     version: str,
 ) -> Callable[[str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any]]:
     def read(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
+        if uri not in PACKAGED_TRANSACTION_READBACK_URIS:
+            raise OperationContractError(
+                "UNREVIEWED_READBACK_URI",
+                f"Transaction readback URI {uri!r} is not in the packaged read-only allowlist.",
+                details={"uri": uri},
+            )
         result = dispatch(
             dispatcher,
             uri,
@@ -3363,7 +4298,11 @@ def transaction_read_call(
             version=version,
             args=args,
             options=options,
-            allow_destructive=False,
+            # These exact URIs are operation-owned readbacks.  Some are routed
+            # as confirmed transactions for public use, so the generic
+            # dispatcher gate must be bypassed internally without broadening
+            # the public direct-call surface.
+            allow_destructive=True,
         )
         if result.get("ok") is not True:
             raise OperationContractError(

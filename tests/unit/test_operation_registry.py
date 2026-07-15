@@ -7,6 +7,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     OPERATION_REQUEST_CONTRACT,
+    UNDO_GROUP_INNER_URIS_BY_VERSION,
     OperationContractError,
     list_operation_specs,
     parse_operation_request,
@@ -64,7 +65,34 @@ def object_row(
 def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() -> None:
     specs = {spec.name: spec.as_dict() for spec in list_operation_specs()}
 
-    assert len(specs) == 17
+    assert len(specs) == 19
+    assert specs["waapi.undoGroup"]["implemented"] is True
+    assert specs["waapi.undoGroup"]["family"] == "same-connection-compound"
+    assert specs["waapi.undoGroup"]["required_arguments"] == ["display_name", "calls"]
+    assert specs["waapi.undoGroup"]["argument_contract"]["properties"]["calls"]["maxItems"] == 32
+    assert specs["waapi.call"]["implemented"] is True
+    assert specs["waapi.call"]["uri"] == "manifest://waapi.call"
+    assert specs["waapi.call"]["family"] == "public-execution-contract"
+    assert specs["waapi.call"]["supported_versions"] == [
+        "2021.1",
+        "2022.1",
+        "2023.1",
+        "2024.1",
+        "2025.1",
+    ]
+    assert specs["waapi.call"]["argument_contract"] == {
+        "type": "object",
+        "required": ["api"],
+        "optional": ["args", "options", "io_root"],
+        "additionalProperties": False,
+        "properties": {
+            "api": {"type": "string", "pattern": r"^ak\."},
+            "args": {"type": "object"},
+            "options": {"type": "object"},
+            "io_root": {"type": "string", "minLength": 1},
+        },
+    }
+    assert "execution is bound to immutable preview confirmation" in specs["waapi.call"]["constraints"]
     assert specs["object.create"]["implemented"] is True
     assert specs["audio.import"]["implemented"] is True
     assert "identity_contract" not in specs["audio.import"]
@@ -92,6 +120,115 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
         "2024.1",
         "2025.1",
     ]
+
+
+@pytest.mark.parametrize(
+    ("version", "cancel_args"),
+    [
+        ("2021.1", {}),
+        ("2022.1", {}),
+        ("2023.1", {"undo": True}),
+        ("2024.1", {"undo": True}),
+        ("2025.1", {"undo": True}),
+    ],
+)
+def test_undo_group_builds_one_exact_versioned_immutable_plan(
+    version: str,
+    cancel_args: Mapping[str, Any],
+) -> None:
+    parsed = parse_operation_request(
+        request(
+            "waapi.undoGroup",
+            {
+                "display_name": "Batch edit",
+                "calls": [
+                    {
+                        "api": "ak.wwise.core.object.setNotes",
+                        "args": {"object": GUID, "value": "after"},
+                    }
+                ],
+            },
+            version=version,
+        )
+    )
+    prepared = prepare_operation(parsed, read_call=lambda *_: {}).as_dict()
+    plan = prepared["pre_state"]["execution_plan"]
+
+    assert prepared["dispatch"] == {
+        "uri": "ak.wwise.core.undo.beginGroup",
+        "args": {},
+        "options": {},
+    }
+    assert plan["begin"]["uri"] == "ak.wwise.core.undo.beginGroup"
+    assert plan["calls"][0]["api"] == "ak.wwise.core.object.setNotes"
+    assert plan["end"]["args"] == {"displayName": "Batch edit"}
+    assert plan["cancel"]["args"] == cancel_args
+    assert plan["same_connection_required"] is True
+    assert plan["automatic_retry"] is False
+
+
+def test_undo_group_rejects_independent_members_version_drift_and_large_requests() -> None:
+    with pytest.raises(OperationContractError) as independent:
+        parse_operation_request(
+            request(
+                "waapi.call",
+                {"api": "ak.wwise.core.undo.beginGroup", "args": {}, "options": {}},
+            )
+        )
+    assert independent.value.error_code == "UNDO_GROUP_COMPOSITE_REQUIRED"
+    assert independent.value.details["required_operation"] == "waapi.undoGroup"
+
+    with pytest.raises(OperationContractError) as version_drift:
+        parse_operation_request(
+            request(
+                "waapi.undoGroup",
+                {
+                    "display_name": "Not in 2022",
+                    "calls": [
+                        {
+                            "api": "ak.wwise.core.object.setStateGroups",
+                            "args": {},
+                        }
+                    ],
+                },
+                version="2022.1",
+            )
+        )
+    assert version_drift.value.error_code == "UNDO_GROUP_INNER_NOT_ALLOWED"
+
+    with pytest.raises(OperationContractError) as oversized:
+        parse_operation_request(
+            request(
+                "waapi.undoGroup",
+                {
+                    "display_name": "Oversized",
+                    "calls": [
+                        {
+                            "api": "ak.wwise.core.object.setNotes",
+                            "args": {"object": GUID, "value": "x" * (129 * 1024)},
+                        }
+                    ],
+                },
+            )
+        )
+    assert oversized.value.error_code == "UNDO_GROUP_REQUEST_TOO_LARGE"
+
+
+def test_undo_group_version_allowlist_is_exact_and_only_grows_at_reviewed_boundaries() -> None:
+    assert {version: len(uris) for version, uris in UNDO_GROUP_INNER_URIS_BY_VERSION.items()} == {
+        "2021.1": 9,
+        "2022.1": 11,
+        "2023.1": 14,
+        "2024.1": 19,
+        "2025.1": 19,
+    }
+    assert "ak.wwise.core.object.pasteProperties" not in UNDO_GROUP_INNER_URIS_BY_VERSION["2021.1"]
+    assert "ak.wwise.core.object.pasteProperties" in UNDO_GROUP_INNER_URIS_BY_VERSION["2022.1"]
+    assert "ak.wwise.core.object.setStateGroups" not in UNDO_GROUP_INNER_URIS_BY_VERSION["2022.1"]
+    assert "ak.wwise.core.object.setStateGroups" in UNDO_GROUP_INNER_URIS_BY_VERSION["2023.1"]
+    assert "ak.wwise.core.blendContainer.addTrack" not in UNDO_GROUP_INNER_URIS_BY_VERSION["2023.1"]
+    assert "ak.wwise.core.blendContainer.addTrack" in UNDO_GROUP_INNER_URIS_BY_VERSION["2024.1"]
+    assert UNDO_GROUP_INNER_URIS_BY_VERSION["2024.1"] == UNDO_GROUP_INNER_URIS_BY_VERSION["2025.1"]
 
 
 def test_compact_operation_inventory_is_stable_and_keeps_boundary_text() -> None:
@@ -1177,3 +1314,263 @@ def test_switch_assignment_validates_relationship_prestate_drift_and_exact_post_
         item["name"] == "complete Switch Container assignment state matches expected post-state"
         for item in verified.assertions
     )
+
+
+@pytest.mark.parametrize(
+    ("api", "arguments", "expected_connected"),
+    [
+        ("ak.wwise.core.remote.connect", {"host": "127.0.0.1"}, True),
+        ("ak.wwise.core.remote.disconnect", {}, False),
+    ],
+)
+def test_public_remote_lifecycle_uses_connection_status_business_readback(
+    api: str,
+    arguments: Mapping[str, Any],
+    expected_connected: bool,
+) -> None:
+    prepared = prepare_operation(
+        parse_operation_request(
+            request(
+                "waapi.call",
+                {"api": api, "args": dict(arguments), "options": {}},
+                version="2022.1",
+            )
+        ),
+        read_call=ScriptedReader({}),
+    ).as_dict()
+
+    assert prepared["verification_plan"] == {
+        "kind": "remote-connection-state",
+        "uri": api,
+        "version": "2022.1",
+        "strategy": "operation_specific_readback",
+        "base_result_strategy": "result_schema",
+        "expected_connected": expected_connected,
+    }
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.remote.getConnectionStatus": [
+                {
+                    "isConnected": expected_connected,
+                    "status": "Connected" if expected_connected else "Not connected",
+                }
+            ]
+        }
+    )
+    verified = verify_prepared_operation(
+        prepared,
+        execution_result={"result": {}},
+        read_call=reader,
+    )
+
+    assert verified.status == "verified"
+    assert verified.business_state_verified is True
+    assert verified.verification_strength == "operation_specific_readback"
+    assert verified.message == (
+        "The WAAPI result schema and operation-specific business-state readbacks passed."
+    )
+    assert reader.calls == [("ak.wwise.core.remote.getConnectionStatus", {}, {})]
+    assert all(item["passed"] for item in verified.assertions)
+
+    mismatch = verify_prepared_operation(
+        prepared,
+        execution_result={"result": {}},
+        read_call=ScriptedReader(
+            {
+                "ak.wwise.core.remote.getConnectionStatus": [
+                    {"isConnected": not expected_connected, "status": "opposite"}
+                ]
+            }
+        ),
+    )
+    assert mismatch.status == "verification_failed"
+    assert mismatch.ok is False
+
+
+def test_public_transport_create_requires_returned_id_list_membership_and_state_readback() -> None:
+    transport_id = 73
+    prepared = prepare_operation(
+        parse_operation_request(
+            request(
+                "waapi.call",
+                {
+                    "api": "ak.wwise.core.transport.create",
+                    "args": {"object": GUID},
+                    "options": {},
+                },
+                version="2025.1",
+            )
+        ),
+        read_call=ScriptedReader({}),
+    ).as_dict()
+    assert prepared["verification_plan"] == {
+        "kind": "transport-created",
+        "uri": "ak.wwise.core.transport.create",
+        "version": "2025.1",
+        "strategy": "operation_specific_readback",
+        "base_result_strategy": "result_schema",
+    }
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.transport.getList": [
+                {"list": [{"transport": transport_id, "object": GUID, "gameObject": 1}]}
+            ],
+            "ak.wwise.core.transport.getState": [{"state": "stopped"}],
+        }
+    )
+    verified = verify_prepared_operation(
+        prepared,
+        execution_result={"result": {"transport": transport_id}},
+        read_call=reader,
+    )
+
+    assert verified.status == "verified"
+    assert verified.business_state_verified is True
+    assert reader.calls == [
+        ("ak.wwise.core.transport.getList", {}, {}),
+        ("ak.wwise.core.transport.getState", {"transport": transport_id}, {}),
+    ]
+    assertion_names = {item["name"] for item in verified.assertions if item["passed"]}
+    assert assertion_names >= {
+        "transport.create returned a non-zero uint32 transport ID",
+        "created transport ID appears exactly once in transport.getList",
+        "created transport ID resolves through transport.getState",
+    }
+
+
+@pytest.mark.parametrize("invalid_id", [None, 0, True, -1, 0x100000000, "73"])
+def test_public_transport_create_never_reads_or_claims_verified_for_invalid_returned_id(
+    invalid_id: Any,
+) -> None:
+    prepared = prepare_operation(
+        parse_operation_request(
+            request(
+                "waapi.call",
+                {
+                    "api": "ak.wwise.core.transport.create",
+                    "args": {"object": GUID},
+                    "options": {},
+                },
+                version="2022.1",
+            )
+        ),
+        read_call=ScriptedReader({}),
+    ).as_dict()
+    reader = ScriptedReader({})
+    execution_payload = {} if invalid_id is None else {"transport": invalid_id}
+
+    verification = verify_prepared_operation(
+        prepared,
+        execution_result={"result": execution_payload},
+        read_call=reader,
+    )
+
+    assert verification.status == "verification_failed"
+    assert verification.ok is False
+    assert reader.calls == []
+    transport_assertion = next(
+        item
+        for item in verification.assertions
+        if item["name"] == "transport.create returned a non-zero uint32 transport ID"
+    )
+    assert transport_assertion["passed"] is False
+
+
+def test_public_transport_create_fails_if_list_or_state_does_not_prove_existence() -> None:
+    prepared = prepare_operation(
+        parse_operation_request(
+            request(
+                "waapi.call",
+                {
+                    "api": "ak.wwise.core.transport.create",
+                    "args": {"object": GUID},
+                    "options": {},
+                },
+            )
+        ),
+        read_call=ScriptedReader({}),
+    ).as_dict()
+    verification = verify_prepared_operation(
+        prepared,
+        execution_result={"result": {"transport": 73}},
+        read_call=ScriptedReader(
+            {
+                "ak.wwise.core.transport.getList": [{"list": [{"transport": 74}]}],
+                "ak.wwise.core.transport.getState": [{"state": "unknown"}],
+            }
+        ),
+    )
+
+    assert verification.status == "verification_failed"
+    failed = {item["name"] for item in verification.assertions if not item["passed"]}
+    assert failed >= {
+        "created transport ID appears exactly once in transport.getList",
+        "ak.wwise.core.transport.getState readback matches the packaged reflected schema",
+        "created transport ID resolves through transport.getState",
+    }
+
+
+def test_public_transport_destroy_uses_request_id_and_proves_absence_from_get_list() -> None:
+    transport_id = 73
+    prepared = prepare_operation(
+        parse_operation_request(
+            request(
+                "waapi.call",
+                {
+                    "api": "ak.wwise.core.transport.destroy",
+                    "args": {"transport": transport_id},
+                    "options": {},
+                },
+                version="2024.1",
+            )
+        ),
+        read_call=ScriptedReader({}),
+    ).as_dict()
+    assert prepared["verification_plan"] == {
+        "kind": "transport-destroyed",
+        "uri": "ak.wwise.core.transport.destroy",
+        "version": "2024.1",
+        "strategy": "operation_specific_readback",
+        "base_result_strategy": "result_schema",
+        "transport_id": transport_id,
+    }
+    verified = verify_prepared_operation(
+        prepared,
+        execution_result={"result": {}},
+        read_call=ScriptedReader(
+            {"ak.wwise.core.transport.getList": [{"list": [{"transport": 74}]}]}
+        ),
+    )
+    assert verified.status == "verified"
+    assert verified.business_state_verified is True
+
+    still_present = verify_prepared_operation(
+        prepared,
+        execution_result={"result": {}},
+        read_call=ScriptedReader(
+            {"ak.wwise.core.transport.getList": [{"list": [{"transport": transport_id}]}]}
+        ),
+    )
+    assert still_present.status == "verification_failed"
+    assert next(
+        item
+        for item in still_present.assertions
+        if item["name"] == "destroyed transport ID is absent from transport.getList"
+    )["passed"] is False
+
+
+@pytest.mark.parametrize("invalid_id", [0, True, -1, 0x100000000, "73"])
+def test_public_transport_destroy_rejects_invalid_transport_id_before_preview(invalid_id: Any) -> None:
+    with pytest.raises(OperationContractError) as invalid:
+        parse_operation_request(
+            request(
+                "waapi.call",
+                {
+                    "api": "ak.wwise.core.transport.destroy",
+                    "args": {"transport": invalid_id},
+                    "options": {},
+                },
+            )
+        )
+
+    assert invalid.value.error_code == "INVALID_ARGUMENT"

@@ -78,6 +78,7 @@ class DispatcherRequest:
     topic_mode: str = "wait"
     topic_match: Mapping[str, Any] | None = None
     live_behavior: bool = False
+    result_limit_bytes: int = MAX_LIVE_RESULT_JSON_BYTES
 
 
 @dataclass(slots=True, frozen=True)
@@ -127,6 +128,7 @@ class WwiseDispatcher:
         topic_mode: str = "wait",
         topic_match: Mapping[str, Any] | None = None,
         live_behavior: bool = False,
+        result_limit_bytes: int = MAX_LIVE_RESULT_JSON_BYTES,
     ) -> dict[str, Any]:
         """Dispatch one WAAPI function or topic and return a structured result."""
 
@@ -142,6 +144,7 @@ class WwiseDispatcher:
             topic_mode=topic_mode,
             topic_match=topic_match,
             live_behavior=live_behavior,
+            result_limit_bytes=result_limit_bytes,
         )
         try:
             result = self._dispatch(request)
@@ -158,6 +161,13 @@ class WwiseDispatcher:
                 request.version,
                 "INVALID_TIMEOUT",
                 "timeout must be finite and non-negative",
+            )
+        if not isinstance(request.result_limit_bytes, int) or isinstance(request.result_limit_bytes, bool) or request.result_limit_bytes <= 0:
+            return self._error_result(
+                request.api,
+                request.version,
+                "INVALID_RESULT_LIMIT",
+                "result_limit_bytes must be a positive integer",
             )
 
         entry = self._lookup_entry(request.version, request.api)
@@ -383,7 +393,8 @@ class WwiseDispatcher:
         result: dict[str, Any],
         request: DispatcherRequest,
     ) -> dict[str, Any]:
-        probe = _probe_json_document_size(result, MAX_LIVE_RESULT_JSON_BYTES)
+        effective_limit = min(MAX_LIVE_RESULT_JSON_BYTES, request.result_limit_bytes)
+        probe = _probe_json_document_size(result, effective_limit)
         common = {
             "item_type": _bounded_public_string(result.get("item_type"), None, 80),
             "category": _bounded_public_string(result.get("category"), None, 80),
@@ -410,7 +421,7 @@ class WwiseDispatcher:
                 "RESULT_TOO_LARGE",
                 "Live WAAPI result exceeded the public JSON size limit",
                 details={
-                    "limit_bytes": MAX_LIVE_RESULT_JSON_BYTES,
+                    "limit_bytes": effective_limit,
                     "observed_at_least_bytes": probe.observed_at_least_bytes,
                     "provenance": LIVE_RESULT_CEILING_PROVENANCE,
                 },
@@ -434,6 +445,7 @@ class WwiseDispatcher:
             topic_mode=str(kwargs["topic_mode"]),
             topic_match=kwargs["topic_match"],
             live_behavior=bool(kwargs["live_behavior"]),
+            result_limit_bytes=int(kwargs["result_limit_bytes"]),
         )
 
     def _destructive_allowed(self, request: DispatcherRequest) -> bool:

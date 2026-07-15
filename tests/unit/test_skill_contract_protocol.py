@@ -8,6 +8,7 @@ SKILL = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
 QUERY = (SKILL_ROOT / "references" / "waapi-query.md").read_text(encoding="utf-8")
 SETUP = (SKILL_ROOT / "references" / "waapi-setup.md").read_text(encoding="utf-8")
 OPERATE = (SKILL_ROOT / "references" / "waapi-operate.md").read_text(encoding="utf-8")
+COVERAGE = (SKILL_ROOT / "references" / "waapi-coverage.md").read_text(encoding="utf-8")
 
 
 def test_common_reads_use_closed_gateway_before_optional_references() -> None:
@@ -50,7 +51,8 @@ def test_ordinary_wwise_work_forbids_agent_authored_code() -> None:
         assert phrase in SKILL
     assert "Skill development, testing, or debugging" in SKILL
     assert "Do not import builders or planners from inline Python" in OPERATE
-    assert "do not bridge those gaps with generated code" in OPERATE.lower()
+    assert "That boundary does not authorize code generation" in OPERATE
+    assert "Do not write code to bypass it" in OPERATE
 
 
 def test_operate_lane_uses_real_transaction_cli_in_order() -> None:
@@ -105,10 +107,12 @@ def test_transaction_state_never_grants_authority_and_hash_alone_is_insufficient
 
 
 def test_verify_payload_is_terminal_and_must_not_be_double_checked() -> None:
-    assert "`verify` already performs the operation-specific live readback" in SKILL
+    assert "`verify` is the terminal authority for the selected contract" in SKILL
+    assert "dedicated operations return their live readback" in SKILL
+    assert "generic `waapi.call` returns reflected result-schema evidence" in SKILL
     assert "Do not add `query-object`, `call`, or another gateway command" in SKILL
     assert "The `verify` payload is the terminal authority" in OPERATE
-    assert "Never append `query-object`, generic `call`, or another gateway command" in OPERATE
+    assert "Never append `query-object`, direct `call`, or another gateway command" in OPERATE
     assert "then stop without an extra query" in OPERATE
 
 
@@ -127,7 +131,7 @@ def test_operation_request_is_closed_and_runtime_owned_metadata_cannot_be_inject
     assert "unknown fields fail" in OPERATE
 
 
-def test_closed_operations_and_boundaries_are_truthful() -> None:
+def test_dedicated_operations_and_generic_transaction_fallback_are_truthful() -> None:
     for operation in (
         "object.create",
         "object.delete",
@@ -141,17 +145,30 @@ def test_closed_operations_and_boundaries_are_truthful() -> None:
         "switchContainer.removeAssignment",
     ):
         assert f"`{operation}`" in OPERATE
-    for boundary in (
-        "object.set",
+    assert "`waapi.call`: one exact version-reflected API" in OPERATE
+    assert "`waapi.undoGroup`: one display name plus 1–32 version-allowlisted" in OPERATE
+    assert "accepted only for a catalog transaction route" in OPERATE
+    assert "result-schema verification" in OPERATE
+    for older_semantic_boundary in (
         "object.copy",
         "object.move",
         "audio.importTabDelimited",
         "soundbank.generate",
-        "soundbank.convertExternalSources",
-        "soundbank.processDefinitionFiles",
     ):
-        assert boundary in OPERATE
+        assert older_semantic_boundary in OPERATE
+    assert "their richer operation-specific verifier is incomplete" in OPERATE
+    assert "the three Undo Group members declare only `waapi.undoGroup`" in OPERATE
     assert "Platform-specific values are not yet accepted" in OPERATE
+
+
+def test_five_version_coverage_reference_reports_executable_registry_not_boundaries() -> None:
+    assert "| Total version/API rows | 814 | 247 | 522 | 45 | 769 |" in COVERAGE
+    assert "The 769 executable rows represent 188 unique public WAAPI URIs" in COVERAGE
+    assert "A hard boundary is never counted as executable coverage" in COVERAGE
+    assert "manifest-registered `waapi.call` operation" in COVERAGE
+    assert "Arbitrary Lua is excluded because it recreates model-authored code execution" in COVERAGE
+    assert "program-tested packaged coverage" in COVERAGE
+    assert 'not “769 endpoints live-verified in' in COVERAGE
 
 
 def test_transaction_runtime_invariants_prevent_hash_target_and_retry_drift() -> None:
@@ -165,9 +182,23 @@ def test_transaction_runtime_invariants_prevent_hash_target_and_retry_drift() ->
         "never automatically retried",
         "executed_unverified",
         "verification_deferred",
+        "execution_cancelled",
+        "result_schema_checked",
     ):
         assert phrase in OPERATE
     assert "even with `--allow-destructive` or `WWISE_DESTRUCTIVE=1`" in OPERATE
+
+
+def test_lifecycle_cleanup_statuses_and_bindings_are_documented() -> None:
+    for phrase in (
+        "opener preview is `not_started`",
+        "successful execution/verification is `pending`",
+        "ambiguous execution is `unknown`",
+        "Transport destroy binds only to the validated ID returned by create",
+        "Work Unit load/unload is reported separately as `available_reversal`",
+        "UI command register/execute are excluded entirely",
+    ):
+        assert phrase in OPERATE
 
 
 def test_operation_specific_verification_is_not_generic_mutation_replay() -> None:

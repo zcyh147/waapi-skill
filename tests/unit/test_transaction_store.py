@@ -154,6 +154,46 @@ def test_execution_result_can_be_recovered_from_hash_chained_journal(tmp_path) -
     }
 
 
+def test_result_schema_checked_is_a_distinct_terminal_success_state(tmp_path) -> None:
+    store = TransactionStore(tmp_path)
+    created = store.create_preview("tx-schema", {"operation": "waapi.call"})
+    store.submit_for_confirmation("tx-schema")
+    store.confirm("tx-schema", artifact_hash=created.artifact_hash)
+    store.begin_execution("tx-schema")
+    store.mark_executed_unverified("tx-schema")
+
+    final = store.record_verification(
+        "tx-schema",
+        TransactionState.RESULT_SCHEMA_CHECKED,
+        details={"verification_strength": "partial_reflected_schema"},
+    )
+
+    assert final.state is TransactionState.RESULT_SCHEMA_CHECKED
+    assert store.read_events("tx-schema")[-1]["to_state"] == "result_schema_checked"
+    with pytest.raises(InvalidTransition, match="terminal"):
+        store.transition("tx-schema", TransactionState.VERIFIED)
+
+
+def test_execution_cancelled_is_a_truthful_terminal_non_verification_state(tmp_path) -> None:
+    store = TransactionStore(tmp_path)
+    created = store.create_preview("tx-cancelled", {"operation": "waapi.undoGroup"})
+    store.submit_for_confirmation("tx-cancelled")
+    store.confirm("tx-cancelled", artifact_hash=created.artifact_hash)
+    store.begin_execution("tx-cancelled")
+
+    final = store.mark_execution_cancelled(
+        "tx-cancelled",
+        details={"rollback_verified": False, "automatic_retry": False},
+    )
+
+    assert final.state is TransactionState.EXECUTION_CANCELLED
+    event = store.read_events("tx-cancelled")[-1]
+    assert event["event_type"] == "execution_cancelled"
+    assert event["details"]["rollback_verified"] is False
+    with pytest.raises(InvalidTransition, match="terminal"):
+        store.transition("tx-cancelled", TransactionState.EXECUTING)
+
+
 @pytest.mark.parametrize(
     "outcome",
     [

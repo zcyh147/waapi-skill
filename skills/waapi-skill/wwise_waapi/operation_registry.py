@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
+from .canonical import canonical_json_bytes
 from .builders.imports import ImportBuilder
 from .builders.identity import ObjectIdentity, ResolvedObject, plan_object_resolution
 from .builders.metadata import (
@@ -27,9 +28,13 @@ from .builders.metadata import (
 )
 from .builders.object_mutation import ObjectMutationBuilder
 from .builders.properties import PropertyReferenceBuilder
-from .builders.common import SemanticPreview
+from .builders.common import SemanticEnvelope, SemanticPreview, SemanticValidationError
+from .builders.schema import validate_semantic_payload, validate_semantic_result
 from .builders.soundbank import SoundBankBuilder
 from .builders.switchcontainer import SwitchContainerAssignmentBuilder
+from .execution_contracts import ExecutionContractError, ExecutionContractRegistry
+from .io_policy import IOPolicyError, validate_isolated_io
+from .transaction_cleanup import build_transaction_cleanup_spec
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 
 
@@ -40,6 +45,68 @@ ROLE_VALIDATION_CONTRACT = "waapi-skill.role-validation/v1"
 OBJECT_GET_URI = "ak.wwise.core.object.get"
 SOUNDBANK_GET_INCLUSIONS_URI = "ak.wwise.core.soundbank.getInclusions"
 SWITCHCONTAINER_GET_ASSIGNMENTS_URI = "ak.wwise.core.switchContainer.getAssignments"
+REMOTE_GET_CONNECTION_STATUS_URI = "ak.wwise.core.remote.getConnectionStatus"
+REMOTE_CONNECT_URI = "ak.wwise.core.remote.connect"
+REMOTE_DISCONNECT_URI = "ak.wwise.core.remote.disconnect"
+TRANSPORT_CREATE_URI = "ak.wwise.core.transport.create"
+TRANSPORT_DESTROY_URI = "ak.wwise.core.transport.destroy"
+TRANSPORT_GET_LIST_URI = "ak.wwise.core.transport.getList"
+TRANSPORT_GET_STATE_URI = "ak.wwise.core.transport.getState"
+PACKAGED_TRANSACTION_READBACK_URIS = frozenset(
+    {
+        OBJECT_GET_URI,
+        GET_PROPERTY_INFO_URI,
+        SOUNDBANK_GET_INCLUSIONS_URI,
+        SWITCHCONTAINER_GET_ASSIGNMENTS_URI,
+        REMOTE_GET_CONNECTION_STATUS_URI,
+        TRANSPORT_GET_LIST_URI,
+        TRANSPORT_GET_STATE_URI,
+    }
+)
+TRANSPORT_STATES = frozenset({"playing", "stopped", "paused"})
+UNDO_BEGIN_GROUP_URI = "ak.wwise.core.undo.beginGroup"
+UNDO_END_GROUP_URI = "ak.wwise.core.undo.endGroup"
+UNDO_CANCEL_GROUP_URI = "ak.wwise.core.undo.cancelGroup"
+UNDO_GROUP_MAX_CALLS = 32
+UNDO_GROUP_MAX_DISPLAY_NAME_LENGTH = 256
+UNDO_GROUP_MAX_REQUEST_BYTES = 128 * 1024
+UNDO_GROUP_MAX_PLAN_BYTES = 256 * 1024
+_UNDO_GROUP_2021_INNER_URIS = frozenset(
+    {
+        "ak.wwise.core.object.setAttenuationCurve",
+        "ak.wwise.core.object.setName",
+        "ak.wwise.core.object.setNotes",
+        "ak.wwise.core.object.setProperty",
+        "ak.wwise.core.object.setRandomizer",
+        "ak.wwise.core.object.setReference",
+        "ak.wwise.core.soundbank.setInclusions",
+        "ak.wwise.core.switchContainer.addAssignment",
+        "ak.wwise.core.switchContainer.removeAssignment",
+    }
+)
+_UNDO_GROUP_2022_INNER_URIS = _UNDO_GROUP_2021_INNER_URIS | {
+    "ak.wwise.core.object.pasteProperties",
+    "ak.wwise.core.sound.setActiveSource",
+}
+_UNDO_GROUP_2023_INNER_URIS = _UNDO_GROUP_2022_INNER_URIS | {
+    "ak.wwise.core.object.setLinked",
+    "ak.wwise.core.object.setStateGroups",
+    "ak.wwise.core.object.setStateProperties",
+}
+_UNDO_GROUP_2024_INNER_URIS = _UNDO_GROUP_2023_INNER_URIS | {
+    "ak.wwise.core.audio.setConversionPlugin",
+    "ak.wwise.core.blendContainer.addAssignment",
+    "ak.wwise.core.blendContainer.addTrack",
+    "ak.wwise.core.blendContainer.removeAssignment",
+    "ak.wwise.core.gameParameter.setRange",
+}
+UNDO_GROUP_INNER_URIS_BY_VERSION: Mapping[str, frozenset[str]] = {
+    "2021.1": _UNDO_GROUP_2021_INNER_URIS,
+    "2022.1": frozenset(_UNDO_GROUP_2022_INNER_URIS),
+    "2023.1": frozenset(_UNDO_GROUP_2023_INNER_URIS),
+    "2024.1": frozenset(_UNDO_GROUP_2024_INNER_URIS),
+    "2025.1": frozenset(_UNDO_GROUP_2024_INNER_URIS),
+}
 SWITCH_GROUP_REFERENCE = "SwitchGroupOrStateGroup"
 IDENTITY_RETURN_FIELDS = ("id", "name", "type", "path", "parent", "notes")
 INCLUSION_FILTERS = frozenset({"events", "structures", "media"})
@@ -66,6 +133,23 @@ IMPORT_ROOTS_BY_VERSION: Mapping[str, frozenset[str]] = {
 IMPORT_ITEM_REQUIRED_FIELDS = ("object_path", "audio_file")
 IMPORT_ITEM_OPTIONAL_FIELDS = ("object_type", "notes")
 _TYPED_PATH_SEGMENT = re.compile(r"^<[^<>]+>(.+)$")
+
+FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS: Mapping[str, frozenset[str]] = {
+    "ak.wwise.cli.generateSoundbank": frozenset(
+        {
+            "custom-global-closing-cmd",
+            "custom-global-opening-cmd",
+            "custom-post-gen-cmd",
+            "custom-pre-gen-cmd",
+        }
+    ),
+    "ak.wwise.cli.tabDelimitedImport": frozenset(
+        {
+            "custom-global-closing-cmd",
+            "custom-global-opening-cmd",
+        }
+    ),
+}
 
 
 _ID_IDENTITY_SCHEMA: Mapping[str, Any] = {
@@ -244,10 +328,12 @@ class VerificationResult:
     assertions: tuple[Mapping[str, Any], ...]
     readbacks: tuple[Mapping[str, Any], ...] = ()
     message: str = ""
+    verification_strength: str = "operation_specific_readback"
+    business_state_verified: bool = True
 
     @property
     def ok(self) -> bool:
-        return self.status == "verified"
+        return self.status in {"verified", "result_schema_checked"}
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -258,6 +344,8 @@ class VerificationResult:
             "assertions": [_json_mapping(item) for item in self.assertions],
             "readbacks": [_json_mapping(item) for item in self.readbacks],
             "message": self.message,
+            "verification_strength": self.verification_strength,
+            "business_state_verified": self.business_state_verified,
         }
 
 
@@ -265,6 +353,68 @@ ReadCall = Callable[[str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, An
 
 
 OPERATION_SPECS: Mapping[str, OperationSpec] = {
+    "waapi.undoGroup": OperationSpec(
+        "waapi.undoGroup",
+        UNDO_BEGIN_GROUP_URI,
+        "same-connection-compound",
+        "Execute 1-32 reviewed project mutations inside one same-session Wwise Undo Group.",
+        ("display_name", "calls"),
+        argument_contract=_object_contract(
+            ("display_name", "calls"),
+            {
+                "display_name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": UNDO_GROUP_MAX_DISPLAY_NAME_LENGTH,
+                },
+                "calls": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": UNDO_GROUP_MAX_CALLS,
+                    "items": _object_contract(
+                        ("api", "args"),
+                        {
+                            "api": {"type": "string", "pattern": r"^ak\.wwise\.core\."},
+                            "args": {"type": "object"},
+                            "options": {"type": "object"},
+                        },
+                        optional=("options",),
+                    ),
+                },
+            },
+        ),
+        constraints=(
+            "beginGroup, every inner mutation, and endGroup execute on one existing WAAPI client",
+            "inner calls are selected from an immutable version-specific project-mutation allowlist",
+            "inner failure triggers same-connection cancelGroup; cancellation is not rollback verification",
+            "begin/end/cancel uncertainty is terminal and never retried automatically",
+        ),
+    ),
+    "waapi.call": OperationSpec(
+        "waapi.call",
+        "manifest://waapi.call",
+        "public-execution-contract",
+        "Execute one manifest-registered guarded function without model-authored code.",
+        ("api",),
+        ("args", "options", "io_root"),
+        argument_contract=_object_contract(
+            ("api",),
+            {
+                "api": {"type": "string", "pattern": r"^ak\."},
+                "args": {"type": "object"},
+                "options": {"type": "object"},
+                "io_root": {"type": "string", "minLength": 1},
+            },
+            optional=("args", "options", "io_root"),
+        ),
+        constraints=(
+            "api must be reflected by the requested Wwise version",
+            "api must resolve to transaction, managed_transaction, or isolated_transaction",
+            "args/options must pass the packaged reflected schema",
+            "isolated transactions audit absolute paths and confine explicit writes under io_root",
+            "execution is bound to immutable preview confirmation",
+        ),
+    ),
     "audio.import": OperationSpec(
         "audio.import",
         "ak.wwise.core.audio.import",
@@ -606,7 +756,278 @@ def parse_operation_request(payload: Mapping[str, Any], *, expected_version: str
         raise OperationContractError("INVALID_REQUEST", "arguments must be a JSON object.")
     _require_exact_keys(arguments, required=spec.required_arguments, optional=spec.optional_arguments, context=operation)
     _validate_nested_request_shape(operation, arguments)
+    if operation == "waapi.call":
+        _public_call_arguments(str(version), arguments)
+    elif operation == "waapi.undoGroup":
+        build_undo_group_execution_plan(str(version), arguments)
     return OperationRequest(OPERATION_REQUEST_CONTRACT, str(version), operation, dict(arguments))
+
+
+def build_undo_group_execution_plan(
+    version: str,
+    arguments: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Return the exact immutable same-connection Undo Group call plan."""
+
+    display_name = arguments.get("display_name")
+    try:
+        request_size = len(canonical_json_bytes(dict(arguments)))
+    except (TypeError, ValueError) as exc:
+        raise OperationContractError(
+            "INVALID_ARGUMENT",
+            "waapi.undoGroup arguments must be a strict JSON document.",
+        ) from exc
+    if request_size > UNDO_GROUP_MAX_REQUEST_BYTES:
+        raise OperationContractError(
+            "UNDO_GROUP_REQUEST_TOO_LARGE",
+            "waapi.undoGroup arguments exceed the packaged compound-request byte limit.",
+            details={"size_bytes": request_size, "limit_bytes": UNDO_GROUP_MAX_REQUEST_BYTES},
+        )
+    if not isinstance(display_name, str) or not display_name.strip():
+        raise OperationContractError(
+            "INVALID_ARGUMENT",
+            "waapi.undoGroup display_name must be a non-empty string.",
+        )
+    if len(display_name) > UNDO_GROUP_MAX_DISPLAY_NAME_LENGTH:
+        raise OperationContractError(
+            "INVALID_ARGUMENT",
+            f"waapi.undoGroup display_name must be at most {UNDO_GROUP_MAX_DISPLAY_NAME_LENGTH} characters.",
+            details={"length": len(display_name)},
+        )
+    raw_calls = arguments.get("calls")
+    if not isinstance(raw_calls, list) or not 1 <= len(raw_calls) <= UNDO_GROUP_MAX_CALLS:
+        raise OperationContractError(
+            "INVALID_ARGUMENT",
+            f"waapi.undoGroup calls must contain between 1 and {UNDO_GROUP_MAX_CALLS} items.",
+            details={"count": len(raw_calls) if isinstance(raw_calls, list) else None},
+        )
+    allowed = UNDO_GROUP_INNER_URIS_BY_VERSION.get(version)
+    if allowed is None:
+        raise OperationContractError(
+            "UNSUPPORTED_VERSION",
+            f"Unsupported Wwise version {version!r}.",
+        )
+    registry = ExecutionContractRegistry()
+    calls: list[dict[str, Any]] = []
+    for index, raw_call in enumerate(raw_calls):
+        if not isinstance(raw_call, Mapping):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                f"waapi.undoGroup calls[{index}] must be a JSON object.",
+            )
+        _require_exact_keys(
+            raw_call,
+            required=("api", "args"),
+            optional=("options",),
+            context=f"waapi.undoGroup calls[{index}]",
+        )
+        api = raw_call.get("api")
+        args = raw_call.get("args")
+        options = raw_call.get("options", {})
+        if not isinstance(api, str) or api not in allowed:
+            raise OperationContractError(
+                "UNDO_GROUP_INNER_NOT_ALLOWED",
+                f"{api!r} is not an allowed waapi.undoGroup inner mutation for Wwise {version}.",
+                details={
+                    "index": index,
+                    "api": api,
+                    "version": version,
+                    "allowed": sorted(allowed),
+                },
+            )
+        if not isinstance(args, Mapping) or not isinstance(options, Mapping):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                f"waapi.undoGroup calls[{index}] args/options must be JSON objects.",
+            )
+        contract = registry.describe(version, api)
+        if contract.route != "transaction" or contract.effect != "project_mutation":
+            raise OperationContractError(
+                "UNDO_GROUP_INNER_ROUTE_MISMATCH",
+                "Undo Group inner calls must remain ordinary packaged project-mutation transactions.",
+                details={
+                    "index": index,
+                    "api": api,
+                    "route": contract.route,
+                    "effect": contract.effect,
+                },
+            )
+        validation = validate_semantic_payload(api, args, options, version=version)
+        calls.append(
+            {
+                "api": api,
+                "args": dict(args),
+                "options": dict(options),
+                "request_validation": validation.as_dict(),
+                "request_validation_strength": (
+                    "partial_reflected_schema"
+                    if validation.unresolved_refs
+                    else "complete_reflected_schema"
+                ),
+            }
+        )
+    cancel_args = {} if version in {"2021.1", "2022.1"} else {"undo": True}
+    plan = {
+        "kind": "same_connection_undo_group",
+        "version": version,
+        "begin": {"uri": UNDO_BEGIN_GROUP_URI, "args": {}, "options": {}},
+        "calls": calls,
+        "end": {
+            "uri": UNDO_END_GROUP_URI,
+            "args": {"displayName": display_name},
+            "options": {},
+        },
+        "cancel": {
+            "uri": UNDO_CANCEL_GROUP_URI,
+            "args": cancel_args,
+            "options": {},
+        },
+        "same_connection_required": True,
+        "automatic_retry": False,
+    }
+    plan_size = len(canonical_json_bytes(plan))
+    if plan_size > UNDO_GROUP_MAX_PLAN_BYTES:
+        raise OperationContractError(
+            "UNDO_GROUP_PLAN_TOO_LARGE",
+            "waapi.undoGroup immutable execution plan exceeds the packaged byte limit.",
+            details={"size_bytes": plan_size, "limit_bytes": UNDO_GROUP_MAX_PLAN_BYTES},
+        )
+    return plan
+
+
+def _public_call_arguments(
+    version: str,
+    arguments: Mapping[str, Any],
+) -> tuple[str, Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]]:
+    api = arguments.get("api")
+    if not isinstance(api, str) or not api.startswith("ak."):
+        raise OperationContractError("INVALID_ARGUMENT", "waapi.call api must be a reflected ak.* URI.")
+    raw_args = arguments.get("args", {})
+    raw_options = arguments.get("options", {})
+    if not isinstance(raw_args, Mapping) or not isinstance(raw_options, Mapping):
+        raise OperationContractError("INVALID_ARGUMENT", "waapi.call args and options must be JSON objects.")
+    try:
+        contract = ExecutionContractRegistry().describe(version, api)
+    except ExecutionContractError as exc:
+        raise OperationContractError(
+            "UNAVAILABLE_IN_VERSION",
+            str(exc),
+            details={"api": api, "version": version},
+        ) from exc
+    if contract.route == "compound_transaction_member":
+        raise OperationContractError(
+            "UNDO_GROUP_COMPOSITE_REQUIRED",
+            f"{api!r} is session-scoped and cannot execute as an independent waapi.call transaction; use waapi.undoGroup.",
+            details={
+                "api": api,
+                "version": version,
+                "required_operation": "waapi.undoGroup",
+                "route": contract.route,
+            },
+        )
+    allowed_routes = {"transaction", "managed_transaction", "isolated_transaction"}
+    if contract.route not in allowed_routes:
+        raise OperationContractError(
+            "PUBLIC_ROUTE_MISMATCH",
+            f"waapi.call transaction cannot execute {api!r} through route {contract.route!r}.",
+            details={
+                "api": api,
+                "version": version,
+                "route": contract.route,
+                "gateway_commands": list(contract.gateway_commands),
+            },
+        )
+    forbidden_fields = FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS.get(api, frozenset())
+    supplied_forbidden = tuple(sorted(field for field in forbidden_fields if field in raw_args))
+    if supplied_forbidden:
+        raise OperationContractError(
+            "MODEL_AUTHORED_COMMAND_BLOCKED",
+            "Packaged waapi.call does not accept custom command-line hooks.",
+            details={"api": api, "fields": list(supplied_forbidden)},
+        )
+    validation = validate_semantic_payload(api, raw_args, raw_options, version=version)
+    if api == TRANSPORT_DESTROY_URI and not _valid_transport_id(raw_args.get("transport")):
+        raise OperationContractError(
+            "INVALID_ARGUMENT",
+            "ak.wwise.core.transport.destroy requires a non-zero uint32 transport ID.",
+            details={"api": api, "transport": raw_args.get("transport")},
+        )
+    io_root = arguments.get("io_root")
+    if io_root is not None and not isinstance(io_root, str):
+        raise OperationContractError("INVALID_ARGUMENT", "waapi.call io_root must be an absolute path string.")
+    io_audit: Mapping[str, Any] | None = None
+    if contract.route == "isolated_transaction":
+        try:
+            io_audit = validate_isolated_io(
+                version=version,
+                uri=api,
+                args=raw_args,
+                options=raw_options,
+                io_root=io_root,
+            ).as_dict()
+        except IOPolicyError as exc:
+            raise OperationContractError(
+                exc.error_code,
+                str(exc),
+                details={"io_policy": exc.as_dict()},
+            ) from exc
+    elif io_root is not None:
+        raise OperationContractError(
+            "IO_ROOT_NOT_APPLICABLE",
+            "waapi.call io_root is accepted only for isolated_transaction routes.",
+            details={"api": api, "version": version, "route": contract.route},
+        )
+    return api, dict(raw_args), dict(raw_options), {
+        **contract.as_dict(),
+        "request_validation": validation.as_dict(),
+        "request_validation_strength": (
+            "partial_reflected_schema"
+            if validation.unresolved_refs
+            else "complete_reflected_schema"
+        ),
+        "io_audit": dict(io_audit) if io_audit is not None else None,
+    }
+
+
+def _public_call_verification_plan(
+    *,
+    api: str,
+    version: str,
+    args: Mapping[str, Any],
+    strategy: str,
+) -> dict[str, Any]:
+    common = {"uri": api, "version": version}
+    if api in {REMOTE_CONNECT_URI, REMOTE_DISCONNECT_URI}:
+        return {
+            "kind": "remote-connection-state",
+            **common,
+            "strategy": "operation_specific_readback",
+            "base_result_strategy": strategy,
+            "expected_connected": api == REMOTE_CONNECT_URI,
+        }
+    if api == TRANSPORT_CREATE_URI:
+        return {
+            "kind": "transport-created",
+            **common,
+            "strategy": "operation_specific_readback",
+            "base_result_strategy": strategy,
+        }
+    if api == TRANSPORT_DESTROY_URI:
+        transport_id = args.get("transport")
+        if not _valid_transport_id(transport_id):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "ak.wwise.core.transport.destroy requires a non-zero uint32 transport ID.",
+                details={"api": api, "transport": transport_id},
+            )
+        return {
+            "kind": "transport-destroyed",
+            **common,
+            "strategy": "operation_specific_readback",
+            "base_result_strategy": strategy,
+            "transport_id": transport_id,
+        }
+    return {"kind": "result-schema", **common, "strategy": strategy}
 
 
 def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> PreparedOperation:
@@ -632,7 +1053,72 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
     metadata: dict[str, Any] = {}
     warnings: list[str] = []
 
-    if request.operation == "object.create":
+    if request.operation == "waapi.undoGroup":
+        execution_plan = build_undo_group_execution_plan(request.version, arguments)
+        begin = execution_plan["begin"]
+        preview = SemanticPreview(
+            envelope=SemanticEnvelope(
+                uri=str(begin["uri"]),
+                args=dict(begin["args"]),
+                options=dict(begin["options"]),
+                metadata={
+                    "compound_operation": "waapi.undoGroup",
+                    "execution_plan": execution_plan,
+                    "model_authored_code": False,
+                },
+            ),
+            source_note_family="same-connection-undo-group",
+            version=request.version,
+            requires_destructive_gate=True,
+            raw_dispatch_allowed=False,
+        )
+        verification = {
+            "kind": "undo-group-result-schemas",
+            "version": request.version,
+            "execution_plan": execution_plan,
+            "business_state_verified": False,
+        }
+        cleanup = {
+            "kind": "same_connection_cancel_on_inner_failure",
+            "cancel": dict(execution_plan["cancel"]),
+            "automatic_cleanup": "only_while_group_is_open_after_an_inner_failure",
+            "automatic_retry": False,
+            "rollback_verified": False,
+        }
+        metadata["execution_plan"] = execution_plan
+    elif request.operation == "waapi.call":
+        api, call_args, call_options, execution_contract = _public_call_arguments(
+            request.version,
+            arguments,
+        )
+        preview = SemanticPreview(
+            envelope=SemanticEnvelope(
+                uri=api,
+                args=call_args,
+                options=call_options,
+                metadata={
+                    "execution_contract": execution_contract,
+                    "model_authored_code": False,
+                },
+            ),
+            source_note_family="public-execution-contract",
+            version=request.version,
+            requires_destructive_gate=True,
+            raw_dispatch_allowed=False,
+        )
+        verification = _public_call_verification_plan(
+            api=api,
+            version=request.version,
+            args=call_args,
+            strategy=str(execution_contract["verification_strategy"]),
+        )
+        cleanup = build_transaction_cleanup_spec(
+            api,
+            call_args,
+            execution_contract,
+        )
+        metadata["execution_contract"] = execution_contract
+    elif request.operation == "object.create":
         parent = _resolve_identity(arguments["parent"], role="parent", read=read)
         roles["parent"] = parent
         object_type = _non_empty_string(arguments["type"], field="type")
@@ -1145,6 +1631,86 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         raise OperationContractError("INVALID_PREVIEW", "Prepared operation lacks operation or resolved_roles.")
     assertions: list[Mapping[str, Any]] = []
     readbacks: list[Mapping[str, Any]] = []
+    if operation == "waapi.undoGroup":
+        request_payload = prepared.get("request")
+        dispatch_payload = prepared.get("dispatch")
+        pre_state = prepared.get("pre_state")
+        if (
+            not isinstance(request_payload, Mapping)
+            or not isinstance(dispatch_payload, Mapping)
+            or not isinstance(pre_state, Mapping)
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "waapi.undoGroup preview lacks request, dispatch, or execution plan data.",
+            )
+        version = request_payload.get("version")
+        arguments = request_payload.get("arguments")
+        if not isinstance(version, str) or not isinstance(arguments, Mapping):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "waapi.undoGroup preview lacks versioned arguments.",
+            )
+        expected_plan = build_undo_group_execution_plan(version, arguments)
+        expected_dispatch = expected_plan["begin"]
+        actual_plan = pre_state.get("execution_plan")
+        passed = actual_plan == expected_plan and dict(dispatch_payload) == expected_dispatch
+        assertions.append(
+            {
+                "name": "waapi.undoGroup execution plan still matches the immutable reviewed composite",
+                "passed": passed,
+                "evidence": {
+                    "expected_plan": expected_plan,
+                    "actual_plan": actual_plan,
+                    "expected_dispatch": expected_dispatch,
+                    "actual_dispatch": dict(dispatch_payload),
+                },
+            }
+        )
+        return {
+            "contract": ROLE_VALIDATION_CONTRACT,
+            "operation": operation,
+            "ok": passed,
+            "status": "valid" if passed else "repreview_required",
+            "assertions": [_json_mapping(item) for item in assertions],
+            "readbacks": [],
+        }
+    if operation == "waapi.call":
+        request_payload = prepared.get("request")
+        dispatch_payload = prepared.get("dispatch")
+        if not isinstance(request_payload, Mapping) or not isinstance(dispatch_payload, Mapping):
+            raise OperationContractError("INVALID_PREVIEW", "waapi.call preview lacks request or dispatch data.")
+        version = request_payload.get("version")
+        arguments = request_payload.get("arguments")
+        if not isinstance(version, str) or not isinstance(arguments, Mapping):
+            raise OperationContractError("INVALID_PREVIEW", "waapi.call preview lacks versioned arguments.")
+        api, call_args, call_options, execution_contract = _public_call_arguments(version, arguments)
+        expected = {"uri": api, "args": dict(call_args), "options": dict(call_options)}
+        actual = {
+            "uri": dispatch_payload.get("uri"),
+            "args": dispatch_payload.get("args"),
+            "options": dispatch_payload.get("options"),
+        }
+        passed = actual == expected
+        assertions.append(
+            {
+                "name": "waapi.call dispatch still matches the reviewed versioned contract",
+                "passed": passed,
+                "evidence": {
+                    "expected": expected,
+                    "actual": actual,
+                    "route": execution_contract["route"],
+                },
+            }
+        )
+        return {
+            "contract": ROLE_VALIDATION_CONTRACT,
+            "operation": operation,
+            "ok": passed,
+            "status": "valid" if passed else "repreview_required",
+            "assertions": [_json_mapping(item) for item in assertions],
+            "readbacks": [],
+        }
     for role, snapshot_value in roles.items():
         if not isinstance(snapshot_value, Mapping):
             raise OperationContractError("INVALID_PREVIEW", f"Resolved role {role!r} is malformed.")
@@ -1314,6 +1880,9 @@ def verify_prepared_operation(
         raise OperationContractError("INVALID_PREVIEW", "Prepared operation lacks a verification plan.")
     readbacks: list[Mapping[str, Any]] = []
     assertions: list[Mapping[str, Any]] = []
+    success_status = "verified"
+    verification_strength = "operation_specific_readback"
+    business_state_verified = True
 
     def read_object(*, object_id: Any = None, path: str | None = None, fields: Sequence[str]) -> list[dict[str, Any]]:
         args = {"from": {"id": [object_id]}} if object_id is not None else {"from": {"path": [path]}}
@@ -1327,8 +1896,245 @@ def verify_prepared_operation(
     def check(name: str, passed: bool, evidence: Any) -> None:
         assertions.append({"name": name, "passed": bool(passed), "evidence": evidence})
 
+    def check_result_schema(uri: str, version: str) -> None:
+        try:
+            validation = validate_semantic_result(
+                uri,
+                execution_result.get("result"),
+                version=version,
+            )
+        except SemanticValidationError as exc:
+            check("WAAPI result matches the packaged reflected schema", False, exc.as_dict())
+        else:
+            check("WAAPI result matches the packaged reflected schema", True, validation.as_dict())
+
+    def verified_readback(
+        uri: str,
+        args: Mapping[str, Any],
+        *,
+        version: str,
+    ) -> Mapping[str, Any]:
+        result = read_call(uri, args, {})
+        if not isinstance(result, Mapping):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                f"{uri} verification result must be an object.",
+                details={"actual_type": type(result).__name__},
+            )
+        normalized = dict(result)
+        readbacks.append({"uri": uri, "args": dict(args), "options": {}, "result": normalized})
+        try:
+            validation = validate_semantic_result(uri, normalized, version=version)
+        except SemanticValidationError as exc:
+            check(f"{uri} readback matches the packaged reflected schema", False, exc.as_dict())
+        else:
+            check(
+                f"{uri} readback matches the packaged reflected schema",
+                True,
+                validation.as_dict(),
+            )
+        return normalized
+
     kind = plan.get("kind")
-    if kind == "created-guid-present":
+    if kind == "undo-group-result-schemas":
+        success_status = "result_schema_checked"
+        business_state_verified = False
+        version = plan.get("version")
+        execution_plan = plan.get("execution_plan")
+        compound_payload = execution_result.get("result")
+        if (
+            not isinstance(version, str)
+            or not isinstance(execution_plan, Mapping)
+            or not isinstance(compound_payload, Mapping)
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "Undo Group verification lacks a versioned execution plan or recorded compound result.",
+            )
+        raw_phases = compound_payload.get("phases")
+        phases = raw_phases if isinstance(raw_phases, list) else []
+        inner_plan = execution_plan.get("calls")
+        if not isinstance(inner_plan, list):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "Undo Group execution plan lacks its inner call list.",
+            )
+        expected_uris = [UNDO_BEGIN_GROUP_URI]
+        expected_uris.extend(
+            item.get("api") for item in inner_plan if isinstance(item, Mapping)
+        )
+        expected_uris.append(UNDO_END_GROUP_URI)
+        actual_uris = [
+            phase.get("uri") if isinstance(phase, Mapping) else None
+            for phase in phases
+        ]
+        check(
+            "Undo Group recorded the exact immutable phase order",
+            actual_uris == expected_uris,
+            {"expected": expected_uris, "actual": actual_uris},
+        )
+        partial_schema = False
+        if actual_uris == expected_uris:
+            for index, phase in enumerate(phases):
+                if not isinstance(phase, Mapping):
+                    check(f"Undo Group phase {index} is structured", False, phase)
+                    continue
+                dispatch_result = phase.get("dispatch_result")
+                uri = phase.get("uri")
+                if not isinstance(dispatch_result, Mapping) or not isinstance(uri, str):
+                    check(
+                        f"Undo Group phase {index} recorded a structured dispatch result",
+                        False,
+                        dict(phase),
+                    )
+                    continue
+                check(
+                    f"Undo Group phase {index} dispatch succeeded",
+                    dispatch_result.get("ok") is True,
+                    {"uri": uri, "error_code": dispatch_result.get("error_code")},
+                )
+                try:
+                    validation = validate_semantic_result(
+                        uri,
+                        dispatch_result.get("result"),
+                        version=version,
+                    )
+                except SemanticValidationError as exc:
+                    check(
+                        f"Undo Group phase {index} result matches the packaged reflected schema",
+                        False,
+                        exc.as_dict(),
+                    )
+                else:
+                    partial_schema = partial_schema or bool(validation.unresolved_refs)
+                    check(
+                        f"Undo Group phase {index} result matches the packaged reflected schema",
+                        True,
+                        validation.as_dict(),
+                    )
+        verification_strength = (
+            "partial_reflected_schema" if partial_schema else "complete_reflected_schema"
+        )
+    elif kind == "result-schema":
+        success_status = "result_schema_checked"
+        business_state_verified = False
+        uri = plan.get("uri")
+        version = plan.get("version")
+        if not isinstance(uri, str) or not isinstance(version, str):
+            raise OperationContractError("INVALID_PREVIEW", "result-schema verification lacks uri/version.")
+        try:
+            validation = validate_semantic_result(
+                uri,
+                execution_result.get("result"),
+                version=version,
+            )
+        except SemanticValidationError as exc:
+            check(
+                "WAAPI result matches the packaged reflected schema",
+                False,
+                exc.as_dict(),
+            )
+        else:
+            verification_strength = (
+                "partial_reflected_schema"
+                if validation.unresolved_refs
+                else "complete_reflected_schema"
+            )
+            check(
+                "WAAPI result matches the packaged reflected schema",
+                True,
+                validation.as_dict(),
+            )
+    elif kind == "remote-connection-state":
+        uri = plan.get("uri")
+        version = plan.get("version")
+        expected_connected = plan.get("expected_connected")
+        if (
+            uri not in {REMOTE_CONNECT_URI, REMOTE_DISCONNECT_URI}
+            or not isinstance(version, str)
+            or not isinstance(expected_connected, bool)
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "Remote connection verification lacks a valid uri/version/postcondition.",
+            )
+        check_result_schema(str(uri), version)
+        status = verified_readback(REMOTE_GET_CONNECTION_STATUS_URI, {}, version=version)
+        actual_connected = status.get("isConnected")
+        check(
+            "remote connection state matches the requested postcondition",
+            isinstance(actual_connected, bool) and actual_connected is expected_connected,
+            {"expected": expected_connected, "actual": actual_connected, "status": status.get("status")},
+        )
+    elif kind == "transport-created":
+        uri = plan.get("uri")
+        version = plan.get("version")
+        if uri != TRANSPORT_CREATE_URI or not isinstance(version, str):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "Transport creation verification lacks a valid uri/version.",
+            )
+        check_result_schema(uri, version)
+        transport_id = _execution_payload(execution_result).get("transport")
+        valid_transport_id = _valid_transport_id(transport_id)
+        check(
+            "transport.create returned a non-zero uint32 transport ID",
+            valid_transport_id,
+            {"transport": transport_id},
+        )
+        if valid_transport_id:
+            transport_list = verified_readback(TRANSPORT_GET_LIST_URI, {}, version=version)
+            rows, list_shape_ok = _transport_list_rows(transport_list)
+            check(
+                "transport.getList returned transport rows with valid IDs",
+                list_shape_ok,
+                {"list": transport_list.get("list")},
+            )
+            matches = [row for row in rows if row.get("transport") == transport_id]
+            check(
+                "created transport ID appears exactly once in transport.getList",
+                list_shape_ok and len(matches) == 1,
+                {"transport": transport_id, "matches": matches},
+            )
+            transport_state = verified_readback(
+                TRANSPORT_GET_STATE_URI,
+                {"transport": transport_id},
+                version=version,
+            )
+            state = transport_state.get("state")
+            check(
+                "created transport ID resolves through transport.getState",
+                isinstance(state, str) and state in TRANSPORT_STATES,
+                {"transport": transport_id, "state": state},
+            )
+    elif kind == "transport-destroyed":
+        uri = plan.get("uri")
+        version = plan.get("version")
+        transport_id = plan.get("transport_id")
+        if (
+            uri != TRANSPORT_DESTROY_URI
+            or not isinstance(version, str)
+            or not _valid_transport_id(transport_id)
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "Transport destruction verification lacks a valid uri/version/transport ID.",
+            )
+        check_result_schema(uri, version)
+        transport_list = verified_readback(TRANSPORT_GET_LIST_URI, {}, version=version)
+        rows, list_shape_ok = _transport_list_rows(transport_list)
+        check(
+            "transport.getList returned transport rows with valid IDs",
+            list_shape_ok,
+            {"list": transport_list.get("list")},
+        )
+        matches = [row for row in rows if row.get("transport") == transport_id]
+        check(
+            "destroyed transport ID is absent from transport.getList",
+            list_shape_ok and not matches,
+            {"transport": transport_id, "matches": matches},
+        )
+    elif kind == "created-guid-present":
         created_id = _execution_result_id(execution_result)
         if created_id is None:
             check("execution returned created GUID", False, dict(execution_result))
@@ -1598,14 +2404,60 @@ def verify_prepared_operation(
             )
     else:
         raise OperationContractError("INVALID_PREVIEW", f"Unknown verification plan kind {kind!r}.")
-    return _verification(operation, assertions, readbacks)
+    return _verification(
+        operation,
+        assertions,
+        readbacks,
+        success_status=success_status,
+        verification_strength=verification_strength,
+        business_state_verified=business_state_verified,
+    )
 
 
-def _verification(operation: str, assertions: Sequence[Mapping[str, Any]], readbacks: Sequence[Mapping[str, Any]]) -> VerificationResult:
+def _verification(
+    operation: str,
+    assertions: Sequence[Mapping[str, Any]],
+    readbacks: Sequence[Mapping[str, Any]],
+    *,
+    success_status: str = "verified",
+    verification_strength: str = "operation_specific_readback",
+    business_state_verified: bool = True,
+) -> VerificationResult:
     passed = bool(assertions) and all(item.get("passed") is True for item in assertions)
-    status = "verified" if passed else "verification_failed"
-    message = "All operation-specific readbacks passed." if passed else "One or more operation-specific readbacks failed."
-    return VerificationResult(operation, status, tuple(assertions), tuple(readbacks), message)
+    status = success_status if passed else "verification_failed"
+    if operation == "waapi.call" and business_state_verified and readbacks:
+        message = (
+            "The WAAPI result schema and operation-specific business-state readbacks passed."
+            if passed
+            else "The WAAPI result schema or an operation-specific business-state readback failed."
+        )
+    elif operation in {"waapi.call", "waapi.undoGroup"} and not business_state_verified:
+        message = (
+            "The returned WAAPI payload matches the packaged reflected result schema."
+            if passed
+            else "The returned WAAPI payload does not match the packaged reflected result schema."
+        )
+    elif readbacks:
+        message = (
+            "All operation-specific readbacks passed."
+            if passed
+            else "One or more operation-specific readbacks failed."
+        )
+    else:
+        message = (
+            "All operation-specific verification assertions passed."
+            if passed
+            else "One or more operation-specific verification assertions failed."
+        )
+    return VerificationResult(
+        operation,
+        status,
+        tuple(assertions),
+        tuple(readbacks),
+        message,
+        verification_strength,
+        business_state_verified,
+    )
 
 
 def _resolve_identity(payload: Any, *, role: str, read: ReadCall) -> ResolvedObject:
@@ -2009,6 +2861,18 @@ def _reference_type_token(value: str) -> str:
 
 def _valid_object_id(value: Any) -> bool:
     return not isinstance(value, bool) and isinstance(value, (str, int)) and value != ""
+
+
+def _valid_transport_id(value: Any) -> bool:
+    return not isinstance(value, bool) and isinstance(value, int) and 1 <= value <= 0xFFFFFFFF
+
+
+def _transport_list_rows(result: Mapping[str, Any]) -> tuple[list[dict[str, Any]], bool]:
+    value = result.get("list")
+    if not isinstance(value, list) or not all(isinstance(item, Mapping) for item in value):
+        return [], False
+    rows = [dict(item) for item in value]
+    return rows, all(_valid_transport_id(row.get("transport")) for row in rows)
 
 
 def _reject_protected_delete(target: ResolvedObject) -> None:

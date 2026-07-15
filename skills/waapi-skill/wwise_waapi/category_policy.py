@@ -1,26 +1,29 @@
-"""Phase 2 policy for WAAPI categories excluded from deep live behavior tests."""
+"""Execution-policy notes for WAAPI categories with special runtime guards."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 
-WRAPPER_ONLY_CATEGORIES = frozenset({"ui", "ui.commands", "ui.project"})
-SKIPPED_APPROVED_CATEGORIES = frozenset({"cli", "core.remote", "debug"})
+WRAPPER_ONLY_CATEGORIES = frozenset()
+SKIPPED_APPROVED_CATEGORIES = frozenset()
 POLICY_EXEMPT_CATEGORIES = WRAPPER_ONLY_CATEGORIES | SKIPPED_APPROVED_CATEGORIES
 DEBUG_UNSAFE_LIVE_URIS = frozenset(
     {
         "ak.wwise.debug.enableAsserts",
         "ak.wwise.debug.enableAutomationMode",
+        "ak.wwise.debug.getWalTree",
+        "ak.wwise.debug.restartWaapiServers",
         "ak.wwise.debug.testAssert",
         "ak.wwise.debug.testCrash",
+        "ak.wwise.debug.validateCall",
     }
 )
 
 
 @dataclass(slots=True, frozen=True)
 class CategoryPolicy:
-    """User-approved non-live policy for a reflected WAAPI category."""
+    """User-approved execution policy for a reflected WAAPI category."""
 
     category: str
     target_status: str
@@ -30,65 +33,66 @@ class CategoryPolicy:
 
 
 def category_policy(category: str) -> CategoryPolicy | None:
-    """Return the user-approved Phase 2 policy for a category, if any."""
+    """Return the high-coverage execution policy for a guarded category."""
 
-    if category in WRAPPER_ONLY_CATEGORIES:
+    if category in {"ui", "ui.commands", "ui.project"}:
         return CategoryPolicy(
             category=category,
-            target_status="wrapper-only",
+            target_status="guarded-execution",
             user_approved_rationale=(
-                "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; "
-                "schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target."
+                "UI functions are part of the reviewed high-coverage contract and execute through bounded reads "
+                "or confirmed transactions instead of ad-hoc automation code."
             ),
             risk_explanation=(
                 "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so "
-                "default/live smoke suites would be flaky and could affect the operator session."
+                "mutating UI routes require an immutable preview and explicit confirmation."
             ),
             future_review_trigger=(
-                "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation."
+                "Revisit when a version changes a UI schema or the deterministic program contract no longer matches."
             ),
         )
     if category == "cli":
         return CategoryPolicy(
             category=category,
-            target_status="skipped-approved",
+            target_status="isolated-transaction",
             user_approved_rationale=(
-                "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only."
+                "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction."
             ),
             risk_explanation=(
                 "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts "
-                "outside the narrow live sandbox behavior scope."
+                "outside the active Authoring project and therefore require explicit external-I/O intent."
             ),
             future_review_trigger=(
-                "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved."
+                "Revisit when path confinement or expected-disconnect handling needs a version-specific override."
             ),
         )
     if category == "core.remote":
         return CategoryPolicy(
             category=category,
-            target_status="skipped-approved",
+            target_status="managed-transaction",
             user_approved_rationale=(
-                "User guidance approves skipping remote-console behavior because a deterministic remote console environment is unavailable."
+                "Remote-console calls are part of the high-coverage contract but require a confirmed managed-session transaction."
             ),
             risk_explanation=(
                 "Remote connect/disconnect behavior depends on external consoles and network/session state not provided by the local sandbox."
             ),
             future_review_trigger=(
-                "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup."
+                "Revisit when a controlled console fixture reveals a version-specific lifecycle or cleanup difference."
             ),
         )
     if category == "debug":
         return CategoryPolicy(
             category=category,
-            target_status="skipped-approved",
+            target_status="selective-execution",
             user_approved_rationale=(
-                "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths."
+                "Only generateToneWAV is executable through an isolated transaction; assert, crash, automation, WAL, "
+                "restart, and validateCall endpoints remain explicit exclusions."
             ),
             risk_explanation=(
                 "Debug assert/crash APIs can intentionally fail, crash, or alter automation/assert handling in the running Wwise instance."
             ),
             future_review_trigger=(
-                "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements."
+                "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint."
             ),
         )
     return None
@@ -101,14 +105,14 @@ def unsupported_live_behavior_message(api: str, category: str) -> str:
     if policy is None:
         return f"WAAPI URI {api!r} is not excluded by the Phase 2 category policy."
     return (
-        f"WAAPI URI {api!r} is {policy.target_status!r} by user-approved Phase 2 policy for category "
-        f"{category!r}; wrappers may validate schema/route metadata, but live behavior execution is unsupported. "
+        f"WAAPI URI {api!r} is {policy.target_status!r} by the reviewed execution policy for category "
+        f"{category!r}. "
         f"Risk: {policy.risk_explanation} Review trigger: {policy.future_review_trigger}"
     )
 
 
 def is_policy_exempt_category(category: str) -> bool:
-    """Return whether category is wrapper-only or skipped-approved in Phase 2."""
+    """Return whether an entire category is blocked from live execution."""
 
     return category in POLICY_EXEMPT_CATEGORIES
 
