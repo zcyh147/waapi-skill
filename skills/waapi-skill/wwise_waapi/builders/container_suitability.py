@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol, Sequence
 
+from wwise_waapi.waql import quote_waql_literal  # pyright: ignore[reportMissingImports]
+
 from .common import (
     DEFAULT_WORK_UNIT_NAME,
     KNOWN_WWISE_MANAGEMENT_ROOTS,
@@ -124,7 +126,16 @@ def _live_or_blocked(path: str, safe_read_client: SafeReadClient | None, *, reas
             requires_live_verification=True,
         )
 
-    rows = _read_default_work_unit_children(path, safe_read_client)
+    try:
+        rows = _read_default_work_unit_children(path, safe_read_client)
+    except ValueError as exc:
+        return ContainerSuitabilityResult(
+            valid=False,
+            invalid_target=path,
+            reason="unsupported-waql-literal",
+            requires_live_verification=False,
+            details={"message": str(exc), "boundary": "packaged-waql-literal-evidence"},
+        )
     if len(rows) == 1:
         candidate = _row_path(rows[0])
         if candidate is not None:
@@ -156,18 +167,15 @@ def _live_or_blocked(path: str, safe_read_client: SafeReadClient | None, *, reas
 
 
 def _read_default_work_unit_children(path: str, safe_read_client: SafeReadClient) -> tuple[Mapping[str, Any], ...]:
-    waql = f'{_quote_waql_literal(path)} select children where name = {_quote_waql_literal(DEFAULT_WORK_UNIT_NAME)}'
+    waql = (
+        f"from object {quote_waql_literal(path)} "
+        f"select children where name = {quote_waql_literal(DEFAULT_WORK_UNIT_NAME)}"
+    )
     result = safe_read_client.call(OBJECT_GET_URI, {"waql": waql}, {"return": list(DEFAULT_RETURN_FIELDS)})
     rows = result.get("return", ())
     if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes)):
         return ()
     return tuple(row for row in rows if isinstance(row, Mapping) and _is_default_work_unit_child(row, path))
-
-
-def _quote_waql_literal(value: str) -> str:
-    if any(ord(character) < 32 for character in value):
-        raise ValueError("WAQL literals must not contain control characters.")
-    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 def _is_default_work_unit_child(row: Mapping[str, Any], parent_path: str) -> bool:

@@ -21,9 +21,17 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
 MANIFEST_ROOT = SKILL_ROOT / "resources" / "manifest"
 SUMMARY_RESOURCE = Path(__file__).resolve().parents[2] / "tests" / "destructive" / "support" / "resources" / "capabilities" / "2022.1" / "phase2-coverage-summary.json"
-SKIPPED_APPROVED_CATEGORIES = {"cli", "core.remote", "debug"}
-WRAPPER_ONLY_CATEGORIES = {"ui", "ui.commands", "ui.project"}
-POLICY_CATEGORIES = SKIPPED_APPROVED_CATEGORIES | WRAPPER_ONLY_CATEGORIES
+EXECUTION_STATUS_BY_CATEGORY = {
+    "cli": "isolated-transaction",
+    "core.remote": "managed-transaction",
+    "debug": "selective-execution",
+    "ui": "guarded-execution",
+    "ui.commands": "guarded-execution",
+    "ui.project": "guarded-execution",
+}
+EXECUTION_POLICY_STATUSES = frozenset(EXECUTION_STATUS_BY_CATEGORY.values())
+POLICY_CATEGORIES = set(EXECUTION_STATUS_BY_CATEGORY)
+POLICY_NON_BEHAVIOR_STATUSES = EXECUTION_POLICY_STATUSES | {"conformance-only-skip"}
 
 
 def test_phase2_summary_resource_is_regenerated_byte_stable() -> None:
@@ -49,7 +57,7 @@ def test_phase2_summary_covers_144_reflected_apis_and_audits_statuses() -> None:
     assert result.live_behavioral_covered_count == 13
     assert result.substitute_covered_count == 25
     assert result.deferred_count == 63
-    assert result.excluded_count == 43
+    assert result.excluded_count == 11
     assert result.status_counts == payload["summary"]["phase2_status_counts"]
     assert sum(payload["summary"]["phase2_status_counts"].values()) == 144
     assert [entry["uri"] for entry in payload["entries"]] == sorted(
@@ -68,20 +76,22 @@ def test_before_after_counts_preserve_phase1_baseline_and_phase2_policy() -> Non
     assert summary["live_behavioral_covered_count"] == 13
     assert summary["substitute_covered_count"] == 25
     assert summary["deferred_count"] == 63
-    assert summary["excluded_count"] == 43
+    assert summary["excluded_count"] == 11
     assert summary["phase1_status_counts"] == {"deferred-with-substitute-test": 117, "fake-route-tested": 27}
     assert summary["original_deferred_before_phase2"] == 117
     assert summary["original_deferred_after_phase2"] == 63
     assert summary["original_deferred_promoted_behavioral"] == 13
-    assert summary["original_deferred_policy_approved"] == 41
+    assert summary["original_deferred_policy_approved"] == 11
     assert summary["original_fake_route_promoted_live"] == 0
     assert summary["phase2_status_counts"] == {
         "conformance-only-skip": 11,
         "fake-route-tested": 25,
+        "guarded-execution": 11,
+        "isolated-transaction": 12,
+        "managed-transaction": 4,
         "sandbox-mutating-tested": 13,
-        "skipped-approved": 21,
+        "selective-execution": 5,
         "still-deferred-with-evidence": 63,
-        "wrapper-only": 11,
     }
     assert summary["phase2_status_counts"].get("live-sandbox-tested", 0) == 0
     assert summary["profiler_backed_tested_count"] == 0
@@ -89,24 +99,28 @@ def test_before_after_counts_preserve_phase1_baseline_and_phase2_policy() -> Non
     assert summary["windows_validation"] == "pending"
 
 
-def test_policy_categories_take_precedence_over_fake_route_status() -> None:
+def test_high_coverage_execution_policy_categories_take_precedence_over_phase1_status() -> None:
     entries = _summary_payload()["entries"]
-    skipped = [entry for entry in entries if entry["achieved_status"] == "skipped-approved"]
-    wrapper = [entry for entry in entries if entry["achieved_status"] == "wrapper-only"]
-    phase1_fake_policy = [
-        entry for entry in entries if entry["phase1_status"] == "fake-route-tested" and entry["category"] in POLICY_CATEGORIES
-    ]
+    policy_entries = [entry for entry in entries if entry["category"] in POLICY_CATEGORIES]
 
-    assert len(skipped) == 21
-    assert len(wrapper) == 11
-    assert {entry["category"] for entry in skipped} <= SKIPPED_APPROVED_CATEGORIES
-    assert {entry["category"] for entry in wrapper} <= WRAPPER_ONLY_CATEGORIES
-    assert len(phase1_fake_policy) == 2
-    for entry in phase1_fake_policy:
-        expected = "skipped-approved" if entry["category"] in SKIPPED_APPROVED_CATEGORIES else "wrapper-only"
-        assert entry["achieved_status"] == expected, entry["uri"]
-        assert entry["status_transition"] == "phase1-fake-route-policy-approved", entry["uri"]
+    assert len(policy_entries) == 32
+    assert not any(entry["achieved_status"] in {"wrapper-only", "skipped-approved"} for entry in entries)
+    for entry in policy_entries:
+        assert entry["achieved_status"] == EXECUTION_STATUS_BY_CATEGORY[entry["category"]], entry["uri"]
+        assert entry["evidence_class"] == "program_tested_packaged_execution", entry["uri"]
+        assert entry["evidence_command"] == "ci/test.sh --mode program -- -q -ra", entry["uri"]
+        assert entry["user_approved_rationale"], entry["uri"]
+        assert entry["future_review_trigger"], entry["uri"]
         assert entry["counts_as_behavioral"] is False, entry["uri"]
+        assert entry["counts_as_live_behavioral"] is False, entry["uri"]
+        expected_transition = (
+            "phase1-fake-route-execution-policy"
+            if entry["phase1_status"] == "fake-route-tested"
+            else "phase1-deferred-execution-policy"
+        )
+        assert entry["status_transition"] == expected_transition, entry["uri"]
+
+    assert sum(entry["phase1_status"] == "fake-route-tested" for entry in policy_entries) == 2
 
 
 def test_non_policy_phase1_fake_route_tested_apis_remain_accepted_and_unchanged() -> None:
@@ -135,9 +149,8 @@ def test_behavioral_counts_are_derived_from_explicit_entry_flags_only() -> None:
     non_behavior_statuses = {
         "fake-route-tested",
         "still-deferred-with-evidence",
-        "wrapper-only",
-        "skipped-approved",
         "conformance-only-skip",
+        *EXECUTION_POLICY_STATUSES,
     }
 
     assert summary["behavioral_covered_count"] == len(behavioral_entries)
@@ -163,7 +176,7 @@ def test_every_phase2_transition_has_evidence_and_deferred_entries_keep_blockers
             assert entry["future_review_trigger"], entry["uri"]
             assert entry["counts_as_behavioral"] is False, entry["uri"]
             assert entry["counts_as_live_behavioral"] is False, entry["uri"]
-        if entry["achieved_status"] in {"wrapper-only", "skipped-approved", "conformance-only-skip"}:
+        if entry["achieved_status"] in POLICY_NON_BEHAVIOR_STATUSES:
             assert entry["user_approved_rationale"], entry["uri"]
             assert entry["counts_as_behavioral"] is False, entry["uri"]
             assert entry["counts_as_live_behavioral"] is False, entry["uri"]

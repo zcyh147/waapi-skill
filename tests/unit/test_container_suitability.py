@@ -84,7 +84,12 @@ def test_live_child_resolution_hook_uses_only_safe_read_and_requires_confirmatio
     assert client.calls == [
         (
             OBJECT_GET_URI,
-            {"waql": r'"\\Custom Root" select children where name = "Default Work Unit"'},
+            {
+                "waql": (
+                    r'from object "\Custom Root" '
+                    'select children where name = "Default Work Unit"'
+                )
+            },
             {"return": ["id", "name", "type", "path"]},
         )
     ]
@@ -98,12 +103,15 @@ def test_confirmed_candidate_policy_does_not_rewrite_target() -> None:
     assert result.candidate_targets == (r"\Master-Mixer Hierarchy\Default Work Unit",)
 
 
-def test_live_child_resolution_escapes_waql_literals() -> None:
+def test_live_child_resolution_fails_closed_for_unproven_quote_escaping() -> None:
     client = FakeSafeReadClient([])
 
-    assess_writable_container_suitability(r'\Custom "Root"', safe_read_client=client)
+    result = assess_writable_container_suitability(r'\Custom "Root"', safe_read_client=client)
 
-    assert client.calls[0][1] == {"waql": r'"\\Custom \"Root\"" select children where name = "Default Work Unit"'}
+    assert result.valid is False
+    assert result.reason == "unsupported-waql-literal"
+    assert result.details["boundary"] == "packaged-waql-literal-evidence"
+    assert client.calls == []
 
 
 def test_live_child_resolution_rejects_mismatched_rows() -> None:

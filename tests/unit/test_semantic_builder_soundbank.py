@@ -89,6 +89,23 @@ def test_set_inclusions_validates_operation_filters_and_emits_preflight_readback
     assert preview.to_dispatcher_request().dry_run is True
 
 
+def test_set_inclusions_allows_empty_replace_for_exact_state_clear_only() -> None:
+    preview = builder().set_inclusions(
+        soundbank=SOUNDBANK_ID,
+        operation="replace",
+        inclusions=[],
+    )
+
+    assert preview.dispatch_payload() == {
+        "uri": SET_INCLUSIONS_URI,
+        "args": {"soundbank": SOUNDBANK_ID, "operation": "replace", "inclusions": []},
+        "options": {},
+    }
+    with pytest.raises(SemanticValidationError) as empty_add:
+        builder().set_inclusions(soundbank=SOUNDBANK_ID, operation="add", inclusions=[])
+    assert empty_add.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+
+
 def test_set_inclusions_rejects_bad_operation_filter_duplicates_and_ambiguous_identity() -> None:
     with pytest.raises(SemanticValidationError) as bad_operation:
         builder().set_inclusions(soundbank=SOUNDBANK_ID, operation="clear", inclusions=[{"object": SOUND_ID, "filter": ["media"]}])
@@ -135,7 +152,10 @@ def test_generate_preview_records_artifact_evidence_plan_without_outputs(tmp_pat
     assert artifact_plan["completion_claim"] == "not-claimed"
     assert f"{tmp_path / 'GeneratedSoundBanks'}/Mac/English(US)/UnitBank.bnk" in artifact_plan["expected_output_artifact_paths"]
     assert not any(tmp_path.rglob("*.bnk"))
-    assert preview.evidence_plan[3]["hidden_subscription"] is False
+    assert preview.readback_plan == ()
+    assert preview.envelope.metadata["execution_result_evidence"]["replay_for_evidence"] is False
+    assert preview.evidence_plan[2]["kind"] == "execution-result-evidence"
+    assert preview.evidence_plan[4]["hidden_subscription"] is False
 
 
 def test_generate_rejects_set_inclusion_filter_spelling_and_module_helper_accepts_checker() -> None:
@@ -159,6 +179,14 @@ def test_convert_external_sources_preview_is_destructive_gated_and_schema_valida
     assert preview.requires_destructive_gate is True
     assert preview.envelope.metadata["schema_validation"]["uri"] == CONVERT_EXTERNAL_SOURCES_URI
     assert preview.envelope.metadata["artifact_evidence_plan"]["writes_files_by_preview"] is False
+    assert preview.readback_plan == ()
+    assert preview.envelope.metadata["execution_result_evidence"] == {
+        "source_uri": CONVERT_EXTERNAL_SOURCES_URI,
+        "capture": "conversion-result",
+        "source": "single-dispatch-result",
+        "replay_for_evidence": False,
+        "executable_readback": False,
+    }
 
     with pytest.raises(SemanticValidationError) as empty:
         builder().convert_external_sources([])
@@ -166,22 +194,63 @@ def test_convert_external_sources_preview_is_destructive_gated_and_schema_valida
 
 
 def test_process_definition_files_is_high_risk_and_rejects_bad_proof_claims() -> None:
-    preview = builder().process_definition_files(files=("/sandbox/Task8SoundBankDefinitions/Unit.xml",), expected_soundbank_names=("UnitBank",))
+    preview = builder().process_definition_files(
+        files=("/sandbox/Task8SoundBankDefinitions/Unit.xml",),
+        expected_soundbank_names=("UnitBank", "Quoted Safe Bank"),
+    )
 
     assert preview.dispatch_payload() == {"uri": PROCESS_DEFINITION_FILES_URI, "args": {"files": ["/sandbox/Task8SoundBankDefinitions/Unit.xml"]}, "options": {}}
     assert preview.requires_destructive_gate is True
     assert preview.envelope.metadata["destructive_gate"]["high_risk"] is True
     assert "empty mapping" in preview.envelope.metadata["proof_policy"]
     assert preview.evidence_plan[2]["rejects"] == ["empty-mapping", "ak.wwise.file_error", "call-success-only"]
+    assert [plan.uri for plan in preview.readback_plan] == ["ak.wwise.core.object.get", "ak.wwise.core.object.get"]
+    assert [plan.args for plan in preview.readback_plan] == [
+        {"waql": 'from type SoundBank where name = "UnitBank"'},
+        {"waql": 'from type SoundBank where name = "Quoted Safe Bank"'},
+    ]
+    assert all("<" not in str(plan.as_dict()) for plan in preview.readback_plan)
 
     for proof in ({}, {"uri": "ak.wwise.file_error"}, {"call": "success"}):
         with pytest.raises(SemanticValidationError) as exc:
-            builder().process_definition_files(files=("/sandbox/Unit.xml",), process_result_proof=proof)
+            builder().process_definition_files(files=("/sandbox/Unit.xml",), expected_soundbank_names=("UnitBank",), process_result_proof=proof)
         assert exc.value.error_code == SemanticErrorCode.DESTRUCTIVE_GATE_REQUIRED
 
     with pytest.raises(SemanticValidationError) as no_files:
         builder().process_definition_files(files=())
     assert no_files.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+
+    with pytest.raises(SemanticValidationError) as no_names:
+        builder().process_definition_files(files=("/sandbox/Unit.xml",))
+    assert no_names.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+    assert "expected_soundbank_names" in str(no_names.value)
+
+    with pytest.raises(SemanticValidationError) as scalar_name:
+        builder().process_definition_files(files=("/sandbox/Unit.xml",), expected_soundbank_names="UnitBank")
+    assert scalar_name.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+    assert "array" in str(scalar_name.value)
+
+
+@pytest.mark.parametrize("name", ('Bad"Bank', "Bad\nBank", "Bad\x7fBank"))
+def test_process_definition_files_soundbank_name_waql_literals_fail_closed(name: str) -> None:
+    with pytest.raises(SemanticValidationError) as exc:
+        builder().process_definition_files(files=("/sandbox/Unit.xml",), expected_soundbank_names=(name,))
+
+    assert exc.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+    assert exc.value.details["boundary"] == "packaged-waql-literal-evidence"
+
+
+def test_soundbank_readback_plans_have_no_placeholders_or_destructive_replays() -> None:
+    previews = (
+        builder().generate(soundbanks=({"name": "UnitBank"},)),
+        builder().convert_external_sources((ExternalSourceConversion(input="/tmp/unit.wsources", platform="Mac"),)),
+        builder().process_definition_files(files=("/sandbox/Unit.xml",), expected_soundbank_names=("UnitBank", "OtherBank")),
+    )
+    destructive_uris = {GENERATE_URI, CONVERT_EXTERNAL_SOURCES_URI, PROCESS_DEFINITION_FILES_URI}
+
+    for preview in previews:
+        assert not any(plan.uri in destructive_uris for plan in preview.readback_plan)
+        assert all("<" not in str(plan.as_dict()) for plan in preview.readback_plan)
 
 
 def test_topic_expectations_are_evidence_only_and_do_not_subscribe_or_claim_completion() -> None:

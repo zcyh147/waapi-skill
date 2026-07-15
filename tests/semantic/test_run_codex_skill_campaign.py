@@ -1,0 +1,342 @@
+from __future__ import annotations
+
+import subprocess
+from dataclasses import replace
+from pathlib import Path
+from typing import Any, Mapping, Sequence
+
+import pytest
+
+from tests.semantic import run_codex_skill_campaign as campaign
+from tests.semantic import run_codex_skill_matrix as matrix
+from tests.semantic.support.codex_campaign import (
+    ATTEMPT_MANIFEST_FILE,
+    CampaignEvidenceError,
+    create_attempt,
+    list_campaign_attempts,
+    sha256_file,
+    stable_tree_sha256,
+)
+from tests.semantic.support.codex_campaign_runner import (
+    LIVE_READINESS_RETRY_CATEGORY,
+    ChildValidation,
+    PhaseVerdict,
+)
+from tests.semantic.support.codex_eval_suite import EvalSession, load_eval_suite
+
+
+_SCREENING = load_eval_suite(matrix.DEFAULT_SUITE).expand_profile("screening")
+_C1 = next(session for session in _SCREENING if session.case.id == "C1")
+
+
+def _options(
+    tmp_path: Path,
+    *,
+    pair_ids: tuple[str, ...] = (_C1.pair_id,),
+) -> campaign.CampaignOptions:
+    skill = tmp_path / "skill"
+    skill.mkdir(parents=True, exist_ok=True)
+    (skill / "SKILL.md").write_text("# frozen candidate\n", encoding="utf-8")
+    codex = tmp_path / "codex"
+    codex.write_text("synthetic executable; never invoked\n", encoding="utf-8")
+    auth = tmp_path / "auth.json"
+    auth.write_text("{}\n", encoding="utf-8")
+    live_config = tmp_path / "live-config.json"
+    live_config.write_text("{}\n", encoding="utf-8")
+    return campaign.CampaignOptions(
+        campaign_root=tmp_path / "workspace" / "campaign",
+        resume=False,
+        verify_only=False,
+        profile="screening",
+        suite_path=matrix.DEFAULT_SUITE.resolve(),
+        skill_source=skill.resolve(),
+        codex_binary=codex.resolve(),
+        auth_json=auth.resolve(),
+        live_config=live_config.resolve(),
+        model="synthetic-model",
+        reasoning_effort="medium",
+        service_tier="priority",
+        timeout_seconds=5.0,
+        case_ids=(),
+        versions=(),
+        pair_ids=pair_ids,
+        offline_only=False,
+        lock_timeout_seconds=1.0,
+        max_pre_action_retries=0,
+    )
+
+
+def _effective_for(options: campaign.CampaignOptions) -> dict[str, Any]:
+    harness_excludes = ["__pycache__", ".pytest_cache", ".DS_Store", ".coverage"]
+    interpreter = Path(campaign.sys.executable).resolve(strict=True)
+    return {
+        "contract": campaign.CAMPAIGN_EFFECTIVE_CONTRACT,
+        "selection": {
+            "profile": options.profile,
+            "pair_ids": list(options.pair_ids),
+            "required_units": {_C1.pair_id: ["single"]},
+        },
+        "candidate": {
+            "path": str(options.skill_source),
+            "tree_sha256": stable_tree_sha256(options.skill_source),
+            "excluded_names": [],
+        },
+        "codex": {
+            "path": str(options.codex_binary),
+            "sha256": sha256_file(options.codex_binary),
+            "memory": "disabled",
+            "fresh_session_per_phase": True,
+        },
+        "suite": {
+            "path": str(options.suite_path),
+            "sha256": sha256_file(options.suite_path),
+        },
+        "live_config": {
+            "path": str(options.live_config),
+            "sha256": sha256_file(options.live_config),
+        },
+        "runtime": {
+            "interpreter": str(interpreter),
+            "interpreter_sha256": sha256_file(interpreter),
+        },
+        "harness": {
+            "semantic_tree_sha256": stable_tree_sha256(
+                campaign.REPO_ROOT / "tests" / "semantic",
+                exclude_names=harness_excludes,
+            ),
+            "destructive_support_tree_sha256": stable_tree_sha256(
+                campaign.REPO_ROOT / "tests" / "destructive" / "support",
+                exclude_names=harness_excludes,
+            ),
+            "excluded_names": harness_excludes,
+        },
+    }
+
+
+def _pass_validation(expected_sessions: Sequence[EvalSession]) -> ChildValidation:
+    session = expected_sessions[0]
+    return ChildValidation(
+        observations=(
+            {
+                "unit_id": session.pair_id,
+                "status": "PASS",
+                "phases": [{"phase": session.phase, "status": "PASS"}],
+            },
+        ),
+        phase_verdicts=(
+            PhaseVerdict(
+                session_id=session.session_id,
+                phase=session.phase,
+                status="PASS",
+                reason="synthetic trusted PASS",
+            ),
+        ),
+        executed_session_ids=(session.session_id,),
+        pending_session_ids=(),
+        retry_categories=(),
+        summary={"synthetic": True},
+    )
+
+
+def _pre_session_readiness_retry_validation(
+    expected_sessions: Sequence[EvalSession],
+) -> ChildValidation:
+    session = expected_sessions[0]
+    verdict = PhaseVerdict(
+        session_id=session.session_id,
+        phase=session.phase,
+        status="RETRYABLE",
+        reason="synthetic runner-owned readiness failure before Codex",
+        retry_category=LIVE_READINESS_RETRY_CATEGORY,
+    )
+    return ChildValidation(
+        observations=(
+            {
+                "unit_id": session.pair_id,
+                "status": "RETRYABLE",
+                "phases": [{"phase": session.phase, "status": "RETRYABLE"}],
+            },
+        ),
+        phase_verdicts=(verdict,),
+        executed_session_ids=(),
+        pending_session_ids=tuple(item.session_id for item in expected_sessions),
+        retry_categories=(LIVE_READINESS_RETRY_CATEGORY,),
+        summary={"synthetic": True},
+    )
+
+
+def _install_synthetic_execution(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    options: campaign.CampaignOptions,
+) -> list[list[str]]:
+    effective = _effective_for(options)
+    child_calls: list[list[str]] = []
+
+    monkeypatch.setattr(campaign, "WORKSPACE_ROOT", options.campaign_root.parent)
+    monkeypatch.setattr(
+        campaign,
+        "build_effective_config",
+        lambda _options, *, sessions, required_units: effective,
+    )
+
+    def fake_child(argv: Sequence[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
+        child_calls.append(list(argv))
+        return subprocess.CompletedProcess(list(argv), 0, "synthetic stdout\n", "")
+
+    monkeypatch.setattr(campaign, "run_child", fake_child)
+    monkeypatch.setattr(
+        campaign,
+        "validate_child_run",
+        lambda _root, *, expected_sessions, **_kwargs: _pass_validation(expected_sessions),
+    )
+    return child_calls
+
+
+def test_live_readiness_category_auto_retries_exactly_once_per_invocation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    options = replace(_options(tmp_path), max_pre_action_retries=1)
+    child_calls = _install_synthetic_execution(monkeypatch, options=options)
+    monkeypatch.setattr(
+        campaign,
+        "validate_child_run",
+        lambda _root, *, expected_sessions, **_kwargs: (
+            _pre_session_readiness_retry_validation(expected_sessions)
+        ),
+    )
+
+    assert campaign.run_campaign(options) == campaign.EXIT_PENDING
+    assert len(child_calls) == 2
+    assert len(list_campaign_attempts(options.campaign_root)) == 2
+
+
+def test_candidate_frozen_hash_drift_is_detected(tmp_path: Path) -> None:
+    options = _options(tmp_path)
+    effective = _effective_for(options)
+    campaign.assert_candidate_frozen(options.skill_source, effective=effective)
+
+    (options.skill_source / "SKILL.md").write_text(
+        "# changed during campaign\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CampaignEvidenceError, match="candidate Skill drifted"):
+        campaign.assert_candidate_frozen(options.skill_source, effective=effective)
+
+
+def test_candidate_drift_during_child_is_sealed_as_blocked(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    options = _options(tmp_path)
+    effective = _effective_for(options)
+    monkeypatch.setattr(campaign, "WORKSPACE_ROOT", options.campaign_root.parent)
+    monkeypatch.setattr(
+        campaign,
+        "build_effective_config",
+        lambda _options, *, sessions, required_units: effective,
+    )
+
+    def mutate_candidate(
+        argv: Sequence[str], *, cwd: Path
+    ) -> subprocess.CompletedProcess[str]:
+        (options.skill_source / "SKILL.md").write_text(
+            "# drifted inside synthetic child boundary\n",
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(list(argv), 0, "", "")
+
+    monkeypatch.setattr(campaign, "run_child", mutate_candidate)
+    monkeypatch.setattr(
+        campaign,
+        "validate_child_run",
+        lambda *_args, **_kwargs: pytest.fail(
+            "drift must block before child evidence is accepted"
+        ),
+    )
+
+    assert campaign.run_campaign(options) == campaign.EXIT_BLOCKED
+    attempts = list_campaign_attempts(options.campaign_root)
+    assert len(attempts) == 1
+    assert (attempts[0] / ATTEMPT_MANIFEST_FILE).is_file()
+    assert (attempts[0] / "candidate-drift-before-seal.json").is_file()
+
+
+def test_invalid_pair_exits_two_before_creating_campaign_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    options = _options(
+        tmp_path,
+        pair_ids=("screening:not-a-real-case:2022.1:r1",),
+    )
+    monkeypatch.setattr(campaign, "WORKSPACE_ROOT", options.campaign_root.parent)
+    monkeypatch.setattr(campaign, "parse_args", lambda _argv: options)
+    monkeypatch.setattr(
+        campaign,
+        "build_effective_config",
+        lambda *_args, **_kwargs: pytest.fail(
+            "invalid selection must fail before campaign fingerprinting"
+        ),
+    )
+
+    assert campaign.main([]) == campaign.EXIT_CONFIG
+    assert not options.campaign_root.exists()
+
+
+def test_build_child_argv_never_requests_overwrite(tmp_path: Path) -> None:
+    options = _options(tmp_path)
+    group = campaign.ChildGroup(
+        group_id="offline",
+        version=None,
+        pair_ids=(_C1.pair_id,),
+        sessions=(_C1,),
+    )
+
+    argv = campaign.build_child_argv(
+        options,
+        group=group,
+        matrix_root=tmp_path / "matrix",
+    )
+
+    assert "--overwrite" not in argv
+    assert argv.count("--pair-id") == 1
+    assert argv[argv.index("--pair-id") + 1] == _C1.pair_id
+
+
+def test_sealed_pass_resumes_verify_only_without_starting_another_child(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    options = _options(tmp_path)
+    child_calls = _install_synthetic_execution(monkeypatch, options=options)
+
+    assert campaign.run_campaign(options) == campaign.EXIT_PASS
+    assert len(child_calls) == 1
+    attempts = list_campaign_attempts(options.campaign_root)
+    assert len(attempts) == 1
+    assert (attempts[0] / ATTEMPT_MANIFEST_FILE).is_file()
+
+    resume = replace(options, resume=True, verify_only=True)
+    assert campaign.run_campaign(resume) == campaign.EXIT_PASS
+    assert len(child_calls) == 1
+
+
+def test_resume_with_unsealed_attempt_exits_blocked(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    options = _options(tmp_path)
+    child_calls = _install_synthetic_execution(monkeypatch, options=options)
+    assert campaign.run_campaign(options) == campaign.EXIT_PASS
+    assert len(child_calls) == 1
+
+    _attempt_id, unsealed = create_attempt(options.campaign_root)
+    assert not (unsealed / ATTEMPT_MANIFEST_FILE).exists()
+    resume = replace(options, resume=True, verify_only=True)
+    monkeypatch.setattr(campaign, "parse_args", lambda _argv: resume)
+
+    assert campaign.main([]) == campaign.EXIT_BLOCKED
+    assert len(child_calls) == 1

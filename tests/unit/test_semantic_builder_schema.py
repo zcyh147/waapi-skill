@@ -70,6 +70,28 @@ def fake_manifest_loader() -> ManifestSchemaLoader:
                         "optionsSchema": {"additionalProperties": False, "properties": {}, "type": "object"},
                     },
                 },
+                {
+                    "uri": "ak.test.discriminatedOneOf",
+                    "status": "ok",
+                    "schema": {
+                        "argsSchema": {
+                            "additionalProperties": False,
+                            "oneOf": [
+                                {
+                                    "properties": {"mode": {"const": "first"}},
+                                    "required": ["mode"],
+                                },
+                                {
+                                    "properties": {"mode": {"const": "second"}},
+                                    "required": ["mode"],
+                                },
+                            ],
+                            "properties": {"mode": {"type": "string"}},
+                            "type": "object",
+                        },
+                        "optionsSchema": {"additionalProperties": False, "properties": {}, "type": "object"},
+                    },
+                },
             ]
         },
     )
@@ -159,3 +181,16 @@ def test_schema_oneof_requires_exactly_one_complete_branch() -> None:
         )
     assert overlapping.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
     assert overlapping.value.details["required_policy"] == "exactly one"
+
+
+def test_schema_oneof_validates_complete_branches_not_only_required_fields() -> None:
+    validator = SemanticSchemaValidator(manifest_loader=fake_manifest_loader())
+
+    validator.validate("ak.test.discriminatedOneOf", {"mode": "first"})
+
+    with pytest.raises(SemanticValidationError) as invalid:
+        validator.validate("ak.test.discriminatedOneOf", {"mode": "other"})
+
+    assert invalid.value.details["required_policy"] == "exactly one"
+    assert invalid.value.details["required_alternatives"] == [["mode"], ["mode"]]
+    assert invalid.value.details["matched_alternatives"] == []

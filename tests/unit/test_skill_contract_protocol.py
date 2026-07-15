@@ -1,258 +1,257 @@
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 
-SKILL_MD = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill" / "SKILL.md"
-
-SEMANTIC_FAMILIES = [
-    "intent_navigation",
-    "crud_authoring",
-    "system_design_preview",
-    "asset_import_workflow",
-    "soundbank_workflow",
-    "switch_assignment_workflow",
-    "bounded_profiler_guidance",
-    "unsupported_runtime_boundary",
-]
+SKILL_ROOT = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+SKILL = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+QUERY = (SKILL_ROOT / "references" / "waapi-query.md").read_text(encoding="utf-8")
+SETUP = (SKILL_ROOT / "references" / "waapi-setup.md").read_text(encoding="utf-8")
+OPERATE = (SKILL_ROOT / "references" / "waapi-operate.md").read_text(encoding="utf-8")
+COVERAGE = (SKILL_ROOT / "references" / "waapi-coverage.md").read_text(encoding="utf-8")
 
 
-def skill_text() -> str:
-    return SKILL_MD.read_text(encoding="utf-8")
+def test_common_reads_use_closed_gateway_before_optional_references() -> None:
+    assert SKILL.index("## Fixed gateway commands") < SKILL.index("## Routing")
+    assert "Treat gateway JSON as authoritative" in SKILL
+    assert "Read one lane reference only when the fixed command table does not fully answer" in SKILL
+    assert "There is no raw-client fallback" in QUERY
 
 
-def protocol_section() -> str:
-    text = skill_text()
-    start = text.index("## Operator protocol")
-    end = text.index("## Setup and runner")
-    return text[start:end]
+def test_machine_readable_agent_result_is_terminal_for_fixed_reads_and_transactions() -> None:
+    assert "any successful gateway payload contains `agent_result`" in SKILL
+    assert "This rule applies to fixed reads as well as transactions" in SKILL
+    assert "Do not reconstruct its fields from the prompt, `normalized`" in SKILL
+    assert "do not run another command after receiving it" in SKILL
+    assert "metadata types --summary-only" in QUERY
+    assert "compact-serialize that object exactly" in QUERY
 
 
-def semantic_builders_section() -> str:
-    text = skill_text()
-    start = text.index("## Semantic builders")
-    end = text.index("## Safety guardrails")
-    return text[start:end]
+def test_initial_skill_bootstrap_is_the_only_combined_read_exception() -> None:
+    assert "After this entry file has been loaded" in SKILL
+    assert "same absolute file" in SKILL
+    assert "this is the only combined read allowed" in SKILL
+    assert "Never combine a reference read, gateway invocation, or any other commands" in SKILL
 
 
-def read_only_scaffold_section() -> str:
-    text = skill_text()
-    start = text.index("## Read-only inspection scaffolding")
-    end = text.index("## Version selection")
-    return text[start:end]
-
-
-def welcome_section() -> str:
-    text = skill_text()
-    start = text.index("## Welcome/status UX for Wwise version detection")
-    end = text.index("Supported Wwise versions")
-    return text[start:end]
-
-
-def safety_section() -> str:
-    text = skill_text()
-    start = text.index("## Safety guardrails")
-    end = text.index("## Resources and documentation")
-    return text[start:end]
-
-
-def test_semantic_protocol_is_closed_and_before_implementation_details() -> None:
-    text = skill_text()
-    protocol = protocol_section()
-
-    assert text.index("## Operator protocol") < text.index("## Setup and runner")
-    assert "closed semantic-intent protocol" in protocol
-    assert "Do not invent intent families" in protocol
-    assert "Extract one structured `SemanticIntent`" in protocol
-    assert "call `SemanticPlanner.plan()`" in protocol
-    assert "present the resulting `SemanticPlan` preview" in protocol
-    assert "Even read-only navigation and unsupported boundary requests still pass through `SemanticPlanner.plan()`" in protocol
-    assert "SemanticPlanner().plan(intent)" in protocol
-    assert "wwise_waapi.semantic_planner" in protocol
-    assert "plan.verification_status" not in protocol
-
-    for family in SEMANTIC_FAMILIES:
-        assert f"`{family}`" in protocol
-
-
-def test_protocol_documents_intent_to_planner_to_preview_to_confirm_to_verify() -> None:
-    protocol = protocol_section()
-
-    required_sequence = [
-        "Extract `SemanticIntent`",
-        "Route CRUD requests at the semantic family level",
-        "Present the `SemanticPlan` preview",
-        "Confirm with `confirm_semantic_plan(preview, confirmation_state, submitted_preview_hash)`",
-        "Execute only the confirmed plan whose internally retained hash still matches the preview artifact shown to the user",
-        "Verify after execution",
-    ]
-
-    positions = [protocol.index(item) for item in required_sequence]
-    assert positions == sorted(positions)
-
-
-def test_project_changing_steps_require_matching_preview_hash() -> None:
-    protocol = protocol_section()
-
-    assert "before project-changing work" in protocol
-    assert "`preview_hash`" in protocol
-    assert "submitted_preview_hash = confirmation_state.preview_hash_seen_by_agent" in protocol
-    assert "submitted_preview_hash=plan.preview_hash" not in protocol
-    assert "Do not display `preview_hash`" in protocol
-    assert "the user gives clear affirmative confirmation" in protocol
-    assert "retained `submitted_preview_hash` exactly matches the current preview hash" in protocol
-    assert "the retained hash does not match, show a fresh preview" in protocol
-    assert "target identity" in protocol
-    assert "planned API" in protocol
-    assert "payload preview" in protocol
-    assert "abort and re-preview" in protocol
-
-
-def test_preview_hash_is_internal_not_user_visible() -> None:
-    protocol = protocol_section()
-
-    assert "Do not display `preview_hash`, checksums, JSON, or magic phrases in user-facing text" in protocol
-    assert "Do not ask the user to type the hash" not in protocol
-    assert "short preview id or hash for traceability" not in protocol
-
-
-def test_semantic_runs_must_emit_machine_readable_planner_facts() -> None:
-    protocol = protocol_section()
-
-    for field in [
-        "structured_intent_extracted",
-        "semantic_family",
-        "semantic_planner_invoked",
-        "semantic_plan_status",
-        "preview_hash",
-        "source_builder_refs",
-        "unsupported_boundary_returned",
-        "unsupported_boundary_reason",
-        "mutation_executed",
-        "mutation_executed_before_confirmation",
-        "verification_status",
-    ]:
-        assert f"`{field}`" in protocol
-    assert "SEMANTIC_RESULT_JSON" in protocol
-    assert "live WAAPI may supplement or verify the plan" in protocol
-    assert "verification_steps" in protocol
-
-
-def test_crud_guidance_stays_at_semantic_family_level_without_raw_payload_sprawl() -> None:
-    protocol = protocol_section()
-    builders = semantic_builders_section()
-    text = protocol + builders
-
-    assert "Route CRUD requests at the semantic family level" in protocol
-    assert "Do not paste raw WAAPI payload schemas into the prompt" in protocol
-    assert "`crud_authoring`: create, set, delete, copy, move, property, reference" in builders
-
-    low_level_family_lines = re.findall(
-        r"^\d+\. `(?:query|object-mutation|property-reference|import|soundbank|switchcontainer)`:.*$",
-        builders,
-        re.MULTILINE,
+def test_exact_identity_query_is_complete_in_entry_file() -> None:
+    command = (
+        "query-object --path '<exact-object-path>' --return-field id "
+        "--return-field name --return-field type --return-field path"
     )
-    assert low_level_family_lines == []
-    assert "raw WAAPI payload schemas" in text
-    assert "paste raw WAAPI payload schemas" in text
-    assert '"objects"' not in protocol
-    assert '"children"' not in protocol
-    assert '"onNameConflict"' not in protocol
+    assert command in SKILL
+    assert "Keep all four return fields explicit" in SKILL
+    assert "do not read the query reference before or after it" in SKILL
+    assert "Conditional read for a query not fully covered" in SKILL
+    assert "keep those four fields explicit for an exact path/GUID identity lookup" in QUERY
 
 
-def test_unsupported_runtime_and_mcp_features_are_boundaries_not_execution_capabilities() -> None:
-    protocol = protocol_section()
-    builders = semantic_builders_section()
-
-    unsupported = _unsupported_boundary_paragraph(protocol)
-    for phrase in [
-        "scheduler or delayed runtime posting",
-        "Game Object View emitter control",
-        "timed runtime or ambience playback",
-        "audio narrative sequencing",
-        "RTPC ramps over time",
-        "cross-app MCP federation",
-    ]:
-        assert phrase in unsupported
-
-    assert "are not supported execution capabilities" in unsupported
-    assert "Route them as `unsupported_runtime_boundary`" in unsupported
-    assert "no execution steps" in unsupported
-    assert "no preview id or hash" in unsupported
-    assert "no verification claims" in unsupported
-    assert "supported alternatives only when appropriate" in unsupported
-    assert "`unsupported_runtime_boundary`: unsupported runtime, scheduler, Game Object View, RTPC ramp, narrative sequencing, or cross-app MCP requests" in builders
+def test_ordinary_wwise_work_forbids_agent_authored_code() -> None:
+    for phrase in ("inline Python", "new `.py`/`.js`/`.sh` helper", "direct client construction"):
+        assert phrase in SKILL
+    assert "Skill development, testing, or debugging" in SKILL
+    assert "Do not import builders or planners from inline Python" in OPERATE
+    assert "That boundary does not authorize code generation" in OPERATE
+    assert "Do not write code to bypass it" in OPERATE
 
 
-def test_public_config_surface_excludes_internal_runtime_constants() -> None:
-    text = skill_text()
-    protocol = protocol_section()
-
-    assert "`wwise_version`, `waapi_host`, `waapi_port`, and `project_modification_policy`" in text
-    assert "saved public config fields are exactly `wwise_version`, `waapi_host`, `waapi_port`, and `project_modification_policy`" in protocol
-    assert "startup" in text
-    assert "readiness" in text
-    assert "WwiseConsole" in text
-    assert "not saved public config" in text
-    assert "`use_current_selection_for_ambiguous_queries`" in text
-    assert "saved public config fields include `startup" not in text
-    assert "saved public config fields include `readiness" not in text
-    assert "saved public config fields include `WwiseConsole" not in text
-
-
-def test_welcome_surface_mentions_project_modification_policy() -> None:
-    welcome = welcome_section()
-
-    assert "state the current `project_modification_policy`" in welcome
-    assert "Current project modification policy: preview_then_confirm" in welcome
-    assert "You can ask me to switch it to never, preview_then_confirm, or allow_with_notice" in welcome
-    assert "never, preview_then_confirm, or allow_with_notice" in welcome
-    assert "one-time session onboarding" in welcome
-    assert "first visible `waapi-skill` response after loading the skill" in welcome
-    assert "after making the first WAAPI connection in the current conversation" in welcome
-    assert "If you are not certain the current conversation already displayed the policy, display it" in welcome
-    assert "even when the first task is read-only" in welcome
-    assert "even when the user directly specified the query behavior" in welcome
-    assert "Never answer a first connection summary with only" in welcome
-    assert "Wwise is v2022.1.19" in welcome
-    assert "live WAAPI confirmed the current project and Wwise version" in welcome
-    assert "any localized equivalent without the policy-and-switchable-values line" in welcome
-    assert "Do not reduce the onboarding to only" in welcome
-    assert "project modification policy preview_then_confirm" in welcome
-    assert "do not repeat it in every final connection/project summary" in welcome
-    assert "Repeat it only when the user changes the policy" in welcome
-    assert "asks about mutation safety/config" in welcome
-    assert "preview or execute project-changing work" in welcome
-    assert "current conversation already displayed the policy" in welcome
-    assert "final summaries may simply say which project and Wwise version were used without repeating the policy" in welcome
-    assert "repeat the active policy in that same summary" not in welcome
-    assert "当前工程修改模式" not in welcome
-    assert "For Chinese output" not in welcome
+def test_operate_lane_uses_real_transaction_cli_in_order() -> None:
+    new_transaction_sequence = (
+        "gateway.py operation-schema <operation-name>",
+        "preview --request-json",
+    )
+    continuation_sequence = (
+        "transaction-show <transaction-id>",
+        "confirm <transaction-id> --artifact-hash <artifact-hash>",
+        "execute <transaction-id>",
+        "verify <transaction-id>",
+    )
+    new_positions = [OPERATE.index(item) for item in new_transaction_sequence]
+    continuation_positions = [OPERATE.index(item) for item in continuation_sequence]
+    assert new_positions == sorted(new_positions)
+    assert continuation_positions == sorted(continuation_positions)
+    assert "`operations` first: that command is only for broad capability-inventory questions" in OPERATE
+    assert "Do not call `operations`, `operation-schema`, or `preview` first" in OPERATE
+    assert "Only after a later user message clearly confirms" in OPERATE
+    assert "Never run `confirm` merely because the original request used an imperative verb" in OPERATE
 
 
-def test_read_only_result_cannot_skip_first_policy_notice() -> None:
-    scaffold = read_only_scaffold_section()
+def test_operate_state_directory_is_caller_owned_and_never_probed() -> None:
+    for document in (SKILL, OPERATE):
+        assert "omit `--state-dir`" in document
+        assert "Never run `env`, `printenv`" in document
+        assert "discover `WAAPI_SKILL_STATE_DIR`" in document
+        assert "trusted absolute path" in document
+        assert "structured state-directory error or boundary" in document
 
-    assert "first visible live WAAPI result in the current conversation" in scaffold
-    assert "Current project modification policy: <policy>" in scaffold
-    assert "You can ask me to switch it to never, preview_then_confirm, or allow_with_notice" in scaffold
-    assert "Do not let a read-only result summary be the first visible WAAPI output" in scaffold
-    assert "only says the current project and Wwise version" in scaffold
+    assert "gateway.py --state-dir /absolute/state/dir" not in OPERATE
+    for command in (
+        "gateway.py preview --request-json",
+        "gateway.py transaction-show <transaction-id> --summary-only",
+        "gateway.py confirm <transaction-id> --artifact-hash <artifact-hash>",
+        "gateway.py execute <transaction-id>",
+        "gateway.py verify <transaction-id>",
+    ):
+        assert command in OPERATE
 
 
-def test_xml_backup_guidance_uses_project_root_dot_directory() -> None:
-    safety = safety_section()
+def test_transaction_state_never_grants_authority_and_hash_alone_is_insufficient() -> None:
+    assert "A status or check request stops after `transaction-show`" in SKILL
+    assert "the returned state only constrains which actions are legal" in SKILL
+    assert "an artifact hash alone is not a transaction lookup key" in SKILL
 
-    assert "ak.wwise.core.getProjectInfo" in safety
-    assert "prefer `directories.root`" in safety
-    assert ".waapi_skill_backups/<timestamp>/" in safety
-    assert "create_xml_edit_backup()" in safety
-    assert "instead of writing sibling `.bak` files" in safety
+    assert "A transaction id is required: an artifact hash alone is not a lookup key" in OPERATE
+    assert "A status or check request stops after `transaction-show`" in OPERATE
+    assert "state only constrains which actions are legal and never authorizes an action by itself" in OPERATE
+    assert "An explicit verify-only request" in OPERATE
 
 
-def _unsupported_boundary_paragraph(text: str) -> str:
-    pattern = re.compile(r"^Unsupported boundary requests:.*?(?=^Named invariant:)", re.MULTILINE | re.DOTALL)
-    match = pattern.search(text)
-    assert match is not None
-    return match.group(0)
+def test_verify_payload_is_terminal_and_must_not_be_double_checked() -> None:
+    assert "`verify` is the terminal authority for the selected contract" in SKILL
+    assert "dedicated operations return their live readback" in SKILL
+    assert "generic `waapi.call` returns reflected result-schema evidence" in SKILL
+    assert "Do not add `query-object`, `call`, or another gateway command" in SKILL
+    assert "The `verify` payload is the terminal authority" in OPERATE
+    assert "Never append `query-object`, direct `call`, or another gateway command" in OPERATE
+    assert "then stop without an extra query" in OPERATE
+
+
+def test_operate_examples_are_generic_and_preserve_requested_import_notes() -> None:
+    assert "gateway.py operation-schema <operation-name>" in OPERATE
+    assert "gateway.py operation-schema object.create" not in OPERATE
+    assert '"notes": "Imported through the WAAPI Skill transaction gateway"' in OPERATE
+
+
+def test_operation_request_is_closed_and_runtime_owned_metadata_cannot_be_injected() -> None:
+    assert '"contract": "waapi-skill.operation-request/v1"' in OPERATE
+    for kind in ('"kind":"id"', '"kind":"path"', '"kind":"waql"', '"kind":"scoped-name"'):
+        assert kind in OPERATE
+    for forbidden_input in ("identity rows", "`property_info`", "`reference_info`", "dispatcher args/options", "WAAPI URI"):
+        assert forbidden_input in OPERATE
+    assert "unknown fields fail" in OPERATE
+
+
+def test_dedicated_operations_and_generic_transaction_fallback_are_truthful() -> None:
+    for operation in (
+        "object.create",
+        "object.delete",
+        "object.setName",
+        "object.setNotes",
+        "object.setProperty",
+        "object.setReference",
+        "audio.import",
+        "soundbank.setInclusions",
+        "switchContainer.addAssignment",
+        "switchContainer.removeAssignment",
+    ):
+        assert f"`{operation}`" in OPERATE
+    assert "`waapi.call`: one exact version-reflected API" in OPERATE
+    assert "`waapi.undoGroup`: one display name plus 1–32 version-allowlisted" in OPERATE
+    assert "accepted only for a catalog transaction route" in OPERATE
+    assert "result-schema verification" in OPERATE
+    for older_semantic_boundary in (
+        "object.copy",
+        "object.move",
+        "audio.importTabDelimited",
+        "soundbank.generate",
+    ):
+        assert older_semantic_boundary in OPERATE
+    assert "their richer operation-specific verifier is incomplete" in OPERATE
+    assert "the three Undo Group members declare only `waapi.undoGroup`" in OPERATE
+    assert "Platform-specific values are not yet accepted" in OPERATE
+
+
+def test_five_version_coverage_reference_reports_executable_registry_not_boundaries() -> None:
+    assert "| Total version/API rows | 814 | 247 | 522 | 45 | 769 |" in COVERAGE
+    assert "The 769 executable rows represent 188 unique public WAAPI URIs" in COVERAGE
+    assert "A hard boundary is never counted as executable coverage" in COVERAGE
+    assert "manifest-registered `waapi.call` operation" in COVERAGE
+    assert "Arbitrary Lua is excluded because it recreates model-authored code execution" in COVERAGE
+    assert "program-tested packaged coverage" in COVERAGE
+    assert 'not “769 endpoints live-verified in' in COVERAGE
+
+
+def test_transaction_runtime_invariants_prevent_hash_target_and_retry_drift() -> None:
+    for phrase in (
+        "write-once and SHA-256 bound",
+        "does not accept replacement JSON",
+        "verifies the live Wwise version/project/endpoint",
+        "verifies the packaged implementation digest",
+        "re-reads every canonical GUID role",
+        "repreview_required",
+        "never automatically retried",
+        "executed_unverified",
+        "verification_deferred",
+        "execution_cancelled",
+        "result_schema_checked",
+    ):
+        assert phrase in OPERATE
+    assert "even with `--allow-destructive` or `WWISE_DESTRUCTIVE=1`" in OPERATE
+
+
+def test_lifecycle_cleanup_statuses_and_bindings_are_documented() -> None:
+    for phrase in (
+        "opener preview is `not_started`",
+        "successful execution/verification is `pending`",
+        "ambiguous execution is `unknown`",
+        "Transport destroy binds only to the validated ID returned by create",
+        "Work Unit load/unload is reported separately as `available_reversal`",
+        "UI command register/execute are excluded entirely",
+    ):
+        assert phrase in OPERATE
+
+
+def test_operation_specific_verification_is_not_generic_mutation_replay() -> None:
+    for phrase in (
+        "GUID returned by execution",
+        "Delete proves GUID absence",
+        "same GUID, new name/path, unchanged parent, and old-path absence",
+        "Numeric properties use typed tolerance",
+        "References must normalize to the target identity",
+    ):
+        assert phrase in OPERATE
+    assert "run `verify`, not `execute` again" in OPERATE
+
+
+def test_planner_and_xml_are_explicit_non_execution_boundaries() -> None:
+    assert "`SemanticPlanner` is a candidate/schema planning resource, not the transaction executor" in OPERATE
+    assert "do not use its generic mutation verification steps" in OPERATE
+    assert "XML editing is not an automatic fallback" in OPERATE
+    assert "return `unsupported_by_skill_interface`" in OPERATE
+
+
+def test_public_config_surface_excludes_runtime_internals() -> None:
+    for field in ("wwise_version", "waapi_host", "waapi_port", "project_modification_policy"):
+        assert f"`{field}`" in SETUP
+    assert "Do not describe timeout constants" in SETUP
+    assert "environment wiring" in SETUP
+    assert "default `WwiseConsole` paths" in SETUP
+    assert "gateway.py config-show" in SETUP
+    assert "gateway.py config-set" in SETUP
+    assert "$XDG_CONFIG_HOME/waapi-skill/config.json" in SETUP
+    assert "never writes the legacy file inside the Skill checkout" in SETUP
+
+
+def test_one_time_onboarding_is_global_natural_and_does_not_add_a_gateway_call() -> None:
+    for phrase in (
+        "The first time this Skill is used in a conversation",
+        "`waapi-skill` is loaded",
+        "current WAAPI address",
+        "WAAPI adapter version",
+        "current project modification policy",
+        "若有需要，可按需切换模式",
+        "`never` / `preview_then_confirm` / `allow_with_notice`",
+        "ordinary prose, not a status bar, table, field list, or rigid template",
+        "Use the first gateway command already required by the user's task",
+        "An offline task stays offline",
+        "visible conversation does not already contain this introduction",
+        "do not use memory to make that decision",
+        "separate normal progress update",
+    ):
+        assert phrase in SKILL
+    assert "run exactly one offline `config-show` to obtain the introduction facts" in SKILL
+    assert "never run `status` or open a live WAAPI connection only for the introduction" in SKILL
+    assert "The entry file owns the one-time conversation introduction for every lane" in SETUP
+    assert "Do not add policy or implementation narration to a simple read-only result" not in SETUP
+    assert "do not repeat policy narration in every simple read-only result" in SETUP
+    assert "project modification policy" not in QUERY.lower()

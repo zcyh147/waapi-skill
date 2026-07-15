@@ -745,18 +745,20 @@
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "isolated-transaction",
       "blocking_condition": "",
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "future_review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -765,29 +767,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.addNewPlatform",
-      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "isolated-transaction",
       "blocking_condition": "",
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "future_review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -796,29 +800,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.convertExternalSource",
-      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "isolated-transaction",
       "blocking_condition": "",
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "future_review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -827,29 +833,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.createNewProject",
-      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "isolated-transaction",
       "blocking_condition": "",
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "future_review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -858,29 +866,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.dumpObjects",
-      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "isolated-transaction",
       "blocking_condition": "",
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "future_review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -889,29 +899,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.generateSoundbank",
-      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "isolated-transaction",
       "blocking_condition": "",
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "future_review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -920,29 +932,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.migrate",
-      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "isolated-transaction",
       "blocking_condition": "",
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "future_review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -951,29 +965,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.moveMediaIdsToSingleFile",
-      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "isolated-transaction",
       "blocking_condition": "",
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "future_review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -982,29 +998,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.moveMediaIdsToWorkUnits",
-      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "isolated-transaction",
       "blocking_condition": "",
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "future_review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -1013,29 +1031,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.tabDelimitedImport",
-      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "isolated-transaction",
       "blocking_condition": "",
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "future_review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -1044,29 +1064,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.updateMediaIdsInSingleFile",
-      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "isolated-transaction",
       "blocking_condition": "",
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "future_review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -1075,29 +1097,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.verify",
-      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "isolated-transaction",
       "blocking_condition": "",
       "category": "cli",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "future_review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -1106,13 +1130,13 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit when a disposable CLI-only project fixture and explicit migration/generation acceptance criteria are approved.",
+      "review_trigger": "Revisit when path confinement or expected-disconnect handling needs a version-specific override.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.waapiServer",
-      "user_approved_rationale": "User guidance approves skipping deep CLI behavior in Phase 2; wrappers keep manifest/schema accounting only.",
+      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -3087,18 +3111,20 @@
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "managed-transaction",
       "blocking_condition": "",
       "category": "core.remote",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
+      "future_review_trigger": "Revisit when a controlled console fixture reveals a version-specific lifecycle or cleanup difference.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -3107,29 +3133,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
+      "review_trigger": "Revisit when a controlled console fixture reveals a version-specific lifecycle or cleanup difference.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.core.remote.connect",
-      "user_approved_rationale": "User guidance approves skipping remote-console behavior because a deterministic remote console environment is unavailable.",
+      "user_approved_rationale": "Remote-console calls are part of the high-coverage contract but require a confirmed managed-session transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "managed-transaction",
       "blocking_condition": "",
       "category": "core.remote",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
+      "future_review_trigger": "Revisit when a controlled console fixture reveals a version-specific lifecycle or cleanup difference.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -3138,29 +3166,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
+      "review_trigger": "Revisit when a controlled console fixture reveals a version-specific lifecycle or cleanup difference.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.core.remote.disconnect",
-      "user_approved_rationale": "User guidance approves skipping remote-console behavior because a deterministic remote console environment is unavailable.",
+      "user_approved_rationale": "Remote-console calls are part of the high-coverage contract but require a confirmed managed-session transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "managed-transaction",
       "blocking_condition": "",
       "category": "core.remote",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
+      "future_review_trigger": "Revisit when a controlled console fixture reveals a version-specific lifecycle or cleanup difference.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -3169,29 +3199,31 @@
         "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
       },
       "phase1_status": "fake-route-tested",
-      "review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
+      "review_trigger": "Revisit when a controlled console fixture reveals a version-specific lifecycle or cleanup difference.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-fake-route-policy-approved",
+      "status_transition": "phase1-fake-route-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.core.remote.getAvailableConsoles",
-      "user_approved_rationale": "User guidance approves skipping remote-console behavior because a deterministic remote console environment is unavailable.",
+      "user_approved_rationale": "Remote-console calls are part of the high-coverage contract but require a confirmed managed-session transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "managed-transaction",
       "blocking_condition": "",
       "category": "core.remote",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
+      "future_review_trigger": "Revisit when a controlled console fixture reveals a version-specific lifecycle or cleanup difference.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -3200,13 +3232,13 @@
         "test": "tests/unit/test_dispatch_routes_all_2022.py::test_every_non_deferred_api_routes_with_fake_runtime"
       },
       "phase1_status": "fake-route-tested",
-      "review_trigger": "Revisit when a controlled remote console fixture is available and can prove connection lifecycle cleanup.",
+      "review_trigger": "Revisit when a controlled console fixture reveals a version-specific lifecycle or cleanup difference.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-fake-route-policy-approved",
+      "status_transition": "phase1-fake-route-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.core.remote.getConnectionStatus",
-      "user_approved_rationale": "User guidance approves skipping remote-console behavior because a deterministic remote console environment is unavailable.",
+      "user_approved_rationale": "Remote-console calls are part of the high-coverage contract but require a confirmed managed-session transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -3993,18 +4025,20 @@
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "selective-execution",
       "blocking_condition": "",
       "category": "debug",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
+      "future_review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "topic",
       "phase1_behavioral_evidence": {
@@ -4013,29 +4047,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
+      "review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.debug.assertFailed",
-      "user_approved_rationale": "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths.",
+      "user_approved_rationale": "Only generateToneWAV is executable through an isolated transaction; assert, crash, automation, WAL, restart, and validateCall endpoints remain explicit exclusions.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "selective-execution",
       "blocking_condition": "",
       "category": "debug",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
+      "future_review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -4044,29 +4080,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
+      "review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.debug.enableAsserts",
-      "user_approved_rationale": "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths.",
+      "user_approved_rationale": "Only generateToneWAV is executable through an isolated transaction; assert, crash, automation, WAL, restart, and validateCall endpoints remain explicit exclusions.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "selective-execution",
       "blocking_condition": "",
       "category": "debug",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
+      "future_review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -4075,29 +4113,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
+      "review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.debug.enableAutomationMode",
-      "user_approved_rationale": "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths.",
+      "user_approved_rationale": "Only generateToneWAV is executable through an isolated transaction; assert, crash, automation, WAL, restart, and validateCall endpoints remain explicit exclusions.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "selective-execution",
       "blocking_condition": "",
       "category": "debug",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
+      "future_review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -4106,29 +4146,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
+      "review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.debug.testAssert",
-      "user_approved_rationale": "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths.",
+      "user_approved_rationale": "Only generateToneWAV is executable through an isolated transaction; assert, crash, automation, WAL, restart, and validateCall endpoints remain explicit exclusions.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "skipped-approved",
+      "achieved_status": "selective-execution",
       "blocking_condition": "",
       "category": "debug",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
+      "future_review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -4137,29 +4179,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only with explicit crash/assert sandbox approval and isolated process-failure evidence requirements.",
+      "review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.debug.testCrash",
-      "user_approved_rationale": "User guidance approves skipping debug behavior; assert/crash/automation debug APIs must not run in Phase 2 default or live smoke paths.",
+      "user_approved_rationale": "Only generateToneWAV is executable through an isolated transaction; assert, crash, automation, WAL, restart, and validateCall endpoints remain explicit exclusions.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "wrapper-only",
+      "achieved_status": "guarded-execution",
       "blocking_condition": "",
       "category": "ui",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "future_review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -4168,29 +4212,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.bringToForeground",
-      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "wrapper-only",
+      "achieved_status": "guarded-execution",
       "blocking_condition": "",
       "category": "ui",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "future_review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -4199,29 +4245,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.captureScreen",
-      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "wrapper-only",
+      "achieved_status": "guarded-execution",
       "blocking_condition": "",
       "category": "ui.commands",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "future_review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -4230,29 +4278,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.commands.execute",
-      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "wrapper-only",
+      "achieved_status": "guarded-execution",
       "blocking_condition": "",
       "category": "ui.commands",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "future_review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "topic",
       "phase1_behavioral_evidence": {
@@ -4261,29 +4311,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.commands.executed",
-      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "wrapper-only",
+      "achieved_status": "guarded-execution",
       "blocking_condition": "",
       "category": "ui.commands",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "future_review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -4292,29 +4344,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.commands.getCommands",
-      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "wrapper-only",
+      "achieved_status": "guarded-execution",
       "blocking_condition": "",
       "category": "ui.commands",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "future_review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -4323,29 +4377,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.commands.register",
-      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "wrapper-only",
+      "achieved_status": "guarded-execution",
       "blocking_condition": "",
       "category": "ui.commands",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "future_review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -4354,29 +4410,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.commands.unregister",
-      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "wrapper-only",
+      "achieved_status": "guarded-execution",
       "blocking_condition": "",
       "category": "ui",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "future_review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -4385,29 +4443,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.getSelectedObjects",
-      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "wrapper-only",
+      "achieved_status": "guarded-execution",
       "blocking_condition": "",
       "category": "ui.project",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "future_review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -4416,29 +4476,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.project.close",
-      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "wrapper-only",
+      "achieved_status": "guarded-execution",
       "blocking_condition": "",
       "category": "ui.project",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "future_review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -4447,29 +4509,31 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.project.open",
-      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "wrapper-only",
+      "achieved_status": "guarded-execution",
       "blocking_condition": "",
       "category": "ui",
       "counts_as_behavioral": false,
       "counts_as_live_behavioral": false,
-      "evidence_class": "",
-      "evidence_command": "python -m pytest tests/unit/test_wrapper_only_categories.py -q",
-      "evidence_path": "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+      "evidence_class": "program_tested_packaged_execution",
+      "evidence_command": "ci/test.sh --mode program -- -q -ra",
+      "evidence_path": "tests/unit/test_public_route_coverage_contract.py",
       "evidence_paths": [
-        "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+        "tests/unit/test_public_route_coverage_contract.py",
+        "tests/unit/test_public_route_program_matrix.py",
+        "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "future_review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "topic",
       "phase1_behavioral_evidence": {
@@ -4478,13 +4542,13 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only when a deterministic UI automation fixture is explicitly approved and can prove no user-project/UI state mutation.",
+      "review_trigger": "Revisit when a version changes a UI schema or the deterministic program contract no longer matches.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
-      "status_transition": "phase1-deferred-policy-approved",
+      "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.selectionChanged",
-      "user_approved_rationale": "User guidance keeps UI shortcut categories as wrapper-only in Phase 2; schema mapping and route diagnostics remain useful, but foreground Authoring UI state is not a deep live target.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -4598,7 +4662,7 @@
       "tests/destructive/support/resources/capabilities/2022.1/task-6-object-topic-live-plan.json",
       "tests/destructive/support/resources/capabilities/2022.1/task-7-project-mutation-sandbox-plan.json",
       "tests/destructive/support/resources/capabilities/2022.1/task-9-profiler-soundengine-feasibility.json",
-      "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json"
+      "skills/waapi-skill/references/waapi-coverage.md"
     ],
     "version": "2022.1",
     "windows_policy": "Windows host validation remains pending; generated Windows SoundBank artifacts from macOS sandbox output are not Windows validation."
@@ -4607,12 +4671,12 @@
     "behavioral_covered_count": 13,
     "deferred_count": 63,
     "evidence_model": "Phase 2 statuses count inventory separately from behavioral/live coverage; fake-route and substitute evidence do not count as behavioral coverage.",
-    "excluded_count": 43,
+    "excluded_count": 11,
     "inventory_covered_count": 144,
     "live_behavioral_covered_count": 13,
     "original_deferred_after_phase2": 63,
     "original_deferred_before_phase2": 117,
-    "original_deferred_policy_approved": 41,
+    "original_deferred_policy_approved": 11,
     "original_deferred_promoted_behavioral": 13,
     "original_fake_route_promoted_live": 0,
     "phase1_status_counts": {
@@ -4622,10 +4686,12 @@
     "phase2_status_counts": {
       "conformance-only-skip": 11,
       "fake-route-tested": 25,
+      "guarded-execution": 11,
+      "isolated-transaction": 12,
+      "managed-transaction": 4,
       "sandbox-mutating-tested": 13,
-      "skipped-approved": 21,
-      "still-deferred-with-evidence": 63,
-      "wrapper-only": 11
+      "selective-execution": 5,
+      "still-deferred-with-evidence": 63
     },
     "profiler_backed_tested_count": 0,
     "reflected_count": 144,

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import queue
 import threading
 import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Protocol
@@ -18,12 +20,22 @@ from .category_policy import (  # pyright: ignore[reportMissingImports]
 )
 from .deferred_registry import ApiClassifier
 from .manifest import ManifestResourceMissingError, ManifestStore
-from .subscriptions import SubscriptionManager, SubscriptionTimeout, SubscriptionUnavailable
+from .safety import requires_destructive_gate  # pyright: ignore[reportMissingImports]
+from .subscriptions import SubscriptionManager, SubscriptionTimeout, SubscriptionUnavailable, payload_matches
 
 DEFAULT_WWISE_VERSION = "2022.1"
 DEFAULT_TIMEOUT_SECONDS = 10.0
+MAX_LIVE_RESULT_JSON_BYTES = 1024 * 1024
+LIVE_RESULT_CEILING_PROVENANCE = "waapi-skill.dispatcher.live-result-json-ceiling/v1"
+MAX_EXCEPTION_MESSAGE_BYTES = 2048
+MAX_EXCEPTION_URI_BYTES = 512
+MAX_EXCEPTION_METADATA_DEPTH = 16
+MAX_EXCEPTION_METADATA_NODES = 256
+MAX_EXCEPTION_METADATA_STRING_BYTES = 8192
 ENV_ALLOW_DESTRUCTIVE = "WWISE_DESTRUCTIVE"
 MANIFEST_ROOT = Path(__file__).resolve().parents[1] / "resources" / "manifest"
+# Compatibility-only export for historical coverage-resource builders.  Runtime
+# gating no longer uses this incomplete token set; see ``wwise_waapi.safety``.
 DESTRUCTIVE_TOKENS = frozenset(
     {
         "close",
@@ -64,7 +76,9 @@ class DispatcherRequest:
     allow_destructive: bool = False
     evidence_dir: Path | None = None
     topic_mode: str = "wait"
+    topic_match: Mapping[str, Any] | None = None
     live_behavior: bool = False
+    result_limit_bytes: int = MAX_LIVE_RESULT_JSON_BYTES
 
 
 @dataclass(slots=True, frozen=True)
@@ -75,6 +89,15 @@ class ManifestApiEntry:
     item_type: str
     category: str
     risk_level: str
+
+
+@dataclass(slots=True, frozen=True)
+class _JsonSizeProbe:
+    """Bounded result of measuring one deterministic JSON document."""
+
+    size_bytes: int | None = None
+    observed_at_least_bytes: int | None = None
+    encoding_failed: bool = False
 
 
 @dataclass(slots=True)
@@ -103,7 +126,9 @@ class WwiseDispatcher:
         allow_destructive: bool = False,
         evidence_dir: str | Path | None = None,
         topic_mode: str = "wait",
+        topic_match: Mapping[str, Any] | None = None,
         live_behavior: bool = False,
+        result_limit_bytes: int = MAX_LIVE_RESULT_JSON_BYTES,
     ) -> dict[str, Any]:
         """Dispatch one WAAPI function or topic and return a structured result."""
 
@@ -117,24 +142,33 @@ class WwiseDispatcher:
             allow_destructive=allow_destructive,
             evidence_dir=evidence_dir,
             topic_mode=topic_mode,
+            topic_match=topic_match,
             live_behavior=live_behavior,
+            result_limit_bytes=result_limit_bytes,
         )
         try:
             result = self._dispatch(request)
         except Exception as exc:  # noqa: BLE001 - callers need structured WAAPI errors
-            result = self._error_result(
-                request.api,
-                request.version,
-                self._error_code(exc),
-                str(exc),
-            )
-        return self._record_evidence(result, request.evidence_dir)
+            result = self._exception_result(request, exc)
+        return self._publish_result(result, request)
 
     def _dispatch(self, request: DispatcherRequest) -> dict[str, Any]:
         if not request.api.strip():
             return self._error_result(request.api, request.version, "INVALID_API", "api must be a non-empty WAAPI URI")
-        if request.timeout < 0:
-            return self._error_result(request.api, request.version, "INVALID_TIMEOUT", "timeout must be non-negative")
+        if not math.isfinite(request.timeout) or request.timeout < 0:
+            return self._error_result(
+                request.api,
+                request.version,
+                "INVALID_TIMEOUT",
+                "timeout must be finite and non-negative",
+            )
+        if not isinstance(request.result_limit_bytes, int) or isinstance(request.result_limit_bytes, bool) or request.result_limit_bytes <= 0:
+            return self._error_result(
+                request.api,
+                request.version,
+                "INVALID_RESULT_LIMIT",
+                "result_limit_bytes must be a positive integer",
+            )
 
         entry = self._lookup_entry(request.version, request.api)
         if entry is None:
@@ -185,9 +219,9 @@ class WwiseDispatcher:
         try:
             payload = _call_with_timeout(self.client, request.api, request.args, request.options, request.timeout)
         except TimeoutError as exc:
-            return self._error_result(request.api, request.version, "TIMEOUT", str(exc), item_type=entry.item_type)
+            return self._exception_result(request, exc, item_type=entry.item_type, error_code="TIMEOUT")
         except Exception as exc:  # noqa: BLE001 - preserve client error type in machine field
-            return self._error_result(request.api, request.version, type(exc).__name__, str(exc), item_type=entry.item_type)
+            return self._exception_result(request, exc, item_type=entry.item_type)
         return self._success_result(request, entry, payload)
 
     def _dispatch_topic(self, request: DispatcherRequest, entry: ManifestApiEntry) -> dict[str, Any]:
@@ -201,11 +235,23 @@ class WwiseDispatcher:
             )
         manager = self.subscription_manager or SubscriptionManager(self.client)  # type: ignore[arg-type]
         try:
-            event = manager.wait_for_event(request.api, timeout=request.timeout, options=dict(request.options or {}))
+            wait_kwargs: dict[str, Any] = {
+                "timeout": request.timeout,
+                "options": dict(request.options or {}),
+            }
+            if request.topic_match is not None:
+                expected = dict(request.topic_match)
+                wait_kwargs["predicate"] = lambda event: payload_matches(event.payload, expected)
+            event = manager.wait_for_event(request.api, **wait_kwargs)
         except SubscriptionTimeout as exc:
-            return self._error_result(request.api, request.version, "TIMEOUT", str(exc), item_type=entry.item_type)
+            return self._exception_result(request, exc, item_type=entry.item_type, error_code="TIMEOUT")
         except SubscriptionUnavailable as exc:
-            return self._error_result(request.api, request.version, "SUBSCRIPTION_UNAVAILABLE", str(exc), item_type=entry.item_type)
+            return self._exception_result(
+                request,
+                exc,
+                item_type=entry.item_type,
+                error_code="SUBSCRIPTION_UNAVAILABLE",
+            )
         return self._success_result(
             request,
             entry,
@@ -256,8 +302,11 @@ class WwiseDispatcher:
         item_type: str | None = None,
         category: str | None = None,
         risk_level: str | None = None,
+        details: Mapping[str, Any] | None = None,
+        waapi_error_uri: Any = None,
+        waapi_error_details: Any = None,
     ) -> dict[str, Any]:
-        return {
+        result = {
             "ok": False,
             "api": api,
             "version": version,
@@ -269,16 +318,115 @@ class WwiseDispatcher:
             "message": message or error_code,
             "evidence_path": None,
         }
+        if isinstance(waapi_error_uri, str) and waapi_error_uri:
+            result["waapi_error_uri"] = waapi_error_uri
+        if details is not None:
+            result["details"] = dict(details)
+        if waapi_error_details is not None:
+            result["waapi_error_details"] = waapi_error_details
+        return result
 
-    def _record_evidence(self, result: dict[str, Any], evidence_dir: Path | None) -> dict[str, Any]:
+    def _exception_result(
+        self,
+        request: DispatcherRequest,
+        exc: Exception,
+        *,
+        item_type: str | None = None,
+        error_code: str | None = None,
+    ) -> dict[str, Any]:
+        """Normalize an untrusted exception without letting its hooks escape."""
+
+        try:
+            normalized = _normalize_exception(exc, error_code=error_code or self._error_code(exc))
+            return self._error_result(
+                request.api,
+                request.version,
+                normalized["error_code"],
+                normalized["message"],
+                item_type=item_type,
+                details=normalized.get("details"),
+                waapi_error_uri=normalized.get("waapi_error_uri"),
+                waapi_error_details=normalized.get("waapi_error_details"),
+            )
+        except BaseException:  # noqa: BLE001 - hostile exception hooks must not cross dispatch
+            return self._error_result(
+                _bounded_public_string(request.api, "<omitted>", MAX_EXCEPTION_URI_BYTES),
+                _bounded_public_string(request.version, "<omitted>", 80),
+                "ERROR_NORMALIZATION_FAILED",
+                "The underlying error could not be normalized safely",
+                item_type=_bounded_public_string(item_type, None, 80),
+            )
+
+    def _publish_result(self, result: dict[str, Any], request: DispatcherRequest) -> dict[str, Any]:
+        """Apply the live public ceiling before returning or recording evidence."""
+
+        published_result = result if request.dry_run else self._constrain_live_result(result, request)
+        evidence_dir = request.evidence_dir
         if evidence_dir is None:
-            return result
+            return published_result
         evidence_dir.mkdir(parents=True, exist_ok=True)
-        safe_api = result["api"].replace(".", "_").replace("/", "_") or "unknown"
-        path = evidence_dir / f"{int(time.time() * 1000)}-{safe_api}.json"
-        result = dict(result)
-        result["evidence_path"] = str(path)
-        path.write_text(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        safe_api = _bounded_public_string(published_result.get("api"), "unknown", 160)
+        safe_api = safe_api.replace(".", "_").replace("/", "_") or "unknown"
+        while True:
+            path = evidence_dir / f"{time.time_ns()}-{uuid.uuid4().hex}-{safe_api}.json"
+            recorded_result = dict(published_result)
+            recorded_result["evidence_path"] = str(path)
+            if not request.dry_run:
+                recorded_result = self._constrain_live_result(recorded_result, request)
+                recorded_result["evidence_path"] = str(path)
+            payload = json.dumps(
+                recorded_result,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+                allow_nan=request.dry_run,
+            ) + "\n"
+            try:
+                with path.open("x", encoding="utf-8") as evidence_file:
+                    evidence_file.write(payload)
+            except FileExistsError:
+                continue
+            return recorded_result
+
+    def _constrain_live_result(
+        self,
+        result: dict[str, Any],
+        request: DispatcherRequest,
+    ) -> dict[str, Any]:
+        effective_limit = min(MAX_LIVE_RESULT_JSON_BYTES, request.result_limit_bytes)
+        probe = _probe_json_document_size(result, effective_limit)
+        common = {
+            "item_type": _bounded_public_string(result.get("item_type"), None, 80),
+            "category": _bounded_public_string(result.get("category"), None, 80),
+            "risk_level": _bounded_public_string(result.get("risk_level"), None, 80),
+        }
+        bounded_api = _bounded_public_string(request.api, "<omitted>", 512)
+        bounded_version = _bounded_public_string(request.version, "<omitted>", 80)
+        if probe.encoding_failed:
+            return self._error_result(
+                bounded_api,
+                bounded_version,
+                "RESULT_NOT_JSON",
+                "Live WAAPI result is not a strict JSON document",
+                details={
+                    "provenance": LIVE_RESULT_CEILING_PROVENANCE,
+                    "reason": "not_json_serializable",
+                },
+                **common,
+            )
+        if probe.observed_at_least_bytes is not None:
+            return self._error_result(
+                bounded_api,
+                bounded_version,
+                "RESULT_TOO_LARGE",
+                "Live WAAPI result exceeded the public JSON size limit",
+                details={
+                    "limit_bytes": effective_limit,
+                    "observed_at_least_bytes": probe.observed_at_least_bytes,
+                    "provenance": LIVE_RESULT_CEILING_PROVENANCE,
+                },
+                **common,
+            )
         return result
 
     def _coerce_request(self, api: str | DispatcherRequest, **kwargs: Any) -> DispatcherRequest:
@@ -295,17 +443,16 @@ class WwiseDispatcher:
             allow_destructive=bool(kwargs["allow_destructive"]),
             evidence_dir=Path(evidence) if evidence is not None else None,
             topic_mode=str(kwargs["topic_mode"]),
+            topic_match=kwargs["topic_match"],
             live_behavior=bool(kwargs["live_behavior"]),
+            result_limit_bytes=int(kwargs["result_limit_bytes"]),
         )
 
     def _destructive_allowed(self, request: DispatcherRequest) -> bool:
         return request.allow_destructive or os.getenv(ENV_ALLOW_DESTRUCTIVE) == "1"
 
     def _is_destructive(self, entry: ManifestApiEntry) -> bool:
-        if entry.item_type != "function":
-            return False
-        operation = entry.uri.rsplit(".", 1)[-1].lower()
-        return entry.risk_level == "high" or any(operation.startswith(token) for token in DESTRUCTIVE_TOKENS)
+        return requires_destructive_gate(entry.uri, entry.item_type, entry.category)
 
     def _unsupported_live_behavior(self, request: DispatcherRequest, entry: ManifestApiEntry) -> bool:
         if request.dry_run:
@@ -321,7 +468,373 @@ class WwiseDispatcher:
             return "TIMEOUT"
         if isinstance(exc, ValueError):
             return "INVALID_REQUEST"
-        return type(exc).__name__
+        return _safe_type_name(exc, "Exception")
+
+
+def _safe_exception_attribute(exc: Exception, name: str) -> tuple[bool, Any]:
+    """Read an optional third-party exception attribute without masking it."""
+
+    try:
+        return True, getattr(exc, name, None)
+    except BaseException:  # noqa: BLE001 - a broken third-party property is not evidence
+        return False, None
+
+
+def _bounded_public_string(value: Any, fallback: Any, max_bytes: int) -> Any:
+    """Keep trusted envelope labels bounded without serializing large inputs."""
+
+    if not isinstance(value, str) or len(value) > max_bytes:
+        return fallback
+    try:
+        return value if len(value.encode("utf-8")) <= max_bytes else fallback
+    except UnicodeEncodeError:
+        return fallback
+
+
+def _safe_type_name(value: Any, fallback: str = "object") -> str:
+    """Return a small type label without invoking instance ``repr`` or ``str``."""
+
+    try:
+        name = type.__getattribute__(type(value), "__name__")
+    except BaseException:  # noqa: BLE001 - even hostile metaclasses are untrusted
+        return fallback
+    return _bounded_public_string(name, fallback, 160)
+
+
+def _safe_exception_message(exc: Exception) -> str | None:
+    try:
+        message = str(exc)
+    except BaseException:  # noqa: BLE001 - Exception.__str__ may call hostile repr hooks
+        return None
+    return _truncate_utf8(message, MAX_EXCEPTION_MESSAGE_BYTES)
+
+
+def _normalize_exception(exc: Exception, *, error_code: str) -> dict[str, Any]:
+    """Extract only bounded, JSON-safe fields from a third-party exception."""
+
+    safe_code = _bounded_public_string(error_code, "ERROR_NORMALIZATION_FAILED", 160)
+    message = _safe_exception_message(exc)
+    if message is None:
+        return {
+            "error_code": "ERROR_NORMALIZATION_FAILED",
+            "message": "The underlying error could not be normalized safely",
+        }
+
+    normalized: dict[str, Any] = {"error_code": safe_code, "message": message or safe_code}
+
+    as_dict_ok, as_dict = _safe_exception_attribute(exc, "as_dict")
+    if as_dict_ok and callable(as_dict):
+        try:
+            structured = as_dict()
+            raw_details = structured.get("details") if isinstance(structured, Mapping) else None
+            safe_details = _json_safe_exception_value(raw_details)
+            if isinstance(safe_details, dict):
+                normalized["details"] = safe_details
+        except BaseException:  # noqa: BLE001 - optional metadata never masks the error
+            pass
+
+    uri_ok, uri = _safe_exception_attribute(exc, "uri")
+    if uri_ok:
+        safe_uri = _bounded_public_string(uri, None, MAX_EXCEPTION_URI_BYTES)
+        if safe_uri:
+            normalized["waapi_error_uri"] = safe_uri
+
+    kwargs_ok, kwargs = _safe_exception_attribute(exc, "kwargs")
+    if kwargs_ok and kwargs is not None:
+        try:
+            normalized["waapi_error_details"] = _json_safe_exception_value(kwargs)
+        except BaseException:  # noqa: BLE001 - sanitizer failures are optional metadata loss
+            pass
+    return normalized
+
+
+def _truncate_utf8(value: str, byte_budget: int) -> str:
+    """Copy at most ``byte_budget`` valid UTF-8 bytes without a large encode."""
+
+    if byte_budget <= 0:
+        return ""
+    parts: list[str] = []
+    used = 0
+    for character in value:
+        codepoint = ord(character)
+        if 0xD800 <= codepoint <= 0xDFFF:
+            character = "\ufffd"
+            codepoint = 0xFFFD
+        width = 1 if codepoint <= 0x7F else 2 if codepoint <= 0x7FF else 3 if codepoint <= 0xFFFF else 4
+        if width > byte_budget - used:
+            break
+        parts.append(character)
+        used += width
+    return "".join(parts)
+
+
+@dataclass(slots=True)
+class _ExceptionMetadataSanitizer:
+    """Budgeted copier for optional third-party exception metadata."""
+
+    nodes_remaining: int = MAX_EXCEPTION_METADATA_NODES
+    string_bytes_remaining: int = MAX_EXCEPTION_METADATA_STRING_BYTES
+    active_ids: set[int] = field(default_factory=set)
+
+    def sanitize(self, value: Any, *, depth: int = 0) -> Any:
+        if self.nodes_remaining <= 0:
+            return {"truncated": "node_budget"}
+        self.nodes_remaining -= 1
+        if depth > MAX_EXCEPTION_METADATA_DEPTH:
+            return {"truncated": "depth_budget"}
+        if value is None or isinstance(value, (bool, int)):
+            return value
+        if isinstance(value, float):
+            return value if math.isfinite(value) else {"type": "float", "reason": "non_finite"}
+        if isinstance(value, str):
+            return self._copy_string(value)
+        if isinstance(value, Mapping):
+            return self._sanitize_mapping(value, depth)
+        if isinstance(value, (list, tuple)):
+            return self._sanitize_sequence(value, depth)
+        return {"type": _safe_type_name(value)}
+
+    def _copy_string(self, value: str) -> str:
+        copied = _truncate_utf8(value, self.string_bytes_remaining)
+        self.string_bytes_remaining -= len(copied.encode("utf-8"))
+        return copied
+
+    def _sanitize_mapping(self, value: Mapping[Any, Any], depth: int) -> dict[str, Any]:
+        identity = id(value)
+        if identity in self.active_ids:
+            return {"truncated": "circular_reference"}
+        self.active_ids.add(identity)
+        result: dict[str, Any] = {}
+        try:
+            try:
+                iterator = iter(value.items())
+            except BaseException:  # noqa: BLE001 - hostile Mapping implementation
+                return {"type": _safe_type_name(value), "unavailable": "items"}
+            while self.nodes_remaining > 0:
+                try:
+                    key, item = next(iterator)
+                except StopIteration:
+                    break
+                except BaseException:  # noqa: BLE001 - partial safe metadata is sufficient
+                    result["_metadata_unavailable"] = "items"
+                    break
+                safe_key = self._safe_key(key)
+                result[safe_key] = self.sanitize(item, depth=depth + 1)
+            else:
+                result["_metadata_truncated"] = "node_budget"
+            return result
+        finally:
+            self.active_ids.remove(identity)
+
+    def _sanitize_sequence(self, value: list[Any] | tuple[Any, ...], depth: int) -> list[Any]:
+        identity = id(value)
+        if identity in self.active_ids:
+            return [{"truncated": "circular_reference"}]
+        self.active_ids.add(identity)
+        result: list[Any] = []
+        try:
+            for item in value:
+                if self.nodes_remaining <= 0:
+                    result.append({"truncated": "node_budget"})
+                    break
+                result.append(self.sanitize(item, depth=depth + 1))
+            return result
+        finally:
+            self.active_ids.remove(identity)
+
+    def _safe_key(self, key: Any) -> str:
+        if isinstance(key, str):
+            return self._copy_string(key)
+        if key is None:
+            return "null"
+        if key is True:
+            return "true"
+        if key is False:
+            return "false"
+        if isinstance(key, int):
+            return int.__repr__(key)
+        if isinstance(key, float) and math.isfinite(key):
+            return float.__repr__(key)
+        return f"<key-type:{_safe_type_name(key)}>"
+
+
+def _json_safe_exception_value(value: Any) -> Any:
+    """Copy third-party error metadata into a deterministic JSON-safe shape."""
+
+    return _ExceptionMetadataSanitizer().sanitize(value)
+
+
+def _probe_json_document_size(value: Any, limit_bytes: int) -> _JsonSizeProbe:
+    """Measure deterministic UTF-8 JSON without materializing the document.
+
+    The counter matches evidence and gateway rendering: UTF-8, sorted keys,
+    two-space indentation, strict JSON numbers, and one trailing newline. It
+    walks at most the configured byte budget, so a single untrusted string or
+    a very wide container cannot force a second full-size serialization.
+    """
+
+    sizer = _BoundedJsonDocumentSizer(limit_bytes)
+    try:
+        sizer.measure(value)
+        sizer.add_bytes(1)  # newline written by the public JSON document renderer
+    except _JsonSizeExceeded:
+        return _JsonSizeProbe(observed_at_least_bytes=limit_bytes + 1)
+    except Exception:  # noqa: BLE001 - encoder failures become a stable public result
+        return _JsonSizeProbe(encoding_failed=True)
+    return _JsonSizeProbe(size_bytes=sizer.observed_bytes)
+
+
+class _JsonSizeExceeded(Exception):
+    """The deterministic JSON document crossed its configured byte ceiling."""
+
+
+class _JsonEncodingRejected(Exception):
+    """A value is not representable by the strict public JSON contract."""
+
+
+class _BoundedJsonDocumentSizer:
+    """Exact byte counter for the JSON subset emitted by the dispatcher."""
+
+    def __init__(self, limit_bytes: int) -> None:
+        if limit_bytes < 0:
+            raise ValueError("JSON byte limit must be non-negative")
+        self.limit_bytes = limit_bytes
+        self.observed_bytes = 0
+        self._active_container_ids: set[int] = set()
+
+    def add_bytes(self, byte_count: int) -> None:
+        if byte_count > self.limit_bytes - self.observed_bytes:
+            raise _JsonSizeExceeded
+        self.observed_bytes += byte_count
+
+    def measure(self, value: Any, *, indent_level: int = 0) -> None:
+        if value is None:
+            self.add_bytes(4)
+            return
+        if value is True:
+            self.add_bytes(4)
+            return
+        if value is False:
+            self.add_bytes(5)
+            return
+        if isinstance(value, str):
+            self._measure_string(value)
+            return
+        if isinstance(value, int):
+            self.add_bytes(len(int.__repr__(value)))
+            return
+        if isinstance(value, float):
+            if not math.isfinite(value):
+                raise _JsonEncodingRejected
+            self.add_bytes(len(float.__repr__(value)))
+            return
+        if isinstance(value, (list, tuple)):
+            self._measure_array(value, indent_level)
+            return
+        if isinstance(value, dict):
+            self._measure_object(value, indent_level)
+            return
+        raise _JsonEncodingRejected
+
+    def _measure_string(self, value: str) -> None:
+        self.add_bytes(2)
+        for character in value:
+            codepoint = ord(character)
+            if character in {'"', "\\"} or character in {"\b", "\f", "\n", "\r", "\t"}:
+                self.add_bytes(2)
+            elif codepoint <= 0x1F:
+                self.add_bytes(6)
+            elif codepoint <= 0x7F:
+                self.add_bytes(1)
+            elif codepoint <= 0x7FF:
+                self.add_bytes(2)
+            elif 0xD800 <= codepoint <= 0xDFFF:
+                raise _JsonEncodingRejected
+            elif codepoint <= 0xFFFF:
+                self.add_bytes(3)
+            else:
+                self.add_bytes(4)
+
+    def _measure_array(self, value: list[Any] | tuple[Any, ...], indent_level: int) -> None:
+        self.add_bytes(1)
+        if not value:
+            self.add_bytes(1)
+            return
+        next_indent = indent_level + 1
+        item_indent_bytes = 1 + (2 * next_indent)
+        separator_bytes = 2 + (2 * next_indent)
+        closing_bytes = 2 + (2 * indent_level)
+        minimum_size = item_indent_bytes + len(value) + (separator_bytes * (len(value) - 1)) + closing_bytes
+        if minimum_size > self.limit_bytes - self.observed_bytes:
+            raise _JsonSizeExceeded
+        self._enter_container(value)
+        try:
+            self.add_bytes(item_indent_bytes)
+            for index, item in enumerate(value):
+                if index:
+                    self.add_bytes(separator_bytes)
+                self.measure(item, indent_level=next_indent)
+            self.add_bytes(closing_bytes)
+        finally:
+            self._leave_container(value)
+
+    def _measure_object(self, value: dict[Any, Any], indent_level: int) -> None:
+        self.add_bytes(1)
+        if not value:
+            self.add_bytes(1)
+            return
+        next_indent = indent_level + 1
+        item_indent_bytes = 1 + (2 * next_indent)
+        separator_bytes = 2 + (2 * next_indent)
+        closing_bytes = 2 + (2 * indent_level)
+        minimum_item_bytes = 5  # empty quoted key, ': ', and a one-byte value
+        minimum_size = (
+            item_indent_bytes
+            + (minimum_item_bytes * len(value))
+            + (separator_bytes * (len(value) - 1))
+            + closing_bytes
+        )
+        if minimum_size > self.limit_bytes - self.observed_bytes:
+            raise _JsonSizeExceeded
+        self._enter_container(value)
+        try:
+            keys = sorted(value)
+            self.add_bytes(item_indent_bytes)
+            for index, key in enumerate(keys):
+                if index:
+                    self.add_bytes(separator_bytes)
+                self._measure_string(self._object_key_string(key))
+                self.add_bytes(2)
+                self.measure(value[key], indent_level=next_indent)
+            self.add_bytes(closing_bytes)
+        finally:
+            self._leave_container(value)
+
+    def _object_key_string(self, key: Any) -> str:
+        if isinstance(key, str):
+            return key
+        if key is True:
+            return "true"
+        if key is False:
+            return "false"
+        if key is None:
+            return "null"
+        if isinstance(key, int):
+            return int.__repr__(key)
+        if isinstance(key, float):
+            if not math.isfinite(key):
+                raise _JsonEncodingRejected
+            return float.__repr__(key)
+        raise _JsonEncodingRejected
+
+    def _enter_container(self, value: Any) -> None:
+        identity = id(value)
+        if identity in self._active_container_ids:
+            raise _JsonEncodingRejected
+        self._active_container_ids.add(identity)
+
+    def _leave_container(self, value: Any) -> None:
+        self._active_container_ids.remove(id(value))
 
 
 def _call_with_timeout(
@@ -331,6 +844,10 @@ def _call_with_timeout(
     options: Mapping[str, Any] | None,
     timeout: float,
 ) -> Any:
+    bounded_call = getattr(client, "call_with_timeout", None)
+    if callable(bounded_call):
+        return bounded_call(api, args, options=options, timeout=timeout)
+
     result_queue: queue.Queue[tuple[bool, Any]] = queue.Queue(maxsize=1)
 
     def target() -> None:

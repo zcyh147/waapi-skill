@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import math
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
@@ -14,6 +16,8 @@ from .source_notes import DEFAULT_SEMANTIC_SOURCE_NOTES, DEFAULT_SEMANTIC_SOURCE
 
 
 SEMANTIC_CONSTRAINT_FACTS_SIZE_LIMIT = 4096
+SCHEMA_VALIDATION_MAX_DEPTH = 32
+SCHEMA_VALIDATION_MAX_NODES = 8192
 
 
 @dataclass(slots=True, frozen=True)
@@ -24,6 +28,9 @@ class SchemaValidationResult:
     version: str = DEFAULT_WWISE_VERSION
     required_fields: tuple[str, ...] = ()
     required_families: tuple[tuple[str, ...], ...] = ()
+    section: str = "request"
+    validated_nodes: int = 0
+    unresolved_refs: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -31,6 +38,9 @@ class SchemaValidationResult:
             "version": self.version,
             "required_fields": list(self.required_fields),
             "required_families": [list(family) for family in self.required_families],
+            "section": self.section,
+            "validated_nodes": self.validated_nodes,
+            "unresolved_refs": list(self.unresolved_refs),
         }
 
 
@@ -103,14 +113,59 @@ class SemanticSchemaValidator:
             raise _schema_error(uri, self.version, f"WAAPI URI {uri!r} is missing required args: {', '.join(missing)}", missing_args=missing)
 
         required_families = _required_families(args_schema)
-        _validate_required_alternatives(uri, self.version, args_schema, arg_payload)
 
         _reject_unknown_fields(uri, self.version, "args", args_schema, arg_payload)
         _reject_unknown_fields(uri, self.version, "options", options_schema, option_payload)
         _validate_known_types(uri, self.version, "args", args_schema, arg_payload)
         _validate_known_types(uri, self.version, "options", options_schema, option_payload)
 
-        return SchemaValidationResult(uri=uri, version=self.version, required_fields=required_fields, required_families=required_families)
+        walker = _SchemaWalker(uri=uri, version=self.version)
+        walker.validate(args_schema, arg_payload, path="args")
+        walker.validate(options_schema, option_payload, path="options")
+
+        return SchemaValidationResult(
+            uri=uri,
+            version=self.version,
+            required_fields=required_fields,
+            required_families=required_families,
+            section="request",
+            validated_nodes=walker.nodes,
+            unresolved_refs=tuple(sorted(walker.unresolved_refs)),
+        )
+
+    def validate_result(self, uri: str, result: Any) -> SchemaValidationResult:
+        """Validate one returned payload against the reflected result schema."""
+
+        schema = self.schema_for(uri)
+        result_schema = _mapping_or_empty(schema.get("resultSchema"))
+        walker = _SchemaWalker(uri=uri, version=self.version)
+        walker.validate(result_schema, result, path="result")
+        return SchemaValidationResult(
+            uri=uri,
+            version=self.version,
+            required_fields=_required_fields(result_schema),
+            required_families=_required_families(result_schema),
+            section="result",
+            validated_nodes=walker.nodes,
+            unresolved_refs=tuple(sorted(walker.unresolved_refs)),
+        )
+
+    def validate_event(self, uri: str, event: Any) -> SchemaValidationResult:
+        """Validate one topic payload against the reflected publish schema."""
+
+        schema = self.schema_for(uri)
+        publish_schema = _mapping_or_empty(schema.get("publishSchema"))
+        walker = _SchemaWalker(uri=uri, version=self.version)
+        walker.validate(publish_schema, event, path="event")
+        return SchemaValidationResult(
+            uri=uri,
+            version=self.version,
+            required_fields=_required_fields(publish_schema),
+            required_families=_required_families(publish_schema),
+            section="event",
+            validated_nodes=walker.nodes,
+            unresolved_refs=tuple(sorted(walker.unresolved_refs)),
+        )
 
 
 def validate_semantic_payload(
@@ -125,6 +180,38 @@ def validate_semantic_payload(
 
     validator = SemanticSchemaValidator(manifest_loader=manifest_loader or ManifestSchemaLoader(), version=version)
     return validator.validate(uri, args=args, options=options)
+
+
+def validate_semantic_result(
+    uri: str,
+    result: Any,
+    *,
+    version: str = DEFAULT_WWISE_VERSION,
+    manifest_loader: ManifestSchemaLoader | None = None,
+) -> SchemaValidationResult:
+    """Validate one strict-JSON WAAPI result using the packaged manifest."""
+
+    validator = SemanticSchemaValidator(
+        manifest_loader=manifest_loader or ManifestSchemaLoader(),
+        version=version,
+    )
+    return validator.validate_result(uri, result)
+
+
+def validate_semantic_event(
+    uri: str,
+    event: Any,
+    *,
+    version: str = DEFAULT_WWISE_VERSION,
+    manifest_loader: ManifestSchemaLoader | None = None,
+) -> SchemaValidationResult:
+    """Validate one topic event using the packaged reflected publish schema."""
+
+    validator = SemanticSchemaValidator(
+        manifest_loader=manifest_loader or ManifestSchemaLoader(),
+        version=version,
+    )
+    return validator.validate_event(uri, event)
 
 
 def extract_semantic_constraint_facts(
@@ -412,36 +499,6 @@ def _required_families(schema: Mapping[str, Any]) -> tuple[tuple[str, ...], ...]
     return tuple(families)
 
 
-def _validate_required_alternatives(uri: str, version: str, schema: Mapping[str, Any], payload: Mapping[str, Any]) -> None:
-    for key, policy in (("oneOf", "exactly one"), ("anyOf", "at least one")):
-        entries = schema.get(key)
-        if not isinstance(entries, list):
-            continue
-        alternatives = tuple(_required_fields(_mapping_or_empty(entry)) for entry in entries)
-        alternatives = tuple(fields for fields in alternatives if fields)
-        if not alternatives:
-            continue
-        matches = tuple(fields for fields in alternatives if all(field in payload for field in fields))
-        if key == "oneOf" and len(matches) != 1:
-            raise _schema_error(
-                uri,
-                version,
-                f"WAAPI URI {uri!r} must satisfy exactly one required args branch.",
-                required_policy=policy,
-                required_alternatives=alternatives,
-                matched_alternatives=matches,
-            )
-        if key == "anyOf" and not matches:
-            raise _schema_error(
-                uri,
-                version,
-                f"WAAPI URI {uri!r} must satisfy at least one required args branch.",
-                required_policy=policy,
-                required_alternatives=alternatives,
-                matched_alternatives=matches,
-            )
-
-
 def _reject_unknown_fields(uri: str, version: str, section: str, schema: Mapping[str, Any], payload: Mapping[str, Any]) -> None:
     if schema.get("additionalProperties") is not False:
         return
@@ -489,6 +546,402 @@ def _type_mismatch(expected: str, value: Any) -> bool:
     if expected == "boolean":
         return not isinstance(value, bool)
     return False
+
+
+@dataclass(slots=True)
+class _SchemaWalker:
+    """Budgeted validator for the self-contained part of reflected schemas.
+
+    Audiokinetic reflection commonly returns references to definition files
+    that are not embedded in the URI response. Those references are reported as
+    unresolved evidence instead of being invented. Every constraint present in
+    the returned schema itself is still enforced recursively.
+    """
+
+    uri: str
+    version: str
+    nodes: int = 0
+    unresolved_refs: set[str] = field(default_factory=set)
+
+    def validate(self, schema: Mapping[str, Any], value: Any, *, path: str, depth: int = 0) -> None:
+        self.nodes += 1
+        if self.nodes > SCHEMA_VALIDATION_MAX_NODES:
+            raise _schema_error(
+                self.uri,
+                self.version,
+                f"WAAPI URI {self.uri!r} exceeded the schema-validation node budget.",
+                section=path,
+                maximum_nodes=SCHEMA_VALIDATION_MAX_NODES,
+            )
+        if depth > SCHEMA_VALIDATION_MAX_DEPTH:
+            raise _schema_error(
+                self.uri,
+                self.version,
+                f"WAAPI URI {self.uri!r} exceeded the schema-validation depth budget.",
+                section=path,
+                maximum_depth=SCHEMA_VALIDATION_MAX_DEPTH,
+            )
+        reference = schema.get("$ref")
+        if isinstance(reference, str):
+            self.unresolved_refs.add(reference)
+
+        self._validate_type(schema, value, path)
+        self._validate_const_enum(schema, value, path)
+        if isinstance(value, Mapping):
+            self._validate_object(schema, value, path, depth)
+        elif isinstance(value, list):
+            self._validate_array(schema, value, path, depth)
+        elif isinstance(value, str):
+            self._validate_string(schema, value, path)
+        elif isinstance(value, (int, float)) and not isinstance(value, bool):
+            self._validate_number(schema, value, path)
+
+        all_of = schema.get("allOf")
+        if isinstance(all_of, list):
+            for index, branch in enumerate(all_of):
+                if isinstance(branch, Mapping):
+                    self.validate(branch, value, path=f"{path}.allOf[{index}]", depth=depth + 1)
+
+        self._validate_alternatives(schema, value, path, depth)
+
+    def _validate_alternatives(
+        self,
+        schema: Mapping[str, Any],
+        value: Any,
+        path: str,
+        depth: int,
+    ) -> None:
+        """Evaluate reflected ``oneOf``/``anyOf`` branches conservatively.
+
+        A successful branch containing an unresolved ``$ref`` is a possible
+        match, not a proven match: the referenced definition could still reject
+        the value.  Such branches keep the validation result partial without
+        inventing constraints that are absent from the packaged reflection.  A
+        branch with only locally available constraints is a definite match.
+
+        Every attempted branch consumes the shared node/depth budget.  Failed
+        speculative branches roll back only their unresolved-reference evidence;
+        they never roll back budget consumption.
+        """
+
+        for keyword, required_policy in (("oneOf", "exactly one"), ("anyOf", "at least one")):
+            raw_branches = schema.get(keyword)
+            if not isinstance(raw_branches, list):
+                continue
+
+            required_alternatives = [
+                list(_required_fields(branch))
+                for branch in raw_branches
+                if isinstance(branch, Mapping) and _required_fields(branch)
+            ]
+            definite_matches: list[int] = []
+            possible_matches: list[int] = []
+            failed_branches: list[dict[str, Any]] = []
+            for index, branch in enumerate(raw_branches):
+                if not isinstance(branch, Mapping):
+                    failed_branches.append(
+                        {
+                            "index": index,
+                            "error_code": "INVALID_PACKAGED_SCHEMA_BRANCH",
+                        }
+                    )
+                    continue
+
+                refs_before = set(self.unresolved_refs)
+                # Validate each branch against branch-local reference evidence.
+                # Otherwise two branches that mention the same unresolved ref
+                # would incorrectly classify the later branch as a definite
+                # match merely because the first branch already recorded it.
+                self.unresolved_refs = set()
+                try:
+                    self.validate(
+                        branch,
+                        value,
+                        path=f"{path}.{keyword}[{index}]",
+                        depth=depth + 1,
+                    )
+                except SemanticValidationError as exc:
+                    if _schema_budget_error(exc):
+                        self.unresolved_refs |= refs_before
+                        raise
+                    self.unresolved_refs = refs_before
+                    failed_branches.append(
+                        {
+                            "index": index,
+                            "error_code": exc.error_code.value,
+                            "message": _compact_text(exc.message),
+                        }
+                    )
+                    continue
+
+                branch_refs = set(self.unresolved_refs)
+                self.unresolved_refs = refs_before | branch_refs
+                if branch_refs:
+                    possible_matches.append(index)
+                else:
+                    definite_matches.append(index)
+
+            has_possible_match = bool(definite_matches or possible_matches)
+            invalid = (
+                not has_possible_match
+                if keyword == "anyOf"
+                else not has_possible_match or len(definite_matches) > 1
+            )
+            if not invalid:
+                continue
+
+            matched_indexes = definite_matches + possible_matches
+            matched_alternatives = [
+                list(_required_fields(raw_branches[index]))
+                for index in matched_indexes
+                if isinstance(raw_branches[index], Mapping) and _required_fields(raw_branches[index])
+            ]
+
+            raise _schema_error(
+                self.uri,
+                self.version,
+                (
+                    f"WAAPI URI {self.uri!r} field {path!r} must satisfy "
+                    f"{required_policy} {keyword} branch."
+                ),
+                section=path,
+                branch_keyword=keyword,
+                required_policy=required_policy,
+                required_alternatives=required_alternatives,
+                matched_alternatives=matched_alternatives,
+                branch_count=len(raw_branches),
+                matched_branch_indexes=definite_matches,
+                unresolved_branch_indexes=possible_matches,
+                failed_branches=failed_branches,
+            )
+
+    def _validate_type(self, schema: Mapping[str, Any], value: Any, path: str) -> None:
+        expected = schema.get("type")
+        if isinstance(expected, str):
+            allowed = (expected,)
+        elif isinstance(expected, list) and all(isinstance(item, str) for item in expected):
+            allowed = tuple(expected)
+        else:
+            return
+        if not any(_matches_json_type(kind, value) for kind in allowed):
+            raise _schema_error(
+                self.uri,
+                self.version,
+                f"WAAPI URI {self.uri!r} field {path!r} expected {', '.join(allowed)}, got {type(value).__name__}.",
+                section=path,
+                expected_types=allowed,
+                actual_type=type(value).__name__,
+            )
+
+    def _validate_const_enum(self, schema: Mapping[str, Any], value: Any, path: str) -> None:
+        if "const" in schema and value != schema["const"]:
+            raise _schema_error(
+                self.uri,
+                self.version,
+                f"WAAPI URI {self.uri!r} field {path!r} does not match its required constant.",
+                section=path,
+                expected=schema["const"],
+            )
+        allowed = schema.get("enum")
+        if isinstance(allowed, list) and value not in allowed:
+            raise _schema_error(
+                self.uri,
+                self.version,
+                f"WAAPI URI {self.uri!r} field {path!r} is not one of the reflected enum values.",
+                section=path,
+                allowed=allowed,
+            )
+
+    def _validate_object(
+        self,
+        schema: Mapping[str, Any],
+        value: Mapping[str, Any],
+        path: str,
+        depth: int,
+    ) -> None:
+        required = schema.get("required")
+        if isinstance(required, list):
+            missing = tuple(item for item in required if isinstance(item, str) and item not in value)
+            if missing:
+                raise _schema_error(
+                    self.uri,
+                    self.version,
+                    f"WAAPI URI {self.uri!r} field {path!r} is missing required members: {', '.join(missing)}.",
+                    section=path,
+                    missing_fields=missing,
+                )
+        properties = schema.get("properties")
+        property_schemas = properties if isinstance(properties, Mapping) else {}
+        pattern_properties = schema.get("patternProperties")
+        patterns = pattern_properties if isinstance(pattern_properties, Mapping) else {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise _schema_error(
+                    self.uri,
+                    self.version,
+                    f"WAAPI URI {self.uri!r} field {path!r} must use string object keys.",
+                    section=path,
+                    actual_key_type=type(key).__name__,
+                )
+            child_schema = property_schemas.get(key)
+            if isinstance(child_schema, Mapping):
+                self.validate(child_schema, item, path=f"{path}.{key}", depth=depth + 1)
+                continue
+            matched = False
+            for pattern, pattern_schema in patterns.items():
+                if not isinstance(pattern, str) or not isinstance(pattern_schema, Mapping):
+                    continue
+                try:
+                    matches = re.search(pattern, key) is not None
+                except re.error as exc:
+                    raise _schema_error(
+                        self.uri,
+                        self.version,
+                        f"WAAPI URI {self.uri!r} contains an invalid packaged schema pattern.",
+                        section=path,
+                        pattern=pattern,
+                    ) from exc
+                if matches:
+                    matched = True
+                    self.validate(pattern_schema, item, path=f"{path}.{key}", depth=depth + 1)
+            additional = schema.get("additionalProperties", True)
+            if isinstance(schema.get("$ref"), str) and not property_schemas:
+                # The reflected response omits the referenced definition file;
+                # its properties cannot be reconstructed locally. Keep the ref
+                # visible in validation evidence instead of treating every
+                # referenced member as an unknown field.
+                additional = True
+            if not matched and additional is False:
+                raise _schema_error(
+                    self.uri,
+                    self.version,
+                    f"WAAPI URI {self.uri!r} has unsupported field {path}.{key}.",
+                    section=path,
+                    unknown_field=key,
+                )
+            if not matched and isinstance(additional, Mapping):
+                self.validate(additional, item, path=f"{path}.{key}", depth=depth + 1)
+
+    def _validate_array(self, schema: Mapping[str, Any], value: list[Any], path: str, depth: int) -> None:
+        minimum = schema.get("minItems")
+        maximum = schema.get("maxItems")
+        if isinstance(minimum, int) and len(value) < minimum:
+            raise _schema_error(
+                self.uri,
+                self.version,
+                f"WAAPI URI {self.uri!r} field {path!r} requires at least {minimum} items.",
+                section=path,
+                minimum_items=minimum,
+                actual_items=len(value),
+            )
+        if isinstance(maximum, int) and len(value) > maximum:
+            raise _schema_error(
+                self.uri,
+                self.version,
+                f"WAAPI URI {self.uri!r} field {path!r} allows at most {maximum} items.",
+                section=path,
+                maximum_items=maximum,
+                actual_items=len(value),
+            )
+        item_schema = schema.get("items")
+        if isinstance(item_schema, Mapping):
+            for index, item in enumerate(value):
+                self.validate(item_schema, item, path=f"{path}[{index}]", depth=depth + 1)
+
+    def _validate_string(self, schema: Mapping[str, Any], value: str, path: str) -> None:
+        minimum = schema.get("minLength")
+        maximum = schema.get("maxLength")
+        if isinstance(minimum, int) and len(value) < minimum:
+            raise _schema_error(
+                self.uri,
+                self.version,
+                f"WAAPI URI {self.uri!r} field {path!r} is shorter than {minimum} characters.",
+                section=path,
+                minimum_length=minimum,
+                actual_length=len(value),
+            )
+        if isinstance(maximum, int) and len(value) > maximum:
+            raise _schema_error(
+                self.uri,
+                self.version,
+                f"WAAPI URI {self.uri!r} field {path!r} is longer than {maximum} characters.",
+                section=path,
+                maximum_length=maximum,
+                actual_length=len(value),
+            )
+        pattern = schema.get("pattern")
+        if isinstance(pattern, str):
+            try:
+                matches = re.search(pattern, value) is not None
+            except re.error as exc:
+                raise _schema_error(
+                    self.uri,
+                    self.version,
+                    f"WAAPI URI {self.uri!r} contains an invalid packaged schema pattern.",
+                    section=path,
+                    pattern=pattern,
+                ) from exc
+            if not matches:
+                raise _schema_error(
+                    self.uri,
+                    self.version,
+                    f"WAAPI URI {self.uri!r} field {path!r} does not match the reflected pattern.",
+                    section=path,
+                    pattern=pattern,
+                )
+
+    def _validate_number(self, schema: Mapping[str, Any], value: int | float, path: str) -> None:
+        if isinstance(value, float) and not math.isfinite(value):
+            raise _schema_error(
+                self.uri,
+                self.version,
+                f"WAAPI URI {self.uri!r} field {path!r} must be finite.",
+                section=path,
+            )
+        minimum = schema.get("minimum")
+        maximum = schema.get("maximum")
+        if isinstance(minimum, (int, float)) and value < minimum:
+            raise _schema_error(
+                self.uri,
+                self.version,
+                f"WAAPI URI {self.uri!r} field {path!r} is below the reflected minimum.",
+                section=path,
+                minimum=minimum,
+                actual=value,
+            )
+        if isinstance(maximum, (int, float)) and value > maximum:
+            raise _schema_error(
+                self.uri,
+                self.version,
+                f"WAAPI URI {self.uri!r} field {path!r} is above the reflected maximum.",
+                section=path,
+                maximum=maximum,
+                actual=value,
+            )
+
+
+def _matches_json_type(expected: str, value: Any) -> bool:
+    if expected == "null":
+        return value is None
+    if expected == "object":
+        return isinstance(value, Mapping)
+    if expected == "array":
+        return isinstance(value, list)
+    if expected == "string":
+        return isinstance(value, str)
+    if expected == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if expected == "number":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if expected == "boolean":
+        return isinstance(value, bool)
+    return True
+
+
+def _schema_budget_error(exc: SemanticValidationError) -> bool:
+    """Return whether a speculative branch exhausted a global walker budget."""
+
+    return "maximum_nodes" in exc.details or "maximum_depth" in exc.details
 
 
 def _schema_error(uri: str, version: str, message: str, **details: Any) -> SemanticValidationError:

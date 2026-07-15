@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import math
+import re
+
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Sequence
 
 from wwise_waapi.dispatcher import DEFAULT_WWISE_VERSION  # pyright: ignore[reportMissingImports]
+from wwise_waapi.waql import quote_waql_literal  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.builders.common import (  # pyright: ignore[reportMissingImports]
     BuilderFamily,
@@ -20,8 +24,9 @@ from wwise_waapi.builders.schema import SemanticSchemaValidator  # pyright: igno
 from wwise_waapi.builders.source_notes import SemanticSourceNoteChecker  # pyright: ignore[reportMissingImports]
 
 
-SUPPORTED_SELECTS = ("descendants", "ancestors", "referencesTo")
+SUPPORTED_SELECTS = ("descendants", "ancestors", "referencesTo", "children", "parent")
 SUPPORTED_OPERATORS = ("=", "!=", "<", "<=", ">", ">=", ":")
+MAX_QUERY_TAKE = 1000
 MUTATING_WORDS = ("set", "delete", "create", "import", "move", "rename")
 LEGACY_QUERY_KEYS = ("from", "transform")
 BUILTIN_ACCESSORS = {
@@ -62,7 +67,7 @@ class QueryPredicate:
 def build_object_get_query(
     *,
     path: str | None = None,
-    object_id: str | int | None = None,
+    object_id: str | None = None,
     type: str | None = None,
     search: str | None = None,
     query: str | None = None,
@@ -150,7 +155,7 @@ def object_get_query(**kwargs: Any) -> SemanticPreview:
     return build_object_get_query(**kwargs)
 
 
-def _source_clause(*, path: str | None, object_id: str | int | None, type: str | None, search: str | None, query: str | None) -> str:
+def _source_clause(*, path: str | None, object_id: str | None, type: str | None, search: str | None, query: str | None) -> str:
     supplied = {
         "path": path,
         "object_id": object_id,
@@ -166,15 +171,96 @@ def _source_clause(*, path: str | None, object_id: str | int | None, type: str |
             details={"sources": active},
         )
     if path is not None and _has_value(path):
-        return _quote_literal(path)
+        # A path is an object specifier, not a generic WAQL string.  Keep the
+        # explicit form so exact-path failures remain distinguishable from
+        # broad queries and can be normalized consistently.
+        return f"from object {_quote_literal(_object_path_specifier(path))}"
     if object_id is not None and _has_value(object_id):
-        return f"from object {_quote_literal(str(object_id))}"
+        return f"from object {_quote_literal(_object_guid_specifier(object_id))}"
     if type is not None and _has_value(type):
         return f"from type {_identifier(type, kind='type')}"
     if search is not None and _has_value(search):
         return f"from search {_quote_literal(search)}"
     assert query is not None
-    return f"from query {_quote_literal(query)}"
+    return f"from query {_quote_literal(_query_object_specifier(query))}"
+
+
+_CANONICAL_GUID = re.compile(
+    r"\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}"
+)
+
+
+def _object_guid_specifier(value: str) -> str:
+    if not isinstance(value, str) or _CANONICAL_GUID.fullmatch(value) is None:
+        raise SemanticValidationError(
+            SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+            "WAQL object_id must be a canonical braced GUID.",
+            details={"object_id": value, "accepted": "canonical-guid"},
+        )
+    return value
+
+
+def _object_path_specifier(value: str) -> str:
+    valid = (
+        isinstance(value, str)
+        and value.startswith("\\")
+        and (value == "\\" or not value.startswith("\\\\"))
+        and (value == "\\" or not value.endswith("\\"))
+        and (value == "\\" or "\\\\" not in value)
+        and "/" not in value
+        and '"' not in value
+        and not any(
+            ord(character) < 32
+            or ord(character) == 127
+            or character in {"\u2028", "\u2029"}
+            for character in value
+        )
+    )
+    if not valid:
+        raise SemanticValidationError(
+            SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+            "WAQL path must be an absolute Wwise object path with single hierarchy separators.",
+            details={
+                "path": value,
+                "accepted": "absolute-single-separator-wwise-path",
+                "boundary": "canonical-wwise-object-path",
+            },
+        )
+    return value
+
+
+def _query_object_specifier(value: str) -> str:
+    """Validate one Query Editor object path or GUID, never raw WAQL."""
+
+    if isinstance(value, str) and _CANONICAL_GUID.fullmatch(value):
+        return value
+    valid_path = (
+        isinstance(value, str)
+        and value.startswith("\\Queries\\")
+        and not value.startswith("\\\\")
+        and not value.endswith("\\")
+        and "\\\\" not in value
+        and "/" not in value
+        and '"' not in value
+        and not any(
+            ord(character) < 32
+            or ord(character) == 127
+            or character in {"\u2028", "\u2029"}
+            for character in value
+        )
+    )
+    if not valid_path:
+        raise SemanticValidationError(
+            SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+            "WAQL query source must be a canonical Query Editor {GUID} or an absolute "
+            r"\Queries\... path with single hierarchy separators; raw WAQL is not accepted.",
+            details={
+                "query": value,
+                "accepted": ["canonical-guid", r"\Queries\..."],
+                "boundary": "query-editor-object-specifier",
+            },
+        )
+    return value
 
 
 def _select_clauses(select: str | Sequence[str] | None) -> list[str]:
@@ -205,20 +291,39 @@ def _predicate_tuple(where: QueryPredicate | Mapping[str, Any] | Sequence[QueryP
         return ()
     if isinstance(where, QueryPredicate) or isinstance(where, Mapping):
         items: Iterable[QueryPredicate | Mapping[str, Any]] = (where,)
-    else:
+    elif isinstance(where, Sequence) and not isinstance(where, (str, bytes)):
         items = where
+    else:
+        raise SemanticValidationError(
+            SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+            "WAQL where must be one JSON predicate object or an array of predicate objects.",
+            details={"where_type": type(where).__name__},
+        )
     return tuple(_predicate(item) for item in items)
 
 
 def _predicate(value: QueryPredicate | Mapping[str, Any]) -> QueryPredicate:
     if isinstance(value, QueryPredicate):
         return value
+    if not isinstance(value, Mapping):
+        raise SemanticValidationError(
+            SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+            "WAQL where predicates must be JSON objects.",
+            details={"predicate_type": type(value).__name__},
+        )
     missing = tuple(key for key in ("field", "operator", "value") if key not in value)
     if missing:
         raise SemanticValidationError(
             SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
             "WAQL where predicates require field, operator, and value.",
             details={"missing": list(missing)},
+        )
+    extra = tuple(sorted(str(key) for key in value if key not in {"field", "operator", "value"}))
+    if extra:
+        raise SemanticValidationError(
+            SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+            "WAQL where predicates do not accept extra fields.",
+            details={"extra": list(extra)},
         )
     return QueryPredicate(str(value["field"]), str(value["operator"]), value["value"])
 
@@ -258,6 +363,12 @@ def _literal(value: str | int | float | bool) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if isinstance(value, float) and not math.isfinite(value):
+            raise SemanticValidationError(
+                SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+                "WAQL numeric predicate literals must be finite.",
+                details={"literal": str(value)},
+            )
         return str(value)
     if not isinstance(value, str):
         raise SemanticValidationError(
@@ -269,16 +380,32 @@ def _literal(value: str | int | float | bool) -> str:
 
 
 def _quote_literal(value: str) -> str:
-    if not value:
+    if not isinstance(value, str) or not value:
         raise SemanticValidationError(
             SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
             "WAQL string/path/GUID literals must be non-empty.",
+            details={"literal_type": type(value).__name__},
         )
-    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    if any(ord(character) < 32 for character in value):
+        raise SemanticValidationError(
+            SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+            "WAQL string/path/GUID literals must not contain control characters.",
+        )
+    # WAQL object paths use a single backslash as their hierarchy separator.
+    # JSON serialization handles transport escaping; doubling separators here
+    # changes the object specifier and makes valid leaf paths resolve as absent.
+    try:
+        return quote_waql_literal(value)
+    except ValueError as exc:
+        raise SemanticValidationError(
+            SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+            str(exc),
+            details={"literal": value, "boundary": "packaged-waql-literal-evidence"},
+        ) from exc
 
 
 def _identifier(value: str, *, kind: str) -> str:
-    if not value or not all(character.isalnum() or character in ("_", ".") for character in value):
+    if not isinstance(value, str) or not value or not all(character.isalnum() or character in ("_", ".") for character in value):
         raise SemanticValidationError(
             SemanticErrorCode.SEMANTIC_PROPERTY_UNSUPPORTED,
             f"Unsupported WAQL {kind} literal: {value!r}",
@@ -288,21 +415,33 @@ def _identifier(value: str, *, kind: str) -> str:
 
 
 def _take_clause(take: int) -> str:
-    if not isinstance(take, int) or isinstance(take, bool) or take < 0:
+    if (
+        not isinstance(take, int)
+        or isinstance(take, bool)
+        or take < 0
+        or take > MAX_QUERY_TAKE
+    ):
         raise SemanticValidationError(
             SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
-            "WAQL take must be a non-negative integer.",
-            details={"take": take},
+            f"WAQL take must be an integer between 0 and {MAX_QUERY_TAKE}.",
+            details={"take": take, "minimum": 0, "maximum": MAX_QUERY_TAKE},
         )
     return f"take {take}"
 
 
 def _require_return_fields(return_fields: Sequence[str] | None) -> None:
-    if not return_fields or not all(isinstance(field, str) and field for field in return_fields):
+    if (
+        not return_fields
+        or isinstance(return_fields, (str, bytes))
+        or not all(isinstance(field, str) and field for field in return_fields)
+    ):
         raise SemanticValidationError(
             SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
             "Query builder requires explicit non-empty options.return fields.",
-            details={"return_fields": list(return_fields or [])},
+            details={
+                "return_fields": list(return_fields or []) if not isinstance(return_fields, str) else return_fields,
+                "return_fields_type": type(return_fields).__name__,
+            },
         )
 
 
@@ -323,7 +462,12 @@ def _reject_legacy_or_unknown_kwargs(values: Mapping[str, Any]) -> None:
 
 
 def _reject_mutating_waql(waql: str) -> None:
-    padded = f" {waql.lower()} "
+    # The builder owns the WAQL grammar, so only structural tokens need this
+    # defense-in-depth check. User literals are already closed by
+    # ``quote_waql_literal`` and may legitimately contain words such as
+    # "delete" or "move" without changing this read-only query into a mutation.
+    structural_waql = re.sub(r'"[^"\r\n]*"', '""', waql)
+    padded = f" {structural_waql.lower()} "
     found = tuple(word for word in MUTATING_WORDS if f" {word} " in padded)
     if found:
         raise SemanticValidationError(

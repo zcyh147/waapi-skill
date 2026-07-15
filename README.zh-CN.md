@@ -2,7 +2,7 @@
 
 # Wwise WAAPI Skill
 
-这个 skill 用来通过 **WAAPI 自动化 Wwise Authoring**，采用的是**版本感知（version-aware）**、**Python 优先**的本地工作流。
+这个 skill 用来通过 **WAAPI 自动化 Wwise Authoring**，采用的是**版本感知（version-aware）**、**gateway 优先**的本地工作流。
 
 它面向的是**任何可以加载 skill 目录和本地辅助脚本的 agent / 工具运行器**，不是绑定某一个特定的编码助手，也不依赖单独部署的 MCP server。
 
@@ -13,12 +13,12 @@
 当任务涉及以下内容时，这个 skill 很有用：
 
 - 查询 Wwise 对象和工程状态
-- 用结构化意图来构建 WAAPI 请求，而不是临时手写 payload
+- 把结构化意图路由到已经封装好的 gateway 命令，而不是临时手写 payload
 - 同时适配多个 Wwise 版本
 - 在执行工程修改前先生成 preview
 - 让行为能力建立在真实测试之上，而不是只靠文档描述
 
-它本质上提供的是一套 **skill-local 的 WAAPI 工具链**：本地 runner、版本化 manifest、semantic builders、dispatcher、bounded subscriptions，以及一整套安全约束。
+它本质上提供的是一层 **skill-local 的 WAAPI 接口**：本地 runner、单一 packaged gateway、版本化 manifest、有边界的 topic wait、闭合 transaction operation，以及安全约束。
 
 ## 为什么需要它
 
@@ -71,7 +71,7 @@
 
 - 普通 inspection 请求优先走 read-only 路径
 - preview-then-confirm 的 mutation 流程
-- semantic plan 的 preview hash 确认
+- closed transaction 的 preview artifact hash 确认
 - bounded destructive opt-in
 - 执行后 verification / readback
 
@@ -86,6 +86,25 @@
 - version-scoped review packets 和 evidence model
 
 目标不是“把 WAAPI 讲对”，而是“让 skill 在真实使用里做对”。
+
+---
+
+## Packaged API 覆盖情况
+
+覆盖率按 **Wwise 版本/API 行**统计，因为同一个 URI 在不同 Wwise 版本中可能具有不同的 schema、执行路由或安全结论。只有 packaged gateway 能真正执行的行才算覆盖；只返回 hard boundary 或只提供文档说明不算覆盖。
+
+| Wwise 版本 | 反射总行数 | 可执行行数 | 可执行 functions | 可执行 topics | 排除行数 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `2021.1` | 126 | 119 | 93 | 26 | 7 |
+| `2022.1` | 144 | 137 | 106 | 31 | 7 |
+| `2023.1` | 181 | 170 | 139 | 31 | 11 |
+| `2024.1` | 178 | 168 | 139 | 29 | 10 |
+| `2025.1` | 185 | 175 | 145 | 30 | 10 |
+| **合计** | **814** | **769** | **622** | **147** | **45** |
+
+这 769 个版本/API 行对应 **188 个唯一可执行 WAAPI URI**，分别通过 fixed command、bounded direct call、bounded topic wait、确认式 transaction、隔离 I/O transaction，或同连接 Undo Group 组合执行。45 个排除行对应 12 个唯一 URI，仅限任意 Lua 执行、危险/private debug 接口，以及不受限的 UI command 注册与执行。
+
+当前固定的纯程序 gate 包含 **957 项程序测试**，其中每一个已覆盖的版本/API 行都有一项可执行路由用例，并覆盖由 gateway 提供的会话提示上下文。它验证 packaged 路由、schema、安全边界、I/O 约束、transaction 行为、fake dispatch 执行和确定性的 onboarding 信息；这不等于已经在真实 Wwise 进程中逐一运行了全部 769 行。完整口径见[五版本覆盖契约](./skills/waapi-skill/references/waapi-coverage.md)。
 
 ---
 
@@ -134,14 +153,14 @@
 
 这个 skill 使用反射生成的 manifest 和按版本组织的 semantic notes，让 agent 能在正确的 WAAPI 表面上工作，而不是把所有版本当成一样。
 
-### Semantic planner + dispatcher 模型
+### Packaged gateway 执行模型
 
 正常路径大致是：
 
 1. 检测或选择 Wwise 版本
-2. 抽取结构化 semantic intent
-3. 生成 semantic preview 或直接 read-only plan
-4. 通过验证过的 WAAPI dispatch 层执行
+2. 为意图选择固定的 packaged gateway 路由
+3. 执行直接 read-only 命令，或生成不可变 mutation preview
+4. 只通过闭合 transaction 路由确认和执行
 5. 对结果做 verification
 
 ### 优先支持 read-first 的安全 inspection
@@ -150,7 +169,7 @@
 
 ### Bounded topic handling
 
-支持 topic waits，但采用的是有边界的等待模型，而不是假设无限期 listener 生命周期。
+支持 topic waits，但采用的是有边界的等待模型，而不是假设无限期 listener 生命周期。命令 timeout 是端到端预算，事件等待会从中预留一小段时间用于 unsubscribe、写 evidence 和关闭 transport。成功的 `wait-topic` 会把校验后的 WAAPI publish payload 直接放在 `event` 下，dispatcher 内部 callback envelope 不会泄漏到公开结果。不要用目标最终名称匹配 `object.created`，因为通知发生时命名尚未完成。对于 packaged ActorMixer 探针，Wwise 2021.1-2024.1 在通知时报告 `ActorMixer`，Wwise 2025.1 则报告底层 `PropertyContainer`；需要证明事件归属时，应把返回的对象 GUID 与可信 publisher 的 GUID 对账。
 
 ### Unsupported boundary 明确返回
 
@@ -175,13 +194,21 @@ python scripts/run.py --help
 python scripts/run.py setup_environment.py
 ```
 
+Runner 只接受 packaged `gateway.py` 和 `setup_environment.py` 两个入口。未知、绝对路径、越界或 symlink script target 即使在本地真实存在也会被拒绝。
+
 ### 2. 配置版本和 WAAPI endpoint
 
-持久化配置在：
+正常的持久化配置位于已安装 Skill 之外。Gateway 会按以下顺序使用第一个可用路径：
 
 ```text
-skills/waapi-skill/data/config.json
+$WAAPI_SKILL_CONFIG_PATH
+$XDG_CONFIG_HOME/waapi-skill/config.json
+$HOME/.config/waapi-skill/config.json
 ```
+
+只通过 `gateway.py config-show` 和 `gateway.py config-set` 查看或修改配置，不要手动编辑。
+`skills/waapi-skill/data/config.json` 只是在外部配置不存在时使用的只读旧版兼容回退，
+永远不是正常写入目标。
 
 公开的持久化字段故意保持很小：
 
@@ -190,27 +217,33 @@ skills/waapi-skill/data/config.json
 - `waapi_port`
 - `project_modification_policy`
 
-### 3. 使用 skill-local runner
+### 3. 所有 read-only 工作都走 gateway
 
-低层示例：
+无需拼装 WAAPI 代码即可检查实时版本/工程并查询对象：
 
-```python
-from wwise_waapi import WwiseDispatcher
-
-result = WwiseDispatcher(client=waapi_client).dispatch(
-    "ak.wwise.core.getInfo",
-    version="2025.1",
-    args={},
-    options={},
-    timeout=10.0,
-    dry_run=False,
-    allow_destructive=False,
-)
+```bash
+python scripts/run.py gateway.py status
+python scripts/run.py gateway.py query-object \
+  --path '\Events\Default Work Unit' \
+  --return-field id --return-field name --return-field type --return-field path
 ```
 
-### 4. 非 trivial 任务优先走 semantic planning
+### 4. 工程修改必须走 closed transaction lane
 
-对于 authoring、imports、soundbanks、switch assignments、结构化多步任务，优先用 semantic planner，而不是直接从零开始手写 WAAPI payload。
+先查询 packaged request contract。`preview` 返回的 transaction id 和 artifact hash 必须原样用于后续命令：
+
+```bash
+python scripts/run.py gateway.py operation-schema object.setNotes
+python scripts/run.py gateway.py preview \
+  --request-json '{"contract":"waapi-skill.operation-request/v1","operation":"object.setNotes","arguments":{"object":{"kind":"path","value":"\\Events\\Default Work Unit\\Target"},"value":"Reviewed"}}'
+python scripts/run.py gateway.py confirm <transaction-id> --artifact-hash <artifact-hash>
+python scripts/run.py gateway.py execute <transaction-id>
+python scripts/run.py gateway.py verify <transaction-id>
+```
+
+Gateway 是唯一公开接口。完成普通 Wwise 任务时，不要 import 内部 runtime module、构造 `WaapiClient`、创建一次性 helper script，也不要使用 inline Python。如果 gateway 返回没有 packaged route，就直接报告 unsupported boundary，不要自行合成代码。
+
+Manifest 反射只用于发现能力，不等于授权执行。generic `call` 仅开放两个零输入、严格校验结果的反射列表：`ak.wwise.waapi.getFunctions` 与 `ak.wwise.waapi.getTopics`。其他读取必须先有专用的 bounded command；fixed command 和 bounded topic wait 也只对 immutable reviewed allowlist 中的精确 URI 开放。新的或尚未 review 的 function/topic 即使名字以 `get`、`verify`、`dump` 开头也会 fail closed；`--dry-run` 不能绕过 fixed、transaction、topic 或 unsupported 路由边界。
 
 ---
 
@@ -218,8 +251,9 @@ result = WwiseDispatcher(client=waapi_client).dispatch(
 
 - destructive operations 默认阻止
 - project-changing steps 应先 preview 再执行
-- semantic plan 的确认必须匹配当前 preview artifact
+- confirmation 必须匹配当前不可变 preview artifact
 - unsupported runtime boundary 要清楚失败，而不是假装支持
+- reflected function/topic 必须先有显式 reviewed public route
 - evidence、runtime data、local auth state 默认保持本地
 
 这个 skill 追求的是**边界诚实、行为可复核**，不是“什么都答应”。
@@ -260,9 +294,10 @@ result = WwiseDispatcher(client=waapi_client).dispatch(
 
 - `skills/waapi-skill/SKILL.md` — skill contract
 - `skills/waapi-skill/scripts/run.py` — skill-local runner
-- `skills/waapi-skill/wwise_waapi/dispatcher.py` — 验证过的 WAAPI dispatch
-- `skills/waapi-skill/wwise_waapi/semantic_planner.py` — 结构化 semantic planning
-- `skills/waapi-skill/wwise_waapi/builders/` — preview-oriented builders
+- `skills/waapi-skill/scripts/gateway.py` — 唯一公开的 packaged WAAPI 接口
+- `skills/waapi-skill/references/` — 按需加载的 lane-specific gateway guidance
+- `skills/waapi-skill/wwise_waapi/capabilities.py` — 离线 public-route catalog
+- `skills/waapi-skill/wwise_waapi/operation_registry.py` — closed transaction operations 和明确边界
 - `skills/waapi-skill/resources/manifest/<version>/` — 反射生成的版本化 manifests
 - `skills/waapi-skill/resources/semantic/<version>/` — semantic source-note resources
 - `skills/waapi-skill/resources/waql/<version>/` — WAQL guidance resources
@@ -288,7 +323,7 @@ result = WwiseDispatcher(client=waapi_client).dispatch(
 
 ### 这个 skill 绑定某个特定 agent 吗？
 
-不绑定。它是一个本地 skill 包，包含 Python helpers 和 markdown guidance。任何能加载并遵循 skill 目录的本地 agent 工作流都可以使用。
+不绑定。它是一个包含 packaged runner/gateway 和 markdown guidance 的本地 skill 包。任何能加载并遵循 skill 目录的本地 agent 工作流都可以使用。
 
 ### 它是 MCP server 吗？
 
@@ -312,7 +347,7 @@ result = WwiseDispatcher(client=waapi_client).dispatch(
 
 - **按需加载**
 - **多版本支持**
-- **结构化 semantic planning**
+- **闭合、可由 agent 直接执行的 gateway 路由**
 - **更安全的 mutation flow**
 - **测试覆盖更完整**
 

@@ -10,7 +10,7 @@ from wwise_waapi.builders.source_notes import EXPECTED_SOURCE_NOTE_URI_INVENTORY
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_NOTES = ROOT / "skills" / "waapi-skill" / "resources" / "semantic" / "2022.1" / "source_notes.json"
-SKILL_MD = ROOT / "skills" / "waapi-skill" / "SKILL.md"
+OPERATE_REFERENCE = ROOT / "skills" / "waapi-skill" / "references" / "waapi-operate.md"
 
 INCLUDED_FAMILIES = {
     "query",
@@ -90,16 +90,19 @@ def test_source_note_required_field_strings_match_reflected_behavior() -> None:
     assert "ak.wwise.core.soundbank.convertExternalSources: sources array; each source entry input, platform" in notes["soundbank"]["required_fields"]
 
 
-def test_skill_docs_prefer_builders_without_claiming_live_execution() -> None:
-    text = SKILL_MD.read_text(encoding="utf-8")
+def test_skill_docs_route_builders_through_packaged_transaction_runtime_only() -> None:
+    text = OPERATE_REFERENCE.read_text(encoding="utf-8")
 
-    assert "prefer the semantic planner before hand-writing dispatcher payloads" in text
-    assert "source-grounded builders, previews, readback plans, and dispatcher requests" in text
-    assert "it does not open Wwise, subscribe to topics, or dispatch live calls by default" in text
-    assert "raw `WwiseDispatcher` contract remains the explicit escape hatch" in text
+    assert "only normal execution path is the packaged transaction CLI" in text
+    assert "Do not import builders or planners from inline Python" in text
+    assert "`SemanticPlanner` is a candidate/schema planning resource, not the transaction executor" in text
+    assert "preview --request-json" in text
+    assert "execute <transaction-id>" in text
+    assert "verify <transaction-id>" in text
     assert "Packaged semantic builder source-note families" not in text
     for family in INCLUDED_FAMILIES:
-        assert f"`{family}`" not in text
+        assert f"builder family `{family}`" not in text
+        assert f"`{family}` builder" not in text
     forbidden_claims = (
         "builders execute live Wwise by default",
         "semantic builders dispatch live calls by default",

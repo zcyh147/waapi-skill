@@ -4,6 +4,7 @@ Use `ci/test.sh` to run project test modes with consistent environment setup. Se
 
 ## Common commands
 
+- `ci/test.sh --mode program`
 - `ci/test.sh --mode nonlive`
 - `ci/test.sh --version all --mode all -- -q -ra`
 - `ci/test.sh --version all --mode matrix -- -q -ra`
@@ -12,6 +13,14 @@ Use `ci/test.sh` to run project test modes with consistent environment setup. Se
 - `ci/test.sh --version all --mode smoke`
 
 Positional form is still supported, for example `ci/test.sh 2021.1 live`.
+
+## Pure program gate
+
+Use `ci/test.sh --mode program` for the five-version public-route expansion. This mode is deliberately narrower than `nonlive`: it selects only the packaged public-route coverage, program matrix, negative gateway contracts, isolated-I/O policy tests, optional registry-integrity test, and the generic transaction full-chain test under `tests/unit`.
+
+The program gate forces `WWISE_LIVE=0`, `WWISE_DESTRUCTIVE=0`, and `WWISE_STRICT_REAL=0`; clears inherited Wwise executable, project, endpoint, and pytest-addopts settings; and uses injected fake clients. It never collects `tests/semantic`, `tests/live`, or `tests/destructive`, and it must not start Codex, OpenCode, WwiseConsole, or a network client.
+
+Extra arguments after `--` may be pytest flags or filters such as `-q`, `-ra`, `--collect-only`, or `-k expression`. Additional test paths, node ids, `.py` files, and `--pyargs` are rejected so the fixed program-only collection cannot be widened accidentally.
 
 ## Local real-Wwise path config
 

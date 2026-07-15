@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping, Sequence
 
+from wwise_waapi.waql import quote_waql_literal  # pyright: ignore[reportMissingImports]
+
 from .common import SemanticErrorCode, SemanticReadbackPlan, SemanticValidationError
 
 OBJECT_GET_URI = "ak.wwise.core.object.get"
@@ -176,7 +178,7 @@ def _scoped_name_waql(identity: ObjectIdentity) -> str:
     assert identity.parent is not None
     return (
         f'from object {_quote(identity.parent)} '
-        f'transform select children '
+        f'select children '
         f'where type = {_quote(identity.type)} and name = {_quote(identity.name)}'
     )
 
@@ -216,4 +218,11 @@ def _non_empty(value: str | None) -> bool:
 
 
 def _quote(value: str) -> str:
-    return '"' + value.replace('\\', '\\\\').replace('\"', '\\"') + '"'
+    try:
+        return quote_waql_literal(value)
+    except ValueError as exc:
+        raise SemanticValidationError(
+            SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+            str(exc),
+            details={"literal": value, "boundary": "packaged-waql-literal-evidence"},
+        ) from exc

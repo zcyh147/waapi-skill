@@ -7,6 +7,8 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.waql import (  # pyright: ignore[reportMissingImports]
     WAQL_EXAMPLES,
+    escape_waql_literal_content,
+    quote_waql_literal,
     validate_stored_waql_examples,
     validate_waql_example,
 )
@@ -147,3 +149,17 @@ def test_mutating_or_badly_shaped_examples_are_rejected() -> None:
                 "expect_live_safe": True,
             }
         )
+
+
+def test_waql_literal_helper_preserves_wwise_paths_and_fails_closed_outside_evidence() -> None:
+    path = r"\Actor-Mixer Hierarchy\Default Work Unit"
+    assert escape_waql_literal_content(path) == path
+    assert quote_waql_literal(path) == r'"\Actor-Mixer Hierarchy\Default Work Unit"'
+
+    for value in ('Embedded "quote"', "line\nbreak", "delete\x7f", "separator\u2028value", "separator\u2029value"):
+        with pytest.raises(ValueError):
+            quote_waql_literal(value)
+
+    for value in ("", None, 3):
+        with pytest.raises(ValueError):
+            quote_waql_literal(value)  # type: ignore[arg-type]

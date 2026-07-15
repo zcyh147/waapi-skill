@@ -185,7 +185,15 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
             self.port = 31337
             self.project_path = kwargs["project_path"]
             self.launch_env = kwargs["launch_env"]
-            self.command = [str(kwargs["console_path"]), "waapi-server", str(self.project_path), "--wamp-port", str(self.port)]
+            self.command = [
+                str(kwargs["console_path"]),
+                "waapi-server",
+                str(self.project_path),
+                "--wamp-port",
+                str(self.port),
+                "--http-port",
+                "0",
+            ]
             self.ready_result: object = None
             self.cleanup_report: CleanupReport | None = None
             seen_project_paths.append(self.project_path)
@@ -236,7 +244,15 @@ def test_strict_real_launch_audit_is_written_after_shutdown(monkeypatch: pytest.
             self.port = 31337
             self.project_path = kwargs["project_path"]
             self.launch_env = kwargs["launch_env"]
-            self.command = [str(kwargs["console_path"]), "waapi-server", str(self.project_path), "--wamp-port", str(self.port)]
+            self.command = [
+                str(kwargs["console_path"]),
+                "waapi-server",
+                str(self.project_path),
+                "--wamp-port",
+                str(self.port),
+                "--http-port",
+                "0",
+            ]
             self.ready_result: object = None
             self.cleanup_report: CleanupReport | None = None
 
@@ -263,7 +279,15 @@ def test_strict_real_launch_audit_is_written_after_shutdown(monkeypatch: pytest.
     assert record["wwise_version"] == "2022.1"
     assert record["pid"] == 4242
     assert record["port"] == 31337
-    assert record["command"] == [str(console), "waapi-server", str(sandbox.sandbox_project), "--wamp-port", "31337"]
+    assert record["command"] == [
+        str(console),
+        "waapi-server",
+        str(sandbox.sandbox_project),
+        "--wamp-port",
+        "31337",
+        "--http-port",
+        "0",
+    ]
     assert record["wine_prefix_path"] == str(sandbox.wine_prefix_path)
     assert record["launch_project_path"] == str(sandbox.sandbox_project)
     assert record["sandbox_project_path"] == str(sandbox.sandbox_project)
@@ -291,7 +315,15 @@ def test_non_strict_launch_does_not_write_persistent_audit(monkeypatch: pytest.M
             self.port = 31337
             self.project_path = kwargs["project_path"]
             self.launch_env = kwargs["launch_env"]
-            self.command = [str(kwargs["console_path"]), "waapi-server", str(self.project_path), "--wamp-port", str(self.port)]
+            self.command = [
+                str(kwargs["console_path"]),
+                "waapi-server",
+                str(self.project_path),
+                "--wamp-port",
+                str(self.port),
+                "--http-port",
+                "0",
+            ]
             self.ready_result: object = None
             self.cleanup_report: CleanupReport | None = None
 
@@ -322,6 +354,13 @@ def test_launch_shuts_down_when_ready_proof_is_invalid(monkeypatch: pytest.Monke
     env = base_env(console, source_project, tmp_path / "sandbox-root")
     sandbox = prepare_sample_project_sandbox(env)
     shutdown_calls: list[bool] = []
+    lifecycles: list[FakeLifecycle] = []
+    metadata_writes: list[Path] = []
+    original_write_metadata = sandbox_fixture.SandboxProject.write_metadata
+
+    def tracked_write_metadata(project: sandbox_fixture.SandboxProject) -> Path:
+        metadata_writes.append(project.sandbox_path)
+        return original_write_metadata(project)
 
     class FakeLifecycle:
         def __init__(self, **kwargs: Any) -> None:
@@ -329,9 +368,18 @@ def test_launch_shuts_down_when_ready_proof_is_invalid(monkeypatch: pytest.Monke
             self.port = 31338
             self.project_path = kwargs["project_path"]
             self.launch_env = kwargs["launch_env"]
-            self.command = [str(kwargs["console_path"]), "waapi-server", str(self.project_path), "--wamp-port", str(self.port)]
+            self.command = [
+                str(kwargs["console_path"]),
+                "waapi-server",
+                str(self.project_path),
+                "--wamp-port",
+                str(self.port),
+                "--http-port",
+                "0",
+            ]
             self.ready_result: object = None
             self.cleanup_report: CleanupReport | None = None
+            lifecycles.append(self)
 
         def run_until_ready(self) -> object:
             self.ready_result = {"version": {}}
@@ -347,11 +395,173 @@ def test_launch_shuts_down_when_ready_proof_is_invalid(monkeypatch: pytest.Monke
             )
 
     monkeypatch.setattr(sandbox_fixture, "HeadlessLifecycle", FakeLifecycle)
+    monkeypatch.setattr(sandbox_fixture.SandboxProject, "write_metadata", tracked_write_metadata)
 
     try:
         with pytest.raises(SandboxFixtureError, match="displayName"):
             launch_sandboxed_wwise(sandbox, env)
         assert shutdown_calls == [True]
+        assert len(lifecycles) == 1
+        assert lifecycles[0].process is None
+        assert metadata_writes == [sandbox.sandbox_path]
+        persisted = json.loads((sandbox.sandbox_path / "sandbox-metadata.json").read_text(encoding="utf-8"))
+        assert persisted["selected_port"] == 31338
+        assert persisted["command"] == lifecycles[0].command
+        assert persisted["process_pid"] == FakeProcess.pid
+        assert persisted["wine_prefix_path"] == str(sandbox.wine_prefix_path)
+        assert persisted["launch_project_path"] == str(sandbox.sandbox_project)
+        assert persisted["process_cleanup_result"] == "cleaned"
+        assert persisted["process_cleanup_details"]["launch_pid"] == FakeProcess.pid
+        assert persisted["get_info_version"] is None
+        assert persisted["get_info_display_name"] is None
+        assert persisted["identity_verified"] is None
+    finally:
+        cleanup_sandbox(sandbox, failed=True)
+
+
+@pytest.mark.parametrize(
+    ("residual_processes", "expected_cleanup_result"),
+    [
+        ([], "cleaned"),
+        ([ResidualProcess(pid=999, command="WINEPREFIX=/tmp/test wineserver")], "residual-processes"),
+    ],
+)
+def test_launch_failure_records_existing_cleanup_report(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    residual_processes: list[ResidualProcess],
+    expected_cleanup_result: str,
+) -> None:
+    console = make_console(tmp_path)
+    source_project = make_sample_project(tmp_path / "source")
+    env = base_env(console, source_project, tmp_path / "sandbox-root")
+    sandbox = prepare_sample_project_sandbox(env)
+    launch_error = RuntimeError("readiness failed after lifecycle cleanup")
+    shutdown_calls: list[bool] = []
+    lifecycles: list[FakeLifecycle] = []
+
+    class FakeLifecycle:
+        def __init__(self, **kwargs: Any) -> None:
+            self.process = FakeProcess()
+            self.port = 31339
+            self.project_path = kwargs["project_path"]
+            self.launch_env = kwargs["launch_env"]
+            self.command = [
+                str(kwargs["console_path"]),
+                "waapi-server",
+                str(self.project_path),
+                "--wamp-port",
+                str(self.port),
+                "--http-port",
+                "0",
+            ]
+            self.ready_result: object = None
+            self.cleanup_report: CleanupReport | None = None
+            lifecycles.append(self)
+
+        def run_until_ready(self) -> object:
+            self.process = None
+            self.cleanup_report = CleanupReport(
+                launch_pid=5151,
+                wine_prefix=self.launch_env.get("WINEPREFIX"),
+                process_exited=True,
+                residual_processes=list(residual_processes),
+            )
+            raise launch_error
+
+        def shutdown(self, suppress_errors: bool = True) -> None:
+            shutdown_calls.append(suppress_errors)
+
+    monkeypatch.setattr(sandbox_fixture, "HeadlessLifecycle", FakeLifecycle)
+
+    try:
+        with pytest.raises(RuntimeError, match="readiness failed after lifecycle cleanup") as exc_info:
+            launch_sandboxed_wwise(sandbox, env)
+        assert exc_info.value is launch_error
+        assert shutdown_calls == [True]
+        assert len(lifecycles) == 1
+        persisted = json.loads((sandbox.sandbox_path / "sandbox-metadata.json").read_text(encoding="utf-8"))
+        assert persisted["selected_port"] == 31339
+        assert persisted["command"] == lifecycles[0].command
+        assert persisted["process_pid"] == 5151
+        assert persisted["wine_prefix_path"] == str(sandbox.wine_prefix_path)
+        assert persisted["launch_project_path"] == str(sandbox.sandbox_project)
+        assert persisted["process_cleanup_result"] == expected_cleanup_result
+        assert persisted["process_cleanup_details"]["launch_pid"] == 5151
+        assert persisted["process_cleanup_details"]["residual_processes"] == [
+            {"pid": process.pid, "command": process.command} for process in residual_processes
+        ]
+        assert persisted["get_info_version"] is None
+        assert persisted["get_info_display_name"] is None
+        assert persisted["identity_verified"] is None
+    finally:
+        cleanup_sandbox(sandbox, failed=True)
+
+
+def test_launch_shuts_down_when_run_until_ready_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    console = make_console(tmp_path)
+    source_project = make_sample_project(tmp_path / "source")
+    env = base_env(console, source_project, tmp_path / "sandbox-root")
+    sandbox = prepare_sample_project_sandbox(env)
+    launch_error = RuntimeError("run_until_ready failed")
+    shutdown_calls: list[bool] = []
+    lifecycles: list[FakeLifecycle] = []
+    metadata_writes: list[Path] = []
+    original_write_metadata = sandbox_fixture.SandboxProject.write_metadata
+
+    def tracked_write_metadata(project: sandbox_fixture.SandboxProject) -> Path:
+        metadata_writes.append(project.sandbox_path)
+        return original_write_metadata(project)
+
+    class FakeLifecycle:
+        def __init__(self, **kwargs: Any) -> None:
+            self.process = FakeProcess()
+            self.port = 31338
+            self.project_path = kwargs["project_path"]
+            self.launch_env = kwargs["launch_env"]
+            self.command = [
+                str(kwargs["console_path"]),
+                "waapi-server",
+                str(self.project_path),
+                "--wamp-port",
+                str(self.port),
+                "--http-port",
+                "0",
+            ]
+            self.ready_result: object = None
+            self.cleanup_report: CleanupReport | None = None
+            lifecycles.append(self)
+
+        def run_until_ready(self) -> object:
+            raise launch_error
+
+        def shutdown(self, suppress_errors: bool = True) -> None:
+            shutdown_calls.append(suppress_errors)
+            self.process = None
+            raise RuntimeError("cleanup failed")
+
+    monkeypatch.setattr(sandbox_fixture, "HeadlessLifecycle", FakeLifecycle)
+    monkeypatch.setattr(sandbox_fixture.SandboxProject, "write_metadata", tracked_write_metadata)
+
+    try:
+        with pytest.raises(RuntimeError, match="run_until_ready failed") as exc_info:
+            launch_sandboxed_wwise(sandbox, env)
+        assert exc_info.value is launch_error
+        assert shutdown_calls == [True]
+        assert len(lifecycles) == 1
+        assert lifecycles[0].process is None
+        assert metadata_writes == [sandbox.sandbox_path]
+        persisted = json.loads((sandbox.sandbox_path / "sandbox-metadata.json").read_text(encoding="utf-8"))
+        assert persisted["selected_port"] == 31338
+        assert persisted["command"] == lifecycles[0].command
+        assert persisted["process_pid"] == FakeProcess.pid
+        assert persisted["wine_prefix_path"] == str(sandbox.wine_prefix_path)
+        assert persisted["launch_project_path"] == str(sandbox.sandbox_project)
+        assert persisted["process_cleanup_details"] is None
+        assert persisted["process_cleanup_result"] == "error:RuntimeError:cleanup failed"
+        assert persisted["get_info_version"] is None
+        assert persisted["get_info_display_name"] is None
+        assert persisted["identity_verified"] is None
     finally:
         cleanup_sandbox(sandbox, failed=True)
 
@@ -368,7 +578,15 @@ def test_shutdown_raises_when_cleanup_report_has_residual_processes(monkeypatch:
             self.port = 31337
             self.project_path = kwargs["project_path"]
             self.launch_env = kwargs["launch_env"]
-            self.command = [str(kwargs["console_path"]), "waapi-server", str(self.project_path), "--wamp-port", str(self.port)]
+            self.command = [
+                str(kwargs["console_path"]),
+                "waapi-server",
+                str(self.project_path),
+                "--wamp-port",
+                str(self.port),
+                "--http-port",
+                "0",
+            ]
             self.ready_result: object = None
             self.cleanup_report: CleanupReport | None = None
 

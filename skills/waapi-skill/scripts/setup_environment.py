@@ -12,9 +12,19 @@ from dataclasses import dataclass
 from pathlib import Path
 
 try:  # pragma: no cover - import path differs between CLI and tests
-    from config import SKILL_DIR, VENV_DIR
+    from config import (
+        PackagedScriptError,
+        SKILL_DIR,
+        VENV_DIR,
+        resolve_packaged_script,
+    )
 except ImportError:  # pragma: no cover
-    from .config import SKILL_DIR, VENV_DIR
+    from .config import (
+        PackagedScriptError,
+        SKILL_DIR,
+        VENV_DIR,
+        resolve_packaged_script,
+    )
 
 
 @dataclass(slots=True)
@@ -59,9 +69,10 @@ class SkillEnvironment:
         return True
 
     def run(self, script_name: str, args: list[str]) -> int:
-        script_path = self.skill_dir / "scripts" / script_name
-        if not script_path.exists():
-            print(f"Script not found: {script_name}")
+        try:
+            script_path = resolve_packaged_script(self.skill_dir, script_name)
+        except PackagedScriptError as exc:
+            print(f"Script rejected: {exc}")
             return 1
 
         self.ensure()

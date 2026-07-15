@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import pytest  # pyright: ignore[reportMissingImports]
 
-from wwise_waapi.builders.common import SemanticErrorCode  # pyright: ignore[reportMissingImports]
+from wwise_waapi.builders.common import (  # pyright: ignore[reportMissingImports]
+    SemanticErrorCode,
+    SemanticValidationError,
+)
 from wwise_waapi.builders.identity import (  # pyright: ignore[reportMissingImports]
     IdentityAmbiguityError,
     ObjectIdentity,
@@ -63,7 +66,12 @@ def test_name_only_identity_requires_unique_scope() -> None:
     planned = resolve_object_identity(scoped)
     assert isinstance(planned, ResolutionPlan)
     assert planned.readback_plan.uri == "ak.wwise.core.object.get"
-    assert "Default Work Unit" in planned.readback_plan.args["waql"]
+    assert planned.readback_plan.args == {
+        "waql": (
+            r'from object "\Actor-Mixer Hierarchy\Default Work Unit" '
+            'select children where type = "Sound" and name = "Explosion"'
+        )
+    }
 
     resolved = resolve_object_identity(
         scoped,
@@ -117,3 +125,16 @@ def test_scoped_identity_rejects_multirow_readback_even_with_one_match() -> None
     assert exc.value.error_code == SemanticErrorCode.AMBIGUOUS_OBJECT_IDENTITY
     assert exc.value.details["row_count"] == 2
     assert exc.value.details["matching_row_count"] == 1
+
+
+def test_scoped_identity_fails_closed_for_unproven_literal_escaping() -> None:
+    with pytest.raises(SemanticValidationError, match="embedded quotes") as exc:
+        resolve_object_identity(
+            ObjectIdentity(
+                name='Explosion "quoted"',
+                type="Sound",
+                parent=r"\Actor-Mixer Hierarchy\Default Work Unit",
+            )
+        )
+
+    assert exc.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH

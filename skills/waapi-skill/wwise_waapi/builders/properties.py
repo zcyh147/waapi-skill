@@ -7,6 +7,7 @@ from enum import Enum
 from typing import Any, Mapping, Sequence
 
 from wwise_waapi.dispatcher import DEFAULT_WWISE_VERSION  # pyright: ignore[reportMissingImports]
+from wwise_waapi.waql import quote_waql_literal  # pyright: ignore[reportMissingImports]
 
 from .common import (  # pyright: ignore[reportMissingImports]
     BuilderContext,
@@ -396,10 +397,18 @@ def _resolved_exact_object(name: str, identity: ObjectIdentity | ResolvedObject)
 
 
 def _object_value_readback(object: ResolvedObject, return_fields: tuple[str, ...], description: str) -> tuple[SemanticReadbackPlan, ...]:
+    try:
+        object_literal = quote_waql_literal(str(object.object))
+    except ValueError as exc:
+        raise SemanticValidationError(
+            SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+            str(exc),
+            details={"object": object.object, "boundary": "packaged-waql-literal-evidence"},
+        ) from exc
     return (
         SemanticReadbackPlan(
             OBJECT_GET_URI,
-            args={"waql": f'from object "{object.object}"'},
+            args={"waql": f"from object {object_literal}"},
             options={"return": list(return_fields)},
             description=description,
         ),
@@ -436,7 +445,12 @@ def _require_property_value(metadata: PropertyInfoMetadataRecord, value: Any) ->
 
 
 def _require_reference_metadata(metadata: PropertyInfoMetadataRecord) -> None:
-    supports_reference = metadata.supports.get("reference") is True or metadata.type.lower() in {"reference", "objectreference"}
+    restriction_type = metadata.restriction.get("type")
+    supports_reference = (
+        metadata.supports.get("reference") is True
+        or metadata.type.lower() in {"reference", "objectreference"}
+        or (isinstance(restriction_type, str) and restriction_type.casefold() == "reference")
+    )
     constrained = metadata.supports.get("constrained") is True or bool(metadata.restriction.get("constraints")) or bool(metadata.restriction.get("ordering"))
     if not supports_reference:
         raise SemanticValidationError(

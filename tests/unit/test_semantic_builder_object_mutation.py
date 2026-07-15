@@ -85,8 +85,28 @@ def test_create_preview_has_exact_payload_gate_readback_and_cleanup() -> None:
     )
     assert checker.calls == [(BuilderFamily.OBJECT_MUTATION.value, "2022.1")]
     assert preview.readback_plan[0].uri == "ak.wwise.core.object.get"
-    assert "WAAPI_TASK5_Object" in preview.readback_plan[0].args["waql"]
+    assert preview.readback_plan[0].args == {
+        "waql": 'from object "{parent}" select children where name = "WAAPI_TASK5_Object"'
+    }
     assert preview.envelope.metadata["cleanup_expectation"]["kind"] == "delete-created-object"
+
+
+def test_create_readback_preserves_path_separators_and_rejects_unproven_quotes() -> None:
+    preview = builder().create(
+        parent=ObjectIdentity(path=r"\Actor-Mixer Hierarchy\Default Work Unit"),
+        type="ActorMixer",
+        name="Child",
+    )
+    assert preview.readback_plan[0].args == {
+        "waql": (
+            r'from object "\Actor-Mixer Hierarchy\Default Work Unit" '
+            'select children where name = "Child"'
+        )
+    }
+
+    with pytest.raises(SemanticValidationError, match="embedded quotes") as exc:
+        builder().create(parent=exact_id("{parent}"), type="ActorMixer", name='Child "quoted"')
+    assert exc.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
 
 
 def test_set_batch_preview_represents_partial_success_risk_without_atomicity_claim() -> None:

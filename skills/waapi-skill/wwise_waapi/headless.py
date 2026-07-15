@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import platform
 import queue
+import secrets
 import signal
 import socket
 import subprocess
@@ -28,6 +29,9 @@ DEFAULT_PROBE_INTERVAL = 0.25
 DEFAULT_PROBE_TIMEOUT = 5.0
 DEFAULT_SHUTDOWN_TIMEOUT = 10.0
 DEFAULT_KILL_TIMEOUT = 3.0
+AUTO_WAAPI_PORT_FIRST = 30000
+AUTO_WAAPI_PORT_LAST = 32767
+WWISE_SERVER_BIND_HOST = "0.0.0.0"
 
 
 class HeadlessLifecycleError(RuntimeError):
@@ -233,22 +237,51 @@ def _default_process_factory(command: list[str], **kwargs: Any) -> subprocess.Po
 
 
 def find_free_port(host: str = DEFAULT_HOST) -> int:
-    """Ask the OS for an available TCP port."""
+    """Select an available Wwise server port outside common ephemeral ranges."""
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind((host, 0))
-        return int(sock.getsockname()[1])
+    pool_size = AUTO_WAAPI_PORT_LAST - AUTO_WAAPI_PORT_FIRST + 1
+    start_offset = secrets.randbelow(pool_size)
+    for offset in range(pool_size):
+        candidate = AUTO_WAAPI_PORT_FIRST + ((start_offset + offset) % pool_size)
+        try:
+            assert_port_free(host, candidate)
+        except PortUnavailable:
+            continue
+        return candidate
+    raise PortUnavailable(
+        f"No Wwise WAAPI port is available in {AUTO_WAAPI_PORT_FIRST}..{AUTO_WAAPI_PORT_LAST}"
+    )
+
+
+def _tcp_endpoint_accepting(host: str, port: int | None, *, timeout: float) -> bool:
+    if port is None:
+        return False
+    try:
+        with socket.create_connection((host, port), timeout=max(timeout, 0.01)):
+            return True
+    except OSError:
+        return False
 
 
 def assert_port_free(host: str, port: int) -> None:
-    """Fail fast when a caller-supplied WAAPI port is occupied."""
+    """Fail fast unless Wwise can bind the IPv4 port on every interface.
+
+    ``host`` is the client connection host. WwiseConsole owns the server and
+    binds more broadly, so checking only the client host can miss conflicts on
+    another local interface.
+    """
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        exclusive_address_use = getattr(socket, "SO_EXCLUSIVEADDRUSE", None)
+        if os.name == "nt" and exclusive_address_use is not None:
+            sock.setsockopt(socket.SOL_SOCKET, exclusive_address_use, 1)
         try:
-            sock.bind((host, port))
+            sock.bind((WWISE_SERVER_BIND_HOST, port))
         except OSError as exc:
-            raise PortUnavailable(f"WAAPI port {host}:{port} is not available") from exc
+            raise PortUnavailable(
+                f"Wwise WAAPI server port {WWISE_SERVER_BIND_HOST}:{port} is not available "
+                f"for client host {host}"
+            ) from exc
 
 
 def _run_with_timeout(
@@ -406,13 +439,13 @@ class HeadlessLifecycle:
                 last_error = exc
                 time.sleep(min(self.timeouts.probe_interval, max(0.0, deadline - time.monotonic())))
 
-        self.shutdown(suppress_errors=True)
         diagnostics = self._failure_diagnostics(
             phase="readiness",
             timeout=self.timeouts.readiness,
             duration=time.monotonic() - started_at,
             last_error=last_error,
         )
+        self.shutdown(suppress_errors=True)
         raise ReadinessTimeout(self._failure_message("WAAPI readiness timed out", diagnostics), diagnostics)
 
     def run_until_ready(self) -> Any:
@@ -474,6 +507,13 @@ class HeadlessLifecycle:
         self.shutdown(suppress_errors=True)
 
     def _probe_once(self) -> Any:
+        if self.waapi_client_factory is default_waapi_client_factory and not _tcp_endpoint_accepting(
+            self.host,
+            self.port,
+            timeout=min(0.1, self.timeouts.probe),
+        ):
+            raise ConnectionRefusedError(f"WAAPI TCP endpoint is not accepting connections at {self.host}:{self.port}")
+
         def probe() -> Any:
             client = self.waapi_client_factory(self.waapi_url)
             try:
@@ -487,7 +527,6 @@ class HeadlessLifecycle:
             ReadinessTimeout,
             f"Single WAAPI probe exceeded {self.timeouts.probe:.2f}s",
         )
-
     def _failure_diagnostics(
         self,
         *,

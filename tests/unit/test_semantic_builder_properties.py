@@ -86,6 +86,22 @@ def test_set_name_and_notes_return_preview_with_readback_and_topic_evidence() ->
     assert notes_preview.evidence_plan[2]["topic"] == "ak.wwise.core.object.notesChanged"
 
 
+def test_object_value_readback_preserves_path_and_rejects_unproven_quotes() -> None:
+    path = r"\Actor-Mixer Hierarchy\Default Work Unit\Sound"
+    preview = builder().set_notes(object=ObjectIdentity(path=path), value="hello")
+
+    assert preview.readback_plan[0].args == {
+        "waql": r'from object "\Actor-Mixer Hierarchy\Default Work Unit\Sound"'
+    }
+
+    with pytest.raises(SemanticValidationError, match="embedded quotes") as exc:
+        builder().set_notes(
+            object=ObjectIdentity(path=r'\Actor-Mixer Hierarchy\A "Quoted" Sound'),
+            value="hello",
+        )
+    assert exc.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+
+
 def test_set_property_requires_metadata_match() -> None:
     with pytest.raises(SemanticValidationError) as name_mismatch:
         builder().set_property(object=exact_sound(), property="Pitch", value=-3.0, property_info=volume_info())
@@ -158,6 +174,26 @@ def test_set_reference_preview_uses_target_object_value_and_evidence_plan() -> N
     )
     assert preview.envelope.metadata["applicability"]["target_identity"]["object"] == exact_bus().id
     assert preview.evidence_plan[2]["topic"] == "ak.wwise.core.object.referenceChanged"
+
+
+def test_set_reference_accepts_legacy_live_metadata_with_reference_restriction_type() -> None:
+    metadata = PropertyInfoMetadataRecord(
+        name="SwitchGroupOrStateGroup",
+        type="",
+        supports={"randomizer": False, "rtpc": "None", "unlink": False},
+        restriction={
+            "type": "reference",
+            "restrictions": [{"type": ["Switch Group", "State Group"], "sharedOnlyTypes": []}],
+        },
+    )
+    preview = builder().set_reference(
+        object=exact_sound(),
+        reference="SwitchGroupOrStateGroup",
+        target=exact_bus(),
+        reference_info=metadata,
+    )
+
+    assert preview.dispatch_payload()["uri"] == SET_REFERENCE_URI
 
 
 def test_set_randomizer_requires_support_and_one_randomizer_field() -> None:

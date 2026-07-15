@@ -12,6 +12,7 @@ def test_skill_contract_mentions_scaffold_elements() -> None:
     assert "resources/semantic/<version>/" in text
     assert "resources/waql/<version>/" in text
     assert "resources/deferred/<version>.json" in text
-    assert "references/semantic/<version>/" in text
-    assert "Windows validation" in text
-    assert "project modification policy" in text
+    assert "references/waapi-setup.md" in text
+    assert "references/waapi-query.md" in text
+    assert "references/waapi-operate.md" in text
+    assert "gateway.py status" in text

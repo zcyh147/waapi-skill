@@ -7,7 +7,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from .api_coverage_audit import Phase2CoverageStatusRecord  # pyright: ignore[reportMissingImports]
+from .api_coverage_audit import (  # pyright: ignore[reportMissingImports]
+    EXECUTION_POLICY_STATUSES,
+    Phase2CoverageStatusRecord,
+)
 from wwise_waapi.category_policy import category_policy  # pyright: ignore[reportMissingImports]
 from wwise_waapi.deferred_registry import DeferredRegistry  # pyright: ignore[reportMissingImports]
 from wwise_waapi.manifest import DeterministicJsonWriter, ManifestStore  # pyright: ignore[reportMissingImports]
@@ -76,6 +79,12 @@ UNIT_ROUTE_COMMAND = "python -m pytest tests/unit/test_dispatch_routes_all_2022.
 UNIT_WRAPPER_POLICY_COMMAND = "python -m pytest tests/unit/test_wrapper_only_categories.py -q"
 UNIT_CONFORMANCE_POLICY_COMMAND = (
     "python -m pytest tests/unit/test_phase21_uri_policy.py tests/unit/test_phase2_coverage_summary.py -q"
+)
+UNIT_PROGRAM_POLICY_COMMAND = "ci/test.sh --mode program -- -q -ra"
+PROGRAM_POLICY_EVIDENCE_PATHS = (
+    "tests/unit/test_public_route_coverage_contract.py",
+    "tests/unit/test_public_route_program_matrix.py",
+    "tests/unit/test_public_route_negative_contracts.py",
 )
 
 TASK7_EVIDENCE = ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage/task-7-object-mutation.md"
@@ -356,6 +365,22 @@ class Phase2CoverageSummaryBuilder:
                 }
             )
             return entry
+        if achieved_status in EXECUTION_POLICY_STATUSES:
+            policy = category_policy(category)
+            if policy is None:
+                raise ValueError(f"Missing execution policy for {uri} category {category}")
+            entry.update(
+                {
+                    "evidence_class": "program_tested_packaged_execution",
+                    "evidence_command": UNIT_PROGRAM_POLICY_COMMAND,
+                    "evidence_path": PROGRAM_POLICY_EVIDENCE_PATHS[0],
+                    "evidence_paths": list(PROGRAM_POLICY_EVIDENCE_PATHS),
+                    "future_review_trigger": policy.future_review_trigger,
+                    "review_trigger": policy.future_review_trigger,
+                    "user_approved_rationale": policy.user_approved_rationale,
+                }
+            )
+            return entry
         if achieved_status in {"wrapper-only", "skipped-approved"}:
             policy = category_policy(category)
             if policy is None:
@@ -553,7 +578,7 @@ class Phase2CoverageSummaryBuilder:
                 "tests/destructive/support/resources/capabilities/2022.1/task-6-object-topic-live-plan.json",
                 "tests/destructive/support/resources/capabilities/2022.1/task-7-project-mutation-sandbox-plan.json",
                 "tests/destructive/support/resources/capabilities/2022.1/task-9-profiler-soundengine-feasibility.json",
-                "tests/destructive/support/resources/capabilities/2022.1/wrapper-only-category-policy.json",
+                "skills/waapi-skill/references/waapi-coverage.md",
             ],
             "version": version,
             "windows_policy": "Windows host validation remains pending; generated Windows SoundBank artifacts from macOS sandbox output are not Windows validation.",
@@ -571,6 +596,12 @@ class Phase2CoverageSummaryBuilder:
     def _status_transition(self, phase1_status: str, achieved_status: str) -> str:
         if phase1_status == achieved_status == "fake-route-tested":
             return "phase1-fake-route-unchanged"
+        if achieved_status in EXECUTION_POLICY_STATUSES:
+            return (
+                "phase1-fake-route-execution-policy"
+                if phase1_status == "fake-route-tested"
+                else "phase1-deferred-execution-policy"
+            )
         if achieved_status in {"wrapper-only", "skipped-approved"}:
             return "phase1-deferred-policy-approved" if phase1_status != "fake-route-tested" else "phase1-fake-route-policy-approved"
         if achieved_status == "conformance-only-skip":

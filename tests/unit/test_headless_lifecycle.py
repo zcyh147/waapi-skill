@@ -29,6 +29,7 @@ from wwise_waapi.headless import (  # pyright: ignore[reportMissingImports]
     WwiseConsolePathResolver,
     assert_port_free,
     default_waapi_client_factory,
+    find_free_port,
 )
 import wwise_waapi.headless as headless_module  # pyright: ignore[reportMissingImports]
 
@@ -136,6 +137,129 @@ def test_occupied_port_is_rejected() -> None:
             assert_port_free("127.0.0.1", port)
 
 
+def test_port_probe_uses_wildcard_server_bind_without_reuse(monkeypatch: pytest.MonkeyPatch) -> None:
+    bind_calls: list[tuple[str, int]] = []
+    socket_options: list[tuple[int, int, int]] = []
+
+    class RecordingSocket:
+        def __enter__(self) -> RecordingSocket:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def bind(self, address: tuple[str, int]) -> None:
+            bind_calls.append(address)
+
+        def setsockopt(self, level: int, option: int, value: int) -> None:
+            socket_options.append((level, option, value))
+
+    monkeypatch.setattr(headless_module.socket, "socket", lambda *args, **kwargs: RecordingSocket())
+    monkeypatch.setattr(headless_module.os, "name", "posix")
+
+    assert_port_free("127.0.0.1", 31337)
+
+    assert bind_calls == [("0.0.0.0", 31337)]
+    assert socket_options == []
+
+
+def test_windows_port_probe_requests_exclusive_address_use(monkeypatch: pytest.MonkeyPatch) -> None:
+    socket_options: list[tuple[int, int, int]] = []
+
+    class RecordingSocket:
+        def __enter__(self) -> RecordingSocket:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def bind(self, address: tuple[str, int]) -> None:
+            assert address == ("0.0.0.0", 31337)
+
+        def setsockopt(self, level: int, option: int, value: int) -> None:
+            socket_options.append((level, option, value))
+
+    exclusive_address_use = 0x100
+    monkeypatch.setattr(headless_module.socket, "socket", lambda *args, **kwargs: RecordingSocket())
+    monkeypatch.setattr(headless_module.socket, "SO_EXCLUSIVEADDRUSE", exclusive_address_use, raising=False)
+    monkeypatch.setattr(headless_module.os, "name", "nt")
+
+    assert_port_free("127.0.0.1", 31337)
+
+    assert socket_options == [(socket.SOL_SOCKET, exclusive_address_use, 1)]
+
+
+def test_find_free_port_scans_safe_pool_from_random_start_and_skips_conflicts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    attempted: list[tuple[str, int]] = []
+
+    monkeypatch.setattr(headless_module.secrets, "randbelow", lambda size: 2)
+
+    def reject_first_two(host: str, port: int) -> None:
+        attempted.append((host, port))
+        if len(attempted) <= 2:
+            raise PortUnavailable("occupied")
+
+    monkeypatch.setattr(headless_module, "assert_port_free", reject_first_two)
+
+    selected = find_free_port("127.0.0.1")
+
+    assert selected == headless_module.AUTO_WAAPI_PORT_FIRST + 4
+    assert selected != 0
+    assert attempted == [
+        ("127.0.0.1", headless_module.AUTO_WAAPI_PORT_FIRST + 2),
+        ("127.0.0.1", headless_module.AUTO_WAAPI_PORT_FIRST + 3),
+        ("127.0.0.1", headless_module.AUTO_WAAPI_PORT_FIRST + 4),
+    ]
+
+
+def test_find_free_port_wraps_and_raises_when_safe_pool_is_exhausted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    attempted: list[int] = []
+    pool_size = headless_module.AUTO_WAAPI_PORT_LAST - headless_module.AUTO_WAAPI_PORT_FIRST + 1
+    monkeypatch.setattr(headless_module.secrets, "randbelow", lambda size: size - 1)
+
+    def always_occupied(host: str, port: int) -> None:
+        attempted.append(port)
+        raise PortUnavailable("occupied")
+
+    monkeypatch.setattr(headless_module, "assert_port_free", always_occupied)
+
+    with pytest.raises(PortUnavailable, match=r"30000\.\.32767"):
+        find_free_port("127.0.0.1")
+
+    assert len(attempted) == pool_size
+    assert attempted[:2] == [
+        headless_module.AUTO_WAAPI_PORT_LAST,
+        headless_module.AUTO_WAAPI_PORT_FIRST,
+    ]
+    assert set(attempted) == set(
+        range(headless_module.AUTO_WAAPI_PORT_FIRST, headless_module.AUTO_WAAPI_PORT_LAST + 1)
+    )
+
+
+def test_launch_rejects_conflicting_explicit_port_without_replacement(tmp_path: Path) -> None:
+    executable = make_executable(tmp_path)
+    process_calls: list[list[str]] = []
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as occupied:
+        occupied.bind(("127.0.0.1", 0))
+        selected_port = int(occupied.getsockname()[1])
+        lifecycle = HeadlessLifecycle(
+            console_path=executable,
+            port=selected_port,
+            process_factory=lambda command, **kwargs: process_calls.append(command) or FakeProcess(),
+        )
+
+        with pytest.raises(PortUnavailable):
+            lifecycle.launch()
+
+    assert lifecycle.port == selected_port
+    assert process_calls == []
+
+
 def test_launch_uses_argument_list_dynamic_port_and_drains_output(tmp_path: Path) -> None:
     executable = make_executable(tmp_path)
     fake_process = FakeProcess()
@@ -151,8 +275,11 @@ def test_launch_uses_argument_list_dynamic_port_and_drains_output(tmp_path: Path
     lifecycle.launch()
     lifecycle._drainer.join()  # pyright: ignore[reportPrivateUsage]
 
-    assert lifecycle.port is not None and lifecycle.port > 0
-    assert commands == [[str(executable), "waapi-server", "--wamp-port", str(lifecycle.port)]]
+    assert lifecycle.port is not None
+    assert headless_module.AUTO_WAAPI_PORT_FIRST <= lifecycle.port <= headless_module.AUTO_WAAPI_PORT_LAST
+    assert commands == [
+        [str(executable), "waapi-server", "--wamp-port", str(lifecycle.port), "--http-port", "0"]
+    ]
     assert "cwd" not in seen_kwargs[0]
     assert "stdout line" in "".join(lifecycle.output.stdout)
     assert "stderr line" in "".join(lifecycle.output.stderr)
@@ -229,7 +356,15 @@ def test_project_launch_normalizes_relative_project_path_cwd_and_diagnostics(mon
 
     assert lifecycle.port is not None
     assert seen_kwargs[0]["cwd"] == str(absolute_project.parent)
-    assert lifecycle.command == [str(executable), "waapi-server", str(absolute_project), "--wamp-port", str(lifecycle.port)]
+    assert lifecycle.command == [
+        str(executable),
+        "waapi-server",
+        str(absolute_project),
+        "--wamp-port",
+        str(lifecycle.port),
+        "--http-port",
+        "0",
+    ]
     with pytest.raises(ReadinessTimeout) as exc_info:
         lifecycle.wait_ready()
     assert exc_info.value.diagnostics["cwd"] == str(absolute_project.parent)
@@ -355,6 +490,9 @@ def test_readiness_timeout_cleans_up_process(tmp_path: Path) -> None:
     assert diagnostics["timeout"] == lifecycle.timeouts.readiness
     assert diagnostics["duration"] >= 0.0
     assert diagnostics["last_exception"] == {"type": "OSError", "message": "not ready"}
+    assert diagnostics["pid"] == fake_process.pid
+    assert diagnostics["process_state"] == "running"
+    assert diagnostics["exit_code"] is None
     assert diagnostics["stdout_tail"] == "stdout line"
     assert diagnostics["stderr_tail"] == "stderr line"
     message = str(exc_info.value)
@@ -404,7 +542,14 @@ def test_startup_timeout_cleans_up(tmp_path: Path) -> None:
         lifecycle.launch()
     diagnostics = exc_info.value.diagnostics
     assert diagnostics["port"] == lifecycle.port
-    assert diagnostics["argv"] == [str(executable), "waapi-server", "--wamp-port", str(lifecycle.port)]
+    assert diagnostics["argv"] == [
+        str(executable),
+        "waapi-server",
+        "--wamp-port",
+        str(lifecycle.port),
+        "--http-port",
+        "0",
+    ]
     assert diagnostics["cwd"]
     assert diagnostics["timeout"] == lifecycle.timeouts.startup
     assert diagnostics["duration"] >= lifecycle.timeouts.startup
@@ -497,11 +642,12 @@ def test_detached_waapi_server_scan_matches_only_wwise_waapi_selected_port(monke
     port = 57645
     ps_output = f"""
       101 /usr/bin/python WwiseConsole.exe waapi-server --wamp-port {port}
-      200 /Applications/WwiseConsole.sh waapi-server /tmp/Sample Project/SampleProject.wproj --wamp-port {port}
+      200 /Applications/WwiseConsole.sh waapi-server /tmp/Sample Project/SampleProject.wproj --wamp-port {port} --http-port 0
       201 /Applications/WwiseConsole.sh waapi-server /tmp/SampleProject.wproj --wamp-port 1
       202 /Applications/WwiseConsole.sh profiler-server --wamp-port {port}
       203 /usr/bin/python waapi-server --wamp-port {port}
-      204 C:/WwiseConsole.exe waapi-server C:/SampleProject.wproj --wamp-port={port}
+      204 C:/WwiseConsole.exe waapi-server C:/SampleProject.wproj --wamp-port={port} --http-port=0
+      205 /Applications/WwiseConsole.sh waapi-server /tmp/SampleProject.wproj --wamp-port 1 --http-port {port}
       not-a-pid /Applications/WwiseConsole.sh waapi-server --wamp-port {port}
       malformed
     """
@@ -534,7 +680,7 @@ def test_shutdown_detached_port_fallback_terminates_only_matching_ps_rows(monkey
     port = 57645
     fake_process = FakeProcess(returncode=0)
     ps_output = f"""
-      200 /Applications/WwiseConsole.sh waapi-server /tmp/SampleProject.wproj --wamp-port {port}
+      200 /Applications/WwiseConsole.sh waapi-server /tmp/SampleProject.wproj --wamp-port {port} --http-port 0
       201 /Applications/WwiseConsole.sh waapi-server /tmp/SampleProject.wproj --wamp-port 1
       202 /Applications/WwiseConsole.sh profiler-server --wamp-port {port}
       203 /usr/bin/python waapi-server --wamp-port {port}

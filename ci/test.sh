@@ -12,6 +12,7 @@ Versions:
   2021.1 | 2022.1 | 2023.1 | 2024.1 | 2025.1 | all | none
 
 Modes:
+  program      Run the focused pure-program public-route and transaction contract gate
   nonlive      Run default non-live test suite
   all          Run non-live suite first, then strict real matrix
   smoke        Run focused WAAPI getInfo smoke via HeadlessLifecycle
@@ -28,6 +29,8 @@ Notes:
       .sisyphus/runtime/wwise-waapi-sandboxes/<version>-<mode>
 
 Examples:
+  ci/test.sh --mode program
+  ci/test.sh --mode program -- -q -ra
   ci/test.sh --version 2021.1 --mode live
   ci/test.sh --mode nonlive
   ci/test.sh --version all --mode all -- -q -ra
@@ -143,7 +146,7 @@ if [[ -z "$MODE" ]]; then
 fi
 
 case "$MODE" in
-  nonlive|default)
+  program|nonlive|default)
     VERSION="${VERSION:-none}"
     ;;
   all)
@@ -309,7 +312,7 @@ set_mode_flags() {
       export WWISE_DESTRUCTIVE="0"
       export WWISE_STRICT_REAL="1"
       ;;
-    nonlive|default)
+    program|nonlive|default)
       export WWISE_LIVE="0"
       export WWISE_DESTRUCTIVE="0"
       export WWISE_STRICT_REAL="0"
@@ -357,6 +360,97 @@ run_nonlive() {
   set_mode_flags "nonlive"
   print_context "none" "nonlive"
   run_pytest -m "not live and not destructive"
+}
+
+validate_program_pytest_args() {
+  local expects_value="0"
+  local argument
+  for argument in "${PYTEST_EXTRA_ARGS[@]}"; do
+    if [[ "$expects_value" == "1" ]]; then
+      expects_value="0"
+      continue
+    fi
+    case "$argument" in
+      -k|--maxfail|--tb|--color|--durations|--capture)
+        expects_value="1"
+        ;;
+      --pyargs|--pyargs=*)
+        echo "program mode does not allow --pyargs: $argument" >&2
+        exit 1
+        ;;
+      -*) ;;
+      *)
+        echo "program mode accepts pytest flags and filter values, not additional test paths: $argument" >&2
+        exit 1
+        ;;
+    esac
+  done
+  if [[ "$expects_value" == "1" ]]; then
+    echo "program mode received a pytest option without its required value" >&2
+    exit 1
+  fi
+}
+
+run_program() {
+  set_mode_flags "program"
+  unset WWISE_CONSOLE WWISE_SAMPLE_PROJECT_PATH WWISE_SANDBOX_ROOT WWISE_TEST_CONFIG
+  unset WWISE_WAAPI_HOST WWISE_WAAPI_PORT
+  export PYTEST_ADDOPTS=""
+  print_context "none" "program"
+  validate_program_pytest_args
+
+  local -a program_nodes=(
+    tests/unit/test_gateway_session_context.py
+    tests/unit/test_public_route_coverage_contract.py
+    tests/unit/test_public_route_program_matrix.py
+    tests/unit/test_public_route_negative_contracts.py
+    tests/unit/test_io_policy.py
+    tests/unit/test_transaction_cleanup.py
+    tests/unit/test_transaction_gateway.py::test_generic_manifest_call_runs_full_preview_confirm_execute_verify_chain
+    tests/unit/test_transaction_gateway.py::test_generic_isolated_call_runs_full_chain_with_bound_io_audit
+    tests/unit/test_transaction_gateway.py::test_lifecycle_opener_cleanup_spec_survives_the_full_gateway_chain
+    tests/unit/test_transaction_gateway.py::test_load_bank_cleanup_binding_cannot_be_overridden_by_execution_result
+    tests/unit/test_transaction_gateway.py::test_transport_create_materializes_destroy_request_in_execute_verify_and_agent_result
+    tests/unit/test_transaction_gateway.py::test_transport_verify_guard_failure_keeps_result_bound_destroy_request
+    tests/unit/test_transaction_gateway.py::test_successful_mutation_with_journal_failure_keeps_execution_and_cleanup_facts
+    tests/unit/test_transaction_gateway.py::test_transaction_readback_rejects_an_unreviewed_uri_before_dispatch
+    tests/unit/test_transaction_gateway.py::test_lifecycle_opener_execution_exception_reports_unknown_cleanup
+    tests/unit/test_transaction_gateway.py::test_work_unit_load_is_available_reversal_through_the_full_gateway_chain
+    tests/unit/test_transaction_gateway.py::test_lifecycle_closer_is_not_reported_as_needing_more_cleanup
+    tests/unit/test_operation_registry.py::test_undo_group_builds_one_exact_versioned_immutable_plan
+    tests/unit/test_operation_registry.py::test_undo_group_rejects_independent_members_version_drift_and_large_requests
+    tests/unit/test_operation_registry.py::test_undo_group_version_allowlist_is_exact_and_only_grows_at_reviewed_boundaries
+    tests/unit/test_transaction_gateway.py::test_undo_group_success_uses_one_client_and_verifies_only_result_schemas
+    tests/unit/test_transaction_gateway.py::test_undo_group_success_keeps_one_phase_copy_below_the_final_gateway_ceiling
+    tests/unit/test_transaction_gateway.py::test_undo_group_success_with_journal_failure_is_not_replayed
+    tests/unit/test_transaction_gateway.py::test_undo_group_inner_timeout_reserves_budget_cancels_and_never_retries
+    tests/unit/test_transaction_gateway.py::test_undo_group_cancel_failure_is_terminal_indeterminate
+    tests/unit/test_transaction_gateway.py::test_undo_group_malformed_begin_result_best_effort_cancels_but_stays_indeterminate
+    tests/unit/test_transaction_gateway.py::test_undo_group_malformed_end_result_best_effort_cancels_but_stays_indeterminate
+    tests/unit/test_transaction_gateway.py::test_undo_group_phase_exception_best_effort_cancels_and_remains_indeterminate
+    tests/unit/test_transaction_gateway.py::test_undo_group_accumulated_result_limit_stops_inner_and_attempts_cancel
+  )
+  if [[ -f "$ROOT_DIR/tests/unit/test_public_route_registry_integrity.py" ]]; then
+    program_nodes+=(tests/unit/test_public_route_registry_integrity.py)
+  fi
+
+  local node
+  for node in "${program_nodes[@]}"; do
+    case "$node" in
+      tests/unit/*) ;;
+      *)
+        echo "program mode refused a test node outside tests/unit: $node" >&2
+        exit 1
+        ;;
+    esac
+  done
+
+  run_pytest \
+    "${program_nodes[@]}" \
+    -m "not live and not destructive" \
+    --ignore=tests/semantic \
+    --ignore=tests/live \
+    --ignore=tests/destructive
 }
 
 run_smoke_for_version() {
@@ -432,30 +526,35 @@ run_live_for_version() {
         tests/live/test_2021_1_live_prerequisites.py::test_2021_1_live_read_only_prerequisites_validate_exact_get_info_before_matrix \
         tests/live/test_2021_1_reflection_prerequisites.py::test_2021_1_live_reflection_prerequisites_and_resource_generation \
         tests/live/test_2021_1_object_get_matrix.py::test_2021_1_live_waql_object_get_matrix_runs_read_only_against_sandbox \
-        tests/live/test_2021_1_object_topics_sandbox.py::test_2021_1_live_safe_object_topics_against_sandbox
+        tests/live/test_2021_1_object_topics_sandbox.py::test_2021_1_live_safe_object_topics_against_sandbox \
+        tests/live/test_gateway_live_matrix.py::test_gateway_read_only_matrix_runs_once_against_copied_sandbox
       ;;
     2022.1)
       run_pytest \
         tests/live/test_2022_live_prerequisites.py::test_2022_live_environment_prerequisites_fail_fast \
         tests/live/test_2022_reflection_inventory.py::test_2022_live_reflection_inventory_runs_against_sandbox \
-        tests/live/test_2022_waql_live_matrix.py::test_2022_live_waql_object_get_matrix_runs_read_only_against_sandbox
+        tests/live/test_2022_waql_live_matrix.py::test_2022_live_waql_object_get_matrix_runs_read_only_against_sandbox \
+        tests/live/test_gateway_live_matrix.py::test_gateway_read_only_matrix_runs_once_against_copied_sandbox
       ;;
     2023.1)
       run_pytest \
         tests/live/test_2023_reflection_inventory.py::test_2023_live_reflection_inventory_runs_against_sandbox \
-        tests/live/test_2023_waql_live_matrix.py::test_2023_live_waql_object_get_matrix_runs_read_only_against_sandbox
+        tests/live/test_2023_waql_live_matrix.py::test_2023_live_waql_object_get_matrix_runs_read_only_against_sandbox \
+        tests/live/test_gateway_live_matrix.py::test_gateway_read_only_matrix_runs_once_against_copied_sandbox
       ;;
     2024.1)
       run_pytest \
         tests/live/test_2024_reflection_inventory.py::test_2024_live_reflection_inventory_runs_against_sandbox \
         tests/live/test_2024_waql_live_matrix.py::test_2024_live_waql_object_get_matrix_runs_read_only_against_sandbox \
-        tests/live/test_2024_object_topics_sandbox.py::test_2024_1_live_safe_object_topics_against_sandbox
+        tests/live/test_2024_object_topics_sandbox.py::test_2024_1_live_safe_object_topics_against_sandbox \
+        tests/live/test_gateway_live_matrix.py::test_gateway_read_only_matrix_runs_once_against_copied_sandbox
       ;;
     2025.1)
       run_pytest \
         tests/live/test_2025_1_reflection_inventory.py::test_2025_live_reflection_inventory_runs_against_sandbox \
         tests/live/test_2025_1_waql_live_matrix.py::test_2025_live_waql_object_get_matrix_runs_read_only_against_sandbox \
-        tests/live/test_2025_1_object_topics_sandbox.py::test_2025_1_live_safe_object_topics_against_sandbox
+        tests/live/test_2025_1_object_topics_sandbox.py::test_2025_1_live_safe_object_topics_against_sandbox \
+        tests/live/test_gateway_live_matrix.py::test_gateway_read_only_matrix_runs_once_against_copied_sandbox
       ;;
     *)
       echo "Unsupported live version: $v" >&2
@@ -476,31 +575,41 @@ run_destructive_for_version() {
       run_pytest \
         tests/destructive/test_2021_1_project_mutation_sandbox.py \
         tests/destructive/test_2021_1_soundbank_audio_sandbox.py \
-        tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py
+        tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py \
+        tests/destructive/test_gateway_transaction_matrix.py \
+        tests/destructive/test_gateway_workflow_transaction_matrix.py
       ;;
     2022.1)
       run_pytest \
         tests/destructive/test_2022_project_mutation_sandbox.py \
         tests/destructive/test_2022_soundbank_audio_sandbox.py \
-        tests/destructive/test_2022_switchcontainer_assignment_sandbox.py
+        tests/destructive/test_2022_switchcontainer_assignment_sandbox.py \
+        tests/destructive/test_gateway_transaction_matrix.py \
+        tests/destructive/test_gateway_workflow_transaction_matrix.py
       ;;
     2023.1)
       run_pytest \
         tests/destructive/test_2023_project_mutation_sandbox.py \
         tests/destructive/test_2023_soundbank_audio_sandbox.py \
-        tests/destructive/test_2023_switchcontainer_assignment_sandbox.py
+        tests/destructive/test_2023_switchcontainer_assignment_sandbox.py \
+        tests/destructive/test_gateway_transaction_matrix.py \
+        tests/destructive/test_gateway_workflow_transaction_matrix.py
       ;;
     2024.1)
       run_pytest \
         tests/destructive/test_2024_project_mutation_sandbox.py \
         tests/destructive/test_2024_soundbank_audio_sandbox.py \
-        tests/destructive/test_2024_switchcontainer_assignment_sandbox.py
+        tests/destructive/test_2024_switchcontainer_assignment_sandbox.py \
+        tests/destructive/test_gateway_transaction_matrix.py \
+        tests/destructive/test_gateway_workflow_transaction_matrix.py
       ;;
     2025.1)
       run_pytest \
         tests/destructive/test_2025_1_project_mutation_sandbox.py \
         tests/destructive/test_2025_1_soundbank_audio_sandbox.py \
-        tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py
+        tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py \
+        tests/destructive/test_gateway_transaction_matrix.py \
+        tests/destructive/test_gateway_workflow_transaction_matrix.py
       ;;
     *)
       echo "Unsupported destructive version: $v" >&2
@@ -519,6 +628,13 @@ run_matrix_all() {
 }
 
 case "$MODE" in
+  program)
+    if [[ "$VERSION" != "none" ]]; then
+      echo "program mode is all-version and requires version 'none'" >&2
+      exit 1
+    fi
+    run_program
+    ;;
   nonlive|default)
     run_nonlive
     ;;

@@ -103,6 +103,42 @@ def phase3_scenarios() -> tuple[SemanticScenario, ...]:
             family="waql_descendant_query",
         ),
         SemanticScenario(
+            id="phase3-selected-object-query",
+            prompt="What Wwise object is currently selected?",
+            expected_assertions=(
+                "attempts live WAAPI selected-object query before repo/docs/source research",
+                "uses ak.wwise.ui.getSelectedObjects and reports the selected object, explicit empty selection, or a clear headless/UI-unavailable boundary",
+                "does not mutate the project",
+            ),
+            bug_classes=("selection query drift", "repo-doc-first drift"),
+            scenario_sets=("phase3-selected-object",),
+            family="selected_object_query",
+        ),
+        SemanticScenario(
+            id="phase3-selected-object-path-type",
+            prompt="Show the selected Wwise object's path and type.",
+            expected_assertions=(
+                "attempts live WAAPI selected-object query before repo/docs/source research",
+                "uses ak.wwise.ui.getSelectedObjects and reports the selected object, explicit empty selection, or a clear headless/UI-unavailable boundary",
+                "does not mutate the project",
+            ),
+            bug_classes=("selection query drift", "repo-doc-first drift"),
+            scenario_sets=("phase3-selected-object",),
+            family="selected_object_query",
+        ),
+        SemanticScenario(
+            id="phase3-selected-object-empty-clarity",
+            prompt="If nothing is selected in Wwise right now, say so clearly; otherwise tell me the selected object's path and type.",
+            expected_assertions=(
+                "attempts live WAAPI selected-object query before repo/docs/source research",
+                "uses ak.wwise.ui.getSelectedObjects and reports the selected object, explicit empty selection, or a clear headless/UI-unavailable boundary",
+                "does not mutate the project",
+            ),
+            bug_classes=("selection query drift", "repo-doc-first drift"),
+            scenario_sets=("phase3-selected-object",),
+            family="selected_object_query",
+        ),
+        SemanticScenario(
             id="phase3-public-config-boundary",
             prompt="What do I need to configure before we start?",
             expected_assertions=(
@@ -352,17 +388,36 @@ def evaluate_scenario_output(scenario: SemanticScenario, assistant_output: str) 
     facts = _extract_facts(assistant_output)
     failures: list[str] = []
 
-    if scenario.family in {"read_only_bus_listing", "waql_descendant_query"}:
+    if scenario.family in {"read_only_bus_listing", "waql_descendant_query", "selected_object_query"}:
         _require(_truthy(facts, "live_waapi_attempted"), "live WAAPI was not attempted", failures)
-        _require(_has_object_get_call(facts), "ak.wwise.core.object.get was not observed", failures)
         _require(not _research_before_live(facts, assistant_output), "repo/docs/source research happened before live WAAPI", failures)
         _require(not _truthy(facts, "mutation_executed"), "read-only scenario executed a mutation", failures)
+        if scenario.family in {"read_only_bus_listing", "waql_descendant_query"}:
+            _require(_has_object_get_call(facts), "ak.wwise.core.object.get was not observed", failures)
         if scenario.family == "waql_descendant_query":
             root = str(facts.get("descendant_query_root") or facts.get("query_root") or "").lower()
             query_text = str(facts.get("waql_query") or facts.get("query") or assistant_output).lower()
             _require(
                 "master-mixer hierarchy" in root or "master-mixer hierarchy" in query_text,
                 "WAQL scenario did not target Master-Mixer Hierarchy descendants",
+                failures,
+            )
+        elif scenario.family == "selected_object_query":
+            _require(_truthy(facts, "selection_query_attempted"), "selected-object query was not attempted", failures)
+            _require(
+                _has_selected_objects_call(facts),
+                "ak.wwise.ui.getSelectedObjects was not observed",
+                failures,
+            )
+            boundary_returned = _selection_query_headless_boundary_returned(facts)
+            if not boundary_returned:
+                _require(_truthy(facts, "selection_result_reported"), "selected-object result was not reported", failures)
+            selected_count = facts.get("selected_objects_count")
+            empty_selection = _truthy(facts, "selection_empty")
+            has_count = isinstance(selected_count, int)
+            _require(
+                (has_count and selected_count >= 0) or empty_selection or boundary_returned,
+                "selected-object query did not report selected objects or explicit empty selection",
                 failures,
             )
 
@@ -544,6 +599,28 @@ def _has_object_get_call(facts: Mapping[str, Any]) -> bool:
     if isinstance(calls, str):
         calls = [calls]
     return any("ak.wwise.core.object.get" in str(call) or "object.get" in str(call) for call in calls)
+
+
+def _has_selected_objects_call(facts: Mapping[str, Any]) -> bool:
+    calls = facts.get("waapi_calls") or facts.get("live_waapi_calls") or []
+    if isinstance(calls, str):
+        calls = [calls]
+    return any(
+        "ak.wwise.ui.getSelectedObjects" in str(call) or "getSelectedObjects" in str(call)
+        for call in calls
+    )
+
+
+def _selection_query_headless_boundary_returned(facts: Mapping[str, Any]) -> bool:
+    if not _truthy(facts, "unsupported_boundary_returned"):
+        return False
+    reason = str(facts.get("unsupported_boundary_reason") or facts.get("blocked_reason") or "").lower()
+    status = str(facts.get("verification_status") or "").lower()
+    return (
+        "getselectedobjects" in reason
+        or "command-line wwiseconsole" in reason
+        or status == "live_read_completed_selection_api_unavailable_on_command_line_instance"
+    )
 
 
 def _research_before_live(facts: Mapping[str, Any], output: str) -> bool:
