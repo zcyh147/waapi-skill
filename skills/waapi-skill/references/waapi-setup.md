@@ -1,6 +1,6 @@
 # WAAPI setup lane
 
-Use this reference when the request is primarily about connection, version selection, saved config, or first-run onboarding.
+Use this reference when the request is primarily about connection, version selection, or saved config. The entry file owns the one-time conversation introduction for every lane.
 
 ## First connection sequence
 
@@ -53,4 +53,4 @@ the live Wwise project before creating the state store.
 - A mismatch between an explicit/configured version and the connected Wwise instance must fail closed.
 - Persist approved `wwise_version`, `waapi_host`, and `waapi_port` with `config-set` so later runs do not depend on conversation memory. Never write `data/config.json`; it is read-only legacy fallback compatibility when no external config exists.
 
-Do not add policy or implementation narration to a simple read-only result unless the user asks about it.
+After the one-time conversation introduction has been shown, do not repeat policy narration in every simple read-only result unless the user asks or the effective setting changes.

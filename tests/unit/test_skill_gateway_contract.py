@@ -143,3 +143,33 @@ def test_public_readmes_route_users_only_through_the_packaged_gateway() -> None:
     assert "immutable reviewed allowlists" in readmes[0]
     assert "Manifest 反射只用于发现能力，不等于授权执行" in readmes[1]
     assert "immutable reviewed allowlist" in readmes[1]
+
+
+def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
+    english = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    chinese = (REPO_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
+    coverage_contract = (SKILL_ROOT / "references" / "waapi-coverage.md").read_text(encoding="utf-8")
+
+    expected_rows = (
+        "| `2021.1` | 126 | 119 | 93 | 26 | 7 |",
+        "| `2022.1` | 144 | 137 | 106 | 31 | 7 |",
+        "| `2023.1` | 181 | 170 | 139 | 31 | 11 |",
+        "| `2024.1` | 178 | 168 | 139 | 29 | 10 |",
+        "| `2025.1` | 185 | 175 | 145 | 30 | 10 |",
+    )
+    for readme in (english, chinese):
+        for row in expected_rows:
+            assert row in readme
+        assert "**814**" in readme
+        assert "**769**" in readme
+        assert "**622**" in readme
+        assert "**147**" in readme
+        assert "**45**" in readme
+        assert "957" in readme
+        assert "./skills/waapi-skill/references/waapi-coverage.md" in readme
+
+    assert "188 unique executable WAAPI URIs" in english
+    assert "188 个唯一可执行 WAAPI URI" in chinese
+    assert "not a claim that all 769 rows have been exercised against a real Wwise process" in english
+    assert "不等于已经在真实 Wwise 进程中逐一运行了全部 769 行" in chinese
+    assert "currently contains 957 passing tests" in coverage_contract

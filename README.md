@@ -89,6 +89,25 @@ The goal is not just to describe WAAPI correctly. The goal is to make the skill 
 
 ---
 
+## Packaged API coverage
+
+Coverage is counted by **Wwise version/API row** because the same URI can have a different schema, route, or safety decision in each Wwise release. A row counts as covered only when the packaged gateway can actually execute it; a hard boundary or documentation-only description does not count.
+
+| Wwise version | Reflected rows | Executable rows | Executable functions | Executable topics | Excluded rows |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `2021.1` | 126 | 119 | 93 | 26 | 7 |
+| `2022.1` | 144 | 137 | 106 | 31 | 7 |
+| `2023.1` | 181 | 170 | 139 | 31 | 11 |
+| `2024.1` | 178 | 168 | 139 | 29 | 10 |
+| `2025.1` | 185 | 175 | 145 | 30 | 10 |
+| **Total** | **814** | **769** | **622** | **147** | **45** |
+
+Those 769 rows represent **188 unique executable WAAPI URIs**. They are routed through fixed commands, bounded direct calls, bounded topic waits, confirmed transactions, isolated I/O transactions, or the same-connection Undo Group composite. The 45 excluded version rows represent 12 unique URIs limited to arbitrary Lua execution, unsafe/private debug surfaces, and unrestricted UI command registration/execution.
+
+The focused code-only gate currently runs **957 program tests**, including one executable-route case for every covered version/API row plus the gateway-owned conversation-context contract. This proves packaged routing, schema handling, safety boundaries, I/O confinement, transaction behavior, fake-dispatch execution, and deterministic onboarding facts; it is not a claim that all 769 rows have been exercised against a real Wwise process. See [the detailed five-version coverage contract](./skills/waapi-skill/references/waapi-coverage.md).
+
+---
+
 ## Wwise MCP comparison
 
 This skill and a Wwise MCP server solve overlapping problems, but they are not the same tool.

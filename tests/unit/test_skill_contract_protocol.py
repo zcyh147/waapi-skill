@@ -232,6 +232,26 @@ def test_public_config_surface_excludes_runtime_internals() -> None:
     assert "never writes the legacy file inside the Skill checkout" in SETUP
 
 
-def test_simple_read_only_result_has_no_forced_policy_boilerplate() -> None:
-    assert "Do not add policy or implementation narration to a simple read-only result" in SETUP
+def test_one_time_onboarding_is_global_natural_and_does_not_add_a_gateway_call() -> None:
+    for phrase in (
+        "The first time this Skill is used in a conversation",
+        "`waapi-skill` is loaded",
+        "current WAAPI address",
+        "WAAPI adapter version",
+        "current project modification policy",
+        "若有需要，可按需切换模式",
+        "`never` / `preview_then_confirm` / `allow_with_notice`",
+        "ordinary prose, not a status bar, table, field list, or rigid template",
+        "Use the first gateway command already required by the user's task",
+        "An offline task stays offline",
+        "visible conversation does not already contain this introduction",
+        "do not use memory to make that decision",
+        "separate normal progress update",
+    ):
+        assert phrase in SKILL
+    assert "run exactly one offline `config-show` to obtain the introduction facts" in SKILL
+    assert "never run `status` or open a live WAAPI connection only for the introduction" in SKILL
+    assert "The entry file owns the one-time conversation introduction for every lane" in SETUP
+    assert "Do not add policy or implementation narration to a simple read-only result" not in SETUP
+    assert "do not repeat policy narration in every simple read-only result" in SETUP
     assert "project modification policy" not in QUERY.lower()

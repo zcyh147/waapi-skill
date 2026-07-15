@@ -1,6 +1,6 @@
 # Test inventory
 
-This inventory is grouped for human review. The latest non-live verification reported `2938 passed, 77 skipped, 27 deselected`; broad unit coverage is summarized by file or module instead of listing every item instance. This count is a non-live run result, not a fresh full `--collect-only` recount.
+This inventory is grouped for human review. The latest non-live verification reported `2951 passed, 77 skipped, 27 deselected`; broad unit coverage is summarized by file or module instead of listing every item instance. This count is a non-live run result, not a fresh full `--collect-only` recount.
 
 ## Runner modes and strict real behavior
 
@@ -129,6 +129,6 @@ Collected with `ci/test.sh --version all --mode matrix -- --collect-only -q`. Th
 
 | Command | Result | Notes |
 | --- | --- | --- |
-| `ci/test.sh --mode program -- -q -ra` | 946 passed in 16.74s | Fixed program-only collection; 769 parameterized version/API execution rows plus coverage, negative, registry-drift, isolated-I/O, same-connection Undo, lifecycle cleanup, and direct/isolated generic transaction full-chain contracts. It does not include semantic, live, or destructive test directories. |
-| `ci/test.sh --mode nonlive -- -q -ra` | 2938 passed, 77 skipped, 27 deselected in 39.38s | Fresh non-live regression result. Parameterized tests remain grouped by file and feature area for readability. No live or destructive body ran. |
+| `ci/test.sh --mode program -- -q -ra` | 957 passed in 18.28s | Fixed program-only collection; 769 parameterized version/API execution rows plus coverage, gateway session-context, negative, registry-drift, isolated-I/O, same-connection Undo, lifecycle cleanup, and direct/isolated generic transaction full-chain contracts. It does not include semantic, live, or destructive test directories. |
+| `ci/test.sh --mode nonlive -- -q -ra` | 2951 passed, 77 skipped, 27 deselected in 40.28s | Fresh non-live regression result. Parameterized tests remain grouped by file and feature area for readability. No live or destructive body ran. |
 | `ci/test.sh --version all --mode matrix -- --collect-only -q` | Completed, 60 version-scoped invocations collected across focused live and destructive matrix nodes | This command checked strict real prerequisites through the runner, then collected 20 live and 40 destructive invocations without running test bodies. |

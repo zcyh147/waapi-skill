@@ -828,6 +828,46 @@ def test_command_classifier_distinguishes_gateway_from_inline_code_and_discovery
     assert facts.unexpected_commands == (commands[2].command, commands[3].command)
 
 
+def test_command_classifier_accepts_offline_gateway_config_commands(tmp_path: Path) -> None:
+    skill = tmp_path / "waapi-skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    records = (
+        completed_record(
+            gateway_command(skill, "config-show"),
+            {
+                "contract": "waapi-skill.gateway-result/v1",
+                "command": "config-show",
+                "ok": True,
+            },
+        ),
+        completed_record(
+            gateway_command(
+                skill,
+                "config-set --wwise-version 2022.1 --waapi-host 127.0.0.1 "
+                "--waapi-port 8080 --project-modification-policy preview_then_confirm",
+            ),
+            {
+                "contract": "waapi-skill.gateway-result/v1",
+                "command": "config-set",
+                "ok": True,
+            },
+        ),
+    )
+
+    facts = classify_commands(
+        records,
+        skill_source=skill,
+        expected_gateway_subcommands=("config-show", "config-set"),
+    )
+
+    assert facts.gateway_commands == tuple(record.command for record in records)
+    assert facts.gateway_attempt_commands == tuple(record.command for record in records)
+    assert facts.gateway_subcommands == ("config-show", "config-set")
+    assert facts.inline_python_commands == ()
+    assert facts.unexpected_commands == ()
+
+
 def test_command_classifier_normalizes_only_the_exact_session_version_assignment(tmp_path: Path) -> None:
     skill = tmp_path / "waapi-skill"
     skill.mkdir()
@@ -1040,6 +1080,10 @@ def test_command_classifier_rejects_gateway_spoofs_shell_operators_and_failed_or
     assert records[1].command in facts.write_like_commands
     assert facts.inline_python_commands == ()
     assert len(facts.unexpected_commands) == 6
+    assert facts.non_gateway_unexpected_commands == (
+        records[0].command,
+        records[1].command,
+    )
 
 
 def test_command_classifier_does_not_count_unproven_relative_skill_read(tmp_path: Path) -> None:

@@ -107,7 +107,7 @@ closed until the packaged contract is reviewed and updated.
 
 ## Verification scope
 
-The focused program gate currently contains 938 passing tests and exercises
+The focused program gate currently contains 957 passing tests and exercises
 all 769 executable version/API rows with
 in-process fake clients. It validates exact URI dispatch, reflected request and
 result/event schemas, timeout/result ceilings, transaction preparation and
@@ -118,7 +118,8 @@ route bypass attempts, model-authored external command hooks, malformed nested
 payloads, and manifest drift. Direct and isolated generic transactions also run
 through complete preview/confirm/execute/verify program chains.
 
-This iteration intentionally does not run Codex/OpenCode prompt evaluation,
-semantic A/B tests, or the full live-Wwise matrix. Therefore report the result
-as “program-tested packaged coverage,” not “769 endpoints live-verified in
+This iteration ran five narrow, memory-off Codex Terra prompt probes only for
+the one-time natural onboarding behavior. It did not run broad endpoint
+semantic A/B tests or the full live-Wwise matrix. Therefore report the API
+result as “program-tested packaged coverage,” not “769 endpoints live-verified in
 Wwise.”

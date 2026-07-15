@@ -47,6 +47,7 @@ from wwise_waapi.builders.schema import (  # noqa: E402  # pyright: ignore[repor
     validate_semantic_result,
 )
 from wwise_waapi.config import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    PROJECT_MODIFICATION_POLICIES,
     ResolvedSkillConfig,
     SkillConfig,
     load_effective_skill_config,
@@ -134,6 +135,7 @@ OFFLINE_COMMANDS = frozenset(
 )
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
 GATEWAY_CONFIG_CONTRACT = "waapi-skill.config/v1"
+GATEWAY_SESSION_CONTEXT_CONTRACT = "waapi-skill.session-context/v1"
 GATEWAY_DEADLINE_PROVENANCE = "waapi-skill.gateway-deadline/v1"
 GATEWAY_RESULT_CEILING_PROVENANCE = "waapi-skill.gateway-live-result-json-ceiling/v1"
 PROJECT_IDENTITY_FIELDS = ("id", "name", "path")
@@ -893,6 +895,21 @@ def _execute_gateway_unconstrained(
 ) -> tuple[int, dict[str, Any]]:
     args = build_parser().parse_args(argv)
     source_env = dict(os.environ if env is None else env)
+    runtime_endpoint: dict[str, Any] | None = None
+    runtime_detected_version: str | None = None
+
+    def finish(exit_code: int, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        enriched = dict(payload)
+        if runtime_endpoint is not None and "endpoint" not in enriched:
+            enriched["endpoint"] = dict(runtime_endpoint)
+        if runtime_detected_version is not None and "detected_version" not in enriched:
+            enriched["detected_version"] = runtime_detected_version
+        return exit_code, attach_gateway_session_context(
+            enriched,
+            args=args,
+            env=source_env,
+        )
+
     cleanup_failure: BaseException | None = None
     post_result_cleanup_failed = False
     try:
@@ -900,7 +917,7 @@ def _execute_gateway_unconstrained(
             require_project_modification_policy(env=source_env, action="execution")
         route_boundary = preflight_public_route(args, env=source_env)
         if route_boundary is not None:
-            return 2, route_boundary
+            return finish(2, route_boundary)
         preflight_json_inputs(args)
         if args.command == "query-object":
             preflight_query_object_input(args, env=source_env)
@@ -908,8 +925,13 @@ def _execute_gateway_unconstrained(
             preflight_metadata_input(args)
         if args.command in OFFLINE_COMMANDS:
             payload = dispatch_offline_command(args, env=source_env)
-            return (0 if payload.get("ok") else 2), payload
+            return finish(0 if payload.get("ok") else 2, payload)
         connection = resolve_connection(args, env=source_env)
+        runtime_endpoint = {
+            "host": connection.host,
+            "port": connection.port,
+            "url": connection.url,
+        }
         factory = client_factory or default_client_factory
         transport = GatewayTransport(connection.url, factory, deadline=connection.deadline)
         try:
@@ -919,6 +941,7 @@ def _execute_gateway_unconstrained(
                 phase="version_detection.getInfo",
             )
             detected_version = version_key_from_get_info(require_mapping(live_info, "getInfo response"))
+            runtime_detected_version = detected_version
             if connection.version_hint and connection.version_hint != detected_version:
                 raise GatewayInputError(
                     f"Connected Wwise is {detected_version}, but the requested version is {connection.version_hint}"
@@ -962,7 +985,7 @@ def _execute_gateway_unconstrained(
             merged_details = dict(details) if isinstance(details, Mapping) else {}
             merged_details["cleanup_failure"] = cleanup_failure_evidence(cleanup_failure)
             details = merged_details
-        return 2, {
+        return finish(2, {
             "contract": GATEWAY_RESULT_CONTRACT,
             "ok": False,
             "status": "error",
@@ -970,12 +993,12 @@ def _execute_gateway_unconstrained(
             "error_code": normalized["error_code"],
             "message": normalized["message"],
             "details": details,
-        }
+        })
     # ``ok`` describes the completed WAAPI/business operation. A non-zero exit
     # with ``ok: true`` means only post-result cleanup failed; callers must keep
     # mutation execution facts and must not infer that retrying is safe.
     exit_code = 2 if post_result_cleanup_failed else (0 if payload.get("ok") else 2)
-    return exit_code, payload
+    return finish(exit_code, payload)
 
 
 def constrain_live_gateway_result(
@@ -1014,6 +1037,9 @@ def constrain_live_gateway_result(
         "message": reason,
         "details": details,
     }
+    session_context = payload.get("session_context")
+    if isinstance(session_context, Mapping):
+        result["session_context"] = dict(session_context)
     for key, maximum in (
         ("detected_version", 32),
         ("transaction_id", 128),
@@ -1659,6 +1685,129 @@ def load_gateway_config(env: Mapping[str, str]) -> ResolvedSkillConfig:
         return load_effective_skill_config(SKILL_ROOT, env=env)
     except (OSError, RecursionError, ValueError) as exc:
         raise GatewayInputError(f"Public WAAPI Skill config is invalid: {exc}") from exc
+
+
+def attach_gateway_session_context(
+    payload: Mapping[str, Any],
+    *,
+    args: argparse.Namespace,
+    env: Mapping[str, str],
+) -> dict[str, Any]:
+    """Attach bounded onboarding facts without opening another WAAPI connection."""
+
+    agent_result = payload.get("agent_result")
+    result = {key: value for key, value in payload.items() if key != "agent_result"}
+    result["session_context"] = build_gateway_session_context(
+        args=args,
+        env=env,
+        payload=payload,
+    )
+    if "agent_result" in payload:
+        # Machine-readable callers rely on this projection remaining the final
+        # insertion-ordered field so it can be emitted verbatim and then stop.
+        result["agent_result"] = agent_result
+    return result
+
+
+def build_gateway_session_context(
+    *,
+    args: argparse.Namespace,
+    env: Mapping[str, str],
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Resolve the user-facing address, adapter version, and mutation policy."""
+
+    base: dict[str, Any] = {
+        "contract": GATEWAY_SESSION_CONTEXT_CONTRACT,
+        "available": False,
+        "endpoint": {"host": None, "port": None, "url": None},
+        "adapter_version": None,
+        "adapter_version_source": "unavailable",
+        "project_modification_policy": None,
+        "available_project_modification_policies": list(PROJECT_MODIFICATION_POLICIES),
+    }
+    try:
+        config = load_gateway_config(env).config
+        effective = config.as_dict()
+    except GatewayInputError:
+        return base
+
+    payload_endpoint = payload.get("endpoint")
+    host: str | None = None
+    port: int | None = None
+    url: str | None = None
+    if isinstance(payload_endpoint, Mapping):
+        candidate_host = payload_endpoint.get("host")
+        candidate_port = payload_endpoint.get("port")
+        candidate_url = payload_endpoint.get("url")
+        if isinstance(candidate_host, str) and candidate_host:
+            host = candidate_host
+        if isinstance(candidate_port, int) and not isinstance(candidate_port, bool):
+            port = candidate_port
+        if isinstance(candidate_url, str) and candidate_url:
+            url = candidate_url
+
+    if host is None:
+        raw_host = args.host or env.get(ENV_HOST) or effective["waapi_host"] or DEFAULT_HOST
+        try:
+            host = SkillConfig(SKILL_ROOT, waapi_host=str(raw_host)).as_dict()["waapi_host"]
+        except ValueError:
+            host = None
+    if port is None:
+        raw_port: Any = args.port if args.port is not None else env.get(ENV_PORT)
+        if raw_port is None:
+            raw_port = effective["waapi_port"]
+        try:
+            candidate_port = int(raw_port) if raw_port is not None else None
+        except (TypeError, ValueError):
+            candidate_port = None
+        if candidate_port is not None and 1 <= candidate_port <= 65535:
+            port = candidate_port
+    if url is None and host is not None and port is not None:
+        url = f"ws://{host}:{port}/waapi"
+
+    detected_version = payload.get("detected_version")
+    configured_version = args.version or env.get(ENV_VERSION) or effective["wwise_version"]
+    payload_versions = payload.get("versions")
+    command_version = (
+        str(payload_versions[0])
+        if isinstance(payload_versions, Sequence)
+        and not isinstance(payload_versions, (str, bytes, bytearray))
+        and len(payload_versions) == 1
+        and payload_versions[0] in SUPPORTED_WWISE_VERSION_KEYS
+        else None
+    )
+    if detected_version in SUPPORTED_WWISE_VERSION_KEYS:
+        adapter_version = str(detected_version)
+        adapter_version_source = "live_detection"
+    elif configured_version in SUPPORTED_WWISE_VERSION_KEYS:
+        adapter_version = str(configured_version)
+        adapter_version_source = "configured"
+    elif command_version is not None:
+        adapter_version = command_version
+        adapter_version_source = "command_resolution"
+    else:
+        adapter_version = None
+        adapter_version_source = "unavailable"
+
+    policy = effective["project_modification_policy"]
+    available = (
+        host is not None
+        and port is not None
+        and url is not None
+        and adapter_version is not None
+        and policy is not None
+    )
+
+    return {
+        "contract": GATEWAY_SESSION_CONTEXT_CONTRACT,
+        "available": available,
+        "endpoint": {"host": host, "port": port, "url": url},
+        "adapter_version": adapter_version,
+        "adapter_version_source": adapter_version_source,
+        "project_modification_policy": policy,
+        "available_project_modification_policies": list(PROJECT_MODIFICATION_POLICIES),
+    }
 
 
 def require_project_modification_policy(*, env: Mapping[str, str], action: str) -> None:

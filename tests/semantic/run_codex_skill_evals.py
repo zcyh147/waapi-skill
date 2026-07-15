@@ -466,7 +466,7 @@ def evaluate_check(
             list(result.command_facts.inline_python_commands)
             + list(result.command_facts.direct_waapi_client_commands)
             + list(result.command_facts.write_like_commands)
-            + list(getattr(result.command_facts, "unexpected_commands", ()))
+            + list(getattr(result.command_facts, "non_gateway_unexpected_commands", ()))
             + list(result.created_source_files)
             + list(result.modified_source_files)
             + list(result.deleted_source_files)

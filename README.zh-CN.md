@@ -89,6 +89,25 @@
 
 ---
 
+## Packaged API 覆盖情况
+
+覆盖率按 **Wwise 版本/API 行**统计，因为同一个 URI 在不同 Wwise 版本中可能具有不同的 schema、执行路由或安全结论。只有 packaged gateway 能真正执行的行才算覆盖；只返回 hard boundary 或只提供文档说明不算覆盖。
+
+| Wwise 版本 | 反射总行数 | 可执行行数 | 可执行 functions | 可执行 topics | 排除行数 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `2021.1` | 126 | 119 | 93 | 26 | 7 |
+| `2022.1` | 144 | 137 | 106 | 31 | 7 |
+| `2023.1` | 181 | 170 | 139 | 31 | 11 |
+| `2024.1` | 178 | 168 | 139 | 29 | 10 |
+| `2025.1` | 185 | 175 | 145 | 30 | 10 |
+| **合计** | **814** | **769** | **622** | **147** | **45** |
+
+这 769 个版本/API 行对应 **188 个唯一可执行 WAAPI URI**，分别通过 fixed command、bounded direct call、bounded topic wait、确认式 transaction、隔离 I/O transaction，或同连接 Undo Group 组合执行。45 个排除行对应 12 个唯一 URI，仅限任意 Lua 执行、危险/private debug 接口，以及不受限的 UI command 注册与执行。
+
+当前固定的纯程序 gate 包含 **957 项程序测试**，其中每一个已覆盖的版本/API 行都有一项可执行路由用例，并覆盖由 gateway 提供的会话提示上下文。它验证 packaged 路由、schema、安全边界、I/O 约束、transaction 行为、fake dispatch 执行和确定性的 onboarding 信息；这不等于已经在真实 Wwise 进程中逐一运行了全部 769 行。完整口径见[五版本覆盖契约](./skills/waapi-skill/references/waapi-coverage.md)。
+
+---
+
 ## 和 Wwise MCP 的区别
 
 这个 skill 和 Wwise MCP server 有重叠，但不是同一种工具。

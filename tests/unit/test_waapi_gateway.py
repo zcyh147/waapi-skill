@@ -912,6 +912,19 @@ def test_config_show_returns_defaults_offline_without_connecting(
         "source": "defaults",
         "external_path": str(external_path),
         "legacy_fallback_used": False,
+        "session_context": {
+            "contract": "waapi-skill.session-context/v1",
+            "available": False,
+            "endpoint": {"host": "127.0.0.1", "port": None, "url": None},
+            "adapter_version": None,
+            "adapter_version_source": "unavailable",
+            "project_modification_policy": "preview_then_confirm",
+            "available_project_modification_policies": [
+                "never",
+                "preview_then_confirm",
+                "allow_with_notice",
+            ],
+        },
     }
     assert not external_path.exists()
 

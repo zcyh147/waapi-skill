@@ -61,6 +61,8 @@ SUPPORTED_WWISE_VERSIONS = frozenset({"2021.1", "2022.1", "2023.1", "2024.1", "2
 GATEWAY_SUBCOMMANDS = frozenset(
     {
         "status",
+        "config-show",
+        "config-set",
         "buses",
         "selected",
         "query-object",
@@ -294,6 +296,7 @@ class CodexCommandFacts:
     allowed_read_commands: tuple[str, ...] = ()
     skill_read_files: tuple[str, ...] = ()
     unexpected_commands: tuple[str, ...] = ()
+    non_gateway_unexpected_commands: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -1304,6 +1307,7 @@ def classify_commands(
     allowed_reads: list[str] = []
     read_files: list[str] = []
     unexpected: list[str] = []
+    non_gateway_unexpected: list[str] = []
     skill_read = False
     expected = frozenset(str(value) for value in expected_gateway_subcommands)
 
@@ -1352,6 +1356,8 @@ def classify_commands(
                 skill_read = True
         if not is_gateway and not allowed_read:
             unexpected.append(command)
+            if gateway_shape is None:
+                non_gateway_unexpected.append(command)
 
     first_gateway = next((index for index, record in enumerate(records) if record.command in gateway), None)
     first_discovery = next((index for index, record in enumerate(records) if record.command in discovery), None)
@@ -1376,6 +1382,7 @@ def classify_commands(
         allowed_read_commands=tuple(allowed_reads),
         skill_read_files=tuple(read_files),
         unexpected_commands=tuple(unexpected),
+        non_gateway_unexpected_commands=tuple(non_gateway_unexpected),
     )
 
 

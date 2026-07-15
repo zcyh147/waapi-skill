@@ -24,6 +24,14 @@ Use this skill whenever the user is trying to do Wwise work such as:
 
 Technical trigger words still count: `Wwise`, `WAAPI`, `Audiokinetic`, `topic subscription`, `manifest`, `semantic builder`, `dispatcher`, and version-specific WAAPI behavior.
 
+## One-time conversation introduction
+
+The first time this Skill is used in a conversation, tell the user naturally that `waapi-skill` is loaded. Complete that short introduction in the first gateway-backed response by using only the returned `session_context` to report the current WAAPI address, the WAAPI adapter version, and the current project modification policy. Then add a natural equivalent of: “若有需要，可按需切换模式：`never` / `preview_then_confirm` / `allow_with_notice`。” Match the user's language and write ordinary prose, not a status bar, table, field list, or rigid template. Do not add a separate “current operation” field.
+
+For example, natural Chinese wording is: “我已经加载了 `waapi-skill`。当前使用的 WAAPI 地址是 `ws://127.0.0.1:8080/waapi`，适配层版本为 `2022.1`，工程修改策略是 `preview_then_confirm`。若有需要，可按需切换模式：`never`、`preview_then_confirm` 或 `allow_with_notice`。” Adapt the values and wording to the gateway evidence instead of copying the example blindly. Say “当前连接的” only when the task's gateway result proves a live connection; otherwise say “当前使用的” or “当前配置的” without adding engineering-style verification boilerplate. If `session_context.available` is false or a required value is null, say simply which setting is not configured or unavailable; report the remaining facts and never guess a missing value.
+
+Use the first gateway command already required by the user's task. If the first task is a pure explanation that otherwise needs no gateway command, run exactly one offline `config-show` to obtain the introduction facts; never run `status` or open a live WAAPI connection only for the introduction, and never inspect a config file directly. An offline task stays offline. Complete the introduction once per conversation, including when the first task is read-only or offline. Show it only when the visible conversation does not already contain this introduction; do not use memory to make that decision. Do not repeat it unless the user asks about these settings or one of the reported values changes. If the final answer must be exact machine-readable output, put the introduction in a separate normal progress update and keep the required result body exact.
+
 ## Entry rules
 
 1. Route the request into **setup**, **query**, or **operate** from the user's words.
@@ -77,7 +85,7 @@ Use exactly one command for the corresponding intent:
 | wait for one topic event | `wait-topic` | bounded subscription, optional JSON payload match, guaranteed unsubscribe |
 | inspect project-changing operation support | `operations` / `operation-schema` | offline closed request schema and explicit executable boundary |
 
-Each command prints one JSON document. Summarize its actual values in the user's language. Do not paste the whole JSON unless asked.
+Each command prints one JSON document. Summarize its actual values in the user's language. Do not paste the whole JSON unless asked. Every result includes a bounded `session_context`; use it for the one-time conversation introduction above and do not reconstruct those settings from prose, configuration files, or assumptions.
 
 Exact reflection-call fast route: when the user explicitly asks to call `ak.wwise.waapi.getFunctions` or `ak.wwise.waapi.getTopics` with empty args and options, run exactly one matching `call` command from the table, replacing `<supported-version>` with the exact requested or connected Wwise version. Do not run `describe` or `capabilities` first, and do not read the query reference before or after the call. The reviewed route is already fixed by this Skill. If that one gateway invocation is rejected or fails, stop and report the result; never retry it with another command.
 
@@ -87,13 +95,13 @@ When the user explicitly asks for the five-version coverage numbers, exclusions,
 
 Broad `query-object` sources and every `--select` require `--take N` with `0 <= N <= 1000`; use `--all-results` only when the user explicitly asks for an unbounded result. The fixed `buses` command is bounded to 1000 rows and reports that bound plus whether truncation is possible. Never route `ak.wwise.core.object.get` through the generic `call` command: the gateway returns `QUERY_OBJECT_REQUIRED` so all object discovery stays inside `query-object`. Other fixed-command URIs return `FIXED_COMMAND_REQUIRED`, and topic URIs return `WAIT_TOPIC_REQUIRED`; use the command named by that boundary instead of retrying `call`.
 
-When the requested answer is machine-readable and any successful gateway payload contains `agent_result`, compact-serialize exactly that object as the result body and stop. This rule applies to fixed reads as well as transactions. Do not reconstruct its fields from the prompt, `normalized`, summaries, or verification evidence; do not alter JSON escaping or add/remove keys; and do not run another command after receiving it. If the required envelope is `WAAPI_RESULT_JSON=<json>`, append the compact serialization of `agent_result` directly after the prefix. Failed, deferred, indeterminate, or boundary payloads intentionally have no successful `agent_result`; report their actual state instead of inventing one. For a normal natural-language answer, use the complete gateway evidence rather than only the compact projection.
+When the requested answer is machine-readable and any successful gateway payload contains `agent_result`, compact-serialize exactly that object as the result body and stop. This rule applies to fixed reads as well as transactions. Do not reconstruct its fields from the prompt, `normalized`, summaries, or verification evidence; do not alter JSON escaping or add/remove keys; and do not run another command after receiving it. If the required envelope is `WAAPI_RESULT_JSON=<json>`, append the compact serialization of `agent_result` directly after the prefix. Failed, deferred, indeterminate, or boundary payloads intentionally have no successful `agent_result`; report their actual state instead of inventing one. The one-time introduction belongs in a separate progress update when needed and never changes the exact machine-readable result body. For a normal natural-language answer, use the complete gateway evidence rather than only the compact projection.
 
 ## Routing
 
 ### Setup lane
 
-Use setup when the task is about connection state, version detection, host/port issues, saved config, first-run onboarding, or “what Wwise instance is this talking to?”.
+Use setup when the task is about connection state, version detection, host/port issues, saved config, or “what Wwise instance is this talking to?”.
 
 Examples:
 - “Which Wwise version is open?”
@@ -182,7 +190,7 @@ The catalog commands are offline and distinguish manifest availability, executab
 
 ## Detailed references
 
-- `references/waapi-setup.md` — connection, version, config, status, and first-run behavior
+- `references/waapi-setup.md` — connection, version, config, and status troubleshooting
 - `references/waapi-query.md` — read-only inspection, selection/object lookup, bounded topic waits, and no-code failure rules
 - `references/waapi-operate.md` — closed operation JSON, durable preview/confirm/execute/verify, retry rules, and explicit boundaries
 - `references/waapi-coverage.md` — exact five-version counts, exclusions, route meanings, and program-test scope

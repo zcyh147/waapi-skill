@@ -400,6 +400,7 @@ run_program() {
   validate_program_pytest_args
 
   local -a program_nodes=(
+    tests/unit/test_gateway_session_context.py
     tests/unit/test_public_route_coverage_contract.py
     tests/unit/test_public_route_program_matrix.py
     tests/unit/test_public_route_negative_contracts.py
