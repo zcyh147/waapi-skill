@@ -5,9 +5,11 @@ from pathlib import Path
 from typing import Any, cast
 
 
-REFERENCE_ROOT = Path('references') / 'semantic' / '2021.1'
-SOURCE_NOTES = Path('skills') / 'waapi-skill' / 'resources' / 'semantic' / '2021.1' / 'source_notes.json'
-RUNTIME_PACKAGE_ROOT = Path('skills') / 'waapi-skill' / 'wwise_waapi'
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SKILL_ROOT = REPO_ROOT / 'skills' / 'waapi-skill'
+REFERENCE_ROOT = SKILL_ROOT / 'references' / 'semantic' / '2021.1'
+SOURCE_NOTES = SKILL_ROOT / 'resources' / 'semantic' / '2021.1' / 'source_notes.json'
+RUNTIME_PACKAGE_ROOT = SKILL_ROOT / 'wwise_waapi'
 GATE_PATH = REFERENCE_ROOT / 'semantic-builder-notebooklm-gate.md'
 VERSION = '2021.1'
 NOTEBOOK = 'wwise-2021.1.14-docs'

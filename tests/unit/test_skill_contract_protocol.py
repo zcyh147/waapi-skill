@@ -213,11 +213,11 @@ def test_operation_specific_verification_is_not_generic_mutation_replay() -> Non
     assert "run `verify`, not `execute` again" in OPERATE
 
 
-def test_planner_and_xml_are_explicit_non_execution_boundaries() -> None:
-    assert "`SemanticPlanner` is a candidate/schema planning resource, not the transaction executor" in OPERATE
-    assert "do not use its generic mutation verification steps" in OPERATE
-    assert "XML editing is not an automatic fallback" in OPERATE
-    assert "return `unsupported_by_skill_interface`" in OPERATE
+def test_removed_fallback_layers_are_not_advertised() -> None:
+    assert "SemanticPlanner" not in OPERATE
+    assert "XML editing" not in OPERATE
+    assert "XML helper" not in OPERATE
+    assert "only normal execution path is the packaged transaction CLI" in OPERATE
 
 
 def test_public_config_surface_excludes_runtime_internals() -> None:

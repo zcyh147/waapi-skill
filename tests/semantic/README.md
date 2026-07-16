@@ -155,22 +155,3 @@ python -m pytest tests/semantic/test_codex_campaign.py tests/semantic/test_codex
 ```
 
 Passing these mocked/offline tests does not prove live semantic capability.
-
-## Legacy OpenCode comparison
-
-The OpenCode/oh-my-opencode harness remains available only as a legacy
-comparison lane. It is not the formal memory-off v2 gate and its larger harness
-context must not be mixed into fresh Codex results.
-
-Legacy commands include:
-
-```bash
-python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test --scenario-set phase3-required --wwise-version 2022.1 --archive-root .sisyphus/evidence/waapi-opencode-semantic-runs --require-live
-python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test --scenario-set phase3-smoke --wwise-version all --archive-root .sisyphus/evidence/waapi-opencode-semantic-runs --prefer-live
-python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test --scenario-set semantic-capability-required --wwise-version 2022.1 --archive-root .sisyphus/evidence/waapi-opencode-semantic-runs --require-live
-python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test --scenario-set semantic-capability-all --wwise-version all --archive-root .sisyphus/evidence/waapi-opencode-semantic-runs --require-live
-python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test --scenario-set semantic-capability-boundary --wwise-version all --archive-root .sisyphus/evidence/waapi-opencode-semantic-runs --require-live
-```
-
-Keep OpenCode archives separate from fresh Codex v2 evidence and label them
-`legacy comparison` in reports.

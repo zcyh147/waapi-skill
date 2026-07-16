@@ -1,7 +1,4 @@
-.agents/
-.sisyphus/
-.omo
-skills-lock.json
+.waapi-skill-state/
 
 # Python / test artifacts
 .coverage

@@ -30,8 +30,8 @@ from tests.live.test_2024_live_prerequisites import (  # pyright: ignore[reportM
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MATRIX_PATH = REPO_ROOT / "tests" / "fixtures" / "resource-evidence" / "waql" / EXPECTED_WWISE_VERSION / "object-get-live-matrix.json"
-SANDBOX_ROOT = REPO_ROOT / ".sisyphus" / "runtime" / "wwise-2024-live-smoke-sandboxes"
-EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-2024-waapi-integration-coverage" / "live-read-only"
+SANDBOX_ROOT = REPO_ROOT / ".waapi-skill-state" / "runtime" / "wwise-2024-live-smoke-sandboxes"
+EVIDENCE_ROOT = REPO_ROOT / ".waapi-skill-state" / "evidence" / "wwise-2024-waapi-integration-coverage" / "live-read-only"
 MUTATING_TOKENS = ("set", "delete", "create", "import", "move", "rename")
 
 

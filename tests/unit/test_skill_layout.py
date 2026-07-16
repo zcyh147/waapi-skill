@@ -17,7 +17,7 @@ SKILL_ARTIFACT_ENTRIES = (
     "scripts",
     "requirements.txt",
 )
-ROOT_DEVELOPMENT_ENTRIES = ("tests", "ci", "references", "pyproject.toml")
+ROOT_DEVELOPMENT_ENTRIES = ("tests", "ci", "pyproject.toml")
 ROOT_MOVED_ENTRIES = ("SKILL.md", "wwise_waapi", "resources", "scripts", "requirements.txt")
 LEGACY_SOURCE_DIRS = ("wwise_waapi", "resources", "references")
 
@@ -47,20 +47,20 @@ def test_package_imports_from_skill_artifact_package() -> None:
     assert not package_path.is_relative_to(LEGACY_SKILL_ROOT)
 
 
-def test_semantic_source_note_references_remain_root_source_evidence_metadata() -> None:
+def test_semantic_source_note_references_resolve_inside_the_packaged_skill() -> None:
     for source_notes_path in sorted((SKILL_ROOT / "resources" / "semantic").glob("*/source_notes.json")):
         payload = json.loads(source_notes_path.read_text(encoding="utf-8"))
         assert "notebook_id" not in payload
-        root_source_evidence_paths = [payload["protocol"]]
+        packaged_source_evidence_paths = [payload["protocol"]]
         for note in payload["notes"].values():
             assert "notebook_id" not in note
             assert "gate_evidence_path" not in note
-            root_source_evidence_paths.extend(
+            packaged_source_evidence_paths.extend(
                 source_url for source_url in note["source_urls"] if source_url.startswith("references/")
             )
 
-        for relative_path in set(root_source_evidence_paths):
-            assert (REPO_ROOT / relative_path).is_file(), (
+        for relative_path in set(packaged_source_evidence_paths):
+            assert (SKILL_ROOT / relative_path).is_file(), (
                 f"{source_notes_path}: {relative_path}"
             )
 

@@ -33,10 +33,10 @@ from .live_environment import (  # pyright: ignore[reportMissingImports]
 ENV_WWISE_SANDBOX_KEEP_ON_FAILURE = "WWISE_SANDBOX_KEEP_ON_FAILURE"
 ENV_WWISE_STRICT_REAL = "WWISE_STRICT_REAL"
 ENV_WWISE_REAL_LAUNCH_AUDIT_PATH = "WWISE_REAL_LAUNCH_AUDIT_PATH"
-DEFAULT_SANDBOX_ROOT = Path(".sisyphus") / "runtime" / "wwise-waapi-sandboxes"
-KEEP_ON_FAILURE_ROOT = Path(".sisyphus") / "evidence" / "wwise-waapi-live-sandbox-coverage"
+DEFAULT_SANDBOX_ROOT = Path(".waapi-skill-state") / "runtime" / "wwise-waapi-sandboxes"
+KEEP_ON_FAILURE_ROOT = Path(".waapi-skill-state") / "evidence" / "wwise-waapi-live-sandbox-coverage"
 LOCK_FILE_NAME = ".wwise-live-sandbox.lock"
-REAL_LAUNCH_AUDIT_PATH = Path(".sisyphus") / "evidence" / "waapi-test-remediation" / "real-wwise-launches.jsonl"
+REAL_LAUNCH_AUDIT_PATH = Path(".waapi-skill-state") / "evidence" / "waapi-test-remediation" / "real-wwise-launches.jsonl"
 
 
 class SandboxFixtureError(RuntimeError):

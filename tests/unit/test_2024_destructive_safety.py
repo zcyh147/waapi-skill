@@ -41,7 +41,7 @@ def test_2024_destructive_runtime_uses_exact_constants_without_changing_default_
 
 def test_2024_destructive_target_must_be_sandbox_copy(monkeypatch: pytest.MonkeyPatch) -> None:
     existing_path_exists = Path.exists
-    installed_project = REPO_ROOT / ".sisyphus" / "runtime" / "test-installed-2024" / "SampleProject" / "SampleProject.wproj"
+    installed_project = REPO_ROOT / ".waapi-skill-state" / "runtime" / "test-installed-2024" / "SampleProject" / "SampleProject.wproj"
     fake_existing_paths = {
         WWISE_2024_1_CONSOLE_PATH.resolve(strict=False),
         WWISE_2024_1_SAMPLE_PROJECT_PATH.resolve(strict=False),

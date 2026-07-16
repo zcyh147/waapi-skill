@@ -10,10 +10,11 @@ from wwise_waapi.builders.common import BuilderFamily, SemanticErrorCode  # pyri
 from wwise_waapi.builders.source_notes import SemanticSourceNoteChecker  # pyright: ignore[reportMissingImports]
 
 
-REFERENCE_ROOT = Path("references") / "semantic" / "2025.1"
-SOURCE_NOTES = Path("skills") / "waapi-skill" / "resources" / "semantic" / "2025.1" / "source_notes.json"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
+REFERENCE_ROOT = SKILL_ROOT / "references" / "semantic" / "2025.1"
+SOURCE_NOTES = SKILL_ROOT / "resources" / "semantic" / "2025.1" / "source_notes.json"
 GATE_PATH = REFERENCE_ROOT / "semantic-builder-notebooklm-gate.md"
-TASK_5_NOTEBOOKLM_EVIDENCE = Path("references") / "evidence" / "task-2025-5-notebooklm-gate.txt"
 VERSION_2025 = "2025.1"
 NOTEBOOK_2025 = "wwise-2025.1-docs"
 FAMILIES = (
@@ -180,17 +181,3 @@ def test_2025_1_source_note_checker_allows_grounded_local_notes() -> None:
         assert status.allowed is True
         assert status.version == VERSION_2025
         assert status.reason == "Semantic source note is grounded."
-
-
-def test_2025_1_task5_notebooklm_evidence_omits_auth_artifacts() -> None:
-    evidence_text = TASK_5_NOTEBOOKLM_EVIDENCE.read_text(encoding="utf-8")
-
-    assert "Authenticated: Yes" in evidence_text
-    assert "Wwise 2025.1 Docs [ACTIVE]" in evidence_text
-    assert "ID: wwise-2025.1-docs" in evidence_text
-    assert "--notebook-id wwise-2025.1-docs" in evidence_text
-    assert "State file: omitted (local auth artifact)" in evidence_text
-    assert "browser_state" not in evidence_text
-    assert "state.json" not in evidence_text
-    assert "notebooklm.google.com/notebook/" not in evidence_text
-    assert "cookie" not in evidence_text.lower()

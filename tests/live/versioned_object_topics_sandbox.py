@@ -33,7 +33,7 @@ from wwise_waapi.subscriptions import SubscriptionEvent, SubscriptionManager, Su
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "waapi-test-remediation" / "topic-behavior"
+EVIDENCE_ROOT = REPO_ROOT / ".waapi-skill-state" / "evidence" / "waapi-test-remediation" / "topic-behavior"
 SUPPORTED_VERSIONS = {"2021.1", "2024.1", "2025.1"}
 ACTOR_PARENT = r"\Actor-Mixer Hierarchy\Default Work Unit"
 READBACK_FIELDS = ["id", "name", "type", "path", "notes", "Volume"]
@@ -327,7 +327,7 @@ def _delete_if_present(client: Any, object_id: str) -> None:
 def _safe_lock_root(env: Mapping[str, str], version: str) -> Path:
     _require_supported_version(version)
     raw_root = env.get("WWISE_SANDBOX_ROOT")
-    root = Path(raw_root).expanduser() if raw_root else REPO_ROOT / ".sisyphus" / "runtime" / "wwise-waapi-sandboxes" / version / "topic-behavior"
+    root = Path(raw_root).expanduser() if raw_root else REPO_ROOT / ".waapi-skill-state" / "runtime" / "wwise-waapi-sandboxes" / version / "topic-behavior"
     root = root.resolve(strict=False)
     source_project = resolve_sample_project_source(env)
     if source_project is not None:

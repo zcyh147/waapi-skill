@@ -38,7 +38,7 @@ POLICY_2023 = ROOT / "tests" / "destructive" / "support" / "resources" / "capabi
 DEFERRED_2023 = ROOT / "skills" / "waapi-skill" / "resources" / "deferred" / "2023.1.json"
 WAQL_2023 = ROOT / "tests" / "fixtures" / "resource-evidence" / "waql" / VERSION_2023 / "object-get-live-matrix.json"
 FIXTURE_2023 = ROOT / "tests" / "_org" / VERSION_2023
-REFERENCES_2023 = ROOT / "references" / "semantic" / VERSION_2023
+REFERENCES_2023 = ROOT / "skills" / "waapi-skill" / "references" / "semantic" / VERSION_2023
 LIVE_TESTED_2023_URI = "ak.wwise.core.object.get"
 READBACK_HELPER_URIS = {
     "ak.wwise.core.soundbank.getInclusions",

@@ -42,13 +42,13 @@ READBACK_FIELDS = ["id", "name", "type", "path", "notes"]
 PARENT_FIELDS = ["id", "name", "type", "path"]
 REFLECTED_URI_PATH = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill" / "resources" / "manifest" / "2021.1" / "functions.json"
 REPO_ROOT = Path(__file__).resolve().parents[2]
-EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-2021-waapi-integration-coverage"
+EVIDENCE_ROOT = REPO_ROOT / ".waapi-skill-state" / "evidence" / "wwise-2021-waapi-integration-coverage"
 DESTRUCTIVE_EVIDENCE_ROOT = EVIDENCE_ROOT / "destructive"
 TASK_EVIDENCE_PATH = EVIDENCE_ROOT / "task-10-object-crud.json"
 EXACT_DESTRUCTIVE_COMMAND = (
     'WWISE_VERSION=2021.1 WWISE_CONSOLE="/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh" '
     'WWISE_SAMPLE_PROJECT_PATH="/Applications/Audiokinetic/SampleProject2021.1.14.8108/SampleProject/SampleProject.wproj" '
-    "WWISE_SANDBOX_ROOT=.sisyphus/runtime/wwise-waapi-sandboxes/2021.1 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 "
+    "WWISE_SANDBOX_ROOT=.waapi-skill-state/runtime/wwise-waapi-sandboxes/2021.1 WWISE_LIVE=1 WWISE_DESTRUCTIVE=1 "
     "python -m pytest tests/destructive/test_2021_1_project_mutation_sandbox.py -q"
 )
 

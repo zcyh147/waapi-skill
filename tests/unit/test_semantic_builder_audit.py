@@ -95,7 +95,8 @@ def test_skill_docs_route_builders_through_packaged_transaction_runtime_only() -
 
     assert "only normal execution path is the packaged transaction CLI" in text
     assert "Do not import builders or planners from inline Python" in text
-    assert "`SemanticPlanner` is a candidate/schema planning resource, not the transaction executor" in text
+    assert "SemanticPlanner" not in text
+    assert "XML editing" not in text
     assert "preview --request-json" in text
     assert "execute <transaction-id>" in text
     assert "verify <transaction-id>" in text

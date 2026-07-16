@@ -24,6 +24,8 @@ from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 
 
 EXPECTED_INVENTORY = EXPECTED_SOURCE_NOTE_URI_INVENTORY
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
 
 EXCLUDED_URI_TOKENS = ("profiler", "transport", "soundengine", ".ui.", ".cli.", "remote", "debug")
 
@@ -216,7 +218,7 @@ def test_excluded_families_have_no_source_notes(tmp_path: Path) -> None:
 
 def test_markdown_source_notes_exist_for_human_review() -> None:
     for name in ("protocol", *EXPECTED_INVENTORY):
-        path = Path("references") / f"semantic-builder-{name}.md"
+        path = SKILL_ROOT / "references" / "semantic" / "2022.1" / f"semantic-builder-{name}.md"
         assert path.exists()
         text = path.read_text(encoding="utf-8")
         assert "NotebookLM gate evidence" in text or name == "protocol"
@@ -235,8 +237,7 @@ def test_source_note_uri_inventory_accepts_every_packaged_version_specific_endpo
 
 
 def test_every_packaged_source_note_has_a_versioned_runtime_mirror_inside_the_skill() -> None:
-    skill_root = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
-    semantic_root = skill_root / "resources" / "semantic"
+    semantic_root = SKILL_ROOT / "resources" / "semantic"
 
     for version in SUPPORTED_WWISE_VERSION_KEYS:
         payload = json.loads((semantic_root / version / "source_notes.json").read_text(encoding="utf-8"))
@@ -245,8 +246,8 @@ def test_every_packaged_source_note_has_a_versioned_runtime_mirror_inside_the_sk
             source_paths.extend(note["source_urls"])
         for relative_path in source_paths:
             mirror = (
-                skill_root / "references" / "semantic" / version / Path(relative_path).name
+                SKILL_ROOT / "references" / "semantic" / version / Path(relative_path).name
                 if relative_path.startswith("references/")
-                else skill_root / relative_path
+                else SKILL_ROOT / relative_path
             )
             assert mirror.is_file(), (version, relative_path, mirror)

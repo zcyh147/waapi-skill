@@ -41,7 +41,7 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
 from wwise_waapi.versions import WWISE_2025_1_VERSION_KEY  # pyright: ignore[reportMissingImports]
 
 
-DEFAULT_2025_DESTRUCTIVE_SANDBOX_ROOT = Path(".sisyphus") / "runtime" / "wwise-waapi-sandboxes" / "2025.1"
+DEFAULT_2025_DESTRUCTIVE_SANDBOX_ROOT = Path(".waapi-skill-state") / "runtime" / "wwise-waapi-sandboxes" / "2025.1"
 GENERATED_OUTPUT_DIR_NAMES = {
     ".cache",
     "GeneratedSoundBanks",

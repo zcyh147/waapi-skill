@@ -25,7 +25,7 @@ from tests.live.test_2024_live_prerequisites import (  # pyright: ignore[reportM
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SANDBOX_ROOT = REPO_ROOT / ".sisyphus" / "runtime" / "wwise-2024-live-smoke-sandboxes"
+SANDBOX_ROOT = REPO_ROOT / ".waapi-skill-state" / "runtime" / "wwise-2024-live-smoke-sandboxes"
 WWISE_BUILD = "2024.1.13.9056"
 
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest  # pyright: ignore[reportMissingImports]
 
-EVIDENCE_PATH = Path(".sisyphus/evidence/task-6-subscription-timeout.md")
+EVIDENCE_PATH = Path(".waapi-skill-state/evidence/task-6-subscription-timeout.md")
 
 
 @pytest.mark.live

@@ -18,23 +18,6 @@ CODEX_PROFILE_COMMANDS = (
     "--profile full_cross_version_168 --campaign-root "
     "skills/waapi-skill-workspace/campaign-full-cross-version-168",
 )
-LEGACY_OPENCODE_COMMANDS = (
-    "python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test "
-    "--scenario-set phase3-required --wwise-version 2022.1 --archive-root "
-    ".sisyphus/evidence/waapi-opencode-semantic-runs --require-live",
-    "python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test "
-    "--scenario-set phase3-smoke --wwise-version all --archive-root "
-    ".sisyphus/evidence/waapi-opencode-semantic-runs --prefer-live",
-    "python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test "
-    "--scenario-set semantic-capability-required --wwise-version 2022.1 --archive-root "
-    ".sisyphus/evidence/waapi-opencode-semantic-runs --require-live",
-    "python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test "
-    "--scenario-set semantic-capability-all --wwise-version all --archive-root "
-    ".sisyphus/evidence/waapi-opencode-semantic-runs --require-live",
-    "python tests/semantic/run_opencode_semantic_batch.py --workspace /Users/xiye/Documents/Git/waapi_skill_test "
-    "--scenario-set semantic-capability-boundary --wwise-version all --archive-root "
-    ".sisyphus/evidence/waapi-opencode-semantic-runs --require-live",
-)
 
 
 def test_fresh_codex_profiles_are_the_formal_documented_workflow() -> None:
@@ -49,7 +32,7 @@ def test_fresh_codex_profiles_are_the_formal_documented_workflow() -> None:
         "formal agent-behavior gate",
         "append-only",
         "--resume --verify-only",
-        "memory-off",
+        "Memory-off",
         "disposable `HOME` and `CODEX_HOME`",
         "`screening` | 40",
         "`formal_98` | 98",
@@ -58,17 +41,19 @@ def test_fresh_codex_profiles_are_the_formal_documented_workflow() -> None:
         assert phrase in readme
 
 
-def test_opencode_commands_are_retained_only_as_legacy_comparison() -> None:
+def test_retired_agent_evaluation_lanes_are_not_documented() -> None:
     readme = SEMANTIC_README.read_text(encoding="utf-8")
     inventory = TEST_INVENTORY.read_text(encoding="utf-8")
 
-    for command in LEGACY_OPENCODE_COMMANDS:
-        assert command in readme
-        assert command in inventory
-    assert "Legacy OpenCode comparison" in readme
-    assert "Legacy OpenCode comparison" in inventory
-    assert "not the formal memory-off v2 gate" in readme
-    assert "# Semantic OpenCode validation" not in readme
+    for stale_name in (
+        "run_opencode_semantic_batch.py",
+        "run_codex_skill_evals.py",
+        "tests/support/evals.json",
+        "skills/waapi-skill/evals/evals.json",
+        "Legacy OpenCode comparison",
+    ):
+        assert stale_name not in readme
+        assert stale_name not in inventory
 
 
 def test_inventory_count_matches_latest_nonlive_result_without_collect_only_overclaim() -> None:
@@ -76,7 +61,7 @@ def test_inventory_count_matches_latest_nonlive_result_without_collect_only_over
 
     assert "807 pytest items" not in inventory
     assert "807 tests collected" not in inventory
-    assert "2951 passed, 77 skipped, 27 deselected" in inventory
+    assert "2768 passed, 80 skipped, 27 deselected" in inventory
     assert "not a fresh full `--collect-only` recount" in inventory
 
 

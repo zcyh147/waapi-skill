@@ -74,11 +74,6 @@ from .properties import (  # pyright: ignore[reportMissingImports]
     build_set_randomizer_preview,
     build_set_reference_preview,
 )
-from .profiler import (  # pyright: ignore[reportMissingImports]
-    PROFILER_PARAMETER_GUIDANCE_SIZE_LIMIT,
-    ProfilerParameterGuidance,
-    extract_profiler_parameter_guidance,
-)
 from .query import QueryPredicate, build_object_get_query, build_query_preview, object_get_query  # pyright: ignore[reportMissingImports]
 from .schema import (  # pyright: ignore[reportMissingImports]
     SEMANTIC_CONSTRAINT_FACTS_SIZE_LIMIT,
@@ -150,7 +145,6 @@ __all__ = [
     "PropertyReferenceBuilder",
     "PropertyReferenceNameRecord",
     "PropertyReferenceOperation",
-    "PROFILER_PARAMETER_GUIDANCE_SIZE_LIMIT",
     "QueryPredicate",
     "ResolutionPlan",
     "ResolvedObject",
@@ -162,7 +156,6 @@ __all__ = [
     "SemanticPreview",
     "SemanticReadbackPlan",
     "SemanticSchemaValidator",
-    "ProfilerParameterGuidance",
     "SemanticSourceNoteChecker",
     "SemanticSourceNoteResource",
     "SemanticValidationError",
@@ -204,7 +197,6 @@ __all__ = [
     "build_set_property_preview",
     "build_set_randomizer_preview",
     "build_set_reference_preview",
-    "extract_profiler_parameter_guidance",
     "expect_audio_imported_topic",
     "extract_semantic_constraint_facts",
     "load_semantic_source_notes",

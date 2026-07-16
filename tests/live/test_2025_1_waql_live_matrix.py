@@ -37,9 +37,9 @@ from tests.live.test_2025_1_live_prerequisites import (  # pyright: ignore[repor
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MATRIX_PATH = REPO_ROOT / "tests" / "fixtures" / "resource-evidence" / "waql" / EXPECTED_WWISE_VERSION / "object-get-live-matrix.json"
-SANDBOX_ROOT = REPO_ROOT / ".sisyphus" / "runtime" / "wwise-2025-live-read-only-sandboxes"
-EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-2025-waapi-integration-coverage" / "live-read-only"
-TASK_LIVE_READ_ONLY_EVIDENCE = REPO_ROOT / ".sisyphus" / "evidence" / "task-2025-9-live-read-only.txt"
+SANDBOX_ROOT = REPO_ROOT / ".waapi-skill-state" / "runtime" / "wwise-2025-live-read-only-sandboxes"
+EVIDENCE_ROOT = REPO_ROOT / ".waapi-skill-state" / "evidence" / "wwise-2025-waapi-integration-coverage" / "live-read-only"
+TASK_LIVE_READ_ONLY_EVIDENCE = REPO_ROOT / ".waapi-skill-state" / "evidence" / "task-2025-9-live-read-only.txt"
 MUTATING_TOKENS = ("set", "delete", "create", "import", "move", "rename")
 
 
@@ -51,7 +51,7 @@ def test_2025_waql_matrix_cases_are_read_only_and_versioned() -> None:
         _assert_case_is_read_only(case)
         assert case["coverage_status"] == "live-tested"
         assert case["evidence_path"].startswith(
-            ".sisyphus/evidence/wwise-2025-waapi-integration-coverage/live-read-only/"
+            ".waapi-skill-state/evidence/wwise-2025-waapi-integration-coverage/live-read-only/"
         )
         assert case["evidence_path"].endswith(f"/{case['id']}.json")
         assert any("resources/manifest/2025.1/schemas.json" in source for source in case["sources"])

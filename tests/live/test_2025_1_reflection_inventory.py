@@ -25,7 +25,7 @@ from tests.live.test_2025_1_live_prerequisites import (  # pyright: ignore[repor
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SANDBOX_ROOT = REPO_ROOT / ".sisyphus" / "runtime" / "wwise-2025-live-read-only-sandboxes"
+SANDBOX_ROOT = REPO_ROOT / ".waapi-skill-state" / "runtime" / "wwise-2025-live-read-only-sandboxes"
 WWISE_BUILD = "2025.1.7.9143"
 
 

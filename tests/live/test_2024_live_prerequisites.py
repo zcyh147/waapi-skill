@@ -27,7 +27,7 @@ EXPECTED_WWISE_CONSOLE = WWISE_2024_1_CONSOLE_PATH
 EXPECTED_SAMPLE_PROJECT = WWISE_2024_1_SAMPLE_PROJECT_PATH
 PREREQUISITE_EVIDENCE = (
     REPO_ROOT
-    / ".sisyphus"
+    / ".waapi-skill-state"
     / "evidence"
     / "wwise-2024-waapi-integration-coverage"
     / "live-read-only"

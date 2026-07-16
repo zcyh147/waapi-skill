@@ -43,7 +43,7 @@ from tests.live.test_2021_1_reflection_prerequisites import (  # pyright: ignore
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-2021-waapi-integration-coverage" / "live-read-only"
+EVIDENCE_ROOT = REPO_ROOT / ".waapi-skill-state" / "evidence" / "wwise-2021-waapi-integration-coverage" / "live-read-only"
 PREREQUISITE_EVIDENCE = EVIDENCE_ROOT / "prerequisites-unavailable.json"
 TASK_PREREQUISITE_EVIDENCE = EVIDENCE_ROOT / "task-8-live-prerequisites.json"
 EXPECTED_DISPLAY_NAME = "v2021.1.14"

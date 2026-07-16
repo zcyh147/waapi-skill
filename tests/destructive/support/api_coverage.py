@@ -18,7 +18,7 @@ SKILL_ROOT = Path(__file__).resolve().parents[3] / "skills" / "waapi-skill"
 DEFAULT_MANIFEST_ROOT = SKILL_ROOT / "resources" / "manifest"
 DEFAULT_COVERAGE_ROOT = SUPPORT_ROOT / "resources" / "capabilities"
 DEFAULT_DEFERRED_ROOT = SKILL_ROOT / "resources" / "deferred"
-DEFAULT_EVIDENCE_PATH = Path(".sisyphus/evidence/task-7-api-coverage-summary.json")
+DEFAULT_EVIDENCE_PATH = Path(".waapi-skill-state/evidence/task-7-api-coverage-summary.json")
 
 SAFE_FAKE_ROUTE_CATEGORIES = frozenset(
     {

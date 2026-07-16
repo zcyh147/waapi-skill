@@ -18,7 +18,7 @@ Positional form is still supported, for example `ci/test.sh 2021.1 live`.
 
 Use `ci/test.sh --mode program` for the five-version public-route expansion. This mode is deliberately narrower than `nonlive`: it selects only the packaged public-route coverage, program matrix, negative gateway contracts, isolated-I/O policy tests, optional registry-integrity test, and the generic transaction full-chain test under `tests/unit`.
 
-The program gate forces `WWISE_LIVE=0`, `WWISE_DESTRUCTIVE=0`, and `WWISE_STRICT_REAL=0`; clears inherited Wwise executable, project, endpoint, and pytest-addopts settings; and uses injected fake clients. It never collects `tests/semantic`, `tests/live`, or `tests/destructive`, and it must not start Codex, OpenCode, WwiseConsole, or a network client.
+The program gate forces `WWISE_LIVE=0`, `WWISE_DESTRUCTIVE=0`, and `WWISE_STRICT_REAL=0`; clears inherited Wwise executable, project, endpoint, and pytest-addopts settings; and uses injected fake clients. It never collects `tests/semantic`, `tests/live`, or `tests/destructive`, and it must not start Codex, WwiseConsole, or a network client.
 
 Extra arguments after `--` may be pytest flags or filters such as `-q`, `-ra`, `--collect-only`, or `-k expression`. Additional test paths, node ids, `.py` files, and `--pyargs` are rejected so the fixed program-only collection cannot be widened accidentally.
 
@@ -38,10 +38,15 @@ Set `WWISE_TEST_CONFIG=/absolute/path/to/live-environment.json` to use a differe
 
 `live`, `destructive`, `smoke`, and `matrix` are strict real modes. They set `WWISE_STRICT_REAL=1`, require an executable `WWISE_CONSOLE`, and require an existing `.wproj` at `WWISE_SAMPLE_PROJECT_PATH`. Missing WwiseConsole or SampleProject prerequisites fail before pytest execution instead of becoming soft skips.
 
-Real launches append proof to `.sisyphus/evidence/waapi-test-remediation/real-wwise-launches.jsonl`. Check the audit with:
+Real launches append proof to `.waapi-skill-state/evidence/waapi-test-remediation/real-wwise-launches.jsonl`. Check the audit with:
 
-- `wc -l .sisyphus/evidence/waapi-test-remediation/real-wwise-launches.jsonl`
-- `tail -n 4 .sisyphus/evidence/waapi-test-remediation/real-wwise-launches.jsonl`
+- `wc -l .waapi-skill-state/evidence/waapi-test-remediation/real-wwise-launches.jsonl`
+- `tail -n 4 .waapi-skill-state/evidence/waapi-test-remediation/real-wwise-launches.jsonl`
+
+Some committed capability and fixture rows retain `.sisyphus/evidence/...` as
+the literal provenance of older validation runs. Those strings are historical
+records, not an active output directory. Do not rewrite them to the current
+state root unless the underlying evidence was actually migrated.
 
 Audit rows include the pid, port, command, sandbox project, `getInfo` version proof, `ready_duration_seconds`, and cleanup result. `ready_duration_seconds` measures WAAPI readiness, not the total foreground GUI or plugin warning lifetime.
 

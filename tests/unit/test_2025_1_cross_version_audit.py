@@ -15,6 +15,7 @@ from wwise_waapi.manifest import ManifestStore, audit_manifest  # pyright: ignor
 
 
 ROOT = Path(__file__).resolve().parents[2]
+SKILL_ROOT = ROOT / "skills" / "waapi-skill"
 VERSION_2022 = "2022.1"
 VERSION_2025 = "2025.1"
 BUILD_2025 = "2025.1.7.9143"
@@ -28,7 +29,7 @@ PHASE2_SUMMARY_2025 = ROOT / "tests" / "destructive" / "support" / "resources" /
 POLICY_2025 = ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION_2025 / "phase21-uri-policy.json"
 DEFERRED_2025 = ROOT / "skills" / "waapi-skill" / "resources" / "deferred" / f"{VERSION_2025}.json"
 SEMANTIC_2025 = ROOT / "skills" / "waapi-skill" / "resources" / "semantic" / VERSION_2025 / "source_notes.json"
-REFERENCES_2025 = ROOT / "references" / "semantic" / VERSION_2025
+REFERENCES_2025 = ROOT / "skills" / "waapi-skill" / "references" / "semantic" / VERSION_2025
 WAQL_2025 = ROOT / "skills" / "waapi-skill" / "resources" / "waql" / VERSION_2025
 GET_INFO_URI = "ak.wwise.core.getInfo"
 EXPECTED_2025_AUDIT_COUNTS = (154, 31, 185, 0)
@@ -418,7 +419,7 @@ def _assert_2025_resources_reconcile(
         assert set(note["required_fields"]) <= set(note["cited_required_fields"]), failure_context
         for evidence_path in [source_notes["protocol"], *note["source_urls"]]:
             assert evidence_path.startswith("references/semantic/2025.1/"), failure_context
-            assert (ROOT / evidence_path).is_file(), failure_context
+            assert (SKILL_ROOT / evidence_path).is_file(), failure_context
             assert not _has_forbidden_2025_text(evidence_path), failure_context
         for uri in note["endpoints"]:
             if uri in coverage_by_uri and coverage_by_uri[uri].get("item_type") != "topic":

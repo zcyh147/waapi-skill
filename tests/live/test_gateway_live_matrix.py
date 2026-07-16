@@ -36,7 +36,7 @@ from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS  # pyright: ignore
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GATEWAY_PATH = REPO_ROOT / "skills" / "waapi-skill" / "scripts" / "gateway.py"
-EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "waapi-gateway-live-matrix"
+EVIDENCE_ROOT = REPO_ROOT / ".waapi-skill-state" / "evidence" / "waapi-gateway-live-matrix"
 GATEWAY_CONTRACT = "waapi-skill.gateway-result/v1"
 PREFERRED_METADATA_TYPES = ("Sound", "ActorMixer", "Bus", "MusicTrack", "Event")
 PREFERRED_PROPERTY_NAMES = ("Volume", "Pitch", "Lowpass", "Highpass", "InitialDelay", "MakeUpGain")
@@ -1023,7 +1023,7 @@ def _safe_lock_root(env: Mapping[str, str], *, version: str) -> Path:
     root = (
         Path(raw_root).expanduser()
         if raw_root
-        else REPO_ROOT / ".sisyphus" / "runtime" / "waapi-gateway-live-matrix" / version
+        else REPO_ROOT / ".waapi-skill-state" / "runtime" / "waapi-gateway-live-matrix" / version
     ).resolve(strict=False)
     source_project = resolve_sample_project_source(env)
     if source_project is not None:

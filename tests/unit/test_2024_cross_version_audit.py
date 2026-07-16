@@ -22,7 +22,7 @@ LIVE_MATRIX_2024 = ROOT / "tests" / "destructive" / "support" / "resources" / "c
 PHASE2_SUMMARY_2024 = ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION_2024 / "phase2-coverage-summary.json"
 POLICY_2024 = ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION_2024 / "phase21-uri-policy.json"
 DEFERRED_2024 = ROOT / "skills" / "waapi-skill" / "resources" / "deferred" / f"{VERSION_2024}.json"
-REFERENCES_2024 = ROOT / "references" / "semantic" / VERSION_2024
+REFERENCES_2024 = ROOT / "skills" / "waapi-skill" / "references" / "semantic" / VERSION_2024
 FIXTURE_2024 = ROOT / "tests" / "_org" / VERSION_2024
 GET_INFO_URI = "ak.wwise.core.getInfo"
 EXPECTED_2024_AUDIT_COUNTS = (148, 30, 178, 0)
@@ -58,13 +58,13 @@ NO_2025_RESOURCE_ROOTS = (
     ROOT / "skills" / "waapi-skill" / "resources" / "manifest",
     ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities",
     ROOT / "skills" / "waapi-skill" / "resources" / "semantic",
-    ROOT / "references" / "semantic",
+    ROOT / "skills" / "waapi-skill" / "references" / "semantic",
 )
 PLANNED_2025_RESOURCE_DIRS = {
     ROOT / "skills" / "waapi-skill" / "resources" / "manifest" / "2025.1",
     ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / "2025.1",
     ROOT / "skills" / "waapi-skill" / "resources" / "semantic" / "2025.1",
-    ROOT / "references" / "semantic" / "2025.1",
+    ROOT / "skills" / "waapi-skill" / "references" / "semantic" / "2025.1",
 }
 
 

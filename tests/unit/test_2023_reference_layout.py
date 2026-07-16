@@ -3,9 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 
-REFERENCE_ROOT = Path("references") / "semantic" / "2023.1"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
+REFERENCE_ROOT = SKILL_ROOT / "references" / "semantic" / "2023.1"
 GATE_PATH = REFERENCE_ROOT / "semantic-builder-notebooklm-gate.md"
-GLOBAL_REFERENCE_ROOT = Path("references")
+PACKAGED_2022_REFERENCE_ROOT = SKILL_ROOT / "references" / "semantic" / "2022.1"
 
 FAMILIES = (
     "query",
@@ -16,7 +18,7 @@ FAMILIES = (
     "switchcontainer",
 )
 
-GLOBAL_2022_FILES = (
+PACKAGED_2022_FILES = (
     "semantic-builder-protocol.md",
     "semantic-builder-notebooklm-gate.md",
     *(f"semantic-builder-{family}.md" for family in FAMILIES),
@@ -39,9 +41,9 @@ def read_reference(name: str) -> str:
     return (REFERENCE_ROOT / f"semantic-builder-{name}.md").read_text(encoding="utf-8")
 
 
-def test_2023_semantic_references_do_not_use_global_2022_files() -> None:
-    for filename in GLOBAL_2022_FILES:
-        assert (GLOBAL_REFERENCE_ROOT / filename).exists(), f"missing fixture for isolation check: {filename}"
+def test_2023_semantic_references_do_not_use_packaged_2022_files() -> None:
+    for filename in PACKAGED_2022_FILES:
+        assert (PACKAGED_2022_REFERENCE_ROOT / filename).exists(), f"missing fixture for isolation check: {filename}"
 
     expected_files = {
         "semantic-builder-protocol.md",

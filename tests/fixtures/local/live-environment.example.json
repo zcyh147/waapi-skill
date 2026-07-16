@@ -3,27 +3,27 @@
     "2021.1": {
       "wwise_console": "/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh",
       "sample_project": "tests/_org/2021.1/SampleProject.wproj",
-      "sandbox_root": ".sisyphus/runtime/wwise-waapi-sandboxes/2021.1"
+      "sandbox_root": ".waapi-skill-state/runtime/wwise-waapi-sandboxes/2021.1"
     },
     "2022.1": {
       "wwise_console": "/Applications/Audiokinetic/Wwise2022.1.19.8584/Wwise.app/Contents/Tools/WwiseConsole.sh",
       "sample_project": "tests/_org/2022.1/SampleProject.wproj",
-      "sandbox_root": ".sisyphus/runtime/wwise-waapi-sandboxes/2022.1"
+      "sandbox_root": ".waapi-skill-state/runtime/wwise-waapi-sandboxes/2022.1"
     },
     "2023.1": {
       "wwise_console": "/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh",
       "sample_project": "tests/_org/2023.1/SampleProject.wproj",
-      "sandbox_root": ".sisyphus/runtime/wwise-waapi-sandboxes/2023.1"
+      "sandbox_root": ".waapi-skill-state/runtime/wwise-waapi-sandboxes/2023.1"
     },
     "2024.1": {
       "wwise_console": "/Applications/Audiokinetic/Wwise2024.1.13.9056/Wwise.app/Contents/Tools/WwiseConsole.sh",
       "sample_project": "tests/_org/2024.1/SampleProject.wproj",
-      "sandbox_root": ".sisyphus/runtime/wwise-waapi-sandboxes/2024.1"
+      "sandbox_root": ".waapi-skill-state/runtime/wwise-waapi-sandboxes/2024.1"
     },
     "2025.1": {
       "wwise_console": "/Applications/Audiokinetic/Wwise2025.1.7.9143/Wwise.app/Contents/Tools/WwiseConsole.sh",
       "sample_project": "tests/_org/2025.1/SampleProject.wproj",
-      "sandbox_root": ".sisyphus/runtime/wwise-waapi-sandboxes/2025.1"
+      "sandbox_root": ".waapi-skill-state/runtime/wwise-waapi-sandboxes/2025.1"
     }
   }
 }

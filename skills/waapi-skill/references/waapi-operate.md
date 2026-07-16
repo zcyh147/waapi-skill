@@ -216,10 +216,4 @@ Some managed calls open resources that need a later packaged companion: bank loa
 
 For a requested `WAAPI_RESULT_JSON=<json>` answer, when the successful preview or verified payload contains `agent_result`, the `<json>` portion is the compact serialization of that object verbatim in structure and values. Do not copy fields manually; this preserves backslashes, quotes, Unicode, numeric types, and the immutable request binding.
 
-## Planner and XML boundaries
-
-`SemanticPlanner` is a candidate/schema planning resource, not the transaction executor. Do not invoke it as proof that a mutation can execute, and do not use its generic mutation verification steps.
-
-XML editing is not an automatic fallback. Only consider it in a separate, explicit offline project-file task after the user asks for XML editing and a packaged, previewable path exists. For an ordinary Wwise request, return `unsupported_by_skill_interface` instead of editing project files or authoring an XML helper.
-
 Only the explicit catalog exclusions and route-specific input policies are interface boundaries. Arbitrary Lua, assert/crash/private debug endpoints, unrestricted UI command registration/execution, custom external command hooks, and cross-app MCP federation are never substituted for a packaged route.

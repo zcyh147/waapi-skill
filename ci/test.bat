@@ -4,7 +4,7 @@ setlocal EnableExtensions EnableDelayedExpansion
 set "SCRIPT_DIR=%~dp0"
 for %%I in ("%SCRIPT_DIR%..") do set "ROOT_DIR=%%~fI"
 set "SKILL_DIR=%ROOT_DIR%\skills\waapi-skill"
-set "DEFAULT_SANDBOX_BASE=%ROOT_DIR%\.sisyphus\runtime\wwise-waapi-sandboxes"
+set "DEFAULT_SANDBOX_BASE=%ROOT_DIR%\.waapi-skill-state\runtime\wwise-waapi-sandboxes"
 
 if defined PYTHONPATH (
     set "PYTHONPATH=%SKILL_DIR%;%PYTHONPATH%"
@@ -553,7 +553,7 @@ echo   - Default Windows paths if not set:
 echo       C:\Audiokinetic\Wwise^<build^>\Authoring\x64\Release\bin\WwiseConsole.exe
 echo       tests\_org\^<version^>\SampleProject.wproj
 echo   - Default sandbox root if not set:
-echo       .sisyphus\runtime\wwise-waapi-sandboxes\^<version^>-^<mode^>
+echo       .waapi-skill-state\runtime\wwise-waapi-sandboxes\^<version^>-^<mode^>
 echo.
 echo Examples:
 echo   ci\test.bat --mode program

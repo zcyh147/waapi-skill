@@ -15,7 +15,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.mediaPool.get",
@@ -35,7 +35,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.mediaPool.getFields",
@@ -56,7 +56,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.profiler.moveCursor",
@@ -77,7 +77,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.profiler.setCursorTime",
@@ -98,7 +98,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.workUnit.load",
@@ -119,7 +119,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.workUnit.unload",
@@ -140,7 +140,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "excluded",
       "uri": "ak.soundengine.getSwitch",
@@ -161,7 +161,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "excluded",
       "uri": "ak.soundengine.postEvent",
@@ -182,7 +182,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "excluded",
       "uri": "ak.soundengine.seekOnEvent",
@@ -203,7 +203,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "excluded",
       "uri": "ak.soundengine.setMultiplePositions",
@@ -224,7 +224,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "excluded",
       "uri": "ak.soundengine.setObjectObstructionAndOcclusion",
@@ -245,7 +245,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "excluded",
       "uri": "ak.soundengine.setPosition",
@@ -266,7 +266,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "excluded",
       "uri": "ak.soundengine.setRTPCValue",
@@ -287,7 +287,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "excluded",
       "uri": "ak.soundengine.stopAll",
@@ -308,7 +308,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "excluded",
       "uri": "ak.wwise.cli.addNewPlatform",
@@ -329,7 +329,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "excluded",
       "uri": "ak.wwise.cli.convertExternalSource",
@@ -350,7 +350,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "excluded",
       "uri": "ak.wwise.cli.dumpObjects",
@@ -371,7 +371,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "excluded",
       "uri": "ak.wwise.cli.executeLuaScript",
@@ -392,7 +392,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "excluded",
       "uri": "ak.wwise.cli.generateSoundbank",
@@ -413,7 +413,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "excluded",
       "uri": "ak.wwise.cli.waapiServer",
@@ -434,7 +434,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.console.project.open",
@@ -455,9 +455,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-import.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-import.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-sandbox-mutating",
       "uri": "ak.wwise.core.audio.import",
@@ -478,9 +478,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-import.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-import.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-sandbox-mutating",
       "uri": "ak.wwise.core.audio.importTabDelimited",
@@ -501,7 +501,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.audio.setConversionPlugin",
@@ -522,7 +522,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
@@ -543,7 +543,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
@@ -564,7 +564,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.blendContainer.addTrack",
@@ -586,7 +586,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.executeLuaScript",
@@ -606,7 +606,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.getInfo",
@@ -626,7 +626,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.getProjectInfo",
@@ -646,7 +646,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.log.get",
@@ -667,9 +667,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-object-mutation.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-sandbox-mutating",
       "uri": "ak.wwise.core.object.create",
@@ -690,9 +690,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-object-mutation.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-sandbox-mutating",
       "uri": "ak.wwise.core.object.diff",
@@ -712,9 +712,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-query.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-query.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-live-read-only",
       "uri": "ak.wwise.core.object.get",
@@ -734,9 +734,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-property-reference.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-property-reference.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-live-read-only",
       "uri": "ak.wwise.core.object.getAttenuationCurve",
@@ -756,9 +756,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-property-reference.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-property-reference.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-live-read-only",
       "uri": "ak.wwise.core.object.getPropertyInfo",
@@ -778,9 +778,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-property-reference.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-property-reference.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-live-read-only",
       "uri": "ak.wwise.core.object.getTypes",
@@ -801,9 +801,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-object-mutation.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-sandbox-mutating",
       "uri": "ak.wwise.core.object.move",
@@ -824,9 +824,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-object-mutation.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-sandbox-mutating",
       "uri": "ak.wwise.core.object.pasteProperties",
@@ -847,9 +847,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-object-mutation.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-sandbox-mutating",
       "uri": "ak.wwise.core.object.set",
@@ -870,9 +870,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-property-reference.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-property-reference.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-sandbox-mutating",
       "uri": "ak.wwise.core.object.setAttenuationCurve",
@@ -893,9 +893,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-property-reference.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-property-reference.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-sandbox-mutating",
       "uri": "ak.wwise.core.object.setProperty",
@@ -916,9 +916,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-property-reference.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-property-reference.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-sandbox-mutating",
       "uri": "ak.wwise.core.object.setRandomizer",
@@ -939,9 +939,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-property-reference.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-property-reference.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-sandbox-mutating",
       "uri": "ak.wwise.core.object.setReference",
@@ -962,7 +962,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.profiler.getCpuUsage",
@@ -983,7 +983,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.profiler.getLoadedMedia",
@@ -1004,7 +1004,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.profiler.getMeters",
@@ -1025,7 +1025,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.profiler.getPerformanceMonitor",
@@ -1046,7 +1046,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.profiler.getRTPCs",
@@ -1067,7 +1067,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.profiler.getStreamedMedia",
@@ -1088,7 +1088,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.profiler.getVoiceContributions",
@@ -1109,7 +1109,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.profiler.registerMeter",
@@ -1130,9 +1130,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-soundbank.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-soundbank.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-sandbox-mutating",
       "uri": "ak.wwise.core.soundbank.convertExternalSources",
@@ -1154,9 +1154,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-soundbank.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-soundbank.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-sandbox-mutating",
       "uri": "ak.wwise.core.soundbank.generate",
@@ -1177,9 +1177,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-soundbank.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-soundbank.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-sandbox-mutating",
       "uri": "ak.wwise.core.soundbank.processDefinitionFiles",
@@ -1200,7 +1200,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.sourceControl.getSourceFiles",
@@ -1221,7 +1221,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "excluded",
       "uri": "ak.wwise.debug.generateToneWAV",
@@ -1242,7 +1242,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "excluded",
       "uri": "ak.wwise.debug.getWalTree",
@@ -1262,7 +1262,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.waapi.getSchema",
@@ -1283,9 +1283,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-object-mutation.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-live-read-only",
       "uri": "ak.wwise.core.object.structureChanged",
@@ -1305,7 +1305,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.log.itemAdded",
@@ -1326,9 +1326,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-object-mutation.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.object.childAdded",
@@ -1349,9 +1349,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-object-mutation.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.object.childRemoved",
@@ -1372,9 +1372,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-object-mutation.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.object.created",
@@ -1395,9 +1395,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-object-mutation.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.object.nameChanged",
@@ -1418,9 +1418,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-object-mutation.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.object.postDeleted",
@@ -1441,9 +1441,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-object-mutation.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-object-mutation.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.object.preDeleted",
@@ -1463,9 +1463,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-property-reference.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-property-reference.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-live-read-only",
       "uri": "ak.wwise.core.object.propertyChanged",
@@ -1486,7 +1486,7 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "deferred",
       "uri": "ak.wwise.core.profiler.captureLog.itemAdded",
@@ -1506,9 +1506,9 @@
       "source_evidence": [
         "resources/manifest/2025.1/added-since-2024.1.json",
         "resources/semantic/2025.1/source_notes.json",
-        "references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
-        "references/semantic/2025.1/semantic-builder-soundbank.md",
-        "references/semantic/2025.1/discrepancy-register.md"
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+        "skills/waapi-skill/references/semantic/2025.1/semantic-builder-soundbank.md",
+        "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md"
       ],
       "status": "candidate-live-read-only",
       "uri": "ak.wwise.core.soundbank.generated",
@@ -1516,7 +1516,7 @@
     }
   ],
   "metadata": {
-    "discrepancy_register": "references/semantic/2025.1/discrepancy-register.md",
+    "discrepancy_register": "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md",
     "generator": "task-2025-6-added-api-classification",
     "inventory_source": "resources/manifest/2025.1/added-since-2024.1.json",
     "policy": {

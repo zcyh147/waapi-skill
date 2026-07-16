@@ -140,7 +140,11 @@ def _validate_case(case: Mapping[str, Any]) -> None:
     if status not in CAPABILITY_STATUS_VALUES:
         raise ProfilerCapabilitySchemaError(f"Task 3 case {case_id} has invalid capability status {status!r}")
     evidence_path = _require_non_empty_string(case, "evidence_path")
-    if not evidence_path.startswith(".sisyphus/evidence/wwise-waapi-deferred-reevaluation/"):
+    accepted_evidence_roots = (
+        ".sisyphus/evidence/wwise-waapi-deferred-reevaluation/",  # historical committed provenance
+        ".waapi-skill-state/evidence/wwise-waapi-deferred-reevaluation/",  # current writer
+    )
+    if not evidence_path.startswith(accepted_evidence_roots):
         raise ProfilerCapabilitySchemaError(f"Task 3 case {case_id} has wrong evidence path {evidence_path!r}")
     for field in ("capture_sequence", "cleanup", "assertions", "uris"):
         values = case.get(field)

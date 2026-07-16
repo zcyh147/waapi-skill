@@ -41,7 +41,7 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
 from wwise_waapi.versions import WWISE_2021_1_VERSION_KEY  # pyright: ignore[reportMissingImports]
 
 
-DEFAULT_2021_DESTRUCTIVE_SANDBOX_ROOT = Path(".sisyphus") / "runtime" / "wwise-waapi-sandboxes" / "2021.1"
+DEFAULT_2021_DESTRUCTIVE_SANDBOX_ROOT = Path(".waapi-skill-state") / "runtime" / "wwise-waapi-sandboxes" / "2021.1"
 WWISE_2021_DESTRUCTIVE_TIMEOUTS = LifecycleTimeouts(readiness=180.0)
 GENERATED_OUTPUT_DIR_NAMES = {
     ".cache",

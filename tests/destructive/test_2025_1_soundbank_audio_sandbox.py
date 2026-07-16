@@ -29,7 +29,7 @@ from tests.support.active_gate_failures import skip_or_fail_unavailable  # pyrig
 CONTAINER_PARENT = r"\Containers\Default Work Unit"
 READBACK_FIELDS = ["id", "name", "type", "path", "notes"]
 REPO_ROOT = Path(__file__).resolve().parents[2]
-EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-2025-waapi-integration-coverage" / "destructive"
+EVIDENCE_ROOT = REPO_ROOT / ".waapi-skill-state" / "evidence" / "wwise-2025-waapi-integration-coverage" / "destructive"
 SOUNDBANK_PARENT = r"\SoundBanks\Default Work Unit"
 
 

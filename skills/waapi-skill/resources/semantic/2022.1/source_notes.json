@@ -38,7 +38,7 @@
       "return_shape": "Object with an objects array describing created or replaced objects according to options.return.",
       "source_urls": [
         "resources/manifest/2022.1/schemas.json",
-        "references/semantic-builder-import.md"
+        "references/semantic/2022.1/semantic-builder-import.md"
       ],
       "status": "grounded",
       "unsupported_cases": "Do not use this family for profiler, transport, soundengine, UI, CLI, remote, or debug APIs; do not set Switch Container state constraints through import builders.",
@@ -101,7 +101,7 @@
       "return_shape": "Object containing an objects array for modified or created objects, with fields controlled by options.return.",
       "source_urls": [
         "resources/manifest/2022.1/schemas.json",
-        "references/semantic-builder-object-mutation.md"
+        "references/semantic/2022.1/semantic-builder-object-mutation.md"
       ],
       "status": "grounded",
       "unsupported_cases": "Do not create Query objects or Source, Effect, or Metadata plug-ins here; do not populate Metadata, Clips, Sequences, or Stingers lists; do not rely on WAAPI creation order for constrained references.",
@@ -164,7 +164,7 @@
       "return_shape": "Metadata getters return object type/property/reference/curve metadata; setName, setNotes, setProperty, setReference, setRandomizer, and setAttenuationCurve return empty JSON objects; getPropertyInfo returns property metadata such as type, default, supports, display, dependencies, restrictions, and UI metadata.",
       "source_urls": [
         "resources/manifest/2022.1/schemas.json",
-        "references/semantic-builder-property-reference.md"
+        "references/semantic/2022.1/semantic-builder-property-reference.md"
       ],
       "status": "grounded",
       "unsupported_cases": "getPropertyInfo does not read the current property value; use ak.wwise.core.object.get for value readback instead.",
@@ -195,7 +195,7 @@
       "return_shape": "Object with a return array; each returned object contains key-value pairs requested by options.return, defaulting to id and name when no return list is supplied.",
       "source_urls": [
         "resources/waql/2022.1/object-get-examples.json",
-        "references/semantic-builder-query.md"
+        "references/semantic/2022.1/semantic-builder-query.md"
       ],
       "status": "grounded",
       "unsupported_cases": "Profiler, transport, soundengine, UI, CLI, remote, debug, and mutating WAQL-like operations are outside this family.",
@@ -251,7 +251,7 @@
       "return_shape": "getInclusions returns inclusion records; generate returns a logs array; setInclusions and convertExternalSources return empty JSON objects; processDefinitionFiles reports generation through WAAPI log output; generated and generationDone are topic payloads.",
       "source_urls": [
         "resources/manifest/2022.1/schemas.json",
-        "references/semantic-builder-soundbank.md"
+        "references/semantic/2022.1/semantic-builder-soundbank.md"
       ],
       "status": "grounded",
       "unsupported_cases": "Do not include profiler, transport, soundengine, UI, CLI, remote, or debug APIs; do not treat generationDone as a completion gate.",
@@ -294,13 +294,13 @@
       "return_shape": "addAssignment and removeAssignment return empty JSON objects; getAssignments returns a return array of child and stateOrSwitch assignment pairs; assignmentAdded and assignmentRemoved are topic payloads.",
       "source_urls": [
         "resources/manifest/2022.1/schemas.json",
-        "references/semantic-builder-switchcontainer.md"
+        "references/semantic/2022.1/semantic-builder-switchcontainer.md"
       ],
       "status": "grounded",
       "unsupported_cases": "No profiler, transport, soundengine, UI, CLI, remote, or debug APIs are part of this family.",
       "version_target": "2022.1"
     }
   },
-  "protocol": "references/semantic-builder-protocol.md",
+  "protocol": "references/semantic/2022.1/semantic-builder-protocol.md",
   "version": "2022.1"
 }

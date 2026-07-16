@@ -24,7 +24,7 @@ def test_live_sample_project_launches_only_from_sandbox() -> None:
     source_hash_before = None
     source_mtime_before = None
 
-    lock_root = Path(env.get("WWISE_SANDBOX_ROOT", ".sisyphus/runtime/wwise-waapi-sandboxes")).expanduser()
+    lock_root = Path(env.get("WWISE_SANDBOX_ROOT", ".waapi-skill-state/runtime/wwise-waapi-sandboxes")).expanduser()
     with LiveSandboxLock(lock_root):
         sandbox = prepare_sample_project_sandbox(env, hash_strategy="bounded")
         source_hash_before = hash_project(sandbox.source_root, preferred_strategy="bounded")
@@ -47,6 +47,6 @@ def test_live_sample_project_launches_only_from_sandbox() -> None:
     assert hash_project(sandbox.source_root, preferred_strategy="bounded").digest == source_hash_before.digest
     if failed and os.getenv("WWISE_SANDBOX_KEEP_ON_FAILURE") == "1":
         assert preserved is not None
-        assert ".sisyphus/evidence/wwise-waapi-live-sandbox-coverage" in str(preserved)
+        assert ".waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage" in str(preserved)
     else:
         assert not sandbox.sandbox_path.exists()

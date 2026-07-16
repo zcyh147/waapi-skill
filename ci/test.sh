@@ -26,7 +26,7 @@ Notes:
       WWISE_STARTUP_TIMEOUT, WWISE_READINESS_TIMEOUT,
       WWISE_PROBE_TIMEOUT, WWISE_SHUTDOWN_TIMEOUT
   - Default sandbox root if not set:
-      .sisyphus/runtime/wwise-waapi-sandboxes/<version>-<mode>
+      .waapi-skill-state/runtime/wwise-waapi-sandboxes/<version>-<mode>
 
 Examples:
   ci/test.sh --mode program
@@ -48,7 +48,7 @@ EOF
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SKILL_DIR="$ROOT_DIR/skills/waapi-skill"
-DEFAULT_SANDBOX_BASE="$ROOT_DIR/.sisyphus/runtime/wwise-waapi-sandboxes"
+DEFAULT_SANDBOX_BASE="$ROOT_DIR/.waapi-skill-state/runtime/wwise-waapi-sandboxes"
 export PYTHONPATH="$SKILL_DIR${PYTHONPATH:+:$PYTHONPATH}"
 
 INITIAL_WWISE_CONSOLE=""

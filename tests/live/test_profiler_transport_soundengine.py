@@ -59,7 +59,7 @@ TASK5_SOUNDENGINE_PATH = (
     / "task-5-profiler-soundengine-evidence.json"
 )
 TASK3_SOURCE_PROJECT = REPO_ROOT / "tests" / "_org" / "2022.1" / "SampleProject.wproj"
-EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-waapi-deferred-reevaluation"
+EVIDENCE_ROOT = REPO_ROOT / ".waapi-skill-state" / "evidence" / "wwise-waapi-deferred-reevaluation"
 TASK_PREFIX = "WAAPI_TASK3_SANDBOX_"
 CAPTURE_TIMEOUT_SECONDS = 5.0
 TRANSPORT_STATES = {"playing", "stopped", "paused"}
@@ -593,7 +593,7 @@ def _row_id(row: Mapping[str, Any]) -> str:
 
 def _safe_lock_root(env: Mapping[str, str]) -> Path:
     raw_root = env.get("WWISE_SANDBOX_ROOT")
-    root = Path(raw_root).expanduser() if raw_root else REPO_ROOT / ".sisyphus" / "runtime" / "wwise-waapi-sandboxes"
+    root = Path(raw_root).expanduser() if raw_root else REPO_ROOT / ".waapi-skill-state" / "runtime" / "wwise-waapi-sandboxes"
     root = root.resolve(strict=False)
     source_project = resolve_sample_project_source(env)
     if source_project is not None:

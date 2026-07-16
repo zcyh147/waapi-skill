@@ -37,4 +37,4 @@ Each source note records:
 
 The deterministic resource used by tests and future builders is `resources/semantic/2022.1/source_notes.json`. Markdown notes mirror that resource for human review.
 
-Persisted gate evidence for this source-note set is `references/semantic-builder-notebooklm-gate.md`. Do not copy `Auth result`, `List result`, or `Query result` claims into individual notes; the checker must read the evidence file and fail closed through `NotebookLMGate`.
+Persisted gate evidence for this source-note set is `references/semantic/2022.1/semantic-builder-notebooklm-gate.md`. Do not copy `Auth result`, `List result`, or `Query result` claims into individual notes; the checker must read the evidence file and fail closed through `NotebookLMGate`.

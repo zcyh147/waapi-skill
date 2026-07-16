@@ -1,3 +1,5 @@
+"""Identity handoff tests for packaged mutation and import builders."""
+
 from __future__ import annotations
 
 import pytest  # pyright: ignore[reportMissingImports]

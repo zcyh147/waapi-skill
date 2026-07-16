@@ -29,13 +29,13 @@ EXPECTED_WWISE_CONSOLE = WWISE_2025_1_CONSOLE_PATH
 EXPECTED_SAMPLE_PROJECT = WWISE_2025_1_SAMPLE_PROJECT_PATH
 PREREQUISITE_EVIDENCE = (
     REPO_ROOT
-    / ".sisyphus"
+    / ".waapi-skill-state"
     / "evidence"
     / "wwise-2025-waapi-integration-coverage"
     / "live-read-only"
     / "prerequisites-unavailable.json"
 )
-TASK_PREREQUISITE_BLOCKER = REPO_ROOT / ".sisyphus" / "evidence" / "task-2025-9-live-prereq-blocker.txt"
+TASK_PREREQUISITE_BLOCKER = REPO_ROOT / ".waapi-skill-state" / "evidence" / "task-2025-9-live-prereq-blocker.txt"
 
 
 @pytest.mark.live
@@ -55,8 +55,8 @@ def test_2025_live_environment_prerequisites_fail_fast() -> None:
 
 
 def test_2025_wrong_path_prerequisites_skip_before_sandbox_copy(monkeypatch: pytest.MonkeyPatch) -> None:
-    wrong_console = REPO_ROOT / ".sisyphus" / "runtime" / "wrong-2025" / "WwiseConsole.sh"
-    wrong_project = REPO_ROOT / ".sisyphus" / "runtime" / "wrong-2025" / "SampleProject.wproj"
+    wrong_console = REPO_ROOT / ".waapi-skill-state" / "runtime" / "wrong-2025" / "WwiseConsole.sh"
+    wrong_project = REPO_ROOT / ".waapi-skill-state" / "runtime" / "wrong-2025" / "SampleProject.wproj"
     monkeypatch.setenv(ENV_WWISE_LIVE, "1")
     monkeypatch.setenv(ENV_WWISE_VERSION, EXPECTED_WWISE_VERSION)
     monkeypatch.setenv(ENV_WWISE_CONSOLE, str(wrong_console))

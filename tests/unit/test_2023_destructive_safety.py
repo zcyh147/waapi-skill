@@ -29,7 +29,7 @@ ORG_FIXTURE_2023_ROOT = REPO_ROOT / "tests" / "_org" / "2023.1"
 
 def test_2023_destructive_target_must_be_sandbox_copy(monkeypatch: pytest.MonkeyPatch) -> None:
     existing_path_exists = Path.exists
-    installed_project = REPO_ROOT / ".sisyphus" / "runtime" / "test-installed-2023" / "SampleProject" / "SampleProject.wproj"
+    installed_project = REPO_ROOT / ".waapi-skill-state" / "runtime" / "test-installed-2023" / "SampleProject" / "SampleProject.wproj"
     fake_existing_paths = {
         WWISE_2023_1_CONSOLE_PATH.resolve(strict=False),
         WWISE_2023_1_SAMPLE_PROJECT_PATH.resolve(strict=False),

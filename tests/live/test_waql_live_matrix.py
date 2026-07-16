@@ -40,7 +40,7 @@ MATRIX_PATH = (
     / "2022.1"
     / "object-get-live-matrix.json"
 )
-EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-waapi-live-sandbox-coverage"
+EVIDENCE_ROOT = REPO_ROOT / ".waapi-skill-state" / "evidence" / "wwise-waapi-live-sandbox-coverage"
 WAQL_EVIDENCE_ROOT = EVIDENCE_ROOT / "waql"
 
 
@@ -101,7 +101,7 @@ def test_live_waql_matrix_runs_read_only_against_sandbox() -> None:
 
 def _safe_lock_root(env: Mapping[str, str]) -> Path:
     raw_root = env.get("WWISE_SANDBOX_ROOT")
-    root = Path(raw_root).expanduser() if raw_root else REPO_ROOT / ".sisyphus" / "runtime" / "wwise-waapi-sandboxes"
+    root = Path(raw_root).expanduser() if raw_root else REPO_ROOT / ".waapi-skill-state" / "runtime" / "wwise-waapi-sandboxes"
     root = root.resolve(strict=False)
     source_project = resolve_sample_project_source(env)
     if source_project is not None:

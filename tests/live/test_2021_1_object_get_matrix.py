@@ -45,9 +45,9 @@ from tests.live.test_2021_1_reflection_prerequisites import (  # pyright: ignore
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MATRIX_PATH = REPO_ROOT / "tests" / "fixtures" / "resource-evidence" / "waql" / EXPECTED_WWISE_VERSION / "object-get-live-matrix.json"
-SANDBOX_ROOT = REPO_ROOT / ".sisyphus" / "runtime" / "wwise-2021-live-read-only-sandboxes"
-EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-2021-waapi-integration-coverage" / "live-read-only"
-TASK_EVIDENCE = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-2021-waapi-integration-coverage" / "task-7-waql-matrix.json"
+SANDBOX_ROOT = REPO_ROOT / ".waapi-skill-state" / "runtime" / "wwise-2021-live-read-only-sandboxes"
+EVIDENCE_ROOT = REPO_ROOT / ".waapi-skill-state" / "evidence" / "wwise-2021-waapi-integration-coverage" / "live-read-only"
+TASK_EVIDENCE = REPO_ROOT / ".waapi-skill-state" / "evidence" / "wwise-2021-waapi-integration-coverage" / "task-7-waql-matrix.json"
 MUTATING_TOKENS = ("set", "delete", "create", "import", "move", "rename")
 READ_ONLY_WAAPI_OPERATIONS = ["ak.wwise.core.getInfo", WAQL_API_URI]
 
@@ -62,7 +62,7 @@ def test_2021_1_waql_matrix_cases_are_read_only_and_versioned() -> None:
         _assert_case_is_read_only(case)
         assert case["coverage_status"] == "live-tested"
         assert case["evidence_path"].startswith(
-            ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/"
+            ".waapi-skill-state/evidence/wwise-2021-waapi-integration-coverage/live-read-only/"
         )
         assert case["evidence_path"].endswith(f"/{case['id']}.json")
         assert any("resources/manifest/2021.1/schemas.json" in source for source in case["sources"])

@@ -7,7 +7,7 @@
 
 ## NotebookLM gate evidence
 
-- Evidence path: `references/semantic-builder-notebooklm-gate.md`
+- Evidence path: `references/semantic/2022.1/semantic-builder-notebooklm-gate.md`
 - Unlock rule: this note unlocks only when `NotebookLMGate` opens that persisted evidence file for notebook id `wwise-2022.1-docs`.
 
 ## Official/source URLs

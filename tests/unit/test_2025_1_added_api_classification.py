@@ -10,7 +10,7 @@ VERSION = "2025.1"
 CLASSIFICATION_RESOURCE = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / VERSION / "added-api-classification.json"
 INVENTORY_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "manifest" / VERSION / "added-since-2024.1.json"
 SOURCE_NOTES_RESOURCE = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "semantic" / VERSION / "source_notes.json"
-DISCREPANCY_REGISTER = REPO_ROOT / "references" / "semantic" / VERSION / "discrepancy-register.md"
+DISCREPANCY_REGISTER = REPO_ROOT / "skills" / "waapi-skill" / "references" / "semantic" / VERSION / "discrepancy-register.md"
 
 ALLOWED_STATUSES = {
     "candidate-live-read-only",
@@ -59,7 +59,7 @@ def test_2025_added_api_classification_uses_valid_status_and_reason_model() -> N
         assert entry["reason_codes"], entry["uri"]
         assert entry["source_evidence"][0] == "resources/manifest/2025.1/added-since-2024.1.json", entry["uri"]
         assert "resources/semantic/2025.1/source_notes.json" in entry["source_evidence"] or "missing_source_evidence" in entry["reason_codes"], entry["uri"]
-        assert "references/semantic/2025.1/discrepancy-register.md" in entry["source_evidence"], entry["uri"]
+        assert "skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md" in entry["source_evidence"], entry["uri"]
 
         if entry["reason_codes"] and DEFER_BY_DEFAULT_REASONS.intersection(entry["reason_codes"]):
             assert entry["status"] in {"deferred", "excluded", "candidate-sandbox-mutating"}, entry["uri"]

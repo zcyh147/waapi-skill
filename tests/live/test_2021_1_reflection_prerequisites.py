@@ -52,8 +52,8 @@ SOURCE_URIS = [
 ]
 REDACTED_LOCAL_PATH = "<local-path-redacted>"
 REFLECTION_TIMEOUTS = LifecycleTimeouts(readiness=180.0)
-SANDBOX_ROOT = REPO_ROOT / ".sisyphus" / "runtime" / "wwise-2021-live-read-only-sandboxes"
-EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-2021-waapi-integration-coverage"
+SANDBOX_ROOT = REPO_ROOT / ".waapi-skill-state" / "runtime" / "wwise-2021-live-read-only-sandboxes"
+EVIDENCE_ROOT = REPO_ROOT / ".waapi-skill-state" / "evidence" / "wwise-2021-waapi-integration-coverage"
 REFLECTION_EVIDENCE_ROOT = EVIDENCE_ROOT / "reflection"
 TASK_REFLECTION_EVIDENCE = EVIDENCE_ROOT / "task-4-reflection.json"
 PREREQUISITE_EVIDENCE = REFLECTION_EVIDENCE_ROOT / "prerequisites-unavailable.json"

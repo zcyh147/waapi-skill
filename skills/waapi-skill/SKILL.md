@@ -133,7 +133,7 @@ Conditional read for a query not fully covered by the fixed commands, exact-iden
 
 ### Operate lane
 
-Use operate for project-changing work: create, move, copy, delete, property/reference edits, imports, soundbanks, switch assignments, design previews, or guarded fallbacks such as XML editing.
+Use operate for project-changing work: create, move, copy, delete, property/reference edits, imports, soundbanks, switch assignments, and design previews.
 
 Examples:
 - “Create a new Event under this Work Unit.”
@@ -185,7 +185,6 @@ The catalog commands are offline and distinguish manifest availability, executab
 - Arbitrary Lua, unsafe/private debug APIs, unrestricted UI command registration/execution, and model-supplied CLI custom command hooks remain blocked. UI command add-ons can launch external programs, while unrestricted built-in command IDs can bypass reviewed project-transition guards. Isolated transactions audit absolute inputs and confine every explicit write path below `io_root`; any implicit Wwise-managed write is disclosed as unproven, never misreported as confined.
 - Do not search the repository to recover from a gateway error. A structured failure is the result unless the user explicitly asked to develop or debug this Skill itself.
 - If a capability has no packaged executable path, return a clear `unsupported_by_skill_interface` boundary instead of synthesizing code.
-- Do not treat XML editing as a normal first-line path. It is a guarded fallback inside the operate lane.
 - Editing this Skill's implementation is allowed only when the user's task is Skill development, testing, or debugging—not as a way to complete an ordinary Wwise request.
 
 ## Detailed references

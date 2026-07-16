@@ -40,7 +40,7 @@ from wwise_waapi.subscriptions import SubscriptionManager, SubscriptionTimeout  
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PLAN_PATH = REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / "2022.1" / "task-4-core-object-deferred-plan.json"
 DEFAULT_SOURCE_PROJECT = REPO_ROOT / "tests" / "_org" / "2022.1" / "SampleProject.wproj"
-EVIDENCE_ROOT = REPO_ROOT / ".sisyphus" / "evidence" / "wwise-waapi-deferred-reevaluation"
+EVIDENCE_ROOT = REPO_ROOT / ".waapi-skill-state" / "evidence" / "wwise-waapi-deferred-reevaluation"
 TEMP_PREFIX = "WAAPI_TASK4_OBJECT_"
 ACTOR_PARENT = r"\Actor-Mixer Hierarchy\Default Work Unit"
 READBACK_FIELDS = ["id", "name", "type", "path", "notes", "Volume"]
@@ -461,7 +461,7 @@ def _task_env(env: dict[str, str]) -> dict[str, str]:
 
 def _safe_lock_root(env: Mapping[str, str]) -> Path:
     raw_root = env.get("WWISE_SANDBOX_ROOT")
-    root = Path(raw_root).expanduser() if raw_root else REPO_ROOT / ".sisyphus" / "runtime" / "wwise-waapi-sandboxes"
+    root = Path(raw_root).expanduser() if raw_root else REPO_ROOT / ".waapi-skill-state" / "runtime" / "wwise-waapi-sandboxes"
     root = root.resolve(strict=False)
     source_project = resolve_sample_project_source(env)
     if source_project is not None:
