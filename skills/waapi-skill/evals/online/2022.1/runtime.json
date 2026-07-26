@@ -1007,12 +1007,12 @@
     "scenario_family": "registration_lifecycle_inventory",
     "scenario_index": 1,
     "prompt": "查看当前 Capture Time 的运行时对象，核对 Player_01、NPC_01 和刚离场的 NPC_Temporary：前两个还注册着，最后一个要有明确的注销时间。",
-    "protocol": "preview_confirm",
-    "confirmation_prompt": "可以，读取当前对象生命周期。",
+    "protocol": "single",
+    "confirmation_prompt": null,
     "fixture": {"adapter": "profiler_capture_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["runner 在同一捕获中注册三个 fixture ID，随后注销 NPC_Temporary", "保存三个 registration topic 与一个 unregistration topic 的时间戳"]},
     "trigger": null,
     "expected_dispatches": [{"api": "ak.wwise.core.profiler.getGameObjects", "count": 1, "effect": "按 Capture Time 读取 game-object lifecycle 表"}],
-    "oracle_assertions": [{"phase": "before", "adapter": "profiler_data_snapshot", "subject_api": "ak.wwise.core.profiler.getGameObjects", "expectation": "封存三对象 ID/name 与 topic 生命周期基线"}, {"phase": "preview", "adapter": "profiler_data_snapshot", "subject_api": "ak.wwise.core.profiler.getGameObjects", "expectation": "确认前注册集合和捕获 cursor 不变"}, {"phase": "after", "adapter": "waapi_profiler_readback", "subject_api": "ak.wwise.core.profiler.getGameObjects", "expectation": "三项 ID/name 精确匹配；Player/NPC_01 无 unregistrationTime，NPC_Temporary 的 unregistrationTime 等于 topic time 容差"}],
+    "oracle_assertions": [{"phase": "before", "adapter": "profiler_data_snapshot", "subject_api": "ak.wwise.core.profiler.getGameObjects", "expectation": "封存三对象 ID/name 与 topic 生命周期基线"}, {"phase": "after", "adapter": "waapi_profiler_readback", "subject_api": "ak.wwise.core.profiler.getGameObjects", "expectation": "三项 ID/name 精确匹配；Player/NPC_01 无 unregistrationTime，NPC_Temporary 的 unregistrationTime 等于 topic time 容差"}],
     "cleanup": {"adapter": "profiler_lifecycle_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
   },
   {
@@ -1024,12 +1024,12 @@
     "scenario_family": "high_id_registration_audit",
     "scenario_index": 2,
     "prompt": "从当前 Capture Time 找出 NetPlayer_Host 和 NetPlayer_Guest，比较它们的完整 64 位对象编号和注册时间，确认没有编号截断或名称对错。",
-    "protocol": "preview_confirm",
-    "confirmation_prompt": "确认，读取并核对这两个网络玩家。",
+    "protocol": "single",
+    "confirmation_prompt": null,
     "fixture": {"adapter": "profiler_capture_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["两个 fixture ID 的低 32 位相同、高 32 位不同，按已知顺序注册", "registration topic 保存原始 uint64 值、名称与 time"]},
     "trigger": null,
     "expected_dispatches": [{"api": "ak.wwise.core.profiler.getGameObjects", "count": 1, "effect": "读取包含完整 ID 与注册时间的对象表"}],
-    "oracle_assertions": [{"phase": "before", "adapter": "profiler_data_snapshot", "subject_api": "ak.wwise.core.profiler.getGameObjects", "expectation": "保存两个原始 uint64 ID 与注册事件顺序"}, {"phase": "preview", "adapter": "profiler_data_snapshot", "subject_api": "ak.wwise.core.profiler.getGameObjects", "expectation": "确认前两对象注册状态与完整 ID 不变"}, {"phase": "after", "adapter": "waapi_profiler_readback", "subject_api": "ak.wwise.core.profiler.getGameObjects", "expectation": "返回两个不同完整 uint64 ID，名称映射正确，registrationTime 顺序与 runner topic 记录一致"}],
+    "oracle_assertions": [{"phase": "before", "adapter": "profiler_data_snapshot", "subject_api": "ak.wwise.core.profiler.getGameObjects", "expectation": "保存两个原始 uint64 ID 与注册事件顺序"}, {"phase": "after", "adapter": "waapi_profiler_readback", "subject_api": "ak.wwise.core.profiler.getGameObjects", "expectation": "返回两个不同完整 uint64 ID，名称映射正确，registrationTime 顺序与 runner topic 记录一致"}],
     "cleanup": {"adapter": "profiler_lifecycle_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
   },
   {
@@ -1077,12 +1077,12 @@
     "scenario_index": 1,
     "prompt": "在当前 Capture Time 中，分析 Voice Pipeline ID 为 {voice_pipeline_id} 的 Player_01 脚步 voice 干声路径，从顶层 Actor-Mixer 到最终 Sound，把每一级对 Volume、LPF、HPF 的贡献列出来，并核对层级顺序。",
     "visible_inputs": [{"name": "voice_pipeline_id", "kind": "integer", "description": "当前 Capture Time 中目标 Player_01 脚步 voice 的 Pipeline ID"}],
-    "protocol": "preview_confirm",
-    "confirmation_prompt": "可以，读取这条 voice 的干声贡献树。",
+    "protocol": "single",
+    "confirmation_prompt": null,
     "fixture": {"adapter": "profiler_capture_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["目标长脚步 fixture voice 具有四级对象 hierarchy，每级设置唯一 Volume/LPF/HPF 差值", "voicePipelineID、object hidden GUID 顺序与 Capture Time 已封存"]},
     "trigger": null,
     "expected_dispatches": [{"api": "ak.wwise.core.profiler.getVoiceContributions", "count": 1, "effect": "以目标 voicePipelineID 和空 bus path 读取 dry contribution tree"}],
-    "oracle_assertions": [{"phase": "before", "adapter": "profiler_data_snapshot", "subject_api": "ak.wwise.core.profiler.getVoiceContributions", "expectation": "保存四级 GUID 顺序、各级参数差值与 voice pipeline"}, {"phase": "preview", "adapter": "profiler_data_snapshot", "subject_api": "ak.wwise.core.profiler.getVoiceContributions", "expectation": "确认前目标 voice、bus path 与对象参数没有变化"}, {"phase": "after", "adapter": "waapi_profiler_readback", "subject_api": "ak.wwise.core.profiler.getVoiceContributions", "expectation": "objects 树按 fixture 顶层到 voice 顺序返回四个 hidden GUID，累计及逐级 Volume/LPF/HPF 与 fixture 容差匹配"}],
+    "oracle_assertions": [{"phase": "before", "adapter": "profiler_data_snapshot", "subject_api": "ak.wwise.core.profiler.getVoiceContributions", "expectation": "保存四级 GUID 顺序、各级参数差值与 voice pipeline"}, {"phase": "after", "adapter": "waapi_profiler_readback", "subject_api": "ak.wwise.core.profiler.getVoiceContributions", "expectation": "objects 树按 fixture 顶层到 voice 顺序返回四个 hidden GUID，累计及逐级 Volume/LPF/HPF 与 fixture 容差匹配"}],
     "cleanup": {"adapter": "profiler_lifecycle_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
   },
   {
@@ -1095,12 +1095,12 @@
     "scenario_index": 2,
     "prompt": "在当前 Capture Time 中，Voice Pipeline ID 为 {voice_pipeline_id} 的 Cave_Emitter voice 同时走干声和 Cave_Reverb；干声 Bus Pipeline ID 数组是 {dry_bus_pipeline_ids}，辅助路径数组是 {aux_bus_pipeline_ids}。比较两条路径的贡献树，重点找出只在辅助路径出现的 Bus 和音量贡献。",
     "visible_inputs": [{"name": "voice_pipeline_id", "kind": "integer", "description": "当前 Capture Time 中目标 Cave_Emitter voice 的 Pipeline ID"}, {"name": "dry_bus_pipeline_ids", "kind": "structured_array", "description": "按路径顺序排列的干声 Bus Pipeline ID 数组"}, {"name": "aux_bus_pipeline_ids", "kind": "structured_array", "description": "按路径顺序排列的 Cave_Reverb 辅助 Bus Pipeline ID 数组"}],
-    "protocol": "preview_confirm",
-    "confirmation_prompt": "确认，读取干声和辅助路径做比较。",
+    "protocol": "single",
+    "confirmation_prompt": null,
     "fixture": {"adapter": "profiler_capture_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["目标 voicePipelineID 具有已知 dry bussesPipelineID 数组与 aux bussesPipelineID 数组", "Cave_Reverb bus hidden GUID 和 aux-only contribution 值已封存"]},
     "trigger": null,
     "expected_dispatches": [{"api": "ak.wwise.core.profiler.getVoiceContributions", "count": 1, "effect": "一次调用携带合并后的 dry 与 Cave_Reverb bus pipeline path ID 数组"}],
-    "oracle_assertions": [{"phase": "before", "adapter": "profiler_data_snapshot", "subject_api": "ak.wwise.core.profiler.getVoiceContributions", "expectation": "保存同一 voice 的两组 bus pipeline 与期望贡献树"}, {"phase": "preview", "adapter": "profiler_data_snapshot", "subject_api": "ak.wwise.core.profiler.getVoiceContributions", "expectation": "确认前 voice 与两条 bus path 生命周期不变"}, {"phase": "after", "adapter": "waapi_profiler_readback", "subject_api": "ak.wwise.core.profiler.getVoiceContributions", "expectation": "单次返回绑定同一 voicePipelineID 并覆盖两条路径；aux 树独有 cave_reverb_guid/贡献，dry 树不含该 GUID"}],
+    "oracle_assertions": [{"phase": "before", "adapter": "profiler_data_snapshot", "subject_api": "ak.wwise.core.profiler.getVoiceContributions", "expectation": "保存同一 voice 的两组 bus pipeline 与期望贡献树"}, {"phase": "after", "adapter": "waapi_profiler_readback", "subject_api": "ak.wwise.core.profiler.getVoiceContributions", "expectation": "单次返回绑定同一 voicePipelineID 并覆盖两条路径；aux 树独有 cave_reverb_guid/贡献，dry 树不含该 GUID"}],
     "cleanup": {"adapter": "profiler_lifecycle_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
   },
   {

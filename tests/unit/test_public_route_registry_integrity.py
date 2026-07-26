@@ -42,11 +42,11 @@ def test_every_registry_row_has_one_complete_route_contract() -> None:
     assert len({(row.version, row.item_type, row.uri) for row in rows}) == 814
     assert Counter(row.route for row in rows) == {
         "bounded_call": 60,
-        "bounded_topic_wait": 147,
-        "excluded": 45,
-        "fixed_command": 42,
-        "isolated_transaction": 135,
-        "managed_transaction": 234,
+        "bounded_topic_wait": 152,
+        "excluded": 6,
+        "fixed_command": 56,
+        "isolated_transaction": 141,
+        "managed_transaction": 248,
         "compound_transaction_member": 15,
         "transaction": 136,
     }

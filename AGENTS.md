@@ -15,6 +15,14 @@ for Wwise Authoring. Read this file before changing the Skill or running tests.
 - Support is intentionally version-pinned for Wwise `2021.1`, `2022.1`,
   `2023.1`, `2024.1`, and `2025.1`. Do not assume that a URI or schema is
   identical across versions.
+- The canonical `wwise-console` execution profile is the five-version
+  WwiseConsole reflection. The separate `wwise-authoring-ui` profile is only
+  that canonical surface plus the five fixed `ak.wwise.ui.commands.*` URIs;
+  it is not a complete Authoring reflection. Profile counts are packaged route
+  contracts, not claims that every row dispatches on the named host: all five
+  UI-command routes require Authoring, including rows retained in older Console
+  manifests. Live `getInfo.isCommandLine` selects the profile automatically.
+  Never add a caller-controlled live profile override.
 - Prefer deterministic code and structured results over prompt-only knowledge.
   When a capability is unavailable through the packaged interface, return a
   clear boundary instead of teaching the model how to synthesize a workaround.
@@ -43,7 +51,9 @@ for Wwise Authoring. Read this file before changing the Skill or running tests.
     `transaction_runtime.py`, `transaction_cleanup.py`, `io_policy.py`,
     `dispatcher.py`, `subscriptions.py`, and the semantic builders.
 - `skills/waapi-skill/resources/manifest/<version>/`
-  - reflected functions, topics, schemas, and immutable inventory metadata.
+  - reflected Console functions, topics, schemas, immutable inventory
+    metadata, and the narrow `authoring-ui-commands-supplement.json` and
+    `authoring-ui-command-inventory.json` resources.
 - `skills/waapi-skill/resources/deferred/<version>.json`
   - category and deferred-route classification.
 - `skills/waapi-skill/resources/semantic/<version>/` and `resources/waql/<version>/`
@@ -106,6 +116,13 @@ user's approval.
 - A new reflected API row needs an explicit public route or exclusion, versioned
   schema validation, safety classification, and program coverage. Same-count URI
   substitutions must fail the inventory digest checks.
+- Authoring UI command-ID inventories are host/project/plugin/add-on evidence
+  snapshots, never runtime allowlists. Execution and registration decisions
+  must use a fresh bounded `ak.wwise.ui.commands.getCommands` read. If these
+  resources need refreshing, use
+  `tests/maintenance/collect_authoring_ui_commands.py`; do not broaden the
+  collector beyond live `getInfo`, the five fixed schemas, and `getCommands`
+  without a new review.
 - A new mutation route needs a closed request schema, immutable preview artifact,
   confirmation binding, drift checks, non-retry semantics, and an appropriate
   verifier or an explicit weaker boundary.
@@ -164,7 +181,30 @@ Windows support evidence only from an actual Windows host. A missing prerequisit
 skip, or blocked lane is not passing evidence; report it explicitly and fail
 closed where the contract requires proof.
 
-### 4. Fresh Codex CLI semantic validation
+### 4. Real Authoring reflection maintenance
+
+Refresh the fixed UI-command supplement only against an already-running,
+matching Wwise Authoring process, one version at a time:
+
+```bash
+skills/waapi-skill/.venv/bin/python \
+  tests/maintenance/collect_authoring_ui_commands.py --version 2025.1
+```
+
+This developer-only collector is the narrow exception to the public Skill's
+no-direct-client rule. Per version it performs exactly seven read-only calls:
+`getInfo`, `getSchema` for each of the five fixed UI-command URIs, and
+`getCommands`. It must never execute, register, or unregister a command. Its
+command-ID inventory is an environment snapshot, not an allowlist. This
+maintenance evidence does not prove a UI business effect and is not part of
+the Console live/destructive matrix.
+
+The offline `capabilities --profile wwise-authoring-ui` and
+`describe <uri> --profile wwise-authoring-ui` options inspect the packaged
+overlay only. They are not configuration fields and cannot override live host
+detection.
+
+### 5. Fresh Codex CLI semantic validation
 
 Use this lane for changes to `SKILL.md`, routing, first-use behavior, exact output
 handling, or no-code/no-bypass behavior. Do not evaluate from an existing Codex

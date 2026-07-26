@@ -1,0 +1,256 @@
+{
+  "audit": {
+    "added_function_count": 4,
+    "added_schema_count": 5,
+    "added_topic_count": 1,
+    "inventory_sha256": "cf45646f92c93984500b5ceb7dbfa3d3df193df6c9d39c791f6ed29f52f9213b",
+    "schema_failure_count": 0,
+    "schema_override_count": 0
+  },
+  "format": "waapi-authoring-ui-commands-supplement-v1",
+  "functions": [
+    {
+      "reflection": {
+        "uri": "ak.wwise.ui.commands.execute"
+      },
+      "type": "function",
+      "uri": "ak.wwise.ui.commands.execute"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.ui.commands.getCommands"
+      },
+      "type": "function",
+      "uri": "ak.wwise.ui.commands.getCommands"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.ui.commands.register"
+      },
+      "type": "function",
+      "uri": "ak.wwise.ui.commands.register"
+    },
+    {
+      "reflection": {
+        "uri": "ak.wwise.ui.commands.unregister"
+      },
+      "type": "function",
+      "uri": "ak.wwise.ui.commands.unregister"
+    }
+  ],
+  "metadata": {
+    "authoring_ui_commands_reflection_sha256": "bbf7a26066d066c29828f8c8eff8ccc20f433252da9d31e630497fbaa4f34599",
+    "base_host_surface": "wwise-console",
+    "console_reflection_inventory_sha256": "82c07fde08d7e7a32cd7162068897a273c7346e362cdb410e4f9a8cb87c1a909",
+    "generator": "wwise_waapi.authoring_ui_commands_manifest.build_authoring_ui_commands_supplement",
+    "host_surface": "wwise-authoring",
+    "inventory_source": "targeted-authoring-ui-commands-collection",
+    "manifest_origin": "authoring-ui-commands-reflection",
+    "scope_uris": [
+      "ak.wwise.ui.commands.execute",
+      "ak.wwise.ui.commands.executed",
+      "ak.wwise.ui.commands.getCommands",
+      "ak.wwise.ui.commands.register",
+      "ak.wwise.ui.commands.unregister"
+    ],
+    "surface_scope": "ak.wwise.ui.commands",
+    "wwise_build": "2024.1.13.9056",
+    "wwise_version_target": "2024.1"
+  },
+  "schema_overrides": [],
+  "schemas": [
+    {
+      "schema": {
+        "argsSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "description": "The ID of the command to execute. Refer to \\ref globalcommandsids for the lists of commands.",
+              "type": "string"
+            },
+            "objects": {
+              "description": "An array of objects. Each object is an ID (GUID), name, or path of the object. Some commands can take objects as arguments. Refer to the commands for more information.",
+              "items": {
+                "$ref": "waapi_definitions.json#/definitions/objectArg"
+              },
+              "type": "array"
+            },
+            "platforms": {
+              "description": "An array of platform. Each platform is an ID (GUID) or a unique name. Some commands can take platforms as arguments. Refer to the commands for more information.",
+              "items": {
+                "$ref": "waapi_definitions.json#/definitions/platformArg"
+              },
+              "type": "array"
+            },
+            "value": {
+              "$ref": "common_definitions.json#/definitions/propertyValue",
+              "description": "A value to pass to the command. Some commands can take a value as an argument. Refer to the commands for more information."
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        },
+        "description": "Executes a command. Some commands can take a list of objects as parameters. Refer to \\ref globalcommandsids for the available commands.",
+        "optionsSchema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "resultSchema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        }
+      },
+      "status": "ok",
+      "uri": "ak.wwise.ui.commands.execute"
+    },
+    {
+      "schema": {
+        "description": "Sent when a command is executed. The objects for which the command is executed are sent in the publication.",
+        "optionsSchema": {
+          "$ref": "waapi_definitions.json#/definitions/objectReturnOptions",
+          "description": "Specifies the return options for every object returned."
+        },
+        "publishSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "description": "The command ID that was executed.",
+              "type": "string"
+            },
+            "objects": {
+              "description": "The objects for which the command was executed. The objects are usually the selected objects. They are returned in the format specified in the options. Can be empty if no object is used.",
+              "items": {
+                "$ref": "waapi_definitions.json#/definitions/objectReturn",
+                "description": "The objects. Use the options to specify which data to return. Default returns id and name."
+              },
+              "type": "array"
+            },
+            "platforms": {
+              "description": "An array of platform for which the command is executed. Each platform is an ID (GUID).",
+              "items": {
+                "$ref": "waapi_definitions.json#/definitions/platformArg"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "command",
+            "objects",
+            "platforms"
+          ],
+          "type": "object"
+        }
+      },
+      "status": "ok",
+      "uri": "ak.wwise.ui.commands.executed"
+    },
+    {
+      "schema": {
+        "argsSchema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "description": "Gets the list of commands.",
+        "optionsSchema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "resultSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "commands": {
+              "description": "An array of command ids.",
+              "items": {
+                "description": "Command ids which can be used with ak.wwise.ui.commands.execute.",
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "status": "ok",
+      "uri": "ak.wwise.ui.commands.getCommands"
+    },
+    {
+      "schema": {
+        "argsSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "commands": {
+              "$ref": "waapi_definitions.json#/definitions/addOnsCommands",
+              "description": "Data for the commands to be registered."
+            }
+          },
+          "required": [
+            "commands"
+          ],
+          "type": "object"
+        },
+        "description": "Registers an array of add-on commands. Registered commands remain until the Wwise process is terminated. Refer to \\ref defining_custom_commands for more information about registering commands. Also refer to \\ref ak_wwise_ui_commands_executed.",
+        "optionsSchema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "resultSchema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        }
+      },
+      "status": "ok",
+      "uri": "ak.wwise.ui.commands.register"
+    },
+    {
+      "schema": {
+        "argsSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "commands": {
+              "description": "An array of commands to unregister.",
+              "items": {
+                "description": "A command ID.",
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "commands"
+          ],
+          "type": "object"
+        },
+        "description": "Unregisters an array of add-on UI commands.",
+        "optionsSchema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "resultSchema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        }
+      },
+      "status": "ok",
+      "uri": "ak.wwise.ui.commands.unregister"
+    }
+  ],
+  "topics": [
+    {
+      "reflection": {
+        "uri": "ak.wwise.ui.commands.executed"
+      },
+      "type": "topic",
+      "uri": "ak.wwise.ui.commands.executed"
+    }
+  ]
+}

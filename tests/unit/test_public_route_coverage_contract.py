@@ -22,28 +22,18 @@ from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 # Deliberately independent of production routing code: changing production
 # exclusions cannot silently lower the acceptance target.
 APPROVED_EXCLUSION_URIS = {
-    "ak.wwise.cli.executeLuaScript",
-    "ak.wwise.core.executeLuaScript",
-    "ak.wwise.debug.enableAsserts",
-    "ak.wwise.debug.enableAutomationMode",
-    "ak.wwise.debug.getWalTree",
-    "ak.wwise.debug.restartWaapiServers",
-    "ak.wwise.debug.testAssert",
-    "ak.wwise.debug.testCrash",
-    "ak.wwise.debug.validateCall",
-    "ak.wwise.debug.assertFailed",
     "ak.wwise.ui.commands.register",
     "ak.wwise.ui.commands.execute",
 }
 
 
-def test_five_version_public_route_contract_is_exactly_769_rows() -> None:
+def test_five_version_public_route_contract_is_exactly_808_rows() -> None:
     summary = validate_packaged_execution_contracts()
 
     assert summary["manifest_rows"] == 814
-    assert summary["executable_rows"] == EXPECTED_PUBLIC_VERSION_ROWS == 769
-    assert summary["excluded_rows"] == 45
-    assert summary["unique_public_uris"] == EXPECTED_PUBLIC_UNIQUE_URIS == 188
+    assert summary["executable_rows"] == EXPECTED_PUBLIC_VERSION_ROWS == 808
+    assert summary["excluded_rows"] == 6
+    assert summary["unique_public_uris"] == EXPECTED_PUBLIC_UNIQUE_URIS == 198
     assert set(APPROVED_EXCLUSIONS) == APPROVED_EXCLUSION_URIS
 
 
@@ -77,7 +67,7 @@ def test_capability_catalog_counts_only_real_execution_contracts() -> None:
         and entry.execution_contract.get("executable") is True
     ]
 
-    assert len(executable) == 769
+    assert len(executable) == 808
     assert {entry.uri for entry in executable} == {
         entry.uri
         for version in SUPPORTED_WWISE_VERSION_KEYS

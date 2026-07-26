@@ -43,11 +43,11 @@ REVIEWED_TOPIC_URIS = _reviewed_topic_uris()
 # now represented by an executable transaction contract instead.
 BOUNDED_CALL_CANDIDATES: Mapping[str, str] = MappingProxyType({})
 EXPLICIT_UNSUPPORTED_LIVE_URIS: Mapping[str, str] = MappingProxyType(
-    {uri: reason for uri, reason in APPROVED_EXCLUSIONS.items() if uri != "ak.wwise.debug.assertFailed"}
+    dict(APPROVED_EXCLUSIONS)
 )
 IMMEDIATE_UNSUPPORTED_CALL_URIS = frozenset(EXPLICIT_UNSUPPORTED_LIVE_URIS)
 EXPLICIT_UNSUPPORTED_TOPIC_URIS: Mapping[str, str] = MappingProxyType(
-    {"ak.wwise.debug.assertFailed": APPROVED_EXCLUSIONS["ak.wwise.debug.assertFailed"]}
+    {}
 )
 
 

@@ -24,7 +24,7 @@ SUMMARY_RESOURCE = Path(__file__).resolve().parents[2] / "tests" / "destructive"
 EXECUTION_STATUS_BY_CATEGORY = {
     "cli": "isolated-transaction",
     "core.remote": "managed-transaction",
-    "debug": "selective-execution",
+    "debug": "guarded-execution",
     "ui": "guarded-execution",
     "ui.commands": "guarded-execution",
     "ui.project": "guarded-execution",
@@ -86,11 +86,10 @@ def test_before_after_counts_preserve_phase1_baseline_and_phase2_policy() -> Non
     assert summary["phase2_status_counts"] == {
         "conformance-only-skip": 11,
         "fake-route-tested": 25,
-        "guarded-execution": 11,
+        "guarded-execution": 16,
         "isolated-transaction": 12,
         "managed-transaction": 4,
         "sandbox-mutating-tested": 13,
-        "selective-execution": 5,
         "still-deferred-with-evidence": 63,
     }
     assert summary["phase2_status_counts"].get("live-sandbox-tested", 0) == 0

@@ -65,6 +65,11 @@ python scripts/run.py gateway.py query-object --search 'ExactName' --where-json 
 python scripts/run.py gateway.py --version 2025.1 query-object --type AudioFileSource --take 1000 --match-original-file-path '<first-complete-returned-Path>' --match-original-file-path '<second-complete-returned-Path>'
 python scripts/run.py gateway.py metadata types --summary-only
 python scripts/run.py gateway.py metadata property-info --object '{GUID}' --property Volume
+python scripts/run.py gateway.py project-default-work-units
+python scripts/run.py gateway.py --version 2022.1 profiler-game-objects --time capture
+python scripts/run.py gateway.py --version 2025.1 profiler-voice-contributions --time capture --voice-pipeline-id 17 --bus-pipeline-id 21 --bus-pipeline-id 22
+python scripts/run.py gateway.py --version 2025.1 debug-wal-tree --take 128
+python scripts/run.py gateway.py --version 2025.1 debug-validate-call ak.wwise.core.object.get --args-json '{"from":{"id":["{GUID}"]}}' --options-json '{"return":["id","name"]}'
 python scripts/run.py gateway.py --timeout 10 wait-topic ak.wwise.core.object.created --match-json '{"object":{"id":"{GUID}"}}'
 python scripts/run.py gateway.py --timeout 120 wait-topic ak.wwise.core.soundbank.generated --options-json '{"return":["id","name","type","path"]}' --event-count 2 --match-json '{"soundbank":{"name":"Weapons_Core"}}'
 python scripts/run.py gateway.py capabilities --all-versions --query object.get --limit 20
@@ -203,13 +208,58 @@ python scripts/run.py gateway.py query-object --path '\Actor-Mixer Hierarchy\Def
 
 For a machine-readable object-type summary, use the fixed `metadata types --summary-only` route. Its successful payload exposes the bounded projection as `agent_result`; compact-serialize that object exactly into the requested result envelope and stop. Do not derive a replacement from `normalized`, alter its keys or values, or repeat the metadata command after success. This fixed-read projection follows the same terminal `agent_result` rule as a successful transaction payload.
 
+Use the three version-stable fixed reads instead of composing their reflected
+payloads. `profiler-game-objects` accepts only a non-negative millisecond time
+or the exact `user` / `capture` cursor and is available in Wwise 2022.1–2025.1;
+it normalizes the 2022.1 `registrationTime` spelling to the same public
+`register_time` shape used for later versions.
+`profiler-voice-contributions` is available in all five versions, requires one
+unsigned 32-bit voice pipeline ID, and accepts up to 64 repeated ordered bus
+pipeline IDs; omit the bus flags for the explicit dry path. Its DSF projection
+keeps `feature_available`, `reported`, and `value` separate, so older versions
+never receive a fabricated zero. `project-default-work-units` likewise keeps
+availability, reporting, and value separate for the `defaultWorkUnits` and
+`defaultImportWorkUnit` fields introduced in Wwise 2025.1. Each successful
+command exposes its stable projection as the terminal `agent_result`; do not
+rebuild it from the raw version-specific fields.
+
 `query-object` accepts exactly one source: `--path`, `--object-id`, `--type`, `--search`, or `--query`. Here `--query` means an existing Wwise Query Editor object identified by a canonical `{GUID}` or an absolute `\Queries\...` path with single backslash hierarchy separators. It never accepts raw WAQL such as `from type Sound`; use the other closed source and transform flags instead. Supported `--select` values are `descendants`, `ancestors`, `referencesTo`, `children`, and `parent`; `this` and `owner` remain outside the packaged boundary. In `--where-json`, `=` is exact equality and `:` is a contains/match predicate; when the user says a field must equal an exact value, use `=` even if the source is `--search`. Every broad source (`--type`, `--search`, `--query`) and every `--select` transform requires either `--take N`, where `N` is between `0` and `1000`, or the explicit `--all-results` opt-in. `--take` and `--all-results` cannot be combined. Use `--all-results` only when the user explicitly requests an unbounded result set. Exact path/GUID lookup without a transform remains one-object bounded and needs neither flag. A bounded success that exceeds its `take`, an untransformed exact lookup that returns more than one row, or a fixed `buses` result above 1000 rows is rejected as protocol drift; `--all-results` remains unbounded for genuinely broad queries. The fixed `buses` command uses `take 1000`, reports that bound in its JSON, and marks a 1000-row response as possibly truncated. The gateway defaults to `id,name,type,path`; supplying any `--return-field` replaces that default list, so repeat the flag for every field needed. An untransformed exact `--path` lookup must return `path`, and an exact `--object-id` lookup must return `id`; the gateway normalizes path separators/case or GUID case and rejects a mismatched returned identity. For exact identity inspection, keep those four fields explicit for an exact path/GUID identity lookup. Successful object queries must return a JSON object containing a `return` array of JSON object rows; an invalid response shape or bound is a structured error, never an empty-result substitute. A successful selection must likewise contain an explicit `objects` array whose every row is an object; only `objects: []` means a valid empty selection.
 
 `wait-topic` accepts only an exact URI in the reviewed topic allowlist. Its `--event-count` defaults to `1` and is restricted to `1..64`; one end-to-end timeout covers subscription setup and collection of the full requested count. `--match-json` is a recursive payload subset applied independently to every candidate event, and non-matching events do not consume the requested count. The route always unsubscribes on success or timeout, and the complete dispatcher collection shares the topic execution contract's 256 KiB JSON result ceiling. Default single-event mode preserves the existing `event` result. Multi-event mode returns ordered `events`, `event_count`, and `requested_event_count`, with every payload validated against that version's reflected `publishSchema`. Collection stops after the requested number of matches, so it does not by itself prove that no later `(N+1)` event exists; an exact-cardinality test needs a runner-owned publisher/oracle for that assertion.
 
+The five `ak.wwise.ui.commands.*` APIs use the automatically selected
+Authoring host profile. For a command inventory, call
+`ak.wwise.ui.commands.getCommands` directly through the live bounded `call`
+route; do not first use the default Console-profile `describe`, because
+Wwise 2024.1 and 2025.1 obtain these schemas from the Authoring supplement.
+For an explicit offline schema audit, use
+`gateway.py --version <version> describe ak.wwise.ui.commands.getCommands --profile wwise-authoring-ui`;
+that option inspects the packaged catalog only and cannot override the live
+profile.
+Observe executed commands with bounded
+`wait-topic ak.wwise.ui.commands.executed`. The gateway derives the profile
+only from live `getInfo.isCommandLine`; WwiseConsole returns
+`AUTHORING_HOST_REQUIRED` without dispatching the requested UI API.
+
+The packaged observed command-ID snapshots contain 317 / 451 / 475 / 594 / 623
+rows for Wwise 2021.1 through 2025.1. They reflect the project, installed
+plug-ins, registered add-ons, and exact Wwise build present during collection.
+They are not cross-machine allowlists. A modifying UI-command operation always
+uses a fresh live `getCommands` result immediately before dispatch.
+
 For `ak.wwise.core.soundbank.generated`, use a 120-second timeout by default because the matching generation may need to finish after the subscription is established. This topic-specific default overrides the general 5–10 second guidance; use another finite timeout only when the user explicitly supplies it. Use exactly `{"return":["id","name","type","path"]}` as the subscription options. Those four fields provide the bounded SoundBank identity needed for the user-facing result and are the closed route default; do not vary them from case wording. Set `--event-count` to the number of requested Bank × platform × language cells. Build `--match-json` only from names explicitly present in the user's request: include `soundbank.name` when one Bank name is common to every requested cell, and include `platform.name` when one platform name is common to every cell. If neither dimension has one common name, omit `--match-json` instead of passing an empty object. Never discover or inject a GUID only to construct the subscription predicate; exact GUID correlation belongs to the trusted post-return oracle, not to the model-authored command.
 
-`object.created` fires before the final name is applied, so do not match it by the requested name. An ActorMixer create reports event type `ActorMixer` in Wwise 2021.1-2024.1 but `PropertyContainer` in Wwise 2025.1; use the version-specific type as a bounded predicate and correlate `event.object.id` with trusted publisher evidence when exact ownership matters. The sole excluded topic, `ak.wwise.debug.assertFailed`, and any unreviewed future topic return `UNSUPPORTED_BY_SKILL_INTERFACE` before subscription.
+`object.created` fires before the final name is applied, so do not match it by the requested name. An ActorMixer create reports event type `ActorMixer` in Wwise 2021.1-2024.1 but `PropertyContainer` in Wwise 2025.1; use the version-specific type as a bounded predicate and correlate `event.object.id` with trusted publisher evidence when exact ownership matters. `ak.wwise.debug.assertFailed` is available through the same bounded `wait-topic` route and its versioned publish schema; it is a diagnostic event, not proof that an assertion request was safely recovered. Any unreviewed future topic returns `UNSUPPORTED_BY_SKILL_INTERFACE` before subscription.
+
+`debug-wal-tree` is the only route for `ak.wwise.debug.getWalTree` and is
+available in Wwise 2023.1–2025.1. It takes `1..256`, validates every returned
+node, sorts by the reflected node-map key, and returns only the bounded
+projection under terminal `agent_result`. `debug-validate-call` is available
+in Wwise 2024.1–2025.1 and asks Wwise to validate, not execute, one exact
+reflected function request. Supply only the sections the user actually wants
+validated; omitted args/options/result sections remain omitted. Both APIs are
+private/debug-build surfaces and may still be rejected by a non-Debug Wwise
+binary even when their versioned schema exists.
 
 An invalid response shape is a structured error. It must never be converted into an empty query, Bus list, project, or selection.
 

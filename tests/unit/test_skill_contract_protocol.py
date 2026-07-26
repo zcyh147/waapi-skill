@@ -775,6 +775,8 @@ def test_dedicated_operations_and_generic_transaction_fallback_are_truthful() ->
     for operation in (
         "object.create",
         "object.set",
+        "object.setLinked",
+        "object.setRTPC",
         "object.delete",
         "object.setName",
         "object.setNotes",
@@ -788,6 +790,10 @@ def test_dedicated_operations_and_generic_transaction_fallback_are_truthful() ->
         "soundbank.processDefinitionFiles",
         "switchContainer.addAssignment",
         "switchContainer.removeAssignment",
+        "ui.captureScreen",
+        "ui.commands.execute",
+        "ui.commands.register",
+        "ui.commands.unregister",
     ):
         assert f"`{operation}`" in OPERATE
     assert "`waapi.call`: one exact version-reflected API" in OPERATE
@@ -802,7 +808,8 @@ def test_dedicated_operations_and_generic_transaction_fallback_are_truthful() ->
     assert "audio.importTabDelimited" not in incomplete_sentence.split(". That boundary", 1)[0]
     assert "soundbank.generate" not in incomplete_sentence.split(". That boundary", 1)[0]
     assert "the three Undo Group members declare only `waapi.undoGroup`" in OPERATE
-    assert "Platform-specific values are not yet accepted" in OPERATE
+    assert "An optional explicit `platform` is accepted only after `isPropertyEnabled`" in OPERATE
+    assert "An optional explicit `platform` is used for the enablement check" in OPERATE
 
 
 def test_tab_delimited_import_documents_wwise_physical_separator_boundary() -> None:
@@ -943,14 +950,32 @@ def test_import_language_and_use_existing_mapping_are_row_sensitive() -> None:
 
 
 def test_five_version_coverage_reference_reports_executable_registry_not_boundaries() -> None:
-    assert "| Total version/API rows | 814 | 249 | 520 | 45 | 769 |" in COVERAGE
-    assert "The 769 executable rows represent 188 unique public WAAPI URIs" in COVERAGE
-    assert "A hard boundary is never counted as executable coverage" in COVERAGE
+    coverage_flat = " ".join(COVERAGE.split())
+    assert "| Total version/API rows | 814 | 268 | 540 | 6 | 808 |" in COVERAGE
+    assert "The 808 packaged route rows represent 198 unique public WAAPI route contracts" in COVERAGE
+    assert "A hard boundary is never counted as routed coverage" in COVERAGE
+    assert "still require a live Authoring host" in coverage_flat
+    assert "`AUTHORING_HOST_REQUIRED` before business" in coverage_flat
     assert "manifest-registered `waapi.call` operation" in COVERAGE
-    assert "Arbitrary Lua is excluded because it recreates model-authored code execution" in COVERAGE
+    assert "Lua file operations are executable only from an existing `.lua` file" in COVERAGE
+    assert (
+        "Hidden/model-authored source and unrestricted loader fields remain closed"
+        in coverage_flat
+    )
     assert "program-tested packaged coverage" in COVERAGE
     assert "not individually" in COVERAGE
     assert "live-semantic-verified" in COVERAGE
+
+
+def test_lua_source_authority_is_explicitly_a_caller_assertion_not_proof() -> None:
+    skill_flat = " ".join(SKILL.split())
+    operate_flat = " ".join(OPERATE.split())
+
+    assert "`source_authority` is a caller assertion in the request protocol" in skill_flat
+    assert "set it only when the current user message actually supplies" in skill_flat
+    assert "`source_authority` is only a caller assertion in the request protocol" in operate_flat
+    assert "cannot independently prove who authored or supplied them" in operate_flat
+    assert "Never generate, repair, wrap, augment, or hide Lua" in operate_flat
 
 
 def test_transaction_runtime_invariants_prevent_confirmation_target_and_retry_drift() -> None:
@@ -980,7 +1005,8 @@ def test_lifecycle_cleanup_statuses_and_bindings_are_documented() -> None:
         "ambiguous execution is `unknown`",
         "Transport destroy binds only to the validated ID returned by create",
         "Work Unit load/unload is reported separately as `available_reversal`",
-        "UI command register/execute are excluded entirely",
+        "A successful closed UI registration retains its exact unregister cleanup companion",
+        "Both standalone UI unregister forms have unknown ownership and no inverse",
     ):
         assert phrase in OPERATE
 

@@ -20,10 +20,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from .authoring_ui_commands_manifest import (
+    AUTHORING_UI_COMMAND_URIS,
+    AuthoringUiCommandsSupplementError,
+    AuthoringUiCommandsSupplementMissingError,
+)
 from .builders.source_notes import load_semantic_source_notes
 from .category_policy import category_policy
 from .deferred_registry import ApiClassifier
 from .execution_contracts import (
+    AUTHORING_UI_DEDICATED_OPERATIONS,
+    AUTHORING_UI_EXECUTION_PROFILE,
+    CONSOLE_EXECUTION_PROFILE,
     ExecutionContract,
     ExecutionContractError,
     ExecutionContractRegistry,
@@ -76,6 +84,13 @@ class CapabilityRecord:
     policy: Mapping[str, Any] | None = None
     evidence: Mapping[str, Any] = field(default_factory=dict)
     execution_contract: Mapping[str, Any] = field(default_factory=dict)
+    manifest_runtime_profile: str = CONSOLE_EXECUTION_PROFILE
+    authoring_ui_profile: str = "not_reflected_separately"
+    host_surface: str | None = None
+    full_authoring_inventory_reflected: bool | None = None
+    authoring_ui_commands_supplement_evidence: Mapping[str, Any] = field(
+        default_factory=dict
+    )
 
     def as_compact_dict(self) -> dict[str, Any]:
         """Return the stable agent-facing inventory row.
@@ -85,7 +100,7 @@ class CapabilityRecord:
         Use :meth:`as_dict` only for an explicitly requested detailed row.
         """
 
-        return {
+        result = {
             "version": self.version,
             "uri": self.uri,
             "item_type": self.item_type,
@@ -100,32 +115,56 @@ class CapabilityRecord:
             "read_only": self.safety.read_only,
             "execution_contract": _compact_execution_contract(self.execution_contract),
         }
+        if self.host_surface is not None:
+            result["host_surface"] = self.host_surface
+        if self.full_authoring_inventory_reflected is not None:
+            result["full_authoring_inventory_reflected"] = (
+                self.full_authoring_inventory_reflected
+            )
+        if self.authoring_ui_commands_supplement_evidence:
+            result["authoring_ui_commands_supplement_evidence"] = _json_safe(
+                self.authoring_ui_commands_supplement_evidence
+            )
+        return result
 
     def as_dict(self, *, detail: bool = False) -> dict[str, Any]:
         schema_summary = _schema_summary(self.schema_status, self.schema)
         if detail and self.schema_status == "ok":
             schema_summary["full"] = _json_safe(self.schema)
+        interface = {
+            "status": self.safety.interface_status,
+            "preferred_route": self.preferred_route,
+            "execution_mode": self.execution_mode,
+            "fixed_commands": list(self.fixed_commands),
+            "gateway_commands": list(self.gateway_commands),
+            "transaction_operations": list(self.transaction_operations),
+            "transaction_boundaries": [
+                _json_safe(item) for item in self.transaction_boundaries
+            ],
+            "semantic_family": self.semantic_family,
+            "requires_live_wwise": True,
+            "manifest_runtime_profile": self.manifest_runtime_profile,
+            "authoring_ui_profile": self.authoring_ui_profile,
+            "schema_validation_level": "bounded_recursive_reflection",
+            **self.safety.as_dict(),
+        }
+        if self.host_surface is not None:
+            interface["host_surface"] = self.host_surface
+        if self.full_authoring_inventory_reflected is not None:
+            interface["full_authoring_inventory_reflected"] = (
+                self.full_authoring_inventory_reflected
+            )
+        if self.authoring_ui_commands_supplement_evidence:
+            interface["authoring_ui_commands_supplement_evidence"] = _json_safe(
+                self.authoring_ui_commands_supplement_evidence
+            )
         return {
             "version": self.version,
             "uri": self.uri,
             "item_type": self.item_type,
             "category": self.category,
             "risk_level": self.risk_level,
-            "interface": {
-                "status": self.safety.interface_status,
-                "preferred_route": self.preferred_route,
-                "execution_mode": self.execution_mode,
-                "fixed_commands": list(self.fixed_commands),
-                "gateway_commands": list(self.gateway_commands),
-                "transaction_operations": list(self.transaction_operations),
-                "transaction_boundaries": [_json_safe(item) for item in self.transaction_boundaries],
-                "semantic_family": self.semantic_family,
-                "requires_live_wwise": True,
-                "manifest_runtime_profile": "wwise-console",
-                "authoring_ui_profile": "not_reflected_separately",
-                "schema_validation_level": "bounded_recursive_reflection",
-                **self.safety.as_dict(),
-            },
+            "interface": interface,
             "execution_contract": _json_safe(self.execution_contract),
             "schema": schema_summary,
             "policy": _json_safe(self.policy) if self.policy is not None else None,
@@ -162,8 +201,66 @@ class CapabilityCatalog:
         return tuple(SUPPORTED_WWISE_VERSION_KEYS)
 
     def entries(self, version: str) -> tuple[CapabilityRecord, ...]:
+        """Return the unchanged default WwiseConsole capability profile."""
+
+        return self._entries_for_profile(
+            version,
+            profile=CONSOLE_EXECUTION_PROFILE,
+        )
+
+    def entries_for_profile(
+        self,
+        version: str,
+        *,
+        profile: str,
+    ) -> tuple[CapabilityRecord, ...]:
+        """Return capabilities for one explicitly selected host profile."""
+
+        if profile not in {
+            CONSOLE_EXECUTION_PROFILE,
+            AUTHORING_UI_EXECUTION_PROFILE,
+        }:
+            raise CapabilityCatalogError(
+                f"Unknown capability profile {profile!r}; expected "
+                f"{CONSOLE_EXECUTION_PROFILE!r} or "
+                f"{AUTHORING_UI_EXECUTION_PROFILE!r}"
+            )
+        return self._entries_for_profile(version, profile=profile)
+
+    def authoring_ui_entries(
+        self,
+        version: str,
+    ) -> tuple[CapabilityRecord, ...]:
+        """Return Console capabilities plus the fixed Authoring UI family."""
+
+        return self.entries_for_profile(
+            version,
+            profile=AUTHORING_UI_EXECUTION_PROFILE,
+        )
+
+    def _entries_for_profile(
+        self,
+        version: str,
+        *,
+        profile: str,
+    ) -> tuple[CapabilityRecord, ...]:
         self._require_version(version)
-        manifest = ManifestStore(root=self.manifest_root).load(version)
+        manifest_store = ManifestStore(root=self.manifest_root)
+        if profile == CONSOLE_EXECUTION_PROFILE:
+            manifest = manifest_store.load(version)
+        else:
+            try:
+                manifest = manifest_store.load_with_authoring_ui_commands(
+                    version
+                )
+            except (
+                AuthoringUiCommandsSupplementError,
+                AuthoringUiCommandsSupplementMissingError,
+            ) as exc:
+                raise CapabilityCatalogError(
+                    f"Wwise {version} Authoring UI capability profile is "
+                    f"unavailable: {exc}"
+                ) from exc
         schemas = {
             str(entry.get("uri")): entry
             for entry in manifest.get("schemas", [])
@@ -172,7 +269,10 @@ class CapabilityCatalog:
         semantic_families = self._semantic_families(version)
         deferred = self._deferred_entries(version)
         try:
-            registry_entries = self.execution_registry.entries(version)
+            registry_entries = self.execution_registry.entries_for_profile(
+                version,
+                profile=profile,
+            )
         except ExecutionContractError as exc:
             raise CapabilityCatalogError(str(exc)) from exc
         execution_contracts = {
@@ -191,7 +291,12 @@ class CapabilityCatalog:
                     raise CapabilityCatalogError(f"Duplicate reflected {item_type} URI in {version}: {uri}")
                 seen.add(key)
                 classification = self.classifier.classify(uri, item_type)
-                reflected_safety = classify_api_safety(uri, item_type, classification.category)
+                reflected_safety = _safety_for_profile(
+                    uri,
+                    item_type,
+                    classification.category,
+                    profile=profile,
+                )
                 try:
                     execution_contract = execution_contracts[(item_type, uri)]
                 except KeyError as exc:
@@ -201,6 +306,14 @@ class CapabilityCatalog:
                 family = semantic_families.get(uri)
                 fixed_commands = FIXED_COMMANDS_BY_URI.get(uri, ())
                 transaction_operations, transaction_boundaries = _transaction_routes(version, uri)
+                if (
+                    profile == AUTHORING_UI_EXECUTION_PROFILE
+                    and uri in AUTHORING_UI_DEDICATED_OPERATIONS
+                ):
+                    transaction_operations = (
+                        AUTHORING_UI_DEDICATED_OPERATIONS[uri],
+                    )
+                    transaction_boundaries = ()
                 if uri in UNDO_GROUP_MEMBER_URIS:
                     transaction_operations = ("waapi.undoGroup",)
                     transaction_boundaries = ()
@@ -222,6 +335,24 @@ class CapabilityCatalog:
                 policy_record = _policy_record(classification.category)
                 preferred_route = _preferred_route(execution_contract)
                 gateway_commands = execution_contract.gateway_commands
+                authoring_profile = (
+                    profile == AUTHORING_UI_EXECUTION_PROFILE
+                )
+                host_surface = (
+                    str(entry.get("host_surface"))
+                    if authoring_profile
+                    and isinstance(entry.get("host_surface"), str)
+                    else None
+                )
+                authoring_evidence = (
+                    _authoring_ui_supplement_evidence(
+                        manifest,
+                        entry,
+                    )
+                    if authoring_profile
+                    and uri in AUTHORING_UI_COMMAND_URIS
+                    else {}
+                )
                 records.append(
                     CapabilityRecord(
                         version=version,
@@ -242,6 +373,28 @@ class CapabilityCatalog:
                         policy=policy_record,
                         evidence=_evidence_record(deferred.get(uri)),
                         execution_contract=execution_contract.as_dict(),
+                        manifest_runtime_profile=(
+                            str(
+                                manifest.get("metadata", {}).get(
+                                    "surface_profile",
+                                    AUTHORING_UI_EXECUTION_PROFILE,
+                                )
+                            )
+                            if authoring_profile
+                            else CONSOLE_EXECUTION_PROFILE
+                        ),
+                        authoring_ui_profile=(
+                            "fixed-five-uri-reflection-supplement"
+                            if authoring_profile
+                            else "not_reflected_separately"
+                        ),
+                        host_surface=host_surface,
+                        full_authoring_inventory_reflected=(
+                            False if authoring_profile else None
+                        ),
+                        authoring_ui_commands_supplement_evidence=(
+                            authoring_evidence
+                        ),
                     )
                 )
         _validate_execution_contract_invariant(version, records)
@@ -252,6 +405,32 @@ class CapabilityCatalog:
             if entry.uri == uri:
                 return entry
         raise CapabilityNotFoundError(f"WAAPI URI {uri!r} is not reflected by Wwise {version}")
+
+    def describe_for_profile(
+        self,
+        version: str,
+        uri: str,
+        *,
+        profile: str,
+    ) -> CapabilityRecord:
+        for entry in self.entries_for_profile(version, profile=profile):
+            if entry.uri == uri:
+                return entry
+        raise CapabilityNotFoundError(
+            f"WAAPI URI {uri!r} is not reflected by Wwise {version} "
+            f"profile {profile!r}"
+        )
+
+    def authoring_ui_describe(
+        self,
+        version: str,
+        uri: str,
+    ) -> CapabilityRecord:
+        return self.describe_for_profile(
+            version,
+            uri,
+            profile=AUTHORING_UI_EXECUTION_PROFILE,
+        )
 
     def select(
         self,
@@ -276,21 +455,82 @@ class CapabilityCatalog:
             and (needle is None or needle in entry.uri.lower())
         )
 
+    def select_for_profile(
+        self,
+        version: str,
+        *,
+        profile: str,
+        category: str | None = None,
+        item_type: str | None = None,
+        semantic_family: str | None = None,
+        preferred_route: str | None = None,
+        query: str | None = None,
+    ) -> tuple[CapabilityRecord, ...]:
+        if item_type is not None and item_type not in {"function", "topic"}:
+            raise CapabilityCatalogError(
+                "item_type must be 'function' or 'topic'"
+            )
+        needle = query.lower() if query else None
+        return tuple(
+            entry
+            for entry in self.entries_for_profile(version, profile=profile)
+            if (category is None or entry.category == category)
+            and (item_type is None or entry.item_type == item_type)
+            and (
+                semantic_family is None
+                or entry.semantic_family == semantic_family
+            )
+            and (
+                preferred_route is None
+                or entry.preferred_route == preferred_route
+            )
+            and (needle is None or needle in entry.uri.lower())
+        )
+
     def summary(self, versions: Iterable[str]) -> dict[str, Any]:
+        """Return the unchanged default WwiseConsole capability summary."""
+
+        return self.summary_for_profile(
+            versions,
+            profile=CONSOLE_EXECUTION_PROFILE,
+            include_profile=False,
+        )
+
+    def summary_for_profile(
+        self,
+        versions: Iterable[str],
+        *,
+        profile: str,
+        include_profile: bool = True,
+    ) -> dict[str, Any]:
         selected_versions = tuple(versions)
         if not selected_versions:
             raise CapabilityCatalogError("At least one Wwise version is required")
         version_summaries: dict[str, Any] = {}
         all_entries: list[CapabilityRecord] = []
         for version in selected_versions:
-            entries = list(self.entries(version))
+            entries = list(
+                self.entries_for_profile(version, profile=profile)
+            )
             all_entries.extend(entries)
             version_summaries[version] = _count_summary(entries)
-        return {
+        result = {
             "versions": list(selected_versions),
             "totals": _count_summary(all_entries),
             "by_version": version_summaries,
         }
+        if include_profile:
+            result["profile"] = profile
+        return result
+
+    def authoring_ui_summary(
+        self,
+        versions: Iterable[str],
+    ) -> dict[str, Any]:
+        return self.summary_for_profile(
+            versions,
+            profile=AUTHORING_UI_EXECUTION_PROFILE,
+        )
 
     def _semantic_families(self, version: str) -> dict[str, str]:
         resource = load_semantic_source_notes(
@@ -333,6 +573,80 @@ class CapabilityCatalog:
             raise CapabilityCatalogError(
                 f"Unsupported Wwise version {version!r}; supported versions: {', '.join(SUPPORTED_WWISE_VERSION_KEYS)}"
             )
+
+
+def _safety_for_profile(
+    uri: str,
+    item_type: str,
+    category: str,
+    *,
+    profile: str,
+) -> ApiSafety:
+    if (
+        profile != AUTHORING_UI_EXECUTION_PROFILE
+        or uri not in AUTHORING_UI_COMMAND_URIS
+    ):
+        return classify_api_safety(uri, item_type, category)
+    if uri in {
+        "ak.wwise.ui.commands.getCommands",
+        "ak.wwise.ui.commands.executed",
+    }:
+        return ApiSafety(
+            read_only=True,
+            requires_destructive_gate=False,
+            requires_confirmation=False,
+            interface_status="available",
+            reason=(
+                "This Authoring-only UI command inventory/event surface is "
+                "exposed through a bounded reviewed route."
+            ),
+        )
+    return ApiSafety(
+        read_only=False,
+        requires_destructive_gate=True,
+        requires_confirmation=True,
+        interface_status="available_via_transaction",
+        reason=(
+            "This Authoring-only UI command mutation is exposed through its "
+            "closed dedicated operation, immutable preview confirmation, and "
+            "live command-inventory verification."
+        ),
+    )
+
+
+def _authoring_ui_supplement_evidence(
+    manifest: Mapping[str, Any],
+    row: Mapping[str, Any],
+) -> dict[str, Any]:
+    metadata = manifest.get("metadata")
+    if not isinstance(metadata, Mapping):
+        raise CapabilityCatalogError(
+            "Authoring UI manifest metadata must be an object"
+        )
+    audit = manifest.get("audit")
+    if not isinstance(audit, Mapping):
+        raise CapabilityCatalogError(
+            "Authoring UI manifest audit must be an object"
+        )
+    supplement_audit = audit.get("authoring_ui_commands_supplement")
+    if not isinstance(supplement_audit, Mapping):
+        raise CapabilityCatalogError(
+            "Authoring UI manifest lacks supplement audit evidence"
+        )
+    return {
+        "manifest_origin": row.get("manifest_origin"),
+        "supplement_inventory_sha256": metadata.get(
+            "authoring_ui_commands_supplement_sha256"
+        ),
+        "reflected_family_inventory_sha256": supplement_audit.get(
+            "inventory_sha256"
+        ),
+        "surface_inventory_sha256": metadata.get(
+            "surface_inventory_sha256"
+        ),
+        "surface_profile": metadata.get("surface_profile"),
+        "surface_scope": "ak.wwise.ui.commands",
+    }
 
 
 def _preferred_route(contract: ExecutionContract) -> str:

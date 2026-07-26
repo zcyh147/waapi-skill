@@ -42,20 +42,11 @@ CAPABILITY_COMPACT_KEYS = {
 }
 EXPECTED_EXCLUDED_FUNCTION_URIS = frozenset(
     {
-        "ak.wwise.cli.executeLuaScript",
-        "ak.wwise.core.executeLuaScript",
-        "ak.wwise.debug.enableAsserts",
-        "ak.wwise.debug.enableAutomationMode",
-        "ak.wwise.debug.getWalTree",
-        "ak.wwise.debug.restartWaapiServers",
-        "ak.wwise.debug.testAssert",
-        "ak.wwise.debug.testCrash",
-        "ak.wwise.debug.validateCall",
         "ak.wwise.ui.commands.register",
         "ak.wwise.ui.commands.execute",
     }
 )
-EXPECTED_EXCLUDED_TOPIC_URIS = frozenset({"ak.wwise.debug.assertFailed"})
+EXPECTED_EXCLUDED_TOPIC_URIS = frozenset()
 
 
 class FakeEventHandler:
@@ -1407,16 +1398,16 @@ def test_capability_matrix_is_available_offline_without_config_or_client(tmp_pat
     assert payload["summary"]["totals"]["total"] == 814
     assert payload["summary"]["totals"]["schema_status"] == {"ok": 814}
     assert payload["summary"]["totals"]["interface_status"] == {
-        "available": 249,
-        "available_via_transaction": 520,
-        "unsupported_by_skill_interface": 45,
+        "available": 268,
+        "available_via_transaction": 540,
+        "unsupported_by_skill_interface": 6,
     }
     assert payload["summary"]["totals"]["preferred_routes"] == {
-        "bounded_topic_wait": 147,
-        "fixed_command": 42,
+        "bounded_topic_wait": 152,
+        "fixed_command": 56,
         "manifest_dispatch": 60,
-        "transaction_operation": 520,
-        "unsupported_boundary": 45,
+        "transaction_operation": 540,
+        "unsupported_boundary": 6,
     }
     assert payload["match_count"] == 814
     assert payload["returned_count"] == 0
@@ -1524,7 +1515,10 @@ def test_describe_defaults_to_compact_cross_version_schema_offline(tmp_path: Pat
     }
     capability = payload["availability"]["2025.1"]["capability"]
     assert capability["interface"]["preferred_route"] == "fixed_command"
-    assert capability["interface"]["gateway_commands"] == ["status"]
+    assert capability["interface"]["gateway_commands"] == [
+        "status",
+        "project-default-work-units",
+    ]
     assert "semantic_builder_ref" not in capability["interface"]
     assert capability["schema"]["status"] == "ok"
     assert "full" not in capability["schema"]
@@ -1756,7 +1750,7 @@ def test_unreflected_uri_is_structured_unsupported_after_live_version_detection(
 
 
 @pytest.mark.parametrize("api", sorted(EXPECTED_EXCLUDED_FUNCTION_URIS))
-def test_all_eleven_excluded_functions_are_rejected_before_connecting(
+def test_legacy_ui_command_exclusions_now_route_to_named_transactions_before_connecting(
     tmp_path: Path,
     api: str,
 ) -> None:
@@ -1776,8 +1770,14 @@ def test_all_eleven_excluded_functions_are_rejected_before_connecting(
     )
 
     assert exit_code == 2
-    assert payload["status"] == "unsupported_by_skill_interface"
-    assert payload["error_code"] == "UNSUPPORTED_BY_SKILL_INTERFACE"
+    assert payload["status"] == "transaction_required"
+    assert payload["error_code"] == "TRANSACTION_REQUIRED"
+    assert payload["capability"]["interface"]["transaction_operations"] == [
+        {
+            "ak.wwise.ui.commands.execute": "ui.commands.execute",
+            "ak.wwise.ui.commands.register": "ui.commands.register",
+        }[api]
+    ]
     assert payload["executed"] is False
     assert called is False
 
@@ -2487,6 +2487,197 @@ def test_media_pool_duration_canonicalizer_is_exactly_scoped_and_does_not_mutate
     )
     assert type(wrong_version["filters"][0]["value"]) is int
     assert type(other_api["filters"][0]["value"]) is int
+
+
+def test_media_pool_filter_families_use_closed_practical_shapes(tmp_path: Path) -> None:
+    reference = tmp_path / "reference.wav"
+    reference.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+
+    waapi_gateway.validate_bounded_direct_call_request(
+        "ak.wwise.core.mediaPool.get",
+        {
+            "filters": [
+                {
+                    "type": "field",
+                    "field": "WAV/Duration",
+                    "operator": "lessThanOrEqual",
+                    "value": 8.0,
+                },
+                {
+                    "type": "audioDescription",
+                    "value": "short dry stone footstep",
+                    # The Wwise 2025 SDK's type-specific example uses this shape.
+                    "weight": 0.8,
+                },
+                {
+                    "type": "audioSimilarity",
+                    "value": str(reference),
+                    "weight": 0.75,
+                },
+            ],
+            "databases": [r"\Databases\Project Originals"],
+            "maxResults": 40,
+        },
+        {"return": ["Path", "Filename", "WAV/Duration"]},
+    )
+
+
+@pytest.mark.parametrize("weight", (0.0, 0.8, 1.0))
+def test_media_pool_audio_description_accepts_finite_weight_boundaries(
+    weight: float,
+) -> None:
+    waapi_gateway.validate_bounded_direct_call_request(
+        "ak.wwise.core.mediaPool.get",
+        {
+            "filters": [
+                {
+                    "type": "audioDescription",
+                    "value": "short dry stone footstep",
+                    "weight": weight,
+                }
+            ],
+            "maxResults": 40,
+        },
+        {"return": ["Path"]},
+    )
+
+
+@pytest.mark.parametrize(
+    ("filter_factory", "message"),
+    [
+        (
+            lambda path: {
+                "type": "field",
+                "field": "Filename",
+                "operator": "contains",
+                "value": "footstep",
+                "weight": 0.5,
+            },
+            "closed field filter shape",
+        ),
+        (
+            lambda path: {
+                "type": "audioDescription",
+                "value": "footstep",
+                "field": "Filename",
+            },
+            "closed audioDescription filter shape",
+        ),
+        (
+            lambda path: {
+                "type": "audioSimilarity",
+                "value": str(path),
+                "field": "Filename",
+            },
+            "closed audioSimilarity filter shape",
+        ),
+        (
+            lambda path: {
+                "type": "audioSimilarity",
+                "value": str(path),
+                "weight": 1.01,
+            },
+            "from 0 through 1",
+        ),
+        (
+            lambda path: {
+                "type": "field",
+                "field": "WAV/Duration",
+                "operator": "equals",
+                "value": 2**1024,
+            },
+            "finite number",
+        ),
+        (
+            lambda path: {
+                "type": "audioSimilarity",
+                "value": str(path),
+                "weight": 2**1024,
+            },
+            "finite number from 0 through 1",
+        ),
+        (
+            lambda path: {
+                "type": "audioSimilarity",
+                "value": "relative.wav",
+            },
+            "absolute regular audio-file path",
+        ),
+    ],
+)
+def test_media_pool_filter_shapes_fail_closed(
+    tmp_path: Path,
+    filter_factory: Any,
+    message: str,
+) -> None:
+    reference = tmp_path / "reference.wav"
+    reference.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+    with pytest.raises(waapi_gateway.GatewayInputError, match=message):
+        waapi_gateway.validate_bounded_direct_call_request(
+            "ak.wwise.core.mediaPool.get",
+            {
+                "filters": [filter_factory(reference)],
+                "maxResults": 40,
+            },
+            {"return": ["Path"]},
+        )
+
+
+@pytest.mark.parametrize(
+    "weight",
+    (
+        pytest.param(float("nan"), id="nan"),
+        pytest.param(float("inf"), id="positive-infinity"),
+        pytest.param(float("-inf"), id="negative-infinity"),
+        pytest.param(2**1024, id="double-overflow-integer"),
+        pytest.param(-0.01, id="below-range"),
+        pytest.param(1.01, id="above-range"),
+    ),
+)
+def test_media_pool_audio_description_rejects_invalid_weight(
+    weight: float | int,
+) -> None:
+    with pytest.raises(
+        waapi_gateway.GatewayInputError,
+        match="finite number from 0 through 1",
+    ):
+        waapi_gateway.validate_bounded_direct_call_request(
+            "ak.wwise.core.mediaPool.get",
+            {
+                "filters": [
+                    {
+                        "type": "audioDescription",
+                        "value": "short dry stone footstep",
+                        "weight": weight,
+                    }
+                ],
+                "maxResults": 40,
+            },
+            {"return": ["Path"]},
+        )
+
+
+def test_media_pool_audio_similarity_rejects_symlink_and_missing_file(tmp_path: Path) -> None:
+    reference = tmp_path / "reference.wav"
+    reference.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+    link = tmp_path / "reference-link.wav"
+    link.symlink_to(reference)
+
+    for value in (link, tmp_path / "missing.wav"):
+        with pytest.raises(waapi_gateway.GatewayInputError):
+            waapi_gateway.validate_bounded_direct_call_request(
+                "ak.wwise.core.mediaPool.get",
+                {
+                    "filters": [
+                        {
+                            "type": "audioSimilarity",
+                            "value": str(value),
+                        }
+                    ],
+                    "maxResults": 40,
+                },
+                {"return": ["Path"]},
+            )
 
 
 @pytest.mark.parametrize(
@@ -4551,7 +4742,7 @@ def test_public_generic_call_routes_reviewed_topics_to_wait_topic_before_connect
     assert called is False
 
 
-def test_wait_topic_rejects_debug_assert_topic_before_connecting_or_subscribing(
+def test_debug_assert_topic_is_routed_to_bounded_wait_before_connecting(
     tmp_path: Path,
 ) -> None:
     topic = "ak.wwise.debug.assertFailed"
@@ -4560,19 +4751,20 @@ def test_wait_topic_rejects_debug_assert_topic_before_connecting_or_subscribing(
     def client_factory(url: str) -> FakeClient:
         nonlocal called
         called = True
-        raise AssertionError(f"excluded topic must not connect or subscribe to {url}")
+        raise AssertionError(f"topic route boundary must not connect to {url}")
 
     assert frozenset(EXPLICIT_UNSUPPORTED_TOPIC_URIS) == EXPECTED_EXCLUDED_TOPIC_URIS
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["wait-topic", topic],
+        ["call", topic, "--dry-run"],
         env=gateway_env(tmp_path),
         client_factory=client_factory,
     )
 
     assert exit_code == 2
-    assert payload["status"] == "unsupported_by_skill_interface"
-    assert payload["error_code"] == "UNSUPPORTED_BY_SKILL_INTERFACE"
+    assert payload["status"] == "wait_topic_required"
+    assert payload["error_code"] == "WAIT_TOPIC_REQUIRED"
+    assert payload["required_command"] == "wait-topic"
     assert payload["executed"] is False
     assert called is False
 
@@ -4593,7 +4785,11 @@ def test_wait_topic_executes_reviewed_ui_topics_and_unsubscribes(
     event: Mapping[str, Any],
 ) -> None:
     client = FakeClient(
-        {"ak.wwise.core.getInfo": live_info()},
+        {
+            "ak.wwise.core.getInfo": live_info(
+                command_line=topic != "ak.wwise.ui.commands.executed"
+            )
+        },
         subscription_events={topic: [event]},
     )
 

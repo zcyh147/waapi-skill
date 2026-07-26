@@ -154,6 +154,49 @@ def _prepare_merge(*, nested_row: Mapping[str, Any] | None = None) -> tuple[dict
     return prepared, reader
 
 
+def test_object_set_real_property_rejects_integer_outside_finite_waapi_range() -> None:
+    property_request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2022.1",
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": {"kind": "id", "value": TARGET_ID},
+                    "properties": [{"name": "Volume", "value": 2**1024}],
+                }
+            ],
+            "on_name_conflict": "fail",
+        },
+    }
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.getTypes": [_type_catalog()],
+            "ak.wwise.core.object.get": [{"return": [_target_row()]}],
+            "ak.wwise.core.object.getPropertyInfo": [
+                {
+                    "name": "Volume",
+                    "type": "Real32",
+                    "supports": {"randomizer": True, "rtpc": "Additive"},
+                }
+            ],
+        }
+    )
+
+    with pytest.raises(OperationContractError) as invalid:
+        prepare_operation(
+            parse_operation_request(property_request),
+            read_call=reader,
+        )
+
+    assert invalid.value.error_code == "INVALID_PROPERTY_VALUE"
+    assert [call[0] for call in reader.calls] == [
+        "ak.wwise.core.object.getTypes",
+        "ak.wwise.core.object.get",
+        "ak.wwise.core.object.getPropertyInfo",
+    ]
+
+
 def _confirmation_responses(
     *,
     nested_row: Mapping[str, Any] | None = None,

@@ -5,7 +5,6 @@ import math
 import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.operation_object import (  # pyright: ignore[reportMissingImports]
-    RTPC_UNSUPPORTED_BOUNDARY,
     ObjectOperationContractError,
     ObjectTreeLimits,
     bind_request_result_topology,
@@ -13,6 +12,7 @@ from wwise_waapi.operation_object import (  # pyright: ignore[reportMissingImpor
     flatten_create_result,
     flatten_set_result,
     materialize_waapi_node,
+    materialize_waapi_rtpc,
     normalize_conflict_policy,
     normalize_object_forest,
     normalize_object_tree,
@@ -297,9 +297,98 @@ def test_result_topology_mismatch_never_binds_ids_by_guessing_names() -> None:
     assert exc.value.details["missing"] == ["$.children[0]"]
 
 
-def test_rtpc_is_an_explicit_boundary_not_a_raw_object_list() -> None:
+def test_rtpc_descriptors_are_closed_normalized_and_materialized() -> None:
+    descriptors = normalize_rtpc_descriptors(
+        [
+            {
+                "property": "OutputBusVolume",
+                "control_input": {"kind": "path", "value": "\\Game Parameters\\Default Work Unit\\Distance"},
+                "points": [
+                    {"x": 0, "y": -20.0, "shape": "Linear"},
+                    {"x": 100, "y": 0, "shape": "SCurve"},
+                ],
+                "notes": "Distance curve",
+            }
+        ]
+    )
+    assert [item.as_dict() for item in descriptors] == [
+        {
+            "property": "OutputBusVolume",
+            "control_input": {"kind": "path", "value": "\\Game Parameters\\Default Work Unit\\Distance"},
+            "points": [
+                {"x": 0, "y": -20.0, "shape": "Linear"},
+                {"x": 100, "y": 0, "shape": "SCurve"},
+            ],
+            "notes": "Distance curve",
+        }
+    ]
+    assert materialize_waapi_rtpc(descriptors[0], resolved_control_input="{CONTROL}") == {
+        "type": "RTPC",
+        "name": "",
+        "@Curve": {
+            "type": "Curve",
+            "points": [
+                {"x": 0, "y": -20.0, "shape": "Linear"},
+                {"x": 100, "y": 0, "shape": "SCurve"},
+            ],
+        },
+        "@PropertyName": "OutputBusVolume",
+        "@ControlInput": "{CONTROL}",
+        "notes": "Distance curve",
+    }
+
+
+@pytest.mark.parametrize(
+    ("payload", "error_code"),
+    [
+        ([], "EMPTY_RTPC_LIST"),
+        (
+            [
+                {
+                    "property": "Volume",
+                    "control_input": {"kind": "id", "value": "{CONTROL}"},
+                    "points": [],
+                }
+            ],
+            "RTPC_POINT_LIMIT",
+        ),
+        (
+            [
+                {
+                    "property": "Volume",
+                    "control_input": {"kind": "id", "value": "{CONTROL}"},
+                    "points": [
+                        {"x": 1, "y": 0, "shape": "Linear"},
+                        {"x": 0, "y": 1, "shape": "Linear"},
+                    ],
+                }
+            ],
+            "INVALID_RTPC_POINT_ORDER",
+        ),
+        (
+            [
+                {
+                    "property": "Volume",
+                    "control_input": {"kind": "id", "value": "{CONTROL}"},
+                    "points": [{"x": 0, "y": 0, "shape": "Bezier"}],
+                }
+            ],
+            "INVALID_RTPC_POINT_SHAPE",
+        ),
+        (
+            [
+                {
+                    "property": "Volume",
+                    "control_input": {"kind": "id", "value": "{CONTROL}"},
+                    "points": [{"x": 0, "y": 0, "shape": "Linear"}],
+                    "listMode": "replaceAll",
+                }
+            ],
+            "INVALID_FIELDS",
+        ),
+    ],
+)
+def test_rtpc_descriptors_fail_closed(payload: object, error_code: str) -> None:
     with pytest.raises(ObjectOperationContractError) as exc:
-        normalize_rtpc_descriptors([{"property": "Volume", "points": []}])
-    assert exc.value.error_code == "RTPC_NOT_IMPLEMENTED"
-    assert str(exc.value) == RTPC_UNSUPPORTED_BOUNDARY
-    assert "dedicated reviewed contract" in str(exc.value)
+        normalize_rtpc_descriptors(payload)
+    assert exc.value.error_code == error_code

@@ -302,7 +302,7 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         )
 
 
-def test_program_matrix_is_the_exact_769_row_contract() -> None:
+def test_program_matrix_is_the_exact_808_row_contract() -> None:
     expected = {
         (entry.version, entry.item_type, entry.uri)
         for version in SUPPORTED_WWISE_VERSION_KEYS
@@ -311,4 +311,4 @@ def test_program_matrix_is_the_exact_769_row_contract() -> None:
     actual = {(entry.version, entry.item_type, entry.uri) for entry in PROGRAM_ROWS}
 
     assert actual == expected
-    assert len(actual) == 769
+    assert len(actual) == 808

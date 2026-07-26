@@ -689,6 +689,7 @@ def _runtime_files(root: Path, version: str) -> tuple[str, ...]:
         f"resources/manifest/{version}/functions.json",
         f"resources/manifest/{version}/schemas.json",
         f"resources/manifest/{version}/topics.json",
+        f"resources/manifest/{version}/authoring-ui-commands-supplement.json",
         f"resources/semantic/{version}/source_notes.json",
     )
     return common + versioned

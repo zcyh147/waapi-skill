@@ -74,8 +74,9 @@ def test_catalog_separates_route_safety_and_evidence_without_overclaiming() -> N
     assert mutation.safety.interface_status == "available_via_transaction"
     assert assignment.safety.requires_destructive_gate is True
     assert assignment.transaction_operations == ("switchContainer.addAssignment",)
-    assert unsafe.preferred_route == "unsupported_boundary"
-    assert unsafe.safety.interface_status == "unsupported_by_skill_interface"
+    assert unsafe.preferred_route == "transaction_operation"
+    assert unsafe.transaction_operations == ("debug.testCrash",)
+    assert unsafe.safety.interface_status == "available_via_transaction"
     assert read.evidence["registry_status"] in {"deferred", "not_listed_in_packaged_deferred_registry"}
 
 
@@ -106,7 +107,11 @@ def test_catalog_keeps_specific_builder_boundaries_and_hides_generic_bypass() ->
     assert create.transaction_operations == ("object.create",)
     assert set_name.transaction_operations == ("object.setName",)
     assert create.preferred_route == set_name.preferred_route == "transaction_operation"
-    assert batch.transaction_operations == ("object.set",)
+    assert batch.transaction_operations == (
+        "object.createPlugin",
+        "object.set",
+        "object.setRTPC",
+    )
     assert batch.transaction_boundaries == ()
     assert copy.transaction_boundaries[0]["operation"] == "object.copy"
     assert copy.transaction_operations == ("waapi.call",)
@@ -122,23 +127,19 @@ def test_catalog_keeps_specific_builder_boundaries_and_hides_generic_bypass() ->
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
-def test_all_topics_except_debug_assert_failed_expose_a_bounded_wait_route(version: str) -> None:
+def test_all_topics_expose_a_bounded_wait_route(version: str) -> None:
     topics = CapabilityCatalog().select(version, item_type="topic")
     reviewed = [entry for entry in topics if entry.uri in REVIEWED_TOPIC_URIS]
     unsupported = [entry for entry in topics if entry.uri not in REVIEWED_TOPIC_URIS]
 
     assert topics
-    assert {entry.execution_mode for entry in topics} == {"bounded_topic_wait", "excluded"}
+    assert {entry.execution_mode for entry in topics} == {"bounded_topic_wait"}
     assert reviewed
     assert all(entry.preferred_route == "bounded_topic_wait" for entry in reviewed)
     assert all(entry.gateway_commands == ("wait-topic",) for entry in reviewed)
     assert all(entry.safety.read_only for entry in reviewed)
     assert all(not entry.safety.requires_destructive_gate for entry in reviewed)
-    assert all(entry.preferred_route == "unsupported_boundary" for entry in unsupported)
-    assert {entry.uri for entry in unsupported} == {"ak.wwise.debug.assertFailed"}
-    assert all(entry.gateway_commands == () for entry in unsupported)
-    assert all(not entry.safety.read_only for entry in unsupported)
-    assert all(entry.safety.requires_destructive_gate for entry in unsupported)
+    assert unsupported == []
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
@@ -175,16 +176,16 @@ def test_catalog_summary_reconciles_all_five_version_totals() -> None:
     assert summary["totals"]["total"] == 814
     assert summary["totals"]["schema_status"] == {"ok": 814}
     assert summary["totals"]["interface_status"] == {
-        "available": 249,
-        "available_via_transaction": 520,
-        "unsupported_by_skill_interface": 45,
+        "available": 268,
+        "available_via_transaction": 540,
+        "unsupported_by_skill_interface": 6,
     }
     assert summary["totals"]["preferred_routes"] == {
-        "bounded_topic_wait": 147,
-        "fixed_command": 42,
+        "bounded_topic_wait": 152,
+        "fixed_command": 56,
         "manifest_dispatch": 60,
-        "transaction_operation": 520,
-        "unsupported_boundary": 45,
+        "transaction_operation": 540,
+        "unsupported_boundary": 6,
     }
     assert "semantic_builder" not in summary["totals"]["preferred_routes"]
     for version, (functions, topics) in EXPECTED_COUNTS.items():
@@ -265,21 +266,12 @@ def test_public_manifest_dispatch_is_exactly_the_immutable_reviewed_call_allowli
     )
 
 
-def test_exact_exclusion_registry_is_disjoint_and_accounts_for_all_45_rows() -> None:
+def test_exact_exclusion_registry_is_disjoint_and_accounts_for_all_6_rows() -> None:
     expected_function_exclusions = {
-        "ak.wwise.cli.executeLuaScript",
-        "ak.wwise.core.executeLuaScript",
-        "ak.wwise.debug.enableAsserts",
-        "ak.wwise.debug.enableAutomationMode",
-        "ak.wwise.debug.getWalTree",
-        "ak.wwise.debug.restartWaapiServers",
-        "ak.wwise.debug.testAssert",
-        "ak.wwise.debug.testCrash",
-        "ak.wwise.debug.validateCall",
         "ak.wwise.ui.commands.register",
         "ak.wwise.ui.commands.execute",
     }
-    expected_topic_exclusions = {"ak.wwise.debug.assertFailed"}
+    expected_topic_exclusions: set[str] = set()
 
     assert BOUNDED_CALL_CANDIDATES == {}
     assert set(EXPLICIT_UNSUPPORTED_LIVE_URIS) == expected_function_exclusions
@@ -298,7 +290,7 @@ def test_exact_exclusion_registry_is_disjoint_and_accounts_for_all_45_rows() -> 
         for entry in entries
         if entry.safety.interface_status == "unsupported_by_skill_interface"
     ]
-    assert len(excluded) == 45
+    assert len(excluded) == 6
     assert {entry.uri for entry in excluded} == expected_function_exclusions | expected_topic_exclusions
     assert all(entry.preferred_route == "unsupported_boundary" for entry in excluded)
     assert all(entry.execution_mode == "excluded" for entry in excluded)

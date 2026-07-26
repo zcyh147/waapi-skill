@@ -9,6 +9,7 @@ import math
 import os
 import queue
 import shlex
+import stat
 import subprocess
 import sys
 import threading
@@ -30,11 +31,25 @@ from wwise_waapi.capabilities import (  # noqa: E402  # pyright: ignore[reportMi
     CapabilityRecord,
     FIXED_COMMANDS_BY_URI,
 )
+from wwise_waapi.authoring_ui_commands_manifest import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    AUTHORING_UI_COMMAND_URIS,
+)
 from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     canonical_json_bytes,
     canonical_sha256,
 )
 from wwise_waapi.builders.common import SemanticValidationError  # noqa: E402  # pyright: ignore[reportMissingImports]
+from wwise_waapi.builders.cli_request_templates import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    CLI_REQUEST_TEMPLATE_URIS,
+    build_cli_request_template,
+    build_cli_request_template_set,
+    is_cli_request_template_uri,
+)
+from wwise_waapi.builders.debug_lua import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    DebugLuaContractError,
+    MAX_WAL_TREE_NODES,
+    normalize_wal_tree_result,
+)
 from wwise_waapi.builders.metadata import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MetadataBuilder,
     parse_get_attenuation_curve_result,
@@ -47,6 +62,16 @@ from wwise_waapi.builders.query import (  # noqa: E402  # pyright: ignore[report
     MAX_QUERY_TAKE,
     SUPPORTED_SELECTS,
     build_object_get_query,
+)
+from wwise_waapi.builders.stable_reads import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    MAX_BUS_PIPELINE_IDS,
+    STABLE_READ_RESULT_LIMIT_BYTES,
+    build_profiler_game_objects_request,
+    build_profiler_voice_contributions_request,
+    build_project_default_work_units_request,
+    normalize_profiler_game_objects_result,
+    normalize_profiler_voice_contributions_result,
+    normalize_project_default_work_units_result,
 )
 from wwise_waapi.builders.schema import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     validate_semantic_event,
@@ -70,7 +95,9 @@ from wwise_waapi.dispatcher import (  # noqa: E402  # pyright: ignore[reportMiss
     _safe_type_name as safe_type_name,
 )
 from wwise_waapi.execution_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    AUTHORING_UI_EXECUTION_PROFILE,
     CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS,
+    CONSOLE_EXECUTION_PROFILE,
     POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY,
     POST_EXECUTION_PROJECT_GUARD_POLICIES,
     POST_EXECUTION_PROJECT_GUARD_REVALIDATE,
@@ -79,8 +106,10 @@ from wwise_waapi.execution_contracts import (  # noqa: E402  # pyright: ignore[r
     PROJECT_GUARD_TRANSITION_TO_PATH,
 )
 from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS,
     OPERATION_REQUEST_CONTRACT,
     PACKAGED_TRANSACTION_READBACK_URIS,
+    UI_COMMAND_OPERATIONS,
     OperationContractError,
     VerificationResult,
     build_undo_group_execution_plan,
@@ -101,6 +130,10 @@ from wwise_waapi.safety import (  # noqa: E402  # pyright: ignore[reportMissingI
     REVIEWED_TOPIC_URIS,
 )
 from wwise_waapi.subscriptions import MAX_WAIT_EVENT_COUNT  # noqa: E402  # pyright: ignore[reportMissingImports]
+from wwise_waapi.transaction_locality import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    is_loopback_waapi_host,
+    local_filesystem_path_roles,
+)
 from wwise_waapi.transaction_runtime import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     DEFAULT_PREVIEW_TTL_SECONDS,
     PROJECT_GUARD_PHASE_POST_VERIFICATION,
@@ -173,6 +206,7 @@ ORIGINAL_FILE_REFERENCE_MATCH_CONTRACT = (
 )
 SUBSCRIPTION_CLEANUP_AFTER_RETRY = "unsubscribed_after_retry"
 NAMED_OPERATION_WIRE_PATH_URIS: Mapping[str, str] = {
+    "lua.executeCliFile": "ak.wwise.cli.executeLuaScript",
     "soundbank.convertExternalSources": (
         "ak.wwise.core.soundbank.convertExternalSources"
     ),
@@ -234,6 +268,8 @@ MAX_MEDIA_POOL_FILTERS = 16
 MAX_MEDIA_POOL_DATABASES = 8
 MAX_MEDIA_POOL_RETURN_FIELDS = 32
 MAX_MEDIA_POOL_SEARCH_TEXT_CHARS = 1024
+MAX_MEDIA_POOL_FILTER_TOKEN_CHARS = 256
+MAX_MEDIA_POOL_FILTER_VALUE_CHARS = 4096
 MEDIA_POOL_FLOAT_FILTER_FIELDS_BY_VERSION: Mapping[str, frozenset[str]] = {
     "2025.1": frozenset({"WAV/Duration"}),
 }
@@ -287,6 +323,16 @@ class GatewayResultShapeError(ValueError):
             "message": str(self),
             "details": dict(self.details),
         }
+
+
+class AuthoringUiRuntimeManifestStore:
+    """Read-only dispatcher adapter for the explicit Authoring UI profile."""
+
+    def __init__(self, base_store: Any) -> None:
+        self._base_store = base_store
+
+    def load(self, version: str) -> dict[str, Any]:
+        return self._base_store.load_with_authoring_ui_commands(version)
 
 
 class GatewaySubscriptionCleanupError(RuntimeError):
@@ -800,6 +846,68 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("status", help="Return live Wwise version and current project information")
     subparsers.add_parser("buses", help="Return all Bus objects with id, name, type, and path")
     subparsers.add_parser("selected", help="Return current UI selection or a clear command-line/UI boundary")
+    subparsers.add_parser(
+        "project-default-work-units",
+        help="Report version-aware default project Work Units without fabricating unavailable fields",
+    )
+
+    profiler_game_objects = subparsers.add_parser(
+        "profiler-game-objects",
+        help="Return profiler game objects through a cross-version registration-time projection",
+    )
+    profiler_game_objects.add_argument(
+        "--time",
+        required=True,
+        help="Non-negative capture time in milliseconds, or the exact cursor token user/capture",
+    )
+
+    profiler_voice_contributions = subparsers.add_parser(
+        "profiler-voice-contributions",
+        help="Return one bounded voice contribution tree with version-aware DSF availability",
+    )
+    profiler_voice_contributions.add_argument(
+        "--time",
+        required=True,
+        help="Non-negative capture time in milliseconds, or the exact cursor token user/capture",
+    )
+    profiler_voice_contributions.add_argument(
+        "--voice-pipeline-id",
+        required=True,
+        help="Unsigned 32-bit voice pipeline identifier",
+    )
+    profiler_voice_contributions.add_argument(
+        "--bus-pipeline-id",
+        action="append",
+        default=[],
+        help="Repeat in voice-path order; omit all values for the dry path",
+    )
+
+    debug_wal_tree = subparsers.add_parser(
+        "debug-wal-tree",
+        help="Return a bounded deterministic projection of the private WAL tree",
+    )
+    debug_wal_tree.add_argument(
+        "--take",
+        type=int,
+        default=128,
+        metavar=f"1..{MAX_WAL_TREE_NODES}",
+        help=(
+            "Maximum WAL nodes returned after the complete bounded call; "
+            f"defaults to 128 and is capped at {MAX_WAL_TREE_NODES}"
+        ),
+    )
+
+    debug_validate_call = subparsers.add_parser(
+        "debug-validate-call",
+        help="Validate bounded args/options/result documents without invoking the target function",
+    )
+    debug_validate_call.add_argument(
+        "api",
+        help="Exact reflected WAAPI function URI to validate",
+    )
+    debug_validate_call.add_argument("--args-json")
+    debug_validate_call.add_argument("--options-json")
+    debug_validate_call.add_argument("--result-json")
 
     query_object = subparsers.add_parser(
         "query-object",
@@ -898,6 +1006,16 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     capabilities.add_argument("--all-versions", action="store_true")
+    capabilities.add_argument(
+        "--profile",
+        choices=(CONSOLE_EXECUTION_PROFILE, AUTHORING_UI_EXECUTION_PROFILE),
+        default=CONSOLE_EXECUTION_PROFILE,
+        help=(
+            "Inspect the packaged WwiseConsole profile (default) or the "
+            "Console-plus-five-URI Authoring UI supplement; this offline "
+            "selection never overrides live host detection"
+        ),
+    )
     capabilities.add_argument("--category")
     capabilities.add_argument("--item-type", choices=("function", "topic"))
     capabilities.add_argument("--family")
@@ -922,10 +1040,20 @@ def build_parser() -> argparse.ArgumentParser:
 
     describe = subparsers.add_parser(
         "describe",
-        help="Describe one URI, its schema, stable route, safety gate, and evidence boundary offline",
+        help="Describe one URI, its schema, stable route, safety gate, request template when reviewed, and evidence boundary offline",
     )
     describe.add_argument("api")
     describe.add_argument("--all-versions", action="store_true")
+    describe.add_argument(
+        "--profile",
+        choices=(CONSOLE_EXECUTION_PROFILE, AUTHORING_UI_EXECUTION_PROFILE),
+        default=CONSOLE_EXECUTION_PROFILE,
+        help=(
+            "Inspect the packaged WwiseConsole profile (default) or the "
+            "Console-plus-five-URI Authoring UI supplement; this offline "
+            "selection never overrides live host detection"
+        ),
+    )
     describe.add_argument(
         "--full-schema",
         action="store_true",
@@ -947,7 +1075,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     operation_schema = subparsers.add_parser(
         "operation-schema",
-        help="Describe one closed operation request shape and its execution boundary offline",
+        help="Describe one closed operation request shape, versioned CLI templates when applicable, and its execution boundary offline",
     )
     operation_schema.add_argument("operation")
 
@@ -1090,6 +1218,13 @@ def _execute_gateway_unconstrained(
             preflight_query_object_input(args, env=source_env)
         if args.command == "metadata":
             preflight_metadata_input(args)
+        if args.command in {
+            "profiler-game-objects",
+            "profiler-voice-contributions",
+        }:
+            preflight_stable_read_input(args, env=source_env)
+        if args.command in {"debug-wal-tree", "debug-validate-call"}:
+            preflight_debug_read_input(args)
         if args.command in OFFLINE_COMMANDS:
             payload = dispatch_offline_command(args, env=source_env)
             return finish(0 if payload.get("ok") else 2, payload)
@@ -1114,6 +1249,10 @@ def _execute_gateway_unconstrained(
                     f"Connected Wwise is {detected_version}, but the requested version is {connection.version_hint}"
                 )
             dispatcher = WwiseDispatcher(client=transport)
+            if live_info.get("isCommandLine") is False:
+                dispatcher.manifest_store = AuthoringUiRuntimeManifestStore(
+                    dispatcher.manifest_store
+                )
             payload = dispatch_command(
                 args,
                 env=source_env,
@@ -1607,6 +1746,188 @@ def catalog_route_boundary_payload(
     )
 
 
+def live_capability(
+    version: str,
+    api: str,
+    *,
+    live_info: Mapping[str, Any],
+) -> CapabilityRecord:
+    """Resolve a capability from the host profile proven by live getInfo."""
+
+    catalog = CapabilityCatalog()
+    if live_info.get("isCommandLine") is False:
+        return catalog.authoring_ui_describe(version, api)
+    return catalog.describe(version, api)
+
+
+def authoring_host_required_payload(
+    *,
+    api: str | None,
+    command: str,
+    live_info: Mapping[str, Any],
+    common: Mapping[str, Any] | None = None,
+    operation: str | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "contract": GATEWAY_RESULT_CONTRACT,
+        "ok": False,
+        "status": "authoring_host_required",
+        "command": command,
+        "error_code": "AUTHORING_HOST_REQUIRED",
+        "message": (
+            "This Wwise UI-command capability requires Wwise Authoring; "
+            "WwiseConsole cannot expose or execute it."
+        ),
+        "details": {
+            "is_command_line": live_info.get("isCommandLine"),
+            "required_host": "wwise-authoring",
+        },
+        "executed": False,
+        "verified": False,
+    }
+    if api is not None:
+        payload["api"] = api
+    if operation is not None:
+        payload["operation"] = operation
+    if common is not None:
+        payload.update(dict(common))
+    return payload
+
+
+def authoring_host_platform(live_info: Mapping[str, Any]) -> str:
+    """Map only the official live getInfo platform values used by Authoring."""
+
+    platform = live_info.get("platform")
+    if not isinstance(platform, str):
+        raise OperationContractError(
+            "HOST_PLATFORM_UNAVAILABLE",
+            "Wwise Authoring getInfo did not return a usable platform.",
+            details={"platform": platform, "supported": ["x64", "win32", "macosx"]},
+        )
+    mapped = {
+        "x64": "windows",
+        "win32": "windows",
+        "macosx": "macos",
+    }.get(platform.strip().casefold())
+    if mapped is None:
+        raise OperationContractError(
+            "HOST_PLATFORM_UNAVAILABLE",
+            "Wwise Authoring reported a platform that the closed command-registration adapter does not support.",
+            details={
+                "platform": platform,
+                "supported": ["x64", "win32", "macosx"],
+            },
+        )
+    return mapped
+
+
+def live_authoring_api_boundary(
+    api: str,
+    *,
+    command: str,
+    live_info: Mapping[str, Any],
+    common: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if api not in AUTHORING_UI_COMMAND_URIS:
+        return None
+    if live_info.get("isCommandLine") is False:
+        return None
+    return authoring_host_required_payload(
+        api=api,
+        command=command,
+        live_info=live_info,
+        common=common,
+    )
+
+
+def live_authoring_transaction_boundary(
+    request_payload: Mapping[str, Any],
+    *,
+    command: str,
+    live_info: Mapping[str, Any],
+    common: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    operation = request_payload.get("operation")
+    if operation not in UI_COMMAND_OPERATIONS:
+        return None
+    if live_info.get("isCommandLine") is not False:
+        return authoring_host_required_payload(
+            api=None,
+            command=command,
+            live_info=live_info,
+            common=common,
+            operation=str(operation),
+        )
+    arguments = request_payload.get("arguments")
+    owned_unregister = (
+        operation == "ui.commands.unregister"
+        and isinstance(arguments, Mapping)
+        and "commands" in arguments
+    )
+    if operation == "ui.commands.register" or owned_unregister:
+        # Fail before project reads or preview creation when the live platform
+        # cannot be represented by the closed register adapter.
+        authoring_host_platform(live_info)
+    return None
+
+
+def local_filesystem_host_required_payload(
+    *,
+    command: str,
+    endpoint_host: str,
+    operation: str,
+    path_roles: Sequence[str],
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "contract": GATEWAY_RESULT_CONTRACT,
+        "ok": False,
+        "status": "local_waapi_host_required",
+        "command": command,
+        "operation": operation,
+        "error_code": "LOCAL_WAAPI_HOST_REQUIRED",
+        "message": (
+            "This transaction binds filesystem state proved on the gateway "
+            "machine or uses the fail-closed isolated transaction route, so "
+            "its WAAPI endpoint must be an explicit loopback host."
+        ),
+        "details": {
+            "boundary_basis": (
+                "gateway_local_filesystem_or_isolated_transaction"
+            ),
+            "endpoint_host": endpoint_host,
+            "path_roles": list(path_roles),
+            "required_endpoint_scope": "loopback",
+            "local_proof_is_remote_host_proof": False,
+        },
+        "executed": False,
+        "verified": False,
+        **dict(common),
+    }
+
+
+def local_filesystem_transaction_boundary(
+    request_payload: Mapping[str, Any],
+    *,
+    command: str,
+    endpoint_host: str,
+    common: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    operation = request_payload.get("operation")
+    if not isinstance(operation, str):
+        return None
+    path_roles = local_filesystem_path_roles(request_payload)
+    if not path_roles or is_loopback_waapi_host(endpoint_host):
+        return None
+    return local_filesystem_host_required_payload(
+        command=command,
+        endpoint_host=endpoint_host,
+        operation=operation,
+        path_roles=path_roles,
+        common=common,
+    )
+
+
 def preflight_public_route(
     args: argparse.Namespace,
     *,
@@ -1632,7 +1953,12 @@ def preflight_public_route(
                 f"{', '.join(SUPPORTED_WWISE_VERSION_KEYS)}"
             )
         try:
-            capability = CapabilityCatalog().describe(str(version), api)
+            catalog = CapabilityCatalog()
+            capability = (
+                catalog.authoring_ui_describe(str(version), api)
+                if api in AUTHORING_UI_COMMAND_URIS
+                else catalog.describe(str(version), api)
+            )
         except CapabilityNotFoundError:
             safety_context = None
             if args.command == "call":
@@ -1654,6 +1980,12 @@ def preflight_public_route(
     # With no configured version, retain the static bootstrap boundaries that
     # can reject or redirect a request without opening WAAPI. If no such
     # boundary applies, live getInfo detection selects the manifest later.
+    if api in AUTHORING_UI_COMMAND_URIS:
+        capability = CapabilityCatalog().authoring_ui_describe("2022.1", api)
+        return catalog_route_boundary_payload(
+            capability,
+            command=args.command,
+        )
     if args.command == "call":
         if api == OBJECT_GET_URI:
             return query_object_required_payload()
@@ -1870,6 +2202,53 @@ def preflight_metadata_input(args: argparse.Namespace) -> None:
         raise GatewayInputError("metadata --summary-only is supported only for the types operation")
 
 
+def preflight_stable_read_input(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> None:
+    """Validate closed profiler scalars before opening a WAAPI transport."""
+
+    (version,) = resolve_catalog_versions(args, env=env)
+    if args.command == "profiler-game-objects":
+        build_profiler_game_objects_request(
+            version=version,
+            time=args.time,
+        )
+        return
+    if len(args.bus_pipeline_id) > MAX_BUS_PIPELINE_IDS:
+        raise GatewayInputError(
+            "profiler-voice-contributions accepts at most "
+            f"{MAX_BUS_PIPELINE_IDS} --bus-pipeline-id values"
+        )
+    build_profiler_voice_contributions_request(
+        version=version,
+        time=args.time,
+        voice_pipeline_id=args.voice_pipeline_id,
+        bus_pipeline_ids=tuple(args.bus_pipeline_id),
+    )
+
+
+def preflight_debug_read_input(args: argparse.Namespace) -> None:
+    """Reject fixed debug-read scalar boundaries before opening WAAPI."""
+
+    if args.command == "debug-wal-tree":
+        if (
+            isinstance(args.take, bool)
+            or not isinstance(args.take, int)
+            or not 1 <= args.take <= MAX_WAL_TREE_NODES
+        ):
+            raise GatewayInputError(
+                f"debug-wal-tree --take must be between 1 and {MAX_WAL_TREE_NODES}"
+            )
+        return
+    if args.command == "debug-validate-call":
+        if not isinstance(args.api, str) or not args.api.startswith("ak."):
+            raise GatewayInputError(
+                "debug-validate-call api must be an exact reflected ak.* function URI"
+            )
+
+
 def preflight_json_inputs(args: argparse.Namespace) -> None:
     """Validate every command-line JSON document before opening WAAPI."""
 
@@ -1894,6 +2273,15 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
             )
     elif args.command == "preview":
         parse_json_object(args.request_json, "--request-json")
+    elif args.command == "debug-validate-call":
+        for field_name, option_name in (
+            ("args_json", "--args-json"),
+            ("options_json", "--options-json"),
+            ("result_json", "--result-json"),
+        ):
+            value = getattr(args, field_name)
+            if value is not None:
+                parse_json_object(value, option_name)
 
 
 def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]) -> dict[str, Any]:
@@ -1937,13 +2325,15 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
     if args.command == "capabilities":
         catalog = CapabilityCatalog()
         versions = resolve_catalog_versions(args, env=env)
+        profile = args.profile
         if args.limit < 0:
             raise GatewayInputError("--limit must be zero or greater")
         selected = []
         for version in versions:
             selected.extend(
-                catalog.select(
+                catalog.select_for_profile(
                     version,
+                    profile=profile,
                     category=args.category,
                     item_type=args.item_type,
                     semantic_family=args.family,
@@ -1959,9 +2349,14 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "status": "ok",
             "command": "capabilities",
             "offline": True,
+            "profile": profile,
             "versions": list(versions),
-            "summary": catalog.summary(versions),
+            "summary": catalog.summary_for_profile(
+                versions,
+                profile=profile,
+            ),
             "filters": {
+                "profile": profile,
                 "category": args.category,
                 "item_type": args.item_type,
                 "semantic_family": args.family,
@@ -1981,11 +2376,16 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
     if args.command == "describe":
         catalog = CapabilityCatalog()
         versions = resolve_catalog_versions(args, env=env)
+        profile = args.profile
         availability: dict[str, Any] = {}
         found = 0
         for version in versions:
             try:
-                entry = catalog.describe(version, args.api)
+                entry = catalog.describe_for_profile(
+                    version,
+                    args.api,
+                    profile=profile,
+                )
             except CapabilityNotFoundError:
                 availability[version] = {
                     "available": False,
@@ -1994,10 +2394,21 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 }
             else:
                 found += 1
-                availability[version] = {
+                version_row: dict[str, Any] = {
                     "available": True,
                     "capability": entry.as_dict(detail=bool(args.full_schema)),
                 }
+                if is_cli_request_template_uri(args.api):
+                    version_row["request_template"] = build_cli_request_template(
+                        version=version,
+                        uri=args.api,
+                        schema=entry.schema,
+                        forbidden_fields=FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS.get(
+                            args.api,
+                            (),
+                        ),
+                    )
+                availability[version] = version_row
         if found == 0:
             raise CapabilityNotFoundError(
                 f"WAAPI URI {args.api!r} is not reflected by requested versions: {', '.join(versions)}"
@@ -2008,6 +2419,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "status": "ok",
             "command": "describe",
             "offline": True,
+            "profile": profile,
             "api": args.api,
             "versions": list(versions),
             "schema_detail": "full" if args.full_schema else "summary",
@@ -2085,6 +2497,19 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             # session context after it, so the Agent sees this exact template
             # immediately before constructing the preview request.
             payload["direct_fast_route_contract"] = direct_fast_route_contract
+        if spec.name == "waapi.call":
+            cli_schemas: dict[str, Mapping[str, Any]] | None = None
+            if request_version is not None:
+                cli_schemas = {
+                    entry.uri: entry.schema
+                    for entry in CapabilityCatalog().entries(request_version)
+                    if entry.uri in CLI_REQUEST_TEMPLATE_URIS
+                }
+            payload["cli_request_templates"] = build_cli_request_template_set(
+                version=request_version,
+                schemas=cli_schemas,
+                forbidden_fields_by_uri=FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS,
+            )
         return payload
     if args.command in {"transaction-show", "confirm", "reject"}:
         store = resolve_transaction_store(args, env=env)
@@ -2693,6 +3118,361 @@ def dispatch_command(
             "wwise": status_wwise_summary(info_payload),
             "project": status_project_summary(project),
         }
+    if args.command == "project-default-work-units":
+        if detected_version == "2021.1":
+            projection = normalize_project_default_work_units_result(
+                version=detected_version,
+                result=None,
+            )
+            return {
+                "ok": True,
+                "status": "ok",
+                **common,
+                "api_attempted": None,
+                "call": None,
+                "message": (
+                    "Wwise 2021.1 has no reflected getProjectInfo API; "
+                    "the 2025.1 default Work Unit fields are unavailable."
+                ),
+                "agent_result": projection,
+            }
+        request = build_project_default_work_units_request(
+            version=detected_version,
+        )
+        request_validation = validate_semantic_payload(
+            request.uri,
+            request.args,
+            request.options,
+            version=detected_version,
+        )
+        result = dispatch(
+            dispatcher,
+            request.uri,
+            connection=connection,
+            version=detected_version,
+            args=request.args,
+            options=request.options,
+            result_limit_bytes=STABLE_READ_RESULT_LIMIT_BYTES,
+        )
+        if not result.get("ok"):
+            return {
+                "ok": False,
+                "status": "error",
+                **common,
+                "semantic_preview": request.as_dict(),
+                "schema_validation": {
+                    "request": request_validation.as_dict(),
+                    "result": None,
+                },
+                "call": dispatch_call_summary(result),
+            }
+        raw_result = result.get("result")
+        result_validation = validate_semantic_result(
+            request.uri,
+            raw_result,
+            version=detected_version,
+        )
+        projection = normalize_project_default_work_units_result(
+            version=detected_version,
+            result=raw_result,
+        )
+        return {
+            "ok": True,
+            "status": "ok",
+            **common,
+            "semantic_preview": request.as_dict(),
+            "schema_validation": {
+                "request": request_validation.as_dict(),
+                "result": result_validation.as_dict(),
+            },
+            "call": dispatch_call_summary(result),
+            "agent_result": projection,
+        }
+    if args.command == "profiler-game-objects":
+        request = build_profiler_game_objects_request(
+            version=detected_version,
+            time=args.time,
+        )
+        request_validation = validate_semantic_payload(
+            request.uri,
+            request.args,
+            request.options,
+            version=detected_version,
+        )
+        result = dispatch(
+            dispatcher,
+            request.uri,
+            connection=connection,
+            version=detected_version,
+            args=request.args,
+            options=request.options,
+            result_limit_bytes=STABLE_READ_RESULT_LIMIT_BYTES,
+        )
+        if not result.get("ok"):
+            return {
+                "ok": False,
+                "status": "error",
+                **common,
+                "semantic_preview": request.as_dict(),
+                "schema_validation": {
+                    "request": request_validation.as_dict(),
+                    "result": None,
+                },
+                "call": dispatch_call_summary(result),
+            }
+        raw_result = result.get("result")
+        result_validation = validate_semantic_result(
+            request.uri,
+            raw_result,
+            version=detected_version,
+        )
+        projection = normalize_profiler_game_objects_result(
+            version=detected_version,
+            result=raw_result,
+        )
+        return {
+            "ok": True,
+            "status": "ok",
+            **common,
+            "semantic_preview": request.as_dict(),
+            "schema_validation": {
+                "request": request_validation.as_dict(),
+                "result": result_validation.as_dict(),
+            },
+            "call": dispatch_call_summary(result),
+            "agent_result": projection,
+        }
+    if args.command == "profiler-voice-contributions":
+        request = build_profiler_voice_contributions_request(
+            version=detected_version,
+            time=args.time,
+            voice_pipeline_id=args.voice_pipeline_id,
+            bus_pipeline_ids=tuple(args.bus_pipeline_id),
+        )
+        request_validation = validate_semantic_payload(
+            request.uri,
+            request.args,
+            request.options,
+            version=detected_version,
+        )
+        result = dispatch(
+            dispatcher,
+            request.uri,
+            connection=connection,
+            version=detected_version,
+            args=request.args,
+            options=request.options,
+            result_limit_bytes=STABLE_READ_RESULT_LIMIT_BYTES,
+        )
+        if not result.get("ok"):
+            return {
+                "ok": False,
+                "status": "error",
+                **common,
+                "semantic_preview": request.as_dict(),
+                "schema_validation": {
+                    "request": request_validation.as_dict(),
+                    "result": None,
+                },
+                "call": dispatch_call_summary(result),
+            }
+        raw_result = result.get("result")
+        result_validation = validate_semantic_result(
+            request.uri,
+            raw_result,
+            version=detected_version,
+        )
+        projection = normalize_profiler_voice_contributions_result(
+            version=detected_version,
+            result=raw_result,
+        )
+        return {
+            "ok": True,
+            "status": "ok",
+            **common,
+            "semantic_preview": request.as_dict(),
+            "schema_validation": {
+                "request": request_validation.as_dict(),
+                "result": result_validation.as_dict(),
+            },
+            "call": dispatch_call_summary(result),
+            "agent_result": projection,
+        }
+    if args.command == "debug-wal-tree":
+        api = "ak.wwise.debug.getWalTree"
+        try:
+            capability = CapabilityCatalog().describe(detected_version, api)
+        except CapabilityNotFoundError:
+            return unreflected_interface_payload(
+                api,
+                detected_version,
+                command=args.command,
+                common=common,
+            )
+        if (
+            capability.preferred_route != "fixed_command"
+            or args.command not in capability.fixed_commands
+        ):
+            raise GatewayInputError(
+                f"{api} is not bound to the packaged {args.command} route in Wwise {detected_version}"
+            )
+        request_validation = validate_semantic_payload(
+            api,
+            {},
+            {},
+            version=detected_version,
+        )
+        result = dispatch(
+            dispatcher,
+            api,
+            connection=connection,
+            version=detected_version,
+            args={},
+            options={},
+            result_limit_bytes=int(
+                capability.execution_contract["result_limit_bytes"]
+            ),
+            operation_timeout=float(
+                capability.execution_contract["timeout_seconds"]
+            ),
+        )
+        if not result.get("ok"):
+            return {
+                "ok": False,
+                "status": "error",
+                **common,
+                "api_attempted": api,
+                "call": dispatch_call_summary(result),
+                "schema_validation": {
+                    "request": request_validation.as_dict(),
+                    "result": None,
+                },
+            }
+        result_validation = validate_semantic_result(
+            api,
+            result.get("result"),
+            version=detected_version,
+        )
+        try:
+            projection = normalize_wal_tree_result(
+                result.get("result"),
+                take=args.take,
+            )
+        except DebugLuaContractError as exc:
+            raise GatewayResultShapeError(
+                str(exc),
+                details=exc.details,
+                error_code=exc.error_code,
+            ) from exc
+        return {
+            "ok": True,
+            "status": "ok",
+            **common,
+            "api_attempted": api,
+            "call": dispatch_call_summary(result),
+            "schema_validation": {
+                "request": request_validation.as_dict(),
+                "result": result_validation.as_dict(),
+            },
+            "agent_result": projection,
+        }
+    if args.command == "debug-validate-call":
+        api = "ak.wwise.debug.validateCall"
+        try:
+            capability = CapabilityCatalog().describe(detected_version, api)
+        except CapabilityNotFoundError:
+            return unreflected_interface_payload(
+                api,
+                detected_version,
+                command=args.command,
+                common=common,
+            )
+        try:
+            target = CapabilityCatalog().describe(detected_version, args.api)
+        except CapabilityNotFoundError:
+            return unreflected_interface_payload(
+                args.api,
+                detected_version,
+                command=args.command,
+                common=common,
+            )
+        if target.item_type != "function":
+            raise GatewayInputError(
+                "debug-validate-call accepts only a reflected WAAPI function URI"
+            )
+        if (
+            capability.preferred_route != "fixed_command"
+            or args.command not in capability.fixed_commands
+        ):
+            raise GatewayInputError(
+                f"{api} is not bound to the packaged {args.command} route in Wwise {detected_version}"
+            )
+        call_args: dict[str, Any] = {"id": args.api}
+        supplied_sections: list[str] = []
+        for source, target_name, option_name in (
+            (args.args_json, "args", "--args-json"),
+            (args.options_json, "options", "--options-json"),
+            (args.result_json, "result", "--result-json"),
+        ):
+            if source is None:
+                continue
+            call_args[target_name] = parse_json_object(source, option_name)
+            supplied_sections.append(target_name)
+        request_validation = validate_semantic_payload(
+            api,
+            call_args,
+            {},
+            version=detected_version,
+        )
+        result = dispatch(
+            dispatcher,
+            api,
+            connection=connection,
+            version=detected_version,
+            args=call_args,
+            options={},
+            result_limit_bytes=int(
+                capability.execution_contract["result_limit_bytes"]
+            ),
+            operation_timeout=float(
+                capability.execution_contract["timeout_seconds"]
+            ),
+        )
+        result_validation = (
+            validate_semantic_result(
+                api,
+                result.get("result"),
+                version=detected_version,
+            )
+            if result.get("ok")
+            else None
+        )
+        return {
+            "ok": bool(result.get("ok")),
+            "status": "ok" if result.get("ok") else "error",
+            **common,
+            "api_attempted": api,
+            "validated_api": args.api,
+            "supplied_sections": supplied_sections,
+            "call": dispatch_call_summary(result),
+            "schema_validation": {
+                "request": request_validation.as_dict(),
+                "result": (
+                    result_validation.as_dict()
+                    if result_validation is not None
+                    else None
+                ),
+            },
+            "agent_result": (
+                {
+                    "validated_api": args.api,
+                    "supplied_sections": supplied_sections,
+                    "accepted_by_wwise": True,
+                }
+                if result.get("ok")
+                else None
+            ),
+        }
     if args.command == "buses":
         preview = build_object_get_query(
             type="Bus",
@@ -2872,8 +3652,20 @@ def dispatch_command(
     if args.command == "wait-topic":
         request_options = parse_json_object(args.options_json, "--options-json")
         match = parse_json_object(args.match_json, "--match-json")
+        authoring_boundary = live_authoring_api_boundary(
+            args.api,
+            command="wait-topic",
+            live_info=live_info,
+            common=common,
+        )
+        if authoring_boundary is not None:
+            return authoring_boundary
         try:
-            capability = CapabilityCatalog().describe(detected_version, args.api)
+            capability = live_capability(
+                detected_version,
+                args.api,
+                live_info=live_info,
+            )
         except CapabilityNotFoundError:
             return unreflected_interface_payload(
                 args.api,
@@ -2914,7 +3706,12 @@ def dispatch_command(
         if args.event_count == 1:
             event = normalize_topic_event_result(result, expected_topic=args.api) if result.get("ok") else None
             event_validation = (
-                validate_semantic_event(args.api, event, version=detected_version)
+                validate_semantic_event(
+                    args.api,
+                    event,
+                    version=detected_version,
+                    authoring_ui_profile=live_info.get("isCommandLine") is False,
+                )
                 if event is not None
                 else None
             )
@@ -2936,7 +3733,12 @@ def dispatch_command(
         )
         event_validations = (
             [
-                validate_semantic_event(args.api, event, version=detected_version).as_dict()
+                validate_semantic_event(
+                    args.api,
+                    event,
+                    version=detected_version,
+                    authoring_ui_profile=live_info.get("isCommandLine") is False,
+                ).as_dict()
                 for event in events
             ]
             if events is not None
@@ -2970,8 +3772,20 @@ def dispatch_command(
                 request_options=request_options,
                 dry_run=args.dry_run,
             )
+        authoring_boundary = live_authoring_api_boundary(
+            args.api,
+            command="call",
+            live_info=live_info,
+            common=common,
+        )
+        if authoring_boundary is not None:
+            return authoring_boundary
         try:
-            capability = CapabilityCatalog().describe(detected_version, args.api)
+            capability = live_capability(
+                detected_version,
+                args.api,
+                live_info=live_info,
+            )
         except CapabilityNotFoundError:
             return unreflected_interface_payload(
                 args.api,
@@ -2991,6 +3805,7 @@ def dispatch_command(
             request_args,
             request_options,
             version=detected_version,
+            authoring_ui_profile=live_info.get("isCommandLine") is False,
         )
         request_args = canonicalize_bounded_direct_call_request(
             args.api,
@@ -3017,6 +3832,7 @@ def dispatch_command(
                 args.api,
                 result.get("result"),
                 version=detected_version,
+                authoring_ui_profile=live_info.get("isCommandLine") is False,
             )
             if result.get("ok") and not args.dry_run
             else None
@@ -3137,13 +3953,17 @@ def prepared_wire_path_io_audit(
                     "expected_uri": expected_uri,
                 },
             )
-        soundbank_guard = pre_state.get("soundbank_guard")
-        io_audit = (
-            soundbank_guard.get("io_audit")
-            if isinstance(soundbank_guard, Mapping)
-            else None
-        )
-        context = "SoundBank"
+        if operation == "lua.executeCliFile":
+            io_audit = pre_state.get("lua_io_audit")
+            context = "Lua"
+        else:
+            soundbank_guard = pre_state.get("soundbank_guard")
+            io_audit = (
+                soundbank_guard.get("io_audit")
+                if isinstance(soundbank_guard, Mapping)
+                else None
+            )
+            context = "SoundBank"
     if not isinstance(io_audit, Mapping):
         raise WwiseWirePathError(
             "WIRE_PATH_AUDIT_MISSING",
@@ -3175,6 +3995,22 @@ def dispatch_transaction_command(
     )
     if args.command == "preview":
         request_payload = parse_json_object(args.request_json, "--request-json")
+        authoring_boundary = live_authoring_transaction_boundary(
+            request_payload,
+            command="preview",
+            live_info=live_info,
+            common=common,
+        )
+        if authoring_boundary is not None:
+            return authoring_boundary
+        locality_boundary = local_filesystem_transaction_boundary(
+            request_payload,
+            command="preview",
+            endpoint_host=connection.host,
+            common=common,
+        )
+        if locality_boundary is not None:
+            return locality_boundary
         project_guard_mode, target_project_path = transaction_project_guard_spec(
             request_payload,
             version=detected_version,
@@ -3272,6 +4108,23 @@ def dispatch_transaction_command(
     if not isinstance(artifact, Mapping):
         raise GatewayInputError("transaction preview artifact must be a JSON object")
     prepared = require_mapping(artifact.get("prepared_operation"), "prepared operation")
+    sealed_request = require_mapping(artifact.get("request"), "transaction request")
+    authoring_boundary = live_authoring_transaction_boundary(
+        sealed_request,
+        command=args.command,
+        live_info=live_info,
+        common=common,
+    )
+    if authoring_boundary is not None:
+        return authoring_boundary
+    locality_boundary = local_filesystem_transaction_boundary(
+        sealed_request,
+        command=args.command,
+        endpoint_host=connection.host,
+        common=common,
+    )
+    if locality_boundary is not None:
+        return locality_boundary
     if record.state is TransactionState.EXECUTING:
         recovered = store.mark_execution_indeterminate(
             transaction_id,
@@ -3370,7 +4223,11 @@ def dispatch_transaction_command(
                 "Immutable prepared dispatch URI does not match its closed operation registry entry.",
                 details={"operation": operation, "expected": spec.uri, "actual": dispatch_payload.get("uri")},
             )
-        capability = CapabilityCatalog().describe(detected_version, call_uri)
+        capability = live_capability(
+            detected_version,
+            call_uri,
+            live_info=live_info,
+        )
         if operation == "waapi.call" and capability.preferred_route != "transaction_operation":
             raise OperationContractError(
                 "PREVIEW_DISPATCH_MISMATCH",
@@ -3542,7 +4399,33 @@ def dispatch_transaction_command(
             call_args,
             call_options,
             version=detected_version,
+            authoring_ui_profile=live_info.get("isCommandLine") is False,
         )
+        verification_plan = require_mapping(
+            prepared.get("verification_plan"),
+            "prepared verification plan",
+        )
+        if verification_plan.get("kind") == "host-control-terminal":
+            return dispatch_host_control_transaction(
+                env=env,
+                connection=connection,
+                detected_version=detected_version,
+                dispatcher=dispatcher,
+                common=common,
+                store=store,
+                transaction_id=transaction_id,
+                artifact_hash=preview.artifact_hash,
+                prepared=prepared,
+                call_uri=call_uri,
+                call_args=call_args,
+                call_options=call_options,
+                capability=capability,
+                schema_validation=schema_validation.as_dict(),
+                role_validation=role_validation,
+                guard_validation=guard_validation,
+                project_call=project_call,
+                verification_plan=verification_plan,
+            )
         runtime_call_args = call_args
         runtime_call_options = call_options
         wire_path_adaptation: Mapping[str, Any] | None = None
@@ -3934,6 +4817,154 @@ def dispatch_transaction_command(
             payload["agent_result"] = agent_result
         return payload
     raise GatewayInputError(f"unsupported transaction command: {args.command}")
+
+
+def dispatch_host_control_transaction(
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+    store: TransactionStore,
+    transaction_id: str,
+    artifact_hash: str,
+    prepared: Mapping[str, Any],
+    call_uri: str,
+    call_args: Mapping[str, Any],
+    call_options: Mapping[str, Any],
+    capability: CapabilityRecord,
+    schema_validation: Mapping[str, Any],
+    role_validation: Mapping[str, Any],
+    guard_validation: Mapping[str, Any],
+    project_call: Mapping[str, Any] | None,
+    verification_plan: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Dispatch one deliberately terminal debug host control exactly once.
+
+    A returned empty result does not prove that a restart, assertion handler,
+    or process crash completed.  Conversely, a dropped WAAPI connection cannot
+    prove that the request reached Wwise.  Both outcomes therefore terminate
+    in a durable indeterminate state with explicit lifecycle evidence and no
+    retry/reconnect/verify command.
+    """
+
+    expected_disconnect = verification_plan.get("expected_disconnect")
+    process_expectation = verification_plan.get("process_expectation")
+    if not isinstance(expected_disconnect, bool) or not isinstance(
+        process_expectation, str
+    ):
+        raise OperationContractError(
+            "INVALID_PREVIEW",
+            "Host-control verification lacks its expected disconnect and process lifecycle.",
+        )
+    require_project_modification_policy(env=env, action="execution")
+    store.begin_execution(transaction_id)
+    result: Mapping[str, Any] | None = None
+    exception_evidence: Mapping[str, Any] | None = None
+    try:
+        result = dispatch(
+            dispatcher,
+            call_uri,
+            connection=connection,
+            version=detected_version,
+            args=call_args,
+            options=call_options,
+            allow_destructive=True,
+            operation_timeout=float(
+                capability.execution_contract["timeout_seconds"]
+            ),
+            result_limit_bytes=int(
+                capability.execution_contract["result_limit_bytes"]
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001 - disconnect is part of this contract
+        exception_evidence = {
+            "error_type": safe_type_name(exc, "Exception"),
+            "message": bounded_gateway_label(str(exc), 2048),
+        }
+
+    dispatch_accepted = bool(result is not None and result.get("ok") is True)
+    if dispatch_accepted:
+        delivery = "waapi_result_returned"
+        disconnect_observation = "not_observed_before_result"
+    elif result is not None:
+        delivery = "indeterminate_after_dispatch_attempt"
+        disconnect_observation = (
+            "call_failed_or_connection_loss_observed"
+            if expected_disconnect
+            else "unexpected_call_failure_observed"
+        )
+    else:
+        delivery = "exception_after_dispatch_started"
+        disconnect_observation = (
+            "exception_compatible_with_expected_disconnect"
+            if expected_disconnect
+            else "unexpected_exception_observed"
+        )
+    lifecycle = {
+        "expected": process_expectation,
+        "observed": "not_observed_by_gateway",
+        "gateway_process_action": "none",
+        "reconnect_attempted": False,
+    }
+    durable_details = {
+        "host_control": call_uri,
+        "expected_disconnect": expected_disconnect,
+        "disconnect_observation": disconnect_observation,
+        "dispatch_delivery": delivery,
+        "dispatch_accepted": dispatch_accepted,
+        "process_lifecycle": lifecycle,
+        "dispatch_result": dict(result) if result is not None else None,
+        "exception": dict(exception_evidence) if exception_evidence else None,
+        "automatic_retry": False,
+    }
+    indeterminate = store.mark_execution_indeterminate(
+        transaction_id,
+        details=durable_details,
+    )
+    return {
+        "ok": False,
+        "status": (
+            "expected_disconnect_indeterminate"
+            if expected_disconnect
+            else "host_control_effect_indeterminate"
+        ),
+        **common,
+        "transaction_id": transaction_id,
+        "state": indeterminate.state.value,
+        "artifact_hash": artifact_hash,
+        "host_control": call_uri,
+        "expected_disconnect": expected_disconnect,
+        "disconnect_observation": disconnect_observation,
+        "dispatch_delivery": delivery,
+        "dispatch_accepted": dispatch_accepted,
+        "process_lifecycle": lifecycle,
+        "call": (
+            dispatch_call_summary(result)
+            if isinstance(result, Mapping)
+            else None
+        ),
+        "exception": dict(exception_evidence) if exception_evidence else None,
+        "schema_validation": schema_validation,
+        "role_validation": role_validation,
+        "guard_validation": guard_validation,
+        "project_call": (
+            dispatch_call_summary(project_call)
+            if isinstance(project_call, Mapping)
+            else None
+        ),
+        "executed": True if dispatch_accepted else None,
+        "verified": False,
+        "cleanup": transaction_cleanup_payload(
+            prepared,
+            phase="indeterminate",
+            execution_result=result,
+        ),
+        "automatic_retry": False,
+        "reconnect_attempted": False,
+        "generic_verify_allowed": False,
+    }
 
 
 def dispatch_undo_group_execution_plan(
@@ -7075,6 +8106,12 @@ def validate_bounded_direct_call_request(
     filters = request_args.get("filters", [])
     databases = request_args.get("databases", [])
     return_fields = request_options.get("return", [])
+    if not isinstance(filters, list):
+        raise GatewayInputError("mediaPool.get filters must be an array")
+    if not isinstance(databases, list):
+        raise GatewayInputError("mediaPool.get databases must be an array")
+    if not isinstance(return_fields, list):
+        raise GatewayInputError("mediaPool.get return must be an array")
     if len(filters) > MAX_MEDIA_POOL_FILTERS:
         raise GatewayInputError(
             f"mediaPool.get accepts at most {MAX_MEDIA_POOL_FILTERS} filters"
@@ -7089,12 +8126,132 @@ def validate_bounded_direct_call_request(
         )
     if len(set(return_fields)) != len(return_fields):
         raise GatewayInputError("mediaPool.get return fields must be unique")
+    if not all(isinstance(item, str) and item for item in databases):
+        raise GatewayInputError("mediaPool.get databases must contain non-empty strings")
+    if len(set(databases)) != len(databases):
+        raise GatewayInputError("mediaPool.get databases must be unique")
+    for index, raw_filter in enumerate(filters):
+        _validate_media_pool_filter(raw_filter, index=index)
     search_text = request_args.get("searchText")
     if isinstance(search_text, str) and len(search_text) > MAX_MEDIA_POOL_SEARCH_TEXT_CHARS:
         raise GatewayInputError(
             "mediaPool.get searchText exceeds the reviewed "
             f"{MAX_MEDIA_POOL_SEARCH_TEXT_CHARS}-character limit"
         )
+
+
+def _validate_media_pool_filter(raw_filter: Any, *, index: int) -> None:
+    path = f"mediaPool.get filters[{index}]"
+    if not isinstance(raw_filter, Mapping):
+        raise GatewayInputError(f"{path} must be an object")
+    filter_type = raw_filter.get("type")
+    if filter_type == "field":
+        required = {"type", "field", "operator", "value"}
+        allowed = required
+    elif filter_type == "audioDescription":
+        required = {"type", "value"}
+        allowed = required | {"weight"}
+    elif filter_type == "audioSimilarity":
+        required = {"type", "value"}
+        allowed = required | {"weight"}
+    else:
+        raise GatewayInputError(
+            f"{path}.type must be field, audioDescription, or audioSimilarity"
+        )
+    actual = set(raw_filter)
+    missing = sorted(required - actual)
+    unknown = sorted(actual - allowed)
+    if missing or unknown:
+        raise GatewayInputError(
+            f"{path} does not match the closed {filter_type} filter shape; "
+            f"missing={missing}, unknown={unknown}"
+        )
+
+    value = raw_filter.get("value")
+    if filter_type == "field":
+        field = raw_filter.get("field")
+        operator = raw_filter.get("operator")
+        if (
+            not isinstance(field, str)
+            or not field
+            or len(field) > MAX_MEDIA_POOL_FILTER_TOKEN_CHARS
+        ):
+            raise GatewayInputError(
+                f"{path}.field must be a non-empty string of at most "
+                f"{MAX_MEDIA_POOL_FILTER_TOKEN_CHARS} characters"
+            )
+        if (
+            not isinstance(operator, str)
+            or not operator
+            or len(operator) > MAX_MEDIA_POOL_FILTER_TOKEN_CHARS
+        ):
+            raise GatewayInputError(
+                f"{path}.operator must be a non-empty string of at most "
+                f"{MAX_MEDIA_POOL_FILTER_TOKEN_CHARS} characters"
+            )
+        if isinstance(value, str):
+            if len(value) > MAX_MEDIA_POOL_FILTER_VALUE_CHARS:
+                raise GatewayInputError(
+                    f"{path}.value exceeds the "
+                    f"{MAX_MEDIA_POOL_FILTER_VALUE_CHARS}-character limit"
+                )
+        elif (
+            not _is_finite_waapi_number(value)
+        ):
+            raise GatewayInputError(
+                f"{path}.value must be a finite number or bounded string"
+            )
+        return
+
+    if not isinstance(value, str) or not value:
+        raise GatewayInputError(f"{path}.value must be a non-empty string")
+    if len(value) > MAX_MEDIA_POOL_FILTER_VALUE_CHARS:
+        raise GatewayInputError(
+            f"{path}.value exceeds the "
+            f"{MAX_MEDIA_POOL_FILTER_VALUE_CHARS}-character limit"
+        )
+    weight = raw_filter.get("weight", 1.0)
+    if (
+        not _is_finite_waapi_number(weight)
+        or not 0 <= weight <= 1
+    ):
+        raise GatewayInputError(
+            f"{path}.weight must be a finite number from 0 through 1"
+        )
+    if filter_type == "audioDescription":
+        return
+
+    source = Path(value)
+    if not source.is_absolute():
+        raise GatewayInputError(
+            f"{path}.value must be an absolute regular audio-file path"
+        )
+    try:
+        file_mode = source.lstat().st_mode
+    except OSError as exc:
+        raise GatewayInputError(
+            f"{path}.value must name an existing absolute regular audio file"
+        ) from exc
+    if stat.S_ISLNK(file_mode) or not stat.S_ISREG(file_mode):
+        raise GatewayInputError(
+            f"{path}.value must name a non-symlink regular audio file"
+        )
+    if not os.access(source, os.R_OK):
+        raise GatewayInputError(f"{path}.value must be readable")
+
+
+def _is_finite_waapi_number(value: Any) -> bool:
+    """Return whether a JSON number has one finite WAAPI double representation."""
+
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    if isinstance(value, float):
+        return math.isfinite(value)
+    try:
+        converted = float(value)
+    except (OverflowError, ValueError):
+        return False
+    return math.isfinite(converted)
 
 
 def _reject_duplicate_gateway_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:

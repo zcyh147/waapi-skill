@@ -8,6 +8,10 @@ from pathlib import Path
 from typing import Any, Mapping, Protocol
 
 from wwise_waapi.dispatcher import DEFAULT_WWISE_VERSION, DispatcherRequest
+from wwise_waapi.authoring_ui_commands_manifest import (
+    AuthoringUiCommandsSupplementError,
+    AuthoringUiCommandsSupplementMissingError,
+)
 from wwise_waapi.manifest import ManifestResourceMissingError, ManifestStore
 
 
@@ -246,6 +250,79 @@ class ManifestSchemaLoader:
             SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
             f"No usable schema for WAAPI URI {uri!r} in manifest {version}",
             details=_schema_absence_details(uri, version),
+        )
+
+    def load_authoring_ui_manifest(
+        self,
+        version: str = DEFAULT_WWISE_VERSION,
+    ) -> dict[str, Any]:
+        """Load the explicit Console-plus-UI-command schema profile."""
+
+        try:
+            manifest = self.manifest_store.load_with_authoring_ui_commands(
+                version
+            )
+        except ManifestResourceMissingError as exc:
+            raise SemanticValidationError(
+                SemanticErrorCode.UNSUPPORTED_WWISE_VERSION,
+                f"Unsupported Wwise version for semantic builders: {version}",
+                details={
+                    "version": version,
+                    "resource_path": str(exc.path),
+                    "profile": "wwise-authoring-ui",
+                },
+            ) from exc
+        except (
+            AuthoringUiCommandsSupplementError,
+            AuthoringUiCommandsSupplementMissingError,
+        ) as exc:
+            details: dict[str, Any] = {
+                "version": version,
+                "profile": "wwise-authoring-ui",
+                "fallback_allowed": False,
+            }
+            path = getattr(exc, "path", None)
+            if path is not None:
+                details["resource_path"] = str(path)
+            raise SemanticValidationError(
+                SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+                f"Authoring UI schemas are unavailable for Wwise {version}: {exc}",
+                details=details,
+            ) from exc
+        if not manifest:
+            raise SemanticValidationError(
+                SemanticErrorCode.UNSUPPORTED_WWISE_VERSION,
+                f"Unsupported Wwise version for semantic builders: {version}",
+                details={
+                    "version": version,
+                    "profile": "wwise-authoring-ui",
+                },
+            )
+        return manifest
+
+    def authoring_ui_schema_for(
+        self,
+        uri: str,
+        version: str = DEFAULT_WWISE_VERSION,
+    ) -> Mapping[str, Any]:
+        """Resolve schemas only from the explicit Authoring UI profile."""
+
+        manifest = self.load_authoring_ui_manifest(version)
+        for entry in manifest.get("schemas", []):
+            if not isinstance(entry, Mapping) or entry.get("uri") != uri:
+                continue
+            schema = entry.get("schema")
+            if isinstance(schema, Mapping):
+                return schema
+            break
+        raise SemanticValidationError(
+            SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+            f"No usable Authoring UI schema for WAAPI URI {uri!r} "
+            f"in manifest {version}",
+            details={
+                **_schema_absence_details(uri, version),
+                "profile": "wwise-authoring-ui",
+            },
         )
 
 

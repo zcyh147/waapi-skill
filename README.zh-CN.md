@@ -91,22 +91,65 @@
 
 ## Packaged API 覆盖情况
 
-覆盖率按 **Wwise 版本/API 行**统计，因为同一个 URI 在不同 Wwise 版本中可能具有不同的 schema、执行路由或安全结论。只有 packaged gateway 能真正执行的行才算覆盖；只返回 hard boundary 或只提供文档说明不算覆盖。
+覆盖率按 **Wwise 版本/API 行**统计，因为同一个 URI 在不同 Wwise 版本中可能具有不同的 schema、执行路由或安全结论。只有 packaged gateway 已提供公共执行合同的行才算覆盖；只返回 hard boundary 或只提供文档说明不算覆盖。真正 dispatch 前仍必须通过实时宿主、版本和安全前置条件。
 
-| Wwise 版本 | 反射总行数 | 可执行行数 | 可执行 functions | 可执行 topics | 排除行数 |
+默认 `wwise-console` profile 是由 WwiseConsole 反射得到的基准接口：
+
+| Wwise 版本 | 反射总行数 | 已封装路由行数 | 已封装 functions | 已封装 topics | Registry 排除行数 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `2021.1` | 126 | 119 | 93 | 26 | 7 |
-| `2022.1` | 144 | 137 | 106 | 31 | 7 |
-| `2023.1` | 181 | 170 | 139 | 31 | 11 |
-| `2024.1` | 178 | 168 | 139 | 29 | 10 |
-| `2025.1` | 185 | 175 | 145 | 30 | 10 |
-| **合计** | **814** | **769** | **622** | **147** | **45** |
+| `2021.1` | 126 | 124 | 97 | 27 | 2 |
+| `2022.1` | 144 | 142 | 110 | 32 | 2 |
+| `2023.1` | 181 | 179 | 147 | 32 | 2 |
+| `2024.1` | 178 | 178 | 148 | 30 | 0 |
+| `2025.1` | 185 | 185 | 154 | 31 | 0 |
+| **合计** | **814** | **808** | **656** | **152** | **6** |
 
-这 769 个版本/API 行对应 **188 个唯一可执行 WAAPI URI**，分别通过 fixed command、bounded direct call、bounded topic wait、确认式 transaction、隔离 I/O transaction，或同连接 Undo Group 组合执行。45 个排除行对应 12 个唯一 URI，仅限任意 Lua 执行、危险/private debug 接口，以及不受限的 UI command 注册与执行。
+这 808 个版本/API 行对应 **198 个唯一已封装 WAAPI URI**。这是接口合同
+覆盖数，不表示 808 行都能在 WwiseConsole 上 dispatch：2021.1–2023.1
+各自保留的 3 个 UI command 路由仍要求实时宿主为 Authoring；连接
+WwiseConsole 时会在业务调用前失败。另有一个
+`wwise-authoring-ui` profile，只在基准接口上补入从真实 Wwise Authoring
+反射得到的五个固定 `ak.wwise.ui.commands.*` URI：
 
-命名操作层还为 `ak.wwise.core.object.create`、`ak.wwise.core.object.set`、`ak.wwise.core.audio.import`、`ak.wwise.core.audio.importTabDelimited`、`ak.wwise.core.soundbank.generate`、`ak.wwise.core.soundbank.convertExternalSources` 和 `ak.wwise.core.soundbank.processDefinitionFiles` 提供闭合、按版本约束的业务合同。`object.create`、两种导入和 `soundbank.generate` 覆盖五个版本；`object.set`、External Sources 转换和 Definition Files 处理从 `2022.1` 起提供，因为 `2021.1` 清单没有这些 URI。Wwise `2021.1` 的 SoundBank 生成只从实时 Project 的 `filePath`、`workunitIsDirty` 和受约束、带哈希、严格解析的 `.wproj` 获取工程上下文；后续版本绑定实时 `core.getProjectInfo`。一旦 URI 已有实现完成的命名操作，generic `waapi.call` 会以 `DEDICATED_OPERATION_REQUIRED` 拒绝该 URI，避免原始 payload 绕过专用合同。
+| Wwise 版本 | Packaged overlay 行数 | 已封装路由行数 | 已封装 functions | 已封装 topics | Registry 排除行数 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `2021.1` | 126 | 126 | 99 | 27 | 0 |
+| `2022.1` | 144 | 144 | 112 | 32 | 0 |
+| `2023.1` | 181 | 181 | 149 | 32 | 0 |
+| `2024.1` | 183 | 183 | 152 | 31 | 0 |
+| `2025.1` | 190 | 190 | 158 | 32 | 0 |
+| **合计** | **824** | **824** | **670** | **154** | **0** |
 
-当前固定的纯程序 gate 包含 **1457 项程序测试**，其中每一个已覆盖的版本/API 行都有一项可执行路由用例，并覆盖由 gateway 提供的会话提示上下文和上述命名操作的合同/验证矩阵。它验证 packaged 路由、schema、安全边界、I/O 约束、transaction 行为、fake dispatch 执行和确定性的 onboarding 信息；这不等于已经在真实 Wwise 进程中逐一运行了全部 769 行。另有一轮关闭 memory 的 `h80-release-c38` 真实 Wwise campaign，已通过全部 80 个获批重型 API 场景（2022.1 为 70 个，2024.1 和 2025.1 各 5 个）；这份证据只覆盖这些场景及其封存候选版本，不代表整个接口都做过真实语义测试。完整口径见[五版本覆盖契约](./skills/waapi-skill/references/waapi-coverage.md)。
+Authoring profile 对应 **200 个唯一已封装 WAAPI URI**；连接匹配的
+Authoring 宿主时，824 行都有公共执行路由。它只是 Console
+manifest 加上窄范围的 UI command supplement，并不表示仓库反射了完整的
+Authoring API。Gateway 根据实时 `getInfo.isCommandLine` 自动判断宿主；
+连接 WwiseConsole 时，UI command 会在业务调用前被拒绝。五个版本采集到的
+命令 ID 数量分别为 317、451、475、594、623；它们只是当前工程、插件和
+add-on 环境下的观察快照，不是运行时 allowlist。真正执行前始终以实时
+`getCommands` 结果为准。
+
+五个 Authoring 版本的资源采集总共只做了 35 次只读 WAAPI 调用：每个版本
+一次 `getInfo`、五个固定 URI 的 `getSchema`，以及一次 `getCommands`。
+本轮没有在真实 Wwise 中执行、注册或注销 UI command；这些 transaction
+路径和强化后的 `object.createPlugin` 读回验证器，当前证据来自程序测试和
+fake client，不是新增的真实业务修改证据。
+
+可用 `gateway.py capabilities --profile wwise-console` 或
+`gateway.py capabilities --profile wwise-authoring-ui` 离线查看相应接口表；
+这个 catalog 选项不能覆盖实时宿主探测得到的 profile。
+
+两套 profile 都通过 fixed command、bounded direct call、bounded topic
+wait、确认式 transaction、隔离 I/O transaction 或同连接 Undo Group
+执行。Lua 文件路由只接受已经存在并重新绑定路径、大小和哈希的 `.lua`
+文件；Wwise 2025.1 另有精确 inline source 路由。`source_authority`
+只是调用方声明，不是运行时对对话来源的证明；Skill 不会生成、修复或包装
+Lua。Private debug API 使用有界读取/订阅或明确的不可重试 transaction，
+restart/assert/crash 会以生命周期不确定状态终止。
+
+命名操作层还为对象创建与修改、插件创建、RTPC/平台 link、音频导入、SoundBank 工作流、Lua/debug、截图，以及 Authoring UI command 的执行、注册和注销提供闭合、按版本约束的业务合同。`object.createPlugin` 只接受明确的 class ID 和闭合的 Source/Effect 描述；`2022.1` 使用固定 Effect 引用，后续版本追加 EffectSlot，并通过实时读回验证新建插件。UI command execute 只能验证反射出的空结果结构，不能声称任意 GUI 或工程效果已经验证；register/unregister 还会验证实时命令 ID 的存在状态。Wwise `2021.1` 的 SoundBank 生成只从实时 Project 的 `filePath`、`workunitIsDirty` 和受约束、带哈希、严格解析的 `.wproj` 获取工程上下文；后续版本绑定实时 `core.getProjectInfo`。这些路由把不可变 preview 绑定到之后的确认，并使用各操作能提供的最强读回，而不是只相信 WAAPI 返回成功。一旦 URI 已有实现完成的命名操作，generic `waapi.call` 会以 `DEDICATED_OPERATION_REQUIRED` 拒绝该 URI，避免原始 payload 绕过专用合同。
+
+当前固定的纯程序 gate 包含 **1901 项程序测试**，其中每一个已覆盖的默认 profile 版本/API 行都有一项已封装路由合同用例，并另外覆盖 Authoring overlay/UI command、gateway 会话提示上下文和上述命名操作的合同/验证矩阵。它验证 packaged 路由、schema、安全边界、I/O 约束、transaction 行为、fake dispatch 执行和确定性的 onboarding 信息；这不等于已经在真实 Wwise 进程中逐一运行了全部 808 行。另有一轮关闭 memory 的 `h80-release-c38` 真实 Wwise campaign，已通过全部 80 个获批重型 API 场景（2022.1 为 70 个，2024.1 和 2025.1 各 5 个）；这份证据只覆盖这些场景及其封存候选版本，不代表整个接口都做过真实语义测试。完整口径见[五版本覆盖契约](./skills/waapi-skill/references/waapi-coverage.md)。
 
 ---
 

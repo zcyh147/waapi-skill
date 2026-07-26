@@ -19,7 +19,7 @@ import math
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Mapping, NoReturn, Sequence
+from typing import Any, Mapping, Sequence
 
 from .canonical import canonical_json_bytes
 
@@ -36,18 +36,31 @@ DEFAULT_MAX_NAME_LENGTH = 255
 DEFAULT_MAX_TYPE_LENGTH = 128
 DEFAULT_MAX_FIELD_NAME_LENGTH = 128
 DEFAULT_MAX_NOTES_LENGTH = 64 * 1024
+DEFAULT_MAX_RTPCS = 32
+DEFAULT_MAX_RTPC_POINTS = 256
 
 NODE_FIELDS = frozenset({"type", "name", "notes", "properties", "references", "children"})
 PROPERTY_FIELDS = frozenset({"name", "value"})
 REFERENCE_FIELDS = frozenset({"name", "target"})
+RTPC_FIELDS = frozenset({"property", "control_input", "points"})
+RTPC_OPTIONAL_FIELDS = frozenset({"notes"})
+RTPC_POINT_FIELDS = frozenset({"x", "y", "shape"})
+RTPC_POINT_SHAPES = frozenset(
+    {
+        "Constant",
+        "Linear",
+        "Log3",
+        "Log2",
+        "Log1",
+        "InvertedSCurve",
+        "SCurve",
+        "Exp1",
+        "Exp2",
+        "Exp3",
+    }
+)
 IDENTITY_KINDS = frozenset({"id", "path", "waql", "scoped-name"})
 _DYNAMIC_FIELD_NAME = re.compile(r"^[:_a-zA-Z0-9]+$")
-
-RTPC_UNSUPPORTED_BOUNDARY = (
-    "object.set RTPC editing is not exposed by the initial closed object operation: "
-    "curve/list replacement, ControlInput resolution, versioned point-shape validation, "
-    "full-list readback, and rollback semantics require a dedicated reviewed contract."
-)
 
 
 class ObjectOperationContractError(ValueError):
@@ -170,6 +183,37 @@ class ObjectReferenceDescriptor:
 
     def as_dict(self) -> dict[str, Any]:
         return {"name": self.name, "target": self.target.as_dict()}
+
+
+@dataclass(frozen=True, slots=True)
+class RtpcCurvePoint:
+    x: int | float
+    y: int | float
+    shape: str
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"x": self.x, "y": self.y, "shape": self.shape}
+
+
+@dataclass(frozen=True, slots=True)
+class RtpcDescriptor:
+    """One closed RTPC request before live ControlInput resolution."""
+
+    request_path: str
+    property: str
+    control_input: ObjectIdentityDescriptor
+    points: tuple[RtpcCurvePoint, ...]
+    notes: str | None
+
+    def as_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "property": self.property,
+            "control_input": self.control_input.as_dict(),
+            "points": [point.as_dict() for point in self.points],
+        }
+        if self.notes is not None:
+            result["notes"] = self.notes
+        return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -402,14 +446,146 @@ def normalize_reference_descriptors(
     return _normalize_references(payload, request_path=request_path, limits=limits)
 
 
-def normalize_rtpc_descriptors(payload: Any, *, request_path: str = "$.rtpcs") -> NoReturn:
-    """Return the explicit first-release boundary for object.set RTPC lists."""
+def normalize_rtpc_descriptors(
+    payload: Any,
+    *,
+    request_path: str = "$.rtpcs",
+    limits: ObjectTreeLimits = ObjectTreeLimits(),
+    max_rtpcs: int = DEFAULT_MAX_RTPCS,
+    max_points_per_curve: int = DEFAULT_MAX_RTPC_POINTS,
+) -> tuple[RtpcDescriptor, ...]:
+    """Normalize the closed public RTPC DSL without accepting raw object lists."""
 
-    raise ObjectOperationContractError(
-        "RTPC_NOT_IMPLEMENTED",
-        RTPC_UNSUPPORTED_BOUNDARY,
-        details={"path": request_path, "supplied": payload is not None},
+    _request_size(payload, limits=limits, path=request_path)
+    rows = _descriptor_rows(
+        payload,
+        request_path=request_path,
+        limit=_positive_limit(max_rtpcs, field="max_rtpcs"),
     )
+    if not rows:
+        raise ObjectOperationContractError(
+            "EMPTY_RTPC_LIST",
+            f"{request_path} must contain at least one RTPC descriptor.",
+            details={"path": request_path},
+        )
+
+    point_limit = _positive_limit(max_points_per_curve, field="max_points_per_curve")
+    normalized: list[RtpcDescriptor] = []
+    for index, item in enumerate(rows):
+        path = f"{request_path}[{index}]"
+        _exact_fields(item, required=RTPC_FIELDS, optional=RTPC_OPTIONAL_FIELDS, path=path)
+        property_name = _field_name(item.get("property"), path=f"{path}.property", limits=limits)
+        control_input = _normalize_identity(
+            item.get("control_input"),
+            path=f"{path}.control_input",
+            limits=limits,
+        )
+        points_payload = item.get("points")
+        if not isinstance(points_payload, list):
+            raise ObjectOperationContractError(
+                "INVALID_RTPC_POINTS",
+                f"{path}.points must be an array.",
+                details={"path": f"{path}.points", "actual_type": type(points_payload).__name__},
+            )
+        if not points_payload or len(points_payload) > point_limit:
+            raise ObjectOperationContractError(
+                "RTPC_POINT_LIMIT",
+                f"{path}.points must contain between 1 and {point_limit} points.",
+                details={"path": f"{path}.points", "count": len(points_payload), "limit": point_limit},
+            )
+
+        points: list[RtpcCurvePoint] = []
+        previous_x: int | float | None = None
+        for point_index, raw_point in enumerate(points_payload):
+            point_path = f"{path}.points[{point_index}]"
+            point = _mapping(raw_point, path=point_path)
+            _exact_fields(point, required=RTPC_POINT_FIELDS, optional=frozenset(), path=point_path)
+            x = _finite_number(point.get("x"), path=f"{point_path}.x")
+            y = _finite_number(point.get("y"), path=f"{point_path}.y")
+            shape = point.get("shape")
+            if shape not in RTPC_POINT_SHAPES:
+                raise ObjectOperationContractError(
+                    "INVALID_RTPC_POINT_SHAPE",
+                    f"{point_path}.shape is not a supported Wwise curve shape.",
+                    details={
+                        "path": f"{point_path}.shape",
+                        "actual": shape,
+                        "allowed": sorted(RTPC_POINT_SHAPES),
+                    },
+                )
+            if previous_x is not None and x <= previous_x:
+                raise ObjectOperationContractError(
+                    "INVALID_RTPC_POINT_ORDER",
+                    f"{path}.points x coordinates must be strictly increasing.",
+                    details={
+                        "path": f"{point_path}.x",
+                        "previous_x": previous_x,
+                        "actual_x": x,
+                    },
+                )
+            previous_x = x
+            points.append(RtpcCurvePoint(x=x, y=y, shape=shape))
+
+        notes = item.get("notes")
+        if notes is not None:
+            if not isinstance(notes, str):
+                raise ObjectOperationContractError(
+                    "INVALID_RTPC_NOTES",
+                    f"{path}.notes must be a string when present.",
+                    details={"path": f"{path}.notes", "actual_type": type(notes).__name__},
+                )
+            if len(notes) > limits.max_notes_length:
+                raise ObjectOperationContractError(
+                    "STRING_LIMIT_EXCEEDED",
+                    f"{path}.notes exceeds the length limit.",
+                    details={
+                        "path": f"{path}.notes",
+                        "length": len(notes),
+                        "limit": limits.max_notes_length,
+                    },
+                )
+            if any(ord(character) < 32 and character not in "\n\r\t" for character in notes):
+                raise ObjectOperationContractError(
+                    "INVALID_RTPC_NOTES",
+                    f"{path}.notes must not contain control characters.",
+                    details={"path": f"{path}.notes"},
+                )
+        normalized.append(
+            RtpcDescriptor(
+                request_path=path,
+                property=property_name,
+                control_input=control_input,
+                points=tuple(points),
+                notes=notes,
+            )
+        )
+    return tuple(normalized)
+
+
+def materialize_waapi_rtpc(
+    descriptor: RtpcDescriptor,
+    *,
+    resolved_control_input: ObjectId,
+) -> dict[str, Any]:
+    """Build the native ``@RTPC`` row from reviewed data and one resolved identity."""
+
+    _require_object_id(
+        resolved_control_input,
+        path=f"{descriptor.request_path}.control_input",
+    )
+    result: dict[str, Any] = {
+        "type": "RTPC",
+        "name": "",
+        "@Curve": {
+            "type": "Curve",
+            "points": [point.as_dict() for point in descriptor.points],
+        },
+        "@PropertyName": descriptor.property,
+        "@ControlInput": resolved_control_input,
+    }
+    if descriptor.notes is not None:
+        result["notes"] = descriptor.notes
+    return result
 
 
 def flatten_request_nodes(roots: Sequence[ObjectNodeDescriptor]) -> tuple[ObjectNodeDescriptor, ...]:
@@ -977,6 +1153,22 @@ def _is_json_scalar(value: Any) -> bool:
     return isinstance(value, float) and math.isfinite(value)
 
 
+def _finite_number(value: Any, *, path: str) -> int | float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ObjectOperationContractError(
+            "INVALID_NUMBER",
+            f"{path} must be a finite JSON number.",
+            details={"path": path, "actual_type": type(value).__name__},
+        )
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ObjectOperationContractError(
+            "INVALID_NUMBER",
+            f"{path} must be a finite JSON number.",
+            details={"path": path, "actual": repr(value)},
+        )
+    return value
+
+
 def _require_object_id(value: Any, *, path: str) -> None:
     if isinstance(value, bool) or not isinstance(value, str | int):
         raise ObjectOperationContractError(
@@ -1043,13 +1235,16 @@ __all__ = [
     "ObjectResultNode",
     "ObjectTopologyEdge",
     "ObjectTreeLimits",
-    "RTPC_UNSUPPORTED_BOUNDARY",
+    "RTPC_POINT_SHAPES",
+    "RtpcCurvePoint",
+    "RtpcDescriptor",
     "bind_request_result_topology",
     "describe_conflict_policy",
     "flatten_create_result",
     "flatten_request_nodes",
     "flatten_set_result",
     "materialize_waapi_node",
+    "materialize_waapi_rtpc",
     "normalize_conflict_policy",
     "normalize_object_forest",
     "normalize_object_node",

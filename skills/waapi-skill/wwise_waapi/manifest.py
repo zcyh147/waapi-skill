@@ -8,6 +8,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 
+from .authoring_ui_commands_manifest import (
+    AUTHORING_HOST_SURFACE,
+    AUTHORING_UI_COMMANDS_SUPPLEMENT_FILENAME,
+    CONSOLE_HOST_SURFACE,
+    AuthoringUiCommandsSupplement,
+    AuthoringUiCommandsSupplementMissingError,
+    merge_authoring_ui_commands_surface,
+)
 from .versions import is_explicit_fail_closed_version  # pyright: ignore[reportMissingImports]
 
 
@@ -161,8 +169,16 @@ class ReflectionManifestBuilder:
     version: str = "2022.1"
     inventory_source: str = DEFAULT_INVENTORY_SOURCE
     wwise_build: str | None = None
+    host_surface: str = CONSOLE_HOST_SURFACE
 
     def build(self) -> ReflectionManifest:
+        if self.host_surface not in (
+            CONSOLE_HOST_SURFACE,
+            AUTHORING_HOST_SURFACE,
+        ):
+            raise ValueError(
+                f"Unsupported reflection host surface: {self.host_surface!r}"
+            )
         functions = self.reflection_client.get_functions()
         topics = self.reflection_client.get_topics()
         all_uris = sorted({entry.uri for entry in functions + topics})
@@ -173,7 +189,9 @@ class ReflectionManifestBuilder:
         failure_count = sum(1 for result in schema_results if result.status != "ok")
         metadata = {
             "generator": "wwise_waapi.manifest.ReflectionManifestBuilder",
+            "host_surface": self.host_surface,
             "inventory_source": self.inventory_source,
+            "manifest_origin": "direct-reflection",
             "schema_source_uri": GET_SCHEMA_URI,
             "schema_source_uris": [GET_SCHEMA_URI],
             "source_uris": [GET_FUNCTIONS_URI, GET_TOPICS_URI, GET_SCHEMA_URI],
@@ -229,11 +247,15 @@ class ManifestResourceMissingError(FileNotFoundError):
 
 @dataclass(slots=True)
 class ManifestStore:
-    """Filesystem-backed manifest store with legacy in-memory helpers."""
+    """Filesystem-backed store whose default load remains Console-only."""
 
     root: Path | None = None
     writer: DeterministicJsonWriter = field(default_factory=DeterministicJsonWriter)
     versions: dict[str, dict[str, Any]] = field(default_factory=dict)
+    authoring_ui_commands_supplements: dict[
+        str,
+        AuthoringUiCommandsSupplement,
+    ] = field(default_factory=dict)
 
     def load(self, version: str) -> dict[str, Any]:
         if self.root is None:
@@ -256,6 +278,44 @@ class ManifestStore:
     def record(self, version: str, manifest: dict[str, Any]) -> None:
         self.versions[version] = manifest
 
+    def load_with_authoring_ui_commands(self, version: str) -> dict[str, Any]:
+        """Compose only the fixed GUI command family onto the Console inventory."""
+
+        console_manifest = self.load(version)
+        supplement = self.load_authoring_ui_commands_supplement(version)
+        if supplement is None:
+            path = (
+                self.root
+                / version
+                / AUTHORING_UI_COMMANDS_SUPPLEMENT_FILENAME
+                if self.root is not None
+                else None
+            )
+            raise AuthoringUiCommandsSupplementMissingError(version, path)
+        return merge_authoring_ui_commands_surface(console_manifest, supplement)
+
+    def load_authoring_ui_commands_supplement(
+        self,
+        version: str,
+    ) -> AuthoringUiCommandsSupplement | None:
+        if self.root is None:
+            return self.authoring_ui_commands_supplements.get(version)
+        path = self.root / version / AUTHORING_UI_COMMANDS_SUPPLEMENT_FILENAME
+        if not path.exists():
+            return self.authoring_ui_commands_supplements.get(version)
+        supplement = AuthoringUiCommandsSupplement.from_dict(
+            _read_json(path),
+            expected_version=version,
+        )
+        self.authoring_ui_commands_supplements[version] = supplement
+        return supplement
+
+    def record_authoring_ui_commands_supplement(
+        self,
+        supplement: AuthoringUiCommandsSupplement,
+    ) -> None:
+        self.authoring_ui_commands_supplements[supplement.version] = supplement
+
     def write_manifest(self, manifest: ReflectionManifest) -> list[Path]:
         if self.root is None:
             self.versions[manifest.version] = manifest.as_dict()
@@ -267,6 +327,23 @@ class ManifestStore:
             written.append(path)
         self.versions[manifest.version] = manifest.as_dict()
         return written
+
+    def write_authoring_ui_commands_supplement(
+        self,
+        supplement: AuthoringUiCommandsSupplement,
+    ) -> Path | None:
+        """Write the fixed-family evidence without changing Console resources."""
+
+        self.authoring_ui_commands_supplements[supplement.version] = supplement
+        if self.root is None:
+            return None
+        path = (
+            self.root
+            / supplement.version
+            / AUTHORING_UI_COMMANDS_SUPPLEMENT_FILENAME
+        )
+        self.writer.write(path, supplement.as_dict())
+        return path
 
     def ensure_placeholder_versions(self, versions: list[str] | tuple[str, ...]) -> list[Path]:
         if self.root is None:
@@ -287,6 +364,7 @@ def build_manifest_from_caller(
     version: str = "2022.1",
     inventory_source: str = DEFAULT_INVENTORY_SOURCE,
     wwise_build: str | None = None,
+    host_surface: str = CONSOLE_HOST_SURFACE,
 ) -> ReflectionManifest:
     """Convenience entry point for scripts/tests that already own a WAAPI caller."""
 
@@ -296,6 +374,7 @@ def build_manifest_from_caller(
         version=version,
         inventory_source=inventory_source,
         wwise_build=wwise_build,
+        host_surface=host_surface,
     ).build()
 
 

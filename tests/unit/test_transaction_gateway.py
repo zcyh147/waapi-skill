@@ -618,6 +618,70 @@ def confirm(
     return payload
 
 
+def test_debug_test_crash_is_confirmed_dispatched_once_and_terminal_indeterminate(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2022.1",
+        "operation": "debug.testCrash",
+        "arguments": {"acknowledge": "crash_wwise_process"},
+    }
+    transaction = preview(
+        request,
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info()],
+                "ak.wwise.core.getProjectInfo": [project()],
+            }
+        ),
+    )
+    confirm(
+        transaction["transaction_id"],
+        transaction["artifact_hash"],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info()],
+            "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.debug.testCrash": [{}],
+        }
+    )
+
+    exit_code, payload = execute(
+        ["execute", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=client,
+    )
+
+    assert exit_code == 2
+    assert payload["ok"] is False
+    assert payload["status"] == "expected_disconnect_indeterminate"
+    assert payload["state"] == TransactionState.INDETERMINATE.value
+    assert payload["expected_disconnect"] is True
+    assert payload["dispatch_delivery"] == "waapi_result_returned"
+    assert payload["dispatch_accepted"] is True
+    assert payload["process_lifecycle"] == {
+        "expected": "wwise_process_termination",
+        "observed": "not_observed_by_gateway",
+        "gateway_process_action": "none",
+        "reconnect_attempted": False,
+    }
+    assert payload["automatic_retry"] is False
+    assert payload["reconnect_attempted"] is False
+    assert payload["generic_verify_allowed"] is False
+    assert "next_command" not in payload
+    assert [call[0] for call in client.calls].count(
+        "ak.wwise.debug.testCrash"
+    ) == 1
+
+
 def preview_and_confirm_public_call(
     request: Mapping[str, Any],
     *,
@@ -888,8 +952,11 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     assert operations["object.copy"]["implemented"] is False
     assert "returned copy GUID" in operations["object.copy"]["boundary"]
     assert "argument_contract" not in operations["object.create"]
+    assert operations["ui.commands.execute"]["implemented"] is True
+    assert operations["ui.commands.register"]["implemented"] is True
+    assert operations["ui.commands.unregister"]["implemented"] is True
     compact_json = json.dumps(catalog, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8")
-    assert len(compact_json) < 12_500
+    assert len(compact_json) < 24_000
 
     exit_code, detail_catalog = execute(["operations", "--detail"], tmp_path=tmp_path)
 
@@ -3301,6 +3368,139 @@ def test_generic_manifest_call_runs_full_preview_confirm_execute_verify_chain(tm
     assert verify_payload["agent_result"]["request"] == generic_manifest_call_request()
 
 
+def test_object_create_plugin_runs_full_preview_confirm_execute_verify_chain(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "create-plugin-state"
+    create_plugin_request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2022.1",
+        "operation": "object.createPlugin",
+        "arguments": {
+            "target": {"kind": "id", "value": OBJECT_GUID},
+            "plugin": {
+                "kind": "source",
+                "name": "Generated Tone",
+                "class_id": 123_456,
+            },
+        },
+    }
+    preview_client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info()],
+            "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [
+                {"return": [object_row()]},
+                {"return": []},
+            ],
+        }
+    )
+    transaction = preview(
+        create_plugin_request,
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=preview_client,
+    )
+    stored = TransactionStore(state_dir).load_preview(
+        transaction["transaction_id"]
+    )
+    assert stored.artifact["prepared_operation"]["dispatch"] == {
+        "uri": "ak.wwise.core.object.set",
+        "args": {
+            "objects": [
+                {
+                    "object": OBJECT_GUID,
+                    "onNameConflict": "fail",
+                    "children": [
+                        {
+                            "type": "Source",
+                            "name": "Generated Tone",
+                            "classId": 123_456,
+                        }
+                    ],
+                }
+            ],
+            "autoAddToSourceControl": False,
+        },
+        "options": {},
+    }
+    confirm(
+        transaction["transaction_id"],
+        transaction["artifact_hash"],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+
+    execution_result = {
+        "objects": [
+            {
+                "id": OBJECT_GUID,
+                "children": [
+                    {
+                        "id": CREATED_GUID,
+                        "name": "Generated Tone",
+                        "type": "Source",
+                    }
+                ],
+            }
+        ]
+    }
+    execute_client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info()],
+            "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [
+                {"return": [object_row()]},
+                {"return": []},
+            ],
+            "ak.wwise.core.object.set": [execution_result],
+        }
+    )
+    execute_exit, execute_payload = execute(
+        ["execute", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=execute_client,
+    )
+    assert execute_exit == 0, execute_payload
+    assert execute_payload["state"] == TransactionState.EXECUTED_UNVERIFIED.value
+    assert [call[0] for call in execute_client.calls].count(
+        "ak.wwise.core.object.set"
+    ) == 1
+
+    plugin_row = {
+        "id": CREATED_GUID,
+        "name": "Generated Tone",
+        "type": "Source",
+        "classId": 123_456,
+        "parent": {"id": OBJECT_GUID},
+        "owner": {"id": OBJECT_GUID},
+    }
+    verify_client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info()],
+            "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [plugin_row]}],
+        }
+    )
+    verify_exit, verify_payload = execute(
+        ["verify", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=verify_client,
+    )
+
+    assert verify_exit == 0, verify_payload
+    assert verify_payload["state"] == TransactionState.VERIFIED.value
+    assert verify_payload["verified"] is True
+    assert verify_payload["verification"]["business_state_verified"] is True
+    assert verify_payload["verification"]["verification_strength"] == (
+        "operation_specific_readback"
+    )
+    assert verify_payload["agent_result"]["request"] == create_plugin_request
+    assert verify_payload["agent_result"]["verified"] is True
+
+
 def test_lifecycle_opener_cleanup_spec_survives_the_full_gateway_chain(tmp_path: Path) -> None:
     state_dir = tmp_path / "load-bank-state"
     sound_bank = {"name": "Main", "ids": [1, 2]}
@@ -3970,6 +4170,370 @@ def test_generic_isolated_call_runs_full_chain_with_bound_io_audit(tmp_path: Pat
     assert verify_payload["agent_result"]["result"] == {}
     assert verify_payload["agent_result"]["verified"] is False
     assert verify_payload["agent_result"]["request"] == request
+
+
+@pytest.mark.parametrize(
+    ("version", "operation", "arguments", "expected_roles"),
+    (
+        (
+            "2022.1",
+            "audio.import",
+            {
+                "imports": [
+                    {
+                        "object_path": (
+                            r"\Actor-Mixer Hierarchy\Default Work Unit"
+                            r"\RemoteImport"
+                        ),
+                        "audio_file": "/remote-only/source.wav",
+                    }
+                ]
+            },
+            (
+                "arguments.imports[].audio_file",
+                "live_project_files",
+            ),
+        ),
+        (
+            "2022.1",
+            "audio.importTabDelimited",
+            {
+                "import_file": "/remote-only/import.tsv",
+                "import_location": {
+                    "kind": "path",
+                    "value": r"\Actor-Mixer Hierarchy\Default Work Unit",
+                },
+                "import_language": "SFX",
+            },
+            (
+                "arguments.import_file",
+                "tab_file_audio_sources",
+                "live_project_files",
+            ),
+        ),
+        (
+            "2022.1",
+            "soundbank.generate",
+            {
+                "soundbanks": [
+                    {
+                        "name": "RemoteBank",
+                        "artifact_expectation": "nonlocalized",
+                    }
+                ],
+                "platforms": ["Mac"],
+                "skip_languages": True,
+                "write_to_disk": True,
+                "io_root": "/remote-only/output",
+            },
+            (
+                "arguments.io_root",
+                "generated_artifacts",
+                "live_project_path",
+            ),
+        ),
+        (
+            "2022.1",
+            "soundbank.convertExternalSources",
+            {
+                "sources": [
+                    {
+                        "input": "/remote-only/external.wsources",
+                        "platform": "Mac",
+                        "output": "/remote-only/wem",
+                    }
+                ],
+                "io_root": "/remote-only",
+            },
+            (
+                "arguments.io_root",
+                "arguments.sources[].input",
+                "arguments.sources[].output",
+            ),
+        ),
+        (
+            "2022.1",
+            "soundbank.processDefinitionFiles",
+            {
+                "files": ["/remote-only/banks.tsv"],
+                "io_root": "/remote-only",
+            },
+            (
+                "arguments.files[]",
+                "arguments.io_root",
+                "live_project_path",
+            ),
+        ),
+        (
+            "2022.1",
+            "waapi.call",
+            {
+                "api": "ak.wwise.cli.migrate",
+                "args": {"project": "/remote-only/SampleProject.wproj"},
+                "options": {},
+                "io_root": "/remote-only",
+            },
+            ("execution_contract.isolated_transaction",),
+        ),
+        (
+            "2024.1",
+            "waapi.call",
+            {
+                "api": "ak.wwise.core.sourceControl.getStatus",
+                "args": {"files": ["/remote-only/Project.wwu"]},
+                "options": {},
+            },
+            ("execution_contract.isolated_transaction",),
+        ),
+        (
+            "2024.1",
+            "waapi.call",
+            {
+                "api": "ak.wwise.core.audio.convert",
+                "args": {},
+                "options": {},
+                "io_root": "/remote-only",
+            },
+            ("execution_contract.isolated_transaction",),
+        ),
+    ),
+)
+def test_remote_local_filesystem_previews_fail_before_project_or_path_proof(
+    tmp_path: Path,
+    version: str,
+    operation: str,
+    arguments: Mapping[str, Any],
+    expected_roles: tuple[str, ...],
+) -> None:
+    year = int(version.split(".", 1)[0])
+    client = FakeClient(
+        {"ak.wwise.core.getInfo": [live_info(year=year)]}
+    )
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": version,
+        "operation": operation,
+        "arguments": dict(arguments),
+    }
+
+    exit_code, payload = execute(
+        [
+            "--host",
+            "192.0.2.10",
+            "preview",
+            "--request-json",
+            json.dumps(request),
+        ],
+        tmp_path=tmp_path,
+        state_dir=tmp_path / f"remote-{operation.replace('.', '-')}",
+        client=client,
+        version=version,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "LOCAL_WAAPI_HOST_REQUIRED"
+    assert payload["details"]["path_roles"] == list(expected_roles)
+    assert payload["details"]["boundary_basis"] == (
+        "gateway_local_filesystem_or_isolated_transaction"
+    )
+    assert payload["executed"] is False
+    assert [call[0] for call in client.calls] == [
+        "ak.wwise.core.getInfo"
+    ]
+
+
+def test_confirmed_generic_isolated_transaction_stays_confirmed_on_remote_execute(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "remote-isolated-execute"
+    io_root = (tmp_path / "isolated-io").resolve()
+    request = generic_isolated_call_request(io_root)
+    transaction = preview(
+        request,
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(year=2023)],
+                "ak.wwise.core.getProjectInfo": [project()],
+            }
+        ),
+    )
+    confirm(
+        transaction["transaction_id"],
+        transaction["artifact_hash"],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+    before = TransactionStore(state_dir).load(transaction["transaction_id"])
+    assert before.state is TransactionState.CONFIRMED
+    remote_client = FakeClient(
+        {"ak.wwise.core.getInfo": [live_info(year=2023)]}
+    )
+
+    exit_code, payload = execute(
+        [
+            "--host",
+            "192.0.2.10",
+            "execute",
+            transaction["transaction_id"],
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=remote_client,
+        version="2023.1",
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "LOCAL_WAAPI_HOST_REQUIRED"
+    assert payload["command"] == "execute"
+    assert payload["executed"] is False
+    assert TransactionStore(state_dir).load(
+        transaction["transaction_id"]
+    ).state is TransactionState.CONFIRMED
+    assert [call[0] for call in remote_client.calls] == [
+        "ak.wwise.core.getInfo"
+    ]
+
+
+def test_confirmed_named_soundbank_transaction_stays_confirmed_on_remote_execute(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state_dir = tmp_path / "remote-named-soundbank-execute"
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2022.1",
+        "operation": "soundbank.generate",
+        "arguments": {
+            "soundbanks": [
+                {
+                    "name": "LocalBank",
+                    "artifact_expectation": "nonlocalized",
+                }
+            ],
+            "platforms": ["Mac"],
+            "skip_languages": True,
+            "write_to_disk": True,
+            "io_root": str((tmp_path / "soundbank-io").resolve()),
+        },
+    }
+    artifact = {
+        "contract": "waapi-skill.transaction-preview/v1",
+        "request": request,
+        "prepared_operation": {
+            "contract": "waapi-skill.prepared-operation/v1",
+            "operation": "soundbank.generate",
+            "version": "2022.1",
+            "dispatch": {
+                "uri": "ak.wwise.core.soundbank.generate",
+                "args": {},
+                "options": {},
+            },
+            "resolved_roles": {},
+            "pre_state": {},
+            "verification_plan": {},
+            "cleanup": {"kind": "discard-case-owned-project-copy"},
+        },
+        "project_guard": {"fingerprint": "project-fingerprint"},
+        "runtime_guard": {"fingerprint": "runtime-fingerprint"},
+        "created_at": "2099-01-01T00:00:00Z",
+        "expires_at": "2099-01-01T00:05:00Z",
+    }
+
+    class StubArtifact:
+        def as_dict(self) -> dict[str, Any]:
+            return json.loads(json.dumps(artifact))
+
+    monkeypatch.setattr(
+        waapi_gateway,
+        "build_transaction_artifact",
+        lambda *args, **kwargs: StubArtifact(),
+    )
+    transaction = preview(
+        request,
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info()],
+                "ak.wwise.core.getProjectInfo": [project()],
+            }
+        ),
+    )
+    confirm(
+        transaction["transaction_id"],
+        transaction["artifact_hash"],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+    remote_client = FakeClient(
+        {"ak.wwise.core.getInfo": [live_info()]}
+    )
+
+    exit_code, payload = execute(
+        [
+            "--host",
+            "192.0.2.10",
+            "execute",
+            transaction["transaction_id"],
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=remote_client,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "LOCAL_WAAPI_HOST_REQUIRED"
+    assert payload["details"]["path_roles"] == [
+        "arguments.io_root",
+        "generated_artifacts",
+        "live_project_path",
+    ]
+    assert payload["executed"] is False
+    assert TransactionStore(state_dir).load(
+        transaction["transaction_id"]
+    ).state is TransactionState.CONFIRMED
+    assert [call[0] for call in remote_client.calls] == [
+        "ak.wwise.core.getInfo"
+    ]
+
+
+def test_remote_named_capture_screen_is_not_a_locality_transaction(
+    tmp_path: Path,
+) -> None:
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2022.1",
+        "operation": "ui.captureScreen",
+        "arguments": {},
+    }
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info()],
+            "ak.wwise.core.getProjectInfo": [project()],
+        }
+    )
+
+    exit_code, payload = execute(
+        [
+            "--host",
+            "192.0.2.10",
+            "preview",
+            "--request-json",
+            json.dumps(request),
+        ],
+        tmp_path=tmp_path,
+        state_dir=tmp_path / "remote-capture",
+        client=client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["status"] == "awaiting_confirmation"
+    assert [call[0] for call in client.calls] == [
+        "ak.wwise.core.getInfo",
+        "ak.wwise.core.getProjectInfo",
+    ]
 
 
 def test_local_wine_cli_execute_translates_only_the_transient_dispatch_paths(

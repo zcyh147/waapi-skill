@@ -28,15 +28,16 @@ named test documents plus closed adapter and request-mapping registries:
   Any listed scenario is blocked from real execution until all of its entries
   are closed; the model must never guess an enum number or unresolved token.
 
-The v3 definitions cover the 188-URI union of executable APIs reflected across
+The v3 definitions cover the 198-URI union of executable APIs reflected across
 the five supported versions. The coverage unit is one unique URI, not each of
-the 769 executable version/API rows: shared APIs use 2022.1 scenarios, while the
-51 APIs absent from 2022.1 use their earliest reflected later version. The 119
+the 808 packaged route-contract version/API rows: shared APIs use 2022.1
+scenarios, while the
+56 APIs absent from 2022.1 use their earliest reflected later version. The 124
 executable APIs present in 2021.1 are also present in 2022.1, so their shared
 cases use 2022.1 as the representative execution version. This suite therefore
 must not be cited as exhaustive per-version schema or behavior coverage.
 
-The broad 316-case review selection remains pinned to Wwise 2022.1, so APIs
+The broad 326-case review selection remains pinned to Wwise 2022.1, so APIs
 introduced only in later versions have reviewable definitions but cannot
 receive 2022.1 evidence. The coverage rule is deliberately strict: every
 unique executable API needs at least two different natural user prompts, two
@@ -77,13 +78,13 @@ log channel/severity mappings. Resolve
 them in versioned Skill resources or closed builders after prompt approval;
 never place internal enum integers into the natural user prompt.
 
-The 2022.1 review selection contains 316 scenarios for 137 APIs. It consists of
-110 single-turn cases and 206 cases using the preview/confirm protocol.
+The 2022.1 review selection contains 326 scenarios for 142 APIs. It consists of
+116 single-turn cases and 210 cases using the preview/confirm protocol.
 Seventeen cases need more than one separately previewed call, so the selection
-requires 226 confirmation turns: 316 fresh tasks and 542 total user turns. The
-representative later-version increments add 66 / 25 / 17 tasks for 2023.1 /
-2024.1 / 2025.1. The complete reviewed selection is therefore 424 fresh tasks
-and 762 user turns. This is intentionally not advertised as a “few dozen” run.
+requires 230 confirmation turns: 326 fresh tasks and 556 total user turns. The
+representative later-version increments add 74 / 27 / 17 tasks for 2023.1 /
+2024.1 / 2025.1. The complete reviewed selection is therefore 444 fresh tasks
+and 792 user turns. This is intentionally not advertised as a “few dozen” run.
 Each case has exactly one primary API; reducing the task count later would
 require separately reviewed composite prompts and oracles rather than silently
 sharing coverage credit.
@@ -126,7 +127,7 @@ and every curve point.
 This executable profile does not make the other V3 definitions runnable. The
 remaining catalog still contains specification-only adapters, unresolved
 request mappings, UI/runtime/profiler lifecycle requirements, and unapproved
-execution surfaces. Do not describe all 424 V3 scenarios or all 188 reflected
+execution surfaces. Do not describe all 444 V3 scenarios or all 198 reflected
 URIs as implemented or tested. V2 remains the default suite unless
 `--profile heavy_cross_version_80` is selected explicitly.
 

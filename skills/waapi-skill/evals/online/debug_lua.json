@@ -1,0 +1,1098 @@
+{
+  "contract": "waapi-skill.codex-semantic-online-cases/v3",
+  "version_scope": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
+  "cases": [
+    {
+      "id": "LUA23-CLI-FILE-01",
+      "api": "ak.wwise.cli.executeLuaScript",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "external_isolated",
+      "scenario_family": "cli_batch_report_export",
+      "scenario_index": 1,
+      "prompt": "这是我逐字提供的现成 Lua 脚本 {script_file}，文件位于隔离目录 {io_root}。请不要改写脚本，直接执行它，并传入批次名 dialogue_pass_17 和输出文件名 report-dialogue-pass-17.json；完成后告诉我脚本返回的素材总数与异常总数。",
+      "visible_inputs": [
+        {
+          "name": "script_file",
+          "kind": "absolute_file_path",
+          "description": "用户明确提供、已存在且位于本场景隔离目录内的 Lua 文件绝对路径"
+        },
+        {
+          "name": "io_root",
+          "kind": "absolute_directory_path",
+          "description": "只属于本场景的现有非符号链接隔离目录绝对路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，执行刚才预览的这份脚本和参数。",
+      "fixture": {
+        "adapter": "lua_execution_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "隔离目录内的用户脚本逐字生成并封存路径、大小、修改时间与 SHA-256",
+          "脚本只读取场景自有素材清单并写入 report-dialogue-pass-17.json",
+          "预期返回值和输出文件内容由独立实现预先计算"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.cli.executeLuaScript",
+          "count": 1,
+          "effect": "执行用户提供的 Lua 文件，传入固定批次名与相对输出文件名，并返回素材统计"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "before",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.cli.executeLuaScript",
+          "expectation": "脚本、素材清单和隔离目录树的路径、大小、mtime_ns 与 SHA-256 已在预览前封存"
+        },
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.cli.executeLuaScript",
+          "expectation": "显式确认前没有启动脚本，隔离目录中不存在输出报告，封存输入逐字段不变"
+        },
+        {
+          "phase": "after",
+          "adapter": "lua_execution_oracle",
+          "subject_api": "ak.wwise.cli.executeLuaScript",
+          "expectation": "返回的 total/error 数值等于独立计算值；输出 JSON 的规范化内容、大小和 SHA-256 等于隐藏基线，脚本文件本身未改变"
+        }
+      ],
+      "cleanup": {
+        "adapter": "lua_execution_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "case_owned_io_root_removed_on_success",
+          "failed_or_indeterminate_io_root_sealed_and_never_reused"
+        ]
+      }
+    },
+    {
+      "id": "LUA23-CLI-FILE-02",
+      "api": "ak.wwise.cli.executeLuaScript",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "external_isolated",
+      "scenario_family": "cli_media_manifest_audit",
+      "scenario_index": 2,
+      "prompt": "请运行我提供的 Lua 文件 {script_file}，它的隔离目录是 {io_root}。脚本内容保持原样，参数指定 platform 为 Windows、language 为 SFX，并让它生成 media-audit.csv；我需要知道重复媒体编号和缺失源文件各有多少条。",
+      "visible_inputs": [
+        {
+          "name": "script_file",
+          "kind": "absolute_file_path",
+          "description": "用户明确提供、已存在且位于本场景隔离目录内的 Lua 文件绝对路径"
+        },
+        {
+          "name": "io_root",
+          "kind": "absolute_directory_path",
+          "description": "只属于本场景的现有非符号链接隔离目录绝对路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，按预览执行这份媒体审计脚本。",
+      "fixture": {
+        "adapter": "lua_execution_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "用户脚本和含有已知重复编号、缺失源文件与正常记录的媒体清单位于独立目录",
+          "所有输入文件在提示渲染前完成路径与 SHA-256 封存",
+          "CSV 的行顺序、引用字段和统计值已有独立基线"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.cli.executeLuaScript",
+          "count": 1,
+          "effect": "执行用户提供的媒体审计脚本，并以 Windows、SFX 和 media-audit.csv 作为显式参数"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "before",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.cli.executeLuaScript",
+          "expectation": "脚本与媒体清单的完整文件证明和目录快照已封存"
+        },
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.cli.executeLuaScript",
+          "expectation": "确认前没有生成 CSV，输入脚本与媒体清单的摘要保持不变"
+        },
+        {
+          "phase": "after",
+          "adapter": "lua_execution_oracle",
+          "subject_api": "ak.wwise.cli.executeLuaScript",
+          "expectation": "脚本返回的 duplicate_count 与 missing_count 等于隐藏清单基线；CSV 逐行内容、编码和 SHA-256 正确且没有目录外写入"
+        }
+      ],
+      "cleanup": {
+        "adapter": "lua_execution_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "case_owned_io_root_removed_on_success",
+          "failed_or_indeterminate_io_root_sealed_and_never_reused"
+        ]
+      }
+    },
+    {
+      "id": "LUA23-CORE-FILE-01",
+      "api": "ak.wwise.core.executeLuaScript",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "authoring_hierarchy_summary",
+      "scenario_index": 1,
+      "prompt": "这是我写好的 Lua 文件 {script_file}，隔离目录为 {io_root}。请保持源码不变，在当前 Wwise 中执行，并传入根路径“\\\\Actor-Mixer Hierarchy”和 include_notes 为 true；只返回脚本汇总的对象类型、数量和带备注对象数量，不要保存工程。",
+      "visible_inputs": [
+        {
+          "name": "script_file",
+          "kind": "absolute_file_path",
+          "description": "用户明确提供、用于当前 Authoring 实例的现有 Lua 文件绝对路径"
+        },
+        {
+          "name": "io_root",
+          "kind": "absolute_directory_path",
+          "description": "包含该脚本的场景专用现有目录绝对路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，按预览执行这份层级汇总脚本。",
+      "fixture": {
+        "adapter": "lua_execution_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "场景工程包含隐藏 GUID 锚定的 Actor-Mixer、Sound、Random Container 和带备注控制对象",
+          "用户脚本的路径、字节数与 SHA-256 已封存且脚本只读",
+          "独立对象查询已建立类型数量和备注数量基线"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.executeLuaScript",
+          "count": 1,
+          "effect": "执行用户提供的只读 Authoring Lua 文件，以指定根路径和备注开关返回层级统计"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "before",
+          "adapter": "project_snapshot_unchanged_oracle",
+          "subject_api": "ak.wwise.core.executeLuaScript",
+          "expectation": "目标工程对象图、脏状态、文件摘要和脚本文件证明已封存"
+        },
+        {
+          "phase": "preview",
+          "adapter": "project_snapshot_unchanged_oracle",
+          "subject_api": "ak.wwise.core.executeLuaScript",
+          "expectation": "确认前没有运行脚本，工程对象图、脏状态和文件摘要逐项不变"
+        },
+        {
+          "phase": "after",
+          "adapter": "lua_execution_oracle",
+          "subject_api": "ak.wwise.core.executeLuaScript",
+          "expectation": "脚本返回的类型集合、各类型计数和备注计数等于独立对象查询；工程仍未变脏且 XML 摘要不变"
+        }
+      ],
+      "cleanup": {
+        "adapter": "lua_execution_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "case_owned_script_removed_on_success",
+          "failed_or_indeterminate_project_copy_sealed_and_never_reused"
+        ]
+      }
+    },
+    {
+      "id": "LUA23-CORE-FILE-02",
+      "api": "ak.wwise.core.executeLuaScript",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "authoring_reference_audit",
+      "scenario_index": 2,
+      "prompt": "运行我逐字提供的 Lua 文件 {script_file}，文件所在目录是 {io_root}。参数用根路径“\\\\Events”和 include_missing 为 true，请返回事件到动作目标的引用审计结果；源码不要改，工程也不要保存或改动。",
+      "visible_inputs": [
+        {
+          "name": "script_file",
+          "kind": "absolute_file_path",
+          "description": "用户明确提供、用于引用审计的现有 Lua 文件绝对路径"
+        },
+        {
+          "name": "io_root",
+          "kind": "absolute_directory_path",
+          "description": "包含该脚本的场景专用现有目录绝对路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，执行当前预览的引用审计脚本。",
+      "fixture": {
+        "adapter": "lua_execution_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "隔离工程含两个有效 Event→Action→Sound 链和一个可识别的缺失目标控制链",
+          "用户脚本为只读并已封存文件身份和完整摘要",
+          "独立引用图读取已记录事件 GUID、动作 GUID、目标 GUID 和缺失目标集合"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.executeLuaScript",
+          "count": 1,
+          "effect": "执行用户提供的只读引用审计脚本，并返回 Events 根路径下的有效与缺失引用"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "before",
+          "adapter": "project_snapshot_unchanged_oracle",
+          "subject_api": "ak.wwise.core.executeLuaScript",
+          "expectation": "工程引用图、脏状态、文件摘要和脚本证明已封存"
+        },
+        {
+          "phase": "preview",
+          "adapter": "project_snapshot_unchanged_oracle",
+          "subject_api": "ak.wwise.core.executeLuaScript",
+          "expectation": "确认前对象和引用均未变化，脚本没有被执行或改写"
+        },
+        {
+          "phase": "after",
+          "adapter": "lua_execution_oracle",
+          "subject_api": "ak.wwise.core.executeLuaScript",
+          "expectation": "脚本返回的三段引用链与缺失目标集合精确等于独立引用图读回；工程脏状态和 XML 摘要保持基线"
+        }
+      ],
+      "cleanup": {
+        "adapter": "lua_execution_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "case_owned_script_removed_on_success",
+          "failed_or_indeterminate_project_copy_sealed_and_never_reused"
+        ]
+      }
+    },
+    {
+      "id": "DBG22-T-ASSERT-FAILED-01",
+      "api": "ak.wwise.debug.assertFailed",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "next_assert_site_diagnosis",
+      "scenario_index": 1,
+      "prompt": "接下来我要复现一次 Wwise 调试断言。请监听下一条断言通知，把失败表达式、源文件名和行号完整告诉我，只取开始监听之后的第一条。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "debug_assert_topic_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "专用 Debug 构建进程已就绪且断言处理不会弹出无人值守对话框",
+          "发布前不存在遗留订阅，目标断言的表达式、文件名与行号由外部控制器封存",
+          "源工程与用户进程均不参与本场景"
+        ]
+      },
+      "trigger": {
+        "adapter": "debug_assert_trigger",
+        "publisher_api": "controlled_debug_assert_stimulus",
+        "ownership_assertion": "runner 只在订阅确认后触发一个带隐藏 nonce 的已知断言，并保存发布时刻"
+      },
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.debug.assertFailed",
+          "count": 1,
+          "effect": "observation"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "event",
+          "adapter": "debug_assert_event_oracle",
+          "subject_api": "ak.wwise.debug.assertFailed",
+          "expectation": "通知的 expression、fileName、lineNumber 与外部控制器封存值逐字段相等，接收时间晚于订阅确认且没有旧事件混入"
+        },
+        {
+          "phase": "cleanup",
+          "adapter": "topic_subscription_audit",
+          "subject_api": "ak.wwise.debug.assertFailed",
+          "expectation": "取得一条完整事件后订阅已取消，后续探针不会进入结果"
+        }
+      ],
+      "cleanup": {
+        "adapter": "debug_topic_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "assert_handler_returned_to_baseline",
+          "topic_subscription_removed"
+        ]
+      }
+    },
+    {
+      "id": "DBG22-T-ASSERT-FAILED-02",
+      "api": "ak.wwise.debug.assertFailed",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "assert_source_disambiguation",
+      "scenario_index": 2,
+      "prompt": "我在排查两个相似的渲染断言。请从现在开始等下一条 Wwise 调试断言，报告表达式、文件和行号，并明确它来自声音渲染路径还是界面刷新路径。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "debug_assert_topic_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "专用 Debug 构建进程具备两个文件名相似但行号和表达式不同的受控断言点",
+          "目标声音渲染断言的三字段基线和界面刷新干扰断言基线均已封存",
+          "控制器保证目标断言是订阅确认后的下一条事件"
+        ]
+      },
+      "trigger": {
+        "adapter": "debug_assert_trigger",
+        "publisher_api": "controlled_render_assert_stimulus",
+        "ownership_assertion": "runner 在订阅确认后只触发声音渲染断言，界面刷新干扰断言保留为隐藏对照但不提前发布"
+      },
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.debug.assertFailed",
+          "count": 1,
+          "effect": "observation"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "event",
+          "adapter": "debug_assert_event_oracle",
+          "subject_api": "ak.wwise.debug.assertFailed",
+          "expectation": "事件三字段与声音渲染断言基线完全相等且不等于界面刷新对照，来源分类由文件与行号共同证明"
+        },
+        {
+          "phase": "cleanup",
+          "adapter": "topic_subscription_audit",
+          "subject_api": "ak.wwise.debug.assertFailed",
+          "expectation": "订阅在首个目标事件后关闭，清理探针不再被观察"
+        }
+      ],
+      "cleanup": {
+        "adapter": "debug_topic_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "assert_handler_returned_to_baseline",
+          "topic_subscription_removed"
+        ]
+      }
+    },
+    {
+      "id": "DBG22-ASSERTS-01",
+      "api": "ak.wwise.debug.enableAsserts",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_lifecycle",
+      "scenario_family": "assert_processing_enable",
+      "scenario_index": 1,
+      "prompt": "为了排查这个专用 Wwise 进程里的开发版问题，请开启调试断言处理。这个改动只用于当前临时进程；执行后如实说明能验证到什么，不能验证到什么。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，开启当前临时进程的调试断言处理。",
+      "fixture": {
+        "adapter": "debug_mode_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "场景使用可随时销毁的专用 Debug 构建进程",
+          "调用前进程 PID、连接身份、工程摘要和响应性探针已封存",
+          "该接口没有可读回的内部断言模式状态"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.debug.enableAsserts",
+          "count": 1,
+          "effect": "以 enable=true 请求一次进程级调试断言模式变更"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "process_isolation_oracle",
+          "subject_api": "ak.wwise.debug.enableAsserts",
+          "expectation": "确认前 PID、连接身份、工程摘要与响应性均保持基线，未发送模式变更"
+        },
+        {
+          "phase": "after",
+          "adapter": "debug_mode_result_schema_boundary",
+          "subject_api": "ak.wwise.debug.enableAsserts",
+          "expectation": "只证明一次请求返回符合空结果结构且同一进程仍可响应；由于接口没有 getter，不能声称已独立证明内部开关值或引用计数"
+        }
+      ],
+      "cleanup": {
+        "adapter": "debug_mode_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "scenario_owned_debug_process_terminated",
+          "no_inverse_refcount_claim"
+        ]
+      }
+    },
+    {
+      "id": "DBG22-ASSERTS-02",
+      "api": "ak.wwise.debug.enableAsserts",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_lifecycle",
+      "scenario_family": "assert_processing_disable",
+      "scenario_index": 2,
+      "prompt": "这轮诊断结束了，请在当前专用 Wwise 进程里关闭调试断言处理，避免后续步骤继续弹出断言。完成后不要把不可读回的内部状态说成已经验证。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，关闭当前临时进程的调试断言处理。",
+      "fixture": {
+        "adapter": "debug_mode_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "独立 Debug 构建进程仅供本场景使用且调用前响应正常",
+          "进程身份、工程摘要与连接基线已封存",
+          "断言模式为进程级引用计数且没有状态 getter"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.debug.enableAsserts",
+          "count": 1,
+          "effect": "以 enable=false 请求一次进程级调试断言模式变更"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "process_isolation_oracle",
+          "subject_api": "ak.wwise.debug.enableAsserts",
+          "expectation": "确认前专用进程、连接与工程基线不变，未发送模式变更"
+        },
+        {
+          "phase": "after",
+          "adapter": "debug_mode_result_schema_boundary",
+          "subject_api": "ak.wwise.debug.enableAsserts",
+          "expectation": "只能确认一次 enable=false 请求得到合法空结果且进程继续响应；无法独立读取内部引用计数，因此不得报告强状态验证"
+        }
+      ],
+      "cleanup": {
+        "adapter": "debug_mode_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "scenario_owned_debug_process_terminated",
+          "no_inverse_refcount_claim"
+        ]
+      }
+    },
+    {
+      "id": "DBG22-AUTOMATION-01",
+      "api": "ak.wwise.debug.enableAutomationMode",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_lifecycle",
+      "scenario_family": "unattended_dialog_suppression",
+      "scenario_index": 1,
+      "prompt": "我要让这个临时 Wwise 进程无人值守跑一轮自动化，请开启自动化模式，尽量减少对话框和弹窗阻塞。只改当前专用进程，并明确告知这个模式没有可读回状态。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，为当前临时进程开启自动化模式。",
+      "fixture": {
+        "adapter": "debug_mode_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "场景使用独立可销毁的 Wwise 进程且没有用户工程",
+          "进程身份、连接响应性、前台窗口和工程摘要已封存",
+          "自动化模式接口没有状态 getter"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.debug.enableAutomationMode",
+          "count": 1,
+          "effect": "以 enable=true 请求当前专用进程进入自动化模式"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "process_isolation_oracle",
+          "subject_api": "ak.wwise.debug.enableAutomationMode",
+          "expectation": "确认前 PID、连接、窗口与工程摘要均保持基线，未发送自动化模式变更"
+        },
+        {
+          "phase": "after",
+          "adapter": "debug_mode_result_schema_boundary",
+          "subject_api": "ak.wwise.debug.enableAutomationMode",
+          "expectation": "只证明一次 enable=true 请求返回合法空结果且同一进程继续响应；没有独立 getter，不能宣称内部模式位已经读回"
+        }
+      ],
+      "cleanup": {
+        "adapter": "debug_mode_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "scenario_owned_debug_process_terminated",
+          "no_unverified_inverse_claim"
+        ]
+      }
+    },
+    {
+      "id": "DBG22-AUTOMATION-02",
+      "api": "ak.wwise.debug.enableAutomationMode",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_lifecycle",
+      "scenario_family": "interactive_mode_restore",
+      "scenario_index": 2,
+      "prompt": "无人值守步骤已经结束，请把当前临时 Wwise 进程恢复为普通交互模式，后续对话框不要再被自动处理。执行后只报告确实可验证的结果。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，为当前临时进程关闭自动化模式。",
+      "fixture": {
+        "adapter": "debug_mode_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "独立进程只服务本场景并在调用前保持响应",
+          "进程身份、连接状态、前台窗口和工程摘要已封存",
+          "内部自动化模式值不能通过另一接口读取"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.debug.enableAutomationMode",
+          "count": 1,
+          "effect": "以 enable=false 请求当前专用进程退出自动化模式"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "process_isolation_oracle",
+          "subject_api": "ak.wwise.debug.enableAutomationMode",
+          "expectation": "确认前进程、连接、窗口和工程状态保持基线，未发送模式变更"
+        },
+        {
+          "phase": "after",
+          "adapter": "debug_mode_result_schema_boundary",
+          "subject_api": "ak.wwise.debug.enableAutomationMode",
+          "expectation": "只确认一次 enable=false 请求返回合法空结果且进程仍响应；因为没有独立状态读回，不把请求成功表述为强业务状态证明"
+        }
+      ],
+      "cleanup": {
+        "adapter": "debug_mode_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "scenario_owned_debug_process_terminated",
+          "no_unverified_inverse_claim"
+        ]
+      }
+    },
+    {
+      "id": "DBG23-WAL-TREE-01",
+      "api": "ak.wwise.debug.getWalTree",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_runtime",
+      "scenario_family": "wal_type_inventory",
+      "scenario_index": 1,
+      "prompt": "读取当前专用 Wwise 的 WAL 树，最多取前 64 个节点，按节点类型汇总数量，并列出每个节点的短编号、名称和类型；我需要和声音引擎同步清单核对。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "debug_read_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "专用 Debug 构建已将一组隐藏 GUID 锚定对象同步到声音引擎",
+          "独立进程内探针在请求前封存完整 WAL 节点键、短编号、名称和类型",
+          "节点总数小于全局安全上限且前 64 个排序结果稳定"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.debug.getWalTree",
+          "count": 1,
+          "effect": "读取并规范化投影 WAL 树的前 64 个节点"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "after",
+          "adapter": "wal_tree_snapshot_oracle",
+          "subject_api": "ak.wwise.debug.getWalTree",
+          "expectation": "规范化节点按 key 排序，id/name/type 逐字段等于独立进程内快照；返回数、总数、截断标志和按类型汇总相互一致"
+        }
+      ],
+      "cleanup": {
+        "adapter": "debug_host_control_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "scenario_owned_debug_process_terminated"
+        ]
+      }
+    },
+    {
+      "id": "DBG23-WAL-TREE-02",
+      "api": "ak.wwise.debug.getWalTree",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_runtime",
+      "scenario_family": "wal_sync_anchor_check",
+      "scenario_index": 2,
+      "prompt": "帮我检查声音引擎同步树里是否出现了本轮的 Combat_Music、Player_Footsteps 和 Master Audio Bus。读取最多 128 个 WAL 节点，给出它们各自的短编号和类型，并说明有没有同名但编号不同的项。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "debug_read_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "三个目标对象和一个同名干扰对象已在专用 Debug 构建中同步",
+          "目标及干扰对象的短编号、类型和 WAL key 由独立探针封存",
+          "节点总数不超过 128 且没有同步中的未决更新"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.debug.getWalTree",
+          "count": 1,
+          "effect": "读取最多 128 个 WAL 节点并定位三个命名锚点及同名干扰项"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "after",
+          "adapter": "wal_tree_snapshot_oracle",
+          "subject_api": "ak.wwise.debug.getWalTree",
+          "expectation": "三个目标节点的 id/name/type 等于独立快照，同名干扰项按不同 id 单独报告，未凭名称合并；计数与截断元数据正确"
+        }
+      ],
+      "cleanup": {
+        "adapter": "debug_host_control_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "scenario_owned_debug_process_terminated"
+        ]
+      }
+    },
+    {
+      "id": "DBG23-RESTART-WAAPI-01",
+      "api": "ak.wwise.debug.restartWaapiServers",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_lifecycle",
+      "scenario_family": "waapi_listener_recovery",
+      "scenario_index": 1,
+      "prompt": "这个专用 Wwise 进程的 WAAPI 监听状态异常，请重启它的 WAAPI 服务。我知道当前连接会断开、结果可能暂时不确定，并明确提供确认词 restart_waapi_servers；不要重启整个 Wwise 进程。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，执行当前预览的 WAAPI 服务重启。",
+      "fixture": {
+        "adapter": "debug_host_control_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "专用 Wwise 进程使用独占端口，PID、启动时间、工程身份和监听器世代已封存",
+          "外部生命周期控制器可观察旧连接关闭和新监听器就绪，但不会替被测调用重启服务",
+          "源工程只读且不存在用户会话"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.debug.restartWaapiServers",
+          "count": 1,
+          "effect": "在精确确认词约束下请求一次 WAAPI 服务重启，不重试也不重启 Wwise 进程"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "waapi_server_process_oracle",
+          "subject_api": "ak.wwise.debug.restartWaapiServers",
+          "expectation": "确认前 PID、启动时间、监听器世代和现有连接均等于基线，没有提前断开或重启"
+        },
+        {
+          "phase": "after",
+          "adapter": "waapi_restart_oracle",
+          "subject_api": "ak.wwise.debug.restartWaapiServers",
+          "expectation": "旧连接在一次发送后关闭，新监听器在限时内以同一 Wwise PID 和工程身份恢复，监听器世代只增加一次；否则结果标记失败或不确定而不是通过"
+        }
+      ],
+      "cleanup": {
+        "adapter": "debug_host_control_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "scenario_owned_debug_process_terminated",
+          "no_retry_or_second_restart"
+        ]
+      }
+    },
+    {
+      "id": "DBG23-RESTART-WAAPI-02",
+      "api": "ak.wwise.debug.restartWaapiServers",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_lifecycle",
+      "scenario_family": "multi_client_rebind",
+      "scenario_index": 2,
+      "prompt": "请重启当前临时 Wwise 的 WAAPI 服务，让两条已经卡住的测试连接重新建立。我接受两条旧连接都会断开，精确确认词是 restart_waapi_servers；只执行一次，不要自动重试。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，按当前预览只重启一次 WAAPI 服务。",
+      "fixture": {
+        "adapter": "debug_host_control_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "专用进程有两条由外部控制器持有的独立旧连接和一个未连接探针",
+          "PID、工程身份、三个客户端状态和监听器世代已封存",
+          "控制器只观察断开与恢复，不主动调用重启"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.debug.restartWaapiServers",
+          "count": 1,
+          "effect": "以精确确认词请求一次服务重启，使两条旧连接断开后可重新绑定"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "waapi_server_process_oracle",
+          "subject_api": "ak.wwise.debug.restartWaapiServers",
+          "expectation": "确认前两条旧连接、第三探针、监听器世代、PID 和工程身份均未变化"
+        },
+        {
+          "phase": "after",
+          "adapter": "waapi_restart_oracle",
+          "subject_api": "ak.wwise.debug.restartWaapiServers",
+          "expectation": "两条旧连接都收到关闭，随后两个新连接和独立探针均读回同一 PID/工程；只观察到一个新监听器世代，没有自动第二次发送"
+        }
+      ],
+      "cleanup": {
+        "adapter": "debug_host_control_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "scenario_owned_debug_process_terminated",
+          "no_retry_or_second_restart"
+        ]
+      }
+    },
+    {
+      "id": "DBG22-TEST-ASSERT-01",
+      "api": "ak.wwise.debug.testAssert",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_lifecycle",
+      "scenario_family": "assert_notification_probe",
+      "scenario_index": 1,
+      "prompt": "在这个可销毁的专用 Debug 构建里故意触发一次测试断言，用来检查断言通知链。我理解这会产生真实断言，精确确认词是 trigger_debug_assert，用户工程不在这个进程里。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，在当前专用进程里触发这一次测试断言。",
+      "fixture": {
+        "adapter": "debug_host_control_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "专用 Debug 构建的断言处理器已配置为记录后继续且不会阻塞无人值守流程",
+          "外部控制器已在预览前订阅断言事件并封存 PID、工程摘要和事件游标",
+          "没有用户工程或其他客户端连接到该进程"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.debug.testAssert",
+          "count": 1,
+          "effect": "在精确确认词约束下故意触发一次 Debug 测试断言"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "debug_assert_event_oracle",
+          "subject_api": "ak.wwise.debug.testAssert",
+          "expectation": "确认前事件游标之后没有新断言，PID、工程摘要和断言处理器配置保持基线"
+        },
+        {
+          "phase": "after",
+          "adapter": "debug_assert_event_oracle",
+          "subject_api": "ak.wwise.debug.testAssert",
+          "expectation": "一次发送后收到恰好一个测试断言事件，表达式、文件和行号符合该构建的封存基线；进程随后仍响应且没有第二次发送"
+        }
+      ],
+      "cleanup": {
+        "adapter": "debug_host_control_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "scenario_owned_debug_process_terminated",
+          "no_retry_or_duplicate_assert"
+        ]
+      }
+    },
+    {
+      "id": "DBG22-TEST-ASSERT-02",
+      "api": "ak.wwise.debug.testAssert",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_lifecycle",
+      "scenario_family": "assert_handler_recovery",
+      "scenario_index": 2,
+      "prompt": "我需要验证这个临时 Debug 版 Wwise 在处理测试断言后还能继续响应。请故意触发一次，精确确认词是 trigger_debug_assert；完成后检查进程身份没有变化，并确认还能读取工程信息。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，在当前专用进程里触发一次并检查恢复。",
+      "fixture": {
+        "adapter": "debug_host_control_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "断言处理器在此构建中会记录断言并返回，不显示阻塞弹窗",
+          "PID、启动时间、工程身份、响应性和断言事件游标已封存",
+          "外部进程监视器与事件订阅均已就绪"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.debug.testAssert",
+          "count": 1,
+          "effect": "故意触发一次测试断言并观察专用进程的断言处理后响应性"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "debug_assert_event_oracle",
+          "subject_api": "ak.wwise.debug.testAssert",
+          "expectation": "确认前没有新断言事件，进程身份和工程响应性均保持基线"
+        },
+        {
+          "phase": "after",
+          "adapter": "debug_assert_event_oracle",
+          "subject_api": "ak.wwise.debug.testAssert",
+          "expectation": "事件游标后只有一个已知测试断言；同一 PID 随后成功返回工程身份，进程未重启且目标调用没有重试"
+        }
+      ],
+      "cleanup": {
+        "adapter": "debug_host_control_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "scenario_owned_debug_process_terminated",
+          "no_retry_or_duplicate_assert"
+        ]
+      }
+    },
+    {
+      "id": "DBG22-TEST-CRASH-01",
+      "api": "ak.wwise.debug.testCrash",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_lifecycle",
+      "scenario_family": "controlled_process_termination",
+      "scenario_index": 1,
+      "prompt": "让这个一次性的专用 Wwise 测试进程按设计崩溃，用来验证外部守护程序的退出检测。我接受连接中断和进程终止，精确确认词是 crash_wwise_process；不要自动重试，也不要碰用户工程。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，让当前一次性测试进程执行这次崩溃。",
+      "fixture": {
+        "adapter": "debug_host_control_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "专用进程、工程副本和端口只属于本场景，源工程不可写",
+          "PID、启动时间、连接状态、工程摘要与退出观察器已封存",
+          "没有用户窗口、未保存用户工作或其他客户端"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.debug.testCrash",
+          "count": 1,
+          "effect": "在精确确认词约束下向一次性 Wwise 进程发送一次故意崩溃请求"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "process_isolation_oracle",
+          "subject_api": "ak.wwise.debug.testCrash",
+          "expectation": "确认前 PID、连接、工程摘要和退出观察器均保持基线，进程仍在运行"
+        },
+        {
+          "phase": "after",
+          "adapter": "wwise_process_termination_oracle",
+          "subject_api": "ak.wwise.debug.testCrash",
+          "expectation": "一次发送后原 PID 在限时内退出且端口关闭，没有自动重启或第二次发送；仅断线但 PID 未退出必须标为不确定或失败"
+        }
+      ],
+      "cleanup": {
+        "adapter": "debug_host_control_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "scenario_owned_process_absent",
+          "no_retry_or_relaunch"
+        ]
+      }
+    },
+    {
+      "id": "DBG22-TEST-CRASH-02",
+      "api": "ak.wwise.debug.testCrash",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_lifecycle",
+      "scenario_family": "multi_client_crash_observation",
+      "scenario_index": 2,
+      "prompt": "请让当前隔离的临时 Wwise 进程触发测试崩溃，验证两个监控客户端是否都能识别同一次退出。我知道会丢失连接，精确确认词是 crash_wwise_process；只发送一次，不要重新启动进程。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，对当前隔离进程执行这一回崩溃测试。",
+      "fixture": {
+        "adapter": "debug_host_control_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "两个外部观察客户端连接同一个场景专用 PID 和端口",
+          "PID、启动时间、客户端连接标识、工程摘要和源工程哈希已封存",
+          "进程退出后不会由系统服务自动拉起"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.debug.testCrash",
+          "count": 1,
+          "effect": "发送一次故意崩溃请求，使两个观察客户端看到同一个进程退出"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "process_isolation_oracle",
+          "subject_api": "ak.wwise.debug.testCrash",
+          "expectation": "确认前两个客户端都保持连接，PID、启动时间和工程摘要未变"
+        },
+        {
+          "phase": "after",
+          "adapter": "wwise_process_termination_oracle",
+          "subject_api": "ak.wwise.debug.testCrash",
+          "expectation": "两个客户端都将同一 PID 标记为退出，端口关闭且没有新 PID；调用审计只有一次发送，源工程哈希保持不变"
+        }
+      ],
+      "cleanup": {
+        "adapter": "debug_host_control_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "scenario_owned_process_absent",
+          "no_retry_or_relaunch"
+        ]
+      }
+    },
+    {
+      "id": "DBG24-VALIDATE-CALL-01",
+      "api": "ak.wwise.debug.validateCall",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "online_authoring",
+      "scenario_family": "mutation_argument_validation",
+      "scenario_index": 1,
+      "prompt": "在不真正切换模式的前提下，帮我验证“开启自动化模式”这份调用参数是否合法：只提供 enable 为 true 的参数对象和空选项对象。请说明校验是否被当前 Wwise 接受，并确认目标操作没有执行。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "debug_read_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "专用 2024.1 Debug 构建支持调用校验且目标自动化模式接口可反射",
+          "目标函数的版本化参数与结果结构由本地资源和独立实例反射共同封存",
+          "调用审计可区分校验函数与被校验目标函数"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.debug.validateCall",
+          "count": 1,
+          "effect": "只校验自动化模式函数的 enable=true 参数对象和空选项对象，不调用目标函数"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "after",
+          "adapter": "validate_call_oracle",
+          "subject_api": "ak.wwise.debug.validateCall",
+          "expectation": "Wwise 接受结果与独立版本化 schema 校验一致；审计中只有一次校验调用，没有自动化模式目标调用，进程和工程状态不变"
+        }
+      ],
+      "cleanup": {
+        "adapter": "debug_host_control_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "scenario_owned_debug_process_terminated"
+        ]
+      }
+    },
+    {
+      "id": "DBG24-VALIDATE-CALL-02",
+      "api": "ak.wwise.debug.validateCall",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "online_authoring",
+      "scenario_family": "empty_query_contract_validation",
+      "scenario_index": 2,
+      "prompt": "请只校验当前版本的信息查询接口是否接受空参数对象和空选项对象，不要真正执行信息查询。把 Wwise 的接受结果和本地结构检查结论对照给我。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "debug_read_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "专用 2024.1 Debug 构建支持校验调用",
+          "信息查询函数的 URI 映射和空参数、空选项结构已由版本化能力目录封存",
+          "调用审计能证明被校验的信息查询函数没有实际执行"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.debug.validateCall",
+          "count": 1,
+          "effect": "校验信息查询函数的空参数与空选项结构，并且不执行被校验函数"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "after",
+          "adapter": "validate_call_oracle",
+          "subject_api": "ak.wwise.debug.validateCall",
+          "expectation": "Wwise 接受结论与独立 schema 校验完全一致；调用日志只含校验函数，不含信息查询目标函数，工程与进程身份保持基线"
+        }
+      ],
+      "cleanup": {
+        "adapter": "debug_host_control_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "scenario_owned_debug_process_terminated"
+        ]
+      }
+    }
+  ]
+}

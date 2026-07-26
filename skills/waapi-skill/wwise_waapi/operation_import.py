@@ -23,6 +23,7 @@ AUDIO_IMPORT_PLAN_CONTRACT = "waapi-skill.audio-import-plan/v1"
 TAB_IMPORT_PLAN_CONTRACT = "waapi-skill.tab-import-plan/v1"
 SUPPORTED_WWISE_VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
 SUPPORTED_IMPORT_OPERATIONS = ("createNew", "useExisting", "replaceExisting")
+AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS = ("2023.1", "2024.1", "2025.1")
 
 # Wwise 2022 evidence establishes only audioFile/objectPath/importLanguage for
 # a useExisting row that resolves to a localized object.  The fields below are
@@ -138,6 +139,36 @@ class ImportContractError(ValueError):
             "message": self.message,
             "details": dict(self.details),
         }
+
+
+def normalize_auto_check_out_to_source_control(
+    value: Any,
+    *,
+    version: str,
+    supplied: bool,
+) -> bool | None:
+    """Close the versioned import source-control option before dispatch."""
+
+    lane = _require_version(version)
+    if not supplied:
+        return False if lane in AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS else None
+    if type(value) is not bool:
+        raise ImportContractError(
+            "INVALID_ARGUMENT",
+            "auto_check_out_to_source_control must be a JSON boolean.",
+            details={"field": "auto_check_out_to_source_control", "value": value},
+        )
+    if lane not in AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS:
+        raise ImportContractError(
+            "VERSION_BEHAVIOR_BOUNDARY",
+            "auto_check_out_to_source_control is available only in Wwise 2023.1-2025.1.",
+            details={
+                "field": "auto_check_out_to_source_control",
+                "version": lane,
+                "supported_versions": list(AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS),
+            },
+        )
+    return value
 
 
 def import_operation_policy(import_operation: str) -> dict[str, Any]:
@@ -264,11 +295,17 @@ def build_audio_import_plan(
     *,
     version: str,
     import_operation: str,
+    auto_check_out_to_source_control: bool | None = None,
 ) -> dict[str, Any]:
     """Normalize the closed ``audio.import`` item DSL into a JSON plan."""
 
     lane = _require_version(version)
     policy = import_operation_policy(import_operation)
+    auto_check_out = normalize_auto_check_out_to_source_control(
+        auto_check_out_to_source_control,
+        version=lane,
+        supplied=auto_check_out_to_source_control is not None,
+    )
     if isinstance(imports, (str, bytes)) or not isinstance(imports, Sequence):
         raise ImportContractError("INVALID_ARGUMENT", "imports must be a JSON array.")
     if not imports:
@@ -358,8 +395,8 @@ def build_audio_import_plan(
         "importOperation": policy["import_operation"],
         "autoAddToSourceControl": False,
     }
-    if lane in {"2023.1", "2024.1", "2025.1"}:
-        dispatch_args["autoCheckOutToSourceControl"] = False
+    if auto_check_out is not None:
+        dispatch_args["autoCheckOutToSourceControl"] = auto_check_out
     return {
         "contract": AUDIO_IMPORT_PLAN_CONTRACT,
         "version": lane,
@@ -388,11 +425,17 @@ def parse_tab_delimited_import_file(
     import_location: str,
     import_language: str,
     import_operation: str,
+    auto_check_out_to_source_control: bool | None = None,
 ) -> dict[str, Any]:
     """Parse and prove a reviewed UTF-8 TSV subset without trusting caller rows."""
 
     lane = _require_version(version)
     policy = import_operation_policy(import_operation)
+    auto_check_out = normalize_auto_check_out_to_source_control(
+        auto_check_out_to_source_control,
+        version=lane,
+        supplied=auto_check_out_to_source_control is not None,
+    )
     location = canonical_import_location(import_location, version=lane)
     language = _require_language(import_language, field="import_language")
     path, data, import_file_proof = _read_proven_bytes(
@@ -532,8 +575,8 @@ def parse_tab_delimited_import_file(
         "importOperation": policy["import_operation"],
         "autoAddToSourceControl": False,
     }
-    if lane in {"2023.1", "2024.1", "2025.1"}:
-        dispatch_args["autoCheckOutToSourceControl"] = False
+    if auto_check_out is not None:
+        dispatch_args["autoCheckOutToSourceControl"] = auto_check_out
     return {
         "contract": TAB_IMPORT_PLAN_CONTRACT,
         "version": lane,
@@ -1034,6 +1077,7 @@ def _file_proof(path: Path, file_stat: os.stat_result, sha256: str) -> dict[str,
 
 __all__ = [
     "AUDIO_IMPORT_PLAN_CONTRACT",
+    "AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS",
     "IMPORT_ROOTS_BY_VERSION",
     "ImportContractError",
     "MAX_IMPORT_ITEMS",
@@ -1050,6 +1094,7 @@ __all__ = [
     "canonical_import_target",
     "derive_tab_target",
     "import_operation_policy",
+    "normalize_auto_check_out_to_source_control",
     "parse_tab_delimited_import_file",
     "regular_file_proof",
     "verify_regular_file_proof",

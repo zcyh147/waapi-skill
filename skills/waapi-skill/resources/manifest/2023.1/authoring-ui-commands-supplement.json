@@ -1,0 +1,34 @@
+{
+  "audit": {
+    "added_function_count": 0,
+    "added_schema_count": 0,
+    "added_topic_count": 0,
+    "inventory_sha256": "d984dbb3d5197b0bc95039bdb6341f59fbbca406a76b895292493624de57767d",
+    "schema_failure_count": 0,
+    "schema_override_count": 0
+  },
+  "format": "waapi-authoring-ui-commands-supplement-v1",
+  "functions": [],
+  "metadata": {
+    "authoring_ui_commands_reflection_sha256": "12819067f7123ee018f4aa693e1f58de5e291643d094e89bc4336cc70aed6a53",
+    "base_host_surface": "wwise-console",
+    "console_reflection_inventory_sha256": "046a536ab1462fc78fd2899aa3af80c101f971ca02ca2005791c79c9c89c783d",
+    "generator": "wwise_waapi.authoring_ui_commands_manifest.build_authoring_ui_commands_supplement",
+    "host_surface": "wwise-authoring",
+    "inventory_source": "targeted-authoring-ui-commands-collection",
+    "manifest_origin": "authoring-ui-commands-reflection",
+    "scope_uris": [
+      "ak.wwise.ui.commands.execute",
+      "ak.wwise.ui.commands.executed",
+      "ak.wwise.ui.commands.getCommands",
+      "ak.wwise.ui.commands.register",
+      "ak.wwise.ui.commands.unregister"
+    ],
+    "surface_scope": "ak.wwise.ui.commands",
+    "wwise_build": "2023.1.19.8928",
+    "wwise_version_target": "2023.1"
+  },
+  "schema_overrides": [],
+  "schemas": [],
+  "topics": []
+}

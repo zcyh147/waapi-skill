@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import hashlib
-import ipaddress
 import json
 import os
 import re
 from dataclasses import dataclass
 from pathlib import Path, PurePath, PureWindowsPath
 from typing import Any, Iterable, Mapping
+
+from .endpoint_scope import is_loopback_waapi_host
 
 try:  # ``pwd`` is unavailable on native Windows.
     import pwd
@@ -163,7 +164,9 @@ def adapt_cli_dispatch_paths(
             "The local CLI runtime is neither a proven native POSIX process nor a proven Wine process.",
             details={"process_path": process_path, "project_path": project_wire_path},
         )
-    if not isinstance(endpoint_host, str) or not _is_loopback_host(endpoint_host):
+    if not isinstance(endpoint_host, str) or not is_loopback_waapi_host(
+        endpoint_host
+    ):
         raise WwiseWirePathError(
             "REMOTE_WWISE_PATH_MAPPING_UNAVAILABLE",
             "Host paths cannot be mapped into a remote Windows Wwise filesystem.",
@@ -526,16 +529,6 @@ def _normalize_wire_path(value: str) -> str:
             "UNC paths cannot establish a local Wine drive mapping.",
         )
     return value.replace("/", "\\")
-
-
-def _is_loopback_host(value: str) -> bool:
-    normalized = value.strip().casefold()
-    if normalized in {"localhost", "localhost.localdomain"}:
-        return True
-    try:
-        return ipaddress.ip_address(normalized).is_loopback
-    except ValueError:
-        return False
 
 
 def _json_path(parts: tuple[str | int, ...]) -> str:

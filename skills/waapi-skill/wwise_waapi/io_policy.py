@@ -49,6 +49,7 @@ _EXACT_PATH_FIELDS = frozenset(
         "importfile",
         "input",
         "licensefile",
+        "luascript",
         "newfiles",
         "output",
         "path",
@@ -123,6 +124,7 @@ _READ_PATH_FIELDS = frozenset(
         "importfile",
         "input",
         "licensefile",
+        "luascript",
         "sourcebyplatform",
         "sourcefile",
         "tabdelimitedimportfile",
@@ -162,6 +164,9 @@ _SOURCE_CONTROL_WRITE_URIS = frozenset(
     }
 )
 _IMPLICIT_WRITE_REASONS: Mapping[str, str] = {
+    "ak.wwise.cli.executeLuaScript": (
+        "User-supplied Lua can perform project, runtime, UI, process, or filesystem side effects that cannot be inferred from its source path."
+    ),
     "ak.wwise.cli.convertExternalSource": (
         "External-source conversion writes generated media even when Wwise selects the default output directory."
     ),
@@ -176,6 +181,9 @@ _IMPLICIT_WRITE_REASONS: Mapping[str, str] = {
     ),
     "ak.wwise.core.audio.importTabDelimited": (
         "Tab-delimited import writes imported media and project/work-unit content."
+    ),
+    "ak.wwise.core.executeLuaScript": (
+        "User-supplied Lua can perform project, runtime, UI, process, or filesystem side effects that cannot be inferred from its source path."
     ),
     "ak.wwise.core.soundbank.convertExternalSources": (
         "External-source conversion writes platform media, including when the output field is omitted."

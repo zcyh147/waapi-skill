@@ -9,6 +9,8 @@ built, and every implemented operation has an operation-specific verifier.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import json
 import math
@@ -17,7 +19,7 @@ import re
 import stat
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
 from .canonical import canonical_json_bytes
@@ -33,16 +35,30 @@ from .builders.metadata import (
 from .builders.object_mutation import ObjectMutationBuilder
 from .builders.properties import PropertyReferenceBuilder
 from .builders.common import SemanticEnvelope, SemanticPreview, SemanticValidationError
+from .builders.debug_lua import (
+    CLI_LUA_RESERVED_FIELDS,
+    CORE_LUA_RESERVED_FIELDS,
+    DebugLuaContractError,
+    LUA_SOURCE_AUTHORITY,
+    MAX_LUA_SOURCE_BYTES,
+    MAX_LUA_WA_ARGS_BYTES,
+    MAX_LUA_WA_ARGS_KEYS,
+    normalize_lua_wa_args,
+    seal_inline_lua_source,
+    seal_isolated_lua_file,
+)
 from .builders.schema import validate_semantic_payload, validate_semantic_result
 from .builders.soundbank import SoundBankBuilder
 from .builders.switchcontainer import SwitchContainerAssignmentBuilder
 from .execution_contracts import ExecutionContractError, ExecutionContractRegistry
 from .io_policy import IOPolicyError, validate_isolated_io
 from .operation_import import (
+    AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS,
     ImportContractError,
     build_audio_import_plan,
     expected_audio_file_source_result_path,
     language_requires_live_project_validation,
+    normalize_auto_check_out_to_source_control,
     parse_tab_delimited_import_file,
     regular_file_proof as import_regular_file_proof,
     unsupported_localized_existing_fields,
@@ -53,15 +69,50 @@ from .operation_object import (
     ObjectNodeDescriptor,
     ObjectOperationContractError,
     ObjectResultNode,
+    RtpcDescriptor,
     bind_request_result_topology,
     flatten_create_result,
     flatten_request_nodes,
     flatten_set_result,
     materialize_waapi_node,
+    materialize_waapi_rtpc,
     normalize_object_forest,
     normalize_property_descriptors,
     normalize_reference_descriptors,
+    normalize_rtpc_descriptors,
     normalize_object_tree,
+)
+from .operation_plugin import (
+    PLUGIN_2022_EFFECT_TARGET_READBACK_FIELDS,
+    PLUGIN_EFFECT_SLOT_READBACK_FIELDS,
+    SUPPORTED_PLUGIN_VERSIONS,
+    WWISE_2022_EFFECT_FIELDS,
+    PluginCreationDescriptor,
+    PluginOperationContractError,
+    ValidatedPluginProperty,
+    build_plugin_creation_plan,
+    normalize_plugin_creation,
+    plugin_property_metadata_requests,
+    plugin_verification_fields,
+    validate_plugin_property_metadata,
+    verify_created_plugin_row,
+)
+from .operation_ui_commands import (
+    EXECUTE_URI as UI_COMMAND_EXECUTE_URI,
+    GET_COMMANDS_URI as UI_COMMAND_GET_COMMANDS_URI,
+    REGISTER_URI as UI_COMMAND_REGISTER_URI,
+    UNREGISTER_EXISTING_ACKNOWLEDGEMENT,
+    UNREGISTER_URI as UI_COMMAND_UNREGISTER_URI,
+    USER_SUPPLIED_SOURCE_AUTHORITY as UI_COMMAND_SOURCE_AUTHORITY,
+    UiCommandContractError,
+    build_ui_command_execute_plan,
+    build_ui_commands_register_plan,
+    build_ui_commands_unregister_descriptors_plan,
+    build_ui_commands_unregister_existing_plan,
+    validate_empty_ui_command_result,
+    validate_ui_command_plan,
+    validate_ui_command_runtime_preconditions,
+    verify_ui_command_inventory_postcondition,
 )
 from .operation_soundbank import (
     SoundBankContractError,
@@ -84,6 +135,10 @@ VERIFICATION_RESULT_CONTRACT = "waapi-skill.operation-verification/v1"
 ROLE_VALIDATION_CONTRACT = "waapi-skill.role-validation/v1"
 OBJECT_GET_URI = "ak.wwise.core.object.get"
 OBJECT_GET_TYPES_URI = "ak.wwise.core.object.getTypes"
+OBJECT_IS_LINKED_URI = "ak.wwise.core.object.isLinked"
+OBJECT_IS_PROPERTY_ENABLED_URI = "ak.wwise.core.object.isPropertyEnabled"
+OBJECT_SET_LINKED_URI = "ak.wwise.core.object.setLinked"
+OBJECT_SET_URI = "ak.wwise.core.object.set"
 GET_PROJECT_INFO_URI = "ak.wwise.core.getProjectInfo"
 SOUNDBANK_GET_INCLUSIONS_URI = "ak.wwise.core.soundbank.getInclusions"
 SWITCHCONTAINER_GET_ASSIGNMENTS_URI = "ak.wwise.core.switchContainer.getAssignments"
@@ -96,10 +151,40 @@ TRANSPORT_GET_LIST_URI = "ak.wwise.core.transport.getList"
 TRANSPORT_GET_STATE_URI = "ak.wwise.core.transport.getState"
 CLI_CONVERT_EXTERNAL_SOURCE_URI = "ak.wwise.cli.convertExternalSource"
 AUTHORING_AUDIO_CONVERT_URI = "ak.wwise.core.audio.convert"
+CLI_EXECUTE_LUA_URI = "ak.wwise.cli.executeLuaScript"
+CORE_EXECUTE_LUA_URI = "ak.wwise.core.executeLuaScript"
+DEBUG_ENABLE_ASSERTS_URI = "ak.wwise.debug.enableAsserts"
+DEBUG_ENABLE_AUTOMATION_MODE_URI = "ak.wwise.debug.enableAutomationMode"
+DEBUG_RESTART_WAAPI_SERVERS_URI = "ak.wwise.debug.restartWaapiServers"
+DEBUG_TEST_ASSERT_URI = "ak.wwise.debug.testAssert"
+DEBUG_TEST_CRASH_URI = "ak.wwise.debug.testCrash"
+GET_INFO_URI = "ak.wwise.core.getInfo"
+UI_COMMAND_OPERATIONS = frozenset(
+    {
+        "ui.commands.execute",
+        "ui.commands.register",
+        "ui.commands.unregister",
+    }
+)
+REPLAY_GUARD_OPERATIONS = frozenset(
+    {
+        "lua.executeCliFile",
+        "lua.executeCoreFile",
+        "lua.executeCoreInline",
+        "debug.setAsserts",
+        "debug.setAutomationMode",
+        "debug.restartWaapiServers",
+        "debug.testAssert",
+        "debug.testCrash",
+    }
+)
 PACKAGED_TRANSACTION_READBACK_URIS = frozenset(
     {
         OBJECT_GET_URI,
         OBJECT_GET_TYPES_URI,
+        OBJECT_IS_LINKED_URI,
+        OBJECT_IS_PROPERTY_ENABLED_URI,
+        GET_INFO_URI,
         GET_PROJECT_INFO_URI,
         GET_PROPERTY_INFO_URI,
         SOUNDBANK_GET_INCLUSIONS_URI,
@@ -107,6 +192,7 @@ PACKAGED_TRANSACTION_READBACK_URIS = frozenset(
         REMOTE_GET_CONNECTION_STATUS_URI,
         TRANSPORT_GET_LIST_URI,
         TRANSPORT_GET_STATE_URI,
+        UI_COMMAND_GET_COMMANDS_URI,
     }
 )
 TRANSPORT_STATES = frozenset({"playing", "stopped", "paused"})
@@ -167,10 +253,34 @@ DEFINITION_SHORT_ID_OBJECT_TYPE_CODES: Mapping[str, int] = {
 }
 OBJECT_REPLACE_SNAPSHOT_FIELDS = ("id", "path")
 OBJECT_REPLACE_MAX_SUBTREE_NODES = 128
+RTPC_SNAPSHOT_FIELDS = (
+    "id",
+    "name",
+    "type",
+    "path",
+    "notes",
+    "@PropertyName",
+    "@ControlInput",
+    "@Curve",
+)
+RTPC_MAX_LIST_ROWS = 128
+RTPC_CONTROL_INPUT_TYPE_TOKENS = frozenset(
+    {
+        "gameparameter",
+        "modulatorlfo",
+        "modulatorenvelope",
+        "modulatortime",
+        "midiparameter",
+    }
+)
 _REFERENCE_ACTIVATION_DEPENDENCY_FIELDS = frozenset(
     {"action", "context", "property", "type"}
 )
 _REFERENCE_ACTIVATION_FIELD_NAME = re.compile(r"^[:_a-zA-Z0-9]+$")
+_PLUGIN_GUID = re.compile(
+    r"^\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}$"
+)
 INCLUSION_FILTERS = frozenset({"events", "structures", "media"})
 IMPORT_WRITABLE_PARENT_TYPES = frozenset(
     {
@@ -293,6 +403,12 @@ IDENTITY_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     ]
 }
 
+PLATFORM_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    "type": "string",
+    "minLength": 1,
+    "description": "Exact platform GUID or unique Wwise platform name.",
+}
+
 _OBJECT_PROPERTY_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     "type": "object",
     "required": ["name", "value"],
@@ -300,6 +416,90 @@ _OBJECT_PROPERTY_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     "properties": {
         "name": {"type": "string", "minLength": 1},
         "value": {"description": "Finite JSON scalar validated against live getPropertyInfo metadata."},
+    },
+}
+
+_PLUGIN_PROPERTY_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    "type": "object",
+    "required": ["name", "value"],
+    "additionalProperties": False,
+    "properties": {
+        "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": (
+                "Exact plug-in property name. The Skill validates it with a "
+                "classId-scoped live getPropertyInfo read."
+            ),
+        },
+        "value": {
+            "description": (
+                "Finite JSON scalar accepted only after live getPropertyInfo "
+                "name/type validation."
+            )
+        },
+    },
+}
+
+_PLUGIN_CREATION_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    "type": "object",
+    "required": ["kind", "name", "class_id"],
+    "optional": ["notes", "platform", "language", "properties"],
+    "additionalProperties": False,
+    "properties": {
+        "kind": {"type": "string", "enum": ["source", "effect"]},
+        "name": {"type": "string", "minLength": 1, "maxLength": 255},
+        "class_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4_294_967_295,
+            "description": (
+                "Exact uint32 Wwise plug-in classId. It is never inferred from "
+                "a display name."
+            ),
+        },
+        "notes": {"type": "string", "maxLength": 64 * 1024},
+        "platform": PLATFORM_ARGUMENT_SCHEMA,
+        "language": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": (
+                "Exact Wwise Source language, such as SFX; accepted only when "
+                "kind is source."
+            ),
+        },
+        "properties": {
+            "type": "array",
+            "maxItems": 32,
+            "items": _PLUGIN_PROPERTY_ARGUMENT_SCHEMA,
+        },
+    },
+}
+
+_RTPC_POINT_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    "type": "object",
+    "required": ["x", "y", "shape"],
+    "additionalProperties": False,
+    "properties": {
+        "x": {"type": "number"},
+        "y": {"type": "number"},
+        "shape": {
+            "type": "string",
+            "enum": [
+                "Constant",
+                "Linear",
+                "Log3",
+                "Log2",
+                "Log1",
+                "InvertedSCurve",
+                "SCurve",
+                "Exp1",
+                "Exp2",
+                "Exp3",
+            ],
+        },
     },
 }
 _OBJECT_REFERENCE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
@@ -360,6 +560,41 @@ _SOUNDBANK_GENERATE_ITEM_SCHEMA: Mapping[str, Any] = {
         "rebuild": {"type": "boolean"},
     },
 }
+
+_IMPORT_AUTO_CHECK_OUT_SCHEMA: Mapping[str, Any] = {
+    "type": "boolean",
+    "default": False,
+    "supported_versions": list(AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS),
+    "description": (
+        "Ask Wwise to check out affected source-control files before import. "
+        "Omission defaults to false; explicit use is accepted only in Wwise 2023.1-2025.1."
+    ),
+}
+
+_LUA_SOURCE_AUTHORITY_SCHEMA: Mapping[str, Any] = {
+    "const": LUA_SOURCE_AUTHORITY,
+    "description": (
+        "Caller assertion that the current user message supplied the exact file "
+        "path or complete inline Lua verbatim; the runtime cannot independently "
+        "prove provenance. Agents must not synthesize, repair, or wrap Lua and "
+        "must not use this lane as a fallback."
+    ),
+}
+_LUA_WA_ARGS_SCHEMA: Mapping[str, Any] = {
+    "type": "object",
+    "maxProperties": MAX_LUA_WA_ARGS_KEYS,
+    "description": (
+        f"Strict JSON data passed to wa_args, capped at {MAX_LUA_WA_ARGS_BYTES} "
+        "bytes. Packaged Lua source/loader fields are reserved."
+    ),
+}
+_LUA_FILE_SCHEMA: Mapping[str, Any] = {
+    "type": "string",
+    "absoluteRegularFile": True,
+    "pattern": r"(?i)\.lua$",
+    "maximumBytes": MAX_LUA_SOURCE_BYTES,
+}
+
 
 def _object_contract(
     required: Sequence[str],
@@ -519,6 +754,81 @@ class VerificationResult:
 
 ReadCall = Callable[[str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any]]
 
+# Positive contract for dedicated operations whose adapters bind paths on the
+# gateway machine. Generic ``waapi.call`` locality is derived separately from
+# its versioned ``isolated_transaction`` execution route. Conditional UI
+# descriptor paths remain request-shaped and are classified by the locality
+# module.
+LOCAL_FILESYSTEM_OPERATION_ROLES: Mapping[str, tuple[str, ...]] = {
+    "audio.import": (
+        "arguments.imports[].audio_file",
+        "live_project_files",
+    ),
+    "audio.importTabDelimited": (
+        "arguments.import_file",
+        "tab_file_audio_sources",
+        "live_project_files",
+    ),
+    "lua.executeCliFile": (
+        "arguments.io_root",
+        "arguments.script_file",
+    ),
+    "lua.executeCoreFile": (
+        "arguments.io_root",
+        "arguments.script_file",
+    ),
+    "lua.executeCoreInline": ("arguments.io_root",),
+    "soundbank.convertExternalSources": (
+        "arguments.io_root",
+        "arguments.sources[].input",
+        "arguments.sources[].output",
+    ),
+    "soundbank.generate": (
+        "arguments.io_root",
+        "generated_artifacts",
+        "live_project_path",
+    ),
+    "soundbank.processDefinitionFiles": (
+        "arguments.files[]",
+        "arguments.io_root",
+        "live_project_path",
+    ),
+}
+CONDITIONAL_LOCAL_FILESYSTEM_OPERATIONS = frozenset(
+    {
+        "ui.commands.execute",
+        "ui.commands.register",
+        "ui.commands.unregister",
+    }
+)
+DYNAMIC_LOCAL_FILESYSTEM_OPERATIONS = frozenset({"waapi.call"})
+NO_LOCAL_FILESYSTEM_OPERATIONS = frozenset(
+    {
+        "debug.restartWaapiServers",
+        "debug.setAsserts",
+        "debug.setAutomationMode",
+        "debug.testAssert",
+        "debug.testCrash",
+        "object.copy",
+        "object.create",
+        "object.createPlugin",
+        "object.delete",
+        "object.move",
+        "object.set",
+        "object.setLinked",
+        "object.setName",
+        "object.setNotes",
+        "object.setProperty",
+        "object.setRTPC",
+        "object.setReference",
+        "soundbank.setInclusions",
+        "switchContainer.addAssignment",
+        "switchContainer.removeAssignment",
+        "ui.captureScreen",
+        "waapi.undoGroup",
+    }
+)
+
 
 OPERATION_SPECS: Mapping[str, OperationSpec] = {
     "waapi.undoGroup": OperationSpec(
@@ -616,7 +926,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "import",
         "Import absolute regular audio files with a closed createNew/useExisting/replaceExisting policy and verify every requested target and copied source file.",
         ("imports",),
-        ("import_operation",),
+        ("import_operation", "auto_check_out_to_source_control"),
         argument_contract=_object_contract(
             ("imports",),
             {
@@ -652,14 +962,16 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     "type": "string",
                     "enum": ["createNew", "useExisting", "replaceExisting"],
                 },
+                "auto_check_out_to_source_control": _IMPORT_AUTO_CHECK_OUT_SCHEMA,
             },
-            optional=("import_operation",),
+            optional=("import_operation", "auto_check_out_to_source_control"),
         ),
         constraints=(
             "all source files and targets are preflighted before the single dispatch",
             "useExisting preserves an existing target GUID; replaceExisting requires the old GUID to disappear",
             "a live non-SFX localized useExisting row dispatches only audioFile/objectPath/importLanguage; objectType is consumed by live type preflight and other requested row fields are rejected",
             "replaceExisting is irreversible and must be exercised only in a disposable project copy during tests",
+            "auto_check_out_to_source_control defaults to false and is accepted only in Wwise 2023.1-2025.1; explicit use on 2021.1/2022.1 fails before connection",
         ),
     ),
     "audio.importTabDelimited": OperationSpec(
@@ -668,7 +980,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "import",
         "Import a bounded strict-UTF-8 tab-delimited file whose targets and source-file proofs are derived by the packaged parser.",
         ("import_file", "import_location", "import_language"),
-        ("import_operation",),
+        ("import_operation", "auto_check_out_to_source_control"),
         argument_contract=_object_contract(
             ("import_file", "import_location", "import_language"),
             {
@@ -679,14 +991,16 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     "type": "string",
                     "enum": ["createNew", "useExisting", "replaceExisting"],
                 },
+                "auto_check_out_to_source_control": _IMPORT_AUTO_CHECK_OUT_SCHEMA,
             },
-            optional=("import_operation",),
+            optional=("import_operation", "auto_check_out_to_source_control"),
         ),
         identity_arguments=("import_location",),
         constraints=(
             "accepted columns are version-pinned and importLanguage is a call argument, never a TSV column",
             "the parser hashes the TSV and every referenced absolute regular media file before preview",
             "a missing or invalid row rejects the whole request before dispatch",
+            "auto_check_out_to_source_control defaults to false and is accepted only in Wwise 2023.1-2025.1; explicit use on 2021.1/2022.1 fails before connection",
         ),
     ),
     "object.create": OperationSpec(
@@ -785,15 +1099,18 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "object.setProperty",
         "ak.wwise.core.object.setProperty",
         "property-reference",
-        "Set one non-platform-specific property using live property metadata and typed readback.",
+        "Set one property for the current or an explicit platform using live property metadata and typed readback.",
         ("object", "property", "value"),
+        ("platform",),
         argument_contract=_object_contract(
             ("object", "property", "value"),
             {
                 "object": IDENTITY_ARGUMENT_SCHEMA,
                 "property": {"type": "string", "minLength": 1},
                 "value": {"description": "JSON scalar accepted only after live property metadata validation."},
+                "platform": PLATFORM_ARGUMENT_SCHEMA,
             },
+            optional=("platform",),
         ),
         identity_arguments=("object",),
     ),
@@ -801,17 +1118,110 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "object.setReference",
         "ak.wwise.core.object.setReference",
         "property-reference",
-        "Set one non-platform-specific reference after resolving source and target GUIDs.",
+        "Set one reference for the current or an explicit platform after resolving source and target GUIDs.",
         ("object", "reference", "target"),
+        ("platform",),
         argument_contract=_object_contract(
             ("object", "reference", "target"),
             {
                 "object": IDENTITY_ARGUMENT_SCHEMA,
                 "reference": {"type": "string", "minLength": 1},
                 "target": IDENTITY_ARGUMENT_SCHEMA,
+                "platform": PLATFORM_ARGUMENT_SCHEMA,
             },
+            optional=("platform",),
         ),
         identity_arguments=("object", "target"),
+    ),
+    "object.setLinked": OperationSpec(
+        "object.setLinked",
+        OBJECT_SET_LINKED_URI,
+        "property-reference",
+        "Link or unlink one property, reference, or object list for one explicit platform.",
+        ("object", "property", "platform", "linked"),
+        argument_contract=_object_contract(
+            ("object", "property", "platform", "linked"),
+            {
+                "object": IDENTITY_ARGUMENT_SCHEMA,
+                "property": {"type": "string", "minLength": 1},
+                "platform": PLATFORM_ARGUMENT_SCHEMA,
+                "linked": {"type": "boolean"},
+            },
+        ),
+        identity_arguments=("object",),
+        constraints=(
+            "pre-state and post-state are read with ak.wwise.core.object.isLinked",
+            "the platform is explicit and the linked value must be a JSON boolean",
+            "the same object/property/platform tuple is rebound at confirmation",
+        ),
+        supported_versions=("2023.1", "2024.1", "2025.1"),
+    ),
+    "object.createPlugin": OperationSpec(
+        "object.createPlugin",
+        OBJECT_SET_URI,
+        "object-mutation",
+        (
+            "Create one Source or Effect plug-in from an exact classId through "
+            "the version-correct Wwise object topology."
+        ),
+        ("target", "plugin"),
+        argument_contract=_object_contract(
+            ("target", "plugin"),
+            {
+                "target": IDENTITY_ARGUMENT_SCHEMA,
+                "plugin": _PLUGIN_CREATION_ARGUMENT_SCHEMA,
+            },
+        ),
+        identity_arguments=("target",),
+        constraints=(
+            "target resolves live to exactly one canonical object before preview",
+            "class_id is an exact caller-supplied uint32 and is never guessed from a plug-in display name",
+            "every requested property is validated by classId-scoped live getPropertyInfo metadata",
+            "Source plug-ins are create-only children of Sound or Voice targets",
+            "Wwise 2022.1 Effects use the first proven-empty @Effect0 through @Effect3 reference",
+            "Wwise 2023.1 and later Effects append one EffectSlot and verify its @Effect reference",
+            "pre-existing plug-in identities are sealed before dispatch; replacement, raw replaceAll, and caller-authored object.set payloads are rejected",
+            "the returned association and post-read id/name/type/classId/parent/owner must bind uniquely to the immutable plan",
+        ),
+        supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
+    ),
+    "object.setRTPC": OperationSpec(
+        "object.setRTPC",
+        OBJECT_SET_URI,
+        "object-mutation",
+        "Add or update one RTPC curve through a closed property, ControlInput, and point contract.",
+        ("object", "property", "control_input", "points"),
+        ("notes", "mode"),
+        argument_contract=_object_contract(
+            ("object", "property", "control_input", "points"),
+            {
+                "object": IDENTITY_ARGUMENT_SCHEMA,
+                "property": {"type": "string", "minLength": 1},
+                "control_input": IDENTITY_ARGUMENT_SCHEMA,
+                "points": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 256,
+                    "items": _RTPC_POINT_ARGUMENT_SCHEMA,
+                },
+                "notes": {"type": "string"},
+                "mode": {
+                    "type": "string",
+                    "enum": ["add", "add_or_replace"],
+                    "default": "add_or_replace",
+                },
+            },
+            optional=("notes", "mode"),
+        ),
+        identity_arguments=("object", "control_input"),
+        constraints=(
+            "live getPropertyInfo must report RTPC support for the requested property",
+            "the ControlInput resolves to exactly one existing GameParameter, MIDI, or Modulator object",
+            "add appends one typed @RTPC row; add_or_replace updates one exact property/ControlInput match in place",
+            "raw @RTPC rows and caller-authored listMode/replaceAll are never accepted",
+            "the complete RTPC list is sealed before execution and read back after execution",
+        ),
+        supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
     ),
     "object.set": OperationSpec(
         "object.set",
@@ -835,6 +1245,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                         {
                             "object": IDENTITY_ARGUMENT_SCHEMA,
                             "notes": {"type": "string"},
+                            "platform": PLATFORM_ARGUMENT_SCHEMA,
                             "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
                             "references": {"type": "array", "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA},
                             "children": {
@@ -847,7 +1258,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                                 ),
                             },
                         },
-                        optional=("notes", "properties", "references", "children"),
+                        optional=("notes", "platform", "properties", "references", "children"),
                     ),
                 },
                 "on_name_conflict": {
@@ -868,10 +1279,353 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "every target and field pre-state is captured before the one non-retryable batch dispatch",
             "every existing nested container that receives descendants is a separate objects[] target; children contain only genuinely new direct descendants",
             "on_name_conflict applies only to new children; existing objects[] targets do not imply merge, and children requested as new or absent use fail",
-            "children are append/merge only; listMode, replaceAll, raw @ keys, plug-ins, platform link state, and RTPCs are rejected",
+            "each target row may set properties/references for one explicit platform; link state remains the dedicated object.setLinked operation",
+            "children are append/merge only; listMode, replaceAll, raw @ keys, plug-ins, and RTPCs are rejected",
             "a partial result or any per-target readback mismatch fails verification",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
+    ),
+    "lua.executeCliFile": OperationSpec(
+        "lua.executeCliFile",
+        CLI_EXECUTE_LUA_URI,
+        "explicit-user-code",
+        "Execute one existing user-supplied Lua file through the Wwise CLI endpoint.",
+        ("script_file", "io_root", "source_authority"),
+        ("wa_args", "watchdog_seconds"),
+        argument_contract=_object_contract(
+            ("script_file", "io_root", "source_authority"),
+            {
+                "script_file": _LUA_FILE_SCHEMA,
+                "io_root": {
+                    "type": "string",
+                    "absoluteExistingDirectory": True,
+                },
+                "source_authority": _LUA_SOURCE_AUTHORITY_SCHEMA,
+                "wa_args": _LUA_WA_ARGS_SCHEMA,
+                "watchdog_seconds": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "supported_versions": ["2024.1", "2025.1"],
+                },
+            },
+            optional=("wa_args", "watchdog_seconds"),
+        ),
+        constraints=(
+            "script_file must be an existing non-symlink .lua file canonically contained by io_root",
+            "the complete file size and SHA-256 are sealed at preview and rechecked before execution",
+            "source_authority is a caller assertion, not runtime provenance proof, and may be set only for a path supplied verbatim in the current user message",
+            "do-file, lua-path, require, migration, project, and arbitrary loader switches are not exposed",
+            "watchdog_seconds is accepted only in Wwise 2024.1-2025.1",
+            "Lua side effects are not inferred, confined, rolled back, or retried",
+        ),
+        supported_versions=("2023.1", "2024.1", "2025.1"),
+    ),
+    "lua.executeCoreFile": OperationSpec(
+        "lua.executeCoreFile",
+        CORE_EXECUTE_LUA_URI,
+        "explicit-user-code",
+        "Execute one existing user-supplied Lua file in connected Wwise Authoring.",
+        ("script_file", "io_root", "source_authority"),
+        ("wa_args",),
+        argument_contract=_object_contract(
+            ("script_file", "io_root", "source_authority"),
+            {
+                "script_file": _LUA_FILE_SCHEMA,
+                "io_root": {
+                    "type": "string",
+                    "absoluteExistingDirectory": True,
+                },
+                "source_authority": _LUA_SOURCE_AUTHORITY_SCHEMA,
+                "wa_args": _LUA_WA_ARGS_SCHEMA,
+            },
+            optional=("wa_args",),
+        ),
+        constraints=(
+            "script_file must be an existing non-symlink .lua file canonically contained by io_root",
+            "the complete file size and SHA-256 are sealed at preview and rechecked before execution",
+            "source_authority is a caller assertion, not runtime provenance proof, and may be set only for a path supplied verbatim in the current user message",
+            "doFiles, luaPaths, requires, and hidden helper source are not exposed",
+            "Lua side effects are not inferred, confined, rolled back, or retried",
+        ),
+        supported_versions=("2023.1", "2024.1", "2025.1"),
+    ),
+    "lua.executeCoreInline": OperationSpec(
+        "lua.executeCoreInline",
+        CORE_EXECUTE_LUA_URI,
+        "explicit-user-code",
+        "Execute one exact user-supplied inline Lua string in Wwise 2025.1.",
+        ("lua_code", "io_root", "source_authority"),
+        ("wa_args",),
+        argument_contract=_object_contract(
+            ("lua_code", "io_root", "source_authority"),
+            {
+                "lua_code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maximumBytes": MAX_LUA_SOURCE_BYTES,
+                },
+                "io_root": {
+                    "type": "string",
+                    "absoluteExistingDirectory": True,
+                },
+                "source_authority": _LUA_SOURCE_AUTHORITY_SCHEMA,
+                "wa_args": _LUA_WA_ARGS_SCHEMA,
+            },
+            optional=("wa_args",),
+        ),
+        constraints=(
+            "source_authority is a caller assertion, not runtime provenance proof; lua_code must be copied byte-for-byte from the current user message and is sealed by size and SHA-256",
+            "io_root is an explicit isolated transaction context; Lua's implicit side effects are still not claimed confined",
+            "the Skill never generates, repairs, wraps, or augments the Lua string",
+            "luaScript, doFiles, luaPaths, requires, and hidden helper source are not exposed",
+            "Lua side effects are not inferred, confined, rolled back, or retried",
+        ),
+        supported_versions=("2025.1",),
+    ),
+    "debug.setAsserts": OperationSpec(
+        "debug.setAsserts",
+        DEBUG_ENABLE_ASSERTS_URI,
+        "debug-runtime",
+        "Apply one explicitly confirmed process-wide debug-assert ref-count change.",
+        ("enable",),
+        argument_contract=_object_contract(
+            ("enable",),
+            {"enable": {"type": "boolean"}},
+        ),
+        constraints=(
+            "the endpoint has no state getter; verification proves only the reflected result schema",
+            "Wwise implements a process-wide ref-count, so this operation is never retried or described as idempotent",
+        ),
+    ),
+    "debug.setAutomationMode": OperationSpec(
+        "debug.setAutomationMode",
+        DEBUG_ENABLE_AUTOMATION_MODE_URI,
+        "debug-runtime",
+        "Enable or disable Wwise automation mode after an explicit immutable preview.",
+        ("enable",),
+        argument_contract=_object_contract(
+            ("enable",),
+            {"enable": {"type": "boolean"}},
+        ),
+        constraints=(
+            "automation mode affects process-wide dialog and popup handling",
+            "the endpoint has no state getter; verification proves only the reflected result schema",
+            "the operation is never retried automatically",
+        ),
+    ),
+    "debug.restartWaapiServers": OperationSpec(
+        "debug.restartWaapiServers",
+        DEBUG_RESTART_WAAPI_SERVERS_URI,
+        "dangerous-host-control",
+        "Request a WAAPI server restart and terminate the transaction without reconnecting.",
+        ("acknowledge",),
+        argument_contract=_object_contract(
+            ("acknowledge",),
+            {"acknowledge": {"const": "restart_waapi_servers"}},
+        ),
+        constraints=(
+            "the immutable acknowledgement distinguishes this from an ordinary WAAPI call",
+            "disconnect is expected; delivery and server restart completion may remain indeterminate",
+            "the Wwise process is expected to remain running, but this gateway does not claim lifecycle observation",
+            "there is no automatic retry, reconnect, or generic verify phase",
+        ),
+        supported_versions=("2023.1", "2024.1", "2025.1"),
+    ),
+    "debug.testAssert": OperationSpec(
+        "debug.testAssert",
+        DEBUG_TEST_ASSERT_URI,
+        "dangerous-host-control",
+        "Deliberately trigger Wwise's private test assertion after explicit confirmation.",
+        ("acknowledge",),
+        argument_contract=_object_contract(
+            ("acknowledge",),
+            {"acknowledge": {"const": "trigger_debug_assert"}},
+        ),
+        constraints=(
+            "the immutable acknowledgement distinguishes this deliberate failure from an ordinary call",
+            "an assertion dialog, assertFailed event, disconnect, or continued process are host-build dependent",
+            "there is no automatic retry, cleanup promise, or business-state verification",
+        ),
+    ),
+    "debug.testCrash": OperationSpec(
+        "debug.testCrash",
+        DEBUG_TEST_CRASH_URI,
+        "dangerous-host-control",
+        "Deliberately request Wwise process termination after explicit confirmation.",
+        ("acknowledge",),
+        argument_contract=_object_contract(
+            ("acknowledge",),
+            {"acknowledge": {"const": "crash_wwise_process"}},
+        ),
+        constraints=(
+            "the immutable acknowledgement distinguishes this deliberate crash from an ordinary call",
+            "disconnect and process termination are expected, but delivery and lifecycle completion may remain indeterminate",
+            "there is no automatic retry, reconnect, cleanup promise, or generic verify phase",
+        ),
+    ),
+    "ui.commands.execute": OperationSpec(
+        "ui.commands.execute",
+        UI_COMMAND_EXECUTE_URI,
+        "authoring-ui-command",
+        "Execute one installed Wwise Authoring UI command after a fresh live command-inventory check.",
+        ("command",),
+        ("objects", "platforms", "value", "files"),
+        argument_contract=_object_contract(
+            ("command",),
+            {
+                "command": {"type": "string", "minLength": 1, "maxLength": 512},
+                "objects": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "items": {"type": "string", "maxLength": 1024},
+                },
+                "platforms": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "items": {"type": "string", "maxLength": 256},
+                },
+                "value": {
+                    "description": "Optional finite JSON scalar forwarded as the command value.",
+                },
+                "files": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "items": {"type": "string", "absoluteRegularFile": True},
+                    "supported_versions": ["2025.1"],
+                },
+            },
+            optional=("objects", "platforms", "value", "files"),
+        ),
+        constraints=(
+            "available only when live getInfo.isCommandLine is false",
+            "the command ID must be present in a fresh getCommands result immediately before dispatch",
+            "files is available only in Wwise 2025.1 and every file identity/content proof is replayed before dispatch",
+            "generic command effects have no business-state readback and are never retried automatically",
+        ),
+    ),
+    "ui.commands.register": OperationSpec(
+        "ui.commands.register",
+        UI_COMMAND_REGISTER_URI,
+        "authoring-ui-command",
+        "Register bounded Wwise Authoring UI commands from closed descriptors and verify their IDs appear.",
+        ("commands",),
+        ("source_authority",),
+        argument_contract=_object_contract(
+            ("commands",),
+            {
+                "commands": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "items": {
+                        "type": "object",
+                        "description": (
+                            "Closed descriptor with id, display_name, handler, and optional "
+                            "context_menu/main_menu/default_shortcut fields; raw native "
+                            "program/args/luaScript payload fields are rejected."
+                        ),
+                    },
+                },
+                "source_authority": {
+                    "const": UI_COMMAND_SOURCE_AUTHORITY,
+                    "description": (
+                        "Required only for exact existing program or Lua paths supplied "
+                        "verbatim by the user."
+                    ),
+                },
+            },
+            optional=("source_authority",),
+        ),
+        constraints=(
+            "available only when live getInfo.isCommandLine is false",
+            "host platform is derived only from live getInfo.platform; callers cannot supply it",
+            "x64 and win32 map to Windows, macosx maps to macOS, and every other platform fails closed",
+            "all command IDs must be absent immediately before dispatch and present after dispatch",
+            "external program/Lua paths are immutable proven local paths; the Skill never authors source code",
+            "generic Program descriptors name one final proved executable and require empty argument_tokens",
+        ),
+    ),
+    "ui.commands.unregister": OperationSpec(
+        "ui.commands.unregister",
+        UI_COMMAND_UNREGISTER_URI,
+        "authoring-ui-command",
+        "Unregister command IDs from closed descriptor evidence or an explicitly acknowledged ID list; both standalone forms have unknown ownership and no inferred inverse.",
+        (),
+        ("commands", "source_authority", "command_ids", "acknowledgement"),
+        argument_contract={
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "commands": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "items": {
+                        "type": "object",
+                        "description": (
+                            "The same closed descriptor accepted by ui.commands.register."
+                        ),
+                    },
+                },
+                "source_authority": {"const": UI_COMMAND_SOURCE_AUTHORITY},
+                "command_ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "items": {"type": "string", "minLength": 1, "maxLength": 512},
+                },
+                "acknowledgement": {
+                    "const": UNREGISTER_EXISTING_ACKNOWLEDGEMENT,
+                },
+            },
+            "oneOf": [
+                {
+                    "required": ["commands"],
+                    "forbidden": ["command_ids", "acknowledgement"],
+                },
+                {
+                    "required": ["command_ids", "acknowledgement"],
+                    "forbidden": ["commands", "source_authority"],
+                },
+            ],
+        },
+        constraints=(
+            "available only when live getInfo.isCommandLine is false",
+            "descriptor-backed mode uses a live-derived host platform and sealed definitions only to derive the requested IDs; it proves neither ownership nor a matching live definition",
+            "existing-ID mode requires an exact irreversibility acknowledgement because getCommands exposes no definitions or ownership",
+            "all command IDs must be present immediately before dispatch and absent after dispatch",
+            "neither standalone mode carries inverse registration cleanup; reversible cleanup is bound to a previously successful register transaction",
+        ),
+    ),
+    "ui.captureScreen": OperationSpec(
+        "ui.captureScreen",
+        "ak.wwise.ui.captureScreen",
+        "ui",
+        "Capture the whole Wwise UI or one named view through a stable five-version request.",
+        (),
+        ("view_name", "view_channel", "rect"),
+        argument_contract=_object_contract(
+            (),
+            {
+                "view_name": {"type": "string", "minLength": 1},
+                "view_channel": {"type": "integer", "minimum": 1, "maximum": 4},
+                "rect": _object_contract(
+                    ("x", "y", "width", "height"),
+                    {
+                        "x": {"type": "integer", "minimum": 0},
+                        "y": {"type": "integer", "minimum": 0},
+                        "width": {"type": "integer", "minimum": 1},
+                        "height": {"type": "integer", "minimum": 1},
+                    },
+                ),
+            },
+            optional=("view_name", "view_channel", "rect"),
+        ),
+        constraints=(
+            "view_channel maps to viewSyncGroup in 2021.1 and viewSelectionChannel in 2022.1-2025.1",
+            "rect is always a complete x/y/width/height object even though 2021.1 reflection did not mark its members required",
+            "the returned image must have a declared image content type and valid bounded base64",
+        ),
     ),
     "object.copy": OperationSpec(
         "object.copy",
@@ -1831,6 +2585,476 @@ def _prepare_object_create(
     return preview, roles, {"object_graph_guard": graph_guard, "object_create_nodes": node_specs}, verification, cleanup
 
 
+def _raise_plugin_operation_error(exc: PluginOperationContractError) -> NoReturn:
+    raise OperationContractError(
+        exc.error_code,
+        str(exc),
+        details=exc.details,
+    ) from exc
+
+
+def _plugin_guid(value: Any, *, field: str, allow_none: bool = False) -> str | None:
+    if isinstance(value, Mapping):
+        value = value.get("id")
+    if value is None and allow_none:
+        return None
+    if not isinstance(value, str) or not _PLUGIN_GUID.fullmatch(value):
+        raise OperationContractError(
+            "INVALID_READBACK",
+            f"{field} must expose one canonical Wwise GUID.",
+            details={"field": field, "value": value},
+        )
+    return value
+
+
+def _sealed_plugin_property_validation(
+    value: Any,
+    *,
+    descriptor: PluginCreationDescriptor,
+) -> tuple[ValidatedPluginProperty, ...]:
+    """Rehydrate the immutable property/type bindings without trusting JSON."""
+
+    if not isinstance(value, list):
+        raise OperationContractError(
+            "INVALID_PREVIEW",
+            "object.createPlugin property validation must be an ordered array.",
+        )
+    if len(value) != len(descriptor.properties):
+        raise OperationContractError(
+            "INVALID_PREVIEW",
+            "object.createPlugin property validation count does not match the "
+            "immutable descriptor.",
+            details={
+                "expected": len(descriptor.properties),
+                "actual": len(value),
+            },
+        )
+
+    validated: list[ValidatedPluginProperty] = []
+    for index, (raw_row, requested) in enumerate(
+        zip(value, descriptor.properties)
+    ):
+        if (
+            not isinstance(raw_row, Mapping)
+            or set(raw_row) != {"name", "value", "metadata_type"}
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "object.createPlugin property validation row is malformed.",
+                details={"index": index, "row": raw_row},
+            )
+        name = raw_row.get("name")
+        metadata_type = raw_row.get("metadata_type")
+        raw_value = raw_row.get("value")
+        if (
+            name != requested.name
+            or type(raw_value) is not type(requested.value)
+            or raw_value != requested.value
+            or not isinstance(metadata_type, str)
+            or not metadata_type
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "object.createPlugin property validation does not match the "
+                "immutable descriptor.",
+                details={
+                    "index": index,
+                    "expected": requested.as_dict(),
+                    "actual": dict(raw_row),
+                },
+            )
+        validated.append(
+            ValidatedPluginProperty(
+                name=requested.name,
+                value=requested.value,
+                metadata_type=metadata_type,
+            )
+        )
+
+    try:
+        canonical = validate_plugin_property_metadata(
+            descriptor,
+            (
+                [
+                    {"name": item.name, "type": item.metadata_type}
+                    for item in validated
+                ]
+                if validated
+                else None
+            ),
+        )
+    except PluginOperationContractError as exc:
+        raise OperationContractError(
+            "INVALID_PREVIEW",
+            "object.createPlugin property validation is not a valid sealed "
+            "classId-scoped binding.",
+            details=exc.as_dict(),
+        ) from exc
+    if tuple(validated) != canonical:
+        raise OperationContractError(
+            "INVALID_PREVIEW",
+            "object.createPlugin property validation is not canonical.",
+        )
+    return canonical
+
+
+def _normalize_plugin_source_rows(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    target_id: str,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    normalized: list[dict[str, Any]] = []
+    for index, row_value in enumerate(rows):
+        row = dict(row_value)
+        object_type = row.get("type")
+        if not isinstance(object_type, str) or not object_type:
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "Every direct child row must expose a type while Source plug-in pre-state is captured.",
+                details={"index": index, "row": row},
+            )
+        if object_type != "Source":
+            continue
+        object_id = _plugin_guid(row.get("id"), field=f"source_children[{index}].id")
+        name = row.get("name")
+        if not isinstance(name, str):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "Every Source plug-in pre-state row must expose a name.",
+                details={"index": index, "row": row},
+            )
+        parent = _plugin_guid(
+            row.get("parent"),
+            field=f"source_children[{index}].parent",
+        )
+        if not _same_identity(parent, target_id):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "A direct Source child readback reported a different parent.",
+                details={
+                    "index": index,
+                    "expected_parent": target_id,
+                    "actual_parent": parent,
+                    "row": row,
+                },
+            )
+        normalized.append(
+            {
+                "id": object_id,
+                "name": name,
+                "type": object_type,
+                "parent": parent,
+            }
+        )
+    normalized.sort(key=lambda row: str(row["id"]).casefold())
+    ids = [str(row["id"]) for row in normalized]
+    if len({value.casefold() for value in ids}) != len(ids):
+        raise OperationContractError(
+            "INVALID_READBACK",
+            "Source plug-in pre-state contains duplicate GUIDs.",
+            details={"rows": normalized},
+        )
+    return normalized, ids
+
+
+def _read_plugin_prestate(
+    *,
+    version: str,
+    target_id: str,
+    descriptor: PluginCreationDescriptor,
+    read: ReadCall,
+) -> dict[str, Any]:
+    if descriptor.kind == "source":
+        fields = ("id", "name", "type", "parent")
+        args = {
+            "from": {"id": [target_id]},
+            "transform": [{"select": ["children"]}],
+        }
+        options = {"return": list(fields)}
+        result = read(OBJECT_GET_URI, args, options)
+        rows = _rows(result)
+        normalized_rows, ids = _normalize_plugin_source_rows(
+            rows,
+            target_id=target_id,
+        )
+        return {
+            "kind": "source_children",
+            "uri": OBJECT_GET_URI,
+            "args": args,
+            "options": options,
+            "rows": normalized_rows,
+            "preexisting_plugin_ids": ids,
+        }
+
+    if version == "2022.1":
+        fields = ("id", *WWISE_2022_EFFECT_FIELDS)
+        args = {"from": {"id": [target_id]}}
+        options = {"return": list(fields)}
+        result = read(OBJECT_GET_URI, args, options)
+        rows = _rows(result)
+        if len(rows) != 1 or not _same_identity(rows[0].get("id"), target_id):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "Wwise 2022.1 fixed Effect pre-state must return the target exactly once.",
+                details={"target_id": target_id, "rows": rows},
+            )
+        fixed_effects: dict[str, str | None] = {}
+        for field_name in WWISE_2022_EFFECT_FIELDS:
+            if field_name not in rows[0]:
+                raise OperationContractError(
+                    "INVALID_READBACK",
+                    "Wwise 2022.1 fixed Effect pre-state omitted a requested slot.",
+                    details={
+                        "field": field_name,
+                        "required_fields": list(WWISE_2022_EFFECT_FIELDS),
+                        "row": rows[0],
+                    },
+                )
+            fixed_effects[field_name] = _plugin_guid(
+                rows[0].get(field_name),
+                field=f"fixed_effects.{field_name}",
+                allow_none=True,
+            )
+        ids = [
+            value
+            for value in fixed_effects.values()
+            if isinstance(value, str)
+        ]
+        if len({value.casefold() for value in ids}) != len(ids):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "Wwise 2022.1 fixed Effect pre-state contains duplicate plug-in GUIDs.",
+                details={"fixed_effects": fixed_effects},
+            )
+        return {
+            "kind": "fixed_effect_references",
+            "uri": OBJECT_GET_URI,
+            "args": args,
+            "options": options,
+            "fixed_effects": fixed_effects,
+            "preexisting_plugin_ids": ids,
+        }
+
+    fields = PLUGIN_EFFECT_SLOT_READBACK_FIELDS
+    args = {
+        "from": {"id": [target_id]},
+        "transform": [{"select": ["@Effects"]}],
+    }
+    options = {"return": list(fields)}
+    result = read(OBJECT_GET_URI, args, options)
+    rows = _rows(result)
+    normalized_slots: list[dict[str, Any]] = []
+    plugin_ids: list[str] = []
+    for index, row_value in enumerate(rows):
+        row = dict(row_value)
+        if row.get("type") != "EffectSlot":
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "The @Effects pre-state must contain only EffectSlot rows.",
+                details={"index": index, "row": row},
+            )
+        slot_id = _plugin_guid(row.get("id"), field=f"effect_slots[{index}].id")
+        parent_id = _plugin_guid(
+            row.get("parent"),
+            field=f"effect_slots[{index}].parent",
+        )
+        owner_id = _plugin_guid(
+            row.get("owner"),
+            field=f"effect_slots[{index}].owner",
+        )
+        if not _same_identity(parent_id, target_id) or not _same_identity(
+            owner_id,
+            target_id,
+        ):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "An EffectSlot pre-state row is not owned by the resolved target.",
+                details={
+                    "index": index,
+                    "target_id": target_id,
+                    "parent": parent_id,
+                    "owner": owner_id,
+                    "row": row,
+                },
+            )
+        effect_id = _plugin_guid(
+            row.get("@Effect"),
+            field=f"effect_slots[{index}].@Effect",
+            allow_none=True,
+        )
+        if effect_id is not None:
+            plugin_ids.append(effect_id)
+        normalized_slots.append(
+            {
+                "id": slot_id,
+                "name": row.get("name"),
+                "type": "EffectSlot",
+                "parent": parent_id,
+                "owner": owner_id,
+                "@Effect": effect_id,
+            }
+        )
+    normalized_slots.sort(key=lambda row: str(row["id"]).casefold())
+    slot_ids = [str(row["id"]) for row in normalized_slots]
+    if (
+        len({value.casefold() for value in slot_ids}) != len(slot_ids)
+        or len({value.casefold() for value in plugin_ids}) != len(plugin_ids)
+    ):
+        raise OperationContractError(
+            "INVALID_READBACK",
+            "The @Effects pre-state contains duplicate slot or plug-in GUIDs.",
+            details={"effect_slots": normalized_slots},
+        )
+    return {
+        "kind": "effect_slots",
+        "uri": OBJECT_GET_URI,
+        "args": args,
+        "options": options,
+        "effect_slots": normalized_slots,
+        "preexisting_plugin_ids": sorted(plugin_ids, key=str.casefold),
+    }
+
+
+def _prepare_object_create_plugin(
+    request: OperationRequest,
+    *,
+    arguments: Mapping[str, Any],
+    read: ReadCall,
+) -> tuple[
+    SemanticPreview,
+    dict[str, ResolvedObject],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+]:
+    try:
+        descriptor = normalize_plugin_creation(arguments.get("plugin"))
+    except PluginOperationContractError as exc:
+        _raise_plugin_operation_error(exc)
+
+    target = _resolve_identity(arguments.get("target"), role="target", read=read)
+    if not isinstance(target.object, str) or not _PLUGIN_GUID.fullmatch(target.object):
+        raise OperationContractError(
+            "INVALID_READBACK",
+            "object.createPlugin target must resolve to a canonical Wwise GUID.",
+            details={"target": target.as_dict()},
+        )
+    target_type = target.row.get("type")
+    if not isinstance(target_type, str) or not target_type:
+        raise OperationContractError(
+            "INVALID_READBACK",
+            "object.createPlugin target readback must expose a type.",
+            details={"target": target.as_dict()},
+        )
+
+    property_metadata: list[dict[str, Any]] = []
+    for metadata_request in plugin_property_metadata_requests(descriptor):
+        raw_args = metadata_request["args"]
+        info = _read_property_info(
+            read,
+            class_id=descriptor.class_id,
+            name=str(raw_args["property"]),
+        )
+        property_metadata.append(info.as_dict())
+
+    plugin_prestate = _read_plugin_prestate(
+        version=request.version,
+        target_id=target.object,
+        descriptor=descriptor,
+        read=read,
+    )
+    fixed_effects = (
+        plugin_prestate.get("fixed_effects")
+        if plugin_prestate.get("kind") == "fixed_effect_references"
+        else None
+    )
+    try:
+        plugin_plan = build_plugin_creation_plan(
+            version=request.version,
+            target_id=target.object,
+            target_type=target_type,
+            request=descriptor,
+            property_metadata=property_metadata or None,
+            effect_slots_2022=(
+                fixed_effects
+                if isinstance(fixed_effects, Mapping)
+                else None
+            ),
+        )
+    except PluginOperationContractError as exc:
+        _raise_plugin_operation_error(exc)
+
+    plan_payload = plugin_plan.as_dict()
+    preview = _closed_operation_preview(
+        uri=OBJECT_SET_URI,
+        args=plugin_plan.dispatch_args,
+        options={},
+        version=request.version,
+        family="object-mutation",
+        metadata={
+            "closed_plugin_creation": True,
+            "plugin_kind": descriptor.kind,
+            "plugin_class_id": descriptor.class_id,
+            "placement": dict(plugin_plan.placement),
+            "create_only": True,
+            "raw_replace_all_allowed": False,
+        },
+    )
+    preexisting_ids = plugin_prestate["preexisting_plugin_ids"]
+    guard = {
+        "version": request.version,
+        "target_id": target.object,
+        "target_type": target_type,
+        "descriptor": descriptor.as_dict(),
+        "plan": plan_payload,
+        "snapshot": plugin_prestate,
+        "property_metadata": property_metadata,
+    }
+    verification: dict[str, Any] = {
+        "kind": "object-plugin-created",
+        "version": request.version,
+        "target_id": target.object,
+        "target_type": target_type,
+        "descriptor": descriptor.as_dict(),
+        "placement": dict(plugin_plan.placement),
+        "preexisting_plugin_ids": list(preexisting_ids),
+        "property_validation": [
+            item.as_dict() for item in plugin_plan.validated_properties
+        ],
+        "readback_fields": list(plugin_verification_fields(descriptor)),
+        "readback_view": {
+            "language": descriptor.language,
+            "platform": descriptor.platform,
+        },
+    }
+    if plugin_prestate["kind"] == "fixed_effect_references":
+        verification["pre_effect_references"] = dict(
+            plugin_prestate["fixed_effects"]
+        )
+    elif plugin_prestate["kind"] == "effect_slots":
+        verification["preexisting_effect_slot_ids"] = [
+            str(row["id"])
+            for row in plugin_prestate["effect_slots"]
+        ]
+    cleanup = {
+        "kind": "delete-created-plugin-after-fresh-preview",
+        "description": (
+            "Cleanup may delete only the verified returned plug-in GUID after "
+            "a separate fresh destructive preview."
+        ),
+        "automatic": False,
+        "automatic_retry": False,
+        "source": "verification_result.plugin.id",
+    }
+    return (
+        preview,
+        {"target": target},
+        {"plugin_creation_guard": guard},
+        verification,
+        cleanup,
+    )
+
+
 def _prepare_object_set(
     request: OperationRequest,
     *,
@@ -1850,6 +3074,11 @@ def _prepare_object_set(
     for index, item in enumerate(raw_objects):
         merge_child_snapshots: list[dict[str, Any]] = []
         target = _resolve_identity(item.get("object"), role=f"objects[{index}].object", read=read)
+        platform = (
+            _non_empty_string(item.get("platform"), field=f"objects[{index}].platform")
+            if "platform" in item
+            else None
+        )
         target_key = _identity_key(target.object)
         previous_index = resolved_target_ids.get(target_key)
         if previous_index is not None:
@@ -1889,10 +3118,13 @@ def _prepare_object_set(
             "canonical_type": target.row.get("type"),
             "notes_supplied": "notes" in item,
             "requested_notes": item.get("notes"),
+            "platform": platform,
             "properties": [],
             "references": [],
         }
         trusted: dict[str, Any] = {"object": target.object}
+        if platform is not None:
+            trusted["platform"] = platform
         property_info_by_name: dict[str, PropertyInfoMetadataRecord] = {}
         derived_target_properties: dict[str, Any] = {}
         if "notes" in item:
@@ -1903,6 +3135,13 @@ def _prepare_object_set(
         for descriptor in properties:
             info = _read_property_info(read, object_id=target.object, name=descriptor.name)
             _require_object_property_value(info, descriptor.value)
+            if platform is not None:
+                _require_platform_field_enabled(
+                    read,
+                    object_id=target.object,
+                    field_name=descriptor.name,
+                    platform=platform,
+                )
             property_info_by_name[descriptor.name.casefold()] = info
             trusted[f"@{descriptor.name}"] = descriptor.value
             target_spec["properties"].append(
@@ -1911,6 +3150,13 @@ def _prepare_object_set(
         for descriptor in references:
             info = _read_property_info(read, object_id=target.object, name=descriptor.name)
             _require_object_reference_metadata(info)
+            if platform is not None:
+                _require_platform_field_enabled(
+                    read,
+                    object_id=target.object,
+                    field_name=descriptor.name,
+                    platform=platform,
+                )
             activation_properties = _apply_reference_activation_dependencies(
                 info,
                 read=read,
@@ -2022,10 +3268,22 @@ def _prepare_object_set(
                 *(row["name"] for row in target_spec["references"]),
             ]
         )
-        snapshot_rows = _read_object_id_rows(target.object, fields=snapshot_fields, read=read)
+        snapshot_args = {"from": {"id": [target.object]}}
+        snapshot_options: dict[str, Any] = {"return": list(snapshot_fields)}
+        if platform is not None:
+            snapshot_options["platform"] = platform
+        snapshot_result = read(OBJECT_GET_URI, snapshot_args, snapshot_options)
+        snapshot_rows = _rows(snapshot_result)
         if len(snapshot_rows) != 1:
             raise OperationContractError("INVALID_READBACK", "object.set pre-state target must resolve exactly once.")
-        field_snapshots.append({"object_id": target.object, "fields": snapshot_fields, "rows": snapshot_rows})
+        field_snapshots.append(
+            {
+                "object_id": target.object,
+                "fields": snapshot_fields,
+                "platform": platform,
+                "rows": snapshot_rows,
+            }
+        )
         target_spec["pre_state"] = snapshot_rows[0]
         child_rows = _read_direct_children(target.object, fields=IDENTITY_RETURN_FIELDS, read=read)
         children_snapshots.append(
@@ -2082,6 +3340,291 @@ def _prepare_object_set(
         "partial_success_possible": len(raw_objects) > 1,
     }
     return preview, roles, {"object_graph_guard": graph_guard, "object_set_nodes": node_specs}, verification, cleanup
+
+
+def _prepare_object_set_linked(
+    request: OperationRequest,
+    *,
+    arguments: Mapping[str, Any],
+    read: ReadCall,
+) -> tuple[SemanticPreview, dict[str, ResolvedObject], dict[str, Any], dict[str, Any], dict[str, Any]]:
+    target = _resolve_identity(arguments.get("object"), role="object", read=read)
+    field_name = _non_empty_string(arguments.get("property"), field="property")
+    platform = _non_empty_string(arguments.get("platform"), field="platform")
+    linked = arguments.get("linked")
+    if not isinstance(linked, bool):
+        raise OperationContractError("INVALID_ARGUMENT", "object.setLinked linked must be a JSON boolean.")
+    info = _read_property_info(read, object_id=target.object, name=field_name)
+    if info.supports.get("unlink") is not True:
+        raise OperationContractError(
+            "LINK_UNSUPPORTED",
+            "Live property metadata does not support platform link/unlink for this field.",
+            details={"field": field_name, "supports": dict(info.supports)},
+        )
+    before_result = read(
+        OBJECT_IS_LINKED_URI,
+        {"object": target.object, "property": field_name, "platform": platform},
+        {},
+    )
+    before = before_result.get("linked") if isinstance(before_result, Mapping) else None
+    if not isinstance(before, bool):
+        raise OperationContractError(
+            "INVALID_READBACK",
+            "object.isLinked must return one linked boolean.",
+            details={"result": before_result},
+        )
+    if before is linked:
+        raise OperationContractError(
+            "NO_OP",
+            "object.setLinked already matches the requested link state.",
+            details={"field": field_name, "platform": platform, "linked": linked},
+        )
+    dispatch_args = {
+        "object": target.object,
+        "property": field_name,
+        "platform": platform,
+        "linked": linked,
+    }
+    preview = _closed_operation_preview(
+        uri=OBJECT_SET_LINKED_URI,
+        args=dispatch_args,
+        options={},
+        version=request.version,
+        family="property-reference",
+        metadata={
+            "closed_platform_link": True,
+            "field_info": info.as_dict(),
+            "linked_before": before,
+        },
+    )
+    pre_state = {
+        "linked_before": {
+            "object_id": target.object,
+            "property": field_name,
+            "platform": platform,
+            "linked": before,
+        }
+    }
+    verification = {
+        "kind": "object-linked-state",
+        "version": request.version,
+        "object_id": target.object,
+        "property": field_name,
+        "platform": platform,
+        "expected_linked": linked,
+    }
+    cleanup = {
+        "kind": "restore-platform-link-state",
+        "automatic": False,
+        "automatic_retry": False,
+        "snapshot": dict(pre_state["linked_before"]),
+    }
+    return preview, {"object": target}, pre_state, verification, cleanup
+
+
+def _prepare_object_set_rtpc(
+    request: OperationRequest,
+    *,
+    arguments: Mapping[str, Any],
+    read: ReadCall,
+) -> tuple[SemanticPreview, dict[str, ResolvedObject], dict[str, Any], dict[str, Any], dict[str, Any]]:
+    target = _resolve_identity(arguments.get("object"), role="object", read=read)
+    control = _resolve_identity(arguments.get("control_input"), role="control_input", read=read)
+    if not _is_rtpc_control_input(control.row.get("type")):
+        raise OperationContractError(
+            "INVALID_CONTROL_INPUT_TYPE",
+            "RTPC ControlInput must resolve to a GameParameter, MIDI parameter, or Modulator object.",
+            details={"control_input": control.as_dict()},
+        )
+    descriptor_payload = {
+        "property": arguments.get("property"),
+        "control_input": arguments.get("control_input"),
+        "points": arguments.get("points"),
+        **({"notes": arguments.get("notes")} if "notes" in arguments else {}),
+    }
+    try:
+        descriptors = normalize_rtpc_descriptors(
+            [descriptor_payload],
+            request_path="$.arguments.rtpcs",
+            max_rtpcs=1,
+        )
+    except ObjectOperationContractError as exc:
+        raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+    descriptor = descriptors[0]
+    info = _read_property_info(read, object_id=target.object, name=descriptor.property)
+    rtpc_support = info.supports.get("rtpc")
+    if not isinstance(rtpc_support, str) or rtpc_support.casefold() == "none":
+        raise OperationContractError(
+            "RTPC_UNSUPPORTED",
+            "Live property metadata does not support an RTPC for this field.",
+            details={"property": descriptor.property, "supports": dict(info.supports)},
+        )
+    mode = str(arguments.get("mode", "add_or_replace"))
+    if mode not in {"add", "add_or_replace"}:
+        raise OperationContractError(
+            "INVALID_ARGUMENT",
+            "object.setRTPC mode must be add or add_or_replace.",
+            details={"mode": mode},
+        )
+    before_rows = _read_rtpc_rows(target.object, read=read)
+    matches = [
+        row
+        for row in before_rows
+        if row.get("@PropertyName") == descriptor.property
+        and _same_identity(
+            _reference_identity(row.get("@ControlInput")),
+            control.object,
+        )
+    ]
+    if len(matches) > 1:
+        raise OperationContractError(
+            "AMBIGUOUS_RTPC",
+            "More than one RTPC matches the requested property and ControlInput.",
+            details={
+                "property": descriptor.property,
+                "control_input": control.object,
+                "matches": matches,
+            },
+        )
+    if mode == "add" and matches:
+        raise OperationContractError(
+            "TARGET_EXISTS",
+            "object.setRTPC add requires the property/ControlInput pair to be absent.",
+            details={"property": descriptor.property, "control_input": control.object},
+        )
+
+    action = "update" if matches else "add"
+    if action == "add":
+        if len(before_rows) >= RTPC_MAX_LIST_ROWS:
+            raise OperationContractError(
+                "RTPC_LIST_LIMIT_EXCEEDED",
+                "Adding an RTPC would exceed the reviewed complete-list limit.",
+                details={
+                    "count": len(before_rows),
+                    "limit": RTPC_MAX_LIST_ROWS,
+                    "requested_action": action,
+                },
+            )
+        dispatch_row = {
+            "object": target.object,
+            "@RTPC": [
+                materialize_waapi_rtpc(
+                    descriptor,
+                    resolved_control_input=control.object,
+                )
+            ],
+        }
+    else:
+        existing_id = matches[0].get("id")
+        if not _valid_object_id(existing_id):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "The matching RTPC row lacks a canonical GUID.",
+                details={"row": matches[0]},
+            )
+        dispatch_row = {
+            "object": existing_id,
+            "@Curve": {
+                "type": "Curve",
+                "points": [point.as_dict() for point in descriptor.points],
+            },
+        }
+        if descriptor.notes is not None:
+            dispatch_row["notes"] = descriptor.notes
+
+    dispatch_args = {
+        "objects": [dispatch_row],
+        "onNameConflict": "fail",
+        "listMode": "append",
+        "autoAddToSourceControl": False,
+    }
+    preview = _closed_operation_preview(
+        uri=OBJECT_SET_URI,
+        args=dispatch_args,
+        options={"return": ["id", "name", "type", "path", "@RTPC", "@Curve"]},
+        version=request.version,
+        family="object-mutation",
+        metadata={
+            "closed_rtpc_operation": True,
+            "action": action,
+            "mode": mode,
+            "property_info": info.as_dict(),
+            "rtpc_support": rtpc_support,
+            "raw_replace_all_allowed": False,
+        },
+    )
+    rtpc_snapshot = {
+        "object_id": target.object,
+        "fields": list(RTPC_SNAPSHOT_FIELDS),
+        "rows": before_rows,
+    }
+    verification = {
+        "kind": "object-rtpc-state",
+        "version": request.version,
+        "object_id": target.object,
+        "action": action,
+        "existing_rtpc_id": matches[0].get("id") if matches else None,
+        "property": descriptor.property,
+        "control_input_id": control.object,
+        "points": [point.as_dict() for point in descriptor.points],
+        "notes_supplied": descriptor.notes is not None,
+        "expected_notes": descriptor.notes,
+        "before_rows": before_rows,
+    }
+    cleanup = {
+        "kind": "restore-rtpc-snapshot-or-discard-owned-sandbox",
+        "automatic": False,
+        "automatic_retry": False,
+        "action": action,
+        "snapshot": rtpc_snapshot,
+    }
+    return (
+        preview,
+        {"object": target, "control_input": control},
+        {"rtpc_snapshot": rtpc_snapshot},
+        verification,
+        cleanup,
+    )
+
+
+def _read_rtpc_rows(object_id: Any, *, read: ReadCall) -> list[dict[str, Any]]:
+    result = read(
+        OBJECT_GET_URI,
+        {
+            "from": {"id": [object_id]},
+            "transform": [{"select": ["@RTPC"]}],
+        },
+        {"return": list(RTPC_SNAPSHOT_FIELDS)},
+    )
+    rows = _rows(result)
+    if len(rows) > RTPC_MAX_LIST_ROWS:
+        raise OperationContractError(
+            "RTPC_LIST_LIMIT_EXCEEDED",
+            "The target RTPC list exceeds the reviewed snapshot limit.",
+            details={"count": len(rows), "limit": RTPC_MAX_LIST_ROWS},
+        )
+    if not all(
+        _valid_object_id(row.get("id"))
+        and row.get("type") == "RTPC"
+        and isinstance(row.get("@PropertyName"), str)
+        and _valid_object_id(_reference_identity(row.get("@ControlInput")))
+        and isinstance(row.get("@Curve"), Mapping)
+        and isinstance(row["@Curve"].get("points"), list)
+        for row in rows
+    ):
+        raise OperationContractError(
+            "INVALID_READBACK",
+            "The complete RTPC list snapshot contains an unrecognized row.",
+            details={"rows": rows},
+        )
+    return rows
+
+
+def _is_rtpc_control_input(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    token = re.sub(r"[^a-z0-9]", "", value.casefold())
+    return token in RTPC_CONTROL_INPUT_TYPE_TOKENS
 
 
 def _read_object_type_catalog(read: ReadCall) -> tuple[ObjectTypeMetadataRecord, ...]:
@@ -2225,10 +3768,37 @@ def _read_property_info(
     return info
 
 
+def _require_platform_field_enabled(
+    read: ReadCall,
+    *,
+    object_id: Any,
+    field_name: str,
+    platform: str,
+) -> None:
+    result = read(
+        OBJECT_IS_PROPERTY_ENABLED_URI,
+        {"object": object_id, "property": field_name, "platform": platform},
+        {},
+    )
+    enabled = result.get("return") if isinstance(result, Mapping) else None
+    if not isinstance(enabled, bool):
+        raise OperationContractError(
+            "INVALID_READBACK",
+            "isPropertyEnabled must return one boolean for an explicit platform.",
+            details={"field": field_name, "platform": platform, "result": result},
+        )
+    if not enabled:
+        raise OperationContractError(
+            "PROPERTY_DISABLED_FOR_PLATFORM",
+            "The requested property or reference is disabled for the explicit platform.",
+            details={"field": field_name, "platform": platform},
+        )
+
+
 def _require_object_property_value(metadata: PropertyInfoMetadataRecord, value: Any) -> None:
     property_type = metadata.type.casefold()
     if property_type in {"real32", "real64", "float", "double"}:
-        valid = not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(float(value))
+        valid = _is_finite_waapi_number(value)
     elif property_type in {"int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64", "integer"}:
         valid = not isinstance(value, bool) and isinstance(value, int)
     elif property_type in {"bool", "boolean"}:
@@ -2262,6 +3832,20 @@ def _require_object_property_value(metadata: PropertyInfoMetadataRecord, value: 
                 "Property value is not one of the live metadata enum values.",
                 details={"property": metadata.name, "value": value, "allowed": allowed},
             )
+
+
+def _is_finite_waapi_number(value: Any) -> bool:
+    """Return whether a JSON number has one finite WAAPI double representation."""
+
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    if isinstance(value, float):
+        return math.isfinite(value)
+    try:
+        converted = float(value)
+    except (OverflowError, ValueError):
+        return False
+    return math.isfinite(converted)
 
 
 def _require_object_reference_metadata(metadata: PropertyInfoMetadataRecord) -> None:
@@ -2807,8 +4391,48 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             execution_contract,
         )
         metadata["execution_contract"] = execution_contract
+    elif request.operation in {
+        "lua.executeCliFile",
+        "lua.executeCoreFile",
+        "lua.executeCoreInline",
+    }:
+        preview, workflow_state, verification, cleanup = _prepare_lua_execution(
+            request,
+            arguments=arguments,
+        )
+        metadata.update(workflow_state)
+    elif request.operation in {"debug.setAsserts", "debug.setAutomationMode"}:
+        preview, workflow_state, verification, cleanup = _prepare_debug_mode_change(
+            request,
+            arguments=arguments,
+        )
+        metadata.update(workflow_state)
+    elif request.operation in {
+        "debug.restartWaapiServers",
+        "debug.testAssert",
+        "debug.testCrash",
+    }:
+        preview, workflow_state, verification, cleanup = _prepare_debug_host_control(
+            request,
+            arguments=arguments,
+        )
+        metadata.update(workflow_state)
     elif request.operation == "object.create":
         preview, workflow_roles, workflow_state, verification, cleanup = _prepare_object_create(
+            request,
+            arguments=arguments,
+            read=read,
+        )
+        roles.update(workflow_roles)
+        metadata.update(workflow_state)
+    elif request.operation == "object.createPlugin":
+        (
+            preview,
+            workflow_roles,
+            workflow_state,
+            verification,
+            cleanup,
+        ) = _prepare_object_create_plugin(
             request,
             arguments=arguments,
             read=read,
@@ -2823,6 +4447,36 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         )
         roles.update(workflow_roles)
         metadata.update(workflow_state)
+    elif request.operation == "object.setLinked":
+        preview, workflow_roles, workflow_state, verification, cleanup = _prepare_object_set_linked(
+            request,
+            arguments=arguments,
+            read=read,
+        )
+        roles.update(workflow_roles)
+        metadata.update(workflow_state)
+    elif request.operation == "object.setRTPC":
+        preview, workflow_roles, workflow_state, verification, cleanup = _prepare_object_set_rtpc(
+            request,
+            arguments=arguments,
+            read=read,
+        )
+        roles.update(workflow_roles)
+        metadata.update(workflow_state)
+    elif request.operation in UI_COMMAND_OPERATIONS:
+        preview, workflow_state, verification, cleanup = (
+            _prepare_ui_command_operation(
+                request,
+                arguments=arguments,
+                read=read,
+            )
+        )
+        metadata.update(workflow_state)
+    elif request.operation == "ui.captureScreen":
+        preview, verification, cleanup = _prepare_ui_capture_screen(
+            request,
+            arguments=arguments,
+        )
     elif request.operation == "object.delete":
         target = _resolve_identity(arguments["object"], role="object", read=read)
         _reject_protected_delete(target)
@@ -2856,6 +4510,11 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         roles["object"] = source
         field_name = "property" if request.operation == "object.setProperty" else "reference"
         field_value = _non_empty_string(arguments[field_name], field=field_name)
+        platform = (
+            _non_empty_string(arguments.get("platform"), field="platform")
+            if "platform" in arguments
+            else None
+        )
         info_payload = read(
             GET_PROPERTY_INFO_URI,
             {"object": source.object, "property": field_value},
@@ -2863,10 +4522,20 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         )
         info = parse_get_property_info_result(info_payload)
         metadata["field_info"] = info.as_dict()
+        if platform is not None:
+            _require_platform_field_enabled(
+                read,
+                object_id=source.object,
+                field_name=field_value,
+                platform=platform,
+            )
         field_before_result = read(
             OBJECT_GET_URI,
             {"from": {"id": [source.object]}},
-            {"return": ["id", "path", field_value]},
+            {
+                "return": ["id", "path", field_value],
+                **({"platform": platform} if platform is not None else {}),
+            },
         )
         field_before_rows = _rows(field_before_result)
         if len(field_before_rows) != 1:
@@ -2878,6 +4547,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         metadata["field_before"] = {
             "field": field_value,
             "value": _field_value(field_before_rows[0], field_value),
+            "platform": platform,
             "row": field_before_rows[0],
         }
         if request.operation == "object.setProperty":
@@ -2887,6 +4557,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 value=arguments["value"],
                 property_info=info,
                 property_enabled=None,
+                platform=platform,
             )
             verification = {
                 "kind": "same-guid-property",
@@ -2894,6 +4565,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 "field": field_value,
                 "expected_value": arguments["value"],
                 "metadata_type": info.type,
+                "platform": platform,
             }
         else:
             target = _resolve_identity(arguments["target"], role="target", read=read)
@@ -2904,12 +4576,14 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 reference=field_value,
                 target=target,
                 reference_info=info,
+                platform=platform,
             )
             verification = {
                 "kind": "same-guid-reference",
                 "object_id": source.object,
                 "field": field_value,
                 "expected_target_id": target.object,
+                "platform": platform,
             }
         cleanup = {"kind": "restore-pre-state", "snapshot": dict(source.row), "field_metadata": info.as_dict()}
     elif request.operation == "audio.import":
@@ -2971,6 +4645,473 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
     )
 
 
+def _prepare_ui_command_operation(
+    request: OperationRequest,
+    *,
+    arguments: Mapping[str, Any],
+    read: ReadCall,
+) -> tuple[SemanticPreview, dict[str, Any], dict[str, Any], dict[str, Any]]:
+    host_platform: str | None = None
+    live_host_info: dict[str, Any] | None = None
+    if request.operation == "ui.commands.register" or (
+        request.operation == "ui.commands.unregister"
+        and "commands" in arguments
+    ):
+        live_host_info = dict(read(GET_INFO_URI, {}, {}))
+        host_platform = _ui_command_host_platform(live_host_info)
+    plan = _build_ui_command_operation_plan(
+        request,
+        arguments=arguments,
+        host_platform=host_platform,
+    )
+    dispatch = plan["dispatch"]
+    preview = SemanticPreview(
+        envelope=SemanticEnvelope(
+            uri=str(dispatch["uri"]),
+            args=dict(dispatch["arguments"]),
+            options=dict(dispatch["options"]),
+            metadata={
+                "authoring_host_required": True,
+                "host_platform_source": (
+                    "live ak.wwise.core.getInfo.platform"
+                    if host_platform is not None
+                    else None
+                ),
+                "model_authored_code": False,
+                "ui_command_plan_sha256": plan["plan_sha256"],
+            },
+        ),
+        source_note_family="authoring-ui-command",
+        version=request.version,
+        requires_destructive_gate=True,
+        raw_dispatch_allowed=False,
+    )
+    state: dict[str, Any] = {"ui_command_plan": plan}
+    if live_host_info is not None:
+        state["ui_command_live_host"] = {
+            "isCommandLine": live_host_info.get("isCommandLine"),
+            "platform": live_host_info.get("platform"),
+            "mapped_host_platform": host_platform,
+        }
+    verification = {
+        "kind": "ui-command-plan",
+        "plan": plan,
+        "version": request.version,
+        "business_state_verified": request.operation
+        in {"ui.commands.register", "ui.commands.unregister"},
+    }
+    return preview, state, verification, dict(plan["cleanup"])
+
+
+def _build_ui_command_operation_plan(
+    request: OperationRequest,
+    *,
+    arguments: Mapping[str, Any],
+    host_platform: str | None = None,
+) -> dict[str, Any]:
+    try:
+        if request.operation == "ui.commands.execute":
+            optional: dict[str, Any] = {}
+            for field_name in ("objects", "platforms", "value", "files"):
+                if field_name in arguments:
+                    optional[field_name] = arguments[field_name]
+            plan = build_ui_command_execute_plan(
+                version=request.version,
+                command=arguments.get("command"),
+                **optional,
+            )
+        elif request.operation == "ui.commands.register":
+            if host_platform is None:
+                raise OperationContractError(
+                    "HOST_PLATFORM_UNAVAILABLE",
+                    "ui.commands.register requires a platform derived from live getInfo.",
+                )
+            plan = build_ui_commands_register_plan(
+                version=request.version,
+                host_platform=host_platform,
+                commands=arguments.get("commands"),
+                source_authority=arguments.get("source_authority"),
+            )
+        elif request.operation == "ui.commands.unregister":
+            if "commands" in arguments:
+                if host_platform is None:
+                    raise OperationContractError(
+                        "HOST_PLATFORM_UNAVAILABLE",
+                        "Descriptor-backed ui.commands.unregister requires a platform derived from live getInfo.",
+                    )
+                plan = build_ui_commands_unregister_descriptors_plan(
+                    version=request.version,
+                    host_platform=host_platform,
+                    commands=arguments.get("commands"),
+                    source_authority=arguments.get("source_authority"),
+                )
+            else:
+                plan = build_ui_commands_unregister_existing_plan(
+                    version=request.version,
+                    command_ids=arguments.get("command_ids"),
+                    acknowledgement=arguments.get("acknowledgement"),
+                )
+        else:  # pragma: no cover - the public operation registry is closed.
+            raise OperationContractError(
+                "UNKNOWN_OPERATION",
+                f"Unknown UI-command operation {request.operation!r}.",
+            )
+    except UiCommandContractError as exc:
+        raise OperationContractError(
+            exc.error_code,
+            str(exc),
+            details=exc.details,
+        ) from exc
+    return validate_ui_command_plan(plan)
+
+
+def _ui_command_host_platform(live_info: Mapping[str, Any]) -> str:
+    if live_info.get("isCommandLine") is not False:
+        raise OperationContractError(
+            "AUTHORING_HOST_REQUIRED",
+            "Wwise Authoring UI commands require a live Authoring host, not WwiseConsole.",
+            details={
+                "is_command_line": live_info.get("isCommandLine"),
+                "required_host": "wwise-authoring",
+            },
+        )
+    platform = live_info.get("platform")
+    if not isinstance(platform, str):
+        raise OperationContractError(
+            "HOST_PLATFORM_UNAVAILABLE",
+            "Wwise Authoring getInfo did not return a usable platform.",
+            details={"platform": platform, "supported": ["x64", "win32", "macosx"]},
+        )
+    normalized = platform.strip().casefold()
+    mapped = {
+        "x64": "windows",
+        "win32": "windows",
+        "macosx": "macos",
+    }.get(normalized)
+    if mapped is None:
+        raise OperationContractError(
+            "HOST_PLATFORM_UNAVAILABLE",
+            "Wwise Authoring reported a platform that the closed command-registration adapter does not support.",
+            details={
+                "platform": platform,
+                "supported": ["x64", "win32", "macosx"],
+            },
+        )
+    return mapped
+
+
+def _prepare_lua_execution(
+    request: OperationRequest,
+    *,
+    arguments: Mapping[str, Any],
+) -> tuple[SemanticPreview, dict[str, Any], dict[str, Any], dict[str, Any]]:
+    try:
+        if request.operation in {"lua.executeCliFile", "lua.executeCoreFile"}:
+            source_proof = seal_isolated_lua_file(
+                arguments.get("script_file"),
+                io_root=arguments.get("io_root"),
+                source_authority=arguments.get("source_authority"),
+            )
+            reserved = (
+                CLI_LUA_RESERVED_FIELDS
+                if request.operation == "lua.executeCliFile"
+                else CORE_LUA_RESERVED_FIELDS
+            )
+            wa_args = normalize_lua_wa_args(
+                arguments.get("wa_args"),
+                reserved_fields=reserved,
+            )
+            dispatch_args: dict[str, Any] = dict(wa_args)
+            dispatch_args[
+                "lua-script"
+                if request.operation == "lua.executeCliFile"
+                else "luaScript"
+            ] = source_proof["file"]["path"]
+            if "watchdog_seconds" in arguments:
+                watchdog = arguments.get("watchdog_seconds")
+                if (
+                    request.operation != "lua.executeCliFile"
+                    or request.version not in {"2024.1", "2025.1"}
+                    or isinstance(watchdog, bool)
+                    or not isinstance(watchdog, int)
+                    or watchdog < 0
+                ):
+                    raise DebugLuaContractError(
+                        "UNAVAILABLE_IN_VERSION",
+                        "watchdog_seconds is accepted only as a non-negative integer in Wwise 2024.1-2025.1.",
+                        details={"version": request.version},
+                    )
+                dispatch_args["watchdog-timeout"] = watchdog
+        else:
+            source_proof = seal_inline_lua_source(
+                arguments.get("lua_code"),
+                io_root=arguments.get("io_root"),
+                source_authority=arguments.get("source_authority"),
+            )
+            wa_args = normalize_lua_wa_args(
+                arguments.get("wa_args"),
+                reserved_fields=CORE_LUA_RESERVED_FIELDS,
+            )
+            dispatch_args = {**wa_args, "luaString": arguments["lua_code"]}
+    except DebugLuaContractError as exc:
+        raise OperationContractError(
+            exc.error_code,
+            str(exc),
+            details=exc.details,
+        ) from exc
+
+    uri = (
+        CLI_EXECUTE_LUA_URI
+        if request.operation == "lua.executeCliFile"
+        else CORE_EXECUTE_LUA_URI
+    )
+    try:
+        io_audit = validate_isolated_io(
+            version=request.version,
+            uri=uri,
+            args=dispatch_args,
+            options={},
+            io_root=source_proof["io_root"],
+        ).as_dict()
+    except IOPolicyError as exc:
+        raise OperationContractError(
+            exc.error_code,
+            str(exc),
+            details={"io_policy": exc.as_dict()},
+        ) from exc
+    preview = _closed_operation_preview(
+        uri=uri,
+        args=dispatch_args,
+        options={},
+        version=request.version,
+        family="explicit-user-code",
+        metadata={
+            "explicit_user_lua": True,
+            "source_authority": LUA_SOURCE_AUTHORITY,
+            "source_kind": source_proof["kind"],
+            "source_sha256": (
+                source_proof["file"]["sha256"]
+                if source_proof["kind"] == "file"
+                else source_proof["sha256"]
+            ),
+            "io_audit": io_audit,
+            "automatic_retry": False,
+        },
+    )
+    state = {
+        "lua_source_proof": source_proof,
+        "lua_wa_args": wa_args,
+        "lua_io_audit": io_audit,
+        "implicit_side_effect_confinement": "not_proven",
+    }
+    verification = {
+        "kind": "result-schema",
+        "uri": uri,
+        "version": request.version,
+        "strategy": "explicit-user-lua-result-schema",
+        "business_state_verified": False,
+    }
+    cleanup = {
+        "kind": "none",
+        "automatic": False,
+        "automatic_retry": False,
+        "side_effects_reversible": False,
+        "note": (
+            "Lua may mutate project, runtime, UI, or filesystem state. The "
+            "gateway seals source provenance but cannot infer or roll back its effects."
+        ),
+    }
+    return preview, state, verification, cleanup
+
+
+def _prepare_debug_mode_change(
+    request: OperationRequest,
+    *,
+    arguments: Mapping[str, Any],
+) -> tuple[SemanticPreview, dict[str, Any], dict[str, Any], dict[str, Any]]:
+    enable = arguments.get("enable")
+    if not isinstance(enable, bool):
+        raise OperationContractError(
+            "INVALID_ARGUMENT",
+            f"{request.operation} enable must be a JSON boolean.",
+        )
+    uri = (
+        DEBUG_ENABLE_ASSERTS_URI
+        if request.operation == "debug.setAsserts"
+        else DEBUG_ENABLE_AUTOMATION_MODE_URI
+    )
+    preview = _closed_operation_preview(
+        uri=uri,
+        args={"enable": enable},
+        options={},
+        version=request.version,
+        family="debug-runtime",
+        metadata={
+            "process_wide_mode_change": True,
+            "state_readback_available": False,
+            "automatic_retry": False,
+        },
+    )
+    state = {
+        "debug_mode_request": {
+            "uri": uri,
+            "enable": enable,
+            "pre_state": "unavailable",
+        }
+    }
+    verification = {
+        "kind": "result-schema",
+        "uri": uri,
+        "version": request.version,
+        "strategy": "debug-mode-result-schema-only",
+        "business_state_verified": False,
+    }
+    cleanup = {
+        "kind": "manual-only",
+        "automatic": False,
+        "automatic_retry": False,
+        "inverse_call_promised": False,
+        "note": (
+            "The endpoint exposes no state getter. enableAsserts is ref-counted, "
+            "so an inverse call is not treated as verified rollback."
+        ),
+    }
+    return preview, state, verification, cleanup
+
+
+def _prepare_debug_host_control(
+    request: OperationRequest,
+    *,
+    arguments: Mapping[str, Any],
+) -> tuple[SemanticPreview, dict[str, Any], dict[str, Any], dict[str, Any]]:
+    contract = {
+        "debug.restartWaapiServers": {
+            "uri": DEBUG_RESTART_WAAPI_SERVERS_URI,
+            "acknowledge": "restart_waapi_servers",
+            "expected_disconnect": True,
+            "process_expectation": "wwise_process_remains_running_waapi_servers_restart",
+        },
+        "debug.testAssert": {
+            "uri": DEBUG_TEST_ASSERT_URI,
+            "acknowledge": "trigger_debug_assert",
+            "expected_disconnect": False,
+            "process_expectation": "assert_handler_or_dialog_is_host_build_dependent",
+        },
+        "debug.testCrash": {
+            "uri": DEBUG_TEST_CRASH_URI,
+            "acknowledge": "crash_wwise_process",
+            "expected_disconnect": True,
+            "process_expectation": "wwise_process_termination",
+        },
+    }[request.operation]
+    if arguments.get("acknowledge") != contract["acknowledge"]:
+        raise OperationContractError(
+            "DANGEROUS_HOST_CONTROL_ACKNOWLEDGEMENT_REQUIRED",
+            f"{request.operation} requires its exact immutable acknowledgement.",
+            details={
+                "expected": contract["acknowledge"],
+                "actual": arguments.get("acknowledge"),
+            },
+        )
+    preview = _closed_operation_preview(
+        uri=str(contract["uri"]),
+        args={},
+        options={},
+        version=request.version,
+        family="dangerous-host-control",
+        metadata={
+            "dangerous_host_control": True,
+            "acknowledgement": contract["acknowledge"],
+            "expected_disconnect": contract["expected_disconnect"],
+            "process_expectation": contract["process_expectation"],
+            "automatic_retry": False,
+        },
+    )
+    state = {
+        "host_control": {
+            "operation": request.operation,
+            **contract,
+            "process_observation": "not_performed_by_gateway",
+        }
+    }
+    verification = {
+        "kind": "host-control-terminal",
+        "uri": contract["uri"],
+        "version": request.version,
+        "expected_disconnect": contract["expected_disconnect"],
+        "process_expectation": contract["process_expectation"],
+        "generic_verify_allowed": False,
+        "business_state_verified": False,
+    }
+    cleanup = {
+        "kind": "none",
+        "automatic": False,
+        "automatic_retry": False,
+        "reconnect": False,
+        "process_cleanup": False,
+    }
+    return preview, state, verification, cleanup
+
+
+def _prepare_ui_capture_screen(
+    request: OperationRequest,
+    *,
+    arguments: Mapping[str, Any],
+) -> tuple[SemanticPreview, dict[str, Any], dict[str, Any]]:
+    dispatch_args: dict[str, Any] = {}
+    if "view_name" in arguments:
+        dispatch_args["viewName"] = _non_empty_string(
+            arguments.get("view_name"),
+            field="view_name",
+        )
+    if "view_channel" in arguments:
+        channel = arguments.get("view_channel")
+        if isinstance(channel, bool) or not isinstance(channel, int) or not 1 <= channel <= 4:
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "ui.captureScreen view_channel must be an integer from 1 through 4.",
+            )
+        dispatch_args[
+            "viewSyncGroup"
+            if request.version == "2021.1"
+            else "viewSelectionChannel"
+        ] = channel
+    if "rect" in arguments:
+        rect = arguments.get("rect")
+        if not isinstance(rect, Mapping):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "ui.captureScreen rect must be a JSON object.",
+            )
+        dispatch_args["rect"] = dict(rect)
+    preview = _closed_operation_preview(
+        uri="ak.wwise.ui.captureScreen",
+        args=dispatch_args,
+        options={},
+        version=request.version,
+        family="ui",
+        metadata={
+            "stable_request_adapter": True,
+            "view_channel_wire_field": (
+                "viewSyncGroup"
+                if request.version == "2021.1"
+                else "viewSelectionChannel"
+            ),
+        },
+    )
+    verification = {
+        "kind": "ui-capture-screen-result",
+        "version": request.version,
+        "max_base64_chars": 1024 * 1024,
+    }
+    cleanup = {
+        "kind": "none",
+        "automatic": False,
+        "automatic_retry": False,
+    }
+    return preview, verification, cleanup
+
+
 def _prepare_audio_import(
     request: OperationRequest,
     *,
@@ -2984,6 +5125,9 @@ def _prepare_audio_import(
             raw_imports,
             version=request.version,
             import_operation=str(operation),
+            auto_check_out_to_source_control=arguments.get(
+                "auto_check_out_to_source_control"
+            ),
         )
     except ImportContractError as exc:
         raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
@@ -3013,6 +5157,9 @@ def _prepare_audio_import_tab_delimited(
             import_location=location_path,
             import_language=str(arguments.get("import_language")),
             import_operation=str(arguments.get("import_operation", "createNew")),
+            auto_check_out_to_source_control=arguments.get(
+                "auto_check_out_to_source_control"
+            ),
         )
     except ImportContractError as exc:
         raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
@@ -3520,6 +5667,41 @@ def _prepare_closed_import_plan(
     dispatch_args = plan.get("dispatch_args")
     if not isinstance(oracle, Mapping) or not isinstance(policy, Mapping) or not isinstance(dispatch_args, Mapping):
         raise OperationContractError("INVALID_PREVIEW", "Closed import plan is malformed.")
+    auto_check_out_supported = (
+        request.version in AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS
+    )
+    auto_check_out_dispatched = "autoCheckOutToSourceControl" in dispatch_args
+    if dispatch_args.get("autoAddToSourceControl") is not False:
+        raise OperationContractError(
+            "INVALID_PREVIEW",
+            "Closed import plans must keep autoAddToSourceControl disabled.",
+        )
+    if auto_check_out_dispatched != auto_check_out_supported:
+        raise OperationContractError(
+            "INVALID_PREVIEW",
+            "Closed import auto-check-out dispatch does not match the Wwise version boundary.",
+            details={
+                "version": request.version,
+                "field_dispatched": auto_check_out_dispatched,
+                "supported": auto_check_out_supported,
+            },
+        )
+    if auto_check_out_dispatched and type(
+        dispatch_args.get("autoCheckOutToSourceControl")
+    ) is not bool:
+        raise OperationContractError(
+            "INVALID_PREVIEW",
+            "Closed import autoCheckOutToSourceControl must be a JSON boolean.",
+        )
+    source_control_policy = {
+        "auto_add_to_source_control": False,
+        "auto_check_out_to_source_control": dispatch_args.get(
+            "autoCheckOutToSourceControl",
+            False,
+        ),
+        "auto_check_out_to_source_control_supported": auto_check_out_supported,
+        "auto_check_out_to_source_control_dispatched": auto_check_out_dispatched,
+    }
     raw_targets = oracle.get("targets")
     if not isinstance(raw_targets, list) or not all(isinstance(row, Mapping) for row in raw_targets):
         raise OperationContractError("INVALID_PREVIEW", "Closed import target oracle is malformed.")
@@ -3974,6 +6156,7 @@ def _prepare_closed_import_plan(
             "import_operation": import_operation,
             "target_count": len(targets),
             "caller_expected_rows_accepted": False,
+            "source_control_policy": source_control_policy,
             "preflight_consumed_fields": preflight_consumed_fields,
             **(
                 {
@@ -5335,6 +7518,200 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             "assertions": [_json_mapping(item) for item in assertions],
             "readbacks": [],
         }
+    if operation in UI_COMMAND_OPERATIONS:
+        request_payload = prepared.get("request")
+        dispatch_payload = prepared.get("dispatch")
+        pre_state = prepared.get("pre_state")
+        if (
+            not isinstance(request_payload, Mapping)
+            or not isinstance(dispatch_payload, Mapping)
+            or not isinstance(pre_state, Mapping)
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                f"{operation} preview lacks request, dispatch, or UI-command plan evidence.",
+            )
+        stored_plan = pre_state.get("ui_command_plan")
+        if not isinstance(stored_plan, Mapping):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                f"{operation} preview lacks its sealed UI-command plan.",
+            )
+        replay_request = parse_operation_request(request_payload)
+        host_platform: str | None = None
+        if operation == "ui.commands.register" or (
+            operation == "ui.commands.unregister"
+            and "commands" in replay_request.arguments
+        ):
+            host_result = read_call(GET_INFO_URI, {}, {})
+            if not isinstance(host_result, Mapping):
+                raise OperationContractError(
+                    "INVALID_READBACK",
+                    "ui.commands.register getInfo execution guard must return an object.",
+                )
+            host_platform = _ui_command_host_platform(host_result)
+            readbacks.append(
+                {
+                    "role": "authoring-host",
+                    "uri": GET_INFO_URI,
+                    "args": {},
+                    "options": {},
+                    "result": dict(host_result),
+                }
+            )
+        replayed_plan = _build_ui_command_operation_plan(
+            replay_request,
+            arguments=replay_request.arguments,
+            host_platform=host_platform,
+        )
+        stored_valid = validate_ui_command_plan(stored_plan)
+        expected_dispatch = {
+            "uri": replayed_plan["dispatch"]["uri"],
+            "args": dict(replayed_plan["dispatch"]["arguments"]),
+            "options": dict(replayed_plan["dispatch"]["options"]),
+        }
+        assertions.extend(
+            [
+                {
+                    "name": f"{operation} plan still matches the immutable closed request",
+                    "passed": replayed_plan == stored_valid,
+                    "evidence": {
+                        "expected_plan_sha256": replayed_plan["plan_sha256"],
+                        "actual_plan_sha256": stored_valid["plan_sha256"],
+                    },
+                },
+                {
+                    "name": f"{operation} dispatch still matches its sealed UI-command plan",
+                    "passed": dict(dispatch_payload) == expected_dispatch,
+                    "evidence": {
+                        "expected": expected_dispatch,
+                        "actual": dict(dispatch_payload),
+                    },
+                },
+            ]
+        )
+        inventory = read_call(UI_COMMAND_GET_COMMANDS_URI, {}, {})
+        if not isinstance(inventory, Mapping):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "ui.commands.getCommands execution guard must return an object.",
+            )
+        readbacks.append(
+            {
+                "role": "ui-command-inventory",
+                "uri": UI_COMMAND_GET_COMMANDS_URI,
+                "args": {},
+                "options": {},
+                "result": dict(inventory),
+            }
+        )
+        try:
+            runtime_evidence = validate_ui_command_runtime_preconditions(
+                stored_valid,
+                inventory,
+            )
+        except UiCommandContractError as exc:
+            assertions.append(
+                {
+                    "name": f"{operation} live inventory and file proofs still satisfy the sealed preconditions",
+                    "passed": False,
+                    "evidence": exc.as_dict(),
+                }
+            )
+        else:
+            assertions.append(
+                {
+                    "name": f"{operation} live inventory and file proofs still satisfy the sealed preconditions",
+                    "passed": True,
+                    "evidence": runtime_evidence,
+                }
+            )
+        ok = bool(assertions) and all(
+            item.get("passed") is True for item in assertions
+        )
+        return {
+            "contract": ROLE_VALIDATION_CONTRACT,
+            "operation": operation,
+            "ok": ok,
+            "status": "valid" if ok else "repreview_required",
+            "assertions": [_json_mapping(item) for item in assertions],
+            "readbacks": [_json_mapping(item) for item in readbacks],
+        }
+    if operation in REPLAY_GUARD_OPERATIONS:
+        request_payload = prepared.get("request")
+        dispatch_payload = prepared.get("dispatch")
+        pre_state = prepared.get("pre_state")
+        if (
+            not isinstance(request_payload, Mapping)
+            or not isinstance(dispatch_payload, Mapping)
+            or not isinstance(pre_state, Mapping)
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                f"{operation} preview lacks request, dispatch, or pre-state evidence.",
+            )
+        replay_request = parse_operation_request(request_payload)
+
+        def reject_read(
+            uri: str,
+            args: Mapping[str, Any],
+            options: Mapping[str, Any],
+        ) -> Mapping[str, Any]:
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                f"{operation} unexpectedly requested a live read during immutable replay.",
+                details={"uri": uri, "args": dict(args), "options": dict(options)},
+            )
+
+        replayed = prepare_operation(replay_request, read_call=reject_read).as_dict()
+        expected_dispatch = replayed.get("dispatch")
+        expected_pre_state = replayed.get("pre_state")
+        dispatch_matches = (
+            isinstance(expected_dispatch, Mapping)
+            and dict(dispatch_payload) == dict(expected_dispatch)
+        )
+        pre_state_matches = (
+            isinstance(expected_pre_state, Mapping)
+            and dict(pre_state) == dict(expected_pre_state)
+        )
+        assertions.extend(
+            [
+                {
+                    "name": f"{operation} dispatch still matches the immutable closed request",
+                    "passed": dispatch_matches,
+                    "evidence": {
+                        "expected_uri": (
+                            expected_dispatch.get("uri")
+                            if isinstance(expected_dispatch, Mapping)
+                            else None
+                        ),
+                        "actual_uri": dispatch_payload.get("uri"),
+                        "expected_sha256": (
+                            hashlib.sha256(canonical_json_bytes(expected_dispatch)).hexdigest()
+                            if isinstance(expected_dispatch, Mapping)
+                            else None
+                        ),
+                        "actual_sha256": hashlib.sha256(
+                            canonical_json_bytes(dispatch_payload)
+                        ).hexdigest(),
+                    },
+                },
+                {
+                    "name": f"{operation} sealed source/mode/host-control evidence is unchanged",
+                    "passed": pre_state_matches,
+                    "evidence": {
+                        "expected_sha256": (
+                            hashlib.sha256(canonical_json_bytes(expected_pre_state)).hexdigest()
+                            if isinstance(expected_pre_state, Mapping)
+                            else None
+                        ),
+                        "actual_sha256": hashlib.sha256(
+                            canonical_json_bytes(pre_state)
+                        ).hexdigest(),
+                    },
+                },
+            ]
+        )
     for role, snapshot_value in roles.items():
         if not isinstance(snapshot_value, Mapping):
             raise OperationContractError("INVALID_PREVIEW", f"Resolved role {role!r} is malformed.")
@@ -5375,6 +7752,14 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         if isinstance(field_name, str) and object_id is not None:
             args = {"from": {"id": [object_id]}}
             options = {"return": ["id", "path", field_name]}
+            platform = field_before.get("platform")
+            if platform is not None:
+                if not isinstance(platform, str) or not platform:
+                    raise OperationContractError(
+                        "INVALID_PREVIEW",
+                        "Field precondition platform is malformed.",
+                    )
+                options["platform"] = platform
             result = read_call(OBJECT_GET_URI, args, options)
             if not isinstance(result, Mapping):
                 raise OperationContractError("INVALID_READBACK", "Field precondition readback must be an object.")
@@ -5389,6 +7774,245 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 }
             )
 
+    linked_before = pre_state.get("linked_before") if isinstance(pre_state, Mapping) else None
+    if isinstance(linked_before, Mapping):
+        object_id = linked_before.get("object_id")
+        field_name = linked_before.get("property")
+        platform = linked_before.get("platform")
+        expected_linked = linked_before.get("linked")
+        if (
+            not _valid_object_id(object_id)
+            or not isinstance(field_name, str)
+            or not field_name
+            or not isinstance(platform, str)
+            or not platform
+            or not isinstance(expected_linked, bool)
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "Platform-link precondition snapshot is malformed.",
+            )
+        args = {"object": object_id, "property": field_name, "platform": platform}
+        result = read_call(OBJECT_IS_LINKED_URI, args, {})
+        if not isinstance(result, Mapping):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "object.isLinked precondition readback must be an object.",
+            )
+        actual_linked = result.get("linked")
+        readbacks.append(
+            {
+                "role": "object-linked-state",
+                "uri": OBJECT_IS_LINKED_URI,
+                "args": args,
+                "options": {},
+                "result": dict(result),
+            }
+        )
+        assertions.append(
+            {
+                "name": "object platform link pre-state unchanged",
+                "passed": actual_linked is expected_linked,
+                "evidence": {"expected": expected_linked, "actual": actual_linked},
+            }
+        )
+
+    rtpc_snapshot = pre_state.get("rtpc_snapshot") if isinstance(pre_state, Mapping) else None
+    if isinstance(rtpc_snapshot, Mapping):
+        object_id = rtpc_snapshot.get("object_id")
+        fields = rtpc_snapshot.get("fields")
+        expected = rtpc_snapshot.get("rows")
+        if (
+            not _valid_object_id(object_id)
+            or fields != list(RTPC_SNAPSHOT_FIELDS)
+            or not isinstance(expected, list)
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "RTPC precondition snapshot is malformed.",
+            )
+        args = {
+            "from": {"id": [object_id]},
+            "transform": [{"select": ["@RTPC"]}],
+        }
+        options = {"return": list(RTPC_SNAPSHOT_FIELDS)}
+        result = read_call(OBJECT_GET_URI, args, options)
+        if not isinstance(result, Mapping):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "RTPC precondition readback must be an object.",
+            )
+        actual = _rows(result)
+        readbacks.append(
+            {
+                "role": "object-rtpc-list",
+                "uri": OBJECT_GET_URI,
+                "args": args,
+                "options": options,
+                "result": dict(result),
+            }
+        )
+        assertions.append(
+            {
+                "name": "complete RTPC list pre-state unchanged",
+                "passed": actual == expected,
+                "evidence": {"expected": expected, "actual": actual},
+            }
+        )
+
+    plugin_guard = (
+        pre_state.get("plugin_creation_guard")
+        if isinstance(pre_state, Mapping)
+        else None
+    )
+    if isinstance(plugin_guard, Mapping):
+        request_payload = prepared.get("request")
+        version = (
+            request_payload.get("version")
+            if isinstance(request_payload, Mapping)
+            else None
+        )
+        target_id = plugin_guard.get("target_id")
+        target_type = plugin_guard.get("target_type")
+        raw_descriptor = plugin_guard.get("descriptor")
+        expected_snapshot = plugin_guard.get("snapshot")
+        expected_metadata = plugin_guard.get("property_metadata")
+        expected_plan = plugin_guard.get("plan")
+        if (
+            operation != "object.createPlugin"
+            or not isinstance(version, str)
+            or not isinstance(target_id, str)
+            or not _PLUGIN_GUID.fullmatch(target_id)
+            or not isinstance(target_type, str)
+            or not isinstance(raw_descriptor, Mapping)
+            or not isinstance(expected_snapshot, Mapping)
+            or not isinstance(expected_metadata, list)
+            or not isinstance(expected_plan, Mapping)
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "object.createPlugin execution guard is malformed.",
+            )
+        try:
+            descriptor = normalize_plugin_creation(raw_descriptor)
+        except PluginOperationContractError as exc:
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "object.createPlugin descriptor in the immutable preview is malformed.",
+                details=exc.as_dict(),
+            ) from exc
+
+        def plugin_guard_read(
+            uri: str,
+            args: Mapping[str, Any],
+            options: Mapping[str, Any],
+        ) -> Mapping[str, Any]:
+            result = read_call(uri, args, options)
+            if not isinstance(result, Mapping):
+                raise OperationContractError(
+                    "INVALID_READBACK",
+                    f"{uri} plug-in execution guard readback must be an object.",
+                )
+            normalized = dict(result)
+            readbacks.append(
+                {
+                    "role": "plugin-creation-guard",
+                    "uri": uri,
+                    "args": dict(args),
+                    "options": dict(options),
+                    "result": normalized,
+                }
+            )
+            return normalized
+
+        actual_metadata: list[dict[str, Any]] = []
+        for metadata_request in plugin_property_metadata_requests(descriptor):
+            info = _read_property_info(
+                plugin_guard_read,
+                class_id=descriptor.class_id,
+                name=str(metadata_request["args"]["property"]),
+            )
+            actual_metadata.append(info.as_dict())
+        actual_snapshot = _read_plugin_prestate(
+            version=version,
+            target_id=target_id,
+            descriptor=descriptor,
+            read=plugin_guard_read,
+        )
+        assertions.extend(
+            [
+                {
+                    "name": "plug-in classId-scoped property metadata is unchanged",
+                    "passed": actual_metadata == expected_metadata,
+                    "evidence": {
+                        "expected": expected_metadata,
+                        "actual": actual_metadata,
+                    },
+                },
+                {
+                    "name": "complete plug-in placement pre-state is unchanged",
+                    "passed": actual_snapshot == expected_snapshot,
+                    "evidence": {
+                        "expected": expected_snapshot,
+                        "actual": actual_snapshot,
+                    },
+                },
+            ]
+        )
+        fixed_effects = (
+            actual_snapshot.get("fixed_effects")
+            if actual_snapshot.get("kind") == "fixed_effect_references"
+            else None
+        )
+        try:
+            actual_plan = build_plugin_creation_plan(
+                version=version,
+                target_id=target_id,
+                target_type=target_type,
+                request=descriptor,
+                property_metadata=actual_metadata or None,
+                effect_slots_2022=(
+                    fixed_effects
+                    if isinstance(fixed_effects, Mapping)
+                    else None
+                ),
+            ).as_dict()
+        except PluginOperationContractError as exc:
+            assertions.append(
+                {
+                    "name": "closed plug-in creation plan can be replayed",
+                    "passed": False,
+                    "evidence": exc.as_dict(),
+                }
+            )
+        else:
+            prepared_dispatch = prepared.get("dispatch")
+            expected_dispatch = actual_plan.get("dispatch")
+            assertions.extend(
+                [
+                    {
+                        "name": "closed plug-in creation plan is unchanged",
+                        "passed": actual_plan == expected_plan,
+                        "evidence": {
+                            "expected": expected_plan,
+                            "actual": actual_plan,
+                        },
+                    },
+                    {
+                        "name": "closed plug-in dispatch still matches the replayed plan",
+                        "passed": (
+                            isinstance(prepared_dispatch, Mapping)
+                            and isinstance(expected_dispatch, Mapping)
+                            and dict(prepared_dispatch) == dict(expected_dispatch)
+                        ),
+                        "evidence": {
+                            "expected": expected_dispatch,
+                            "actual": prepared_dispatch,
+                        },
+                    },
+                ]
+            )
+
     graph_guard = pre_state.get("object_graph_guard") if isinstance(pre_state, Mapping) else None
     if isinstance(graph_guard, Mapping):
         for index, snapshot in enumerate(graph_guard.get("field_snapshots", [])):
@@ -5401,6 +8025,14 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 raise OperationContractError("INVALID_PREVIEW", "Object graph field snapshot lacks fields/rows.")
             args = {"from": {"id": [object_id]}}
             options = {"return": fields}
+            platform = snapshot.get("platform")
+            if platform is not None:
+                if not isinstance(platform, str) or not platform:
+                    raise OperationContractError(
+                        "INVALID_PREVIEW",
+                        "Object graph field snapshot platform is malformed.",
+                    )
+                options["platform"] = platform
             result = read_call(OBJECT_GET_URI, args, options)
             if not isinstance(result, Mapping):
                 raise OperationContractError("INVALID_READBACK", "Object graph field guard must return an object.")
@@ -6137,6 +8769,118 @@ def _bind_object_set_result_nodes(
     return bound
 
 
+def _single_plugin_result_object(
+    value: Any,
+    *,
+    collection: str,
+) -> dict[str, Any]:
+    if isinstance(value, Mapping):
+        rows = [dict(value)]
+    elif isinstance(value, list) and all(isinstance(row, Mapping) for row in value):
+        rows = [dict(row) for row in value]
+    else:
+        raise OperationContractError(
+            "INVALID_PLUGIN_RESULT",
+            "object.set plug-in result collection must be one object or an array of objects.",
+            details={"collection": collection, "value": value},
+        )
+    if len(rows) != 1:
+        raise OperationContractError(
+            "AMBIGUOUS_PLUGIN_RESULT",
+            "object.set plug-in result must contain exactly one created object.",
+            details={"collection": collection, "rows": rows},
+        )
+    _plugin_guid(rows[0].get("id"), field=f"result.{collection}.id")
+    return rows[0]
+
+
+def _extract_plugin_result_binding(
+    payload: Mapping[str, Any],
+    *,
+    target_id: str,
+    descriptor: PluginCreationDescriptor,
+    placement: Mapping[str, Any],
+) -> dict[str, Any]:
+    raw_associations = payload.get("objects")
+    if not isinstance(raw_associations, list) or not all(
+        isinstance(row, Mapping) for row in raw_associations
+    ):
+        raise OperationContractError(
+            "INVALID_PLUGIN_RESULT",
+            "object.set result must contain an objects array of parent associations.",
+            details={"result": dict(payload)},
+        )
+    associations = [
+        dict(row)
+        for row in raw_associations
+        if _same_identity(row.get("id"), target_id)
+    ]
+    if len(associations) != 1 or len(raw_associations) != 1:
+        raise OperationContractError(
+            "AMBIGUOUS_PLUGIN_RESULT",
+            "object.set result must bind exactly one association to the sealed target.",
+            details={
+                "target_id": target_id,
+                "association_count": len(raw_associations),
+                "matching_associations": associations,
+            },
+        )
+    association = associations[0]
+    collection = placement.get("collection")
+    if not isinstance(collection, str) or not collection:
+        raise OperationContractError(
+            "INVALID_PREVIEW",
+            "Plug-in verification placement lacks a result collection.",
+        )
+    if collection not in association:
+        raise OperationContractError(
+            "MISSING_PLUGIN_RESULT",
+            "object.set result omitted the reviewed plug-in result collection.",
+            details={
+                "collection": collection,
+                "association": association,
+            },
+        )
+    created = _single_plugin_result_object(
+        association[collection],
+        collection=collection,
+    )
+    expected_type = (
+        "EffectSlot"
+        if placement.get("kind") == "effect_slot_append"
+        else descriptor.object_type
+    )
+    result_type = created.get("type")
+    if result_type is not None and result_type != expected_type:
+        raise OperationContractError(
+            "PLUGIN_RESULT_TYPE_MISMATCH",
+            "object.set returned a different created object type.",
+            details={
+                "expected": expected_type,
+                "actual": result_type,
+                "created": created,
+            },
+        )
+    expected_name = "" if expected_type == "EffectSlot" else descriptor.name
+    result_name = created.get("name")
+    if result_name is not None and result_name != expected_name:
+        raise OperationContractError(
+            "PLUGIN_RESULT_NAME_MISMATCH",
+            "object.set returned a different created object name.",
+            details={
+                "expected": expected_name,
+                "actual": result_name,
+                "created": created,
+            },
+        )
+    return {
+        "association": association,
+        "created": created,
+        "created_id": created["id"],
+        "expected_type": expected_type,
+    }
+
+
 def verify_prepared_operation(
     prepared: Mapping[str, Any],
     *,
@@ -6165,9 +8909,12 @@ def verify_prepared_operation(
         path: str | None = None,
         fields: Sequence[str],
         language: str | None = None,
+        platform: str | None = None,
     ) -> list[dict[str, Any]]:
         args = {"from": {"id": [object_id]}} if object_id is not None else {"from": {"path": [path]}}
         options = _import_object_get_options(fields, language=language)
+        if platform is not None:
+            options["platform"] = platform
         result = read_call(OBJECT_GET_URI, args, options)
         if not isinstance(result, Mapping):
             raise OperationContractError("INVALID_READBACK", "object.get verification result must be an object.")
@@ -6229,7 +8976,104 @@ def verify_prepared_operation(
         return normalized
 
     kind = plan.get("kind")
-    if kind == "undo-group-result-schemas":
+    if kind == "ui-command-plan":
+        raw_ui_plan = plan.get("plan")
+        version = plan.get("version")
+        if not isinstance(raw_ui_plan, Mapping) or not isinstance(version, str):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "UI-command verification lacks its sealed plan or version.",
+            )
+        try:
+            ui_plan = validate_ui_command_plan(raw_ui_plan)
+        except UiCommandContractError as exc:
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "UI-command verification plan failed its immutable seal.",
+                details=exc.as_dict(),
+            ) from exc
+        try:
+            result_evidence = validate_empty_ui_command_result(
+                ui_plan,
+                execution_result.get("result"),
+            )
+        except UiCommandContractError as exc:
+            check(
+                "UI-command result matches the closed empty-result contract",
+                False,
+                exc.as_dict(),
+            )
+        else:
+            check(
+                "UI-command result matches the closed empty-result contract",
+                True,
+                result_evidence,
+            )
+        try:
+            reflected = validate_semantic_result(
+                str(ui_plan["dispatch"]["uri"]),
+                execution_result.get("result"),
+                version=version,
+                authoring_ui_profile=True,
+            )
+        except SemanticValidationError as exc:
+            check(
+                "UI-command result matches the Authoring-profile reflected schema",
+                False,
+                exc.as_dict(),
+            )
+        else:
+            check(
+                "UI-command result matches the Authoring-profile reflected schema",
+                True,
+                reflected.as_dict(),
+            )
+        ui_operation = ui_plan.get("operation")
+        if ui_operation == "execute":
+            success_status = "result_schema_checked"
+            verification_strength = "result_schema_only"
+            business_state_verified = False
+        elif ui_operation in {"register", "unregister"}:
+            inventory = read_call(UI_COMMAND_GET_COMMANDS_URI, {}, {})
+            if not isinstance(inventory, Mapping):
+                raise OperationContractError(
+                    "INVALID_READBACK",
+                    "ui.commands.getCommands postcondition readback must return an object.",
+                )
+            readbacks.append(
+                {
+                    "uri": UI_COMMAND_GET_COMMANDS_URI,
+                    "args": {},
+                    "options": {},
+                    "result": dict(inventory),
+                }
+            )
+            try:
+                inventory_evidence = verify_ui_command_inventory_postcondition(
+                    raw_ui_plan,
+                    inventory,
+                )
+            except UiCommandContractError as exc:
+                check(
+                    f"UI-command {ui_operation} inventory postcondition holds",
+                    False,
+                    exc.as_dict(),
+                )
+            else:
+                check(
+                    f"UI-command {ui_operation} inventory postcondition holds",
+                    True,
+                    inventory_evidence,
+                )
+            verification_strength = "operation_specific_readback"
+            business_state_verified = True
+        else:
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "UI-command verification plan names an unsupported operation.",
+                details={"operation": ui_operation},
+            )
+    elif kind == "undo-group-result-schemas":
         success_status = "result_schema_checked"
         business_state_verified = False
         version = plan.get("version")
@@ -6710,6 +9554,314 @@ def verify_prepared_operation(
             actual = _inclusion_rows(_inclusion_map(result))
             expected = control.get("inclusions")
             check("unrelated control SoundBank inclusions are unchanged", actual == expected, {"expected": expected, "actual": actual})
+    elif kind == "object-plugin-created":
+        version = plan.get("version")
+        target_id = plan.get("target_id")
+        target_type = plan.get("target_type")
+        raw_descriptor = plan.get("descriptor")
+        placement = plan.get("placement")
+        preexisting_ids = plan.get("preexisting_plugin_ids")
+        raw_property_validation = plan.get("property_validation")
+        raw_readback_fields = plan.get("readback_fields")
+        raw_readback_view = plan.get("readback_view")
+        if (
+            version not in SUPPORTED_PLUGIN_VERSIONS
+            or not isinstance(target_id, str)
+            or not _PLUGIN_GUID.fullmatch(target_id)
+            or not isinstance(target_type, str)
+            or not target_type
+            or not isinstance(raw_descriptor, Mapping)
+            or not isinstance(placement, Mapping)
+            or not isinstance(preexisting_ids, list)
+            or not all(
+                isinstance(value, str) and _PLUGIN_GUID.fullmatch(value)
+                for value in preexisting_ids
+            )
+            or len({value.casefold() for value in preexisting_ids})
+            != len(preexisting_ids)
+            or not isinstance(raw_readback_fields, list)
+            or not isinstance(raw_readback_view, Mapping)
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "object.createPlugin verification plan is malformed.",
+            )
+        try:
+            descriptor = normalize_plugin_creation(raw_descriptor)
+        except PluginOperationContractError as exc:
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "object.createPlugin verification descriptor is malformed.",
+                details=exc.as_dict(),
+            ) from exc
+
+        expected_readback_fields = list(plugin_verification_fields(descriptor))
+        if raw_readback_fields != expected_readback_fields:
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "object.createPlugin verification fields do not match the "
+                "immutable descriptor.",
+                details={
+                    "expected": expected_readback_fields,
+                    "actual": raw_readback_fields,
+                },
+            )
+        if (
+            set(raw_readback_view) != {"language", "platform"}
+            or raw_readback_view.get("language") != descriptor.language
+            or raw_readback_view.get("platform") != descriptor.platform
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "object.createPlugin verification language/platform view does "
+                "not match the immutable descriptor.",
+                details={
+                    "expected": {
+                        "language": descriptor.language,
+                        "platform": descriptor.platform,
+                    },
+                    "actual": dict(raw_readback_view),
+                },
+            )
+        validated_properties = _sealed_plugin_property_validation(
+            raw_property_validation,
+            descriptor=descriptor,
+        )
+
+        base_plan_fields = {
+            "kind",
+            "version",
+            "target_id",
+            "target_type",
+            "descriptor",
+            "placement",
+            "preexisting_plugin_ids",
+            "property_validation",
+            "readback_fields",
+            "readback_view",
+        }
+        if descriptor.kind == "source":
+            expected_plan_fields = base_plan_fields
+            expected_placement_kind = "source_child"
+            placement_shape_matches = (
+                placement.get("collection") == "children"
+            )
+        elif version == "2022.1":
+            expected_plan_fields = base_plan_fields | {
+                "pre_effect_references"
+            }
+            expected_placement_kind = "fixed_effect_reference"
+            selected_effect_field = placement.get("effect_slot")
+            placement_shape_matches = (
+                selected_effect_field in WWISE_2022_EFFECT_FIELDS
+                and placement.get("collection") == selected_effect_field
+            )
+        else:
+            expected_plan_fields = base_plan_fields | {
+                "preexisting_effect_slot_ids"
+            }
+            expected_placement_kind = "effect_slot_append"
+            placement_shape_matches = (
+                placement.get("collection") == "@Effects"
+            )
+        if (
+            set(plan) != expected_plan_fields
+            or placement.get("kind") != expected_placement_kind
+            or not placement_shape_matches
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "object.createPlugin verification placement is malformed for "
+                "the immutable version and plug-in kind.",
+                details={
+                    "version": version,
+                    "plugin_kind": descriptor.kind,
+                    "placement": dict(placement),
+                    "missing_plan_fields": sorted(
+                        expected_plan_fields - set(plan)
+                    ),
+                    "unknown_plan_fields": sorted(
+                        set(plan) - expected_plan_fields
+                    ),
+                },
+            )
+
+        pre_effect_references: Mapping[str, Any] | None = None
+        preexisting_effect_slot_ids: list[str] | None = None
+        if expected_placement_kind == "fixed_effect_reference":
+            raw_pre_effect_references = plan.get("pre_effect_references")
+            if (
+                not isinstance(raw_pre_effect_references, Mapping)
+                or set(raw_pre_effect_references)
+                != set(WWISE_2022_EFFECT_FIELDS)
+            ):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "object.createPlugin fixed Effect pre-state is malformed.",
+                )
+            pre_effect_references = dict(raw_pre_effect_references)
+        elif expected_placement_kind == "effect_slot_append":
+            raw_preexisting_slot_ids = plan.get(
+                "preexisting_effect_slot_ids"
+            )
+            if (
+                not isinstance(raw_preexisting_slot_ids, list)
+                or not all(
+                    isinstance(value, str)
+                    and _PLUGIN_GUID.fullmatch(value)
+                    for value in raw_preexisting_slot_ids
+                )
+                or len(
+                    {
+                        value.casefold()
+                        for value in raw_preexisting_slot_ids
+                    }
+                )
+                != len(raw_preexisting_slot_ids)
+            ):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "object.createPlugin EffectSlot pre-state is malformed.",
+                )
+            preexisting_effect_slot_ids = list(
+                raw_preexisting_slot_ids
+            )
+
+        readback_view = {
+            "fields": list(raw_readback_fields),
+            "language": raw_readback_view.get("language"),
+            "platform": raw_readback_view.get("platform"),
+        }
+        check_result_schema(OBJECT_SET_URI, version)
+        try:
+            result_binding = _extract_plugin_result_binding(
+                _execution_payload(execution_result),
+                target_id=target_id,
+                descriptor=descriptor,
+                placement=placement,
+            )
+        except OperationContractError as exc:
+            check(
+                "object.set returned exactly one plug-in placement binding",
+                False,
+                exc.as_dict(),
+            )
+            return _verification(operation, assertions, readbacks)
+        check(
+            "object.set returned exactly one plug-in placement binding",
+            True,
+            result_binding,
+        )
+
+        created_id = result_binding["created_id"]
+        expected_parent_id = target_id
+        if expected_placement_kind == "source_child":
+            plugin_id = created_id
+            placement_evidence: dict[str, Any] = {
+                "kind": "source_child"
+            }
+        elif expected_placement_kind == "fixed_effect_reference":
+            target_rows = read_object(
+                object_id=target_id,
+                fields=PLUGIN_2022_EFFECT_TARGET_READBACK_FIELDS,
+            )
+            check(
+                "Wwise 2022.1 Effect target GUID resolves exactly once",
+                len(target_rows) == 1,
+                target_rows,
+            )
+            if len(target_rows) != 1:
+                return _verification(
+                    operation,
+                    assertions,
+                    readbacks,
+                )
+            plugin_id = created_id
+            placement_evidence = {
+                "kind": "fixed_effect_reference",
+                "selected_effect_field": placement["effect_slot"],
+                "pre_effect_references": dict(
+                    pre_effect_references or {}
+                ),
+                "target_post_readback": target_rows[0],
+            }
+        else:
+            slot_id = created_id
+            slot_rows = read_object(
+                object_id=slot_id,
+                fields=PLUGIN_EFFECT_SLOT_READBACK_FIELDS,
+            )
+            check(
+                "created EffectSlot GUID resolves exactly once",
+                len(slot_rows) == 1,
+                slot_rows,
+            )
+            if len(slot_rows) != 1:
+                return _verification(operation, assertions, readbacks)
+            slot = slot_rows[0]
+            try:
+                plugin_id = _plugin_guid(
+                    slot.get("@Effect"),
+                    field="created_effect_slot.@Effect",
+                )
+            except OperationContractError as exc:
+                check(
+                    "created EffectSlot exposes one canonical @Effect binding",
+                    False,
+                    exc.as_dict(),
+                )
+                return _verification(operation, assertions, readbacks)
+            check(
+                "created EffectSlot exposes one canonical @Effect binding",
+                True,
+                {"effect_slot_id": slot_id, "plugin_id": plugin_id},
+            )
+            expected_parent_id = slot_id
+            placement_evidence = {
+                "kind": "effect_slot_append",
+                "preexisting_effect_slot_ids": list(
+                    preexisting_effect_slot_ids or []
+                ),
+                "created_effect_slot": slot,
+            }
+
+        plugin_rows = read_object(
+            object_id=plugin_id,
+            fields=raw_readback_fields,
+            language=descriptor.language,
+            platform=descriptor.platform,
+        )
+        check(
+            "created plug-in GUID resolves exactly once",
+            len(plugin_rows) == 1,
+            plugin_rows,
+        )
+        if len(plugin_rows) != 1:
+            return _verification(operation, assertions, readbacks)
+        try:
+            evidence = verify_created_plugin_row(
+                descriptor,
+                plugin_rows[0],
+                version=version,
+                expected_parent_id=expected_parent_id,
+                expected_owner_id=target_id,
+                validated_properties=validated_properties,
+                preexisting_plugin_ids=preexisting_ids,
+                readback_view=readback_view,
+                placement_evidence=placement_evidence,
+            )
+        except PluginOperationContractError as exc:
+            check(
+                "created plug-in requested state and placement match the immutable plan",
+                False,
+                exc.as_dict(),
+            )
+        else:
+            check(
+                "created plug-in requested state and placement match the immutable plan",
+                True,
+                evidence.as_dict(),
+            )
     elif kind in {"object-create-graph", "object-set-batch"}:
         version = plan.get("version")
         if not isinstance(version, str):
@@ -6803,7 +9955,13 @@ def verify_prepared_operation(
                     {"expected": preexisting_id, "actual": result_node.object},
                 )
             fields = _object_spec_return_fields(spec)
-            rows = read_object(object_id=object_id, fields=fields)
+            platform = spec.get("platform")
+            if platform is not None and (not isinstance(platform, str) or not platform):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "Object graph verification platform is malformed.",
+                )
+            rows = read_object(object_id=object_id, fields=fields, platform=platform)
             check(f"{request_path} GUID resolves exactly once", len(rows) == 1, rows)
             if len(rows) != 1:
                 continue
@@ -7169,7 +10327,12 @@ def verify_prepared_operation(
             check("notes match exactly", rows[0].get("notes") == plan.get("expected_notes"), rows[0].get("notes"))
     elif kind == "same-guid-property":
         field_name = str(plan.get("field"))
-        rows = read_object(object_id=plan.get("object_id"), fields=("id", "path", field_name))
+        platform = plan.get("platform")
+        rows = read_object(
+            object_id=plan.get("object_id"),
+            fields=("id", "path", field_name),
+            platform=platform if isinstance(platform, str) else None,
+        )
         check("property target resolves exactly once", len(rows) == 1, rows)
         if len(rows) == 1:
             actual = _field_value(rows[0], field_name)
@@ -7181,7 +10344,12 @@ def verify_prepared_operation(
             )
     elif kind == "same-guid-reference":
         field_name = str(plan.get("field"))
-        rows = read_object(object_id=plan.get("object_id"), fields=("id", "path", field_name))
+        platform = plan.get("platform")
+        rows = read_object(
+            object_id=plan.get("object_id"),
+            fields=("id", "path", field_name),
+            platform=platform if isinstance(platform, str) else None,
+        )
         check("reference source resolves exactly once", len(rows) == 1, rows)
         if len(rows) == 1:
             actual = _reference_identity(_field_value(rows[0], field_name))
@@ -7195,6 +10363,220 @@ def verify_prepared_operation(
                     "Wwise did not expose a canonical target identity for the reference readback.",
                 )
             check("reference target matches", _same_identity(actual, expected), {"actual": actual, "expected": expected})
+    elif kind == "ui-capture-screen-result":
+        version = plan.get("version")
+        max_chars = plan.get("max_base64_chars")
+        if (
+            not isinstance(version, str)
+            or isinstance(max_chars, bool)
+            or not isinstance(max_chars, int)
+            or max_chars < 1
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "UI capture verification plan is malformed.",
+            )
+        check_result_schema("ak.wwise.ui.captureScreen", version)
+        payload = _execution_payload(execution_result)
+        content_type = payload.get("contentType")
+        encoded = payload.get("contentBase64")
+        check(
+            "screen capture reports an image content type",
+            isinstance(content_type, str) and content_type.startswith("image/"),
+            {"content_type": content_type},
+        )
+        encoded_is_bounded = (
+            isinstance(encoded, str)
+            and bool(encoded)
+            and len(encoded) <= max_chars
+        )
+        check(
+            "screen capture base64 is present and bounded",
+            encoded_is_bounded,
+            {
+                "encoded_length": len(encoded) if isinstance(encoded, str) else None,
+                "limit": max_chars,
+            },
+        )
+        decoded_length: int | None = None
+        valid_base64 = False
+        if encoded_is_bounded:
+            try:
+                decoded = base64.b64decode(encoded, validate=True)
+            except (binascii.Error, ValueError):
+                pass
+            else:
+                decoded_length = len(decoded)
+                valid_base64 = decoded_length > 0
+        check(
+            "screen capture content is valid non-empty base64",
+            valid_base64,
+            {"decoded_length": decoded_length},
+        )
+    elif kind == "object-linked-state":
+        version = plan.get("version")
+        object_id = plan.get("object_id")
+        field_name = plan.get("property")
+        platform = plan.get("platform")
+        expected = plan.get("expected_linked")
+        if (
+            not isinstance(version, str)
+            or not _valid_object_id(object_id)
+            or not isinstance(field_name, str)
+            or not field_name
+            or not isinstance(platform, str)
+            or not platform
+            or not isinstance(expected, bool)
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "Platform-link verification plan is malformed.",
+            )
+        check_result_schema(OBJECT_SET_LINKED_URI, version)
+        result = verified_readback(
+            OBJECT_IS_LINKED_URI,
+            {"object": object_id, "property": field_name, "platform": platform},
+            version=version,
+        )
+        check(
+            "platform link state matches",
+            result.get("linked") is expected,
+            {"expected": expected, "actual": result.get("linked")},
+        )
+    elif kind == "object-rtpc-state":
+        version = plan.get("version")
+        object_id = plan.get("object_id")
+        action = plan.get("action")
+        property_name = plan.get("property")
+        control_input_id = plan.get("control_input_id")
+        expected_points = plan.get("points")
+        before_rows = plan.get("before_rows")
+        if (
+            not isinstance(version, str)
+            or not _valid_object_id(object_id)
+            or action not in {"add", "update"}
+            or not isinstance(property_name, str)
+            or not _valid_object_id(control_input_id)
+            or not isinstance(expected_points, list)
+            or not isinstance(before_rows, list)
+            or not all(isinstance(row, Mapping) for row in before_rows)
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "RTPC verification plan is malformed.",
+            )
+        check_result_schema(OBJECT_SET_URI, version)
+        args = {
+            "from": {"id": [object_id]},
+            "transform": [{"select": ["@RTPC"]}],
+        }
+        options = {"return": list(RTPC_SNAPSHOT_FIELDS)}
+        result = read_call(OBJECT_GET_URI, args, options)
+        if not isinstance(result, Mapping):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "RTPC verification readback must be an object.",
+            )
+        actual_rows = _rows(result)
+        readbacks.append(
+            {
+                "uri": OBJECT_GET_URI,
+                "args": args,
+                "options": options,
+                "result": dict(result),
+            }
+        )
+        before_by_id = {
+            _identity_key(row.get("id")): dict(row)
+            for row in before_rows
+            if _valid_object_id(row.get("id"))
+        }
+        actual_by_id = {
+            _identity_key(row.get("id")): dict(row)
+            for row in actual_rows
+            if _valid_object_id(row.get("id"))
+        }
+        check(
+            "RTPC readback has unique canonical GUIDs",
+            len(actual_by_id) == len(actual_rows),
+            actual_rows,
+        )
+        matches = [
+            row
+            for row in actual_rows
+            if row.get("@PropertyName") == property_name
+            and _same_identity(
+                _reference_identity(row.get("@ControlInput")),
+                control_input_id,
+            )
+        ]
+        check(
+            "exactly one RTPC matches the requested property and ControlInput",
+            len(matches) == 1,
+            matches,
+        )
+        if action == "add":
+            check(
+                "RTPC add preserved every prior row and added exactly one GUID",
+                len(actual_by_id) == len(before_by_id) + 1
+                and all(actual_by_id.get(key) == row for key, row in before_by_id.items()),
+                {
+                    "before_ids": sorted(before_by_id),
+                    "actual_ids": sorted(actual_by_id),
+                },
+            )
+        else:
+            existing_id = plan.get("existing_rtpc_id")
+            existing_key = _identity_key(existing_id) if _valid_object_id(existing_id) else None
+            check(
+                "RTPC update retained the complete GUID set",
+                existing_key is not None and set(actual_by_id) == set(before_by_id),
+                {
+                    "before_ids": sorted(before_by_id),
+                    "actual_ids": sorted(actual_by_id),
+                    "existing_id": existing_id,
+                },
+            )
+            untouched = {
+                key: row
+                for key, row in before_by_id.items()
+                if key != existing_key
+            }
+            check(
+                "RTPC update left every other list row unchanged",
+                all(actual_by_id.get(key) == row for key, row in untouched.items()),
+                {
+                    "untouched_ids": sorted(untouched),
+                    "changed_ids": sorted(
+                        key
+                        for key, row in untouched.items()
+                        if actual_by_id.get(key) != row
+                    ),
+                },
+            )
+            if len(matches) == 1:
+                check(
+                    "RTPC update retained the matched RTPC GUID",
+                    _same_identity(matches[0].get("id"), existing_id),
+                    {"expected": existing_id, "actual": matches[0].get("id")},
+                )
+        if len(matches) == 1:
+            curve = matches[0].get("@Curve")
+            actual_points = curve.get("points") if isinstance(curve, Mapping) else None
+            check(
+                "RTPC curve points match exactly",
+                actual_points == expected_points,
+                {"expected": expected_points, "actual": actual_points},
+            )
+            if plan.get("notes_supplied") is True:
+                check(
+                    "RTPC notes match exactly",
+                    matches[0].get("notes") == plan.get("expected_notes"),
+                    {
+                        "expected": plan.get("expected_notes"),
+                        "actual": matches[0].get("notes"),
+                    },
+                )
     elif kind == "closed-audio-import":
         source_operation = plan.get("source_operation")
         version = plan.get("version")
@@ -8407,12 +11789,254 @@ def _mapping_sequence(value: Any, *, field: str) -> list[Mapping[str, Any]]:
     return [dict(item) for item in value]
 
 
+def _validate_import_source_control_option(
+    arguments: Mapping[str, Any],
+    *,
+    version: str,
+) -> None:
+    try:
+        normalize_auto_check_out_to_source_control(
+            arguments.get("auto_check_out_to_source_control"),
+            version=version,
+            supplied="auto_check_out_to_source_control" in arguments,
+        )
+    except ImportContractError as exc:
+        raise OperationContractError(
+            exc.error_code,
+            str(exc),
+            details=exc.details,
+        ) from exc
+
+
 def _validate_nested_request_shape(
     operation: str,
     arguments: Mapping[str, Any],
     *,
     version: str,
 ) -> None:
+    if operation == "ui.commands.execute":
+        request = OperationRequest(
+            OPERATION_REQUEST_CONTRACT,
+            version,
+            operation,
+            dict(arguments),
+        )
+        _build_ui_command_operation_plan(request, arguments=arguments)
+        return
+    if operation == "ui.commands.unregister":
+        owned_mode = "commands" in arguments
+        existing_mode = (
+            "command_ids" in arguments or "acknowledgement" in arguments
+        )
+        if owned_mode == existing_mode:
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "ui.commands.unregister requires exactly one request mode: "
+                "closed command descriptors, or command_ids plus acknowledgement.",
+            )
+        if existing_mode:
+            if set(arguments) != {"command_ids", "acknowledgement"}:
+                raise OperationContractError(
+                    "INVALID_ARGUMENT",
+                    "Existing-ID ui.commands.unregister accepts only command_ids and acknowledgement.",
+                )
+            request = OperationRequest(
+                OPERATION_REQUEST_CONTRACT,
+                version,
+                operation,
+                dict(arguments),
+            )
+            _build_ui_command_operation_plan(request, arguments=arguments)
+            return
+        if set(arguments) - {"commands", "source_authority"}:
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                    "Descriptor-backed ui.commands.unregister accepts only commands and source_authority.",
+            )
+    if operation in {"ui.commands.register", "ui.commands.unregister"}:
+        context_operation = operation
+        raw_commands = arguments.get("commands")
+        if (
+            not isinstance(raw_commands, list)
+            or not 1 <= len(raw_commands) <= 32
+            or not all(isinstance(item, Mapping) for item in raw_commands)
+        ):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                f"{context_operation} commands must contain 1-32 JSON objects.",
+            )
+        for index, raw_command in enumerate(raw_commands):
+            command = dict(raw_command)
+            _require_exact_keys(
+                command,
+                required=("id", "display_name", "handler"),
+                optional=(
+                    "context_menu",
+                    "default_shortcut",
+                    "main_menu",
+                ),
+                context=f"{context_operation} commands[{index}]",
+            )
+            handler = command.get("handler")
+            if not isinstance(handler, Mapping):
+                raise OperationContractError(
+                    "INVALID_ARGUMENT",
+                    f"{context_operation} commands[{index}].handler must be a JSON object.",
+                )
+            kind = handler.get("kind")
+            optional_by_kind = {
+                "notification": (),
+                "program": (
+                    "argument_tokens",
+                    "program_path",
+                    "redirect_outputs",
+                    "start_mode",
+                    "working_directory",
+                ),
+                "lua_script": (
+                    "argument_tokens",
+                    "lua_module_directories",
+                    "lua_script_path",
+                    "lua_selected_return",
+                    "start_mode",
+                    "working_directory",
+                ),
+            }
+            if kind not in optional_by_kind:
+                raise OperationContractError(
+                    "INVALID_ARGUMENT",
+                    f"{context_operation} commands[{index}].handler.kind is unsupported.",
+                    details={"kind": kind},
+                )
+            required = (
+                ("kind", "program_path")
+                if kind == "program"
+                else (
+                    ("kind", "lua_script_path")
+                    if kind == "lua_script"
+                    else ("kind",)
+                )
+            )
+            _require_exact_keys(
+                handler,
+                required=required,
+                optional=tuple(
+                    field_name
+                    for field_name in optional_by_kind[str(kind)]
+                    if field_name not in required
+                ),
+                context=f"{context_operation} commands[{index}].handler",
+            )
+            for field_name, allowed in (
+                ("context_menu", ("base_path", "enabled_for", "visible_for")),
+                ("main_menu", ("base_path",)),
+            ):
+                value = command.get(field_name)
+                if value is None:
+                    continue
+                if not isinstance(value, Mapping):
+                    raise OperationContractError(
+                        "INVALID_ARGUMENT",
+                        f"{context_operation} commands[{index}].{field_name} must be a JSON object.",
+                    )
+                _require_exact_keys(
+                    value,
+                    required=("base_path",),
+                    optional=tuple(
+                        name for name in allowed if name != "base_path"
+                    ),
+                    context=(
+                        f"{context_operation} commands[{index}].{field_name}"
+                    ),
+                )
+        authority = arguments.get("source_authority")
+        if authority is not None and authority != UI_COMMAND_SOURCE_AUTHORITY:
+            raise OperationContractError(
+                "INVALID_SOURCE_AUTHORITY",
+                f"{context_operation} source_authority uses an unknown assertion.",
+                details={"expected": UI_COMMAND_SOURCE_AUTHORITY},
+            )
+        return
+    if operation in {"lua.executeCliFile", "lua.executeCoreFile"}:
+        try:
+            seal_isolated_lua_file(
+                arguments.get("script_file"),
+                io_root=arguments.get("io_root"),
+                source_authority=arguments.get("source_authority"),
+            )
+            normalize_lua_wa_args(
+                arguments.get("wa_args"),
+                reserved_fields=(
+                    CLI_LUA_RESERVED_FIELDS
+                    if operation == "lua.executeCliFile"
+                    else CORE_LUA_RESERVED_FIELDS
+                ),
+            )
+        except DebugLuaContractError as exc:
+            raise OperationContractError(
+                exc.error_code,
+                str(exc),
+                details=exc.details,
+            ) from exc
+        if "watchdog_seconds" in arguments:
+            watchdog = arguments.get("watchdog_seconds")
+            if (
+                operation != "lua.executeCliFile"
+                or version not in {"2024.1", "2025.1"}
+            ):
+                raise OperationContractError(
+                    "UNAVAILABLE_IN_VERSION",
+                    "watchdog_seconds is available only for lua.executeCliFile in Wwise 2024.1-2025.1.",
+                    details={"operation": operation, "version": version},
+                )
+            if isinstance(watchdog, bool) or not isinstance(watchdog, int) or watchdog < 0:
+                raise OperationContractError(
+                    "INVALID_ARGUMENT",
+                    "watchdog_seconds must be a non-negative integer.",
+                )
+        return
+    if operation == "lua.executeCoreInline":
+        try:
+            seal_inline_lua_source(
+                arguments.get("lua_code"),
+                io_root=arguments.get("io_root"),
+                source_authority=arguments.get("source_authority"),
+            )
+            normalize_lua_wa_args(
+                arguments.get("wa_args"),
+                reserved_fields=CORE_LUA_RESERVED_FIELDS,
+            )
+        except DebugLuaContractError as exc:
+            raise OperationContractError(
+                exc.error_code,
+                str(exc),
+                details=exc.details,
+            ) from exc
+        return
+    if operation in {"debug.setAsserts", "debug.setAutomationMode"}:
+        if not isinstance(arguments.get("enable"), bool):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                f"{operation} enable must be a JSON boolean.",
+            )
+        return
+    if operation in {
+        "debug.restartWaapiServers",
+        "debug.testAssert",
+        "debug.testCrash",
+    }:
+        expected = {
+            "debug.restartWaapiServers": "restart_waapi_servers",
+            "debug.testAssert": "trigger_debug_assert",
+            "debug.testCrash": "crash_wwise_process",
+        }[operation]
+        if arguments.get("acknowledge") != expected:
+            raise OperationContractError(
+                "DANGEROUS_HOST_CONTROL_ACKNOWLEDGEMENT_REQUIRED",
+                f"{operation} requires its exact immutable acknowledgement.",
+                details={"expected": expected, "actual": arguments.get("acknowledge")},
+            )
+        return
     if operation == "audio.import":
         for index, item in enumerate(_mapping_sequence(arguments.get("imports"), field="imports")):
             _require_exact_keys(
@@ -8434,9 +12058,49 @@ def _validate_nested_request_shape(
                     optional=("action",),
                     context=f"audio.import imports[{index}].event",
                 )
+        _validate_import_source_control_option(arguments, version=version)
         return
     if operation == "audio.importTabDelimited":
         _validate_identity_payload_shape(arguments.get("import_location"), role="import_location")
+        _validate_import_source_control_option(arguments, version=version)
+        return
+    if operation == "ui.captureScreen":
+        if "view_name" in arguments:
+            _non_empty_string(arguments.get("view_name"), field="view_name")
+        if "view_channel" in arguments:
+            channel = arguments.get("view_channel")
+            if isinstance(channel, bool) or not isinstance(channel, int) or not 1 <= channel <= 4:
+                raise OperationContractError(
+                    "INVALID_ARGUMENT",
+                    "ui.captureScreen view_channel must be an integer from 1 through 4.",
+                )
+        if "rect" in arguments:
+            rect = arguments.get("rect")
+            if not isinstance(rect, Mapping):
+                raise OperationContractError(
+                    "INVALID_ARGUMENT",
+                    "ui.captureScreen rect must be a JSON object.",
+                )
+            _require_exact_keys(
+                rect,
+                required=("x", "y", "width", "height"),
+                context="ui.captureScreen rect",
+            )
+            for field_name in ("x", "y", "width", "height"):
+                value = rect.get(field_name)
+                minimum = 1 if field_name in {"width", "height"} else 0
+                if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+                    raise OperationContractError(
+                        "INVALID_ARGUMENT",
+                        f"ui.captureScreen rect.{field_name} must be an integer >= {minimum}.",
+                    )
+        return
+    if operation == "object.createPlugin":
+        _validate_identity_payload_shape(arguments.get("target"), role="target")
+        try:
+            normalize_plugin_creation(arguments.get("plugin"))
+        except PluginOperationContractError as exc:
+            _raise_plugin_operation_error(exc)
         return
     if operation == "object.create":
         _validate_identity_payload_shape(arguments.get("parent"), role="parent")
@@ -8472,6 +12136,48 @@ def _validate_nested_request_shape(
         except ObjectOperationContractError as exc:
             raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         return
+    if operation in {"object.setProperty", "object.setReference"}:
+        _validate_identity_payload_shape(arguments.get("object"), role="object")
+        if operation == "object.setReference":
+            _validate_identity_payload_shape(arguments.get("target"), role="target")
+        if "platform" in arguments:
+            _non_empty_string(arguments.get("platform"), field="platform")
+        return
+    if operation == "object.setLinked":
+        _validate_identity_payload_shape(arguments.get("object"), role="object")
+        _non_empty_string(arguments.get("property"), field="property")
+        _non_empty_string(arguments.get("platform"), field="platform")
+        if not isinstance(arguments.get("linked"), bool):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "object.setLinked linked must be a JSON boolean.",
+            )
+        return
+    if operation == "object.setRTPC":
+        _validate_identity_payload_shape(arguments.get("object"), role="object")
+        _validate_identity_payload_shape(arguments.get("control_input"), role="control_input")
+        mode = arguments.get("mode", "add_or_replace")
+        if mode not in {"add", "add_or_replace"}:
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "object.setRTPC mode must be add or add_or_replace.",
+                details={"mode": mode},
+            )
+        descriptor_payload = {
+            "property": arguments.get("property"),
+            "control_input": arguments.get("control_input"),
+            "points": arguments.get("points"),
+            **({"notes": arguments.get("notes")} if "notes" in arguments else {}),
+        }
+        try:
+            normalize_rtpc_descriptors(
+                [descriptor_payload],
+                request_path="$.arguments.rtpcs",
+                max_rtpcs=1,
+            )
+        except ObjectOperationContractError as exc:
+            raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+        return
     if operation == "object.set":
         raw_objects = _mapping_sequence(arguments.get("objects"), field="objects")
         if not raw_objects:
@@ -8492,10 +12198,12 @@ def _validate_nested_request_shape(
             _require_exact_keys(
                 item,
                 required=("object",),
-                optional=("notes", "properties", "references", "children"),
+                optional=("notes", "platform", "properties", "references", "children"),
                 context=f"object.set objects[{index}]",
             )
             _validate_identity_payload_shape(item.get("object"), role=f"objects[{index}].object")
+            if "platform" in item:
+                _non_empty_string(item.get("platform"), field=f"objects[{index}].platform")
             descriptor_key = canonical_json_bytes(item.get("object"))
             if descriptor_key in descriptor_keys:
                 raise OperationContractError(
@@ -9213,6 +12921,10 @@ def _json_mapping(value: Any) -> Any:
 
 
 __all__ = [
+    "CONDITIONAL_LOCAL_FILESYSTEM_OPERATIONS",
+    "DYNAMIC_LOCAL_FILESYSTEM_OPERATIONS",
+    "LOCAL_FILESYSTEM_OPERATION_ROLES",
+    "NO_LOCAL_FILESYSTEM_OPERATIONS",
     "OPERATION_REQUEST_CONTRACT",
     "PREPARED_OPERATION_CONTRACT",
     "VERIFICATION_RESULT_CONTRACT",

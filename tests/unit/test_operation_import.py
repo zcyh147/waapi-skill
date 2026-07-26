@@ -4,11 +4,13 @@ import csv
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.operation_import import (  # pyright: ignore[reportMissingImports]
     AUDIO_IMPORT_PLAN_CONTRACT,
+    AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS,
     MAX_IMPORT_ITEMS,
     MAX_TAB_ROWS,
     SUPPORTED_WWISE_VERSIONS,
@@ -68,6 +70,117 @@ def test_operation_policy_is_closed_for_every_supported_lane(version: str, opera
         assert "autoCheckOutToSourceControl" not in plan["dispatch_args"]
         assert plan["oracle"]["result_contract"] == "objects_only"
     json.dumps(plan)
+
+
+@pytest.mark.parametrize("version", AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS)
+@pytest.mark.parametrize("enabled", [False, True])
+def test_audio_import_exposes_versioned_auto_check_out(
+    version: str,
+    enabled: bool,
+    tmp_path: Path,
+) -> None:
+    root = NEW_ROOT if version == "2025.1" else OLD_ROOT
+    media = _write_media(tmp_path, f"audio-checkout-{version}-{enabled}.wav")
+
+    plan = build_audio_import_plan(
+        [{"object_path": root + r"\CheckoutTarget", "audio_file": str(media)}],
+        version=version,
+        import_operation="createNew",
+        auto_check_out_to_source_control=enabled,
+    )
+
+    assert plan["dispatch_args"]["autoCheckOutToSourceControl"] is enabled
+
+
+@pytest.mark.parametrize("version", AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS)
+@pytest.mark.parametrize("enabled", [False, True])
+def test_tab_import_exposes_versioned_auto_check_out(
+    version: str,
+    enabled: bool,
+    tmp_path: Path,
+) -> None:
+    root = NEW_ROOT if version == "2025.1" else OLD_ROOT
+    media = _write_media(tmp_path, f"tab-checkout-{version}-{enabled}.wav")
+    tsv = _write_tsv(
+        tmp_path,
+        ["Audio File", "Object Path"],
+        [[str(media), "CheckoutTarget"]],
+        name=f"checkout-{version}-{enabled}.tsv",
+    )
+
+    plan = parse_tab_delimited_import_file(
+        tsv,
+        version=version,
+        import_location=root,
+        import_language="SFX",
+        import_operation="createNew",
+        auto_check_out_to_source_control=enabled,
+    )
+
+    assert plan["dispatch_args"]["autoCheckOutToSourceControl"] is enabled
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1"])
+@pytest.mark.parametrize("enabled", [False, True])
+def test_audio_import_rejects_explicit_auto_check_out_in_old_lanes(
+    version: str,
+    enabled: bool,
+    tmp_path: Path,
+) -> None:
+    media = _write_media(tmp_path, f"old-audio-checkout-{version}-{enabled}.wav")
+
+    with pytest.raises(ImportContractError) as caught:
+        build_audio_import_plan(
+            [{"object_path": OLD_ROOT + r"\CheckoutTarget", "audio_file": str(media)}],
+            version=version,
+            import_operation="createNew",
+            auto_check_out_to_source_control=enabled,
+        )
+
+    assert caught.value.error_code == "VERSION_BEHAVIOR_BOUNDARY"
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1"])
+@pytest.mark.parametrize("enabled", [False, True])
+def test_tab_import_rejects_explicit_auto_check_out_in_old_lanes(
+    version: str,
+    enabled: bool,
+    tmp_path: Path,
+) -> None:
+    media = _write_media(tmp_path, f"old-tab-checkout-{version}-{enabled}.wav")
+    tsv = _write_tsv(
+        tmp_path,
+        ["Audio File", "Object Path"],
+        [[str(media), "CheckoutTarget"]],
+        name=f"old-checkout-{version}-{enabled}.tsv",
+    )
+
+    with pytest.raises(ImportContractError) as caught:
+        parse_tab_delimited_import_file(
+            tsv,
+            version=version,
+            import_location=OLD_ROOT,
+            import_language="SFX",
+            import_operation="createNew",
+            auto_check_out_to_source_control=enabled,
+        )
+
+    assert caught.value.error_code == "VERSION_BEHAVIOR_BOUNDARY"
+
+
+@pytest.mark.parametrize("value", [0, 1, "true"])
+def test_import_auto_check_out_requires_a_json_boolean(value: Any, tmp_path: Path) -> None:
+    media = _write_media(tmp_path, f"invalid-checkout-{value}.wav")
+
+    with pytest.raises(ImportContractError) as caught:
+        build_audio_import_plan(
+            [{"object_path": OLD_ROOT + r"\CheckoutTarget", "audio_file": str(media)}],
+            version="2023.1",
+            import_operation="createNew",
+            auto_check_out_to_source_control=value,
+        )
+
+    assert caught.value.error_code == "INVALID_ARGUMENT"
 
 
 def test_audio_import_plan_normalizes_structured_fields_and_provenance(tmp_path: Path) -> None:

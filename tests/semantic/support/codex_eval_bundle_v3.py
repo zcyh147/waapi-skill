@@ -62,6 +62,7 @@ ASSERTION_PHASES = frozenset({"before", "preview", "after", "event", "cleanup"})
 WEAK_ASSERTION_ADAPTERS = frozenset(
     {
         "dispatch_trace",
+        "debug_mode_result_schema_boundary",
         "gateway_verified_flag",
         "model_answer",
         "result_schema",

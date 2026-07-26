@@ -92,12 +92,21 @@ class SemanticSchemaValidator:
 
     manifest_loader: ManifestSchemaLoader = field(default_factory=ManifestSchemaLoader)
     version: str = DEFAULT_WWISE_VERSION
+    authoring_ui_profile: bool = False
 
     def require_supported_version(self) -> None:
-        self.manifest_loader.load_manifest(self.version)
+        if self.authoring_ui_profile:
+            self.manifest_loader.load_authoring_ui_manifest(self.version)
+        else:
+            self.manifest_loader.load_manifest(self.version)
 
     def schema_for(self, uri: str) -> Mapping[str, Any]:
         self.require_supported_version()
+        if self.authoring_ui_profile:
+            return self.manifest_loader.authoring_ui_schema_for(
+                uri,
+                self.version,
+            )
         return self.manifest_loader.schema_for(uri, self.version)
 
     def validate(self, uri: str, args: Mapping[str, Any] | None = None, options: Mapping[str, Any] | None = None) -> SchemaValidationResult:
@@ -175,10 +184,15 @@ def validate_semantic_payload(
     *,
     version: str = DEFAULT_WWISE_VERSION,
     manifest_loader: ManifestSchemaLoader | None = None,
+    authoring_ui_profile: bool = False,
 ) -> SchemaValidationResult:
     """Validate one semantic payload using existing manifest/resource conventions."""
 
-    validator = SemanticSchemaValidator(manifest_loader=manifest_loader or ManifestSchemaLoader(), version=version)
+    validator = SemanticSchemaValidator(
+        manifest_loader=manifest_loader or ManifestSchemaLoader(),
+        version=version,
+        authoring_ui_profile=authoring_ui_profile,
+    )
     return validator.validate(uri, args=args, options=options)
 
 
@@ -188,12 +202,14 @@ def validate_semantic_result(
     *,
     version: str = DEFAULT_WWISE_VERSION,
     manifest_loader: ManifestSchemaLoader | None = None,
+    authoring_ui_profile: bool = False,
 ) -> SchemaValidationResult:
     """Validate one strict-JSON WAAPI result using the packaged manifest."""
 
     validator = SemanticSchemaValidator(
         manifest_loader=manifest_loader or ManifestSchemaLoader(),
         version=version,
+        authoring_ui_profile=authoring_ui_profile,
     )
     return validator.validate_result(uri, result)
 
@@ -204,12 +220,14 @@ def validate_semantic_event(
     *,
     version: str = DEFAULT_WWISE_VERSION,
     manifest_loader: ManifestSchemaLoader | None = None,
+    authoring_ui_profile: bool = False,
 ) -> SchemaValidationResult:
     """Validate one topic event using the packaged reflected publish schema."""
 
     validator = SemanticSchemaValidator(
         manifest_loader=manifest_loader or ManifestSchemaLoader(),
         version=version,
+        authoring_ui_profile=authoring_ui_profile,
     )
     return validator.validate_event(uri, event)
 

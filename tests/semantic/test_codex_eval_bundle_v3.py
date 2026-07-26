@@ -14,6 +14,7 @@ from tests.semantic.support.codex_audio_conversion_runtime_v3 import (
 from tests.semantic.support.codex_eval_bundle_v3 import (
     EvalBundleV3Error,
     SEQUENTIAL_CONFIRMATION_PROMPT,
+    WEAK_ASSERTION_ADAPTERS,
     _parse_online_case,
     load_eval_bundle_v3,
 )
@@ -37,38 +38,151 @@ VERSION_SPECIFIC_AUTHORING_V3 = (
     / "version_specific"
     / "authoring.json"
 )
+DEBUG_LUA_V3 = (
+    REPO_ROOT
+    / "skills"
+    / "waapi-skill"
+    / "evals"
+    / "online"
+    / "debug_lua.json"
+)
 
 
 def test_v3_bundle_covers_every_unique_five_version_api_with_reviewed_heavy_extensions() -> None:
     bundle = load_eval_bundle_v3(SUITE_V3)
 
-    assert len(bundle.coverage) == 188
-    assert len(bundle.scenarios) == 424
+    assert len(bundle.coverage) == 198
+    assert len(bundle.scenarios) == 444
     assert Counter(row.item_type for row in bundle.coverage) == {
-        "function": 156,
-        "topic": 32,
+        "function": 165,
+        "topic": 33,
     }
-    assert Counter(row.scenario_count for row in bundle.coverage) == {2: 172, 5: 16}
+    assert Counter(row.scenario_count for row in bundle.coverage) == {2: 182, 5: 16}
     assert all(len(set(row.scenario_families)) == row.scenario_count for row in bundle.coverage)
     assert all(len(set(row.prompt_sha256)) == row.scenario_count for row in bundle.coverage)
     assert Counter(version for case in bundle.scenarios for version in case.versions) == {
-        "2022.1": 316,
-        "2023.1": 66,
-        "2024.1": 25,
+        "2022.1": 326,
+        "2023.1": 74,
+        "2024.1": 27,
         "2025.1": 17,
     }
 
     cases_2022 = [case for case in bundle.scenarios if "2022.1" in case.versions]
-    assert len(cases_2022) == 316
-    assert len({case.api for case in cases_2022}) == 137
+    assert len(cases_2022) == 326
+    assert len({case.api for case in cases_2022}) == 142
     assert Counter(case.protocol for case in cases_2022) == {
-        "preview_confirm": 206,
-        "single": 110,
+        "preview_confirm": 210,
+        "single": 116,
     }
-    assert sum(case.confirmation_turn_count for case in cases_2022) == 226
+    assert sum(case.confirmation_turn_count for case in cases_2022) == 230
     assert len(cases_2022) + sum(
         case.confirmation_turn_count for case in cases_2022
-    ) == 542
+    ) == 556
+
+
+def test_v3_debug_and_lua_cases_close_protocol_acknowledgement_and_oracle_boundaries() -> None:
+    bundle = load_eval_bundle_v3(SUITE_V3)
+    payload = json.loads(DEBUG_LUA_V3.read_text(encoding="utf-8"))
+    case_ids = {row["id"] for row in payload["cases"]}
+    cases = [bundle.scenario(case_id) for case_id in case_ids]
+
+    assert len(cases) == 20
+    expected = {
+        "ak.wwise.cli.executeLuaScript": ("2023.1", "preview_confirm"),
+        "ak.wwise.core.executeLuaScript": ("2023.1", "preview_confirm"),
+        "ak.wwise.debug.assertFailed": ("2022.1", "single"),
+        "ak.wwise.debug.enableAsserts": ("2022.1", "preview_confirm"),
+        "ak.wwise.debug.enableAutomationMode": ("2022.1", "preview_confirm"),
+        "ak.wwise.debug.getWalTree": ("2023.1", "single"),
+        "ak.wwise.debug.restartWaapiServers": ("2023.1", "preview_confirm"),
+        "ak.wwise.debug.testAssert": ("2022.1", "preview_confirm"),
+        "ak.wwise.debug.testCrash": ("2022.1", "preview_confirm"),
+        "ak.wwise.debug.validateCall": ("2024.1", "single"),
+    }
+    for api, (version, protocol) in expected.items():
+        selected = [case for case in cases if case.api == api]
+        assert len(selected) == 2
+        assert {case.scenario_index for case in selected} == {1, 2}
+        assert len({case.scenario_family for case in selected}) == 2
+        assert all(case.versions == (version,) for case in selected)
+        assert all(case.protocol == protocol for case in selected)
+        assert all(case.primary_dispatch.count == 1 for case in selected)
+        assert all(not bundle.scenario_mapping_blockers(case.id) for case in selected)
+
+    acknowledgement_by_api = {
+        "ak.wwise.debug.restartWaapiServers": "restart_waapi_servers",
+        "ak.wwise.debug.testAssert": "trigger_debug_assert",
+        "ak.wwise.debug.testCrash": "crash_wwise_process",
+    }
+    for api, acknowledgement in acknowledgement_by_api.items():
+        for case in (case for case in cases if case.api == api):
+            assert acknowledgement in case.prompt
+            assert case.confirmation_prompt
+            assert any(
+                assertion.phase == "preview" and assertion.subject_api == api
+                for assertion in case.oracle_assertions
+            )
+            assert any(
+                assertion.phase == "after"
+                and assertion.adapter
+                in {
+                    "debug_assert_event_oracle",
+                    "waapi_restart_oracle",
+                    "wwise_process_termination_oracle",
+                }
+                for assertion in case.oracle_assertions
+            )
+
+    lua_cases = [
+        case
+        for case in cases
+        if case.api
+        in {"ak.wwise.cli.executeLuaScript", "ak.wwise.core.executeLuaScript"}
+    ]
+    assert all(
+        {item.name for item in case.visible_inputs} == {"script_file", "io_root"}
+        for case in lua_cases
+    )
+    assert all(
+        any(
+            phrase in case.prompt
+            for phrase in ("不要改写", "保持源码不变", "保持原样", "源码不要改")
+        )
+        for case in lua_cases
+    )
+    assert all(
+        any(
+            assertion.phase == "after"
+            and assertion.adapter == "lua_execution_oracle"
+            for assertion in case.oracle_assertions
+        )
+        for case in lua_cases
+    )
+
+    mode_cases = [
+        case
+        for case in cases
+        if case.api
+        in {
+            "ak.wwise.debug.enableAsserts",
+            "ak.wwise.debug.enableAutomationMode",
+        }
+    ]
+    assert "debug_mode_result_schema_boundary" in WEAK_ASSERTION_ADAPTERS
+    assert all(
+        any(
+            assertion.phase == "after"
+            and assertion.adapter == "debug_mode_result_schema_boundary"
+            and (
+                "不能" in assertion.expectation
+                or "不得" in assertion.expectation
+                or "无法" in assertion.expectation
+                or "不把" in assertion.expectation
+            )
+            for assertion in case.oracle_assertions
+        )
+        for case in mode_cases
+    )
 
 
 def test_v3_heavy_object_create_and_set_have_five_closed_scenarios_each() -> None:
@@ -1128,7 +1242,7 @@ def test_v3_topics_have_runner_owned_triggers_and_event_oracles() -> None:
     bundle = load_eval_bundle_v3(SUITE_V3)
     topic_cases = [case for case in bundle.scenarios if case.item_type == "topic"]
 
-    assert len(topic_cases) == 67
+    assert len(topic_cases) == 69
     for case in topic_cases:
         assert case.trigger is not None
         assert case.trigger["ownership_assertion"]
@@ -1176,8 +1290,8 @@ def test_v3_visible_prompt_inputs_render_without_hidden_template_fields() -> Non
     bundle = load_eval_bundle_v3(SUITE_V3)
     cases_with_inputs = [case for case in bundle.scenarios if case.visible_inputs]
 
-    assert len(cases_with_inputs) == 214
-    assert sum(len(case.visible_inputs) for case in cases_with_inputs) == 320
+    assert len(cases_with_inputs) == 218
+    assert sum(len(case.visible_inputs) for case in cases_with_inputs) == 328
 
     for case in bundle.scenarios:
         values = {item.name: f"VISIBLE_{item.name}" for item in case.visible_inputs}
@@ -1326,7 +1440,7 @@ def test_v3_unresolved_request_mappings_fail_closed_before_real_execution() -> N
     }
 
     assert bundle.request_mapping_implementation_status == "specification_only_unresolved"
-    assert len(bundle.request_mapping_requirements) == 11
+    assert len(bundle.request_mapping_requirements) == 14
     assert len(blocked) == 35
     assert len({bundle.scenario(case_id).api for case_id in blocked}) == 21
     assert {

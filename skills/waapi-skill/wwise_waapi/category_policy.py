@@ -8,17 +8,7 @@ from dataclasses import dataclass
 WRAPPER_ONLY_CATEGORIES = frozenset()
 SKIPPED_APPROVED_CATEGORIES = frozenset()
 POLICY_EXEMPT_CATEGORIES = WRAPPER_ONLY_CATEGORIES | SKIPPED_APPROVED_CATEGORIES
-DEBUG_UNSAFE_LIVE_URIS = frozenset(
-    {
-        "ak.wwise.debug.enableAsserts",
-        "ak.wwise.debug.enableAutomationMode",
-        "ak.wwise.debug.getWalTree",
-        "ak.wwise.debug.restartWaapiServers",
-        "ak.wwise.debug.testAssert",
-        "ak.wwise.debug.testCrash",
-        "ak.wwise.debug.validateCall",
-    }
-)
+DEBUG_UNSAFE_LIVE_URIS = frozenset()
 
 
 @dataclass(slots=True, frozen=True)
@@ -83,16 +73,17 @@ def category_policy(category: str) -> CategoryPolicy | None:
     if category == "debug":
         return CategoryPolicy(
             category=category,
-            target_status="selective-execution",
+            target_status="guarded-execution",
             user_approved_rationale=(
-                "Only generateToneWAV is executable through an isolated transaction; assert, crash, automation, WAL, "
-                "restart, and validateCall endpoints remain explicit exclusions."
+                "Debug reads, process-wide modes, and deliberate host controls are exposed only through "
+                "separate fixed or confirmed routes with explicit lifecycle evidence."
             ),
             risk_explanation=(
-                "Debug assert/crash APIs can intentionally fail, crash, or alter automation/assert handling in the running Wwise instance."
+                "Debug assert/crash APIs intentionally fail or terminate the host, while automation/assert "
+                "modes affect process-wide behavior and private reads may exist only in Debug builds."
             ),
             future_review_trigger=(
-                "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint."
+                "Revisit when a version changes a private schema, disconnect behavior, or process lifecycle."
             ),
         )
     return None

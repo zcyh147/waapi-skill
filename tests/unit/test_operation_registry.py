@@ -112,7 +112,18 @@ def project_info_row(project_root: Path) -> dict[str, Any]:
 def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() -> None:
     specs = {spec.name: spec.as_dict() for spec in list_operation_specs()}
 
-    assert len(specs) == 19
+    assert len(specs) == 34
+    assert specs["ui.commands.execute"]["uri"] == (
+        "ak.wwise.ui.commands.execute"
+    )
+    assert specs["ui.commands.register"]["required_arguments"] == ["commands"]
+    assert specs["ui.commands.unregister"]["required_arguments"] == []
+    assert set(specs["ui.commands.unregister"]["optional_arguments"]) == {
+        "acknowledgement",
+        "command_ids",
+        "commands",
+        "source_authority",
+    }
     assert specs["waapi.undoGroup"]["implemented"] is True
     assert specs["waapi.undoGroup"]["family"] == "same-connection-compound"
     assert specs["waapi.undoGroup"]["required_arguments"] == ["display_name", "calls"]
@@ -186,6 +197,18 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     import_items = specs["audio.import"]["argument_contract"]["properties"]["imports"]["items"]
     assert import_items["required"] == ["object_path", "audio_file"]
     assert import_items["additionalProperties"] is False
+    for operation in ("audio.import", "audio.importTabDelimited"):
+        assert "auto_check_out_to_source_control" in specs[operation]["optional_arguments"]
+        auto_check_out = specs[operation]["argument_contract"]["properties"][
+            "auto_check_out_to_source_control"
+        ]
+        assert auto_check_out["type"] == "boolean"
+        assert auto_check_out["default"] is False
+        assert auto_check_out["supported_versions"] == ["2023.1", "2024.1", "2025.1"]
+        assert any(
+            "explicit use on 2021.1/2022.1 fails before connection" in constraint
+            for constraint in specs[operation]["constraints"]
+        )
     assert specs["soundbank.setInclusions"]["argument_contract"]["properties"]["mode"]["enum"] == [
         "add",
         "remove",
@@ -199,6 +222,26 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     assert "rejects a child that already has any assignment" in specs["switchContainer.addAssignment"]["constraints"][-1]
     assert specs["object.set"]["implemented"] is True
     assert specs["object.set"]["supported_versions"] == ["2022.1", "2023.1", "2024.1", "2025.1"]
+    create_plugin = specs["object.createPlugin"]
+    assert create_plugin["implemented"] is True
+    assert create_plugin["supported_versions"] == [
+        "2022.1",
+        "2023.1",
+        "2024.1",
+        "2025.1",
+    ]
+    assert create_plugin["identity_contract"]["argument_fields"] == ["target"]
+    plugin_schema = create_plugin["argument_contract"]["properties"]["plugin"]
+    assert plugin_schema["required"] == ["kind", "name", "class_id"]
+    assert plugin_schema["additionalProperties"] is False
+    assert plugin_schema["properties"]["class_id"]["maximum"] == 4_294_967_295
+    assert plugin_schema["properties"]["properties"]["maxItems"] == 32
+    assert "language" in plugin_schema["optional"]
+    assert plugin_schema["properties"]["language"]["minLength"] == 1
+    assert any(
+        "never guessed" in item
+        for item in create_plugin["constraints"]
+    )
     object_set_rows = specs["object.set"]["argument_contract"]["properties"]["objects"]
     object_set_children = object_set_rows["items"]["properties"]["children"]
     object_set_conflict = specs["object.set"]["argument_contract"]["properties"]["on_name_conflict"]
@@ -214,6 +257,15 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
         "existing objects[] targets do not imply merge" in item
         for item in specs["object.set"]["constraints"]
     )
+    assert specs["object.setLinked"]["supported_versions"] == ["2023.1", "2024.1", "2025.1"]
+    assert specs["object.setRTPC"]["supported_versions"] == ["2022.1", "2023.1", "2024.1", "2025.1"]
+    assert specs["object.setRTPC"]["argument_contract"]["properties"]["mode"]["enum"] == [
+        "add",
+        "add_or_replace",
+    ]
+    assert specs["object.set"]["argument_contract"]["properties"]["objects"]["items"]["properties"][
+        "platform"
+    ]["minLength"] == 1
     assert "returned copy GUID" in specs["object.copy"]["boundary"]
     assert specs["object.setProperty"]["identity_contract"]["caller_rows_allowed"] is False
     assert specs["soundbank.convertExternalSources"]["supported_versions"] == [
@@ -233,6 +285,86 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     assert "attested_project_layout" not in generate["optional_arguments"]
     assert "attested_project_layout" not in generate["argument_contract"]["properties"]
     assert any("filePath" in constraint and "WPROJ" in constraint for constraint in generate["constraints"])
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1"])
+@pytest.mark.parametrize("enabled", [False, True])
+@pytest.mark.parametrize(
+    ("operation", "arguments"),
+    [
+        (
+            "audio.import",
+            {
+                "imports": [
+                    {
+                        "object_path": (
+                            r"\Actor-Mixer Hierarchy\Default Work Unit\CheckoutTarget"
+                        ),
+                        "audio_file": "/tmp/checkout.wav",
+                    }
+                ]
+            },
+        ),
+        (
+            "audio.importTabDelimited",
+            {
+                "import_file": "/tmp/checkout.tsv",
+                "import_location": {
+                    "kind": "path",
+                    "value": r"\Actor-Mixer Hierarchy\Default Work Unit",
+                },
+                "import_language": "SFX",
+            },
+        ),
+    ],
+)
+def test_import_auto_check_out_fails_at_the_old_version_request_boundary(
+    operation: str,
+    arguments: Mapping[str, Any],
+    enabled: bool,
+    version: str,
+) -> None:
+    payload_arguments = {
+        **dict(arguments),
+        "auto_check_out_to_source_control": enabled,
+    }
+
+    with pytest.raises(OperationContractError) as caught:
+        parse_operation_request(
+            request(operation, payload_arguments, version=version)
+        )
+
+    assert caught.value.error_code == "VERSION_BEHAVIOR_BOUNDARY"
+    assert caught.value.details["version"] == version
+    assert caught.value.details["supported_versions"] == [
+        "2023.1",
+        "2024.1",
+        "2025.1",
+    ]
+
+
+@pytest.mark.parametrize("value", [None, 0, "false"])
+def test_import_auto_check_out_rejects_non_boolean_request_values(value: Any) -> None:
+    with pytest.raises(OperationContractError) as caught:
+        parse_operation_request(
+            request(
+                "audio.import",
+                {
+                    "imports": [
+                        {
+                            "object_path": (
+                                r"\Actor-Mixer Hierarchy\Default Work Unit\CheckoutTarget"
+                            ),
+                            "audio_file": "/tmp/checkout.wav",
+                        }
+                    ],
+                    "auto_check_out_to_source_control": value,
+                },
+                version="2023.1",
+            )
+        )
+
+    assert caught.value.error_code == "INVALID_ARGUMENT"
 
 
 @pytest.mark.parametrize(
@@ -1136,7 +1268,8 @@ def test_audio_import_closes_nested_fields_files_targets_defaults_and_verificati
                         "audio_file": str(audio_file),
                         "notes": "closed import",
                     }
-                ]
+                ],
+                "auto_check_out_to_source_control": True,
             },
             version="2023.1",
         )
@@ -1167,7 +1300,7 @@ def test_audio_import_closes_nested_fields_files_targets_defaults_and_verificati
             ],
             "importOperation": "createNew",
             "autoAddToSourceControl": False,
-            "autoCheckOutToSourceControl": False,
+            "autoCheckOutToSourceControl": True,
         },
         "options": {
             "return": [
@@ -1183,6 +1316,14 @@ def test_audio_import_closes_nested_fields_files_targets_defaults_and_verificati
                 "audioSource:language",
             ]
         },
+    }
+    assert prepared["semantic_preview"]["envelope"]["metadata"][
+        "source_control_policy"
+    ] == {
+        "auto_add_to_source_control": False,
+        "auto_check_out_to_source_control": True,
+        "auto_check_out_to_source_control_supported": True,
+        "auto_check_out_to_source_control_dispatched": True,
     }
     closed_plan = prepared["pre_state"]["closed_import_plan"]
     assert closed_plan["file_proofs"][0]["size"] == audio_file.stat().st_size

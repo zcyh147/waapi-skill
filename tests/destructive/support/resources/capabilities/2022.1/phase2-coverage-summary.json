@@ -4025,7 +4025,7 @@
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "selective-execution",
+      "achieved_status": "guarded-execution",
       "blocking_condition": "",
       "category": "debug",
       "counts_as_behavioral": false,
@@ -4038,7 +4038,7 @@
         "tests/unit/test_public_route_program_matrix.py",
         "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
+      "future_review_trigger": "Revisit when a version changes a private schema, disconnect behavior, or process lifecycle.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "topic",
       "phase1_behavioral_evidence": {
@@ -4047,18 +4047,18 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
+      "review_trigger": "Revisit when a version changes a private schema, disconnect behavior, or process lifecycle.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.debug.assertFailed",
-      "user_approved_rationale": "Only generateToneWAV is executable through an isolated transaction; assert, crash, automation, WAL, restart, and validateCall endpoints remain explicit exclusions.",
+      "user_approved_rationale": "Debug reads, process-wide modes, and deliberate host controls are exposed only through separate fixed or confirmed routes with explicit lifecycle evidence.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "selective-execution",
+      "achieved_status": "guarded-execution",
       "blocking_condition": "",
       "category": "debug",
       "counts_as_behavioral": false,
@@ -4071,7 +4071,7 @@
         "tests/unit/test_public_route_program_matrix.py",
         "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
+      "future_review_trigger": "Revisit when a version changes a private schema, disconnect behavior, or process lifecycle.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -4080,18 +4080,18 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
+      "review_trigger": "Revisit when a version changes a private schema, disconnect behavior, or process lifecycle.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.debug.enableAsserts",
-      "user_approved_rationale": "Only generateToneWAV is executable through an isolated transaction; assert, crash, automation, WAL, restart, and validateCall endpoints remain explicit exclusions.",
+      "user_approved_rationale": "Debug reads, process-wide modes, and deliberate host controls are exposed only through separate fixed or confirmed routes with explicit lifecycle evidence.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "selective-execution",
+      "achieved_status": "guarded-execution",
       "blocking_condition": "",
       "category": "debug",
       "counts_as_behavioral": false,
@@ -4104,7 +4104,7 @@
         "tests/unit/test_public_route_program_matrix.py",
         "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
+      "future_review_trigger": "Revisit when a version changes a private schema, disconnect behavior, or process lifecycle.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -4113,18 +4113,18 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
+      "review_trigger": "Revisit when a version changes a private schema, disconnect behavior, or process lifecycle.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.debug.enableAutomationMode",
-      "user_approved_rationale": "Only generateToneWAV is executable through an isolated transaction; assert, crash, automation, WAL, restart, and validateCall endpoints remain explicit exclusions.",
+      "user_approved_rationale": "Debug reads, process-wide modes, and deliberate host controls are exposed only through separate fixed or confirmed routes with explicit lifecycle evidence.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "selective-execution",
+      "achieved_status": "guarded-execution",
       "blocking_condition": "",
       "category": "debug",
       "counts_as_behavioral": false,
@@ -4137,7 +4137,7 @@
         "tests/unit/test_public_route_program_matrix.py",
         "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
+      "future_review_trigger": "Revisit when a version changes a private schema, disconnect behavior, or process lifecycle.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -4146,18 +4146,18 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
+      "review_trigger": "Revisit when a version changes a private schema, disconnect behavior, or process lifecycle.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.debug.testAssert",
-      "user_approved_rationale": "Only generateToneWAV is executable through an isolated transaction; assert, crash, automation, WAL, restart, and validateCall endpoints remain explicit exclusions.",
+      "user_approved_rationale": "Debug reads, process-wide modes, and deliberate host controls are exposed only through separate fixed or confirmed routes with explicit lifecycle evidence.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
     {
-      "achieved_status": "selective-execution",
+      "achieved_status": "guarded-execution",
       "blocking_condition": "",
       "category": "debug",
       "counts_as_behavioral": false,
@@ -4170,7 +4170,7 @@
         "tests/unit/test_public_route_program_matrix.py",
         "tests/unit/test_public_route_negative_contracts.py"
       ],
-      "future_review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
+      "future_review_trigger": "Revisit when a version changes a private schema, disconnect behavior, or process lifecycle.",
       "inventory_coverage": "reflected-schema-ok",
       "item_type": "function",
       "phase1_behavioral_evidence": {
@@ -4179,13 +4179,13 @@
         "test": "tests/unit/test_no_silent_skips.py::test_every_deferred_api_has_registry_evidence"
       },
       "phase1_status": "deferred-with-substitute-test",
-      "review_trigger": "Revisit only if Audiokinetic publishes a supported non-debug business contract for an excluded endpoint.",
+      "review_trigger": "Revisit when a version changes a private schema, disconnect behavior, or process lifecycle.",
       "source_coverage_uri": "tests/destructive/support/resources/capabilities/2022.1/api-coverage.json",
       "source_matrix_uri": "tests/destructive/support/resources/capabilities/2022.1/live-coverage-matrix.json",
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.debug.testCrash",
-      "user_approved_rationale": "Only generateToneWAV is executable through an isolated transaction; assert, crash, automation, WAL, restart, and validateCall endpoints remain explicit exclusions.",
+      "user_approved_rationale": "Debug reads, process-wide modes, and deliberate host controls are exposed only through separate fixed or confirmed routes with explicit lifecycle evidence.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -4686,11 +4686,10 @@
     "phase2_status_counts": {
       "conformance-only-skip": 11,
       "fake-route-tested": 25,
-      "guarded-execution": 11,
+      "guarded-execution": 16,
       "isolated-transaction": 12,
       "managed-transaction": 4,
       "sandbox-mutating-tested": 13,
-      "selective-execution": 5,
       "still-deferred-with-evidence": 63
     },
     "profiler_backed_tested_count": 0,

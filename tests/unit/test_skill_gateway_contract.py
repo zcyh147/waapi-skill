@@ -36,8 +36,10 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
     assert "before `ls`, `find`, `rg`" in skill
     assert "inline Python" in skill
     assert "unsupported_by_skill_interface" in skill
-    assert "A fail-closed execution registry assigns all 814 reflected version/API rows" in skill
-    assert "769 executable rows and 45 explicit exclusions" in skill
+    assert "assigns all 814 reflected version/API rows to exactly one catalog decision" in skill
+    assert "808 packaged route-contract rows and 6 explicit exclusions" in skill
+    assert "still require a live Authoring host" in skill
+    assert "824 packaged route-contract version/API rows" in skill
     assert "each `transaction_operation` row requires immutable preview/confirmation through exactly one declared closed lane" in skill
     assert "`waapi.undoGroup` for the three Undo members, and `waapi.call` only when the catalog explicitly lists it" in skill
     assert "FIXED_COMMAND_REQUIRED" in skill
@@ -207,25 +209,27 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
     coverage_contract = (SKILL_ROOT / "references" / "waapi-coverage.md").read_text(encoding="utf-8")
 
     expected_rows = (
-        "| `2021.1` | 126 | 119 | 93 | 26 | 7 |",
-        "| `2022.1` | 144 | 137 | 106 | 31 | 7 |",
-        "| `2023.1` | 181 | 170 | 139 | 31 | 11 |",
-        "| `2024.1` | 178 | 168 | 139 | 29 | 10 |",
-        "| `2025.1` | 185 | 175 | 145 | 30 | 10 |",
+        "| `2021.1` | 126 | 124 | 97 | 27 | 2 |",
+        "| `2022.1` | 144 | 142 | 110 | 32 | 2 |",
+        "| `2023.1` | 181 | 179 | 147 | 32 | 2 |",
+        "| `2024.1` | 178 | 178 | 148 | 30 | 0 |",
+        "| `2025.1` | 185 | 185 | 154 | 31 | 0 |",
     )
     for readme in (english, chinese):
         for row in expected_rows:
             assert row in readme
         assert "**814**" in readme
-        assert "**769**" in readme
-        assert "**622**" in readme
-        assert "**147**" in readme
-        assert "**45**" in readme
-        assert "1457" in readme
+        assert "**808**" in readme
+        assert "**656**" in readme
+        assert "**152**" in readme
+        assert "**6**" in readme
+        assert "1901" in readme
         assert "./skills/waapi-skill/references/waapi-coverage.md" in readme
 
-    assert "188 unique executable WAAPI URIs" in english
-    assert "188 个唯一可执行 WAAPI URI" in chinese
-    assert "not a claim that all 769 rows have been exercised against a real Wwise process" in english
-    assert "不等于已经在真实 Wwise 进程中逐一运行了全部 769 行" in chinese
-    assert "currently contains 1457 passing tests" in coverage_contract
+    assert "198 unique routed WAAPI URIs" in english
+    assert "198 个唯一已封装 WAAPI URI" in chinese
+    assert "still require a live Authoring host" in " ".join(english.split())
+    assert "仍要求实时宿主为 Authoring" in " ".join(chinese.split())
+    assert "not a claim that all 808 rows have been exercised against a real Wwise process" in english
+    assert "不等于已经在真实 Wwise 进程中逐一运行了全部 808 行" in chinese
+    assert "currently contains 1901 passing tests" in coverage_contract

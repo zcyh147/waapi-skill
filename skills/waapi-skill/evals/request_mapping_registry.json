@@ -4,6 +4,53 @@
   "execution_policy": "a scenario referenced by any non-closed requirement is blocked from real execution until every requirement for that scenario is closed",
   "requirements": [
     {
+      "id": "debug.dangerous_acknowledgements",
+      "kind": "enum_map",
+      "status": "closed",
+      "versions": ["2022.1", "2023.1"],
+      "apis": [
+        "ak.wwise.debug.restartWaapiServers",
+        "ak.wwise.debug.testAssert",
+        "ak.wwise.debug.testCrash"
+      ],
+      "case_ids": [
+        "DBG22-TEST-ASSERT-01",
+        "DBG22-TEST-ASSERT-02",
+        "DBG22-TEST-CRASH-01",
+        "DBG22-TEST-CRASH-02",
+        "DBG23-RESTART-WAAPI-01",
+        "DBG23-RESTART-WAAPI-02"
+      ],
+      "json_pointers": ["/args/acknowledge"],
+      "required_semantics": [
+        "restart_waapi_servers means one WAAPI-server restart without retry",
+        "trigger_debug_assert means one deliberate test assertion",
+        "crash_wwise_process means one deliberate process crash"
+      ],
+      "evidence": [
+        "the packaged operation schemas expose one exact const acknowledgement for each dangerous host-control operation",
+        "every natural prompt contains its exact acknowledgement before immutable preview and every case has a separate confirmation turn"
+      ]
+    },
+    {
+      "id": "debug.validate_call_targets",
+      "kind": "schema_map",
+      "status": "closed",
+      "versions": ["2024.1"],
+      "apis": ["ak.wwise.debug.validateCall"],
+      "case_ids": ["DBG24-VALIDATE-CALL-01", "DBG24-VALIDATE-CALL-02"],
+      "json_pointers": ["/args/id", "/args/args", "/args/options"],
+      "required_semantics": [
+        "automation-mode enable true request with empty options",
+        "current-version information query with empty args and options",
+        "validate only without dispatching the target function"
+      ],
+      "evidence": [
+        "the fixed debug-validate-call route resolves only reflected function IDs through CapabilityCatalog",
+        "the two target request shapes are closed by the packaged 2024.1 schemas before live validation"
+      ]
+    },
+    {
       "id": "log.channel_and_severity",
       "kind": "enum_map",
       "status": "missing",
@@ -24,6 +71,35 @@
       "json_pointers": ["/args/channel"],
       "required_semantics": ["the requested business log channel must be explicit and map to an accepted token"],
       "evidence": ["log.get requires channel through an unresolved logCentralChannel reference and the cases do not yet close the choice"]
+    },
+    {
+      "id": "lua.source_authority_and_files",
+      "kind": "schema_map",
+      "status": "closed",
+      "versions": ["2023.1"],
+      "apis": ["ak.wwise.cli.executeLuaScript", "ak.wwise.core.executeLuaScript"],
+      "case_ids": [
+        "LUA23-CLI-FILE-01",
+        "LUA23-CLI-FILE-02",
+        "LUA23-CORE-FILE-01",
+        "LUA23-CORE-FILE-02"
+      ],
+      "json_pointers": [
+        "/args/script_file",
+        "/args/io_root",
+        "/args/source_authority",
+        "/args/wa_args"
+      ],
+      "required_semantics": [
+        "script path copied verbatim from the current user prompt",
+        "canonical existing file contained by the visible isolated root",
+        "user_supplied_verbatim source-authority assertion",
+        "closed strict-JSON custom arguments that cannot replace reserved loader fields"
+      ],
+      "evidence": [
+        "the Lua operation schemas and debug_lua builder close file type, containment, size, hash, source authority, and reserved-field rejection",
+        "each case exposes script_file and io_root in the rendered user prompt and names every custom argument semantically"
+      ]
     },
     {
       "id": "object.attenuation_point_shape",

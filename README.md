@@ -91,22 +91,72 @@ The goal is not just to describe WAAPI correctly. The goal is to make the skill 
 
 ## Packaged API coverage
 
-Coverage is counted by **Wwise version/API row** because the same URI can have a different schema, route, or safety decision in each Wwise release. A row counts as covered only when the packaged gateway can actually execute it; a hard boundary or documentation-only description does not count.
+Coverage is counted by **Wwise version/API row** because the same URI can have a different schema, route, or safety decision in each Wwise release. A row counts as covered only when the packaged gateway has a public execution contract for it; a hard boundary or documentation-only description does not count. Live host, version, and safety preconditions remain separate and must still pass before dispatch.
 
-| Wwise version | Reflected rows | Executable rows | Executable functions | Executable topics | Excluded rows |
+The default `wwise-console` profile is the canonical WwiseConsole-reflected
+surface:
+
+| Wwise version | Reflected rows | Packaged route rows | Routed functions | Routed topics | Registry exclusions |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `2021.1` | 126 | 119 | 93 | 26 | 7 |
-| `2022.1` | 144 | 137 | 106 | 31 | 7 |
-| `2023.1` | 181 | 170 | 139 | 31 | 11 |
-| `2024.1` | 178 | 168 | 139 | 29 | 10 |
-| `2025.1` | 185 | 175 | 145 | 30 | 10 |
-| **Total** | **814** | **769** | **622** | **147** | **45** |
+| `2021.1` | 126 | 124 | 97 | 27 | 2 |
+| `2022.1` | 144 | 142 | 110 | 32 | 2 |
+| `2023.1` | 181 | 179 | 147 | 32 | 2 |
+| `2024.1` | 178 | 178 | 148 | 30 | 0 |
+| `2025.1` | 185 | 185 | 154 | 31 | 0 |
+| **Total** | **814** | **808** | **656** | **152** | **6** |
 
-Those 769 rows represent **188 unique executable WAAPI URIs**. They are routed through fixed commands, bounded direct calls, bounded topic waits, confirmed transactions, isolated I/O transactions, or the same-connection Undo Group composite. The 45 excluded version rows represent 12 unique URIs limited to arbitrary Lua execution, unsafe/private debug surfaces, and unrestricted UI command registration/execution.
+Those 808 rows represent **198 unique routed WAAPI URIs**. This is packaged
+interface coverage, not a claim that all 808 rows dispatch on WwiseConsole:
+the three UI-command routes retained in each 2021.1–2023.1 Console-reflected
+manifest still require a live Authoring host and fail before business dispatch
+on WwiseConsole. The separate
+`wwise-authoring-ui` profile adds only the five fixed
+`ak.wwise.ui.commands.*` URIs reflected from real Wwise Authoring:
 
-The named operation layer also provides closed, version-aware business contracts for `ak.wwise.core.object.create`, `ak.wwise.core.object.set`, `ak.wwise.core.audio.import`, `ak.wwise.core.audio.importTabDelimited`, `ak.wwise.core.soundbank.generate`, `ak.wwise.core.soundbank.convertExternalSources`, and `ak.wwise.core.soundbank.processDefinitionFiles`. `object.create`, both import routes, and `soundbank.generate` are reflected and packaged for all five versions; `object.set`, External Sources conversion, and Definition-file processing are packaged for `2022.1`–`2025.1` because those URIs are not reflected in the `2021.1` inventory. For `soundbank.generate`, Wwise `2021.1` derives its project and output context from the live Project object's `filePath` and `workunitIsDirty` accessors plus a contained, hashed, strictly parsed `.wproj`; no caller-authored project layout is accepted. Later versions bind the reflected `core.getProjectInfo` result. These routes bind an immutable preview to the later confirmation and verify the resulting object topology, imported source evidence, inclusions, or generated artifacts instead of trusting only a successful WAAPI response. Once a URI has an implemented dedicated operation, the generic `waapi.call` fallback is rejected with `DEDICATED_OPERATION_REQUIRED` so raw payloads cannot bypass that contract.
+| Wwise version | Packaged overlay rows | Packaged route rows | Routed functions | Routed topics | Registry exclusions |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `2021.1` | 126 | 126 | 99 | 27 | 0 |
+| `2022.1` | 144 | 144 | 112 | 32 | 0 |
+| `2023.1` | 181 | 181 | 149 | 32 | 0 |
+| `2024.1` | 183 | 183 | 152 | 31 | 0 |
+| `2025.1` | 190 | 190 | 158 | 32 | 0 |
+| **Total** | **824** | **824** | **670** | **154** | **0** |
 
-The focused code-only gate currently runs **1457 program tests**, including one executable-route case for every covered version/API row, the gateway-owned conversation-context contract, and the named-operation contract/verifier matrices above. This proves packaged routing, schema handling, safety boundaries, I/O confinement, transaction behavior, fake-dispatch execution, and deterministic onboarding facts; it is not a claim that all 769 rows have been exercised against a real Wwise process. The completed memory-off `h80-release-c38` campaign separately passed all 80 approved real-Wwise heavy-API scenarios (70 on 2022.1, five on 2024.1, and five on 2025.1); that evidence applies to those scenarios and their sealed candidate, not the whole interface. See [the detailed five-version coverage contract](./skills/waapi-skill/references/waapi-coverage.md).
+The Authoring profile represents **200 unique routed WAAPI URIs**. On a matching
+Authoring host, all 824 rows have a public route. It is
+the Console manifest plus a narrowly reflected UI-command supplement, not a
+claim that the complete Authoring API inventory was reflected. The gateway
+selects the live host profile from `getInfo.isCommandLine`; UI-command calls
+are rejected before business dispatch on WwiseConsole. The recorded command-ID
+counts—317, 451, 475, 594, and 623 for Wwise 2021.1 through 2025.1—are observed
+project/plugin/add-on snapshots, not runtime allowlists. Execution always
+checks the current live `getCommands` result.
+
+The five Authoring resources were collected with 35 read-only WAAPI calls in
+total: per version, one `getInfo`, five fixed-URI `getSchema` calls, and one
+`getCommands`. No live UI command was executed, registered, or unregistered.
+Those transaction paths and the strengthened `object.createPlugin` readback
+verifier are program/fake-client evidence in this candidate, not new live
+business-mutation evidence.
+
+Inspect either packaged profile offline with
+`gateway.py capabilities --profile wwise-console` or
+`gateway.py capabilities --profile wwise-authoring-ui`; this catalog option
+cannot override the profile detected from a live host.
+
+Both profiles route APIs through fixed commands, bounded direct calls, bounded
+topic waits, confirmed transactions, isolated I/O transactions, or the
+same-connection Undo Group composite. Lua file routes accept only an existing
+`.lua` file whose path, size, and hash are rebound, while Wwise 2025.1 also has
+an exact inline-source route; `source_authority` is a caller assertion, not
+runtime proof of conversational provenance. The Skill never generates,
+repairs, or wraps Lua. Private debug APIs use bounded reads/topics or explicit
+non-retry transactions, with restart/assert/crash terminating in an
+indeterminate lifecycle result.
+
+The named operation layer also provides closed, version-aware business contracts for object creation and mutation, plug-in creation, RTPC/platform-link editing, audio import, SoundBank workflows, Lua/debug operations, screenshots, and Authoring UI command execution/registration/unregistration. `object.createPlugin` accepts only an exact class ID and a closed Source/Effect descriptor, uses fixed Effect references in `2022.1` or an appended EffectSlot in later versions, and verifies the created plug-in through live readback. UI command execution verifies only the reflected empty result—not the arbitrary GUI or project effect—while registration and unregistration additionally verify live command-ID membership. For `soundbank.generate`, Wwise `2021.1` derives its project and output context from the live Project object's `filePath` and `workunitIsDirty` accessors plus a contained, hashed, strictly parsed `.wproj`; no caller-authored project layout is accepted. Later versions bind the reflected `core.getProjectInfo` result. These routes bind an immutable preview to the later confirmation and use the strongest available operation-specific readback instead of trusting only a successful WAAPI response. Once a URI has an implemented dedicated operation, the generic `waapi.call` fallback is rejected with `DEDICATED_OPERATION_REQUIRED` so raw payloads cannot bypass that contract.
+
+The focused code-only gate currently runs **1901 program tests**, including one packaged-route-contract case for every covered default-profile version/API row, the separate Authoring overlay/UI-command contracts, the gateway-owned conversation-context contract, and the named-operation contract/verifier matrices above. This proves packaged routing, schema handling, safety boundaries, I/O confinement, transaction behavior, fake-dispatch execution, and deterministic onboarding facts; it is not a claim that all 808 rows have been exercised against a real Wwise process. The completed memory-off `h80-release-c38` campaign separately passed all 80 approved real-Wwise heavy-API scenarios (70 on 2022.1, five on 2024.1, and five on 2025.1); that evidence applies to those scenarios and their sealed candidate, not the whole interface. See [the detailed five-version coverage contract](./skills/waapi-skill/references/waapi-coverage.md).
 
 ---
 

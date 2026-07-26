@@ -108,9 +108,10 @@ def test_bounded_call_returns_validated_business_result_to_agent(tmp_path: Path)
     "api, expected_status",
     (
         ("ak.wwise.core.project.save", "transaction_required"),
-        ("ak.wwise.debug.testCrash", "unsupported_by_skill_interface"),
-        ("ak.wwise.ui.commands.register", "unsupported_by_skill_interface"),
-        ("ak.wwise.ui.commands.execute", "unsupported_by_skill_interface"),
+        ("ak.wwise.debug.testCrash", "transaction_required"),
+        ("ak.wwise.ui.commands.register", "transaction_required"),
+        ("ak.wwise.ui.commands.execute", "transaction_required"),
+        ("ak.wwise.ui.commands.unregister", "transaction_required"),
     ),
 )
 def test_call_cannot_bypass_transaction_or_exclusion_even_with_destructive_env(
@@ -139,7 +140,10 @@ def test_call_cannot_bypass_transaction_or_exclusion_even_with_destructive_env(
 
 @pytest.mark.parametrize("api", ("ak.wwise.core.getInfo", "ak.wwise.debug.testCrash"))
 def test_generic_transaction_accepts_only_registered_transaction_lanes(api: str) -> None:
-    with pytest.raises(OperationContractError, match="route|transaction"):
+    with pytest.raises(
+        OperationContractError,
+        match="route|transaction|dedicated operation",
+    ):
         parse_operation_request(
             {
                 "contract": OPERATION_REQUEST_CONTRACT,
@@ -177,7 +181,12 @@ def test_generic_transaction_cannot_bypass_an_implemented_dedicated_operation(
         )
 
     assert blocked.value.error_code == "DEDICATED_OPERATION_REQUIRED"
-    assert blocked.value.details["required_operations"] == [required_operation]
+    expected_operations = (
+        ["object.createPlugin", "object.set", "object.setRTPC"]
+        if api == "ak.wwise.core.object.set"
+        else [required_operation]
+    )
+    assert blocked.value.details["required_operations"] == expected_operations
 
 
 def test_recursive_schema_validation_rejects_nested_range_and_bad_result() -> None:

@@ -26,16 +26,6 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # silently turn a former category-wide block into additional URI exclusions.
 EXPECTED_EXCLUSION_URIS = frozenset(
     {
-        "ak.wwise.cli.executeLuaScript",
-        "ak.wwise.core.executeLuaScript",
-        "ak.wwise.debug.assertFailed",
-        "ak.wwise.debug.enableAsserts",
-        "ak.wwise.debug.enableAutomationMode",
-        "ak.wwise.debug.getWalTree",
-        "ak.wwise.debug.restartWaapiServers",
-        "ak.wwise.debug.testAssert",
-        "ak.wwise.debug.testCrash",
-        "ak.wwise.debug.validateCall",
         "ak.wwise.ui.commands.register",
         "ak.wwise.ui.commands.execute",
     }
@@ -58,7 +48,7 @@ def test_category_notes_describe_guarded_routes_not_inventory_only_statuses() ->
     expected_statuses = {
         "cli": "isolated-transaction",
         "core.remote": "managed-transaction",
-        "debug": "selective-execution",
+        "debug": "guarded-execution",
         "ui": "guarded-execution",
         "ui.commands": "guarded-execution",
         "ui.project": "guarded-execution",
@@ -146,7 +136,7 @@ def test_safe_debug_file_api_uses_isolated_transaction_in_supported_versions() -
         assert contract.executable is True
 
 
-def test_only_the_twelve_named_uris_fail_closed_before_connect() -> None:
+def test_only_the_two_named_uris_fail_closed_before_connect() -> None:
     assert frozenset(APPROVED_EXCLUSIONS) == EXPECTED_EXCLUSION_URIS
 
     registry = ExecutionContractRegistry()

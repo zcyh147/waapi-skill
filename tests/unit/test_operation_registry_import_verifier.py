@@ -544,7 +544,15 @@ def test_tab_delimited_import_remains_objects_only_in_every_version(
     assert shape["evidence"]["actual_keys"] == ["objects"]
 
 
-def test_tab_delimited_prepare_and_verify_share_the_closed_oracle(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("version", "auto_check_out_to_source_control"),
+    [("2022.1", None), ("2023.1", True)],
+)
+def test_tab_delimited_prepare_and_verify_share_the_closed_oracle(
+    version: str,
+    auto_check_out_to_source_control: bool | None,
+    tmp_path: Path,
+) -> None:
     source = _media(tmp_path, "tab-e2e-source.wav")
     copied = _media(tmp_path, "Originals/SFX/Batch/tab-e2e.wav")
     import_file = tmp_path / "batch.tsv"
@@ -560,16 +568,21 @@ def test_tab_delimited_prepare_and_verify_share_the_closed_oracle(tmp_path: Path
         "parent": {"id": "{77777777-7777-7777-7777-777777777777}"},
         "notes": "",
     }
+    arguments: dict[str, Any] = {
+        "import_file": str(import_file),
+        "import_location": {"kind": "path", "value": OLD_ROOT},
+        "import_language": "SFX",
+    }
+    if auto_check_out_to_source_control is not None:
+        arguments["auto_check_out_to_source_control"] = (
+            auto_check_out_to_source_control
+        )
     parsed = parse_operation_request(
         {
             "contract": OPERATION_REQUEST_CONTRACT,
-            "version": "2022.1",
+            "version": version,
             "operation": "audio.importTabDelimited",
-            "arguments": {
-                "import_file": str(import_file),
-                "import_location": {"kind": "path", "value": OLD_ROOT},
-                "import_language": "SFX",
-            },
+            "arguments": arguments,
         }
     )
     prepared = prepare_operation(
@@ -595,7 +608,7 @@ def test_tab_delimited_prepare_and_verify_share_the_closed_oracle(tmp_path: Path
     verified = verify_prepared_operation(
         prepared,
         execution_result=_result(
-            "2022.1",
+            version,
             [live],
             [copied],
             source_operation="audio.importTabDelimited",
@@ -606,6 +619,20 @@ def test_tab_delimited_prepare_and_verify_share_the_closed_oracle(tmp_path: Path
     assert prepared["verification_plan"]["kind"] == "closed-audio-import"
     assert prepared["verification_plan"]["result_contract"] == "objects_only"
     assert prepared["dispatch"]["args"]["importLocation"] == PARENT_GUID
+    auto_check_out_supported = version == "2023.1"
+    assert (
+        "autoCheckOutToSourceControl" in prepared["dispatch"]["args"]
+    ) is auto_check_out_supported
+    assert prepared["semantic_preview"]["envelope"]["metadata"][
+        "source_control_policy"
+    ] == {
+        "auto_add_to_source_control": False,
+        "auto_check_out_to_source_control": bool(
+            auto_check_out_to_source_control
+        ),
+        "auto_check_out_to_source_control_supported": auto_check_out_supported,
+        "auto_check_out_to_source_control_dispatched": auto_check_out_supported,
+    }
     ancestor_snapshot = next(
         snapshot
         for snapshot in prepared["pre_state"]["import_guard"]["path_snapshots"]

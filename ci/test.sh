@@ -403,13 +403,28 @@ run_program() {
     tests/unit/test_gateway_session_context.py
     tests/unit/test_public_route_coverage_contract.py
     tests/unit/test_public_route_program_matrix.py
+    tests/unit/test_stable_read_adapters.py
+    tests/unit/test_cli_request_templates.py
+    tests/unit/test_debug_read_gateway.py
+    tests/unit/test_debug_lua_operations.py
+    tests/unit/test_debug_lua_gateway_full_chain.py
     tests/unit/test_public_route_negative_contracts.py
     tests/unit/test_subscriptions.py
     tests/unit/test_io_policy.py
+    tests/unit/test_transaction_locality.py
     tests/unit/test_platform_paths.py
     tests/unit/test_transaction_cleanup.py
     tests/unit/test_operation_import.py
     tests/unit/test_operation_object.py
+    tests/unit/test_operation_plugin.py
+    tests/unit/test_operation_plugin_registry.py
+    tests/unit/test_operation_platform_rtpc.py
+    tests/unit/test_authoring_ui_commands_collector.py
+    tests/unit/test_authoring_ui_commands_manifest.py
+    tests/unit/test_authoring_ui_profile.py
+    tests/unit/test_operation_ui_commands.py
+    tests/unit/test_operation_ui_commands_registry.py
+    tests/unit/test_authoring_ui_gateway.py
     tests/unit/test_operation_soundbank.py
     tests/unit/test_operation_registry.py
     tests/unit/test_operation_registry_import_verifier.py
@@ -421,7 +436,13 @@ run_program() {
     tests/unit/test_skill_contract_protocol.py
     tests/unit/test_transaction_gateway.py::test_operation_schema_owns_exact_audio_convert_fast_route_contract
     tests/unit/test_transaction_gateway.py::test_generic_manifest_call_runs_full_preview_confirm_execute_verify_chain
+    tests/unit/test_transaction_gateway.py::test_object_create_plugin_runs_full_preview_confirm_execute_verify_chain
     tests/unit/test_transaction_gateway.py::test_generic_isolated_call_runs_full_chain_with_bound_io_audit
+    tests/unit/test_transaction_gateway.py::test_remote_local_filesystem_previews_fail_before_project_or_path_proof
+    tests/unit/test_transaction_gateway.py::test_confirmed_generic_isolated_transaction_stays_confirmed_on_remote_execute
+    tests/unit/test_transaction_gateway.py::test_confirmed_named_soundbank_transaction_stays_confirmed_on_remote_execute
+    tests/unit/test_transaction_gateway.py::test_remote_named_capture_screen_is_not_a_locality_transaction
+    tests/unit/test_transaction_gateway.py::test_debug_test_crash_is_confirmed_dispatched_once_and_terminal_indeterminate
     tests/unit/test_transaction_gateway.py::test_local_wine_cli_execute_translates_only_the_transient_dispatch_paths
     tests/unit/test_transaction_gateway.py::test_local_wine_cli_mapping_failure_requires_repreview_before_execution_start
     tests/unit/test_transaction_gateway.py::test_generate_soundbank_verify_uses_sealed_result_context_and_runtime_without_project_probe

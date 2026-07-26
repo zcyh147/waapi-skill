@@ -15,6 +15,13 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping
 
+from .authoring_ui_commands_manifest import (
+    AUTHORING_UI_COMMAND_FUNCTION_URIS,
+    AUTHORING_UI_COMMAND_TOPIC_URIS,
+    AUTHORING_UI_COMMAND_URIS,
+    AuthoringUiCommandsSupplementError,
+    AuthoringUiCommandsSupplementMissingError,
+)
 from .manifest import ManifestStore
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 
@@ -24,30 +31,35 @@ MANIFEST_ROOT = SKILL_ROOT / "resources" / "manifest"
 
 PUBLIC_EXECUTION_CONTRACT = "waapi-skill.public-execution-contract/v1"
 PACKAGED_INVENTORY_SHA256 = "4644c792fdf55fe498e7dd9fc7de1475831801d1b363be8488fb13cbdfa826fa"
+CONSOLE_EXECUTION_PROFILE = "wwise-console"
+AUTHORING_UI_EXECUTION_PROFILE = "wwise-authoring-ui"
+PACKAGED_AUTHORING_UI_INVENTORY_SHA256 = (
+    "caa57fd7c0879a7b264d63b7a095c27893a9d2380f4f4d2cacf9a8be9c5c6cea"
+)
 
 EXPECTED_VERSION_COUNTS: Mapping[str, Mapping[str, int]] = MappingProxyType(
     {
         "2021.1": MappingProxyType(
-            {"functions": 99, "topics": 27, "public_functions": 93, "public_topics": 26, "public_total": 119}
+            {"functions": 99, "topics": 27, "public_functions": 97, "public_topics": 27, "public_total": 124}
         ),
         "2022.1": MappingProxyType(
-            {"functions": 112, "topics": 32, "public_functions": 106, "public_topics": 31, "public_total": 137}
+            {"functions": 112, "topics": 32, "public_functions": 110, "public_topics": 32, "public_total": 142}
         ),
         "2023.1": MappingProxyType(
-            {"functions": 149, "topics": 32, "public_functions": 139, "public_topics": 31, "public_total": 170}
+            {"functions": 149, "topics": 32, "public_functions": 147, "public_topics": 32, "public_total": 179}
         ),
         "2024.1": MappingProxyType(
-            {"functions": 148, "topics": 30, "public_functions": 139, "public_topics": 29, "public_total": 168}
+            {"functions": 148, "topics": 30, "public_functions": 148, "public_topics": 30, "public_total": 178}
         ),
         "2025.1": MappingProxyType(
-            {"functions": 154, "topics": 31, "public_functions": 145, "public_topics": 30, "public_total": 175}
+            {"functions": 154, "topics": 31, "public_functions": 154, "public_topics": 31, "public_total": 185}
         ),
     }
 )
 
-EXPECTED_PUBLIC_VERSION_ROWS = 769
+EXPECTED_PUBLIC_VERSION_ROWS = 808
 EXPECTED_MANIFEST_VERSION_ROWS = 814
-EXPECTED_PUBLIC_UNIQUE_URIS = 188
+EXPECTED_PUBLIC_UNIQUE_URIS = 198
 
 EXPECTED_VERSION_INVENTORY_SHA256: Mapping[str, str] = MappingProxyType(
     {
@@ -59,35 +71,84 @@ EXPECTED_VERSION_INVENTORY_SHA256: Mapping[str, str] = MappingProxyType(
     }
 )
 
+EXPECTED_AUTHORING_UI_VERSION_COUNTS: Mapping[
+    str,
+    Mapping[str, int],
+] = MappingProxyType(
+    {
+        "2021.1": MappingProxyType(
+            {
+                "functions": 99,
+                "topics": 27,
+                "public_functions": 99,
+                "public_topics": 27,
+                "public_total": 126,
+            }
+        ),
+        "2022.1": MappingProxyType(
+            {
+                "functions": 112,
+                "topics": 32,
+                "public_functions": 112,
+                "public_topics": 32,
+                "public_total": 144,
+            }
+        ),
+        "2023.1": MappingProxyType(
+            {
+                "functions": 149,
+                "topics": 32,
+                "public_functions": 149,
+                "public_topics": 32,
+                "public_total": 181,
+            }
+        ),
+        "2024.1": MappingProxyType(
+            {
+                "functions": 152,
+                "topics": 31,
+                "public_functions": 152,
+                "public_topics": 31,
+                "public_total": 183,
+            }
+        ),
+        "2025.1": MappingProxyType(
+            {
+                "functions": 158,
+                "topics": 32,
+                "public_functions": 158,
+                "public_topics": 32,
+                "public_total": 190,
+            }
+        ),
+    }
+)
+EXPECTED_AUTHORING_UI_MANIFEST_VERSION_ROWS = 824
+EXPECTED_AUTHORING_UI_PUBLIC_VERSION_ROWS = 824
+EXPECTED_AUTHORING_UI_PUBLIC_UNIQUE_URIS = 200
+EXPECTED_AUTHORING_UI_VERSION_INVENTORY_SHA256: Mapping[str, str] = (
+    MappingProxyType(
+        {
+            "2021.1": "80caea46b0613135df09ea9b74ba55d261061b7b7e6f0cc54a93793bccc60e43",
+            "2022.1": "3c7ee729d0e50453bb7b1b04c955f3a94562a9b3e5abcbde8f53f8ab902145df",
+            "2023.1": "cb513e3584a00f40fd0998d7a73c4a46ecd2528a1351c6ee4f6c26e88734af33",
+            "2024.1": "c63b44b050ffa4c04d2ed8b845157e95c72342bc862589621b2324919fa7f0db",
+            "2025.1": "1187491924ac220713ec094984b7aa5463293df4c7db6c0566013d1884172f4e",
+        }
+    )
+)
+
+AUTHORING_UI_DEDICATED_OPERATIONS: Mapping[str, str] = MappingProxyType(
+    {
+        "ak.wwise.ui.commands.execute": "ui.commands.execute",
+        "ak.wwise.ui.commands.register": "ui.commands.register",
+        "ak.wwise.ui.commands.unregister": "ui.commands.unregister",
+    }
+)
+
 
 APPROVED_EXCLUSIONS: Mapping[str, str] = MappingProxyType(
     {
-        "ak.wwise.cli.executeLuaScript": (
-            "Arbitrary Lua would bypass the packaged Skill implementation and recreate ad-hoc code execution."
-        ),
-        "ak.wwise.core.executeLuaScript": (
-            "Arbitrary Lua would bypass the packaged Skill implementation and recreate ad-hoc code execution."
-        ),
-        "ak.wwise.debug.enableAsserts": (
-            "This debug-only call changes process-wide assert behavior and can destabilize the Wwise host."
-        ),
-        "ak.wwise.debug.enableAutomationMode": (
-            "This debug-only call changes global automation/dialog behavior in the Wwise host."
-        ),
-        "ak.wwise.debug.getWalTree": (
-            "This private debug endpoint exposes internal WAL state and has no supported business contract."
-        ),
-        "ak.wwise.debug.restartWaapiServers": (
-            "This internal endpoint deliberately interrupts WAAPI and cannot provide a reliable completion contract."
-        ),
-        "ak.wwise.debug.testAssert": "This private test endpoint deliberately triggers an assertion.",
-        "ak.wwise.debug.testCrash": "This private test endpoint deliberately crashes Wwise.",
-        "ak.wwise.debug.validateCall": (
-            "This debug-build endpoint validates arbitrary nested call documents rather than a business operation."
-        ),
-        "ak.wwise.debug.assertFailed": (
-            "Observing this debug topic reliably requires manufacturing an unsafe assertion."
-        ),
         "ak.wwise.ui.commands.register": (
             "Command add-ons can persist for the Wwise process and launch arbitrary external programs or scripts."
         ),
@@ -101,13 +162,24 @@ APPROVED_EXCLUSIONS: Mapping[str, str] = MappingProxyType(
 FIXED_COMMANDS_BY_URI: Mapping[str, tuple[str, ...]] = MappingProxyType(
     {
         "ak.wwise.core.getInfo": ("status",),
-        "ak.wwise.core.getProjectInfo": ("status",),
+        "ak.wwise.core.getProjectInfo": (
+            "status",
+            "project-default-work-units",
+        ),
         "ak.wwise.core.object.get": ("query-object", "buses"),
         "ak.wwise.core.object.getAttenuationCurve": ("metadata attenuation-curve",),
         "ak.wwise.core.object.getPropertyAndReferenceNames": ("metadata names",),
         "ak.wwise.core.object.getPropertyInfo": ("metadata property-info",),
         "ak.wwise.core.object.getTypes": ("metadata types",),
         "ak.wwise.core.object.isPropertyEnabled": ("metadata property-enabled",),
+        "ak.wwise.core.profiler.getGameObjects": (
+            "profiler-game-objects",
+        ),
+        "ak.wwise.core.profiler.getVoiceContributions": (
+            "profiler-voice-contributions",
+        ),
+        "ak.wwise.debug.getWalTree": ("debug-wal-tree",),
+        "ak.wwise.debug.validateCall": ("debug-validate-call",),
         "ak.wwise.ui.getSelectedObjects": ("selected",),
     }
 )
@@ -164,6 +236,7 @@ FILESYSTEM_OR_EXTERNAL_URIS = frozenset(
         "ak.wwise.core.soundbank.generate",
         "ak.wwise.core.soundbank.processDefinitionFiles",
         "ak.wwise.debug.generateToneWAV",
+        "ak.wwise.core.executeLuaScript",
         "ak.wwise.ui.captureScreen",
         # Opening or creating a UI project can migrate, check out, or write
         # project files.  Keep those calls in the same isolated lane as their
@@ -225,6 +298,7 @@ POST_EXECUTION_PROJECT_GUARD_POLICY_BY_URI: Mapping[str, str] = MappingProxyType
 
 MANAGED_SESSION_PREFIXES = (
     "ak.soundengine.",
+    "ak.wwise.debug.",
     "ak.wwise.core.profiler.",
     "ak.wwise.core.remote.",
     "ak.wwise.core.transport.",
@@ -333,8 +407,71 @@ class ExecutionContractRegistry:
     manifest_store: ManifestStore = field(default_factory=lambda: ManifestStore(root=MANIFEST_ROOT))
 
     def entries(self, version: str) -> tuple[ExecutionContract, ...]:
+        """Return the unchanged default WwiseConsole execution profile."""
+
         _require_supported_version(version)
         manifest = self.manifest_store.load(version)
+        result = self._entries_from_manifest(
+            version,
+            manifest,
+            profile=CONSOLE_EXECUTION_PROFILE,
+        )
+        _validate_version_counts(version, result)
+        _validate_version_inventory_digest(version, result)
+        return result
+
+    def entries_for_profile(
+        self,
+        version: str,
+        *,
+        profile: str,
+    ) -> tuple[ExecutionContract, ...]:
+        """Return one explicitly selected immutable host-surface profile."""
+
+        if profile == CONSOLE_EXECUTION_PROFILE:
+            return self.entries(version)
+        if profile == AUTHORING_UI_EXECUTION_PROFILE:
+            return self.authoring_ui_entries(version)
+        raise ExecutionContractError(
+            f"Unknown execution profile {profile!r}; expected "
+            f"{CONSOLE_EXECUTION_PROFILE!r} or "
+            f"{AUTHORING_UI_EXECUTION_PROFILE!r}"
+        )
+
+    def authoring_ui_entries(
+        self,
+        version: str,
+    ) -> tuple[ExecutionContract, ...]:
+        """Return Console rows plus only the reflected Authoring UI family."""
+
+        _require_supported_version(version)
+        try:
+            manifest = self.manifest_store.load_with_authoring_ui_commands(
+                version
+            )
+        except (
+            AuthoringUiCommandsSupplementError,
+            AuthoringUiCommandsSupplementMissingError,
+        ) as exc:
+            raise ExecutionContractError(
+                f"Wwise {version} Authoring UI profile is unavailable: {exc}"
+            ) from exc
+        result = self._entries_from_manifest(
+            version,
+            manifest,
+            profile=AUTHORING_UI_EXECUTION_PROFILE,
+        )
+        _validate_authoring_ui_version_counts(version, result)
+        _validate_authoring_ui_version_inventory_digest(version, result)
+        return result
+
+    def _entries_from_manifest(
+        self,
+        version: str,
+        manifest: Mapping[str, Any],
+        *,
+        profile: str,
+    ) -> tuple[ExecutionContract, ...]:
         rows: list[ExecutionContract] = []
         seen: set[tuple[str, str]] = set()
         for item_type, section in (("function", "functions"), ("topic", "topics")):
@@ -349,11 +486,15 @@ class ExecutionContractRegistry:
                 if key in seen:
                     raise ExecutionContractError(f"Manifest {version} contains duplicate {item_type} URI {uri}")
                 seen.add(key)
-                rows.append(self._build(version, uri, item_type))
-        result = tuple(sorted(rows, key=lambda entry: (entry.uri, entry.item_type)))
-        _validate_version_counts(version, result)
-        _validate_version_inventory_digest(version, result)
-        return result
+                rows.append(
+                    self._build(
+                        version,
+                        uri,
+                        item_type,
+                        profile=profile,
+                    )
+                )
+        return tuple(sorted(rows, key=lambda entry: (entry.uri, entry.item_type)))
 
     def describe(self, version: str, uri: str) -> ExecutionContract:
         matches = tuple(entry for entry in self.entries(version) if entry.uri == uri)
@@ -363,10 +504,89 @@ class ExecutionContractRegistry:
             raise ExecutionContractError(f"WAAPI URI {uri!r} is ambiguous in Wwise {version}")
         return matches[0]
 
+    def describe_for_profile(
+        self,
+        version: str,
+        uri: str,
+        *,
+        profile: str,
+    ) -> ExecutionContract:
+        matches = tuple(
+            entry
+            for entry in self.entries_for_profile(version, profile=profile)
+            if entry.uri == uri
+        )
+        if not matches:
+            raise ExecutionContractError(
+                f"WAAPI URI {uri!r} is not reflected by Wwise {version} "
+                f"profile {profile!r}"
+            )
+        if len(matches) != 1:
+            raise ExecutionContractError(
+                f"WAAPI URI {uri!r} is ambiguous in Wwise {version} "
+                f"profile {profile!r}"
+            )
+        return matches[0]
+
+    def authoring_ui_describe(
+        self,
+        version: str,
+        uri: str,
+    ) -> ExecutionContract:
+        return self.describe_for_profile(
+            version,
+            uri,
+            profile=AUTHORING_UI_EXECUTION_PROFILE,
+        )
+
     def executable_entries(self, version: str) -> tuple[ExecutionContract, ...]:
         return tuple(entry for entry in self.entries(version) if entry.executable)
 
-    def _build(self, version: str, uri: str, item_type: str) -> ExecutionContract:
+    def executable_entries_for_profile(
+        self,
+        version: str,
+        *,
+        profile: str,
+    ) -> tuple[ExecutionContract, ...]:
+        return tuple(
+            entry
+            for entry in self.entries_for_profile(version, profile=profile)
+            if entry.executable
+        )
+
+    def authoring_ui_executable_entries(
+        self,
+        version: str,
+    ) -> tuple[ExecutionContract, ...]:
+        return self.executable_entries_for_profile(
+            version,
+            profile=AUTHORING_UI_EXECUTION_PROFILE,
+        )
+
+    def _build(
+        self,
+        version: str,
+        uri: str,
+        item_type: str,
+        *,
+        profile: str = CONSOLE_EXECUTION_PROFILE,
+    ) -> ExecutionContract:
+        if profile not in {
+            CONSOLE_EXECUTION_PROFILE,
+            AUTHORING_UI_EXECUTION_PROFILE,
+        }:
+            raise ExecutionContractError(
+                f"Unsupported execution profile {profile!r}"
+            )
+        if (
+            profile == AUTHORING_UI_EXECUTION_PROFILE
+            and uri in AUTHORING_UI_COMMAND_URIS
+        ):
+            return _build_authoring_ui_execution_contract(
+                version,
+                uri,
+                item_type,
+            )
         excluded_reason = APPROVED_EXCLUSIONS.get(uri)
         if excluded_reason is not None:
             return ExecutionContract(
@@ -479,6 +699,89 @@ class ExecutionContractRegistry:
         )
 
 
+def _build_authoring_ui_execution_contract(
+    version: str,
+    uri: str,
+    item_type: str,
+) -> ExecutionContract:
+    """Build only the five reviewed Authoring UI-command route overrides."""
+
+    expected_type = (
+        "function"
+        if uri in AUTHORING_UI_COMMAND_FUNCTION_URIS
+        else "topic"
+        if uri in AUTHORING_UI_COMMAND_TOPIC_URIS
+        else None
+    )
+    if expected_type is None or item_type != expected_type:
+        raise ExecutionContractError(
+            "The Authoring UI profile contains a malformed command-family "
+            f"row: uri={uri!r}, item_type={item_type!r}"
+        )
+    if item_type == "topic":
+        return ExecutionContract(
+            version=version,
+            uri=uri,
+            item_type=item_type,
+            route="bounded_topic_wait",
+            effect="observation",
+            gateway_commands=("wait-topic",),
+            timeout_seconds=DEFAULT_TOPIC_TIMEOUT_SECONDS,
+            result_limit_bytes=256 * 1024,
+            verification_strategy="topic_event_schema",
+            requires_confirmation=False,
+            program_case="authoring-ui-command-subscribe-event-unsubscribe",
+        )
+    if uri == "ak.wwise.ui.commands.getCommands":
+        return ExecutionContract(
+            version=version,
+            uri=uri,
+            item_type=item_type,
+            route="bounded_call",
+            effect="read",
+            gateway_commands=("call",),
+            timeout_seconds=10.0,
+            result_limit_bytes=256 * 1024,
+            verification_strategy="result_schema",
+            requires_confirmation=False,
+            program_case="authoring-ui-command-live-inventory-bounded-read",
+        )
+    operation = AUTHORING_UI_DEDICATED_OPERATIONS.get(uri)
+    if operation is None:
+        raise ExecutionContractError(
+            f"Authoring UI function {uri!r} lacks a dedicated operation route"
+        )
+    if uri == "ak.wwise.ui.commands.register":
+        lifecycle_strategy = "paired_follow_up_required"
+        companion_uris = ("ak.wwise.ui.commands.unregister",)
+        verification_strategy = "ui_command_inventory_membership"
+    elif uri == "ak.wwise.ui.commands.unregister":
+        lifecycle_strategy = "dedicated_ui_command_transaction"
+        companion_uris = ()
+        verification_strategy = "ui_command_inventory_membership"
+    else:
+        lifecycle_strategy = "dedicated_ui_command_transaction"
+        companion_uris = ()
+        verification_strategy = (
+            "result_schema_and_live_command_inventory_precondition"
+        )
+    return ExecutionContract(
+        version=version,
+        uri=uri,
+        item_type=item_type,
+        route="managed_transaction",
+        effect="runtime_mutation",
+        gateway_commands=("preview", "confirm", "execute", "verify"),
+        timeout_seconds=30.0,
+        result_limit_bytes=1024 * 1024,
+        verification_strategy=verification_strategy,
+        requires_confirmation=True,
+        program_case=f"authoring-{operation}-dedicated-transaction",
+        lifecycle_strategy=lifecycle_strategy,
+        companion_uris=companion_uris,
+    )
+
+
 def validate_packaged_execution_contracts(
     registry: ExecutionContractRegistry | None = None,
 ) -> dict[str, Any]:
@@ -579,6 +882,102 @@ def validate_packaged_execution_contracts(
     }
 
 
+def validate_packaged_authoring_ui_execution_contracts(
+    registry: ExecutionContractRegistry | None = None,
+) -> dict[str, Any]:
+    """Validate the separate five-version Authoring UI execution profile."""
+
+    selected = registry or ExecutionContractRegistry()
+    rows: list[ExecutionContract] = []
+    inventory_rows: list[str] = []
+    for version in SUPPORTED_WWISE_VERSION_KEYS:
+        entries = selected.authoring_ui_entries(version)
+        rows.extend(entries)
+        inventory_rows.extend(
+            f"{entry.version}\t{entry.item_type}\t{entry.uri}\n"
+            for entry in entries
+        )
+    digest = hashlib.sha256(
+        "".join(sorted(inventory_rows)).encode("utf-8")
+    ).hexdigest()
+    if digest != PACKAGED_AUTHORING_UI_INVENTORY_SHA256:
+        raise ExecutionContractError(
+            "The packaged Authoring UI inventory changed without a reviewed "
+            "execution-profile update: "
+            f"expected {PACKAGED_AUTHORING_UI_INVENTORY_SHA256}, got {digest}"
+        )
+    if len(rows) != EXPECTED_AUTHORING_UI_MANIFEST_VERSION_ROWS:
+        raise ExecutionContractError(
+            "Expected "
+            f"{EXPECTED_AUTHORING_UI_MANIFEST_VERSION_ROWS} Authoring UI "
+            f"manifest rows, got {len(rows)}"
+        )
+    executable = tuple(entry for entry in rows if entry.executable)
+    if len(executable) != EXPECTED_AUTHORING_UI_PUBLIC_VERSION_ROWS:
+        raise ExecutionContractError(
+            "Expected "
+            f"{EXPECTED_AUTHORING_UI_PUBLIC_VERSION_ROWS} executable "
+            f"Authoring UI rows, got {len(executable)}"
+        )
+    unique_public = {entry.uri for entry in executable}
+    if len(unique_public) != EXPECTED_AUTHORING_UI_PUBLIC_UNIQUE_URIS:
+        raise ExecutionContractError(
+            "Expected "
+            f"{EXPECTED_AUTHORING_UI_PUBLIC_UNIQUE_URIS} unique Authoring UI "
+            f"URIs, got {len(unique_public)}"
+        )
+    exclusions = tuple(entry for entry in rows if not entry.executable)
+    if exclusions:
+        raise ExecutionContractError(
+            "The explicit Authoring UI profile must not inherit default "
+            f"Console exclusions: {[(row.version, row.uri) for row in exclusions]!r}"
+        )
+    for version in SUPPORTED_WWISE_VERSION_KEYS:
+        ui_rows = {
+            entry.uri: entry
+            for entry in selected.authoring_ui_entries(version)
+            if entry.uri in AUTHORING_UI_COMMAND_URIS
+        }
+        if set(ui_rows) != AUTHORING_UI_COMMAND_URIS:
+            raise ExecutionContractError(
+                f"Wwise {version} Authoring UI profile lacks the exact "
+                "five-command family"
+            )
+        if (
+            ui_rows["ak.wwise.ui.commands.getCommands"].route
+            != "bounded_call"
+            or ui_rows["ak.wwise.ui.commands.executed"].route
+            != "bounded_topic_wait"
+            or any(
+                ui_rows[uri].route != "managed_transaction"
+                or not ui_rows[uri].requires_confirmation
+                for uri in AUTHORING_UI_DEDICATED_OPERATIONS
+            )
+        ):
+            raise ExecutionContractError(
+                f"Wwise {version} Authoring UI routes do not match the "
+                "reviewed profile"
+            )
+    return {
+        "contract": PUBLIC_EXECUTION_CONTRACT,
+        "execution_profile": AUTHORING_UI_EXECUTION_PROFILE,
+        "manifest_rows": len(rows),
+        "executable_rows": len(executable),
+        "excluded_rows": len(rows) - len(executable),
+        "unique_public_uris": len(unique_public),
+        "inventory_sha256": digest,
+        "by_version": {
+            version: {
+                "manifest": len(selected.authoring_ui_entries(version)),
+                "executable": len(
+                    selected.authoring_ui_executable_entries(version)
+                ),
+            }
+            for version in SUPPORTED_WWISE_VERSION_KEYS
+        },
+    }
+
+
 def classify_function_effect(uri: str) -> str:
     """Return the reviewed effect class used by safety and routing."""
 
@@ -637,6 +1036,54 @@ def _validate_version_inventory_digest(
         )
 
 
+def _validate_authoring_ui_version_counts(
+    version: str,
+    entries: Iterable[ExecutionContract],
+) -> None:
+    rows = tuple(entries)
+    expected = EXPECTED_AUTHORING_UI_VERSION_COUNTS[version]
+    actual = {
+        "functions": sum(
+            entry.item_type == "function" for entry in rows
+        ),
+        "topics": sum(entry.item_type == "topic" for entry in rows),
+        "public_functions": sum(
+            entry.item_type == "function" and entry.executable
+            for entry in rows
+        ),
+        "public_topics": sum(
+            entry.item_type == "topic" and entry.executable
+            for entry in rows
+        ),
+        "public_total": sum(entry.executable for entry in rows),
+    }
+    if actual != dict(expected):
+        raise ExecutionContractError(
+            f"Wwise {version} Authoring UI execution-profile counts changed: "
+            f"expected={dict(expected)!r}, actual={actual!r}"
+        )
+
+
+def _validate_authoring_ui_version_inventory_digest(
+    version: str,
+    entries: Iterable[ExecutionContract],
+) -> None:
+    inventory = "".join(
+        sorted(
+            f"{entry.version}\t{entry.item_type}\t{entry.uri}\n"
+            for entry in entries
+        )
+    ).encode("utf-8")
+    actual = hashlib.sha256(inventory).hexdigest()
+    expected = EXPECTED_AUTHORING_UI_VERSION_INVENTORY_SHA256[version]
+    if actual != expected:
+        raise ExecutionContractError(
+            f"Wwise {version} Authoring UI inventory changed without a "
+            "reviewed execution-profile update: "
+            f"expected {expected}, got {actual}"
+        )
+
+
 def _require_supported_version(version: str) -> None:
     if version not in SUPPORTED_WWISE_VERSION_KEYS:
         raise ExecutionContractError(
@@ -646,9 +1093,17 @@ def _require_supported_version(version: str) -> None:
 
 __all__ = [
     "APPROVED_EXCLUSIONS",
+    "AUTHORING_UI_DEDICATED_OPERATIONS",
+    "AUTHORING_UI_EXECUTION_PROFILE",
     "BOUNDED_DIRECT_CALL_URIS",
+    "CONSOLE_EXECUTION_PROFILE",
     "CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS",
     "EXPECTED_MANIFEST_VERSION_ROWS",
+    "EXPECTED_AUTHORING_UI_MANIFEST_VERSION_ROWS",
+    "EXPECTED_AUTHORING_UI_PUBLIC_UNIQUE_URIS",
+    "EXPECTED_AUTHORING_UI_PUBLIC_VERSION_ROWS",
+    "EXPECTED_AUTHORING_UI_VERSION_COUNTS",
+    "EXPECTED_AUTHORING_UI_VERSION_INVENTORY_SHA256",
     "EXPECTED_PUBLIC_UNIQUE_URIS",
     "EXPECTED_PUBLIC_VERSION_ROWS",
     "EXPECTED_VERSION_COUNTS",
@@ -659,6 +1114,7 @@ __all__ = [
     "FIXED_COMMANDS_BY_URI",
     "LIFECYCLE_COMPANIONS",
     "PACKAGED_INVENTORY_SHA256",
+    "PACKAGED_AUTHORING_UI_INVENTORY_SHA256",
     "POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY",
     "POST_EXECUTION_PROJECT_GUARD_POLICIES",
     "POST_EXECUTION_PROJECT_GUARD_POLICY_BY_URI",
@@ -671,5 +1127,6 @@ __all__ = [
     "PROJECT_TRANSITION_GUARD_MODES",
     "PUBLIC_EXECUTION_CONTRACT",
     "classify_function_effect",
+    "validate_packaged_authoring_ui_execution_contracts",
     "validate_packaged_execution_contracts",
 ]

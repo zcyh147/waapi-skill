@@ -53,4 +53,14 @@ the live Wwise project before creating the state store.
 - A mismatch between an explicit/configured version and the connected Wwise instance must fail closed.
 - Persist approved `wwise_version`, `waapi_host`, and `waapi_port` with `config-set` so later runs do not depend on conversation memory. Never write `data/config.json`; it is read-only legacy fallback compatibility when no external config exists.
 
+The live host profile is separate from the saved version. The gateway derives
+`wwise-console` versus `wwise-authoring-ui` from the same live
+`getInfo.isCommandLine` result and does not accept a config field or caller
+override for it. Only the five `ak.wwise.ui.commands.*` APIs depend on this
+profile; a WwiseConsole connection receives `AUTHORING_HOST_REQUIRED` before
+the requested UI operation is dispatched.
+The `capabilities` and `describe` commands accept `--profile` only for offline
+catalog inspection; it is not saved configuration and cannot override live
+host detection.
+
 After the one-time conversation introduction has been shown, do not repeat policy narration in every simple read-only result unless the user asks or the effective setting changes.

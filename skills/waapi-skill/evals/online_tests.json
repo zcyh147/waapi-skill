@@ -17,6 +17,7 @@
     "online/2022.1/core_object.json",
     "online/2022.1/runtime.json",
     "online/2022.1/other.json",
+    "online/debug_lua.json",
     "online/version_specific/runtime.json",
     "online/version_specific/authoring.json",
     "online/version_specific/other.json"
