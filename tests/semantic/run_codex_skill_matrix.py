@@ -104,7 +104,11 @@ from wwise_waapi.transactions import TransactionState  # noqa: E402  # pyright: 
 
 
 DEFAULT_SUITE = SKILL_ROOT / "evals" / "evals-v2.json"
+DEFAULT_V3_SUITE = SKILL_ROOT / "evals" / "suite-v3.json"
 DEFAULT_ITERATION_ROOT = SKILL_ROOT.parent / "waapi-skill-workspace" / "iteration-9-v2-matrix"
+DEFAULT_HEAVY_V3_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "heavy-cross-version-80"
+)
 DEFAULT_CODEX_BINARY = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
 DEFAULT_AUTH_JSON = Path.home() / ".codex" / "auth.json"
 DEFAULT_LIVE_CONFIG = REPO_ROOT / "tests" / "fixtures" / "local" / "live-environment.json"
@@ -134,6 +138,16 @@ QUERY_RESULT_KEYS = frozenset({"count", "objects"})
 QUERY_OBJECT_KEYS = frozenset({"id", "name", "type", "path"})
 MISSING_QUERY_RESULT_KEYS = frozenset({"count", "objects", "not_found"})
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+HEAVY_V3_PROFILE_ID = "heavy_cross_version_80"
+HEAVY_V3_RUN_CONFIG_CONTRACT = "waapi-skill.codex-heavy-matrix-config/v3"
+HEAVY_V3_SUMMARY_CONTRACT = "waapi-skill.codex-heavy-matrix-summary/v3"
+HEAVY_V3_CASE_RECORD_CONTRACT = "waapi-skill.codex-heavy-matrix-case/v3"
+HEAVY_V3_STATUSES = frozenset({"PASS", "FAIL", "BLOCKED", "INDETERMINATE"})
+HEAVY_V3_REQUIRED_MODEL_REQUEST_FIELDS = {
+    "ak.wwise.core.audio.convert": frozenset({"io_root"}),
+    "ak.wwise.core.soundbank.convertExternalSources": frozenset({"io_root"}),
+    "ak.wwise.core.soundbank.processDefinitionFiles": frozenset({"io_root"}),
+}
 
 
 class LiveDependencyPreflightError(RuntimeError):
@@ -176,6 +190,14 @@ class LiveDependencyPreflightError(RuntimeError):
                 "message": self.exception_message,
             },
         }
+
+
+class HeavyV3MatrixError(RuntimeError):
+    """The V3 heavy matrix cannot produce trustworthy campaign evidence."""
+
+
+class HeavyV3RunnerUnavailableError(HeavyV3MatrixError):
+    """No closed project or CLI runner owns the selected V3 unit."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -247,8 +269,559 @@ class VersionRunOutcome:
     error: str
 
 
+HeavyV3UnitLoader = Callable[[RunnerOptions], Sequence[Any]]
+HeavyV3UnitRunner = Callable[..., Any]
+HeavyV3DependencyPreflight = Callable[[], Mapping[str, Any]]
+
+
+def load_heavy_v3_units(options: RunnerOptions) -> tuple[Any, ...]:
+    """Load and filter the reviewed V3 bundle without importing live runners."""
+
+    bundle_module = importlib.import_module(
+        "tests.semantic.support.codex_eval_bundle_v3"
+    )
+    execution_module = importlib.import_module(
+        "tests.semantic.support.codex_eval_execution_v3"
+    )
+    bundle = bundle_module.load_eval_bundle_v3(options.suite_path)
+    scenarios = execution_module.select_heavy_scenarios(
+        bundle,
+        scenario_ids=options.case_ids,
+        versions=options.versions,
+    )
+    blocked = {
+        scenario.id: tuple(
+            requirement.id
+            for requirement in bundle.scenario_mapping_blockers(scenario.id)
+        )
+        for scenario in scenarios
+        if bundle.scenario_mapping_blockers(scenario.id)
+    }
+    if blocked:
+        rendered = ", ".join(
+            f"{scenario_id}={list(requirements)!r}"
+            for scenario_id, requirements in blocked.items()
+        )
+        raise HeavyV3MatrixError(
+            "selected V3 scenarios retain unresolved request mappings: " + rendered
+        )
+    units = tuple(execution_module.build_heavy_units(scenarios))
+    if not units:
+        raise HeavyV3MatrixError("no V3 heavy units matched the requested filters")
+    return units
+
+
+def run_heavy_v3_matrix(
+    options: RunnerOptions,
+    *,
+    unit_loader: HeavyV3UnitLoader | None = None,
+    unit_runner: HeavyV3UnitRunner | None = None,
+    dependency_preflight: HeavyV3DependencyPreflight | None = None,
+) -> int:
+    """Run the selected V3 heavy units sequentially with incremental evidence.
+
+    A semantic ``FAIL`` is retained and the next case runs.  ``BLOCKED``,
+    ``INDETERMINATE``, an unavailable closed runner, or any orchestration fault
+    seals the current record and stops before another Wwise lifecycle starts.
+    The injectable seams are for harness-only tests and are not exposed to the
+    evaluated Codex task.
+    """
+
+    if options.profile != HEAVY_V3_PROFILE_ID:
+        raise HeavyV3MatrixError(
+            f"V3 heavy runner requires profile {HEAVY_V3_PROFILE_ID!r}"
+        )
+    if options.pair_ids:
+        raise HeavyV3MatrixError("V3 heavy execution does not accept pair filters")
+    if options.offline_only:
+        raise HeavyV3MatrixError("V3 heavy execution is real-Wwise only")
+
+    load_units = unit_loader or load_heavy_v3_units
+    execute_unit = unit_runner or run_heavy_v3_unit
+    preflight = dependency_preflight or require_live_runner_dependencies
+    units = tuple(load_units(options))
+    if not units:
+        raise HeavyV3MatrixError("no V3 heavy units matched the requested filters")
+    unit_rows = tuple(
+        _heavy_v3_unit_row(unit, sequence=index)
+        for index, unit in enumerate(units, start=1)
+    )
+    unit_ids = tuple(row["scenario_id"] for row in unit_rows)
+    if len(unit_ids) != len(set(unit_ids)):
+        raise HeavyV3MatrixError("selected V3 heavy units contain duplicate ids")
+
+    prepare_iteration_root(options.iteration_root, overwrite=options.overwrite)
+    started_at = utc_now()
+    records: list[dict[str, Any]] = []
+    run_errors: list[str] = []
+    stop_reason = ""
+    preflight_state = "pending"
+
+    def persist(*, terminal: bool) -> None:
+        completed_at = utc_now() if terminal else None
+        write_json(
+            options.iteration_root / "run-config.json",
+            _heavy_v3_run_config(
+                options,
+                unit_rows=unit_rows,
+                records=records,
+                run_errors=run_errors,
+                stop_reason=stop_reason,
+                preflight_state=preflight_state,
+                started_at=started_at,
+                completed_at=completed_at,
+            ),
+        )
+        write_json(
+            options.iteration_root / "summary.json",
+            _heavy_v3_summary(
+                unit_rows=unit_rows,
+                records=records,
+                run_errors=run_errors,
+                stop_reason=stop_reason,
+                preflight_state=preflight_state,
+                started_at=started_at,
+                completed_at=completed_at,
+            ),
+        )
+
+    persist(terminal=False)
+    try:
+        preflight_payload = dict(preflight())
+        if preflight_payload.get("ok") is not True:
+            raise HeavyV3MatrixError(
+                "live dependency preflight did not return an explicit ok=true result"
+            )
+    except BaseException as exc:  # noqa: BLE001 - terminal summary must survive preflight faults
+        preflight_state = "blocked"
+        stop_reason = "live-dependency-preflight"
+        run_errors.append(format_exception(stop_reason, exc))
+        payload = (
+            exc.as_dict()
+            if isinstance(exc, LiveDependencyPreflightError)
+            else {
+                "contract": LIVE_DEPENDENCY_PREFLIGHT_CONTRACT,
+                "ok": False,
+                "error": {
+                    "type": type(exc).__name__,
+                    "message": str(exc),
+                },
+            }
+        )
+        write_json(options.iteration_root / "live-preflight.json", payload)
+        persist(terminal=True)
+        print(f"[BLOCKED] {stop_reason}: {type(exc).__name__}: {exc}")
+        return 1
+
+    preflight_state = "passed"
+    write_json(options.iteration_root / "live-preflight.json", preflight_payload)
+    persist(terminal=False)
+
+    for unit, unit_row in zip(units, unit_rows, strict=True):
+        scenario_id = unit_row["scenario_id"]
+        scenario_root = (
+            options.iteration_root
+            / "scenarios"
+            / f"{unit_row['sequence']:03d}-{safe_session_name(scenario_id)}"
+        )
+        try:
+            outcome = execute_unit(
+                unit,
+                scenario_root=scenario_root,
+                options=options,
+            )
+            record = _heavy_v3_case_record(
+                unit_row,
+                scenario_root=scenario_root,
+                outcome=outcome,
+            )
+        except BaseException as exc:  # noqa: BLE001 - every attempted unit is accounted for
+            record = _heavy_v3_blocked_case_record(
+                unit_row,
+                scenario_root=scenario_root,
+                exc=exc,
+            )
+            run_errors.append(format_exception(f"heavy-unit:{scenario_id}", exc))
+
+        records.append(record)
+        try:
+            write_json(scenario_root / "matrix-case.json", record)
+        except BaseException as exc:  # noqa: BLE001 - missing evidence is systemic
+            archive_error = format_exception(
+                f"heavy-unit-archive:{scenario_id}", exc
+            )
+            run_errors.append(archive_error)
+            record["status"] = "BLOCKED"
+            record["reason"] = _append_heavy_reason(
+                str(record.get("reason", "")),
+                f"matrix evidence archive failed: {type(exc).__name__}: {exc}",
+            )
+
+        status = str(record["status"])
+        reason = str(record.get("reason", ""))
+        print(
+            f"[{status}] {scenario_id} version={unit_row['version']} "
+            f"api={unit_row['api']} reason={reason or '-'}"
+        )
+        if status in {"BLOCKED", "INDETERMINATE"}:
+            stop_reason = f"{status.lower()}:{scenario_id}"
+            if not any(f"heavy-unit:{scenario_id}" in error for error in run_errors):
+                run_errors.append(
+                    f"[heavy-unit:{scenario_id}] {status}: {reason or 'no reason supplied'}"
+                )
+        persist(terminal=False)
+        if stop_reason:
+            break
+
+    persist(terminal=True)
+    all_selected_passed = (
+        len(records) == len(unit_rows)
+        and not stop_reason
+        and not run_errors
+        and all(record["status"] == "PASS" for record in records)
+    )
+    return 0 if all_selected_passed else 1
+
+
+def run_heavy_v3_unit(
+    unit: Any,
+    *,
+    scenario_root: Path,
+    options: RunnerOptions,
+) -> Any:
+    """Dispatch one V3 unit only through a closed project or CLI runner."""
+
+    unit_row = _heavy_v3_unit_row(unit, sequence=1)
+    api = unit_row["api"]
+    live_environment = trusted_gateway_environment(
+        {"WWISE_TEST_CONFIG": str(options.live_config)}
+    )
+    if api.startswith("ak.wwise.cli."):
+        module_name = "tests.semantic.support.codex_heavy_cli_case_runner_v3"
+        try:
+            cli_module = importlib.import_module(module_name)
+        except (ImportError, AttributeError) as exc:
+            raise HeavyV3RunnerUnavailableError(
+                "the closed V3 CLI case runner is unavailable; expected "
+                f"{module_name}.run_heavy_cli_unit"
+            ) from exc
+        cli_apis = frozenset(getattr(cli_module, "HEAVY_CLI_RUNNER_APIS", ()))
+        options_type = getattr(cli_module, "HeavyCliRunnerOptions", None)
+        runner = getattr(cli_module, "run_heavy_cli_unit", None)
+        if api not in cli_apis or options_type is None or not callable(runner):
+            raise HeavyV3RunnerUnavailableError(
+                f"the closed V3 CLI runner does not own {api}"
+            )
+        cli_options = options_type(
+            skill_source=options.skill_source,
+            codex_binary=options.codex_binary,
+            auth_json=options.auth_json,
+            model=options.model,
+            reasoning_effort=options.reasoning_effort,
+            service_tier=options.service_tier,
+            timeout_seconds=options.timeout_seconds,
+            live_environment=live_environment,
+        )
+        return runner(unit, scenario_root=scenario_root, options=cli_options)
+
+    project_module = importlib.import_module(
+        "tests.semantic.support.codex_heavy_project_runner_v3"
+    )
+    project_apis = frozenset(getattr(project_module, "PROJECT_RUNNER_APIS", ()))
+    if api in project_apis:
+        _require_heavy_v3_model_request_surface(unit, project_module)
+        options_type = getattr(project_module, "HeavyProjectRunnerOptions", None)
+        runner = getattr(project_module, "run_heavy_project_unit", None)
+        if options_type is None or not callable(runner):
+            raise HeavyV3RunnerUnavailableError(
+                "project runner public contract is incomplete"
+            )
+        project_options = options_type(
+            skill_source=options.skill_source,
+            codex_binary=options.codex_binary,
+            auth_json=options.auth_json,
+            model=options.model,
+            reasoning_effort=options.reasoning_effort,
+            service_tier=options.service_tier,
+            timeout_seconds=options.timeout_seconds,
+            live_environment=live_environment,
+        )
+        return runner(unit, scenario_root=scenario_root, options=project_options)
+
+    raise HeavyV3RunnerUnavailableError(
+        f"no closed V3 project runner owns {api}; refusing to synthesize a fallback"
+    )
+
+
+def _require_heavy_v3_model_request_surface(unit: Any, runner_module: Any) -> None:
+    """Refuse runner-owned requests containing fields the model cannot resolve."""
+
+    scenario = getattr(unit, "scenario", None)
+    api = getattr(scenario, "api", None)
+    required = HEAVY_V3_REQUIRED_MODEL_REQUEST_FIELDS.get(str(api), frozenset())
+    if not required:
+        return
+    visible = {
+        str(getattr(value, "name", ""))
+        for value in getattr(scenario, "visible_inputs", ())
+        if getattr(value, "name", None)
+    }
+    declared = getattr(
+        runner_module,
+        "PROJECT_RUNNER_MODEL_RESOLVED_REQUEST_FIELDS",
+        {},
+    )
+    resolved = set()
+    if isinstance(declared, Mapping):
+        raw = declared.get(api, ())
+        if isinstance(raw, (list, tuple, set, frozenset)):
+            resolved = {str(value) for value in raw}
+    missing = sorted(required - visible - resolved)
+    if missing:
+        raise HeavyV3RunnerUnavailableError(
+            f"{getattr(unit, 'unit_id', '<unknown>')} runner request contains "
+            "model-unresolvable fields: "
+            + ", ".join(missing)
+            + "; expose them as natural visible inputs or declare a reviewed "
+            "runner/Skill resolution contract before execution"
+        )
+
+
+def _heavy_v3_unit_row(unit: Any, *, sequence: int) -> dict[str, Any]:
+    scenario = getattr(unit, "scenario", None)
+    scenario_id = getattr(unit, "unit_id", None)
+    version = getattr(unit, "version", None)
+    api = getattr(scenario, "api", None)
+    if (
+        not isinstance(sequence, int)
+        or isinstance(sequence, bool)
+        or sequence < 1
+        or not isinstance(scenario_id, str)
+        or not scenario_id
+        or not isinstance(version, str)
+        or not version
+        or not isinstance(api, str)
+        or not api
+    ):
+        raise HeavyV3MatrixError("V3 heavy unit has an invalid identity")
+    safe_name = safe_session_name(scenario_id)
+    if not safe_name or safe_name != scenario_id:
+        raise HeavyV3MatrixError(
+            f"V3 heavy scenario id is not path-safe: {scenario_id!r}"
+        )
+    return {
+        "sequence": sequence,
+        "scenario_id": scenario_id,
+        "version": version,
+        "api": api,
+        "runner": "cli" if api.startswith("ak.wwise.cli.") else "project",
+    }
+
+
+def _heavy_v3_case_record(
+    unit_row: Mapping[str, Any],
+    *,
+    scenario_root: Path,
+    outcome: Any,
+) -> dict[str, Any]:
+    serializer = getattr(outcome, "as_dict", None)
+    if not callable(serializer):
+        raise HeavyV3MatrixError("V3 runner outcome lacks as_dict()")
+    payload = serializer()
+    if not isinstance(payload, Mapping):
+        raise HeavyV3MatrixError("V3 runner outcome as_dict() must return an object")
+    status = getattr(outcome, "status", payload.get("status"))
+    scenario_id = getattr(outcome, "scenario_id", payload.get("scenario_id"))
+    version = getattr(outcome, "version", payload.get("version"))
+    reason = getattr(outcome, "reason", payload.get("reason", ""))
+    if status not in HEAVY_V3_STATUSES:
+        raise HeavyV3MatrixError(f"V3 runner returned invalid status {status!r}")
+    if scenario_id != unit_row["scenario_id"] or version != unit_row["version"]:
+        raise HeavyV3MatrixError(
+            "V3 runner outcome identity differs from the selected unit"
+        )
+    if not isinstance(reason, str):
+        raise HeavyV3MatrixError("V3 runner outcome reason must be text")
+    passed = getattr(outcome, "passed", status == "PASS")
+    if not isinstance(passed, bool) or passed != (status == "PASS"):
+        raise HeavyV3MatrixError("V3 runner outcome passed/status contract drifted")
+    return {
+        "contract": HEAVY_V3_CASE_RECORD_CONTRACT,
+        **dict(unit_row),
+        "status": status,
+        "reason": reason,
+        "scenario_root": str(scenario_root),
+        "runner_outcome": dict(payload),
+    }
+
+
+def _heavy_v3_blocked_case_record(
+    unit_row: Mapping[str, Any],
+    *,
+    scenario_root: Path,
+    exc: BaseException,
+) -> dict[str, Any]:
+    return {
+        "contract": HEAVY_V3_CASE_RECORD_CONTRACT,
+        **dict(unit_row),
+        "status": "BLOCKED",
+        "reason": f"{type(exc).__name__}: {exc}",
+        "scenario_root": str(scenario_root),
+        "runner_outcome": None,
+    }
+
+
+def _heavy_v3_run_config(
+    options: RunnerOptions,
+    *,
+    unit_rows: Sequence[Mapping[str, Any]],
+    records: Sequence[Mapping[str, Any]],
+    run_errors: Sequence[str],
+    stop_reason: str,
+    preflight_state: str,
+    started_at: str,
+    completed_at: str | None,
+) -> dict[str, Any]:
+    attempted = [str(record["scenario_id"]) for record in records]
+    attempted_set = frozenset(attempted)
+    return {
+        "contract": HEAVY_V3_RUN_CONFIG_CONTRACT,
+        "started_at": started_at,
+        "updated_at": utc_now(),
+        "completed_at": completed_at,
+        "profile": options.profile,
+        "expected_unit_count": len(unit_rows),
+        "selected_units": [dict(row) for row in unit_rows],
+        "case_ids": list(options.case_ids),
+        "versions": list(options.versions),
+        "pair_ids": [],
+        "offline_only": False,
+        "model": options.model,
+        "reasoning_effort": options.reasoning_effort,
+        "service_tier": options.service_tier,
+        "timeout_seconds": options.timeout_seconds,
+        "memory": "disabled",
+        "fresh_process_thread_and_task_per_scenario": True,
+        "sequential_wwise_lifecycles": True,
+        "semantic_fail_policy": "continue",
+        "blocked_or_indeterminate_policy": "stop",
+        "skill_source": str(options.skill_source),
+        "suite_path": str(options.suite_path),
+        "live_config": str(options.live_config),
+        "progress": {
+            "preflight": preflight_state,
+            "attempted_unit_count": len(attempted),
+            "attempted_unit_ids": attempted,
+            "pending_unit_ids": [
+                str(row["scenario_id"])
+                for row in unit_rows
+                if row["scenario_id"] not in attempted_set
+            ],
+            "status_counts": _heavy_v3_status_counts(records),
+            "stop_reason": stop_reason or None,
+            "run_error_count": len(run_errors),
+        },
+    }
+
+
+def _heavy_v3_summary(
+    *,
+    unit_rows: Sequence[Mapping[str, Any]],
+    records: Sequence[Mapping[str, Any]],
+    run_errors: Sequence[str],
+    stop_reason: str,
+    preflight_state: str,
+    started_at: str,
+    completed_at: str | None,
+) -> dict[str, Any]:
+    attempted_ids = [str(record["scenario_id"]) for record in records]
+    attempted_set = frozenset(attempted_ids)
+    pending_ids = [
+        str(row["scenario_id"])
+        for row in unit_rows
+        if row["scenario_id"] not in attempted_set
+    ]
+    all_selected_passed = (
+        completed_at is not None
+        and preflight_state == "passed"
+        and not stop_reason
+        and not run_errors
+        and len(records) == len(unit_rows)
+        and bool(records)
+        and all(record.get("status") == "PASS" for record in records)
+    )
+    return {
+        "contract": HEAVY_V3_SUMMARY_CONTRACT,
+        "started_at": started_at,
+        "updated_at": utc_now(),
+        "completed_at": completed_at,
+        "profile": HEAVY_V3_PROFILE_ID,
+        "preflight": preflight_state,
+        "selected_unit_count": len(unit_rows),
+        "attempted_unit_count": len(records),
+        "attempted_unit_ids": attempted_ids,
+        "status_counts": _heavy_v3_status_counts(records),
+        "passed_unit_ids": [
+            str(record["scenario_id"])
+            for record in records
+            if record.get("status") == "PASS"
+        ],
+        "failed_unit_ids": [
+            str(record["scenario_id"])
+            for record in records
+            if record.get("status") == "FAIL"
+        ],
+        "blocked_unit_ids": [
+            str(record["scenario_id"])
+            for record in records
+            if record.get("status") == "BLOCKED"
+        ],
+        "indeterminate_unit_ids": [
+            str(record["scenario_id"])
+            for record in records
+            if record.get("status") == "INDETERMINATE"
+        ],
+        "pending_unit_ids": pending_ids,
+        "stop_reason": stop_reason or None,
+        "stopped_early": bool(stop_reason),
+        "all_selected_passed": all_selected_passed,
+        "run_errors": list(run_errors),
+        "case_records": [
+            {
+                key: record.get(key)
+                for key in (
+                    "sequence",
+                    "scenario_id",
+                    "version",
+                    "api",
+                    "runner",
+                    "status",
+                    "reason",
+                    "scenario_root",
+                )
+            }
+            for record in records
+        ],
+    }
+
+
+def _heavy_v3_status_counts(
+    records: Sequence[Mapping[str, Any]],
+) -> dict[str, int]:
+    return {
+        status: sum(record.get("status") == status for record in records)
+        for status in ("PASS", "FAIL", "BLOCKED", "INDETERMINATE")
+    }
+
+
+def _append_heavy_reason(current: str, extra: str) -> str:
+    return extra if not current else f"{current}; {extra}"
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     options = parse_args(argv)
+    if options.profile == HEAVY_V3_PROFILE_ID:
+        return run_heavy_v3_matrix(options)
     suite = load_eval_suite(options.suite_path)
     sessions = select_sessions(
         suite.expand_profile(options.profile),
@@ -980,6 +1553,38 @@ def run_live_confirm_phase(
             raise AssertionError(
                 f"{step.name} payload state {payload.get('state')!r} != {expected_state.value!r}"
             )
+        if step.name == "transaction-show":
+            confirmation = payload.get("confirmation")
+            if not isinstance(confirmation, Mapping) or set(confirmation) != {
+                "contract",
+                "token",
+                "binding",
+            }:
+                raise AssertionError(
+                    "transaction-show payload has no closed confirmation binding"
+                )
+            token = confirmation.get("token")
+            binding = confirmation.get("binding")
+            expected_binding = {
+                "material_contract": (
+                    "waapi-skill.confirmation-token-material/v1"
+                ),
+                "transaction_id": pair.transaction_id,
+                "artifact_hash": pair.artifact_hash,
+                "state": TransactionState.AWAITING_CONFIRMATION.value,
+                "event_sequence": pair.seal.event_sequence,
+                "last_event_hash": pair.seal.last_event_hash,
+            }
+            if (
+                confirmation.get("contract")
+                != "waapi-skill.confirmation-binding/v1"
+                or not isinstance(token, str)
+                or not token
+                or binding != expected_binding
+            ):
+                raise AssertionError(
+                    "transaction-show confirmation binding differs from the sealed preview"
+                )
         observer_evidence.append(
             verify_preview_seal(
                 state_directory,
@@ -2456,9 +3061,13 @@ def utc_now() -> str:
 
 def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--profile", choices=PROFILE_IDS, default="screening")
-    parser.add_argument("--suite", default=str(DEFAULT_SUITE))
-    parser.add_argument("--iteration-root", default=str(DEFAULT_ITERATION_ROOT))
+    parser.add_argument(
+        "--profile",
+        choices=(*PROFILE_IDS, HEAVY_V3_PROFILE_ID),
+        default="screening",
+    )
+    parser.add_argument("--suite")
+    parser.add_argument("--iteration-root")
     parser.add_argument("--skill-source", default=str(SKILL_ROOT))
     parser.add_argument("--codex-binary", default=str(DEFAULT_CODEX_BINARY))
     parser.add_argument("--auth-json", default=str(DEFAULT_AUTH_JSON))
@@ -2471,22 +3080,37 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     )
     parser.add_argument("--service-tier", default="priority")
     parser.add_argument("--timeout", type=float, default=240.0)
-    parser.add_argument("--case-id", action="append", choices=CASE_IDS, default=[])
+    parser.add_argument("--case-id", action="append", default=[])
     parser.add_argument("--version", action="append", choices=SUPPORTED_VERSIONS, default=[])
     parser.add_argument("--pair-id", action="append", default=[])
     parser.add_argument("--offline-only", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args(argv)
+    is_heavy_v3 = args.profile == HEAVY_V3_PROFILE_ID
     if args.timeout <= 0:
         parser.error("--timeout must be greater than zero")
     if len(set(args.version)) != len(args.version):
         parser.error("--version values must be unique")
     if len(set(args.pair_id)) != len(args.pair_id):
         parser.error("--pair-id values must be unique")
+    if is_heavy_v3 and args.pair_id:
+        parser.error(f"--pair-id is not supported by {HEAVY_V3_PROFILE_ID}")
+    if is_heavy_v3 and args.offline_only:
+        parser.error(f"--offline-only is not supported by {HEAVY_V3_PROFILE_ID}")
+    if not is_heavy_v3:
+        unknown_case_ids = sorted(set(args.case_id) - set(CASE_IDS))
+        if unknown_case_ids:
+            parser.error(
+                "unknown v2 --case-id values: " + ", ".join(unknown_case_ids)
+            )
+    suite = args.suite or str(DEFAULT_V3_SUITE if is_heavy_v3 else DEFAULT_SUITE)
+    iteration_root = args.iteration_root or str(
+        DEFAULT_HEAVY_V3_ITERATION_ROOT if is_heavy_v3 else DEFAULT_ITERATION_ROOT
+    )
     return RunnerOptions(
         profile=str(args.profile),
-        iteration_root=Path(args.iteration_root).expanduser().resolve(strict=False),
-        suite_path=Path(args.suite).expanduser().resolve(strict=True),
+        iteration_root=Path(iteration_root).expanduser().resolve(strict=False),
+        suite_path=Path(suite).expanduser().resolve(strict=True),
         skill_source=Path(args.skill_source).expanduser().resolve(strict=True),
         codex_binary=Path(args.codex_binary).expanduser().resolve(strict=True),
         auth_json=Path(args.auth_json).expanduser().resolve(strict=True),

@@ -63,23 +63,37 @@ def test_catalog_separates_route_safety_and_evidence_without_overclaiming() -> N
     assert read.safety.read_only is True
     assert read.safety.requires_destructive_gate is False
     assert closed_mutation.preferred_route == "transaction_operation"
-    assert closed_mutation.transaction_operations == ("object.create", "waapi.call")
+    assert closed_mutation.transaction_operations == ("object.create",)
     assert closed_mutation.gateway_commands == ("preview", "confirm", "execute", "verify")
     assert closed_mutation.safety.interface_status == "available_via_transaction"
     assert mutation.semantic_family == "soundbank"
     assert mutation.safety.requires_destructive_gate is True
     assert mutation.safety.requires_confirmation is True
     assert mutation.preferred_route == "transaction_operation"
-    assert mutation.transaction_operations == ("waapi.call",)
+    assert mutation.transaction_operations == ("soundbank.generate",)
     assert mutation.safety.interface_status == "available_via_transaction"
     assert assignment.safety.requires_destructive_gate is True
-    assert assignment.transaction_operations == ("switchContainer.addAssignment", "waapi.call")
+    assert assignment.transaction_operations == ("switchContainer.addAssignment",)
     assert unsafe.preferred_route == "unsupported_boundary"
     assert unsafe.safety.interface_status == "unsupported_by_skill_interface"
     assert read.evidence["registry_status"] in {"deferred", "not_listed_in_packaged_deferred_registry"}
 
 
-def test_catalog_keeps_specific_builder_boundaries_while_exposing_generic_transactions() -> None:
+def test_2025_media_pool_reads_use_the_bounded_direct_route() -> None:
+    catalog = CapabilityCatalog()
+
+    for uri in (
+        "ak.wwise.core.mediaPool.get",
+        "ak.wwise.core.mediaPool.getFields",
+    ):
+        capability = catalog.describe("2025.1", uri)
+        assert capability.preferred_route == "manifest_dispatch"
+        assert capability.gateway_commands == ("call",)
+        assert capability.safety.read_only is True
+        assert capability.safety.requires_confirmation is False
+
+
+def test_catalog_keeps_specific_builder_boundaries_and_hides_generic_bypass() -> None:
     catalog = CapabilityCatalog()
 
     create = catalog.describe("2021.1", "ak.wwise.core.object.create")
@@ -89,22 +103,17 @@ def test_catalog_keeps_specific_builder_boundaries_while_exposing_generic_transa
     audio_import = catalog.describe("2025.1", "ak.wwise.core.audio.import")
     tab_import = catalog.describe("2025.1", "ak.wwise.core.audio.importTabDelimited")
 
-    assert create.transaction_operations == ("object.create", "waapi.call")
-    assert set_name.transaction_operations == ("object.setName", "waapi.call")
+    assert create.transaction_operations == ("object.create",)
+    assert set_name.transaction_operations == ("object.setName",)
     assert create.preferred_route == set_name.preferred_route == "transaction_operation"
-    assert batch.transaction_operations == ("waapi.call",)
-    assert batch.transaction_boundaries == (
-        {
-            "operation": "object.set",
-            "boundary": "Batch partial-success semantics and per-field readback are not yet closed; 2021.1 also lacks the URI.",
-        },
-    )
+    assert batch.transaction_operations == ("object.set",)
+    assert batch.transaction_boundaries == ()
     assert copy.transaction_boundaries[0]["operation"] == "object.copy"
     assert copy.transaction_operations == ("waapi.call",)
-    assert audio_import.transaction_operations == ("audio.import", "waapi.call")
+    assert audio_import.transaction_operations == ("audio.import",)
     assert audio_import.preferred_route == "transaction_operation"
-    assert tab_import.transaction_operations == ("waapi.call",)
-    assert tab_import.transaction_boundaries[0]["operation"] == "audio.importTabDelimited"
+    assert tab_import.transaction_operations == ("audio.importTabDelimited",)
+    assert tab_import.transaction_boundaries == ()
     for generic in (batch, copy, tab_import):
         assert generic.preferred_route == "transaction_operation"
         assert generic.gateway_commands == ("preview", "confirm", "execute", "verify")
@@ -132,6 +141,17 @@ def test_all_topics_except_debug_assert_failed_expose_a_bounded_wait_route(versi
     assert all(entry.safety.requires_destructive_gate for entry in unsupported)
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_soundbank_generated_has_the_reviewed_long_running_timeout(version: str) -> None:
+    catalog = CapabilityCatalog()
+
+    generated = catalog.describe(version, "ak.wwise.core.soundbank.generated")
+    ordinary = catalog.describe(version, "ak.wwise.core.object.created")
+
+    assert generated.execution_contract["timeout_seconds"] == 120.0
+    assert ordinary.execution_contract["timeout_seconds"] == 10.0
+
+
 def test_semantic_inventory_is_version_aware_and_bounded_reads_are_public() -> None:
     catalog = CapabilityCatalog()
 
@@ -155,15 +175,15 @@ def test_catalog_summary_reconciles_all_five_version_totals() -> None:
     assert summary["totals"]["total"] == 814
     assert summary["totals"]["schema_status"] == {"ok": 814}
     assert summary["totals"]["interface_status"] == {
-        "available": 247,
-        "available_via_transaction": 522,
+        "available": 249,
+        "available_via_transaction": 520,
         "unsupported_by_skill_interface": 45,
     }
     assert summary["totals"]["preferred_routes"] == {
         "bounded_topic_wait": 147,
         "fixed_command": 42,
-        "manifest_dispatch": 58,
-        "transaction_operation": 522,
+        "manifest_dispatch": 60,
+        "transaction_operation": 520,
         "unsupported_boundary": 45,
     }
     assert "semantic_builder" not in summary["totals"]["preferred_routes"]
@@ -220,6 +240,8 @@ def test_public_manifest_dispatch_is_exactly_the_immutable_reviewed_call_allowli
             "ak.soundengine.getSwitch",
             "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
             "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
+            "ak.wwise.core.mediaPool.get",
+            "ak.wwise.core.mediaPool.getFields",
             "ak.wwise.core.object.diff",
             "ak.wwise.core.object.isLinked",
             "ak.wwise.core.ping",

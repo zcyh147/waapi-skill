@@ -649,25 +649,77 @@ class HeadlessLifecycle:
         if prefix is None or os.name == "nt":
             return []
         commands: list[list[str]] = []
-        for args in (("-k",), ("-w",)):
-            command = self._run_wineserver(prefix, *args)
-            if command is not None:
-                commands.append(command)
-        if self._owned_wine_processes_for_prefix(prefix):
-            command = self._run_wineserver(prefix, "-k9")
-            if command is not None:
-                commands.append(command)
+        command = self._run_wineserver(prefix, "-k")
+        if command is not None:
+            commands.append(command)
+        if self._wait_for_owned_wine_processes_to_exit(prefix):
+            return commands
+        command = self._run_wineserver(prefix, "-k9")
+        if command is not None:
+            commands.append(command)
+        self._wait_for_owned_wine_processes_to_exit(prefix)
         return commands
 
     def _run_wineserver(self, prefix: Path, *args: str) -> list[str] | None:
         env = dict(self.launch_env or os.environ)
         env["WINEPREFIX"] = str(prefix)
-        command = ["wineserver", *args]
+        executable = self._wineserver_executable(env)
+        if executable is None:
+            return None
+        command = [executable, *args]
         try:
-            subprocess.run(command, env=env, capture_output=True, text=True, check=False, timeout=max(self.timeouts.kill, 0.5))
+            result = subprocess.run(
+                command,
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+                timeout=max(self.timeouts.kill, 0.5),
+            )
         except (OSError, subprocess.SubprocessError):
             return None
+        if getattr(result, "returncode", 1) != 0:
+            return None
         return command
+
+    def _wineserver_executable(self, env: dict[str, str]) -> str | None:
+        configured = env.get("WINESERVER")
+        if configured:
+            candidate = Path(configured).expanduser()
+            if not candidate.is_absolute():
+                return None
+            return self._validated_executable(candidate)
+        if self.console_path is not None:
+            bundled = (
+                Path(self.console_path).expanduser().parent.parent
+                / "SharedSupport"
+                / "Wwise2019x64"
+                / "bin"
+                / "wineserver"
+            )
+            resolved = self._validated_executable(bundled)
+            if resolved is not None:
+                return resolved
+        return "wineserver"
+
+    def _validated_executable(self, candidate: Path) -> str | None:
+        try:
+            resolved = candidate.resolve(strict=True)
+        except OSError:
+            return None
+        if not resolved.is_file() or not os.access(resolved, os.X_OK):
+            return None
+        return str(resolved)
+
+    def _wait_for_owned_wine_processes_to_exit(self, prefix: Path) -> bool:
+        deadline = time.monotonic() + max(self.timeouts.kill, 0.5)
+        while True:
+            if not self._owned_wine_processes_for_prefix(prefix):
+                return True
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            time.sleep(min(0.05, remaining))
 
     def _owned_wine_processes_for_prefix(self, prefix: Path | None = None) -> list[ResidualProcess]:
         owned_prefix = prefix or self._owned_wine_prefix()

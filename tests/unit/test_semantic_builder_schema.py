@@ -92,6 +92,34 @@ def fake_manifest_loader() -> ManifestSchemaLoader:
                         "optionsSchema": {"additionalProperties": False, "properties": {}, "type": "object"},
                     },
                 },
+                {
+                    "uri": "ak.test.patternProperties",
+                    "status": "ok",
+                    "schema": {
+                        "argsSchema": {
+                            "additionalProperties": False,
+                            "patternProperties": {
+                                "^@[:_a-zA-Z0-9]+$": {"type": "number"}
+                            },
+                            "properties": {"name": {"type": "string"}},
+                            "type": "object",
+                        },
+                        "optionsSchema": {"additionalProperties": False, "properties": {}, "type": "object"},
+                    },
+                },
+                {
+                    "uri": "ak.test.invalidPatternProperties",
+                    "status": "ok",
+                    "schema": {
+                        "argsSchema": {
+                            "additionalProperties": False,
+                            "patternProperties": {"[": {"type": "number"}},
+                            "properties": {},
+                            "type": "object",
+                        },
+                        "optionsSchema": {"additionalProperties": False, "properties": {}, "type": "object"},
+                    },
+                },
             ]
         },
     )
@@ -107,6 +135,38 @@ def test_schema_validator_loads_supported_uri_from_manifest_resources() -> None:
 
     assert result.uri == "ak.wwise.core.object.get"
     assert result.version == "2022.1"
+
+
+@pytest.mark.parametrize(
+    "version",
+    ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
+)
+def test_versioned_object_create_schema_accepts_reflected_dynamic_property(
+    version: str,
+) -> None:
+    result = validate_semantic_payload(
+        "ak.wwise.core.object.create",
+        {
+            "parent": "{11111111-1111-1111-1111-111111111111}",
+            "type": "ActorMixer",
+            "name": "Root",
+            "@Volume": -2.0,
+            "children": [
+                {"type": "Sound", "name": "Child", "@Volume": -3.0}
+            ],
+            "onNameConflict": "fail",
+            "autoAddToSourceControl": False,
+        },
+        {},
+        version=version,
+    )
+
+    assert result.version == version
+    assert result.required_fields == ("type", "name", "parent")
+    assert any(
+        reference.endswith("#/definitions/propertyValue")
+        for reference in result.unresolved_refs
+    )
 
 
 def test_unsupported_version_rejected() -> None:
@@ -162,6 +222,36 @@ def test_schema_unknown_or_wrong_type_fields_rejected() -> None:
         validator.validate("ak.wwise.core.object.delete", {"object": 123})
     assert wrong_type.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
     assert wrong_type.value.details["expected_type"] == "string"
+
+
+def test_schema_top_level_pattern_properties_are_known_and_value_validated() -> None:
+    validator = SemanticSchemaValidator(manifest_loader=fake_manifest_loader())
+
+    result = validator.validate(
+        "ak.test.patternProperties",
+        {"name": "Root", "@Volume": -2.0},
+    )
+
+    assert result.validated_nodes >= 3
+    with pytest.raises(SemanticValidationError) as wrong_type:
+        validator.validate(
+            "ak.test.patternProperties",
+            {"name": "Root", "@Volume": "loud"},
+        )
+    assert wrong_type.value.details["actual_type"] == "str"
+    with pytest.raises(SemanticValidationError) as unknown:
+        validator.validate(
+            "ak.test.patternProperties",
+            {"name": "Root", "notAProperty": -2.0},
+        )
+    assert unknown.value.details["unknown_fields"] == ["notAProperty"]
+
+
+def test_schema_top_level_invalid_pattern_fails_closed() -> None:
+    validator = SemanticSchemaValidator(manifest_loader=fake_manifest_loader())
+
+    with pytest.raises(SemanticValidationError, match="invalid packaged schema pattern"):
+        validator.validate("ak.test.invalidPatternProperties", {"@Volume": -2.0})
 
 
 def test_schema_oneof_requires_exactly_one_complete_branch() -> None:

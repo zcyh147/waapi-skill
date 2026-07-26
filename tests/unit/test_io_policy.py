@@ -281,6 +281,96 @@ def test_platform_path_array_audits_only_path_positions(tmp_path: Path):
     assert [item.role for item in audit.paths] == ["read", "write", "write"]
 
 
+def test_nested_platform_pair_arrays_audit_only_pair_path_positions(tmp_path: Path):
+    root = tmp_path / "sandbox"
+    project = tmp_path / "Project.wproj"
+    windows_source = tmp_path / "inputs" / "windows.wsources"
+    mac_source = tmp_path / "inputs" / "mac.wsources"
+    windows_output = root / "Windows"
+    mac_output = root / "Mac"
+
+    audit = validate_isolated_io(
+        version="2022.1",
+        uri="ak.wwise.cli.convertExternalSource",
+        args={
+            "project": str(project),
+            "source-by-platform": [
+                ["Windows", str(windows_source)],
+                ["Mac", str(mac_source)],
+            ],
+            "output": [
+                ["Windows", str(windows_output)],
+                ["Mac", str(mac_output)],
+            ],
+        },
+        io_root=root,
+    )
+
+    assert [(item.json_path, item.raw_path, item.role) for item in audit.paths] == [
+        ("$.args.project", str(project), "read"),
+        ("$.args.source-by-platform[0][1]", str(windows_source), "read"),
+        ("$.args.source-by-platform[1][1]", str(mac_source), "read"),
+        ("$.args.output[0][1]", str(windows_output), "write"),
+        ("$.args.output[1][1]", str(mac_output), "write"),
+    ]
+    assert audit.explicit_write_confinement_proven is True
+
+
+def test_generate_soundbank_nested_platform_pairs_share_the_same_closed_audit_shape(
+    tmp_path: Path,
+):
+    root = tmp_path / "sandbox"
+    project = tmp_path / "Project.wproj"
+
+    audit = validate_isolated_io(
+        version="2022.1",
+        uri="ak.wwise.cli.generateSoundbank",
+        args={
+            "project": str(project),
+            "soundbank-path": [
+                ["Windows", str(root / "Windows")],
+                ["Mac", str(root / "Mac")],
+            ],
+            "cache": str(root / "cache"),
+            "root-output-path": str(root),
+        },
+        io_root=root,
+    )
+
+    assert [(item.json_path, item.role) for item in audit.paths] == [
+        ("$.args.project", "read"),
+        ("$.args.soundbank-path[0][1]", "write"),
+        ("$.args.soundbank-path[1][1]", "write"),
+        ("$.args.cache", "write"),
+        ("$.args.root-output-path", "write"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "value",
+    (
+        [["Windows"]],
+        [["Windows", "/tmp/windows"], ["Mac", 7]],
+        [["Windows", "/tmp/windows"], "Mac", "/tmp/mac"],
+    ),
+)
+def test_malformed_or_mixed_nested_platform_pairs_fail_closed(
+    tmp_path: Path,
+    value: list[object],
+):
+    error = _assert_error(
+        "AMBIGUOUS_PLATFORM_PATH_MAPPING",
+        version="2022.1",
+        uri="ak.wwise.cli.convertExternalSource",
+        args={
+            "project": str(tmp_path / "Project.wproj"),
+            "output": value,
+        },
+        io_root=tmp_path,
+    )
+    assert error.details["json_path"] == "$.args.output"
+
+
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
 def test_generate_soundbank_bank_file_selector_is_audited_without_treating_names_as_paths(
     tmp_path: Path,

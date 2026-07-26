@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import queue
+import stat
 import threading
 import time
 from typing import Any, Callable
@@ -9,12 +11,21 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.subscriptions import (  # pyright: ignore[reportMissingImports]
     DEFAULT_CALLBACK_EXECUTOR,
+    MAX_WAIT_EVENT_COUNT,
     BackgroundSubscription,
     SubscriptionCallbackError,
+    SubscriptionCleanupError,
+    SubscriptionAcknowledgementError,
     SubscriptionEvent,
     SubscriptionManager,
     SubscriptionTimeout,
     SubscriptionUnavailable,
+    SUBSCRIPTION_ACK_CONTRACT,
+    SUBSCRIPTION_ACK_ENV_NAMES,
+    SUBSCRIPTION_ACK_NONCE_ENV,
+    SUBSCRIPTION_ACK_PATH_ENV,
+    SUBSCRIPTION_ACK_STEP_ENV,
+    SUBSCRIPTION_ACK_TOPIC_ENV,
     _put_bounded,
     payload_matches,
 )
@@ -75,6 +86,137 @@ def test_default_executor_guidance_matches_waapi_sequential_executor() -> None:
     assert DEFAULT_CALLBACK_EXECUTOR == "waapi.SequentialThreadExecutor"
 
 
+def _configure_subscription_ack(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    evidence_dir,
+    target,
+    topic: str = "ak.wwise.core.soundbank.generated",
+) -> None:
+    monkeypatch.setenv("WWISE_EVIDENCE_DIR", str(evidence_dir))
+    monkeypatch.setenv(SUBSCRIPTION_ACK_PATH_ENV, str(target))
+    monkeypatch.setenv(SUBSCRIPTION_ACK_NONCE_ENV, "n" * 43)
+    monkeypatch.setenv(SUBSCRIPTION_ACK_TOPIC_ENV, topic)
+    monkeypatch.setenv(SUBSCRIPTION_ACK_STEP_ENV, "soundbank.generated.wait")
+
+
+def test_subscription_ack_is_atomically_published_only_after_subscribe(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    evidence.mkdir(mode=0o700)
+    target = evidence / "subscription-ack-test.json"
+    _configure_subscription_ack(
+        monkeypatch,
+        evidence_dir=evidence,
+        target=target,
+    )
+    client = FakeSubscriptionClient()
+    manager = SubscriptionManager(client)
+
+    handle = manager.subscribe("ak.wwise.core.soundbank.generated")
+
+    assert handle is not None
+    assert len(client.handlers) == 1
+    payload = json.loads(target.read_text(encoding="utf-8"))
+    assert payload == {
+        "contract": SUBSCRIPTION_ACK_CONTRACT,
+        "step_name": "soundbank.generated.wait",
+        "topic": "ak.wwise.core.soundbank.generated",
+        "nonce": "n" * 43,
+        "runner_parent_process_id": payload["runner_parent_process_id"],
+        "gateway_process_id": payload["gateway_process_id"],
+        "subscribed_at_unix_ns": payload["subscribed_at_unix_ns"],
+        "subscribed_at_monotonic_ns": payload["subscribed_at_monotonic_ns"],
+    }
+    assert payload["runner_parent_process_id"] > 0
+    assert payload["gateway_process_id"] > 0
+    assert payload["subscribed_at_unix_ns"] > 0
+    assert payload["subscribed_at_monotonic_ns"] > 0
+    metadata = target.stat()
+    assert metadata.st_nlink == 1
+    assert stat.S_IMODE(metadata.st_mode) & 0o077 == 0
+    assert not list(evidence.glob(".subscription-ack-test.json.*.tmp"))
+    handle.unsubscribe()
+
+
+@pytest.mark.parametrize("failure", ("wrong_topic", "partial", "preexisting", "outside"))
+def test_subscription_ack_failures_unsubscribe_and_publish_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+    failure: str,
+) -> None:
+    evidence = tmp_path / "evidence"
+    evidence.mkdir(mode=0o700)
+    target = evidence / "subscription-ack-test.json"
+    _configure_subscription_ack(
+        monkeypatch,
+        evidence_dir=evidence,
+        target=target,
+    )
+    if failure == "wrong_topic":
+        monkeypatch.setenv(SUBSCRIPTION_ACK_TOPIC_ENV, "ak.wwise.core.object.created")
+    elif failure == "partial":
+        monkeypatch.delenv(SUBSCRIPTION_ACK_NONCE_ENV)
+    elif failure == "preexisting":
+        target.write_text("forged\n", encoding="utf-8")
+    else:
+        other = tmp_path / "other"
+        other.mkdir()
+        target = other / "subscription-ack-test.json"
+        monkeypatch.setenv(SUBSCRIPTION_ACK_PATH_ENV, str(target))
+    client = FakeSubscriptionClient()
+
+    with pytest.raises(SubscriptionAcknowledgementError):
+        SubscriptionManager(client).subscribe(
+            "ak.wwise.core.soundbank.generated"
+        )
+
+    assert client.unsubscribe_calls == 1
+    assert client.handlers == []
+    if failure != "preexisting":
+        assert not target.exists()
+
+
+def test_duplicate_subscription_ack_is_rejected_without_overwrite(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    evidence.mkdir(mode=0o700)
+    target = evidence / "subscription-ack-test.json"
+    _configure_subscription_ack(
+        monkeypatch,
+        evidence_dir=evidence,
+        target=target,
+    )
+    client = FakeSubscriptionClient()
+    manager = SubscriptionManager(client)
+    first = manager.subscribe("ak.wwise.core.soundbank.generated")
+    original = target.read_bytes()
+
+    with pytest.raises(SubscriptionAcknowledgementError):
+        manager.subscribe("ak.wwise.core.soundbank.generated")
+
+    assert target.read_bytes() == original
+    assert client.unsubscribe_calls == 1
+    assert first is not None
+    first.unsubscribe()
+
+
+def test_no_subscription_ack_environment_preserves_normal_behavior(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for name in SUBSCRIPTION_ACK_ENV_NAMES:
+        monkeypatch.delenv(name, raising=False)
+    client = FakeSubscriptionClient()
+    handle = SubscriptionManager(client).subscribe("ak.test.topic")
+    assert handle is not None
+    assert len(client.handlers) == 1
+    handle.unsubscribe()
+
+
 def test_subscribe_success_returns_idempotent_cleanup_handle() -> None:
     client = FakeSubscriptionClient()
     manager = SubscriptionManager(client)
@@ -87,6 +229,68 @@ def test_subscribe_success_returns_idempotent_cleanup_handle() -> None:
     assert handle.unsubscribe() is False
     assert client.unsubscribe_calls == 1
     assert manager.active_topics == set()
+
+
+def test_unsubscribe_false_keeps_handle_and_topic_active_for_retry() -> None:
+    class RetryCleanupClient(FakeSubscriptionClient):
+        def __init__(self) -> None:
+            super().__init__()
+            self.results = [False, True]
+
+        def unsubscribe(self, event_handler: FakeEventHandler) -> bool:
+            self.unsubscribe_calls += 1
+            result = self.results.pop(0)
+            if result and event_handler in self.handlers:
+                self.handlers.remove(event_handler)
+            return result
+
+    client = RetryCleanupClient()
+    manager = SubscriptionManager(client)
+    handle = manager.subscribe("ak.retry.cleanup")
+    assert handle is not None
+
+    assert handle.unsubscribe() is False
+    assert handle.unsubscribed is False
+    assert manager.active_topics == {"ak.retry.cleanup"}
+    assert client.handlers == [handle.handler]
+
+    assert handle.unsubscribe() is True
+    assert handle.unsubscribed is True
+    assert manager.active_topics == set()
+    assert client.handlers == []
+
+
+def test_ack_failure_reports_false_cleanup_without_claiming_unsubscribe(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    class FalseCleanupClient(FakeSubscriptionClient):
+        def unsubscribe(self, event_handler: FakeEventHandler) -> bool:
+            del event_handler
+            self.unsubscribe_calls += 1
+            return False
+
+    evidence = tmp_path / "evidence"
+    evidence.mkdir(mode=0o700)
+    target = evidence / "subscription-ack-test.json"
+    _configure_subscription_ack(
+        monkeypatch,
+        evidence_dir=evidence,
+        target=target,
+        topic="ak.wrong.topic",
+    )
+    client = FalseCleanupClient()
+    manager = SubscriptionManager(client)
+
+    with pytest.raises(
+        SubscriptionAcknowledgementError,
+        match="cleanup returned false and remains active",
+    ):
+        manager.subscribe("ak.actual.topic")
+
+    assert client.unsubscribe_calls == 1
+    assert len(client.handlers) == 1
+    assert manager.active_topics == {"ak.actual.topic"}
 
 
 def test_subscribe_none_result_is_rejected() -> None:
@@ -117,6 +321,34 @@ def test_wait_for_event_receives_event_and_unsubscribes_once() -> None:
     assert event.kwargs == {"sequence": 2}
     assert client.unsubscribe_calls == 1
     assert manager.active_topics == set()
+
+
+def test_wait_for_event_false_unsubscribe_is_a_distinct_cleanup_failure() -> None:
+    class FalseCleanupClient(FakeSubscriptionClient):
+        def unsubscribe(self, event_handler: FakeEventHandler) -> bool:
+            del event_handler
+            self.unsubscribe_calls += 1
+            return False
+
+    client = FalseCleanupClient()
+    manager = SubscriptionManager(client)
+
+    def publish() -> None:
+        while not client.handlers:
+            time.sleep(0.001)
+        client.handlers[0].emit({"id": 1})
+
+    publisher = threading.Thread(target=publish)
+    publisher.start()
+    with pytest.raises(SubscriptionCleanupError) as caught:
+        manager.wait_for_event("ak.false.cleanup", timeout=0.5)
+    publisher.join(0.5)
+
+    assert caught.value.primary_error is None
+    assert caught.value.reason == "unsubscribe_returned_false"
+    assert client.unsubscribe_calls == 1
+    assert len(client.handlers) == 1
+    assert manager.active_topics == {"ak.false.cleanup"}
 
 
 def test_wait_for_event_timeout_unsubscribes_once() -> None:
@@ -178,6 +410,65 @@ def test_wait_for_event_ignores_nonmatching_payload_then_returns_match() -> None
 
     assert event.payload["object"]["name"] == "UI"
     assert client.unsubscribe_calls == 1
+    assert manager.active_topics == set()
+
+
+def test_wait_for_events_collects_matching_events_in_order_and_unsubscribes_once() -> None:
+    client = FakeSubscriptionClient()
+    manager = SubscriptionManager(client)
+
+    def publish() -> None:
+        while not client.handlers:
+            time.sleep(0.001)
+        handler = client.handlers[0]
+        handler.emit({"scope": "ignore", "sequence": 0})
+        handler.emit({"scope": "wanted", "sequence": 1})
+        handler.emit({"scope": "wanted", "sequence": 2})
+        handler.emit({"scope": "wanted", "sequence": 3})
+
+    publisher = threading.Thread(target=publish)
+    publisher.start()
+    events = manager.wait_for_events(
+        "ak.wwise.core.soundbank.generated",
+        event_count=3,
+        timeout=0.5,
+        predicate=lambda item: payload_matches(item.payload, {"scope": "wanted"}),
+    )
+    publisher.join(0.5)
+
+    assert [event.payload["sequence"] for event in events] == [1, 2, 3]
+    assert client.unsubscribe_calls == 1
+    assert manager.active_topics == set()
+
+
+def test_wait_for_events_timeout_reports_partial_count_and_unsubscribes_once() -> None:
+    client = FakeSubscriptionClient()
+    manager = SubscriptionManager(client)
+
+    def publish() -> None:
+        while not client.handlers:
+            time.sleep(0.001)
+        client.handlers[0].emit({"sequence": 1})
+
+    publisher = threading.Thread(target=publish)
+    publisher.start()
+    with pytest.raises(SubscriptionTimeout, match=r"received 1$"):
+        manager.wait_for_events("ak.partial", event_count=2, timeout=0.03)
+    publisher.join(0.5)
+
+    assert client.unsubscribe_calls == 1
+    assert manager.active_topics == set()
+
+
+@pytest.mark.parametrize("event_count", (0, MAX_WAIT_EVENT_COUNT + 1, True, 1.5))
+def test_wait_for_events_rejects_invalid_count_before_subscribing(event_count: object) -> None:
+    client = FakeSubscriptionClient()
+    manager = SubscriptionManager(client)
+
+    with pytest.raises(ValueError, match="event_count"):
+        manager.wait_for_events("ak.invalid", event_count=event_count)  # type: ignore[arg-type]
+
+    assert client.handlers == []
     assert manager.active_topics == set()
 
 

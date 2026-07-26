@@ -243,8 +243,8 @@ def test_tab_delimited_builder_emits_plan_without_file_write(tmp_path: Path) -> 
 
     assert not (tmp_path / "task7.tsv").exists()
     assert plan.render() == (
-        "Audio File\tObject Path\tObject Type\tImport Language\tOriginals Sub Folder\tNotes\n"
-        f"{tmp_path / 'tab-tone.wav'}\t\\Actor-Mixer Hierarchy\\Default Work Unit\\<Sound>TabTone\tSound\tSFX\tTask7\ttab note\n"
+        "Audio File\tObject Path\tObject Type\tOriginalsSubFolder\tNotes\n"
+        f"{tmp_path / 'tab-tone.wav'}\t\\Actor-Mixer Hierarchy\\Default Work Unit\\<Sound>TabTone\tSound\tTask7\ttab note\n"
     )
 
     preview = builder().import_tab_delimited(import_location=r"\Actor-Mixer Hierarchy\Default Work Unit", import_language="SFX", import_operation="createNew", plan=plan)

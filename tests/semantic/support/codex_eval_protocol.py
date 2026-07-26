@@ -23,6 +23,7 @@ from .codex_eval_suite import (
 )
 from .codex_gateway_broker import (
     ExpectedGatewayStep,
+    ResponseBinding,
     SemanticJsonArgument,
 )
 
@@ -463,7 +464,6 @@ def build_expected_gateway_steps(
     elif session.phase == "confirm":
         steps = _confirm_steps(
             transaction_id=values["transaction_id"],
-            preview_hash=values["preview_hash"],
         )
     elif session.case.id in BOUNDARY_CASE_IDS:
         steps = (_operation_schema_step(route),)
@@ -609,27 +609,33 @@ def _preview_step(
 def _confirm_steps(
     *,
     transaction_id: str,
-    preview_hash: str,
 ) -> tuple[ExpectedGatewayStep, ...]:
+    show_name = "transaction-show"
+    confirm_name = "confirm"
+    execute_name = "execute"
     return (
         ExpectedGatewayStep(
-            name="transaction-show",
+            name=show_name,
             subcommand="transaction-show",
             arguments=(transaction_id, "--summary-only"),
         ),
         ExpectedGatewayStep(
-            name="confirm",
+            name=confirm_name,
             subcommand="confirm",
-            arguments=(transaction_id, "--artifact-hash", preview_hash),
+            arguments=(
+                ResponseBinding(show_name, "/transaction_id"),
+                "--confirmation-token",
+                ResponseBinding(show_name, "/confirmation/token"),
+            ),
         ),
         ExpectedGatewayStep(
-            name="execute",
+            name=execute_name,
             subcommand="execute",
-            arguments=(transaction_id,),
+            arguments=(ResponseBinding(confirm_name, "/transaction_id"),),
         ),
         ExpectedGatewayStep(
             name="verify",
             subcommand="verify",
-            arguments=(transaction_id,),
+            arguments=(ResponseBinding(execute_name, "/transaction_id"),),
         ),
     )

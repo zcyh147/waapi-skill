@@ -1,0 +1,157 @@
+{
+  "contract": "waapi-skill.codex-semantic-request-mapping-registry/v3",
+  "implementation_status": "specification_only_unresolved",
+  "execution_policy": "a scenario referenced by any non-closed requirement is blocked from real execution until every requirement for that scenario is closed",
+  "requirements": [
+    {
+      "id": "log.channel_and_severity",
+      "kind": "enum_map",
+      "status": "missing",
+      "versions": ["2023.1"],
+      "apis": ["ak.wwise.core.log.addItem", "ak.wwise.core.log.clear"],
+      "case_ids": ["VS23-F-LOG-ADDITEM-01", "VS23-F-LOG-ADDITEM-02", "VS23-F-LOG-CLEAR-01", "VS23-F-LOG-CLEAR-02"],
+      "json_pointers": ["/args/channel", "/args/severity"],
+      "required_semantics": ["conversion channel", "warning severity", "error severity"],
+      "evidence": ["the reflected target schemas retain unresolved logCentralChannel and logCentralSeverity references"]
+    },
+    {
+      "id": "log.read_channel",
+      "kind": "enum_map",
+      "status": "missing",
+      "versions": ["2022.1"],
+      "apis": ["ak.wwise.core.log.get"],
+      "case_ids": ["O22-LOG-GET-01", "O22-LOG-GET-02"],
+      "json_pointers": ["/args/channel"],
+      "required_semantics": ["the requested business log channel must be explicit and map to an accepted token"],
+      "evidence": ["log.get requires channel through an unresolved logCentralChannel reference and the cases do not yet close the choice"]
+    },
+    {
+      "id": "object.attenuation_point_shape",
+      "kind": "enum_map",
+      "status": "available_not_exposed",
+      "versions": ["2022.1"],
+      "apis": ["ak.wwise.core.object.setAttenuationCurve"],
+      "case_ids": ["OBJ22-F-SETATTENUATIONCURVE-01"],
+      "json_pointers": ["/args/points/*/shape"],
+      "required_semantics": ["Linear point interpolation"],
+      "evidence": ["curveType and use are inline enums, but pointsDefinition remains unresolved in the target public schema"]
+    },
+    {
+      "id": "object.state_properties",
+      "kind": "schema_map",
+      "status": "missing",
+      "versions": ["2023.1"],
+      "apis": ["ak.wwise.core.object.setStateProperties"],
+      "case_ids": ["VS23-F-OBJECT-SETSTATEPROPERTIES-01", "VS23-F-OBJECT-SETSTATEPROPERTIES-02"],
+      "json_pointers": ["/args/stateProperties"],
+      "required_semantics": ["closed member schema for each state-property assignment"],
+      "evidence": ["the reflected target schema retains an unresolved statePropertiesArg reference"]
+    },
+    {
+      "id": "profiler.cursor",
+      "kind": "enum_map",
+      "status": "missing",
+      "versions": ["2022.1"],
+      "apis": ["ak.wwise.core.profiler.getCursorTime"],
+      "case_ids": ["RT-PROF-CURSOR-01", "RT-PROF-CURSOR-02"],
+      "json_pointers": ["/args/cursor"],
+      "required_semantics": ["Capture Time cursor", "User Time cursor"],
+      "evidence": ["the reflected target schema retains an unresolved profilerCursor reference"]
+    },
+    {
+      "id": "profiler.cursor_time",
+      "kind": "enum_map",
+      "status": "missing",
+      "versions": ["2022.1", "2023.1", "2024.1"],
+      "apis": [
+        "ak.wwise.core.profiler.getAudioObjects",
+        "ak.wwise.core.profiler.getBusses",
+        "ak.wwise.core.profiler.getCpuUsage",
+        "ak.wwise.core.profiler.getGameObjects",
+        "ak.wwise.core.profiler.getLoadedMedia",
+        "ak.wwise.core.profiler.getMeters",
+        "ak.wwise.core.profiler.getPerformanceMonitor",
+        "ak.wwise.core.profiler.getRTPCs",
+        "ak.wwise.core.profiler.getStreamedMedia",
+        "ak.wwise.core.profiler.getVoiceContributions",
+        "ak.wwise.core.profiler.getVoices"
+      ],
+      "case_ids": [
+        "RT-PROF-AUDIO-OBJECTS-01",
+        "RT-PROF-AUDIO-OBJECTS-02",
+        "RT-PROF-BUSSES-01",
+        "RT-PROF-BUSSES-02",
+        "RT-PROF-CONTRIB-01",
+        "RT-PROF-CONTRIB-02",
+        "RT-PROF-GAME-OBJECTS-01",
+        "RT-PROF-GAME-OBJECTS-02",
+        "RT-PROF-RTPCS-01",
+        "RT-PROF-VOICES-01",
+        "RT-PROF-VOICES-02",
+        "VS23-PROF-CPU-01",
+        "VS23-PROF-LOADED-MEDIA-01",
+        "VS23-PROF-PERF-01",
+        "VS23-PROF-STREAMS-01",
+        "VS24-PROF-METERS-01"
+      ],
+      "json_pointers": ["/args/time"],
+      "required_semantics": ["current Capture Time accepted literal in addition to an explicit numeric timestamp"],
+      "evidence": ["the reflected target schemas retain unresolved cursorTime references"]
+    },
+    {
+      "id": "profiler.data_type",
+      "kind": "enum_map",
+      "status": "missing",
+      "versions": ["2022.1"],
+      "apis": ["ak.wwise.core.profiler.enableProfilerData"],
+      "case_ids": ["RT-PROF-ENABLE-DATA-01", "RT-PROF-ENABLE-DATA-02"],
+      "json_pointers": ["/args/dataTypes/*/dataType"],
+      "required_semantics": ["Voice", "Game Object", "RTPC", "Bus", "Audio Object", "Voice Contributions"],
+      "evidence": ["all five reflected manifests retain an unresolved profilerDataType reference"]
+    },
+    {
+      "id": "soundengine.action_on_event_type",
+      "kind": "enum_map",
+      "status": "available_not_exposed",
+      "versions": ["2022.1"],
+      "apis": ["ak.soundengine.executeActionOnEvent"],
+      "case_ids": ["RT-SE-EXECUTE-ACTION-01", "RT-SE-EXECUTE-ACTION-02"],
+      "json_pointers": ["/args/actionType"],
+      "required_semantics": ["stop", "pause"],
+      "evidence": ["the reflected schema exposes only integer range 0..4 and an external AkActionOnEventType name"]
+    },
+    {
+      "id": "soundengine.fade_curve",
+      "kind": "enum_map",
+      "status": "available_not_exposed",
+      "versions": ["2022.1"],
+      "apis": ["ak.soundengine.executeActionOnEvent", "ak.soundengine.stopPlayingID"],
+      "case_ids": ["RT-SE-EXECUTE-ACTION-01", "RT-SE-EXECUTE-ACTION-02", "RT-SE-STOP-PLAYING-01", "RT-SE-STOP-PLAYING-02"],
+      "json_pointers": ["/args/fadeCurve"],
+      "required_semantics": ["Linear"],
+      "evidence": ["the reflected schemas expose only integer range 0..9 and an external AkCurveInterpolation name"]
+    },
+    {
+      "id": "soundengine.multi_position_type",
+      "kind": "enum_map",
+      "status": "available_not_exposed",
+      "versions": ["2022.1"],
+      "apis": ["ak.soundengine.setMultiplePositions"],
+      "case_ids": ["RT-SE-MULTI-POSITIONS-01", "RT-SE-MULTI-POSITIONS-02"],
+      "json_pointers": ["/args/multiPositionType"],
+      "required_semantics": ["MultiSources", "MultiDirections"],
+      "evidence": ["the reflected schema exposes only integer range 0..2 and an external MultiPositionType name"]
+    },
+    {
+      "id": "soundengine.position_array",
+      "kind": "schema_map",
+      "status": "available_not_exposed",
+      "versions": ["2022.1"],
+      "apis": ["ak.soundengine.setMultiplePositions"],
+      "case_ids": ["RT-SE-MULTI-POSITIONS-01", "RT-SE-MULTI-POSITIONS-02"],
+      "json_pointers": ["/args/positions"],
+      "required_semantics": ["closed array member schema for position, orientationFront, and orientationTop"],
+      "evidence": ["the raw manifest contains the nested shape, but the v3 structured_array prompt materializer has no member schema yet"]
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "contract": "waapi-skill.codex-semantic-suite-manifest/v3",
+  "skill_name": "waapi-skill",
+  "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
+  "documents": {
+    "online": "online_tests.json",
+    "offline": "offline_tests.json",
+    "adapter_registry": "adapter_registry.json",
+    "request_mapping_registry": "request_mapping_registry.json"
+  },
+  "coverage_policy": {
+    "eligible_interface_status": ["available", "available_via_transaction"],
+    "minimum_distinct_scenarios_per_api": 2,
+    "recommended_distinct_scenarios_per_api": 3,
+    "minimum_distinct_scenario_families_per_api": 2,
+    "offline_cases_receive_functional_credit": false,
+    "repetitions_receive_additional_credit": false,
+    "primary_apis_per_scenario": 1,
+    "coverage_unit": "unique_executable_uri",
+    "representative_version_strategy": "prefer_2022_1_else_earliest_available",
+    "version_row_coverage_claimed": false,
+    "credit_rule": "primary_dispatch_and_business_oracle"
+  },
+  "profiles": [
+    {
+      "id": "online_2022_review",
+      "lane": "online",
+      "versions": ["2022.1"],
+      "execution_status": "definitions_only_pending_user_review"
+    },
+    {
+      "id": "offline_review",
+      "lane": "offline",
+      "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
+      "execution_status": "definitions_only_pending_user_review"
+    }
+  ],
+  "legacy_suite": {
+    "path": "evals-v2.json",
+    "profiles": {
+      "screening": 40,
+      "formal_98": 98,
+      "full_cross_version_168": 168
+    },
+    "status": "frozen_compatibility_and_historical_evidence"
+  }
+}

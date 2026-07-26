@@ -1,6 +1,6 @@
 # WAAPI setup lane
 
-Use this reference when the request is primarily about connection, version selection, or saved config. The entry file owns the one-time conversation introduction for every lane.
+Use this reference when the request is primarily about connection, version selection, or saved config. The entry file owns the one-time conversation introduction for every lane: emit the Gateway's structured `session_context.one_time_introduction` atomically after the first result, then do not repeat it.
 
 ## First connection sequence
 

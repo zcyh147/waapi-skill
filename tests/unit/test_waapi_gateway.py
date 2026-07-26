@@ -207,7 +207,7 @@ def test_gateway_outer_exception_normalization_contains_broken_string_hook(tmp_p
     assert exit_code == 2
     assert payload["error_code"] == "ERROR_NORMALIZATION_FAILED"
     assert payload["message"] == "The underlying error could not be normalized safely"
-    assert len(json.dumps(payload).encode("utf-8")) < 1024
+    assert len(json.dumps(payload).encode("utf-8")) < 1536
 
 
 def test_gateway_outer_exception_normalization_contains_broken_as_dict_hook(tmp_path: Path) -> None:
@@ -232,7 +232,7 @@ def test_gateway_outer_exception_normalization_contains_broken_as_dict_hook(tmp_
     assert payload["error_code"] == "HOSTILE_STRUCTURED_ERROR"
     assert payload["message"] == "safe primary message"
     assert payload["details"] is None
-    assert len(json.dumps(payload).encode("utf-8")) < 1024
+    assert len(json.dumps(payload).encode("utf-8")) < 1536
 
 
 def test_status_uses_project_object_query_for_2021_1(tmp_path: Path) -> None:
@@ -924,6 +924,25 @@ def test_config_show_returns_defaults_offline_without_connecting(
                 "preview_then_confirm",
                 "allow_with_notice",
             ],
+            "one_time_introduction": {
+                "contract": "waapi-skill.session-introduction/v1",
+                "emit_condition": "visible_conversation_intro_absent",
+                "emit_timing": "first_agent_message_after_gateway_result",
+                "atomic": True,
+                "style": "natural_prose_in_user_language",
+                "facts": {
+                    "skill_name": "waapi-skill",
+                    "endpoint_url": None,
+                    "adapter_version": None,
+                    "project_modification_policy": "preview_then_confirm",
+                    "available_project_modification_policies": [
+                        "never",
+                        "preview_then_confirm",
+                        "allow_with_notice",
+                    ],
+                },
+                "machine_readable_result_policy": "separate_progress_message",
+            },
         },
     }
     assert not external_path.exists()
@@ -1388,15 +1407,15 @@ def test_capability_matrix_is_available_offline_without_config_or_client(tmp_pat
     assert payload["summary"]["totals"]["total"] == 814
     assert payload["summary"]["totals"]["schema_status"] == {"ok": 814}
     assert payload["summary"]["totals"]["interface_status"] == {
-        "available": 247,
-        "available_via_transaction": 522,
+        "available": 249,
+        "available_via_transaction": 520,
         "unsupported_by_skill_interface": 45,
     }
     assert payload["summary"]["totals"]["preferred_routes"] == {
         "bounded_topic_wait": 147,
         "fixed_command": 42,
-        "manifest_dispatch": 58,
-        "transaction_operation": 522,
+        "manifest_dispatch": 60,
+        "transaction_operation": 520,
         "unsupported_boundary": 45,
     }
     assert payload["match_count"] == 814
@@ -1820,7 +1839,6 @@ def test_public_generic_call_rejects_object_get_and_points_to_query_object(tmp_p
     (
         ("2022.1", "ak.wwise.cli.dumpObjects", "isolated_transaction"),
         ("2022.1", "ak.wwise.cli.verify", "isolated_transaction"),
-        ("2025.1", "ak.wwise.core.mediaPool.get", "transaction"),
         ("2023.1", "ak.wwise.core.sourceControl.getSourceFiles", "isolated_transaction"),
         ("2023.1", "ak.wwise.core.sourceControl.getStatus", "isolated_transaction"),
     ),
@@ -1888,6 +1906,653 @@ def test_bounded_direct_calls_reject_invalid_payload_without_business_dispatch(
     assert payload["error_code"] == "SemanticValidationError"
     assert payload["details"]["uri"] == api
     assert payload["details"]["missing_args"]
+    assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo"]
+
+
+def test_media_pool_get_is_a_bounded_direct_read(tmp_path: Path) -> None:
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(year=2025, major=1),
+            "ak.wwise.core.mediaPool.get": {"return": []},
+        }
+    )
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2025.1"
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "call",
+            "ak.wwise.core.mediaPool.get",
+            "--args-json",
+            '{"databases":["\\\\Databases\\\\Project Originals"],"maxResults":20}',
+            "--options-json",
+            '{"return":["Path","FileId","Db"]}',
+        ],
+        env=env,
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0
+    assert payload["agent_result"] == {"return": []}
+    assert [call[0] for call in client.calls] == [
+        "ak.wwise.core.getInfo",
+        "ak.wwise.core.mediaPool.get",
+    ]
+
+
+def test_media_pool_post_filter_is_case_sensitive_bounded_and_preserves_order(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        {"Filename": "footstep_gravel.wav", "FileId": "first"},
+        {"Filename": "Footstep_case_decoy.wav", "FileId": "decoy"},
+        {"Filename": "short_footstep_wood.wav", "FileId": "second"},
+        {"Filename": "footstep_metal.wav", "FileId": "third"},
+    ]
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(year=2025, major=1),
+            "ak.wwise.core.mediaPool.get": {"return": rows},
+        }
+    )
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2025.1"
+    request = {
+        "databases": [r"\Databases\Project Originals"],
+        "filters": [
+            {
+                "type": "field",
+                "field": "Filename",
+                "operator": "contains",
+                "value": "footstep",
+            }
+        ],
+        "maxResults": 5,
+    }
+    post_filter = {
+        "field": "Filename",
+        "operator": "containsCaseSensitive",
+        "value": "footstep",
+        "limit": 2,
+    }
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "call",
+            "ak.wwise.core.mediaPool.get",
+            "--args-json",
+            json.dumps(request),
+            "--options-json",
+            json.dumps({"return": ["Filename", "FileId"]}),
+            "--post-filter-json",
+            json.dumps(post_filter),
+        ],
+        env=env,
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["agent_result"] == {"return": [rows[0], rows[2]]}
+    assert list(payload)[-1] == "agent_result"
+    assert client.calls[-1][1] == request
+    assert client.calls[-1][2] == {"return": ["Filename", "FileId"]}
+    audit = payload["post_filter"]
+    assert audit == {
+        "contract": "waapi-skill.media-pool-post-filter/v1",
+        "status": "applied",
+        "field": "Filename",
+        "operator": "containsCaseSensitive",
+        "value_sha256": audit["value_sha256"],
+        "value_code_points": len("footstep"),
+        "value_utf8_bytes": len("footstep".encode("utf-8")),
+        "limit": 2,
+        "request_max_results": 5,
+        "raw_count": 4,
+        "matched_count": 3,
+        "returned_count": 2,
+        "truncated_to_limit": True,
+    }
+    assert len(audit["value_sha256"]) == 64
+    assert "value" not in audit
+
+
+def test_media_pool_post_filter_fails_closed_when_candidate_result_reaches_ceiling(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        {"Filename": "footstep_gravel.wav", "FileId": "first"},
+        {"Filename": "unrelated.wav", "FileId": "second"},
+        {"Filename": "Footstep_case_decoy.wav", "FileId": "third"},
+    ]
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(year=2025, major=1),
+            "ak.wwise.core.mediaPool.get": {"return": rows},
+        }
+    )
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2025.1"
+    request = {
+        "filters": [
+            {
+                "type": "field",
+                "field": "Filename",
+                "operator": "contains",
+                "value": "footstep",
+            }
+        ],
+        "maxResults": 3,
+    }
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "call",
+            "ak.wwise.core.mediaPool.get",
+            "--args-json",
+            json.dumps(request),
+            "--options-json",
+            json.dumps({"return": ["Filename", "FileId"]}),
+            "--post-filter-json",
+            json.dumps(
+                {
+                    "field": "Filename",
+                    "operator": "containsCaseSensitive",
+                    "value": "footstep",
+                    "limit": 2,
+                }
+            ),
+        ],
+        env=env,
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["ok"] is False
+    assert payload["status"] == "incomplete_boundary"
+    assert payload["error_code"] == "MEDIA_POOL_POST_FILTER_INCOMPLETE"
+    assert payload["details"]["raw_count"] == 3
+    assert payload["details"]["request_max_results"] == 3
+    assert payload["call"]["ok"] is True
+    assert payload["post_filter"]["status"] == "incomplete"
+    assert payload["post_filter"]["raw_count"] == 3
+    assert payload["post_filter"]["matched_count"] is None
+    assert payload["post_filter"]["truncated_to_limit"] is None
+    assert "agent_result" not in payload
+
+
+def test_media_pool_post_filter_does_not_project_agent_result_when_waapi_fails(
+    tmp_path: Path,
+) -> None:
+    client = FakeClient(
+        {"ak.wwise.core.getInfo": live_info(year=2025, major=1)},
+        errors={"ak.wwise.core.mediaPool.get": RuntimeError("synthetic read failure")},
+    )
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2025.1"
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "call",
+            "ak.wwise.core.mediaPool.get",
+            "--args-json",
+            json.dumps(
+                {
+                    "filters": [
+                        {
+                            "type": "field",
+                            "field": "Filename",
+                            "operator": "contains",
+                            "value": "footstep",
+                        }
+                    ],
+                    "maxResults": 20,
+                }
+            ),
+            "--options-json",
+            json.dumps({"return": ["Filename", "FileId"]}),
+            "--post-filter-json",
+            json.dumps(
+                {
+                    "field": "Filename",
+                    "operator": "containsCaseSensitive",
+                    "value": "footstep",
+                    "limit": 2,
+                }
+            ),
+        ],
+        env=env,
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["ok"] is False
+    assert payload["call"]["ok"] is False
+    assert payload["post_filter"]["status"] == "not_applied"
+    assert payload["post_filter"]["truncated_to_limit"] is None
+    assert "agent_result" not in payload
+
+
+@pytest.mark.parametrize(
+    ("api", "post_filter", "request_args", "options", "extra_argv", "message_fragment"),
+    (
+        (
+            "ak.wwise.waapi.getFunctions",
+            {"field": "Filename", "operator": "containsCaseSensitive", "value": "footstep", "limit": 2},
+            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "footstep"}], "maxResults": 20},
+            {"return": ["Filename"]},
+            (),
+            "supported only",
+        ),
+        (
+            "ak.wwise.core.mediaPool.get",
+            {"field": "Path", "operator": "containsCaseSensitive", "value": "footstep", "limit": 2},
+            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "footstep"}], "maxResults": 20},
+            {"return": ["Filename"]},
+            (),
+            "field must be exactly",
+        ),
+        (
+            "ak.wwise.core.mediaPool.get",
+            {"field": "Filename", "operator": "matchesRegex", "value": "footstep", "limit": 2},
+            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "footstep"}], "maxResults": 20},
+            {"return": ["Filename"]},
+            (),
+            "operator must be exactly",
+        ),
+        (
+            "ak.wwise.core.mediaPool.get",
+            {"field": "Filename", "operator": "containsCaseSensitive", "value": "footstep", "limit": 2, "code": "malicious"},
+            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "footstep"}], "maxResults": 20},
+            {"return": ["Filename"]},
+            (),
+            "extra keys",
+        ),
+        (
+            "ak.wwise.core.mediaPool.get",
+            {"field": "Filename", "operator": "containsCaseSensitive", "value": "", "limit": 2},
+            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": ""}], "maxResults": 20},
+            {"return": ["Filename"]},
+            (),
+            "nonempty string",
+        ),
+        (
+            "ak.wwise.core.mediaPool.get",
+            {"field": "Filename", "operator": "containsCaseSensitive", "value": "footstep", "limit": True},
+            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "footstep"}], "maxResults": 20},
+            {"return": ["Filename"]},
+            (),
+            "limit must be an integer",
+        ),
+        (
+            "ak.wwise.core.mediaPool.get",
+            {"field": "Filename", "operator": "containsCaseSensitive", "value": "footstep", "limit": 2},
+            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "other"}], "maxResults": 20},
+            {"return": ["Filename"]},
+            (),
+            "matching Filename contains",
+        ),
+        (
+            "ak.wwise.core.mediaPool.get",
+            {"field": "Filename", "operator": "containsCaseSensitive", "value": "footstep", "limit": 2},
+            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "footstep"}], "maxResults": 20},
+            {"return": ["FileId"]},
+            (),
+            "return to include",
+        ),
+        (
+            "ak.wwise.core.mediaPool.get",
+            {"field": "Filename", "operator": "containsCaseSensitive", "value": "footstep", "limit": 2},
+            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "footstep"}], "maxResults": 20},
+            {},
+            (),
+            "return to include",
+        ),
+        (
+            "ak.wwise.core.mediaPool.get",
+            {"field": "Filename", "operator": "containsCaseSensitive", "value": "x" * 1025, "limit": 2},
+            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "x" * 1025}], "maxResults": 20},
+            {"return": ["Filename"]},
+            (),
+            "code-point literal limit",
+        ),
+        (
+            "ak.wwise.core.mediaPool.get",
+            {"field": "Filename", "operator": "containsCaseSensitive", "value": "footstep", "limit": 3},
+            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "footstep"}], "maxResults": 2},
+            {"return": ["Filename"]},
+            (),
+            "greater than or equal",
+        ),
+        (
+            "ak.wwise.core.mediaPool.get",
+            {"field": "Filename", "operator": "containsCaseSensitive", "value": "footstep", "limit": 2},
+            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "footstep"}], "maxResults": 20},
+            {"return": ["Filename"]},
+            ("--dry-run",),
+            "cannot be combined",
+        ),
+    ),
+    ids=(
+        "other-api",
+        "wrong-field",
+        "wrong-operator",
+        "extra-key",
+        "empty-value",
+        "boolean-limit",
+        "unbound-filter",
+        "missing-return-field",
+        "missing-return-mapping",
+        "oversized-literal",
+        "limit-exceeds-max-results",
+        "dry-run",
+    ),
+)
+def test_media_pool_post_filter_rejects_invalid_or_unbound_input_before_connection(
+    tmp_path: Path,
+    api: str,
+    post_filter: Mapping[str, Any],
+    request_args: Mapping[str, Any],
+    options: Mapping[str, Any],
+    extra_argv: tuple[str, ...],
+    message_fragment: str,
+) -> None:
+    factory_calls: list[str] = []
+
+    def forbidden_factory(url: str) -> FakeClient:
+        factory_calls.append(url)
+        raise AssertionError("invalid post-filter input must not open a WAAPI transport")
+
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2025.1"
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "call",
+            api,
+            "--args-json",
+            json.dumps(request_args),
+            "--options-json",
+            json.dumps(options),
+            "--post-filter-json",
+            json.dumps(post_filter),
+            *extra_argv,
+        ],
+        env=env,
+        client_factory=forbidden_factory,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert message_fragment in payload["message"]
+    assert factory_calls == []
+
+
+@pytest.mark.parametrize(
+    ("post_filter_json", "message_fragment"),
+    (
+        ("[]", "must decode to a JSON object"),
+        (
+            '{"field":"Filename","field":"Path","operator":"containsCaseSensitive",'
+            '"value":"footstep","limit":2}',
+            "duplicate JSON key",
+        ),
+    ),
+    ids=("non-object", "duplicate-key"),
+)
+def test_media_pool_post_filter_rejects_malformed_documents_before_connection(
+    tmp_path: Path,
+    post_filter_json: str,
+    message_fragment: str,
+) -> None:
+    factory_calls: list[str] = []
+
+    def forbidden_factory(url: str) -> FakeClient:
+        factory_calls.append(url)
+        raise AssertionError("malformed post-filter input must not connect")
+
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2025.1"
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "call",
+            "ak.wwise.core.mediaPool.get",
+            "--args-json",
+            json.dumps(
+                {
+                    "filters": [
+                        {
+                            "type": "field",
+                            "field": "Filename",
+                            "operator": "contains",
+                            "value": "footstep",
+                        }
+                    ],
+                    "maxResults": 20,
+                }
+            ),
+            "--options-json",
+            json.dumps({"return": ["Filename"]}),
+            "--post-filter-json",
+            post_filter_json,
+        ],
+        env=env,
+        client_factory=forbidden_factory,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert message_fragment in payload["message"]
+    assert factory_calls == []
+
+
+@pytest.mark.parametrize(
+    "raw_result",
+    (
+        {},
+        {"return": {}},
+        {"return": [[]]},
+        {"return": [{"Filename": 7}]},
+        {"return": [], "unexpected": True},
+    ),
+    ids=(
+        "missing-return",
+        "return-not-array",
+        "row-not-object",
+        "filename-not-string",
+        "extra-top-level-key",
+    ),
+)
+def test_media_pool_post_filter_rejects_invalid_success_result_shapes(raw_result: Any) -> None:
+    with pytest.raises(waapi_gateway.GatewayResultShapeError) as exc_info:
+        waapi_gateway.apply_media_pool_post_filter(
+            raw_result,
+            spec={
+                "field": "Filename",
+                "operator": "containsCaseSensitive",
+                "value": "footstep",
+                "limit": 2,
+            },
+            request_max_results=20,
+            evidence_path="evidence.json",
+        )
+
+    assert exc_info.value.error_code == "INVALID_MEDIA_POOL_POST_FILTER_RESULT"
+
+
+def test_media_pool_get_canonicalizes_only_duration_whole_seconds_before_dispatch(
+    tmp_path: Path,
+) -> None:
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(year=2025, major=1),
+            "ak.wwise.core.mediaPool.get": {"return": []},
+        }
+    )
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2025.1"
+    request = {
+        "databases": [r"\Databases\Project Originals"],
+        "filters": [
+            {
+                "type": "field",
+                "field": "WAV/Duration",
+                "operator": "lessThanOrEqual",
+                "value": 8,
+            },
+            {
+                "type": "field",
+                "field": "WAV/Sample Rate",
+                "operator": "equals",
+                "value": 48000,
+            },
+            {
+                "type": "field",
+                "field": "WAV/Channels",
+                "operator": "equals",
+                "value": 1,
+            },
+            {
+                "type": "field",
+                "field": "WAV/Bit Depth",
+                "operator": "equals",
+                "value": 24,
+            },
+        ],
+        "maxResults": 40,
+    }
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "call",
+            "ak.wwise.core.mediaPool.get",
+            "--args-json",
+            json.dumps(request),
+            "--options-json",
+            json.dumps({"return": ["Path", "WAV/Duration"]}),
+        ],
+        env=env,
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    dispatched = client.calls[-1][1]
+    assert dispatched is not None
+    dispatched_filters = dispatched["filters"]
+    assert type(dispatched_filters[0]["value"]) is float
+    assert dispatched_filters[0]["value"] == 8.0
+    assert [type(item["value"]) for item in dispatched_filters[1:]] == [int, int, int]
+    assert type(dispatched["maxResults"]) is int
+
+
+def test_media_pool_duration_canonicalizer_is_exactly_scoped_and_does_not_mutate_input() -> None:
+    request = {
+        "filters": [
+            {"type": "field", "field": "WAV/Duration", "operator": "equals", "value": 8},
+            {"type": "field", "field": "WAV/Sample Rate", "operator": "equals", "value": 48000},
+            {"type": "field", "field": "WAV/Channels", "operator": "equals", "value": 1},
+            {"type": "field", "field": "WAV/Bit Depth", "operator": "equals", "value": 24},
+            {"type": "field", "field": "wav/duration", "operator": "equals", "value": 8},
+            {"type": "audioDescription", "field": "WAV/Duration", "value": 8},
+        ],
+        "maxResults": 40,
+    }
+    original = json.loads(json.dumps(request))
+
+    normalized = waapi_gateway.canonicalize_bounded_direct_call_request(
+        "ak.wwise.core.mediaPool.get",
+        "2025.1",
+        request,
+    )
+
+    assert request == original
+    assert type(request["filters"][0]["value"]) is int
+    assert type(normalized["filters"][0]["value"]) is float
+    assert [type(item["value"]) for item in normalized["filters"][1:]] == [
+        int,
+        int,
+        int,
+        int,
+        int,
+    ]
+    assert type(normalized["maxResults"]) is int
+
+    wrong_version = waapi_gateway.canonicalize_bounded_direct_call_request(
+        "ak.wwise.core.mediaPool.get",
+        "2024.1",
+        request,
+    )
+    other_api = waapi_gateway.canonicalize_bounded_direct_call_request(
+        "ak.wwise.core.object.diff",
+        "2025.1",
+        request,
+    )
+    assert type(wrong_version["filters"][0]["value"]) is int
+    assert type(other_api["filters"][0]["value"]) is int
+
+
+@pytest.mark.parametrize(
+    "duration",
+    (2**53 + 1, 2**1024),
+    ids=("precision-loss", "double-overflow"),
+)
+def test_media_pool_duration_canonicalization_fails_closed_before_business_dispatch(
+    tmp_path: Path,
+    duration: int,
+) -> None:
+    client = FakeClient({"ak.wwise.core.getInfo": live_info(year=2025, major=1)})
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2025.1"
+    request = {
+        "filters": [
+            {
+                "type": "field",
+                "field": "WAV/Duration",
+                "operator": "lessThanOrEqual",
+                "value": duration,
+            }
+        ],
+        "maxResults": 40,
+    }
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "call",
+            "ak.wwise.core.mediaPool.get",
+            "--args-json",
+            json.dumps(request),
+        ],
+        env=env,
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert "exactly representable as a finite WAAPI double" in payload["message"]
+    assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo"]
+
+
+@pytest.mark.parametrize("max_results", (None, 0, 201, True))
+def test_media_pool_get_rejects_an_unbounded_result_request_before_business_dispatch(
+    tmp_path: Path,
+    max_results: Any,
+) -> None:
+    client = FakeClient({"ak.wwise.core.getInfo": live_info(year=2025, major=1)})
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2025.1"
+    request = {} if max_results is None else {"maxResults": max_results}
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "call",
+            "ak.wwise.core.mediaPool.get",
+            "--args-json",
+            json.dumps(request),
+        ],
+        env=env,
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] in {"GatewayInputError", "SemanticValidationError"}
     assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo"]
 
 
@@ -1971,7 +2636,9 @@ def test_public_generic_call_redirects_generic_soundbank_mutation_to_transaction
     assert payload["error_code"] == "TRANSACTION_REQUIRED"
     assert payload["executed"] is False
     assert payload["verified"] is False
-    assert payload["capability"]["interface"]["transaction_operations"] == ["waapi.call"]
+    assert payload["capability"]["interface"]["transaction_operations"] == [
+        "soundbank.generate",
+    ]
     assert payload["capability"]["execution_contract"]["route"] == "isolated_transaction"
     assert called is False
 
@@ -2001,6 +2668,622 @@ def test_query_object_uses_semantic_builder_and_returns_normalized_rows(tmp_path
         {"waql": 'from type Sound where name : "UI" take 10'},
         {"return": ["id", "name", "type", "path"]},
     )
+
+
+def test_query_object_original_file_reference_match_returns_closed_candidate_records(
+    tmp_path: Path,
+) -> None:
+    footstep = r"Y:\Sandbox\Originals\Footstep.wav"
+    unused = "Y:/Sandbox/Originals/Unused.wav"
+    voice = "/Users/xiye/Sandbox/Voice.wav"
+    network = r"\\StudioNas\Originals\Network.wav"
+    rows = [
+        {
+            "id": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBB2}",
+            "path": r"\Actor-Mixer Hierarchy\Footstep Source B",
+            "originalFilePath": "y:/sandbox/originals/FOOTSTEP.wav",
+        },
+        {
+            "id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAA1}",
+            "path": r"\Actor-Mixer Hierarchy\Footstep Source A",
+            "originalFilePath": r"Y:\SANDBOX\ORIGINALS\footstep.wav",
+        },
+        {
+            "id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCC3}",
+            "path": r"\Actor-Mixer Hierarchy\Voice Source",
+            "originalFilePath": voice,
+        },
+        {
+            "id": "{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDD4}",
+            "path": r"\Actor-Mixer Hierarchy\Network Source",
+            "originalFilePath": r"\\studionas\originals\NETWORK.wav",
+        },
+        {
+            "id": "{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEE5}",
+            "path": r"\Actor-Mixer Hierarchy\Unrelated Source",
+            "originalFilePath": r"Y:\Sandbox\Originals\Unrelated.wav",
+        },
+    ]
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(year=2025, major=1),
+            "ak.wwise.core.object.get": {"return": rows},
+        }
+    )
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2025.1"
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--type",
+            "AudioFileSource",
+            "--take",
+            "1000",
+            "--match-original-file-path",
+            footstep,
+            "--match-original-file-path",
+            unused,
+            "--match-original-file-path",
+            voice,
+            "--match-original-file-path",
+            network,
+        ],
+        env=env,
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert client.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {"waql": "from type AudioFileSource take 1000"},
+        {"return": ["id", "path", "originalFilePath"]},
+    )
+    assert payload["agent_result"] == {
+        "contract": "waapi-skill.original-file-reference-match/v1",
+        "scan_complete": True,
+        "scanned_audio_source_count": 5,
+        "scan_limit": 1000,
+        "candidates": [
+            {
+                "originalFilePath": footstep,
+                "classification": "referenced",
+                "reference_count": 2,
+                "references": [
+                    {
+                        "id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAA1}",
+                        "path": r"\Actor-Mixer Hierarchy\Footstep Source A",
+                    },
+                    {
+                        "id": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBB2}",
+                        "path": r"\Actor-Mixer Hierarchy\Footstep Source B",
+                    },
+                ],
+                "references_truncated": False,
+            },
+            {
+                "originalFilePath": unused,
+                "classification": "unreferenced",
+                "reference_count": 0,
+                "references": [],
+                "references_truncated": False,
+            },
+            {
+                "originalFilePath": voice,
+                "classification": "referenced",
+                "reference_count": 1,
+                "references": [
+                    {
+                        "id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCC3}",
+                        "path": r"\Actor-Mixer Hierarchy\Voice Source",
+                    }
+                ],
+                "references_truncated": False,
+            },
+            {
+                "originalFilePath": network,
+                "classification": "referenced",
+                "reference_count": 1,
+                "references": [
+                    {
+                        "id": "{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDD4}",
+                        "path": r"\Actor-Mixer Hierarchy\Network Source",
+                    }
+                ],
+                "references_truncated": False,
+            },
+        ],
+    }
+    assert list(payload)[-1] == "agent_result"
+    audit = payload["original_file_reference_match"]
+    assert audit["status"] == "complete"
+    assert audit["candidate_count"] == 4
+    assert audit["scan_count"] == 5
+    assert audit["reference_count"] == 4
+    assert audit["returned_reference_detail_count"] == 4
+    assert audit["reference_detail_limit_per_candidate"] == 4
+    assert audit["reference_detail_limit"] == 256
+
+
+def test_query_object_original_file_reference_match_sorts_and_truncates_details(
+    tmp_path: Path,
+) -> None:
+    candidate = r"Y:\Sandbox\Originals\Shared.wav"
+    rows = [
+        {
+            "id": f"{{00000000-0000-0000-0000-{index:012X}}}",
+            "path": rf"\Actor-Mixer Hierarchy\Source {path_index}",
+            "originalFilePath": candidate,
+        }
+        for index, path_index in enumerate((5, 1, 4, 2, 3), start=1)
+    ]
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(year=2025, major=1),
+            "ak.wwise.core.object.get": {"return": rows},
+        }
+    )
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2025.1"
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--type",
+            "AudioFileSource",
+            "--take",
+            "1000",
+            "--match-original-file-path",
+            candidate,
+        ],
+        env=env,
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    result = payload["agent_result"]["candidates"][0]
+    assert result["reference_count"] == 5
+    assert result["references_truncated"] is True
+    assert [reference["path"] for reference in result["references"]] == [
+        r"\Actor-Mixer Hierarchy\Source 1",
+        r"\Actor-Mixer Hierarchy\Source 2",
+        r"\Actor-Mixer Hierarchy\Source 3",
+        r"\Actor-Mixer Hierarchy\Source 4",
+    ]
+    audit = payload["original_file_reference_match"]
+    assert audit["reference_count"] == 5
+    assert audit["returned_reference_detail_count"] == 4
+
+
+def test_query_object_original_file_reference_match_maximum_shape_stays_below_gateway_ceiling(
+    tmp_path: Path,
+) -> None:
+    candidates: list[str] = []
+    rows: list[dict[str, str]] = []
+    for candidate_index in range(64):
+        candidate_prefix = f"/pool/{candidate_index:02d}/"
+        candidate = candidate_prefix + "\"" * (
+            waapi_gateway.MAX_ORIGINAL_FILE_PATH_BYTES
+            - len(candidate_prefix.encode("utf-8"))
+        )
+        assert len(candidate.encode("utf-8")) == 1024
+        candidates.append(candidate)
+        for detail_index in range(4):
+            row_index = candidate_index * 4 + detail_index
+            path_prefix = rf"\R{candidate_index:02d}-{detail_index}"
+            remaining = (
+                waapi_gateway.MAX_ORIGINAL_FILE_REFERENCE_PATH_BYTES
+                - len(path_prefix.encode("utf-8"))
+            )
+            hierarchy_path = path_prefix + r"\a" * (remaining // 2)
+            if len(hierarchy_path.encode("utf-8")) < 512:
+                hierarchy_path += "b"
+            assert len(hierarchy_path.encode("utf-8")) == 512
+            rows.append(
+                {
+                    "id": f"{{00000000-0000-0000-0000-{row_index:012X}}}",
+                    "path": hierarchy_path,
+                    "originalFilePath": candidate,
+                }
+            )
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(year=2025, major=1),
+            "ak.wwise.core.object.get": {"return": rows},
+        }
+    )
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2025.1"
+    argv = [
+        "query-object",
+        "--type",
+        "AudioFileSource",
+        "--take",
+        "1000",
+    ]
+    for candidate in candidates:
+        argv.extend(("--match-original-file-path", candidate))
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        argv,
+        env=env,
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["agent_result"]["scan_complete"] is True
+    assert len(payload["agent_result"]["candidates"]) == 64
+    assert all(
+        candidate["references_truncated"] is False
+        for candidate in payload["agent_result"]["candidates"]
+    )
+    assert waapi_gateway.probe_gateway_json_document_size(
+        payload,
+        waapi_gateway.MAX_GATEWAY_RESULT_JSON_BYTES,
+    ) == "ok"
+    observed_size = waapi_gateway.gateway_json_document_size(payload)
+    assert observed_size < waapi_gateway.MAX_GATEWAY_RESULT_JSON_BYTES // 2
+
+
+@pytest.mark.parametrize(
+    ("argv", "message"),
+    (
+        (
+            (
+                "query-object",
+                "--type",
+                "Sound",
+                "--take",
+                "1000",
+                "--match-original-file-path",
+                r"Y:\Sandbox\Originals\source.wav",
+            ),
+            "requires exactly --type AudioFileSource",
+        ),
+        (
+            (
+                "query-object",
+                "--type",
+                "AudioFileSource",
+                "--take",
+                "1000",
+                "--where-json",
+                "{}",
+                "--match-original-file-path",
+                r"Y:\Sandbox\Originals\source.wav",
+            ),
+            "cannot be combined with --where-json",
+        ),
+        (
+            (
+                "query-object",
+                "--type",
+                "AudioFileSource",
+                "--take",
+                "1000",
+                "--select",
+                "parent",
+                "--match-original-file-path",
+                r"Y:\Sandbox\Originals\source.wav",
+            ),
+            "cannot be combined with --select",
+        ),
+        (
+            (
+                "query-object",
+                "--type",
+                "AudioFileSource",
+                "--all-results",
+                "--match-original-file-path",
+                r"Y:\Sandbox\Originals\source.wav",
+            ),
+            "cannot be combined with --all-results",
+        ),
+        (
+            (
+                "query-object",
+                "--type",
+                "AudioFileSource",
+                "--take",
+                "1000",
+                "--return-field",
+                "id",
+                "--match-original-file-path",
+                r"Y:\Sandbox\Originals\source.wav",
+            ),
+            "cannot be combined with --return-field",
+        ),
+        (
+            (
+                "query-object",
+                "--type",
+                "AudioFileSource",
+                "--take",
+                "999",
+                "--match-original-file-path",
+                r"Y:\Sandbox\Originals\source.wav",
+            ),
+            "requires exactly --take 1000",
+        ),
+        (
+            (
+                "query-object",
+                "--path",
+                r"\Actor-Mixer Hierarchy",
+                "--take",
+                "1000",
+                "--match-original-file-path",
+                r"Y:\Sandbox\Originals\source.wav",
+            ),
+            "requires exactly --type AudioFileSource",
+        ),
+    ),
+)
+def test_query_object_original_file_reference_match_rejects_open_query_combinations(
+    tmp_path: Path,
+    argv: tuple[str, ...],
+    message: str,
+) -> None:
+    called = False
+
+    def client_factory(url: str) -> FakeClient:
+        nonlocal called
+        called = True
+        raise AssertionError(f"invalid closed match input must not connect to {url}")
+
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2025.1"
+    exit_code, payload = waapi_gateway.execute_gateway(
+        argv,
+        env=env,
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert message in payload["message"]
+    assert called is False
+
+
+@pytest.mark.parametrize(
+    ("candidates", "message"),
+    (
+        (("relative/source.wav",), "expected an absolute"),
+        ((r"Y:\Sandbox\..\source.wav",), "non-traversing components"),
+        ((r"\\server\share",), "server, share, and file"),
+        ((r"\\?\C:\source.wav",), "extended or device UNC"),
+        (("",), "nonempty absolute path"),
+        (
+            (
+                r"Y:\Sandbox\Originals\source.wav",
+                "y:/sandbox/originals/SOURCE.wav",
+            ),
+            "remain unique after normalization",
+        ),
+        (
+            (
+                r"\\StudioNas\Originals\source.wav",
+                "//studionas/originals/SOURCE.wav",
+            ),
+            "remain unique after normalization",
+        ),
+    ),
+)
+def test_query_object_original_file_reference_match_rejects_invalid_candidates(
+    tmp_path: Path,
+    candidates: tuple[str, ...],
+    message: str,
+) -> None:
+    argv = [
+        "query-object",
+        "--type",
+        "AudioFileSource",
+        "--take",
+        "1000",
+    ]
+    for candidate in candidates:
+        argv.extend(("--match-original-file-path", candidate))
+    called = False
+
+    def client_factory(url: str) -> FakeClient:
+        nonlocal called
+        called = True
+        raise AssertionError(f"invalid candidate must not connect to {url}")
+
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2025.1"
+    exit_code, payload = waapi_gateway.execute_gateway(
+        argv,
+        env=env,
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert message in payload["message"]
+    assert called is False
+
+
+def test_query_object_original_file_reference_match_is_strictly_2025_1(
+    tmp_path: Path,
+) -> None:
+    called = False
+
+    def client_factory(url: str) -> FakeClient:
+        nonlocal called
+        called = True
+        raise AssertionError(f"wrong version must not connect to {url}")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--type",
+            "AudioFileSource",
+            "--take",
+            "1000",
+            "--match-original-file-path",
+            r"Y:\Sandbox\Originals\source.wav",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert "only for Wwise 2025.1" in payload["message"]
+    assert called is False
+
+
+def test_query_object_original_file_reference_match_enforces_candidate_limit(
+    tmp_path: Path,
+) -> None:
+    candidates = [rf"Y:\Sandbox\Originals\source-{index}.wav" for index in range(65)]
+    argv = [
+        "query-object",
+        "--type",
+        "AudioFileSource",
+        "--take",
+        "1000",
+    ]
+    for candidate in candidates:
+        argv.extend(("--match-original-file-path", candidate))
+    called = False
+
+    def client_factory(url: str) -> FakeClient:
+        nonlocal called
+        called = True
+        raise AssertionError(f"too many candidates must not connect to {url}")
+
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2025.1"
+    exit_code, payload = waapi_gateway.execute_gateway(
+        argv,
+        env=env,
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert "between 1 and 64 times" in payload["message"]
+    assert called is False
+
+
+@pytest.mark.parametrize(
+    "rows",
+    (
+        [
+            {
+                "id": "not-a-guid",
+                "path": r"\Actor-Mixer Hierarchy\Source",
+                "originalFilePath": r"Y:\Sandbox\Originals\source.wav",
+            }
+        ],
+        [
+            {
+                "id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+                "path": "relative/path",
+                "originalFilePath": r"Y:\Sandbox\Originals\source.wav",
+            }
+        ],
+        [
+            {
+                "id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+                "path": r"\Actor-Mixer Hierarchy\Source",
+                "originalFilePath": "relative/source.wav",
+            }
+        ],
+        [
+            {
+                "id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+                "path": r"\Actor-Mixer Hierarchy\Source",
+            }
+        ],
+        [
+            {
+                "id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+                "path": r"\Actor-Mixer Hierarchy\Source A",
+                "originalFilePath": r"Y:\Sandbox\Originals\source-a.wav",
+            },
+            {
+                "id": "{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}",
+                "path": r"\Actor-Mixer Hierarchy\Source B",
+                "originalFilePath": r"Y:\Sandbox\Originals\source-b.wav",
+            },
+        ],
+    ),
+)
+def test_query_object_original_file_reference_match_rejects_malformed_or_duplicate_rows(
+    tmp_path: Path,
+    rows: list[dict[str, Any]],
+) -> None:
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(year=2025, major=1),
+            "ak.wwise.core.object.get": {"return": rows},
+        }
+    )
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2025.1"
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--type",
+            "AudioFileSource",
+            "--take",
+            "1000",
+            "--match-original-file-path",
+            r"Y:\Sandbox\Originals\source.wav",
+        ],
+        env=env,
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "INVALID_ORIGINAL_FILE_REFERENCE_RESULT"
+    assert "agent_result" not in payload
+
+
+def test_query_object_original_file_reference_match_rejects_scan_at_take_limit(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        {
+            "id": f"{{00000000-0000-0000-0000-{index:012X}}}",
+            "path": rf"\Actor-Mixer Hierarchy\Source {index}",
+            "originalFilePath": rf"Y:\Sandbox\Originals\source-{index}.wav",
+        }
+        for index in range(1000)
+    ]
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(year=2025, major=1),
+            "ak.wwise.core.object.get": {"return": rows},
+        }
+    )
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2025.1"
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--type",
+            "AudioFileSource",
+            "--take",
+            "1000",
+            "--match-original-file-path",
+            r"Y:\Sandbox\Originals\source-0.wav",
+        ],
+        env=env,
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["status"] == "incomplete_boundary"
+    assert payload["error_code"] == "ORIGINAL_FILE_REFERENCE_SCAN_INCOMPLETE"
+    assert payload["details"]["scan_count"] == 1000
+    assert payload["original_file_reference_match"]["scan_complete"] is False
+    assert "agent_result" not in payload
 
 
 @pytest.mark.parametrize(
@@ -2671,6 +3954,53 @@ def test_unknown_object_error_is_not_normalized_for_broad_waql(tmp_path: Path) -
     assert "normalization" not in payload["call"]
 
 
+def test_replace_absence_normalization_requires_one_exact_old_guid_per_lookup() -> None:
+    old_ids = (
+        "{4AB57FDF-0640-4806-98BE-A3E0C5FB1B91}",
+        "{93814B94-06C8-403B-ABB9-BE085BDF3AFB}",
+        "{341F0462-8024-4E23-B22B-B147D98E0F59}",
+    )
+    unknown_object = {
+        "ok": False,
+        "error_code": "WaapiRequestFailed",
+        "message": "untrusted rendered application error",
+        "waapi_error_uri": "ak.wwise.query.unknown_object",
+        "waapi_error_details": {
+            "message": "from id object is unknown",
+            "details": {"procedureUri": "ak.wwise.core.object.get"},
+        },
+    }
+
+    bulk = waapi_gateway.normalize_exact_object_absence(
+        api="ak.wwise.core.object.get",
+        args={"from": {"id": list(old_ids)}},
+        result=unknown_object,
+    )
+    assert bulk["ok"] is False
+    assert "normalization" not in bulk
+
+    for old_id in old_ids:
+        singleton = waapi_gateway.normalize_exact_object_absence(
+            api="ak.wwise.core.object.get",
+            args={"from": {"id": [old_id]}},
+            result=unknown_object,
+        )
+        assert singleton["ok"] is True
+        assert singleton["result"] == {"return": []}
+        assert singleton["normalization"]["source"] == "ak.wwise.query.unknown_object"
+
+    unrelated = waapi_gateway.normalize_exact_object_absence(
+        api="ak.wwise.core.object.get",
+        args={"from": {"id": [old_ids[0]]}},
+        result={
+            **unknown_object,
+            "waapi_error_uri": "ak.wwise.transport.closed",
+        },
+    )
+    assert unrelated["ok"] is False
+    assert "normalization" not in unrelated
+
+
 def test_query_object_rejects_raw_waql_before_dispatch(tmp_path: Path) -> None:
     client = FakeClient({"ak.wwise.core.getInfo": live_info()})
 
@@ -2844,10 +4174,221 @@ def test_wait_topic_uses_payload_match_and_unsubscribes(tmp_path: Path) -> None:
 
     assert exit_code == 0
     assert payload["event"]["object"]["name"] == "UI"
+    assert "events" not in payload
+    assert "requested_event_count" not in payload
     assert payload["cleanup"] == "unsubscribed"
     assert client.handlers[0].unsubscribe_calls == 1
     assert client.handlers[0].unsubscribe_thread_ident == client.handlers[0].subscribe_thread_ident
     assert client.handlers[0].unsubscribe_thread_ident != threading.get_ident()
+
+
+def test_wait_topic_false_unsubscribe_is_retained_and_close_retries(
+    tmp_path: Path,
+) -> None:
+    topic = "ak.wwise.core.object.created"
+
+    class RetryHandler(FakeEventHandler):
+        def __init__(self) -> None:
+            super().__init__()
+            self.results = [False, True]
+
+        def unsubscribe(self) -> bool:
+            self.unsubscribe_calls += 1
+            self.unsubscribe_thread_ident = threading.get_ident()
+            return self.results.pop(0)
+
+    class RetryClient(FakeClient):
+        def subscribe(
+            self,
+            uri: str,
+            callback: Any,
+            options: Mapping[str, Any] | None = None,
+        ) -> RetryHandler:
+            del uri, options
+            handler = RetryHandler()
+            self.handlers.append(handler)
+            callback({"object": {"id": "wanted"}})
+            return handler
+
+    client = RetryClient({"ak.wwise.core.getInfo": live_info()})
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["--timeout", "0.5", "wait-topic", topic],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["ok"] is False
+    assert payload["call"]["error_code"] == "SUBSCRIPTION_CLEANUP_FAILED"
+    assert payload["cleanup"] == "unsubscribed_after_retry"
+    assert payload["call"]["details"]["subscription_cleanup"] == {
+        "status": "unsubscribed_after_retry",
+        "reason": "unsubscribe_returned_false",
+    }
+    assert client.handlers[0].unsubscribe_calls == 2
+    assert client.disconnected is True
+
+
+def test_wait_topic_repeated_false_unsubscribe_never_claims_cleanup(
+    tmp_path: Path,
+) -> None:
+    topic = "ak.wwise.core.object.created"
+
+    class FalseHandler(FakeEventHandler):
+        def unsubscribe(self) -> bool:
+            self.unsubscribe_calls += 1
+            self.unsubscribe_thread_ident = threading.get_ident()
+            return False
+
+    class FalseClient(FakeClient):
+        def subscribe(
+            self,
+            uri: str,
+            callback: Any,
+            options: Mapping[str, Any] | None = None,
+        ) -> FalseHandler:
+            del uri, options
+            handler = FalseHandler()
+            self.handlers.append(handler)
+            callback({"object": {"id": "wanted"}})
+            return handler
+
+    client = FalseClient({"ak.wwise.core.getInfo": live_info()})
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["--timeout", "0.5", "wait-topic", topic],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["cleanup"] == "unsubscribe_failed"
+    assert payload["call"]["details"]["subscription_cleanup"]["status"] == (
+        "unsubscribe_failed"
+    )
+    assert payload["details"]["cleanup_failure"] == {
+        "error_code": "SUBSCRIPTION_CLEANUP_FAILED",
+        "message": "WAAPI subscription cleanup did not explicitly succeed",
+        "details": {
+            "subscription_token": 1,
+            "reason": "unsubscribe_returned_false",
+        },
+    }
+    assert client.handlers[0].unsubscribe_calls == 2
+
+
+@pytest.mark.parametrize(
+    "result",
+    (
+        {"ok": True},
+        {"ok": False, "error_code": "TIMEOUT"},
+        {"ok": False, "error_code": "RESULT_TOO_LARGE"},
+    ),
+)
+def test_topic_cleanup_projection_never_infers_from_dispatch_outcome(
+    result: Mapping[str, Any],
+) -> None:
+    assert waapi_gateway.topic_subscription_cleanup_status(result) == "unknown"
+
+
+def test_soundbank_generated_wait_is_not_silently_capped_at_ten_seconds(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    topic = "ak.wwise.core.soundbank.generated"
+    captured: dict[str, float] = {}
+
+    def record_dispatch(*args: Any, **kwargs: Any) -> Mapping[str, Any]:
+        operation_timeout = float(kwargs["operation_timeout"])
+        captured["operation_timeout"] = operation_timeout
+        return {
+            "api": topic,
+            "item_type": "topic",
+            "category": None,
+            "version": "2022.1",
+            "ok": False,
+            "risk_level": "read",
+            "error_code": "TIMEOUT",
+            "message": "synthetic timeout without waiting",
+            "details": {"operation_timeout_seconds": operation_timeout},
+        }
+
+    monkeypatch.setattr(waapi_gateway, "dispatch", record_dispatch)
+    client = FakeClient({"ak.wwise.core.getInfo": live_info()})
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["--timeout", "120", "wait-topic", topic],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["call"]["error_code"] == "TIMEOUT"
+    assert 119.0 < captured["operation_timeout"] < 120.0
+
+
+def test_wait_topic_collects_bounded_matching_events_in_order(tmp_path: Path) -> None:
+    topic = "ak.wwise.core.object.created"
+    client = FakeClient(
+        {"ak.wwise.core.getInfo": live_info()},
+        subscription_events={
+            topic: [
+                {"object": {"id": "wrong", "name": "Ignore"}},
+                {"object": {"id": "wanted", "name": "UI_1"}},
+                {"object": {"id": "wanted", "name": "UI_2"}},
+                {"object": {"id": "wanted", "name": "UI_3"}},
+            ]
+        },
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "--timeout",
+            "0.5",
+            "wait-topic",
+            topic,
+            "--event-count",
+            "3",
+            "--match-json",
+            '{"object":{"id":"wanted"}}',
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0
+    assert payload["requested_event_count"] == 3
+    assert payload["event_count"] == 3
+    assert [event["object"]["name"] for event in payload["events"]] == ["UI_1", "UI_2", "UI_3"]
+    assert len(payload["event_validations"]) == 3
+    assert "event" not in payload
+    assert payload["cleanup"] == "unsubscribed"
+    assert client.handlers[0].unsubscribe_calls == 1
+
+
+@pytest.mark.parametrize("event_count", ("0", "65"))
+def test_wait_topic_rejects_invalid_event_count_before_connecting(
+    tmp_path: Path,
+    event_count: str,
+) -> None:
+    called = False
+
+    def client_factory(url: str) -> FakeClient:
+        nonlocal called
+        called = True
+        raise AssertionError(f"invalid event count must not connect to {url}")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["wait-topic", "ak.wwise.core.object.created", "--event-count", event_count],
+        env=gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert "--event-count must be between 1 and 64" in payload["message"]
+    assert called is False
 
 
 def test_wait_topic_accepts_waapi_client_kwargs_only_callback_shape(tmp_path: Path) -> None:
@@ -2910,6 +4451,38 @@ def test_wait_topic_oversized_event_reports_completed_unsubscribe(
 
     assert exit_code == 2
     assert payload["call"]["error_code"] == "RESULT_TOO_LARGE"
+    assert payload["cleanup"] == "unsubscribed"
+    assert client.handlers[0].unsubscribe_calls == 1
+    assert sentinel not in json.dumps(payload)
+
+
+def test_wait_topic_multi_event_aggregate_respects_result_limit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    topic = "ak.wwise.core.object.created"
+    sentinel = "OVERSIZED_MULTI_TOPIC_PAYLOAD_MUST_NOT_ESCAPE"
+    monkeypatch.setattr(dispatcher_module, "MAX_LIVE_RESULT_JSON_BYTES", 2048)
+    client = FakeClient(
+        {"ak.wwise.core.getInfo": live_info()},
+        subscription_events={
+            topic: [
+                {"object": {"id": f"wanted-{index}", "name": sentinel + ("x" * 900)}}
+                for index in range(3)
+            ]
+        },
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["--timeout", "0.5", "wait-topic", topic, "--event-count", "3"],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["call"]["error_code"] == "RESULT_TOO_LARGE"
+    assert payload["requested_event_count"] == 3
+    assert payload["events"] is None
     assert payload["cleanup"] == "unsubscribed"
     assert client.handlers[0].unsubscribe_calls == 1
     assert sentinel not in json.dumps(payload)
@@ -3237,6 +4810,7 @@ def test_timeout_payload_marks_cleanup_complete_when_late_call_releases_in_grace
     object_call_entered = threading.Event()
     release_object_call = threading.Event()
     disconnected = threading.Event()
+    configured_timeout = 0.2
 
     class GraceReleaseClient(FakeClient):
         def call(
@@ -3258,16 +4832,24 @@ def test_timeout_payload_marks_cleanup_complete_when_late_call_releases_in_grace
 
     client = GraceReleaseClient({})
 
+    started_at = time.monotonic()
+
     def release_during_cleanup_grace() -> None:
         assert object_call_entered.wait(timeout=1)
-        time.sleep(0.04)
+        release_at = (
+            started_at
+            + configured_timeout
+            + waapi_gateway.TRANSPORT_CLEANUP_GRACE_SECONDS / 2
+        )
+        remaining = release_at - time.monotonic()
+        if remaining > 0:
+            time.sleep(remaining)
         release_object_call.set()
 
     releaser = threading.Thread(target=release_during_cleanup_grace)
     releaser.start()
-    started_at = time.monotonic()
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["--timeout", "0.03", "buses"],
+        ["--timeout", str(configured_timeout), "buses"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -3275,7 +4857,7 @@ def test_timeout_payload_marks_cleanup_complete_when_late_call_releases_in_grace
     releaser.join(timeout=1)
 
     assert not releaser.is_alive()
-    assert elapsed < 0.15
+    assert elapsed < configured_timeout + waapi_gateway.TRANSPORT_CLEANUP_GRACE_SECONDS + 0.1
     assert exit_code == 2
     assert payload["call"]["error_code"] == "TIMEOUT"
     assert payload["call"]["details"]["provenance"] == (

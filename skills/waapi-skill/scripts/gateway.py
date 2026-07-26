@@ -8,6 +8,8 @@ import json
 import math
 import os
 import queue
+import shlex
+import subprocess
 import sys
 import threading
 import time
@@ -18,6 +20,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
+GATEWAY_RUNNER_PATH = SKILL_ROOT / "scripts" / "run.py"
 if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
@@ -26,6 +29,10 @@ from wwise_waapi.capabilities import (  # noqa: E402  # pyright: ignore[reportMi
     CapabilityNotFoundError,
     CapabilityRecord,
     FIXED_COMMANDS_BY_URI,
+)
+from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    canonical_json_bytes,
+    canonical_sha256,
 )
 from wwise_waapi.builders.common import SemanticValidationError  # noqa: E402  # pyright: ignore[reportMissingImports]
 from wwise_waapi.builders.metadata import (  # noqa: E402  # pyright: ignore[reportMissingImports]
@@ -54,17 +61,25 @@ from wwise_waapi.config import (  # noqa: E402  # pyright: ignore[reportMissingI
     resolve_external_config_path,
 )
 from wwise_waapi.dispatcher import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    SUBSCRIPTION_CLEANUP_DETAILS_KEY,
+    SUBSCRIPTION_CLEANUP_FAILED,
+    SUBSCRIPTION_CLEANUP_UNSUBSCRIBED,
     WwiseDispatcher,
     _normalize_exception as normalize_dispatcher_exception,
     _safe_exception_attribute as safe_exception_attribute,
     _safe_type_name as safe_type_name,
 )
 from wwise_waapi.execution_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS,
+    POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY,
+    POST_EXECUTION_PROJECT_GUARD_POLICIES,
+    POST_EXECUTION_PROJECT_GUARD_REVALIDATE,
     PROJECT_GUARD_INVARIANT,
     PROJECT_GUARD_MODES,
     PROJECT_GUARD_TRANSITION_TO_PATH,
 )
 from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    OPERATION_REQUEST_CONTRACT,
     PACKAGED_TRANSACTION_READBACK_URIS,
     OperationContractError,
     VerificationResult,
@@ -74,18 +89,25 @@ from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[re
     validate_prepared_roles,
     verify_prepared_operation,
 )
+from wwise_waapi.platform_paths import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    WwiseWirePathError,
+    adapt_cli_dispatch_paths,
+    requires_wwise_wire_path_adaptation,
+)
 from wwise_waapi.safety import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     BOUNDED_CALL_CANDIDATES,
     EXPLICIT_UNSUPPORTED_LIVE_URIS,
     EXPLICIT_UNSUPPORTED_TOPIC_URIS,
     REVIEWED_TOPIC_URIS,
 )
+from wwise_waapi.subscriptions import MAX_WAIT_EVENT_COUNT  # noqa: E402  # pyright: ignore[reportMissingImports]
 from wwise_waapi.transaction_runtime import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     DEFAULT_PREVIEW_TTL_SECONDS,
     PROJECT_GUARD_PHASE_POST_VERIFICATION,
     TransactionGuardError,
     build_project_guard,
     build_transaction_artifact,
+    validate_transaction_context_runtime_guards,
     validate_transaction_guards,
 )
 from wwise_waapi.transaction_cleanup import (  # noqa: E402  # pyright: ignore[reportMissingImports]
@@ -95,10 +117,12 @@ from wwise_waapi.transaction_cleanup import (  # noqa: E402  # pyright: ignore[r
     project_transaction_cleanup,
 )
 from wwise_waapi.transactions import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    CONFIRMATION_TOKEN_MATERIAL_CONTRACT,
     STATE_DIRECTORY_ENV,
     InvalidTransition,
     TransactionState,
     TransactionStore,
+    new_transaction_id,
 )
 from wwise_waapi.versions import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     SUPPORTED_WWISE_VERSION_KEYS,
@@ -116,6 +140,7 @@ GET_INFO_URI = "ak.wwise.core.getInfo"
 GET_PROJECT_INFO_URI = "ak.wwise.core.getProjectInfo"
 OBJECT_GET_URI = "ak.wwise.core.object.get"
 GET_SELECTED_URI = "ak.wwise.ui.getSelectedObjects"
+MEDIA_POOL_GET_URI = "ak.wwise.core.mediaPool.get"
 ENV_HOST = "WWISE_WAAPI_HOST"
 ENV_PORT = "WWISE_WAAPI_PORT"
 ENV_VERSION = "WWISE_VERSION"
@@ -136,8 +161,25 @@ OFFLINE_COMMANDS = frozenset(
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
 GATEWAY_CONFIG_CONTRACT = "waapi-skill.config/v1"
 GATEWAY_SESSION_CONTEXT_CONTRACT = "waapi-skill.session-context/v1"
+GATEWAY_SESSION_INTRODUCTION_CONTRACT = "waapi-skill.session-introduction/v1"
+GATEWAY_OPERATION_SCHEMA_DIRECT_FAST_ROUTE_CONTRACT = (
+    "waapi-skill.operation-schema-direct-fast-route/v1"
+)
 GATEWAY_DEADLINE_PROVENANCE = "waapi-skill.gateway-deadline/v1"
 GATEWAY_RESULT_CEILING_PROVENANCE = "waapi-skill.gateway-live-result-json-ceiling/v1"
+MEDIA_POOL_POST_FILTER_CONTRACT = "waapi-skill.media-pool-post-filter/v1"
+ORIGINAL_FILE_REFERENCE_MATCH_CONTRACT = (
+    "waapi-skill.original-file-reference-match/v1"
+)
+SUBSCRIPTION_CLEANUP_AFTER_RETRY = "unsubscribed_after_retry"
+NAMED_OPERATION_WIRE_PATH_URIS: Mapping[str, str] = {
+    "soundbank.convertExternalSources": (
+        "ak.wwise.core.soundbank.convertExternalSources"
+    ),
+    "soundbank.processDefinitionFiles": (
+        "ak.wwise.core.soundbank.processDefinitionFiles"
+    ),
+}
 PROJECT_IDENTITY_FIELDS = ("id", "name", "path")
 EXPANDING_QUERY_SELECTS = frozenset({"descendants", "ancestors", "referencesTo", "children"})
 MAX_GATEWAY_RESULT_JSON_BYTES = 1024 * 1024
@@ -145,6 +187,67 @@ MAX_GATEWAY_JSON_INPUT_BYTES = 256 * 1024
 MAX_GATEWAY_JSON_DEPTH = 32
 MAX_GATEWAY_JSON_NODES = 10_000
 MAX_GATEWAY_JSON_STRING_BYTES = 64 * 1024
+# ``transaction-show --summary-only`` must carry the exact immutable request,
+# but every other review field has a closed projection.  This ceiling bounds
+# that summary fragment independently of request complexity; the small outer
+# gateway/session envelope keeps its existing contract.  Prepared runtime
+# snapshots therefore cannot duplicate and multiply the request size.
+TRANSACTION_SHOW_SUMMARY_FIXED_BUDGET_BYTES = 6 * 1024
+# Prefer a model-visible summary below this softer target.  The 6 KiB ceiling
+# remains the fail-closed boundary for cleanup specs or event chains that cannot
+# be reduced further without losing required evidence.
+TRANSACTION_SHOW_SUMMARY_TARGET_BYTES = 4 * 1024
+TRANSACTION_SHOW_SUMMARY_CONTRACT = "waapi-skill.transaction-show-summary/v1"
+TRANSACTION_NEXT_COMMAND_CONTRACT = "waapi-skill.gateway-next-command/v1"
+TRANSACTION_CONFIRMATION_BINDING_CONTRACT = (
+    "waapi-skill.confirmation-binding/v1"
+)
+# A successful non-terminal execute reply only needs enough information for the
+# caller to continue with ``verify``.  The complete dispatcher result and guard
+# evidence remain sealed in the transaction journal; stdout gets a bounded,
+# digest-bound projection so a large import cannot hide the transaction state
+# behind a tool-output truncation.  Reserve space for the session context added
+# by ``finish`` after this projection is built.
+TRANSACTION_EXECUTE_SUCCESS_STDOUT_BUDGET_BYTES = 24 * 1024
+TRANSACTION_EXECUTE_SUCCESS_ENVELOPE_RESERVE_BYTES = 2 * 1024
+TRANSACTION_EXECUTE_SUCCESS_SUMMARY_CONTRACT = (
+    "waapi-skill.transaction-execute-success-summary/v1"
+)
+TRANSACTION_ROLE_VALIDATION_SUMMARY_CONTRACT = (
+    "waapi-skill.transaction-role-validation-summary/v1"
+)
+# A terminal, strongly verified transaction has already sealed its complete
+# operation-specific readbacks in ``verification_recorded``.  Keep stdout
+# small enough for the agent broker while retaining the exact ``agent_result``
+# and a canonical digest that binds the projection to the journal evidence.
+# Projection is intentionally delayed until transport cleanup succeeds.
+TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES = 24 * 1024
+TRANSACTION_VERIFY_SUCCESS_ENVELOPE_RESERVE_BYTES = 2 * 1024
+TRANSACTION_VERIFY_SUCCESS_SUMMARY_CONTRACT = (
+    "waapi-skill.transaction-verify-success-summary/v1"
+)
+TRANSACTION_VERIFICATION_RESULT_SUMMARY_CONTRACT = (
+    "waapi-skill.transaction-verification-result-summary/v1"
+)
+MAX_MEDIA_POOL_RESULTS = 200
+MAX_MEDIA_POOL_FILTERS = 16
+MAX_MEDIA_POOL_DATABASES = 8
+MAX_MEDIA_POOL_RETURN_FIELDS = 32
+MAX_MEDIA_POOL_SEARCH_TEXT_CHARS = 1024
+MEDIA_POOL_FLOAT_FILTER_FIELDS_BY_VERSION: Mapping[str, frozenset[str]] = {
+    "2025.1": frozenset({"WAV/Duration"}),
+}
+ORIGINAL_FILE_REFERENCE_MATCH_VERSION = "2025.1"
+ORIGINAL_FILE_REFERENCE_MATCH_TYPE = "AudioFileSource"
+ORIGINAL_FILE_REFERENCE_RETURN_FIELDS = ("id", "path", "originalFilePath")
+MAX_ORIGINAL_FILE_PATH_CANDIDATES = 64
+MAX_ORIGINAL_FILE_PATH_BYTES = 1024
+MAX_ORIGINAL_FILE_REFERENCE_PATH_BYTES = 512
+MAX_ORIGINAL_FILE_REFERENCE_DETAILS_PER_CANDIDATE = 4
+MAX_ORIGINAL_FILE_REFERENCE_DETAILS = (
+    MAX_ORIGINAL_FILE_PATH_CANDIDATES
+    * MAX_ORIGINAL_FILE_REFERENCE_DETAILS_PER_CANDIDATE
+)
 UNDO_GROUP_CANCEL_RESERVE_MIN_SECONDS = 2.0
 UNDO_GROUP_CANCEL_RESERVE_MAX_SECONDS = 10.0
 UNDO_GROUP_CANCEL_RESERVE_RATIO = 0.20
@@ -183,6 +286,27 @@ class GatewayResultShapeError(ValueError):
             "error_code": self.error_code,
             "message": str(self),
             "details": dict(self.details),
+        }
+
+
+class GatewaySubscriptionCleanupError(RuntimeError):
+    """A transport-owned subscription did not explicitly unsubscribe."""
+
+    error_code = "SUBSCRIPTION_CLEANUP_FAILED"
+
+    def __init__(self, token: int, *, reason: str) -> None:
+        super().__init__("WAAPI subscription cleanup did not explicitly succeed")
+        self.token = token
+        self.reason = reason
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "error_code": self.error_code,
+            "message": str(self),
+            "details": {
+                "subscription_token": self.token,
+                "reason": self.reason,
+            },
         }
 
 
@@ -592,8 +716,13 @@ class GatewayTransport:
                     (subscription,) = request.args
                     if not isinstance(subscription, _TransportSubscription):
                         raise TypeError("GatewayTransport.unsubscribe requires an opaque transport subscription")
-                    handler = subscriptions.pop(subscription.token, None)
-                    result = False if handler is None else _unsubscribe_event_handler(client, handler)
+                    handler = subscriptions.get(subscription.token)
+                    if handler is None:
+                        result = False
+                    else:
+                        result = _unsubscribe_event_handler(client, handler) is True
+                        if result:
+                            subscriptions.pop(subscription.token, None)
                 else:
                     method = getattr(client, request.operation)
                     result = method(*request.args, **dict(request.kwargs))
@@ -608,12 +737,18 @@ def _close_transport_client(client: Any, subscriptions: dict[int, Any]) -> tuple
     cleanup_error: BaseException | None = None
     for token, handler in tuple(subscriptions.items()):
         try:
-            _unsubscribe_event_handler(client, handler)
+            succeeded = _unsubscribe_event_handler(client, handler) is True
         except BaseException as exc:  # noqa: BLE001 - transferred to the closing thread
             if cleanup_error is None:
                 cleanup_error = exc
-        finally:
-            subscriptions.pop(token, None)
+        else:
+            if not succeeded and cleanup_error is None:
+                cleanup_error = GatewaySubscriptionCleanupError(
+                    token,
+                    reason="unsubscribe_returned_false",
+                )
+            if succeeded:
+                subscriptions.pop(token, None)
     try:
         disconnect = getattr(client, "disconnect", None)
         result = disconnect() if callable(disconnect) else None
@@ -685,6 +820,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     query_object.add_argument("--where-json")
     query_object.add_argument(
+        "--match-original-file-path",
+        action="append",
+        dest="match_original_file_paths",
+        metavar="ABSOLUTE_PATH",
+        help=(
+            "Repeat for 1..64 absolute Media Pool candidate paths; only the fixed "
+            "2025.1 AudioFileSource take-1000 reference-match mode accepts this option"
+        ),
+    )
+    query_object.add_argument(
         "--select",
         action="append",
         choices=SUPPORTED_SELECTS,
@@ -728,11 +873,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     wait_topic = subparsers.add_parser(
         "wait-topic",
-        help="Wait once for a manifest topic, with a bounded timeout, optional payload match, and guaranteed cleanup",
+        help="Collect a bounded count of manifest topic events, with optional payload match and guaranteed cleanup",
     )
     wait_topic.add_argument("api")
     wait_topic.add_argument("--options-json", default="{}")
     wait_topic.add_argument("--match-json", default="{}")
+    wait_topic.add_argument(
+        "--event-count",
+        type=int,
+        default=1,
+        metavar=f"1..{MAX_WAIT_EVENT_COUNT}",
+        help=(
+            "Number of matching events to collect before unsubscribe; defaults to 1 "
+            f"and is capped at {MAX_WAIT_EVENT_COUNT}"
+        ),
+    )
 
     capabilities = subparsers.add_parser(
         "capabilities",
@@ -829,10 +984,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     confirm = subparsers.add_parser(
         "confirm",
-        help="Bind explicit confirmation to one immutable preview hash without connecting to Wwise",
+        help="Bind explicit confirmation to one immutable preview without connecting to Wwise",
     )
     confirm.add_argument("transaction_id")
-    confirm.add_argument("--artifact-hash", required=True)
+    confirmation_binding = confirm.add_mutually_exclusive_group(required=True)
+    confirmation_binding.add_argument("--confirmation-token")
+    confirmation_binding.add_argument(
+        "--artifact-hash",
+        help="Legacy compatibility spelling using the complete immutable preview hash",
+    )
 
     reject = subparsers.add_parser("reject", help="Reject one awaiting transaction without connecting to Wwise")
     reject.add_argument("transaction_id")
@@ -864,6 +1024,13 @@ def build_parser() -> argparse.ArgumentParser:
     call.add_argument("api")
     call.add_argument("--args-json", default="{}")
     call.add_argument("--options-json", default="{}")
+    call.add_argument(
+        "--post-filter-json",
+        help=(
+            "Apply the closed Media Pool Filename case-sensitive contains "
+            "post-filter after a complete bounded candidate read"
+        ),
+    )
     call.add_argument("--dry-run", action="store_true")
     call.add_argument("--allow-destructive", action="store_true", help=argparse.SUPPRESS)
     call.add_argument("--topic-mode", default="wait")
@@ -978,6 +1145,15 @@ def _execute_gateway_unconstrained(
                 post_result_cleanup_failed = True
             else:
                 _finalize_timeout_cleanup(payload)
+                _finalize_subscription_cleanup_after_close(payload)
+        if (
+            args.command == "verify"
+            and not post_result_cleanup_failed
+            and payload.get("ok") is True
+            and payload.get("status") == TransactionState.VERIFIED.value
+            and transaction_verify_cleanup_projection_safe(payload.get("cleanup"))
+        ):
+            payload = project_successful_transaction_verify_payload(payload)
     except Exception as exc:  # noqa: BLE001 - the CLI always returns structured failure JSON
         normalized = normalize_gateway_exception(exc)
         details = normalized.get("details")
@@ -985,7 +1161,7 @@ def _execute_gateway_unconstrained(
             merged_details = dict(details) if isinstance(details, Mapping) else {}
             merged_details["cleanup_failure"] = cleanup_failure_evidence(cleanup_failure)
             details = merged_details
-        return finish(2, {
+        error_payload: dict[str, Any] = {
             "contract": GATEWAY_RESULT_CONTRACT,
             "ok": False,
             "status": "error",
@@ -993,7 +1169,19 @@ def _execute_gateway_unconstrained(
             "error_code": normalized["error_code"],
             "message": normalized["message"],
             "details": details,
-        })
+        }
+        if getattr(args, "command", None) == "transaction-show" and isinstance(
+            details, Mapping
+        ):
+            for key, maximum in (
+                ("transaction_id", 128),
+                ("state", 80),
+                ("artifact_hash", 128),
+            ):
+                value = bounded_gateway_label(details.get(key), maximum)
+                if value is not None:
+                    error_payload[key] = value
+        return finish(2, error_payload)
     # ``ok`` describes the completed WAAPI/business operation. A non-zero exit
     # with ``ok: true`` means only post-result cleanup failed; callers must keep
     # mutation execution facts and must not infer that retrying is safe.
@@ -1058,17 +1246,32 @@ def constrain_live_gateway_result(
 def probe_gateway_json_document_size(value: Any, limit_bytes: int) -> str:
     """Return ok/too_large/not_json for the exact pretty stdout document."""
 
-    encoder = gateway_stdout_json_encoder()
-    observed = 0
     try:
-        for chunk in encoder.iterencode(value):
-            observed += len(chunk.encode("utf-8"))
-            if observed > limit_bytes:
-                return "too_large"
-        observed += 1  # print() appends one newline
+        observed = gateway_json_document_size(value, stop_after_bytes=limit_bytes)
     except (RecursionError, TypeError, UnicodeEncodeError, ValueError):
         return "not_json"
     return "too_large" if observed > limit_bytes else "ok"
+
+
+def gateway_json_document_size(
+    value: Any,
+    *,
+    stop_after_bytes: int | None = None,
+) -> int:
+    """Return the exact UTF-8 byte size printed by :func:`main`.
+
+    The optional early ceiling keeps hostile or malformed nested values from
+    forcing an unbounded sizing pass.  Returning ``ceiling + 1`` is sufficient
+    for every caller that supplied a ceiling.
+    """
+
+    encoder = gateway_stdout_json_encoder()
+    observed = 0
+    for chunk in encoder.iterencode(value):
+        observed += len(chunk.encode("utf-8"))
+        if stop_after_bytes is not None and observed > stop_after_bytes:
+            return stop_after_bytes + 1
+    return observed + 1  # print() appends one newline
 
 
 def gateway_stdout_json_encoder() -> json.JSONEncoder:
@@ -1158,6 +1361,30 @@ def _finalize_timeout_cleanup(value: Any) -> None:
     elif isinstance(value, list):
         for item in value:
             _finalize_timeout_cleanup(item)
+
+
+def _finalize_subscription_cleanup_after_close(value: Any) -> None:
+    """Record that transport close explicitly cleaned a previously retained token."""
+
+    if isinstance(value, dict):
+        if value.get("cleanup") == SUBSCRIPTION_CLEANUP_FAILED:
+            value["cleanup"] = SUBSCRIPTION_CLEANUP_AFTER_RETRY
+        details = value.get("details")
+        cleanup = (
+            details.get(SUBSCRIPTION_CLEANUP_DETAILS_KEY)
+            if isinstance(details, dict)
+            else None
+        )
+        if (
+            isinstance(cleanup, dict)
+            and cleanup.get("status") == SUBSCRIPTION_CLEANUP_FAILED
+        ):
+            cleanup["status"] = SUBSCRIPTION_CLEANUP_AFTER_RETRY
+        for item in value.values():
+            _finalize_subscription_cleanup_after_close(item)
+    elif isinstance(value, list):
+        for item in value:
+            _finalize_subscription_cleanup_after_close(item)
 
 
 def query_object_required_payload(*, common: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -1466,6 +1693,20 @@ def preflight_public_route(
 def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, str]) -> None:
     """Reject closed query input errors before opening a WAAPI transport."""
 
+    if original_file_reference_match_requested(args):
+        (preflight_version,) = resolve_catalog_versions(args, env=env)
+        validate_original_file_reference_match_input(
+            args,
+            version=preflight_version,
+        )
+        build_object_get_query(
+            type=ORIGINAL_FILE_REFERENCE_MATCH_TYPE,
+            take=MAX_QUERY_TAKE,
+            return_fields=ORIGINAL_FILE_REFERENCE_RETURN_FIELDS,
+            version=preflight_version,
+        )
+        return
+
     where = parse_optional_json(args.where_json, "--where-json")
     return_fields = tuple(args.return_fields or ("id", "name", "type", "path"))
     _require_exact_identity_return_field(args, return_fields)
@@ -1485,6 +1726,143 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
     _require_explicit_query_bound(args)
 
 
+def original_file_reference_match_requested(args: argparse.Namespace) -> bool:
+    """Return whether the caller selected the closed candidate-match mode."""
+
+    return bool(getattr(args, "match_original_file_paths", None))
+
+
+def validate_original_file_reference_match_input(
+    args: argparse.Namespace,
+    *,
+    version: str,
+) -> None:
+    """Bind candidate matching to one reviewed, complete object.get request."""
+
+    if version != ORIGINAL_FILE_REFERENCE_MATCH_VERSION:
+        raise GatewayInputError(
+            "--match-original-file-path is currently supported only for Wwise "
+            f"{ORIGINAL_FILE_REFERENCE_MATCH_VERSION}"
+        )
+    if args.object_type != ORIGINAL_FILE_REFERENCE_MATCH_TYPE:
+        raise GatewayInputError(
+            "--match-original-file-path requires exactly "
+            f"--type {ORIGINAL_FILE_REFERENCE_MATCH_TYPE}"
+        )
+    if args.where_json is not None:
+        raise GatewayInputError(
+            "--match-original-file-path cannot be combined with --where-json"
+        )
+    if args.select:
+        raise GatewayInputError(
+            "--match-original-file-path cannot be combined with --select"
+        )
+    if args.all_results:
+        raise GatewayInputError(
+            "--match-original-file-path cannot be combined with --all-results"
+        )
+    if args.return_fields:
+        raise GatewayInputError(
+            "--match-original-file-path uses the fixed id, path, originalFilePath "
+            "projection and cannot be combined with --return-field"
+        )
+    if args.take != MAX_QUERY_TAKE:
+        raise GatewayInputError(
+            "--match-original-file-path requires exactly "
+            f"--take {MAX_QUERY_TAKE}"
+        )
+    normalized_original_file_candidates(args)
+
+
+def normalized_original_file_candidates(
+    args: argparse.Namespace,
+) -> list[tuple[str, tuple[str, ...]]]:
+    """Validate, normalize, and de-duplicate candidate paths in caller order."""
+
+    raw_candidates = tuple(getattr(args, "match_original_file_paths", None) or ())
+    if not 1 <= len(raw_candidates) <= MAX_ORIGINAL_FILE_PATH_CANDIDATES:
+        raise GatewayInputError(
+            "--match-original-file-path must be repeated between 1 and "
+            f"{MAX_ORIGINAL_FILE_PATH_CANDIDATES} times"
+        )
+    candidates: list[tuple[str, tuple[str, ...]]] = []
+    seen: dict[tuple[str, ...], int] = {}
+    for index, raw_path in enumerate(raw_candidates):
+        try:
+            key = normalize_original_file_system_path(raw_path)
+        except ValueError as exc:
+            raise GatewayInputError(
+                f"--match-original-file-path value {index + 1} is invalid: {exc}"
+            ) from exc
+        previous = seen.get(key)
+        if previous is not None:
+            raise GatewayInputError(
+                "--match-original-file-path values must remain unique after "
+                f"normalization; values {previous + 1} and {index + 1} collide"
+            )
+        seen[key] = index
+        candidates.append((raw_path, key))
+    return candidates
+
+
+def normalize_original_file_system_path(value: Any) -> tuple[str, ...]:
+    """Return a lexical comparison key for one absolute native or drive path."""
+
+    if not isinstance(value, str) or not value or value != value.strip():
+        raise ValueError("expected a nonempty absolute path without outer whitespace")
+    try:
+        encoded_size = len(value.encode("utf-8"))
+    except UnicodeEncodeError as exc:
+        raise ValueError("path is not valid UTF-8 text") from exc
+    if encoded_size > MAX_ORIGINAL_FILE_PATH_BYTES:
+        raise ValueError(
+            f"path exceeds the {MAX_ORIGINAL_FILE_PATH_BYTES}-byte limit"
+        )
+    if any(
+        ord(character) < 32
+        or ord(character) == 127
+        or character in {"\u2028", "\u2029"}
+        for character in value
+    ):
+        raise ValueError("path contains a control character")
+
+    normalized = value.replace("\\", "/")
+    if normalized.startswith("//"):
+        flavor = "unc"
+        prefix = ""
+        suffix = normalized[2:]
+    elif len(normalized) >= 2 and normalized[1] == ":":
+        if (
+            not normalized[0].isascii()
+            or not normalized[0].isalpha()
+            or len(normalized) < 4
+            or normalized[2] != "/"
+        ):
+            raise ValueError("expected a drive-absolute path such as Y:/folder/file.wav")
+        flavor = "drive"
+        prefix = normalized[0].casefold()
+        suffix = normalized[3:]
+    elif value.startswith("/"):
+        flavor = "posix"
+        prefix = ""
+        suffix = normalized[1:]
+    else:
+        raise ValueError("expected an absolute POSIX or drive-qualified path")
+
+    parts = suffix.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValueError("path must use normalized non-traversing components")
+    if flavor == "unc":
+        if len(parts) < 3:
+            raise ValueError("UNC paths require nonempty server, share, and file components")
+        if parts[0] in {"?", "."}:
+            raise ValueError("extended or device UNC paths are outside this contract")
+        return (flavor, *(part.casefold() for part in parts))
+    if flavor == "drive":
+        return (flavor, prefix, *(part.casefold() for part in parts))
+    return (flavor, *parts)
+
+
 def preflight_metadata_input(args: argparse.Namespace) -> None:
     """Reject metadata projection modes that have no packaged result contract."""
 
@@ -1496,11 +1874,24 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
     """Validate every command-line JSON document before opening WAAPI."""
 
     if args.command == "call":
-        parse_json_object(args.args_json, "--args-json")
-        parse_json_object(args.options_json, "--options-json")
+        request_args = parse_json_object(args.args_json, "--args-json")
+        request_options = parse_json_object(args.options_json, "--options-json")
+        post_filter = parse_media_pool_post_filter_spec(args.post_filter_json)
+        if post_filter is not None:
+            validate_media_pool_post_filter_request(
+                api=args.api,
+                spec=post_filter,
+                request_args=request_args,
+                request_options=request_options,
+                dry_run=args.dry_run,
+            )
     elif args.command == "wait-topic":
         parse_json_object(args.options_json, "--options-json")
         parse_json_object(args.match_json, "--match-json")
+        if not 1 <= args.event_count <= MAX_WAIT_EVENT_COUNT:
+            raise GatewayInputError(
+                f"wait-topic --event-count must be between 1 and {MAX_WAIT_EVENT_COUNT}"
+            )
     elif args.command == "preview":
         parse_json_object(args.request_json, "--request-json")
 
@@ -1639,21 +2030,70 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         }
     if args.command == "operation-schema":
         spec = describe_operation(args.operation)
-        return {
+        request_version = resolve_operation_schema_version(args, env=env)
+        direct_fast_route_contract = build_operation_schema_direct_fast_route_contract(
+            operation=spec.name,
+            version=request_version,
+        )
+        argument_names = list(
+            dict.fromkeys((*spec.required_arguments, *spec.optional_arguments))
+        )
+        if not spec.implemented:
+            request_envelope = None
+            request_envelope_status = "operation_not_implemented"
+        elif request_version is None:
+            request_envelope = None
+            request_envelope_status = "version_required"
+        elif request_version not in spec.supported_versions:
+            request_envelope = None
+            request_envelope_status = "unsupported_version"
+        else:
+            request_envelope = {
+                "contract": OPERATION_REQUEST_CONTRACT,
+                "version": request_version,
+                "operation": spec.name,
+                "arguments": {},
+            }
+            request_envelope_status = "ready"
+        payload = {
             "contract": GATEWAY_RESULT_CONTRACT,
             "ok": True,
             "status": "ok" if spec.implemented else "unsupported_boundary",
             "command": "operation-schema",
             "offline": True,
             "operation": spec.as_dict(),
+            "request_envelope": request_envelope,
+            "request_envelope_policy": {
+                "status": request_envelope_status,
+                "required_top_level_keys": [
+                    "contract",
+                    "version",
+                    "operation",
+                    "arguments",
+                ],
+                "copy_top_level_exactly": True,
+                "replace_only": "arguments",
+                "argument_container_path": "$.arguments",
+                "argument_paths": {
+                    name: f"$.arguments.{name}" for name in argument_names
+                },
+            },
         }
+        if direct_fast_route_contract is not None:
+            # Keep the version/API-specific product contract prominent at the
+            # end of the offline result.  ``finish`` appends only the bounded
+            # session context after it, so the Agent sees this exact template
+            # immediately before constructing the preview request.
+            payload["direct_fast_route_contract"] = direct_fast_route_contract
+        return payload
     if args.command in {"transaction-show", "confirm", "reject"}:
         store = resolve_transaction_store(args, env=env)
         transaction_id = args.transaction_id
         if args.command == "transaction-show":
-            record = store.load(transaction_id)
-            preview = store.load_preview(transaction_id)
-            events = store.read_events(transaction_id)
+            snapshot = store.load_snapshot(transaction_id)
+            record = snapshot.record
+            preview = snapshot.preview
+            events = snapshot.events
             payload = {
                 "contract": GATEWAY_RESULT_CONTRACT,
                 "ok": True,
@@ -1665,13 +2105,59 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "artifact_hash": preview.artifact_hash,
             }
             if args.summary_only:
-                payload.update(transaction_show_summary(preview.artifact, events))
+                try:
+                    payload.update(transaction_show_summary(preview.artifact, events))
+                except GatewayResultShapeError as exc:
+                    exc.details.update(
+                        {
+                            "transaction_id": transaction_id,
+                            "state": record.state.value,
+                            "artifact_hash": preview.artifact_hash,
+                        }
+                    )
+                    raise
             else:
                 payload.update({"artifact": preview.artifact, "events": list(events)})
+            if record.state is TransactionState.AWAITING_CONFIRMATION:
+                confirmation_token = snapshot.confirmation_token
+                if confirmation_token is None:
+                    raise GatewayInputError(
+                        "awaiting transaction snapshot did not produce a confirmation token"
+                    )
+                # Keep the actionable continuation after the complete review
+                # body.  If a large result is truncated before the immutable
+                # request or event evidence is visible, the confirm argv is
+                # not exposed early enough to invite an unsafe continuation.
+                payload["confirmation"] = {
+                    "contract": TRANSACTION_CONFIRMATION_BINDING_CONTRACT,
+                    "token": confirmation_token,
+                    "binding": {
+                        "material_contract": CONFIRMATION_TOKEN_MATERIAL_CONTRACT,
+                        "transaction_id": transaction_id,
+                        "artifact_hash": preview.artifact_hash,
+                        "state": record.state.value,
+                        "event_sequence": record.event_sequence,
+                        "last_event_hash": record.last_event_hash,
+                    },
+                }
+                payload["next_command"] = transaction_next_command(
+                    "confirm",
+                    [
+                        "confirm",
+                        transaction_id,
+                        "--confirmation-token",
+                        confirmation_token,
+                    ],
+                    requires_explicit_user_confirmation=True,
+                )
             return payload
         if args.command == "confirm":
             require_project_modification_policy(env=env, action="confirmation")
-            record = store.confirm(transaction_id, artifact_hash=args.artifact_hash)
+            record = store.confirm(
+                transaction_id,
+                confirmation_token=args.confirmation_token,
+                artifact_hash=args.artifact_hash,
+            )
             return transaction_state_payload("confirm", record, offline=True)
         record = store.reject(transaction_id, details={"reason": args.reason})
         return transaction_state_payload("reject", record, offline=True)
@@ -1696,17 +2182,54 @@ def attach_gateway_session_context(
     """Attach bounded onboarding facts without opening another WAAPI connection."""
 
     agent_result = payload.get("agent_result")
-    result = {key: value for key, value in payload.items() if key != "agent_result"}
+    next_command = payload.get("next_command")
+    result = {
+        key: value
+        for key, value in payload.items()
+        if key not in {"agent_result", "next_command"}
+    }
     result["session_context"] = build_gateway_session_context(
         args=args,
         env=env,
         payload=payload,
     )
+    if "next_command" in payload:
+        # Keep the exact executable continuation as the final actionable
+        # top-level field.  This makes the packaged absolute launcher path
+        # salient after all evidence and onboarding context.
+        result["next_command"] = next_command
     if "agent_result" in payload:
         # Machine-readable callers rely on this projection remaining the final
         # insertion-ordered field so it can be emitted verbatim and then stop.
         result["agent_result"] = agent_result
     return result
+
+
+def gateway_one_time_introduction(
+    *,
+    endpoint_url: str | None,
+    adapter_version: str | None,
+    project_modification_policy: str | None,
+) -> dict[str, Any]:
+    """Describe the atomic, natural first reply without fixing its wording."""
+
+    return {
+        "contract": GATEWAY_SESSION_INTRODUCTION_CONTRACT,
+        "emit_condition": "visible_conversation_intro_absent",
+        "emit_timing": "first_agent_message_after_gateway_result",
+        "atomic": True,
+        "style": "natural_prose_in_user_language",
+        "facts": {
+            "skill_name": "waapi-skill",
+            "endpoint_url": endpoint_url,
+            "adapter_version": adapter_version,
+            "project_modification_policy": project_modification_policy,
+            "available_project_modification_policies": list(
+                PROJECT_MODIFICATION_POLICIES
+            ),
+        },
+        "machine_readable_result_policy": "separate_progress_message",
+    }
 
 
 def build_gateway_session_context(
@@ -1725,6 +2248,11 @@ def build_gateway_session_context(
         "adapter_version_source": "unavailable",
         "project_modification_policy": None,
         "available_project_modification_policies": list(PROJECT_MODIFICATION_POLICIES),
+        "one_time_introduction": gateway_one_time_introduction(
+            endpoint_url=None,
+            adapter_version=None,
+            project_modification_policy=None,
+        ),
     }
     try:
         config = load_gateway_config(env).config
@@ -1807,6 +2335,11 @@ def build_gateway_session_context(
         "adapter_version_source": adapter_version_source,
         "project_modification_policy": policy,
         "available_project_modification_policies": list(PROJECT_MODIFICATION_POLICIES),
+        "one_time_introduction": gateway_one_time_introduction(
+            endpoint_url=url,
+            adapter_version=adapter_version,
+            project_modification_policy=policy,
+        ),
     }
 
 
@@ -1879,6 +2412,121 @@ def config_result_payload(
             }
         )
     return payload
+
+
+def resolve_operation_schema_version(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> str | None:
+    """Return only an explicitly configured request version for a schema envelope.
+
+    Catalog browsing retains its historical 2022.1 default, but a mutation
+    request must never acquire a version merely because no version was
+    configured.  A missing value therefore produces a non-ready envelope and
+    leaves the caller to select a supported version explicitly.
+    """
+
+    config = load_gateway_config(env).config
+    version = args.version or env.get(ENV_VERSION) or config.wwise_version
+    if version is None:
+        return None
+    if version not in SUPPORTED_WWISE_VERSION_KEYS:
+        raise GatewayInputError(
+            f"Unsupported Wwise version {version!r}; supported versions: "
+            f"{', '.join(SUPPORTED_WWISE_VERSION_KEYS)}"
+        )
+    return str(version)
+
+
+def build_operation_schema_direct_fast_route_contract(
+    *,
+    operation: str,
+    version: str | None,
+) -> dict[str, Any] | None:
+    """Return one exact version/API product contract, never a generic override."""
+
+    if operation != "waapi.call" or version not in {"2024.1", "2025.1"}:
+        return None
+
+    return {
+        "contract": GATEWAY_OPERATION_SCHEMA_DIRECT_FAST_ROUTE_CONTRACT,
+        "scope": {
+            "operation": "waapi.call",
+            "version": version,
+            "exact_api": "ak.wwise.core.audio.convert",
+            "activation": "exact_api_intent_only",
+            "applies_to_other_waapi_call_uris": False,
+        },
+        "canonical_request_template": {
+            "contract": OPERATION_REQUEST_CONTRACT,
+            "version": version,
+            "operation": "waapi.call",
+            "arguments": {
+                "api": "ak.wwise.core.audio.convert",
+                "args": {
+                    "objects": ["<exact-wwise-object-path>"],
+                    "platforms": ["<platform>"],
+                    "languages": ["SFX"],
+                },
+                "options": {},
+                "io_root": "<absolute-allowed-conversion-root>",
+            },
+        },
+        "template_policy": {
+            "copy_outer_shape_exactly": True,
+            "replace_only": [
+                "$.arguments.args.objects",
+                "$.arguments.args.platforms",
+                "$.arguments.args.languages",
+                "$.arguments.io_root",
+            ],
+            "array_replacement": {
+                "paths": [
+                    "$.arguments.args.objects",
+                    "$.arguments.args.platforms",
+                    "$.arguments.args.languages",
+                ],
+                "replace_entire_array": True,
+                "non_empty": True,
+                "preserve_user_order": True,
+            },
+            "placeholders_must_all_be_replaced": True,
+            "missing_or_ambiguous_input": "ask_before_preview",
+        },
+        "rules": {
+            "required_ordered_string_arrays": {
+                "paths": [
+                    "$.arguments.args.objects",
+                    "$.arguments.args.platforms",
+                    "$.arguments.args.languages",
+                ],
+                "min_items": 1,
+                "preserve_user_order": True,
+                "scalar_form_allowed": False,
+                "object_record_items_allowed": False,
+            },
+            "language_mapping": {
+                "natural_sfx_target_without_explicit_localized_languages": [
+                    "SFX"
+                ],
+                "explicit_localized_languages": (
+                    "replace SFX with the stated non-empty ordered string array"
+                ),
+                "languages_must_never_be_omitted": True,
+            },
+            "options": {
+                "path": "$.arguments.options",
+                "exact_value": {},
+            },
+            "io_root": {
+                "path": "$.arguments.io_root",
+                "type": "string",
+                "shape": "scalar",
+                "absolute": True,
+            },
+        },
+    }
 
 
 def resolve_catalog_versions(args: argparse.Namespace, *, env: Mapping[str, str]) -> tuple[str, ...]:
@@ -2127,6 +2775,14 @@ def dispatch_command(
             "objects": rows if result.get("ok") else None,
         }
     if args.command == "query-object":
+        if original_file_reference_match_requested(args):
+            return dispatch_original_file_reference_match(
+                args,
+                connection=connection,
+                detected_version=detected_version,
+                dispatcher=dispatcher,
+                common=common,
+            )
         where = parse_optional_json(args.where_json, "--where-json")
         return_fields = tuple(args.return_fields or ("id", "name", "type", "path"))
         _require_exact_identity_return_field(args, return_fields)
@@ -2239,34 +2895,59 @@ def dispatch_command(
             version=detected_version,
             options=request_options,
             topic_match=match or None,
+            topic_event_count=args.event_count,
             operation_timeout=min(
                 reserved_topic_wait_timeout(connection),
                 float(capability.execution_contract["timeout_seconds"]),
             ),
             result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
         )
-        event = normalize_topic_event_result(result, expected_topic=args.api) if result.get("ok") else None
-        event_validation = (
-            validate_semantic_event(args.api, event, version=detected_version)
-            if event is not None
-            else None
-        )
-        return {
+        payload: dict[str, Any] = {
             "ok": bool(result.get("ok")),
             "status": "ok" if result.get("ok") else "error",
             **common,
             "topic": args.api,
             "match": match or None,
             "call": dispatch_call_summary(result),
-            "event": event,
-            "event_validation": event_validation.as_dict() if event_validation is not None else None,
-            "cleanup": (
-                "unsubscribed"
-                if result.get("ok")
-                or result.get("error_code") in {"TIMEOUT", "RESULT_NOT_JSON", "RESULT_TOO_LARGE"}
-                else "unknown"
-            ),
         }
+        cleanup = topic_subscription_cleanup_status(result)
+        if args.event_count == 1:
+            event = normalize_topic_event_result(result, expected_topic=args.api) if result.get("ok") else None
+            event_validation = (
+                validate_semantic_event(args.api, event, version=detected_version)
+                if event is not None
+                else None
+            )
+            payload["event"] = event
+            payload["event_validation"] = (
+                event_validation.as_dict() if event_validation is not None else None
+            )
+            payload["cleanup"] = cleanup
+            return payload
+
+        events = (
+            normalize_topic_events_result(
+                result,
+                expected_topic=args.api,
+                expected_count=args.event_count,
+            )
+            if result.get("ok")
+            else None
+        )
+        event_validations = (
+            [
+                validate_semantic_event(args.api, event, version=detected_version).as_dict()
+                for event in events
+            ]
+            if events is not None
+            else None
+        )
+        payload["requested_event_count"] = args.event_count
+        payload["event_count"] = len(events) if events is not None else None
+        payload["events"] = events
+        payload["event_validations"] = event_validations
+        payload["cleanup"] = cleanup
+        return payload
     if args.command in {"preview", "execute", "verify"}:
         return dispatch_transaction_command(
             args,
@@ -2280,6 +2961,15 @@ def dispatch_command(
     if args.command == "call":
         request_args = parse_json_object(args.args_json, "--args-json")
         request_options = parse_json_object(args.options_json, "--options-json")
+        post_filter = parse_media_pool_post_filter_spec(args.post_filter_json)
+        if post_filter is not None:
+            validate_media_pool_post_filter_request(
+                api=args.api,
+                spec=post_filter,
+                request_args=request_args,
+                request_options=request_options,
+                dry_run=args.dry_run,
+            )
         try:
             capability = CapabilityCatalog().describe(detected_version, args.api)
         except CapabilityNotFoundError:
@@ -2302,6 +2992,12 @@ def dispatch_command(
             request_options,
             version=detected_version,
         )
+        request_args = canonicalize_bounded_direct_call_request(
+            args.api,
+            detected_version,
+            request_args,
+        )
+        validate_bounded_direct_call_request(args.api, request_args, request_options)
         result = dispatch(
             dispatcher,
             args.api,
@@ -2334,17 +3030,132 @@ def dispatch_command(
             if result.get("ok") and args.api in REFLECTION_INVENTORY_CALLS
             else None
         )
-        return {
+        if post_filter is None:
+            return {
+                "ok": bool(result.get("ok")),
+                "status": "ok" if result.get("ok") else "error",
+                **common,
+                "call": dispatch_call_summary(result),
+                "schema_validation": validation.as_dict(),
+                "result_validation": result_validation.as_dict() if result_validation is not None else None,
+                "agent_result": inventory if inventory is not None else result.get("result"),
+                "inventory": inventory,
+            }
+
+        if not result.get("ok"):
+            return {
+                "ok": False,
+                "status": "error",
+                **common,
+                "call": dispatch_call_summary(result),
+                "schema_validation": validation.as_dict(),
+                "result_validation": None,
+                "post_filter": media_pool_post_filter_audit(
+                    post_filter,
+                    request_max_results=request_args["maxResults"],
+                    status="not_applied",
+                ),
+                "inventory": inventory,
+            }
+
+        filtered_result, post_filter_audit = apply_media_pool_post_filter(
+            result.get("result"),
+            spec=post_filter,
+            request_max_results=request_args["maxResults"],
+            evidence_path=result.get("evidence_path"),
+        )
+        if filtered_result is None:
+            return {
+                "ok": False,
+                "status": "incomplete_boundary",
+                **common,
+                "error_code": "MEDIA_POOL_POST_FILTER_INCOMPLETE",
+                "message": (
+                    "The Media Pool candidate response reached maxResults, so the "
+                    "case-sensitive post-filter cannot prove that its result is complete."
+                ),
+                "details": {
+                    "raw_count": post_filter_audit["raw_count"],
+                    "request_max_results": post_filter_audit["request_max_results"],
+                    "evidence_path": result.get("evidence_path"),
+                },
+                "call": dispatch_call_summary(result),
+                "schema_validation": validation.as_dict(),
+                "result_validation": (
+                    result_validation.as_dict() if result_validation is not None else None
+                ),
+                "post_filter": post_filter_audit,
+                "inventory": inventory,
+            }
+
+        payload = {
             "ok": bool(result.get("ok")),
             "status": "ok" if result.get("ok") else "error",
             **common,
             "call": dispatch_call_summary(result),
             "schema_validation": validation.as_dict(),
             "result_validation": result_validation.as_dict() if result_validation is not None else None,
-            "agent_result": inventory if inventory is not None else result.get("result"),
+            "post_filter": post_filter_audit,
             "inventory": inventory,
         }
+        payload["agent_result"] = filtered_result
+        return payload
     raise GatewayInputError(f"unsupported command: {args.command}")
+
+
+def prepared_wire_path_io_audit(
+    *,
+    operation: str,
+    call_uri: str,
+    prepared: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    """Return the sealed I/O audit for one closed path-bearing dispatch."""
+
+    pre_state = prepared.get("pre_state")
+    if not isinstance(pre_state, Mapping):
+        raise WwiseWirePathError(
+            "WIRE_PATH_AUDIT_MISSING",
+            "The confirmed preview lacks sealed execution state for path adaptation.",
+        )
+    if operation == "waapi.call" and call_uri.startswith("ak.wwise.cli."):
+        execution_contract = pre_state.get("execution_contract")
+        io_audit = (
+            execution_contract.get("io_audit")
+            if isinstance(execution_contract, Mapping)
+            else None
+        )
+        context = "CLI"
+    else:
+        expected_uri = NAMED_OPERATION_WIRE_PATH_URIS.get(operation)
+        if expected_uri != call_uri:
+            raise WwiseWirePathError(
+                "WIRE_PATH_OPERATION_MISMATCH",
+                "The path-bearing dispatch does not match a reviewed named operation.",
+                details={
+                    "operation": operation,
+                    "uri": call_uri,
+                    "expected_uri": expected_uri,
+                },
+            )
+        soundbank_guard = pre_state.get("soundbank_guard")
+        io_audit = (
+            soundbank_guard.get("io_audit")
+            if isinstance(soundbank_guard, Mapping)
+            else None
+        )
+        context = "SoundBank"
+    if not isinstance(io_audit, Mapping):
+        raise WwiseWirePathError(
+            "WIRE_PATH_AUDIT_MISSING",
+            f"The confirmed {context} preview lacks its sealed isolated-I/O audit.",
+        )
+    if io_audit.get("uri") != call_uri:
+        raise WwiseWirePathError(
+            "WIRE_PATH_AUDIT_MISMATCH",
+            "The sealed isolated-I/O audit names a different dispatch URI.",
+            details={"uri": call_uri, "audit_uri": io_audit.get("uri")},
+        )
+    return io_audit
 
 
 def dispatch_transaction_command(
@@ -2404,6 +3215,30 @@ def dispatch_transaction_command(
         awaiting = store.submit_for_confirmation(transaction_id)
         prepared = artifact["prepared_operation"]
         cleanup = transaction_cleanup_payload(prepared, phase="preview")
+        try:
+            review = transaction_show_summary(
+                artifact,
+                store.read_events(transaction_id),
+            )
+        except GatewayResultShapeError as exc:
+            exc.details.update(
+                {
+                    "transaction_id": transaction_id,
+                    "state": awaiting.state.value,
+                    "artifact_hash": created.artifact_hash,
+                }
+            )
+            raise
+        project_call_summary = (
+            dispatch_call_summary(project_call)
+            if isinstance(project_call, Mapping)
+            else None
+        )
+        next_command = transaction_next_command(
+            "transaction-show",
+            ["transaction-show", transaction_id, "--summary-only"],
+            requires_later_user_message=True,
+        )
         agent_result = transaction_agent_result(
             request=require_mapping(artifact.get("request"), "transaction request"),
             transaction_id=transaction_id,
@@ -2411,6 +3246,7 @@ def dispatch_transaction_command(
             state=awaiting.state.value,
             executed=False,
             cleanup=cleanup,
+            next_command=next_command,
         )
         return {
             "ok": True,
@@ -2419,21 +3255,12 @@ def dispatch_transaction_command(
             "transaction_id": transaction_id,
             "state": awaiting.state.value,
             "artifact_hash": created.artifact_hash,
-            "preview_summary": {
-                "request": artifact["request"],
-                "dispatch": prepared["dispatch"],
-                "resolved_roles": prepared["resolved_roles"],
-                "pre_state": prepared["pre_state"],
-                "verification_plan": prepared["verification_plan"],
-                "cleanup": cleanup,
-                "project_guard_fingerprint": project_guard["fingerprint"],
-                "runtime_guard_fingerprint": artifact["runtime_guard"]["fingerprint"],
-                "expires_at": artifact["expires_at"],
-            },
-            "project_call": project_call,
+            **review,
+            "project_call": project_call_summary,
             "executed": False,
             "verified": False,
             "cleanup": cleanup,
+            "next_command": next_command,
             "agent_result": agent_result,
         }
 
@@ -2703,6 +3530,10 @@ def dispatch_transaction_command(
                     execution_result=result,
                 ),
                 "automatic_retry": False,
+                "next_command": transaction_next_command(
+                    "verify",
+                    ["verify", transaction_id],
+                ),
             }
         call_args = require_mapping(dispatch_payload.get("args", {}), "prepared dispatch args")
         call_options = require_mapping(dispatch_payload.get("options", {}), "prepared dispatch options")
@@ -2711,6 +3542,67 @@ def dispatch_transaction_command(
             call_args,
             call_options,
             version=detected_version,
+        )
+        runtime_call_args = call_args
+        runtime_call_options = call_options
+        wire_path_adaptation: Mapping[str, Any] | None = None
+        if requires_wwise_wire_path_adaptation(call_uri):
+            sealed_project_guard = artifact.get("project_guard")
+            try:
+                io_audit = prepared_wire_path_io_audit(
+                    operation=operation,
+                    call_uri=call_uri,
+                    prepared=prepared,
+                )
+                if not isinstance(sealed_project_guard, Mapping):
+                    raise WwiseWirePathError(
+                        "WIRE_PATH_CONTEXT_UNAVAILABLE",
+                        "The confirmed path-bearing preview lacks its sealed project guard.",
+                    )
+                adapted_dispatch = adapt_cli_dispatch_paths(
+                    uri=call_uri,
+                    args=call_args,
+                    options=call_options,
+                    io_audit=io_audit,
+                    project_guard=sealed_project_guard,
+                    current_project_guard=current_guard,
+                )
+            except WwiseWirePathError as exc:
+                adaptation_error = exc.as_dict()
+                repreview = store.require_repreview(
+                    transaction_id,
+                    details={
+                        "error_code": exc.error_code,
+                        "wire_path_adaptation": adaptation_error,
+                    },
+                )
+                return {
+                    "ok": False,
+                    "status": "repreview_required",
+                    **common,
+                    "transaction_id": transaction_id,
+                    "state": repreview.state.value,
+                    "artifact_hash": preview.artifact_hash,
+                    "error_code": exc.error_code,
+                    "message": str(exc),
+                    "details": exc.details,
+                    "schema_validation": schema_validation.as_dict(),
+                    "wire_path_adaptation": adaptation_error,
+                    "role_validation": role_validation,
+                    "guard_validation": guard_validation,
+                    "project_call": project_call,
+                    "executed": False,
+                    "verified": False,
+                    "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
+                    "automatic_retry": False,
+                }
+            runtime_call_args = adapted_dispatch.args
+            runtime_call_options = adapted_dispatch.options
+            wire_path_adaptation = adapted_dispatch.proof
+        wire_path_output = (
+            {"wire_path_adaptation": dict(wire_path_adaptation)}
+            if wire_path_adaptation is not None
+            else {}
         )
         # Re-read at the final mutation boundary as well as before connecting.
         # A policy change during live guard validation must still stop execution.
@@ -2722,8 +3614,8 @@ def dispatch_transaction_command(
                 call_uri,
                 connection=connection,
                 version=detected_version,
-                args=call_args,
-                options=call_options,
+                args=runtime_call_args,
+                options=runtime_call_options,
                 allow_destructive=True,
                 operation_timeout=float(capability.execution_contract["timeout_seconds"]),
                 result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
@@ -2736,6 +3628,7 @@ def dispatch_transaction_command(
                     "error_type": type(exc).__name__,
                     "message": str(exc),
                     "automatic_retry": False,
+                    **wire_path_output,
                 },
             )
             return {
@@ -2745,13 +3638,18 @@ def dispatch_transaction_command(
                 "transaction_id": transaction_id,
                 "state": indeterminate.state.value,
                 "message": str(exc),
+                **wire_path_output,
                 "cleanup": transaction_cleanup_payload(prepared, phase="indeterminate"),
                 "automatic_retry": False,
             }
         if result.get("ok") is not True:
             indeterminate = store.mark_execution_indeterminate(
                 transaction_id,
-                details={"dispatch_result": result, "automatic_retry": False},
+                details={
+                    "dispatch_result": result,
+                    "automatic_retry": False,
+                    **wire_path_output,
+                },
             )
             return {
                 "ok": False,
@@ -2760,6 +3658,7 @@ def dispatch_transaction_command(
                 "transaction_id": transaction_id,
                 "state": indeterminate.state.value,
                 "dispatch_result": result,
+                **wire_path_output,
                 "role_validation": role_validation,
                 "guard_validation": guard_validation,
                 "cleanup": transaction_cleanup_payload(
@@ -2772,7 +3671,15 @@ def dispatch_transaction_command(
         try:
             executed = store.mark_executed_unverified(
                 transaction_id,
-                details={"dispatch_result": result, "automatic_retry": False},
+                details={
+                    "dispatch_result": result,
+                    "schema_validation": schema_validation.as_dict(),
+                    "role_validation": role_validation,
+                    "guard_validation": guard_validation,
+                    "project_call": project_call,
+                    "automatic_retry": False,
+                    **wire_path_output,
+                },
             )
         except Exception as exc:  # noqa: BLE001 - WAAPI success must survive a local journal failure
             persistence_payload = execution_success_persistence_failure_payload(
@@ -2790,10 +3697,11 @@ def dispatch_transaction_command(
                     "role_validation": role_validation,
                     "guard_validation": guard_validation,
                     "project_call": project_call,
+                    **wire_path_output,
                 }
             )
             return persistence_payload
-        return {
+        execute_payload = {
             "ok": True,
             "status": "executed_unverified",
             **common,
@@ -2801,6 +3709,7 @@ def dispatch_transaction_command(
             "state": executed.state.value,
             "artifact_hash": preview.artifact_hash,
             "dispatch_result": result,
+            **wire_path_output,
             "schema_validation": schema_validation.as_dict(),
             "role_validation": role_validation,
             "guard_validation": guard_validation,
@@ -2814,6 +3723,12 @@ def dispatch_transaction_command(
             ),
             "automatic_retry": False,
         }
+        if call_uri != "ak.wwise.cli.migrate":
+            execute_payload["next_command"] = transaction_next_command(
+                "verify",
+                ["verify", transaction_id],
+            )
+        return project_successful_transaction_execute_payload(execute_payload)
 
     if args.command == "verify":
         if record.state is not TransactionState.EXECUTED_UNVERIFIED:
@@ -2826,6 +3741,11 @@ def dispatch_transaction_command(
             request_payload,
             version=detected_version,
         )
+        post_execution_project_guard_policy = transaction_post_execution_project_guard_policy(
+            request_payload,
+            prepared,
+            version=detected_version,
+        )
         # Load the immutable execution evidence before any live verification
         # probe.  A guard/readback failure must not discard a result-bound
         # lifecycle identity such as the ID returned by transport.create.
@@ -2835,30 +3755,64 @@ def dispatch_transaction_command(
         execution_result = event_details.get("dispatch_result") if isinstance(event_details, Mapping) else None
         if not isinstance(execution_result, Mapping):
             execution_result = {}
-        try:
-            project, project_call = current_project(
-                dispatcher,
-                connection=connection,
-                version=detected_version,
-                allow_none=project_guard_mode != PROJECT_GUARD_INVARIANT,
+        if (
+            post_execution_project_guard_policy
+            == POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY
+            and not execution_events
+        ):
+            indeterminate = store.record_verification(
+                transaction_id,
+                TransactionState.INDETERMINATE,
+                details={"error_code": "EXECUTION_EVIDENCE_MISSING"},
             )
-            current_guard = build_project_guard(
-                endpoint=common["endpoint"],
-                version=detected_version,
-                live_info=live_info,
-                project=project,
-                project_guard_mode=project_guard_mode,
-                target_project_path=target_project_path,
-            )
-            guard_validation = validate_transaction_guards(
-                artifact,
-                current_project_guard=current_guard,
-                skill_root=SKILL_ROOT,
-                check_expiry=False,
-                project_phase=PROJECT_GUARD_PHASE_POST_VERIFICATION,
-            )
-        except TransactionGuardError as exc:
             return {
+                "ok": False,
+                "status": "indeterminate",
+                **common,
+                "transaction_id": transaction_id,
+                "state": indeterminate.state.value,
+                "error_code": "EXECUTION_EVIDENCE_MISSING",
+                "project_call": None,
+                "cleanup": transaction_cleanup_payload(prepared, phase="indeterminate"),
+                "automatic_retry": False,
+            }
+        project_call: Mapping[str, Any] | None = None
+        try:
+            if (
+                post_execution_project_guard_policy
+                == POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY
+            ):
+                guard_validation = validate_transaction_context_runtime_guards(
+                    artifact,
+                    endpoint=common["endpoint"],
+                    version=detected_version,
+                    live_info=live_info,
+                    skill_root=SKILL_ROOT,
+                )
+            else:
+                project, project_call = current_project(
+                    dispatcher,
+                    connection=connection,
+                    version=detected_version,
+                    allow_none=project_guard_mode != PROJECT_GUARD_INVARIANT,
+                )
+                current_guard = build_project_guard(
+                    endpoint=common["endpoint"],
+                    version=detected_version,
+                    live_info=live_info,
+                    project=project,
+                    project_guard_mode=project_guard_mode,
+                    target_project_path=target_project_path,
+                )
+                guard_validation = validate_transaction_guards(
+                    artifact,
+                    current_project_guard=current_guard,
+                    skill_root=SKILL_ROOT,
+                    check_expiry=False,
+                    project_phase=PROJECT_GUARD_PHASE_POST_VERIFICATION,
+                )
+        except TransactionGuardError as exc:
+            deferred = {
                 "ok": False,
                 "status": "verification_deferred",
                 **common,
@@ -2875,6 +3829,12 @@ def dispatch_transaction_command(
                 "automatic_retry": False,
                 "manual_verification_retry_allowed": True,
             }
+            if (
+                post_execution_project_guard_policy
+                == POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY
+            ):
+                deferred["project_call"] = None
+            return deferred
         except Exception as exc:  # noqa: BLE001 - read-only verification may be retried manually
             return verification_deferred_payload(
                 common,
@@ -3314,6 +4274,7 @@ def dispatch(
     allow_destructive: bool = False,
     topic_mode: str = "wait",
     topic_match: Mapping[str, Any] | None = None,
+    topic_event_count: int = 1,
     live_behavior: bool = False,
     exact_object_lookup: bool = False,
     operation_timeout: float | None = None,
@@ -3336,6 +4297,7 @@ def dispatch(
         evidence_dir=connection.evidence_dir,
         topic_mode=topic_mode,
         topic_match=topic_match,
+        topic_event_count=topic_event_count,
         live_behavior=live_behavior,
         result_limit_bytes=result_limit_bytes,
     )
@@ -3486,6 +4448,281 @@ def _require_exact_identity_return_field(
     raise GatewayInputError(
         f"Exact {source_option} query-object lookups require --return-field {required_field} "
         "so the packaged gateway can verify the returned identity."
+    )
+
+
+def dispatch_original_file_reference_match(
+    args: argparse.Namespace,
+    *,
+    connection: GatewayConnection,
+    detected_version: str,
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Match a closed candidate set against one complete AudioFileSource scan."""
+
+    validate_original_file_reference_match_input(args, version=detected_version)
+    candidates = normalized_original_file_candidates(args)
+    preview = build_object_get_query(
+        type=ORIGINAL_FILE_REFERENCE_MATCH_TYPE,
+        take=MAX_QUERY_TAKE,
+        return_fields=ORIGINAL_FILE_REFERENCE_RETURN_FIELDS,
+        version=detected_version,
+    )
+    envelope = preview.envelope
+    result = dispatch(
+        dispatcher,
+        envelope.uri,
+        connection=connection,
+        version=detected_version,
+        args=envelope.args,
+        options=envelope.options,
+    )
+    query_bound = {
+        "mode": "take",
+        "value": MAX_QUERY_TAKE,
+        "source": "original-file-reference-match-fixed",
+    }
+    base: dict[str, Any] = {
+        **common,
+        "semantic_preview": preview.as_dict(),
+        "query_bound": query_bound,
+        "call": dispatch_call_summary(result),
+    }
+    if not result.get("ok"):
+        return {
+            "ok": False,
+            "status": "error",
+            **base,
+            "original_file_reference_match": original_file_reference_match_audit(
+                status="not_applied",
+                candidate_count=len(candidates),
+            ),
+        }
+
+    rows = strict_object_get_rows(
+        result,
+        command="query-object original-file reference match",
+        maximum_rows=MAX_QUERY_TAKE,
+        required_string_fields=ORIGINAL_FILE_REFERENCE_RETURN_FIELDS,
+        error_code="INVALID_ORIGINAL_FILE_REFERENCE_RESULT",
+    )
+    matches = index_original_file_reference_rows(
+        rows,
+        candidates=candidates,
+        evidence_path=result.get("evidence_path"),
+    )
+    reference_count = sum(len(values) for values in matches.values())
+    referenced_candidate_count = sum(bool(values) for values in matches.values())
+
+    if len(rows) == MAX_QUERY_TAKE:
+        return {
+            "ok": False,
+            "status": "incomplete_boundary",
+            **base,
+            "error_code": "ORIGINAL_FILE_REFERENCE_SCAN_INCOMPLETE",
+            "message": (
+                "The AudioFileSource response reached take 1000, so candidate "
+                "reference classifications cannot be proven complete."
+            ),
+            "details": {
+                "scan_count": len(rows),
+                "scan_take": MAX_QUERY_TAKE,
+                "evidence_path": result.get("evidence_path"),
+            },
+            "original_file_reference_match": original_file_reference_match_audit(
+                status="scan_limit_reached",
+                candidate_count=len(candidates),
+                scan_count=len(rows),
+                scan_complete=False,
+            ),
+        }
+
+    candidate_results: list[dict[str, Any]] = []
+    returned_reference_detail_count = 0
+    for original_path, key in candidates:
+        references = sorted(
+            matches[key],
+            key=lambda reference: (
+                reference["path"].casefold(),
+                reference["id"].casefold(),
+            ),
+        )
+        returned_references = references[
+            :MAX_ORIGINAL_FILE_REFERENCE_DETAILS_PER_CANDIDATE
+        ]
+        returned_reference_detail_count += len(returned_references)
+        candidate_results.append(
+            {
+                "originalFilePath": original_path,
+                "classification": "referenced" if references else "unreferenced",
+                "reference_count": len(references),
+                "references": returned_references,
+                "references_truncated": (
+                    len(references)
+                    > MAX_ORIGINAL_FILE_REFERENCE_DETAILS_PER_CANDIDATE
+                ),
+            }
+        )
+    payload = {
+        "ok": True,
+        "status": "ok",
+        **base,
+        "original_file_reference_match": original_file_reference_match_audit(
+            status="complete",
+            candidate_count=len(candidates),
+            scan_count=len(rows),
+            scan_complete=True,
+            referenced_candidate_count=referenced_candidate_count,
+            reference_count=reference_count,
+            returned_reference_detail_count=returned_reference_detail_count,
+        ),
+    }
+    payload["agent_result"] = {
+        "contract": ORIGINAL_FILE_REFERENCE_MATCH_CONTRACT,
+        "scan_complete": True,
+        "scanned_audio_source_count": len(rows),
+        "scan_limit": MAX_QUERY_TAKE,
+        "candidates": candidate_results,
+    }
+    return payload
+
+
+def original_file_reference_match_audit(
+    *,
+    status: str,
+    candidate_count: int,
+    scan_count: int | None = None,
+    scan_complete: bool = False,
+    referenced_candidate_count: int | None = None,
+    reference_count: int | None = None,
+    returned_reference_detail_count: int | None = None,
+) -> dict[str, Any]:
+    """Build the bounded completeness audit for candidate path matching."""
+
+    return {
+        "contract": ORIGINAL_FILE_REFERENCE_MATCH_CONTRACT,
+        "status": status,
+        "version": ORIGINAL_FILE_REFERENCE_MATCH_VERSION,
+        "source_type": ORIGINAL_FILE_REFERENCE_MATCH_TYPE,
+        "return_fields": list(ORIGINAL_FILE_REFERENCE_RETURN_FIELDS),
+        "candidate_count": candidate_count,
+        "candidate_limit": MAX_ORIGINAL_FILE_PATH_CANDIDATES,
+        "scan_take": MAX_QUERY_TAKE,
+        "scan_count": scan_count,
+        "scan_complete": scan_complete,
+        "referenced_candidate_count": referenced_candidate_count,
+        "unreferenced_candidate_count": (
+            None
+            if referenced_candidate_count is None
+            else candidate_count - referenced_candidate_count
+        ),
+        "reference_count": reference_count,
+        "returned_reference_detail_count": returned_reference_detail_count,
+        "reference_detail_limit_per_candidate": (
+            MAX_ORIGINAL_FILE_REFERENCE_DETAILS_PER_CANDIDATE
+        ),
+        "reference_detail_limit": MAX_ORIGINAL_FILE_REFERENCE_DETAILS,
+    }
+
+
+def index_original_file_reference_rows(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    candidates: Sequence[tuple[str, tuple[str, ...]]],
+    evidence_path: Any,
+) -> dict[tuple[str, ...], list[dict[str, str]]]:
+    """Validate all returned rows and index only exact normalized candidate hits."""
+
+    matches: dict[tuple[str, ...], list[dict[str, str]]] = {
+        key: [] for _, key in candidates
+    }
+    seen_ids: dict[str, int] = {}
+    for index, row in enumerate(rows):
+        object_id = row["id"]
+        hierarchy_path = row["path"]
+        original_file_path = row["originalFilePath"]
+        if not _canonical_guid(object_id):
+            raise_invalid_original_file_reference_row(
+                index=index,
+                field="id",
+                reason="expected a canonical braced GUID",
+                evidence_path=evidence_path,
+            )
+        identity_key = object_id.casefold()
+        previous = seen_ids.get(identity_key)
+        if previous is not None:
+            raise GatewayResultShapeError(
+                "query-object original-file reference match returned a duplicate object id.",
+                details={
+                    "command": "query-object original-file reference match",
+                    "duplicate_id": object_id,
+                    "first_index": previous,
+                    "duplicate_index": index,
+                    "evidence_path": evidence_path,
+                },
+                error_code="INVALID_ORIGINAL_FILE_REFERENCE_RESULT",
+            )
+        seen_ids[identity_key] = index
+        if not _canonical_wwise_path(hierarchy_path):
+            raise_invalid_original_file_reference_row(
+                index=index,
+                field="path",
+                reason="expected a canonical absolute Wwise hierarchy path",
+                evidence_path=evidence_path,
+            )
+        try:
+            hierarchy_path_size = len(hierarchy_path.encode("utf-8"))
+        except UnicodeEncodeError:
+            hierarchy_path_size = MAX_ORIGINAL_FILE_REFERENCE_PATH_BYTES + 1
+        if hierarchy_path_size > MAX_ORIGINAL_FILE_REFERENCE_PATH_BYTES:
+            raise_invalid_original_file_reference_row(
+                index=index,
+                field="path",
+                reason=(
+                    "path exceeds the closed "
+                    f"{MAX_ORIGINAL_FILE_REFERENCE_PATH_BYTES}-byte detail limit"
+                ),
+                evidence_path=evidence_path,
+            )
+        try:
+            original_key = normalize_original_file_system_path(original_file_path)
+        except ValueError as exc:
+            raise_invalid_original_file_reference_row(
+                index=index,
+                field="originalFilePath",
+                reason=str(exc),
+                evidence_path=evidence_path,
+            )
+        if original_key in matches:
+            matches[original_key].append(
+                {
+                    "id": object_id,
+                    "path": hierarchy_path,
+                }
+            )
+    return matches
+
+
+def raise_invalid_original_file_reference_row(
+    *,
+    index: int,
+    field: str,
+    reason: str,
+    evidence_path: Any,
+) -> None:
+    """Raise one stable fail-closed result error without echoing an arbitrary row."""
+
+    raise GatewayResultShapeError(
+        "query-object original-file reference match returned a malformed row.",
+        details={
+            "command": "query-object original-file reference match",
+            "invalid_index": index,
+            "field": field,
+            "reason": reason,
+            "evidence_path": evidence_path,
+        },
+        error_code="INVALID_ORIGINAL_FILE_REFERENCE_RESULT",
     )
 
 
@@ -3644,6 +4881,580 @@ def dispatch_call_summary(result: Mapping[str, Any]) -> dict[str, Any]:
     if "normalization" in result and result.get("result") == {"return": []}:
         summary["result"] = {"return": []}
     return summary
+
+
+def successful_role_validation_summary(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Digest one successful role guard without duplicating live readbacks."""
+
+    raw_assertions = value.get("assertions")
+    assertions = raw_assertions if isinstance(raw_assertions, list) else []
+    raw_readbacks = value.get("readbacks")
+    readbacks = raw_readbacks if isinstance(raw_readbacks, list) else []
+    return {
+        "summary_contract": TRANSACTION_ROLE_VALIDATION_SUMMARY_CONTRACT,
+        "contract": value.get("contract"),
+        "operation": value.get("operation"),
+        "ok": value.get("ok") is True,
+        "status": value.get("status"),
+        "assertion_count": len(assertions),
+        "passed_assertion_count": sum(
+            1
+            for assertion in assertions
+            if isinstance(assertion, Mapping) and assertion.get("passed") is True
+        ),
+        "assertions_canonical_sha256": canonical_sha256(assertions),
+        "readback_count": len(readbacks),
+        "readbacks_canonical_sha256": canonical_sha256(readbacks),
+        "full_evidence_in_stdout": False,
+    }
+
+
+def successful_dispatch_result_summary(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Keep a successful dispatch outcome while digesting its raw result."""
+
+    summary = dispatch_call_summary(value)
+    summary["result_summary"] = transaction_value_summary(
+        value.get("result"),
+        include_keys=True,
+    )
+    summary["result_included"] = False
+    return summary
+
+
+def successful_execute_component_summary(
+    value: Any,
+    *,
+    preserve: Sequence[str] = (),
+) -> dict[str, Any]:
+    """Return a closed digest projection for a secondary execute component."""
+
+    summary = transaction_value_summary(value, include_keys=True)
+    if isinstance(value, Mapping):
+        for key in preserve:
+            candidate = value.get(key)
+            if isinstance(candidate, (str, int, float, bool)) or candidate is None:
+                if key in value:
+                    summary[key] = candidate
+    return summary
+
+
+def project_successful_transaction_execute_payload(
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bound stdout for one persisted successful non-terminal execution.
+
+    This function is deliberately never used for drift, failed dispatch,
+    persistence failure, cancellation, or indeterminate outcomes.  Those
+    states retain their complete failure evidence and cannot be made to look
+    successful by projection.
+    """
+
+    if payload.get("ok") is not True or payload.get("status") != "executed_unverified":
+        raise GatewayResultShapeError(
+            "Only a persisted executed_unverified payload can use the success projection",
+            details={
+                "ok": payload.get("ok"),
+                "status": payload.get("status"),
+                "required_ok": True,
+                "required_status": "executed_unverified",
+            },
+            error_code="INVALID_EXECUTE_SUCCESS_PROJECTION",
+        )
+
+    projected = dict(payload)
+    agent_result_sentinel = object()
+    agent_result = projected.pop("agent_result", agent_result_sentinel)
+    role_validation = projected.get("role_validation")
+    if not isinstance(role_validation, Mapping) or role_validation.get("ok") is not True:
+        raise GatewayResultShapeError(
+            "A successful execute payload lacks a successful role validation",
+            details={
+                "role_validation_type": type(role_validation).__name__,
+                "role_validation_ok": (
+                    role_validation.get("ok")
+                    if isinstance(role_validation, Mapping)
+                    else None
+                ),
+            },
+            error_code="INVALID_EXECUTE_SUCCESS_PROJECTION",
+        )
+    projected["role_validation"] = successful_role_validation_summary(role_validation)
+    project_call = projected.get("project_call")
+    if isinstance(project_call, Mapping):
+        projected["project_call"] = dispatch_call_summary(project_call)
+
+    projection = {
+        "contract": TRANSACTION_EXECUTE_SUCCESS_SUMMARY_CONTRACT,
+        "detail_level": "full-dispatch-result",
+        "fixed_projection_limit_bytes": (
+            TRANSACTION_EXECUTE_SUCCESS_STDOUT_BUDGET_BYTES
+            - TRANSACTION_EXECUTE_SUCCESS_ENVELOPE_RESERVE_BYTES
+        ),
+        "stdout_budget_bytes": TRANSACTION_EXECUTE_SUCCESS_STDOUT_BUDGET_BYTES,
+        "session_context_reserve_bytes": (
+            TRANSACTION_EXECUTE_SUCCESS_ENVELOPE_RESERVE_BYTES
+        ),
+        "projected_payload_bytes": 0,
+        "full_dispatch_result_in_stdout": True,
+        "full_role_validation_in_stdout": False,
+        "full_execution_evidence_persisted": True,
+        "journal_event": "execution_completed",
+        "truncated": False,
+    }
+    projected["stdout_projection"] = projection
+    fixed_limit = int(projection["fixed_projection_limit_bytes"])
+
+    def append_agent_result() -> None:
+        projected.pop("agent_result", None)
+        if agent_result is not agent_result_sentinel:
+            projected["agent_result"] = agent_result
+
+    def stabilize_size() -> int:
+        append_agent_result()
+        for _ in range(8):
+            observed = gateway_json_document_size(projected)
+            if projection["projected_payload_bytes"] == observed:
+                return observed
+            projection["projected_payload_bytes"] = observed
+        return gateway_json_document_size(projected)
+
+    if stabilize_size() > fixed_limit:
+        dispatch_result = payload.get("dispatch_result")
+        if not isinstance(dispatch_result, Mapping) or dispatch_result.get("ok") is not True:
+            raise GatewayResultShapeError(
+                "A successful execute payload lacks a successful dispatch result",
+                details={
+                    "dispatch_result_type": type(dispatch_result).__name__,
+                    "dispatch_result_ok": (
+                        dispatch_result.get("ok")
+                        if isinstance(dispatch_result, Mapping)
+                        else None
+                    ),
+                },
+                error_code="INVALID_EXECUTE_SUCCESS_PROJECTION",
+            )
+        projected.pop("agent_result", None)
+        projected["dispatch_result"] = successful_dispatch_result_summary(
+            dispatch_result
+        )
+        projection["detail_level"] = "digest-dispatch-result"
+        projection["full_dispatch_result_in_stdout"] = False
+
+    if stabilize_size() > fixed_limit:
+        projected.pop("agent_result", None)
+        for key, preserve in (
+            (
+                "schema_validation",
+                ("contract", "ok", "status", "schema_id"),
+            ),
+            (
+                "guard_validation",
+                (
+                    "ok",
+                    "status",
+                    "project_guard_mode",
+                    "project_guard_phase",
+                    "project_guard_fingerprint",
+                    "runtime_guard_fingerprint",
+                    "expires_at",
+                ),
+            ),
+            (
+                "cleanup",
+                (
+                    "contract",
+                    "status",
+                    "phase",
+                    "automatic_cleanup",
+                    "automatic_retry",
+                ),
+            ),
+            (
+                "wire_path_adaptation",
+                (
+                    "contract",
+                    "mode",
+                    "applied",
+                    "translated_path_count",
+                    "project_guard_fingerprint",
+                    "current_project_guard_fingerprint",
+                ),
+            ),
+        ):
+            if key in projected:
+                projected[key] = successful_execute_component_summary(
+                    projected[key],
+                    preserve=preserve,
+                )
+        projection["detail_level"] = "minimal-digest"
+
+    if stabilize_size() > fixed_limit:
+        projected.pop("agent_result", None)
+        keep = (
+            "ok",
+            "status",
+            "contract",
+            "command",
+            "endpoint",
+            "detected_version",
+            "is_command_line",
+            "transaction_id",
+            "state",
+            "artifact_hash",
+            "dispatch_result",
+            "wire_path_adaptation",
+            "schema_validation",
+            "role_validation",
+            "guard_validation",
+            "project_call",
+            "executed",
+            "verified",
+            "cleanup",
+            "automatic_retry",
+            "next_command",
+            "stdout_projection",
+        )
+        projected = {key: projected[key] for key in keep if key in projected}
+        projection = projected["stdout_projection"]
+        projection["detail_level"] = "minimal-allowlist-digest"
+
+    observed = stabilize_size()
+    if observed > fixed_limit:
+        raise GatewayResultShapeError(
+            "The successful execute projection could not fit its fixed stdout budget",
+            error_code="EXECUTE_SUCCESS_SUMMARY_BUDGET_EXCEEDED",
+            details={
+                "contract": TRANSACTION_EXECUTE_SUCCESS_SUMMARY_CONTRACT,
+                "limit_bytes": fixed_limit,
+                "observed_bytes": observed,
+                "transaction_id": payload.get("transaction_id"),
+                "state": payload.get("state"),
+                "artifact_hash": payload.get("artifact_hash"),
+                "executed": True,
+                "automatic_retry": False,
+                "truncated": False,
+            },
+        )
+    append_agent_result()
+    return projected
+
+
+def transaction_verify_cleanup_projection_safe(value: Any) -> bool:
+    """Return whether a cleanup boundary can remain exact in a success summary."""
+
+    if not isinstance(value, Mapping):
+        return False
+    status = value.get("status")
+    if not isinstance(status, str) or status.casefold() in {
+        "failed",
+        "indeterminate",
+        "unknown",
+    }:
+        return False
+    projection = value.get("projection")
+    if not isinstance(projection, Mapping):
+        return False
+    projection_status = projection.get("status")
+    if not isinstance(projection_status, str) or projection_status.casefold() in {
+        "failed",
+        "indeterminate",
+        "unknown",
+    }:
+        return False
+    return "error" not in projection
+
+
+def successful_verification_result_summary(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Digest complete successful verification evidence already in the journal."""
+
+    raw_assertions = value.get("assertions")
+    assertions = raw_assertions if isinstance(raw_assertions, list) else []
+    raw_readbacks = value.get("readbacks")
+    readbacks = raw_readbacks if isinstance(raw_readbacks, list) else []
+    passed_assertion_count = sum(
+        1
+        for assertion in assertions
+        if isinstance(assertion, Mapping) and assertion.get("passed") is True
+    )
+    return {
+        "summary_contract": TRANSACTION_VERIFICATION_RESULT_SUMMARY_CONTRACT,
+        "contract": value.get("contract"),
+        "operation": value.get("operation"),
+        "status": value.get("status"),
+        "ok": value.get("ok") is True,
+        "verification_strength": value.get("verification_strength"),
+        "business_state_verified": value.get("business_state_verified") is True,
+        "assertion_count": len(assertions),
+        "passed_assertion_count": passed_assertion_count,
+        "failed_assertion_count": len(assertions) - passed_assertion_count,
+        "assertions_canonical_sha256": canonical_sha256(assertions),
+        "readback_count": len(readbacks),
+        "readbacks_canonical_sha256": canonical_sha256(readbacks),
+        "canonical_sha256": canonical_sha256(value),
+        "full_evidence_in_stdout": False,
+    }
+
+
+def validate_successful_transaction_verify_projection(
+    payload: Mapping[str, Any],
+) -> tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]]:
+    """Reject internally inconsistent terminal success before it is compacted."""
+
+    verification = payload.get("verification")
+    agent_result = payload.get("agent_result")
+    cleanup = payload.get("cleanup")
+    invalid_reasons: list[str] = []
+
+    if payload.get("ok") is not True:
+        invalid_reasons.append("top-level ok is not true")
+    if payload.get("status") != TransactionState.VERIFIED.value:
+        invalid_reasons.append("top-level status is not verified")
+    if payload.get("state") != TransactionState.VERIFIED.value:
+        invalid_reasons.append("transaction state is not verified")
+    if payload.get("executed") is not True:
+        invalid_reasons.append("top-level executed is not true")
+    if payload.get("verified") is not True:
+        invalid_reasons.append("top-level verified is not true")
+    if payload.get("result_schema_checked") is not False:
+        invalid_reasons.append("result_schema_checked is not false")
+    if payload.get("automatic_retry") is not False:
+        invalid_reasons.append("automatic_retry is not false")
+
+    if not isinstance(verification, Mapping):
+        invalid_reasons.append("verification is not an object")
+        verification = {}
+    else:
+        if verification.get("ok") is not True:
+            invalid_reasons.append("verification ok is not true")
+        if verification.get("status") != TransactionState.VERIFIED.value:
+            invalid_reasons.append("verification status is not verified")
+        if verification.get("business_state_verified") is not True:
+            invalid_reasons.append("business state was not strongly verified")
+        if payload.get("verification_strength") != verification.get(
+            "verification_strength"
+        ):
+            invalid_reasons.append("verification strength does not match")
+        assertions = verification.get("assertions")
+        if not isinstance(assertions, list):
+            invalid_reasons.append("verification assertions are not an array")
+        elif any(
+            not isinstance(assertion, Mapping)
+            or assertion.get("passed") is not True
+            for assertion in assertions
+        ):
+            invalid_reasons.append("verified assertions are not all passed")
+        readbacks = verification.get("readbacks")
+        if not isinstance(readbacks, list):
+            invalid_reasons.append("verification readbacks are not an array")
+
+    if not isinstance(agent_result, Mapping):
+        invalid_reasons.append("agent_result is not an object")
+        agent_result = {}
+    else:
+        for key in (
+            "transaction_id",
+            "artifact_hash",
+            "state",
+            "executed",
+            "verified",
+        ):
+            if agent_result.get(key) != payload.get(key):
+                invalid_reasons.append(f"agent_result {key} does not match")
+        request = agent_result.get("request")
+        operation = agent_result.get("operation")
+        if not isinstance(request, Mapping):
+            invalid_reasons.append("agent_result request is not an object")
+        elif request.get("operation") != operation:
+            invalid_reasons.append("agent_result request operation does not match")
+        if operation != verification.get("operation"):
+            invalid_reasons.append("verification operation does not match agent_result")
+
+    if not isinstance(cleanup, Mapping):
+        invalid_reasons.append("cleanup is not an object")
+        cleanup = {}
+    elif canonical_sha256(agent_result.get("cleanup")) != canonical_sha256(cleanup):
+        invalid_reasons.append("agent_result cleanup does not match")
+
+    if invalid_reasons:
+        raise GatewayResultShapeError(
+            "A terminal verify success payload is internally inconsistent",
+            error_code="INVALID_VERIFY_SUCCESS_PROJECTION",
+            details={
+                "contract": TRANSACTION_VERIFY_SUCCESS_SUMMARY_CONTRACT,
+                "reasons": invalid_reasons,
+                "transaction_id": bounded_gateway_label(
+                    payload.get("transaction_id"),
+                    128,
+                ),
+                "state": bounded_gateway_label(payload.get("state"), 80),
+                "artifact_hash": bounded_gateway_label(
+                    payload.get("artifact_hash"),
+                    128,
+                ),
+            },
+        )
+    return verification, agent_result, cleanup
+
+
+def project_successful_transaction_verify_payload(
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bound one strong terminal verify reply without altering agent_result.
+
+    Complete assertions and readbacks were durably written to the
+    ``verification_recorded`` journal event before this function can run.
+    Failure, indeterminate, weak result-schema validation, and cleanup-error
+    boundaries never enter this projection.
+    """
+
+    verification, agent_result, _cleanup = (
+        validate_successful_transaction_verify_projection(payload)
+    )
+    verification_summary = successful_verification_result_summary(verification)
+    projected = dict(payload)
+    projected.pop("agent_result", None)
+    projection = {
+        "contract": TRANSACTION_VERIFY_SUCCESS_SUMMARY_CONTRACT,
+        "detail_level": "full-verification-evidence",
+        "fixed_projection_limit_bytes": (
+            TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES
+            - TRANSACTION_VERIFY_SUCCESS_ENVELOPE_RESERVE_BYTES
+        ),
+        "stdout_budget_bytes": TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES,
+        "session_context_reserve_bytes": (
+            TRANSACTION_VERIFY_SUCCESS_ENVELOPE_RESERVE_BYTES
+        ),
+        "projected_payload_bytes": 0,
+        "verification_canonical_sha256": verification_summary["canonical_sha256"],
+        "assertion_count": verification_summary["assertion_count"],
+        "passed_assertion_count": verification_summary["passed_assertion_count"],
+        "readback_count": verification_summary["readback_count"],
+        "full_verification_evidence_in_stdout": True,
+        "full_verification_evidence_persisted": True,
+        "journal_event": "verification_recorded",
+        "agent_result_exact": True,
+        "cleanup_exact": True,
+        "truncated": False,
+    }
+    projected["stdout_projection"] = projection
+    fixed_limit = int(projection["fixed_projection_limit_bytes"])
+
+    def append_agent_result() -> None:
+        projected.pop("agent_result", None)
+        projected["agent_result"] = agent_result
+
+    def stabilize_size() -> int:
+        append_agent_result()
+        for _ in range(8):
+            observed = gateway_json_document_size(projected)
+            if projection["projected_payload_bytes"] == observed:
+                return observed
+            projection["projected_payload_bytes"] = observed
+        return gateway_json_document_size(projected)
+
+    if stabilize_size() > fixed_limit:
+        projected.pop("agent_result", None)
+        projected["verification"] = verification_summary
+        projection["detail_level"] = "digest-verification-evidence"
+        projection["full_verification_evidence_in_stdout"] = False
+
+    if stabilize_size() > fixed_limit:
+        projected.pop("agent_result", None)
+        guard_validation = projected.get("guard_validation")
+        if isinstance(guard_validation, Mapping):
+            projected["guard_validation"] = successful_execute_component_summary(
+                guard_validation,
+                preserve=(
+                    "ok",
+                    "status",
+                    "project_guard_mode",
+                    "project_guard_phase",
+                    "project_guard_fingerprint",
+                    "runtime_guard_fingerprint",
+                ),
+            )
+        project_call = projected.get("project_call")
+        if isinstance(project_call, Mapping):
+            projected["project_call"] = successful_execute_component_summary(
+                project_call,
+                preserve=("api", "ok", "status", "version", "risk_level"),
+            )
+        projection["detail_level"] = "minimal-digest"
+
+    if stabilize_size() > fixed_limit:
+        projected.pop("agent_result", None)
+        keep = (
+            "ok",
+            "status",
+            "contract",
+            "command",
+            "endpoint",
+            "detected_version",
+            "is_command_line",
+            "transaction_id",
+            "state",
+            "artifact_hash",
+            "verification",
+            "guard_validation",
+            "project_call",
+            "executed",
+            "verified",
+            "result_schema_checked",
+            "verification_strength",
+            "cleanup",
+            "automatic_retry",
+            "stdout_projection",
+        )
+        projected = {key: projected[key] for key in keep if key in projected}
+        projection = projected["stdout_projection"]
+        projection["detail_level"] = "minimal-allowlist-digest"
+
+    observed = stabilize_size()
+    if observed > fixed_limit:
+        raise GatewayResultShapeError(
+            "The successful verify projection could not fit its fixed stdout budget",
+            error_code="VERIFY_SUCCESS_SUMMARY_BUDGET_EXCEEDED",
+            details={
+                "contract": TRANSACTION_VERIFY_SUCCESS_SUMMARY_CONTRACT,
+                "limit_bytes": fixed_limit,
+                "observed_bytes": observed,
+                "transaction_id": bounded_gateway_label(
+                    payload.get("transaction_id"),
+                    128,
+                ),
+                "state": bounded_gateway_label(payload.get("state"), 80),
+                "artifact_hash": bounded_gateway_label(
+                    payload.get("artifact_hash"),
+                    128,
+                ),
+                "executed": True,
+                "verified": True,
+                "automatic_retry": False,
+                "agent_result_exact": True,
+                "truncated": False,
+            },
+        )
+    append_agent_result()
+    return projected
+
+
+def topic_subscription_cleanup_status(result: Mapping[str, Any]) -> str:
+    """Project only an explicit dispatcher cleanup fact; never infer from outcome."""
+
+    details = result.get("details")
+    cleanup = (
+        details.get(SUBSCRIPTION_CLEANUP_DETAILS_KEY)
+        if isinstance(details, Mapping)
+        else None
+    )
+    status = cleanup.get("status") if isinstance(cleanup, Mapping) else None
+    if status in {
+        SUBSCRIPTION_CLEANUP_UNSUBSCRIBED,
+        SUBSCRIPTION_CLEANUP_FAILED,
+        SUBSCRIPTION_CLEANUP_AFTER_RETRY,
+    }:
+        return str(status)
+    return "unknown"
 
 
 def status_wwise_summary(value: Any) -> dict[str, Any] | None:
@@ -4004,8 +5815,44 @@ def require_runtime_directory_outside_project(
     )
 
 
+def transaction_next_command(
+    command: str,
+    gateway_argv: Sequence[str],
+    *,
+    requires_explicit_user_confirmation: bool = False,
+    requires_later_user_message: bool = False,
+) -> dict[str, Any]:
+    """Return one canonical continuation without model-rebuilt path segments."""
+
+    normalized = [str(value) for value in gateway_argv]
+    full_argv = [
+        "python",
+        str(GATEWAY_RUNNER_PATH),
+        "gateway.py",
+        *normalized,
+    ]
+    payload: dict[str, Any] = {
+        "contract": TRANSACTION_NEXT_COMMAND_CONTRACT,
+        "command": command,
+        "gateway_argv": normalized,
+        "full_argv": full_argv,
+        "copy_exactly": True,
+    }
+    if requires_explicit_user_confirmation:
+        payload["requires_explicit_user_confirmation"] = True
+    if requires_later_user_message:
+        payload["requires_later_user_message"] = True
+    if os.name == "nt":
+        payload["shell_family"] = "windows-cmd"
+        payload["shell_command"] = subprocess.list2cmdline(full_argv)
+    else:
+        payload["shell_family"] = "posix-sh"
+        payload["shell_command"] = shlex.join(full_argv)
+    return payload
+
+
 def transaction_state_payload(command: str, record: Any, *, offline: bool) -> dict[str, Any]:
-    return {
+    payload = {
         "contract": GATEWAY_RESULT_CONTRACT,
         "ok": True,
         "status": record.state.value,
@@ -4015,6 +5862,12 @@ def transaction_state_payload(command: str, record: Any, *, offline: bool) -> di
         "state": record.state.value,
         "artifact_hash": record.artifact_hash,
     }
+    if command == "confirm" and record.state is TransactionState.CONFIRMED:
+        payload["next_command"] = transaction_next_command(
+            "execute",
+            ["execute", record.transaction_id],
+        )
+    return payload
 
 
 def transaction_agent_result(
@@ -4026,6 +5879,7 @@ def transaction_agent_result(
     executed: bool,
     verified: bool | None = None,
     cleanup: Mapping[str, Any] | None = None,
+    next_command: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Project an immutable transaction artifact into the agent JSON contract.
 
@@ -4050,6 +5904,10 @@ def transaction_agent_result(
         result["verified"] = verified
     if cleanup is not None:
         result["cleanup"] = dict(cleanup)
+    if next_command is not None:
+        # A preview mirrors the exact top-level continuation here so the final
+        # machine-readable field also ends on the canonical shell command.
+        result["next_command"] = next_command
     return result
 
 
@@ -4117,7 +5975,15 @@ def transaction_show_summary(
     artifact: Any,
     events: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
-    """Return the review-relevant immutable preview without runtime hash bulk."""
+    """Return a bounded review projection of one immutable transaction preview.
+
+    The exact request remains visible because it is the object the user reviews
+    before confirmation.  The committed summary shape is returned unchanged
+    whenever its fixed (non-request) portion fits the public budget.  Only an
+    oversized artifact switches to explicitly labelled digest projections so a
+    large object graph is not printed two or three times.  Nothing is
+    byte-truncated.
+    """
 
     artifact_map = dict(artifact) if isinstance(artifact, Mapping) else {}
     prepared_raw = artifact_map.get("prepared_operation")
@@ -4165,11 +6031,18 @@ def transaction_show_summary(
         phase=cleanup_phase,
         execution_result=execution_result,
     )
-    return {
+    request = artifact_map.get("request")
+
+    # ``transaction-show --summary-only`` predates the bounded projections.
+    # Preserve that committed public shape exactly for ordinary transactions;
+    # consumers can keep reading exact dispatch, role, pre-state, and verifier
+    # objects.  Oversized artifacts are the only compatibility boundary where
+    # returning the legacy shape would defeat the result ceiling.
+    legacy_result = {
         "summary_only": True,
         "preview_summary": {
             "contract": artifact_map.get("contract"),
-            "request": artifact_map.get("request"),
+            "request": request,
             "dispatch": prepared.get("dispatch"),
             "resolved_roles": prepared.get("resolved_roles"),
             "pre_state": prepared.get("pre_state"),
@@ -4182,6 +6055,320 @@ def transaction_show_summary(
         "event_count": len(event_rows),
         "events": event_rows,
     }
+    legacy_fixed_result = {
+        "summary_only": True,
+        "preview_summary": {
+            key: value
+            for key, value in legacy_result["preview_summary"].items()
+            if key != "request"
+        },
+        "event_count": len(event_rows),
+        "events": event_rows,
+    }
+    if (
+        gateway_json_document_size(
+            legacy_fixed_result,
+            stop_after_bytes=TRANSACTION_SHOW_SUMMARY_FIXED_BUDGET_BYTES,
+        )
+        <= TRANSACTION_SHOW_SUMMARY_FIXED_BUDGET_BYTES
+    ):
+        return legacy_result
+
+    request_digest = canonical_sha256(request)
+    request_bytes = len(canonical_json_bytes(request))
+
+    variants = (
+        {
+            "detail_level": "review",
+            "include_dispatch_payload": True,
+            "include_role_items": True,
+            "include_names_and_sections": True,
+        },
+        {
+            "detail_level": "compact-dispatch",
+            "include_dispatch_payload": False,
+            "include_role_items": True,
+            "include_names_and_sections": True,
+        },
+        {
+            "detail_level": "digest",
+            "include_dispatch_payload": False,
+            "include_role_items": False,
+            "include_names_and_sections": False,
+        },
+    )
+    observed_by_variant: dict[str, int] = {}
+    bounded_fallback: dict[str, Any] | None = None
+    for variant in variants:
+        detail_level = str(variant["detail_level"])
+        result = {
+            "summary_only": True,
+            "preview_summary": {
+                # Preserve the legacy artifact contract field for consumers
+                # that already display it; ``summary_contract`` versions the
+                # compact shape introduced here.
+                "contract": artifact_map.get("contract"),
+                "summary_contract": TRANSACTION_SHOW_SUMMARY_CONTRACT,
+                "detail_level": detail_level,
+                "request": request,
+                "request_canonical_sha256": request_digest,
+                "dispatch": transaction_dispatch_summary(
+                    prepared.get("dispatch"),
+                    include_payload=bool(variant["include_dispatch_payload"]),
+                    include_key_names=bool(variant["include_names_and_sections"]),
+                ),
+                "resolved_roles": transaction_roles_summary(
+                    prepared.get("resolved_roles"),
+                    include_items=bool(variant["include_role_items"]),
+                    include_role_names=bool(variant["include_names_and_sections"]),
+                ),
+                "pre_state": transaction_value_summary(
+                    prepared.get("pre_state"),
+                    include_keys=bool(variant["include_names_and_sections"]),
+                    include_sections=bool(variant["include_names_and_sections"]),
+                ),
+                "verification_plan": transaction_verification_summary(
+                    prepared.get("verification_plan"),
+                    include_keys=bool(variant["include_names_and_sections"]),
+                ),
+                # Cleanup is a safety obligation rather than optional review
+                # detail.  Preserve the complete immutable spec (including a
+                # companion request and binding) in every detail level.
+                "cleanup": cleanup,
+                "project_guard_fingerprint": project_guard.get("fingerprint"),
+                "runtime_guard_fingerprint": runtime_guard.get("fingerprint"),
+                "expires_at": artifact_map.get("expires_at"),
+                "fixed_projection_limit_bytes": TRANSACTION_SHOW_SUMMARY_FIXED_BUDGET_BYTES,
+                "fixed_projection_target_bytes": TRANSACTION_SHOW_SUMMARY_TARGET_BYTES,
+                "fixed_projection_bytes": 0,
+            },
+            "event_count": len(event_rows),
+            "events": event_rows,
+        }
+        observed = stabilize_transaction_summary_size(result)
+        observed_by_variant[detail_level] = observed
+        if observed <= TRANSACTION_SHOW_SUMMARY_FIXED_BUDGET_BYTES:
+            if observed <= TRANSACTION_SHOW_SUMMARY_TARGET_BYTES:
+                return result
+            # Keep walking toward a smaller projection.  If even the digest
+            # variant cannot hit the preferred target, the last bounded
+            # candidate is still honest and remains below the hard ceiling.
+            bounded_fallback = result
+
+    if bounded_fallback is not None:
+        return bounded_fallback
+
+    raise GatewayResultShapeError(
+        "The transaction review summary could not fit its fixed JSON budget",
+        error_code="SUMMARY_BUDGET_EXCEEDED",
+        details={
+            "contract": TRANSACTION_SHOW_SUMMARY_CONTRACT,
+            "limit_bytes": TRANSACTION_SHOW_SUMMARY_FIXED_BUDGET_BYTES,
+            "target_bytes": TRANSACTION_SHOW_SUMMARY_TARGET_BYTES,
+            "observed_fixed_projection_bytes": observed_by_variant,
+            "request_bytes_excluded_from_limit": request_bytes,
+            "request_canonical_sha256": request_digest,
+            "truncated": False,
+        },
+    )
+
+
+def transaction_dispatch_summary(
+    value: Any,
+    *,
+    include_payload: bool,
+    include_key_names: bool = True,
+) -> dict[str, Any]:
+    """Project a prepared dispatch without duplicating an arbitrarily large request."""
+
+    summary = transaction_value_summary(value, include_keys=include_key_names)
+    dispatch = value if isinstance(value, Mapping) else {}
+    uri = dispatch.get("uri")
+    args = dispatch.get("args")
+    options = dispatch.get("options")
+    if isinstance(uri, str):
+        summary["uri"] = uri
+    summary["args_canonical_sha256"] = canonical_sha256(args)
+    summary["options_canonical_sha256"] = canonical_sha256(options)
+    summary["argument_key_count"] = len(args) if isinstance(args, Mapping) else 0
+    summary["option_key_count"] = len(options) if isinstance(options, Mapping) else 0
+    summary["key_names_included"] = include_key_names
+    if include_key_names:
+        summary["argument_keys"] = (
+            sorted(str(key) for key in args) if isinstance(args, Mapping) else []
+        )
+        summary["option_keys"] = (
+            sorted(str(key) for key in options) if isinstance(options, Mapping) else []
+        )
+    summary["payload_included"] = include_payload
+    if include_payload:
+        summary["args"] = args
+        summary["options"] = options
+    return summary
+
+
+def transaction_roles_summary(
+    value: Any,
+    *,
+    include_items: bool,
+    include_role_names: bool = True,
+) -> dict[str, Any]:
+    """Return stable role evidence with optional bounded identity rows."""
+
+    summary = transaction_value_summary(value, include_keys=include_role_names)
+    roles = value if isinstance(value, Mapping) else {}
+    role_names = sorted(str(role) for role in roles)
+    summary["role_count"] = len(role_names)
+    summary["role_names_included"] = include_role_names
+    if include_role_names:
+        summary["role_names"] = role_names
+    summary["items_included"] = include_items
+    if not include_items:
+        return summary
+
+    items: list[dict[str, Any]] = []
+    for role in role_names:
+        raw = roles.get(role)
+        item: dict[str, Any] = {
+            "role": role,
+            "canonical_sha256": canonical_sha256(raw),
+        }
+        if isinstance(raw, Mapping):
+            for key in ("resolution", "object"):
+                candidate = raw.get(key)
+                if isinstance(candidate, (str, int, float, bool)) or candidate is None:
+                    item[key] = candidate
+            identity = raw.get("row")
+            if not isinstance(identity, Mapping):
+                identity = raw.get("identity")
+            if isinstance(identity, Mapping):
+                projected = {
+                    key: identity.get(key)
+                    for key in ("id", "path", "name", "type")
+                    if identity.get(key) is not None
+                }
+                if projected:
+                    item["identity"] = projected
+        items.append(item)
+    summary["items"] = items
+    return summary
+
+
+def transaction_value_summary(
+    value: Any,
+    *,
+    include_keys: bool = True,
+    include_sections: bool = False,
+) -> dict[str, Any]:
+    """Describe one JSON value by type, shape, and canonical digest."""
+
+    summary: dict[str, Any] = {"canonical_sha256": canonical_sha256(value)}
+    if isinstance(value, Mapping):
+        keys = sorted(str(key) for key in value)
+        summary.update(
+            {
+                "json_type": "object",
+                "key_count": len(keys),
+                "key_names_included": include_keys,
+            }
+        )
+        if include_keys:
+            summary["keys"] = keys
+        if include_sections:
+            summary["sections"] = [
+                {
+                    "name": key,
+                    **transaction_value_summary(value.get(key), include_keys=include_keys),
+                }
+                for key in keys
+            ]
+    elif isinstance(value, list):
+        summary.update({"json_type": "array", "item_count": len(value)})
+    elif value is None:
+        summary["json_type"] = "null"
+    elif isinstance(value, bool):
+        summary["json_type"] = "boolean"
+    elif isinstance(value, (int, float)):
+        summary["json_type"] = "number"
+    elif isinstance(value, str):
+        summary.update({"json_type": "string", "utf8_bytes": len(value.encode("utf-8"))})
+    else:
+        # Transaction artifacts are strict JSON.  Keeping a distinct label here
+        # makes a malformed stored artifact fail during canonical hashing rather
+        # than being silently represented as valid JSON evidence.
+        summary["json_type"] = type(value).__name__
+    return summary
+
+
+def transaction_verification_summary(
+    value: Any,
+    *,
+    include_keys: bool = True,
+) -> dict[str, Any]:
+    """Keep the verification strategy legible while hashing its full plan."""
+
+    summary = transaction_value_summary(value, include_keys=include_keys)
+    plan = value if isinstance(value, Mapping) else {}
+    for key in (
+        "kind",
+        "strategy",
+        "uri",
+        "version",
+        "on_name_conflict",
+        "parent_id",
+    ):
+        candidate = plan.get(key)
+        if isinstance(candidate, (str, int, float, bool)) or candidate is None:
+            if key in plan:
+                summary[key] = candidate
+    for key in (
+        "nodes",
+        "preexisting_root_rows",
+        "replaced_subtree_rows",
+        "readbacks",
+        "assertions",
+    ):
+        candidate = plan.get(key)
+        if isinstance(candidate, list):
+            summary[f"{key}_count"] = len(candidate)
+            summary[f"{key}_canonical_sha256"] = canonical_sha256(candidate)
+    return summary
+
+
+def stabilize_transaction_summary_size(result: Mapping[str, Any]) -> int:
+    """Record the exact pretty JSON size of the fixed projection.
+
+    The request is deliberately removed for this calculation.  The size field
+    itself is included and iterated to a fixed point so the published number is
+    exact for the returned summary projection.
+    """
+
+    preview_raw = result.get("preview_summary")
+    if not isinstance(preview_raw, dict):
+        raise GatewayResultShapeError(
+            "transaction summary preview must be a JSON object",
+            details={"summary_contract": TRANSACTION_SHOW_SUMMARY_CONTRACT},
+            error_code="INVALID_TRANSACTION_SUMMARY",
+        )
+    fixed_preview = {key: value for key, value in preview_raw.items() if key != "request"}
+    fixed_result = {
+        "summary_only": result.get("summary_only"),
+        "preview_summary": fixed_preview,
+        "event_count": result.get("event_count"),
+        "events": result.get("events"),
+    }
+    observed = -1
+    for _ in range(8):
+        fixed_preview["fixed_projection_bytes"] = max(observed, 0)
+        next_observed = gateway_json_document_size(fixed_result)
+        if next_observed == observed:
+            preview_raw["fixed_projection_bytes"] = observed
+            return observed
+        observed = next_observed
+    fixed_preview["fixed_projection_bytes"] = observed
+    observed = gateway_json_document_size(fixed_result)
+    preview_raw["fixed_projection_bytes"] = observed
+    return observed
 
 
 def verification_deferred_payload(
@@ -4305,6 +6492,91 @@ def transaction_project_guard_spec(
             )
         target_project_path = target_value
     return mode, target_project_path
+
+
+def transaction_post_execution_project_guard_policy(
+    request: Mapping[str, Any],
+    prepared: Mapping[str, Any],
+    *,
+    version: str,
+) -> str:
+    """Read the post-execution project policy sealed into the preview."""
+
+    if request.get("operation") != "waapi.call":
+        return POST_EXECUTION_PROJECT_GUARD_REVALIDATE
+    arguments = require_mapping(request.get("arguments"), "waapi.call arguments")
+    api = arguments.get("api")
+    if not isinstance(api, str):
+        raise GatewayInputError("waapi.call preview lacks an API URI")
+    prepared_request = require_mapping(prepared.get("request"), "prepared request")
+    if prepared_request != request:
+        raise GatewayInputError(
+            "Prepared request does not match the immutable transaction request"
+        )
+    dispatch_payload = require_mapping(prepared.get("dispatch"), "prepared dispatch")
+    expected_dispatch = {
+        "uri": api,
+        "args": dict(require_mapping(arguments.get("args", {}), "waapi.call args")),
+        "options": dict(require_mapping(arguments.get("options", {}), "waapi.call options")),
+    }
+    if dispatch_payload != expected_dispatch:
+        raise GatewayInputError(
+            "Prepared dispatch does not match the immutable transaction request"
+        )
+    pre_state = require_mapping(prepared.get("pre_state"), "prepared pre-state")
+    sealed_contract = require_mapping(
+        pre_state.get("execution_contract"),
+        "prepared execution contract",
+    )
+    if sealed_contract.get("version") != version or sealed_contract.get("uri") != api:
+        raise GatewayInputError(
+            "Prepared execution contract does not match the immutable versioned request"
+        )
+    policy = sealed_contract.get("post_execution_project_guard_policy")
+    if not isinstance(policy, str) or policy not in POST_EXECUTION_PROJECT_GUARD_POLICIES:
+        raise GatewayInputError(
+            f"Execution contract for {api!r} has unsupported "
+            f"post_execution_project_guard_policy {policy!r}"
+        )
+    current_contract = CapabilityCatalog().describe(version, api).execution_contract
+    current_policy = current_contract.get("post_execution_project_guard_policy")
+    if not isinstance(current_policy, str) or current_policy not in POST_EXECUTION_PROJECT_GUARD_POLICIES:
+        raise GatewayInputError(
+            f"Packaged execution contract for {api!r} lacks an explicit supported "
+            "post-execution project-guard policy"
+        )
+    if policy != current_policy:
+        raise GatewayInputError(
+            f"Prepared execution contract for {api!r} no longer matches the packaged "
+            "post-execution project-guard policy"
+        )
+    if (
+        policy == POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY
+        and (
+            api not in CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS
+            or sealed_contract.get("route") != "isolated_transaction"
+            or sealed_contract.get("project_guard_mode") != PROJECT_GUARD_INVARIANT
+            or sealed_contract.get("verification_strategy") != "result_schema"
+            or current_contract.get("route") != "isolated_transaction"
+            or current_contract.get("project_guard_mode") != PROJECT_GUARD_INVARIANT
+            or current_contract.get("verification_strategy") != "result_schema"
+            or require_mapping(
+                prepared.get("verification_plan"),
+                "prepared verification plan",
+            )
+            != {
+                "kind": "result-schema",
+                "uri": api,
+                "version": version,
+                "strategy": "result_schema",
+            }
+        )
+    ):
+        raise GatewayInputError(
+            "The context/runtime-only post-execution policy requires the sealed "
+            "reviewed explicit-project Wwise CLI isolated/result-schema contract"
+        )
+    return policy
 
 
 def strengthen_project_transition_verification(
@@ -4470,11 +6742,6 @@ def transaction_read_call(
 
     return read
 
-
-def new_transaction_id() -> str:
-    return f"tx-{uuid.uuid4().hex}"
-
-
 def parse_json_object(text: str, option_name: str) -> dict[str, Any]:
     payload = parse_strict_json(text, option_name)
     if not isinstance(payload, dict):
@@ -4529,6 +6796,305 @@ def _parse_strict_json_float(token: str) -> float:
     if not math.isfinite(value):
         raise ValueError(f"non-finite number {token!r} is not JSON")
     return value
+
+
+def parse_media_pool_post_filter_spec(text: str | None) -> dict[str, Any] | None:
+    """Parse the one closed client-side Media Pool post-filter contract."""
+
+    if text is None:
+        return None
+    spec = parse_json_object(text, "--post-filter-json")
+    expected_keys = {"field", "operator", "value", "limit"}
+    actual_keys = set(spec)
+    if actual_keys != expected_keys:
+        missing = sorted(expected_keys - actual_keys)
+        extra = sorted(actual_keys - expected_keys)
+        details: list[str] = []
+        if missing:
+            details.append(f"missing keys: {', '.join(missing)}")
+        if extra:
+            details.append(f"extra keys: {', '.join(extra)}")
+        raise GatewayInputError(
+            "--post-filter-json must contain exactly field, operator, value, and limit"
+            + (f" ({'; '.join(details)})" if details else "")
+        )
+    if spec["field"] != "Filename":
+        raise GatewayInputError("--post-filter-json field must be exactly 'Filename'")
+    if spec["operator"] != "containsCaseSensitive":
+        raise GatewayInputError(
+            "--post-filter-json operator must be exactly 'containsCaseSensitive'"
+        )
+    value = spec["value"]
+    if not isinstance(value, str) or not value:
+        raise GatewayInputError("--post-filter-json value must be a nonempty string")
+    if len(value) > MAX_MEDIA_POOL_SEARCH_TEXT_CHARS:
+        raise GatewayInputError(
+            "--post-filter-json value exceeds the reviewed "
+            f"{MAX_MEDIA_POOL_SEARCH_TEXT_CHARS}-code-point literal limit"
+        )
+    limit = spec["limit"]
+    if type(limit) is not int or not 1 <= limit <= MAX_MEDIA_POOL_RESULTS:
+        raise GatewayInputError(
+            "--post-filter-json limit must be an integer between 1 and "
+            f"{MAX_MEDIA_POOL_RESULTS}"
+        )
+    return spec
+
+
+def validate_media_pool_post_filter_request(
+    *,
+    api: str,
+    spec: Mapping[str, Any],
+    request_args: Mapping[str, Any],
+    request_options: Mapping[str, Any],
+    dry_run: bool,
+) -> None:
+    """Bind a post-filter to one bounded superset request before connecting."""
+
+    if api != MEDIA_POOL_GET_URI:
+        raise GatewayInputError(
+            "--post-filter-json is supported only for ak.wwise.core.mediaPool.get"
+        )
+    if dry_run:
+        raise GatewayInputError(
+            "--post-filter-json requires a live result and cannot be combined with --dry-run"
+        )
+    max_results = request_args.get("maxResults")
+    if (
+        type(max_results) is not int
+        or not 1 <= max_results <= MAX_MEDIA_POOL_RESULTS
+    ):
+        raise GatewayInputError(
+            "A Media Pool post-filter requires request maxResults between 1 and "
+            f"{MAX_MEDIA_POOL_RESULTS}"
+        )
+    if max_results < spec["limit"]:
+        raise GatewayInputError(
+            "A Media Pool post-filter requires request maxResults to be greater "
+            "than or equal to its limit"
+        )
+    filters = request_args.get("filters")
+    if not isinstance(filters, list) or not any(
+        isinstance(item, Mapping)
+        and item.get("type") == "field"
+        and item.get("field") == spec["field"]
+        and item.get("operator") == "contains"
+        and item.get("value") == spec["value"]
+        for item in filters
+    ):
+        raise GatewayInputError(
+            "A Media Pool post-filter requires a matching Filename contains field "
+            "filter with the same value in --args-json"
+        )
+    return_fields = request_options.get("return")
+    if not isinstance(return_fields, list) or "Filename" not in return_fields:
+        raise GatewayInputError(
+            "A Media Pool post-filter requires options.return to include 'Filename'"
+        )
+
+
+def media_pool_post_filter_audit(
+    spec: Mapping[str, Any],
+    *,
+    request_max_results: int,
+    status: str,
+    raw_count: int | None = None,
+    matched_count: int | None = None,
+    returned_count: int | None = None,
+) -> dict[str, Any]:
+    """Build a bounded audit projection without echoing the arbitrary match text."""
+
+    value = spec["value"]
+    return {
+        "contract": MEDIA_POOL_POST_FILTER_CONTRACT,
+        "status": status,
+        "field": "Filename",
+        "operator": "containsCaseSensitive",
+        "value_sha256": canonical_sha256({"value": value}),
+        "value_code_points": len(value),
+        "value_utf8_bytes": len(value.encode("utf-8")),
+        "limit": spec["limit"],
+        "request_max_results": request_max_results,
+        "raw_count": raw_count,
+        "matched_count": matched_count,
+        "returned_count": returned_count,
+        "truncated_to_limit": (
+            None
+            if matched_count is None or returned_count is None
+            else matched_count > returned_count
+        ),
+    }
+
+
+def apply_media_pool_post_filter(
+    raw_result: Any,
+    *,
+    spec: Mapping[str, Any],
+    request_max_results: int,
+    evidence_path: Any,
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """Apply code-point case-sensitive containment only to a proven-complete candidate set."""
+
+    if not isinstance(raw_result, Mapping) or set(raw_result) != {"return"}:
+        raise GatewayResultShapeError(
+            "mediaPool.get post-filter expected exactly one top-level return array.",
+            details={
+                "expected": {"return": "array<object>"},
+                "actual_result_type": type(raw_result).__name__,
+                "evidence_path": evidence_path,
+            },
+            error_code="INVALID_MEDIA_POOL_POST_FILTER_RESULT",
+        )
+    raw_rows = raw_result.get("return")
+    if not isinstance(raw_rows, list):
+        raise GatewayResultShapeError(
+            "mediaPool.get post-filter expected result.return to be an array.",
+            details={
+                "expected": "array<object>",
+                "actual_return_type": type(raw_rows).__name__,
+                "evidence_path": evidence_path,
+            },
+            error_code="INVALID_MEDIA_POOL_POST_FILTER_RESULT",
+        )
+    rows: list[dict[str, Any]] = []
+    for index, raw_row in enumerate(raw_rows):
+        if not isinstance(raw_row, Mapping):
+            raise GatewayResultShapeError(
+                "mediaPool.get post-filter expected every return row to be an object.",
+                details={
+                    "invalid_index": index,
+                    "actual_row_type": type(raw_row).__name__,
+                    "evidence_path": evidence_path,
+                },
+                error_code="INVALID_MEDIA_POOL_POST_FILTER_RESULT",
+            )
+        filename = raw_row.get("Filename")
+        if not isinstance(filename, str):
+            raise GatewayResultShapeError(
+                "mediaPool.get post-filter expected every return row Filename to be a string.",
+                details={
+                    "invalid_index": index,
+                    "actual_filename_type": type(filename).__name__,
+                    "evidence_path": evidence_path,
+                },
+                error_code="INVALID_MEDIA_POOL_POST_FILTER_RESULT",
+            )
+        rows.append(dict(raw_row))
+
+    raw_count = len(rows)
+    if raw_count >= request_max_results:
+        return None, media_pool_post_filter_audit(
+            spec,
+            request_max_results=request_max_results,
+            status="incomplete",
+            raw_count=raw_count,
+        )
+
+    value = spec["value"]
+    matches = [row for row in rows if value in row["Filename"]]
+    filtered_rows = matches[: spec["limit"]]
+    return {"return": filtered_rows}, media_pool_post_filter_audit(
+        spec,
+        request_max_results=request_max_results,
+        status="applied",
+        raw_count=raw_count,
+        matched_count=len(matches),
+        returned_count=len(filtered_rows),
+    )
+
+
+def canonicalize_bounded_direct_call_request(
+    api: str,
+    version: str,
+    request_args: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Apply exact versioned WAAPI numeric representations after schema validation."""
+
+    normalized = dict(request_args)
+    float_fields = (
+        MEDIA_POOL_FLOAT_FILTER_FIELDS_BY_VERSION.get(version)
+        if api == MEDIA_POOL_GET_URI
+        else None
+    )
+    if not float_fields:
+        return normalized
+
+    filters = request_args.get("filters")
+    if not isinstance(filters, list):
+        return normalized
+
+    normalized_filters: list[Any] = []
+    for index, raw_filter in enumerate(filters):
+        if not isinstance(raw_filter, Mapping):
+            normalized_filters.append(raw_filter)
+            continue
+        item = dict(raw_filter)
+        value = item.get("value")
+        if (
+            item.get("type") == "field"
+            and item.get("field") in float_fields
+            and type(value) is int
+        ):
+            try:
+                canonical_value = float(value)
+            except OverflowError as exc:
+                raise GatewayInputError(
+                    f"mediaPool.get filters[{index}].value for {item['field']} "
+                    "must be exactly representable as a finite WAAPI double"
+                ) from exc
+            if not math.isfinite(canonical_value) or int(canonical_value) != value:
+                raise GatewayInputError(
+                    f"mediaPool.get filters[{index}].value for {item['field']} "
+                    "must be exactly representable as a finite WAAPI double"
+                )
+            item["value"] = canonical_value
+        normalized_filters.append(item)
+    normalized["filters"] = normalized_filters
+    return normalized
+
+
+def validate_bounded_direct_call_request(
+    api: str,
+    request_args: Mapping[str, Any],
+    request_options: Mapping[str, Any],
+) -> None:
+    """Apply URI-specific ceilings that reflected schemas do not express."""
+
+    if api != MEDIA_POOL_GET_URI:
+        return
+    max_results = request_args.get("maxResults")
+    if (
+        not isinstance(max_results, int)
+        or isinstance(max_results, bool)
+        or not 1 <= max_results <= MAX_MEDIA_POOL_RESULTS
+    ):
+        raise GatewayInputError(
+            "mediaPool.get requires an explicit maxResults between 1 and "
+            f"{MAX_MEDIA_POOL_RESULTS}"
+        )
+    filters = request_args.get("filters", [])
+    databases = request_args.get("databases", [])
+    return_fields = request_options.get("return", [])
+    if len(filters) > MAX_MEDIA_POOL_FILTERS:
+        raise GatewayInputError(
+            f"mediaPool.get accepts at most {MAX_MEDIA_POOL_FILTERS} filters"
+        )
+    if len(databases) > MAX_MEDIA_POOL_DATABASES:
+        raise GatewayInputError(
+            f"mediaPool.get accepts at most {MAX_MEDIA_POOL_DATABASES} databases"
+        )
+    if len(return_fields) > MAX_MEDIA_POOL_RETURN_FIELDS:
+        raise GatewayInputError(
+            f"mediaPool.get accepts at most {MAX_MEDIA_POOL_RETURN_FIELDS} return fields"
+        )
+    if len(set(return_fields)) != len(return_fields):
+        raise GatewayInputError("mediaPool.get return fields must be unique")
+    search_text = request_args.get("searchText")
+    if isinstance(search_text, str) and len(search_text) > MAX_MEDIA_POOL_SEARCH_TEXT_CHARS:
+        raise GatewayInputError(
+            "mediaPool.get searchText exceeds the reviewed "
+            f"{MAX_MEDIA_POOL_SEARCH_TEXT_CHARS}-character limit"
+        )
 
 
 def _reject_duplicate_gateway_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -4673,6 +7239,53 @@ def normalize_topic_event_result(
             error_code="INVALID_TOPIC_RESULT",
         )
     return payload
+
+
+def normalize_topic_events_result(
+    result: Mapping[str, Any],
+    *,
+    expected_topic: str,
+    expected_count: int,
+) -> list[Any]:
+    """Unwrap the dispatcher's exact bounded multi-event envelope."""
+
+    wrapper = result.get("result")
+    expected_fields = {"requested_event_count", "events"}
+    if not isinstance(wrapper, Mapping) or set(wrapper) != expected_fields:
+        raise GatewayResultShapeError(
+            "wait-topic multi-event mode requires the exact dispatcher collection envelope.",
+            details={
+                "expected_fields": sorted(expected_fields),
+                "actual_fields": sorted(str(key) for key in wrapper) if isinstance(wrapper, Mapping) else None,
+            },
+            error_code="INVALID_TOPIC_RESULT",
+        )
+    if wrapper.get("requested_event_count") != expected_count:
+        raise GatewayResultShapeError(
+            "wait-topic dispatcher result changed the requested event count.",
+            details={
+                "expected_count": expected_count,
+                "actual_count": wrapper.get("requested_event_count"),
+            },
+            error_code="INVALID_TOPIC_RESULT",
+        )
+    event_wrappers = wrapper.get("events")
+    if not isinstance(event_wrappers, list) or len(event_wrappers) != expected_count:
+        raise GatewayResultShapeError(
+            "wait-topic dispatcher result did not contain the requested number of events.",
+            details={
+                "expected_count": expected_count,
+                "actual_count": len(event_wrappers) if isinstance(event_wrappers, list) else None,
+            },
+            error_code="INVALID_TOPIC_RESULT",
+        )
+    return [
+        normalize_topic_event_result(
+            {"result": event_wrapper},
+            expected_topic=expected_topic,
+        )
+        for event_wrapper in event_wrappers
+    ]
 
 
 def normalize_reflection_inventory_result(

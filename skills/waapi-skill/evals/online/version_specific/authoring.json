@@ -1,0 +1,1530 @@
+{
+  "contract": "waapi-skill.codex-semantic-online-cases/v3",
+  "version_scope": ["2023.1", "2024.1", "2025.1"],
+  "cases": [
+    {
+      "id": "VS23-F-AUDIO-MUTE-01",
+      "api": "ak.wwise.core.audio.mute",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "multi_branch_mute",
+      "scenario_index": 1,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Dialogue` 下的 `Player`、`Companion`、`Radio` 三个分支一起静音，`Narrator` 保持可听。完成后逐个核对显式静音状态，别用父级连带静音冒充对象本身被静音。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，静音这三个分支并保留 `Narrator`。",
+      "fixture": {"adapter": "authoring_mute_solo_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create four hidden-GUID sibling branches with explicit mute=false", "record explicit/effective mute and solo flags, hierarchy, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.audio.mute", "count": 1, "effect": "set explicit mute=true on Player, Companion, and Radio in one call"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.mute", "expectation": "all four target sibling GUIDs have explicit mute=false and their effective flags are recorded"},
+        {"phase": "preview", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.mute", "expectation": "all explicit/effective mute and solo flags plus object snapshots equal baseline"},
+        {"phase": "after", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.mute", "expectation": "Player, Companion, and Radio GUIDs have explicit mute=true while Narrator remains explicit mute=false; solo flags and hierarchy are unchanged"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.audio.mute", "expectation": "mute flags restored or hidden hierarchy removed and source-project hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-AUDIO-MUTE-02",
+      "api": "ak.wwise.core.audio.mute",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "selective_unmute",
+      "scenario_index": 2,
+      "prompt": "`\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\DebugMix` 里的 `Weapons`、`Foley`、`Ambience` 现在都被显式静音了，只恢复 `Weapons` 和 `Foley`，让 `Ambience` 继续静音。父级和三个分支的 Solo 状态都不要动。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，只解除 `Weapons` 和 `Foley` 的静音。",
+      "fixture": {"adapter": "authoring_mute_solo_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create DebugMix with three explicitly muted children and distinct solo baselines", "record parent/child flags, GUIDs, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.audio.mute", "count": 1, "effect": "set explicit mute=false on Weapons and Foley while leaving Ambience muted"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.mute", "expectation": "all three child GUIDs have explicit mute=true and full solo baseline is recorded"},
+        {"phase": "preview", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.mute", "expectation": "all flags and hierarchy remain baseline before confirmation"},
+        {"phase": "after", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.mute", "expectation": "Weapons and Foley explicit mute=false, Ambience explicit mute=true, and parent plus all solo flags equal baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.audio.mute", "expectation": "all owned flags/state are restored or removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-AUDIO-RESETMUTE-01",
+      "api": "ak.wwise.core.audio.resetMute",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "global_mute_reset",
+      "scenario_index": 1,
+      "prompt": "清掉这个临时工程里所有对象的显式静音。静音项分散在 Actor-Mixer、Interactive Music 和 Master-Mixer 三棵层级里；完成后列出之前被静音的对象，确认每一个都恢复，并且原有 Solo 状态不变。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，清除全工程显式静音并保留 Solo 状态。",
+      "fixture": {"adapter": "authoring_mute_solo_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden fixtures across three hierarchies and explicitly mute a known subset", "set a separate known solo subset and record all flags, GUIDs, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.audio.resetMute", "count": 1, "effect": "clear every explicit mute flag in the sandbox authoring session"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.resetMute", "expectation": "known muted GUID set spans all three hierarchies and a distinct solo set is recorded"},
+        {"phase": "preview", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.resetMute", "expectation": "complete mute/solo flag map remains baseline"},
+        {"phase": "after", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.resetMute", "expectation": "no fixture GUID has explicit mute=true and every solo flag exactly equals baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.audio.resetMute", "expectation": "owned session flags and objects are cleared and source-project hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-AUDIO-RESETMUTE-02",
+      "api": "ak.wwise.core.audio.resetMute",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "nested_mute_reset",
+      "scenario_index": 2,
+      "prompt": "重置 `SemanticLab` 测试层级留下的全部静音状态：既有父容器静音，也有它下面个别 Sound 自己静音。我要确认父级和叶子上的显式标记都被清掉，而不是只让最终听感暂时恢复；名称、路径和属性不能变化。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认清除父级和叶子上的全部显式静音。",
+      "fixture": {"adapter": "authoring_mute_solo_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create nested hidden hierarchy with explicit mute flags on parent and selected leaves", "record explicit/effective flags and complete object snapshots"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.audio.resetMute", "count": 1, "effect": "clear nested parent and leaf explicit mute flags globally"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.resetMute", "expectation": "both parent and leaf explicit mute markers are present with effective-state propagation recorded"},
+        {"phase": "preview", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.resetMute", "expectation": "nested flag map and object snapshots are unchanged"},
+        {"phase": "after", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.resetMute", "expectation": "every parent and leaf explicit mute flag is false; all GUID/name/path/property snapshots and solo flags equal baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.audio.resetMute", "expectation": "fixture hierarchy removed and source hashes remain unchanged"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-AUDIO-RESETSOLO-01",
+      "api": "ak.wwise.core.audio.resetSolo",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "global_solo_reset",
+      "scenario_index": 1,
+      "prompt": "清掉这个临时工程里所有对象的显式 Solo。现在 Actor-Mixer、Music 和总线层级各有测试项被 Solo；重置后确认每个显式 Solo 都消失，但原来被 Mute 的对象仍保持 Mute。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，重置全部 Solo，保留现有 Mute。",
+      "fixture": {"adapter": "authoring_mute_solo_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden fixtures in three hierarchies with a known solo set", "create a distinct mute set and record all flags and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.audio.resetSolo", "count": 1, "effect": "clear every explicit solo flag in the authoring session"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.resetSolo", "expectation": "known solo GUIDs span three hierarchies and separate mute flags are recorded"},
+        {"phase": "preview", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.resetSolo", "expectation": "complete solo/mute state map remains baseline"},
+        {"phase": "after", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.resetSolo", "expectation": "all explicit solo flags are false and every explicit mute flag exactly equals baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.audio.resetSolo", "expectation": "owned flags/objects removed or restored and source-project hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-AUDIO-RESETSOLO-02",
+      "api": "ak.wwise.core.audio.resetSolo",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "nested_solo_reset",
+      "scenario_index": 2,
+      "prompt": "把 `SemanticLab` 里父容器和叶子对象留下的 Solo 全部重置。既要清掉父级自身的 Solo，也要清掉叶子上的显式 Solo；重置不能改对象顺序、属性、引用或任何 Mute 标记。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，清除所有层级的 Solo 标记。",
+      "fixture": {"adapter": "authoring_mute_solo_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create nested hidden hierarchy with solo flags on parent and leaves plus distinct mute flags", "record all flags, order, fields, references, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.audio.resetSolo", "count": 1, "effect": "clear nested parent and leaf solo flags globally"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.resetSolo", "expectation": "parent and leaf explicit solo markers and protected mute markers are recorded"},
+        {"phase": "preview", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.resetSolo", "expectation": "flags and complete object snapshots equal baseline"},
+        {"phase": "after", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.resetSolo", "expectation": "all explicit solo flags are false while mute flags, child order, properties, and references equal baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.audio.resetSolo", "expectation": "hidden hierarchy removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-AUDIO-SOLO-01",
+      "api": "ak.wwise.core.audio.solo",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "multi_branch_solo",
+      "scenario_index": 1,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Combat` 里的 `Weapons` 和 `Impacts` 两支一起 Solo，`Foley` 不要 Solo。完成后检查两个目标是显式 Solo，而不是仅仅因为父级或同级状态导致的有效 Solo。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，只 Solo `Weapons` 和 `Impacts`。",
+      "fixture": {"adapter": "authoring_mute_solo_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create three hidden sibling branches with explicit solo=false", "record explicit/effective solo, mute flags, identities, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.audio.solo", "count": 1, "effect": "set explicit solo=true on Weapons and Impacts in one call"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.solo", "expectation": "all three explicit solo flags are false and complete flag baseline is recorded"},
+        {"phase": "preview", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.solo", "expectation": "solo/mute states and hierarchy remain unchanged"},
+        {"phase": "after", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.solo", "expectation": "Weapons and Impacts explicit solo=true, Foley explicit solo=false, and all mute flags/object fields equal baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.audio.solo", "expectation": "solo state restored or fixtures removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-AUDIO-SOLO-02",
+      "api": "ak.wwise.core.audio.solo",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "selective_unsolo",
+      "scenario_index": 2,
+      "prompt": "`\\Interactive Music Hierarchy\\Default Work Unit\\SemanticLab\\Music_Debug` 下的 `Exploration`、`Combat`、`Boss` 都是显式 Solo，只解除 `Exploration` 和 `Combat`，让 `Boss` 保持 Solo。不要改变任何 Mute 状态或音乐层级。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，只解除前两支的 Solo。",
+      "fixture": {"adapter": "authoring_mute_solo_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create three hidden music branches with explicit solo=true and distinct mute baselines", "record flags, hierarchy, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.audio.solo", "count": 1, "effect": "set explicit solo=false on Exploration and Combat while retaining Boss solo"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.solo", "expectation": "all three target GUIDs have explicit solo=true with mute and hierarchy baselines"},
+        {"phase": "preview", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.solo", "expectation": "all flags and object snapshots remain baseline"},
+        {"phase": "after", "adapter": "authoring_mute_solo_state_oracle", "subject_api": "ak.wwise.core.audio.solo", "expectation": "Exploration and Combat explicit solo=false, Boss explicit solo=true, and mute/hierarchy snapshots are unchanged"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.audio.solo", "expectation": "owned state cleared/restored and source-project hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-LOG-ADDITEM-01",
+      "api": "ak.wwise.core.log.addItem",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "tagged_warning_log_entry",
+      "scenario_index": 1,
+      "prompt": "在 Wwise 的 general 日志里加一条 Warning：`[SemanticLab] Dialogue loudness review pending — 中文对白待复核`。我要确认频道、严重级别和完整 UTF-8 文本都正确，并且只新增一条同标记记录。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，写入这条 Warning 日志。",
+      "fixture": {"adapter": "authoring_log_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["open Log Central model and record channel rows/counts", "subscribe runner oracle to log.itemAdded and record source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.log.addItem", "count": 1, "effect": "append one tagged Warning message to the general channel"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "authoring_log_model_oracle", "subject_api": "ak.wwise.core.log.addItem", "expectation": "no row has the unique SemanticLab marker and channel counts are recorded"},
+        {"phase": "preview", "adapter": "authoring_log_model_oracle", "subject_api": "ak.wwise.core.log.addItem", "expectation": "log rows/counts and itemAdded capture remain unchanged"},
+        {"phase": "after", "adapter": "authoring_log_item_event_oracle", "subject_api": "ak.wwise.core.log.addItem", "expectation": "exactly one new itemAdded payload and Log Central row have channel=general, severity=Warning, and byte-exact tagged message"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.log.addItem", "expectation": "subscription removed, owned log state cleared by sandbox teardown, and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-LOG-ADDITEM-02",
+      "api": "ak.wwise.core.log.addItem",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "conversion_error_log_entry",
+      "scenario_index": 2,
+      "prompt": "往 conversion 频道写一条 Error：`[SemanticLab:CVT-42] Missing source media for Boss_Roar`。完成后确认它出现在 conversion 而不是 general，严重级别是 Error，标识 `CVT-42` 没被改写。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，把这条 Error 写入 conversion 频道。",
+      "fixture": {"adapter": "authoring_log_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["record general and conversion channel row snapshots", "install bounded itemAdded capture and record source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.log.addItem", "count": 1, "effect": "append one CVT-42 Error message to the conversion channel"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "authoring_log_model_oracle", "subject_api": "ak.wwise.core.log.addItem", "expectation": "CVT-42 marker is absent from both channel snapshots"},
+        {"phase": "preview", "adapter": "authoring_log_model_oracle", "subject_api": "ak.wwise.core.log.addItem", "expectation": "both channel snapshots remain unchanged"},
+        {"phase": "after", "adapter": "authoring_log_item_event_oracle", "subject_api": "ak.wwise.core.log.addItem", "expectation": "one exact CVT-42 row/event exists in conversion with severity Error and none exists in general"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.log.addItem", "expectation": "capture removed, sandbox log session discarded, and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-LOG-CLEAR-01",
+      "api": "ak.wwise.core.log.clear",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "single_channel_log_clear",
+      "scenario_index": 1,
+      "prompt": "清空 conversion 频道的日志，但保留 general 频道。清理前 conversion 里有三条带 `SemanticLab-CVT` 的测试记录，general 里有两条 `SemanticLab-GEN`；完成后确认前者全没了、后者一条不少。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，只清空 conversion 频道。",
+      "fixture": {"adapter": "authoring_log_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["seed three unique conversion rows and two unique general rows through runner-owned setup", "record exact row identities/counts and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.log.clear", "count": 1, "effect": "clear only the conversion Log Central channel"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "authoring_log_model_oracle", "subject_api": "ak.wwise.core.log.clear", "expectation": "three conversion markers and two general markers exist exactly once each"},
+        {"phase": "preview", "adapter": "authoring_log_model_oracle", "subject_api": "ak.wwise.core.log.clear", "expectation": "all five marker rows and channel counts remain unchanged"},
+        {"phase": "after", "adapter": "authoring_log_model_oracle", "subject_api": "ak.wwise.core.log.clear", "expectation": "conversion channel contains none of its three markers while both general rows and their exact payloads remain"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.log.clear", "expectation": "sandbox log session is discarded and source-project hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-LOG-CLEAR-02",
+      "api": "ak.wwise.core.log.clear",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "default_channel_log_clear",
+      "scenario_index": 2,
+      "prompt": "把 general 频道当前日志清空。里面混有 Message、Warning、Error 三种 `SemanticLab-GEN` 测试项；清理后确认三种严重级别都没有残留，同时 conversion 频道的 `SemanticLab-CVT-keep` 仍在。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认清空 general，保留 conversion。",
+      "fixture": {"adapter": "authoring_log_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["seed unique general rows at Message/Warning/Error and one conversion keep-row", "record exact channel snapshots and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.log.clear", "count": 1, "effect": "clear the default general channel across all severities"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "authoring_log_model_oracle", "subject_api": "ak.wwise.core.log.clear", "expectation": "three severity-distinct general markers and one conversion keep-marker exist"},
+        {"phase": "preview", "adapter": "authoring_log_model_oracle", "subject_api": "ak.wwise.core.log.clear", "expectation": "all marker rows and severity/channel values remain baseline"},
+        {"phase": "after", "adapter": "authoring_log_model_oracle", "subject_api": "ak.wwise.core.log.clear", "expectation": "no general marker remains at any severity and conversion keep-row is byte-for-byte unchanged"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.log.clear", "expectation": "owned log state discarded with sandbox and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-OBJECT-ISLINKED-01",
+      "api": "ak.wwise.core.object.isLinked",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "cross_platform_link_comparison",
+      "scenario_index": 1,
+      "prompt": "检查 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Radio_VO` 的 Volume 在 Windows 和 Mac 两个平台是否链接。两个平台分别给出布尔结果，并结合各平台读值确认不要把“数值恰好相同”误判成链接。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "platform_link_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create Radio_VO with Windows Volume unlinked and Mac Volume linked while current numeric values are equal", "record platform GUIDs, link states, values, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.isLinked", "count": 2, "effect": "read Volume link state independently for Windows and Mac"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "platform_property_xml_oracle", "subject_api": "ak.wwise.core.object.isLinked", "expectation": "saved sandbox fixture proves Windows unlinked and Mac linked despite equal numeric values"},
+        {"phase": "after", "adapter": "waapi_is_linked_oracle", "subject_api": "ak.wwise.core.object.isLinked", "expectation": "Windows response linked=false and Mac response linked=true, each bound to its exact platform GUID"},
+        {"phase": "after", "adapter": "sandbox_unchanged_oracle", "subject_api": "ak.wwise.core.object.isLinked", "expectation": "link/value/object snapshots are identical before and after both reads"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.isLinked", "expectation": "fixture removed and source-project hashes remain unchanged"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-OBJECT-ISLINKED-02",
+      "api": "ak.wwise.core.object.isLinked",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "multi_property_link_audit",
+      "scenario_index": 2,
+      "prompt": "审计 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Boss_SFX` 在 Windows 上的 Volume、Pitch、Lowpass 三个属性：逐项告诉我是否链接，并列出未链接项的 Windows 值和全平台基线，别把三个结果合成一个。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "platform_link_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create Boss_SFX with a mixed linked/unlinked state across the three properties on Windows", "record XML/readback baselines and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.isLinked", "count": 3, "effect": "read Windows link state for Volume, Pitch, and Lowpass separately"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "platform_property_xml_oracle", "subject_api": "ak.wwise.core.object.isLinked", "expectation": "fixture stores a deterministic mixed link-state map and linked/unlinked values"},
+        {"phase": "after", "adapter": "waapi_is_linked_oracle", "subject_api": "ak.wwise.core.object.isLinked", "expectation": "three property-keyed booleans exactly equal fixture map with no swapped or collapsed result"},
+        {"phase": "after", "adapter": "sandbox_unchanged_oracle", "subject_api": "ak.wwise.core.object.isLinked", "expectation": "all platform values, link flags, and project files remain baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.isLinked", "expectation": "owned fixture removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-OBJECT-SETLINKED-01",
+      "api": "ak.wwise.core.object.setLinked",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "platform_property_unlink",
+      "scenario_index": 1,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Mobile_Mix` 的 Volume 在 Android 平台上解除链接，然后把 Android 值保留为当前 -4 dB；Windows 和全平台基线继续链接。完成后同时核对链接状态和三个读值。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，只解除 Android 的 Volume 链接。",
+      "fixture": {"adapter": "platform_link_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create Mobile_Mix with Volume linked on Android and Windows and linked value -4", "record platform GUIDs, values, link flags, XML node, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.setLinked", "count": 1, "effect": "set Android Volume linked=false while preserving its effective -4 value"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_is_linked_oracle", "subject_api": "ak.wwise.core.object.setLinked", "expectation": "Android and Windows Volume both report linked=true and values equal -4"},
+        {"phase": "preview", "adapter": "platform_property_xml_oracle", "subject_api": "ak.wwise.core.object.setLinked", "expectation": "all link flags, values, object fields, and saved XML equal baseline"},
+        {"phase": "after", "adapter": "waapi_is_linked_oracle", "subject_api": "ak.wwise.core.object.setLinked", "expectation": "Android Volume reports linked=false while Windows reports linked=true"},
+        {"phase": "after", "adapter": "platform_property_xml_oracle", "subject_api": "ak.wwise.core.object.setLinked", "expectation": "Android value remains -4, Windows/linked baseline and all non-target properties remain baseline, and XML records only Android unlink"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.setLinked", "expectation": "link state restored or object removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-OBJECT-SETLINKED-02",
+      "api": "ak.wwise.core.object.setLinked",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "platform_property_relink",
+      "scenario_index": 2,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Console_Mix` 在 PS5 上的 Pitch 重新链接回全平台设置。PS5 现在有 +120 cents 的独立值，全平台是 -40；重连后应跟随 -40，Xbox 的独立 Lowpass 不能受影响。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，只把 PS5 的 Pitch 重新链接。",
+      "fixture": {"adapter": "platform_link_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create Console_Mix with PS5 Pitch unlinked=120, linked baseline=-40, and protected Xbox Lowpass override", "record platform GUIDs, flags, XML, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.setLinked", "count": 1, "effect": "set PS5 Pitch linked=true so it follows the -40 linked value"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "platform_property_xml_oracle", "subject_api": "ak.wwise.core.object.setLinked", "expectation": "PS5 Pitch linked=false/value=120, linked baseline=-40, and Xbox Lowpass override are recorded"},
+        {"phase": "preview", "adapter": "platform_property_xml_oracle", "subject_api": "ak.wwise.core.object.setLinked", "expectation": "link/value/XML snapshots are unchanged"},
+        {"phase": "after", "adapter": "waapi_is_linked_oracle", "subject_api": "ak.wwise.core.object.setLinked", "expectation": "PS5 Pitch linked=true and effective readback equals -40"},
+        {"phase": "after", "adapter": "platform_property_xml_oracle", "subject_api": "ak.wwise.core.object.setLinked", "expectation": "stale PS5 Pitch override is absent or inactive and Xbox Lowpass plus all non-target fields equal baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.setLinked", "expectation": "fixture restored/removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-OBJECT-SETSTATEGROUPS-01",
+      "api": "ak.wwise.core.object.setStateGroups",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "two_state_group_assignment",
+      "scenario_index": 1,
+      "prompt": "给 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Ambience_Controller` 配置 `Weather` 和 `TimeOfDay` 两个 State Group，替换现在只挂着的 `LegacyMood`。完成后确认只剩这两个组、顺序和 GUID 正确，原有 Volume 与 Output Bus 不变。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，用 `Weather` 和 `TimeOfDay` 替换旧 State Group。",
+      "fixture": {"adapter": "state_configuration_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create controller plus three hidden State Groups and assign only LegacyMood", "record StateGroup GUIDs, saved WWU StateGroups list, fields, references, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.setStateGroups", "count": 1, "effect": "replace controller StateGroups with ordered Weather and TimeOfDay GUIDs"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "wwu_state_configuration_oracle", "subject_api": "ak.wwise.core.object.setStateGroups", "expectation": "saved object node contains exactly LegacyMood StateGroup GUID and protected fields are recorded"},
+        {"phase": "preview", "adapter": "wwu_state_configuration_oracle", "subject_api": "ak.wwise.core.object.setStateGroups", "expectation": "StateGroups list, WWU hash, properties, and references equal baseline"},
+        {"phase": "after", "adapter": "wwu_state_configuration_oracle", "subject_api": "ak.wwise.core.object.setStateGroups", "expectation": "saved object node contains exactly Weather then TimeOfDay GUIDs and no LegacyMood entry"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setStateGroups", "expectation": "controller GUID/path, Volume, @OutputBus.id, and child graph equal baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.setStateGroups", "expectation": "state config restored or hidden fixtures removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-OBJECT-SETSTATEGROUPS-02",
+      "api": "ak.wwise.core.object.setStateGroups",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "state_group_subset_replacement",
+      "scenario_index": 2,
+      "prompt": "`\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Music_Controller` 现在关联了 `CombatState`、`PlayerHealth`、`Region` 三个 State Group。把配置收缩为 `CombatState` 和 `Region`，移除 `PlayerHealth`，不要删除任何 State Group 对象，也不要改控制器的子层级。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，只从控制器配置里移除 `PlayerHealth`。",
+      "fixture": {"adapter": "state_configuration_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create controller and three hidden State Groups with all three assigned", "record group object snapshots, ordered assignment XML, child graph, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.setStateGroups", "count": 1, "effect": "replace StateGroups list with CombatState and Region only"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "wwu_state_configuration_oracle", "subject_api": "ak.wwise.core.object.setStateGroups", "expectation": "controller lists all three expected StateGroup GUIDs and group object snapshots are recorded"},
+        {"phase": "preview", "adapter": "wwu_state_configuration_oracle", "subject_api": "ak.wwise.core.object.setStateGroups", "expectation": "assignment list, group objects, controller children, and file hashes remain baseline"},
+        {"phase": "after", "adapter": "wwu_state_configuration_oracle", "subject_api": "ak.wwise.core.object.setStateGroups", "expectation": "controller lists exactly CombatState and Region in requested order with no PlayerHealth reference"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setStateGroups", "expectation": "all three StateGroup objects still exist unchanged and controller child GUID set equals baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.setStateGroups", "expectation": "owned objects/config removed or restored and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-OBJECT-SETSTATEPROPERTIES-01",
+      "api": "ak.wwise.core.object.setStateProperties",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "state_property_matrix_replace",
+      "scenario_index": 1,
+      "prompt": "重做 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Combat_Mix` 的 `CombatState` 状态属性：`Calm` 设 Volume -6、Lowpass 20，`Battle` 设 Volume 0、Lowpass 0。旧的 Pitch 状态项全部移除，基础属性和其他 State Group 的设置保留。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，替换这组状态属性并移除旧 Pitch 项。",
+      "fixture": {"adapter": "state_configuration_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create CombatState with Calm/Battle states and controller with old Volume/Pitch state matrix plus another protected group", "record exact saved state-property XML, base values, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.setStateProperties", "count": 1, "effect": "replace CombatState matrix with requested Calm/Battle Volume and Lowpass values"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "wwu_state_configuration_oracle", "subject_api": "ak.wwise.core.object.setStateProperties", "expectation": "old matrix contains tracked Pitch entries and differs from requested Volume/Lowpass matrix"},
+        {"phase": "preview", "adapter": "wwu_state_configuration_oracle", "subject_api": "ak.wwise.core.object.setStateProperties", "expectation": "saved state matrix, base fields, protected group, and hashes equal baseline"},
+        {"phase": "after", "adapter": "wwu_state_configuration_oracle", "subject_api": "ak.wwise.core.object.setStateProperties", "expectation": "CombatState has exactly Calm Volume=-6/Lowpass=20 and Battle Volume=0/Lowpass=0 with no stale Pitch entries"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setStateProperties", "expectation": "base Volume/Pitch/Lowpass and protected State Group matrix equal baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.setStateProperties", "expectation": "state matrix restored or fixture removed and source-project hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS23-F-OBJECT-SETSTATEPROPERTIES-02",
+      "api": "ak.wwise.core.object.setStateProperties",
+      "item_type": "function",
+      "versions": ["2023.1"],
+      "lane": "online_authoring",
+      "scenario_family": "multi_group_state_property_refresh",
+      "scenario_index": 2,
+      "prompt": "更新 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Ambience_Mix` 的状态属性：`Weather/Rain` 设 Volume -2、Pitch -50，`TimeOfDay/Night` 设 Lowpass 35；这次提交后只保留这三项，删除同一对象上过期的 `Weather/Snow` 和 `TimeOfDay/Dawn` 状态项。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，按这三项刷新并清掉两个过期状态项。",
+      "fixture": {"adapter": "state_configuration_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create Weather and TimeOfDay states with requested and stale state entries on hidden mix object", "record exact group/state/property GUID-value matrix, base fields, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.setStateProperties", "count": 1, "effect": "replace complete state-property list with three requested entries across two groups"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "wwu_state_configuration_oracle", "subject_api": "ak.wwise.core.object.setStateProperties", "expectation": "matrix includes stale Weather/Snow and TimeOfDay/Dawn entries and requested values differ"},
+        {"phase": "preview", "adapter": "wwu_state_configuration_oracle", "subject_api": "ak.wwise.core.object.setStateProperties", "expectation": "full matrix and project/object snapshots remain unchanged"},
+        {"phase": "after", "adapter": "wwu_state_configuration_oracle", "subject_api": "ak.wwise.core.object.setStateProperties", "expectation": "saved matrix contains exactly Rain Volume=-2, Rain Pitch=-50, Night Lowpass=35 and no Snow/Dawn entries"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setStateProperties", "expectation": "base object properties, references, name, path, and child graph equal baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.setStateProperties", "expectation": "owned matrix/state fixtures removed or restored and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS24-F-AUDIO-CONVERT-01",
+      "api": "ak.wwise.core.audio.convert",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "external_isolated",
+      "scenario_family": "multi_platform_sfx_conversion",
+      "scenario_index": 1,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weapons` 下的 `Rifle_Close`、`Rifle_Distant`、`Shell_Drop` 三个 SFX 重新转换到 Windows 和 Mac。三个对象当前全局引用同一套 Conversion ShareSet，其中 Windows 组件是 PCM 48 kHz，Mac 组件是 Vorbis 48 kHz；不要改 ShareSet 引用或内容。所有转换产生的缓存和输出只允许落在 `{io_root}` 以内。完成后按对象和平台核对生成媒体、时间戳与错误列表，原始 WAV 不能变化。",
+      "visible_inputs": [
+        {"name": "io_root", "kind": "absolute_directory_path", "description": "用户为本次音频转换明确允许写入的绝对根目录"}
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "明白这些核验限制。当前打开的就是隔离工程，不需要切换项目；确认按现有预览转换这三个 SFX，并保持复合 Conversion ShareSet 不变。",
+      "fixture": {
+        "adapter": "audio_conversion_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "stage three deterministic byte-distinct WAV originals and import them into a case-owned disposable Weapons hierarchy",
+          "create one composite Conversion ShareSet with Windows PCM 48 kHz and Mac Vorbis 48 kHz components, globally assign it to all three Sounds, and record its reference/component XML plus source hashes, expected media IDs, cache roots, process ownership, and the unique project/asset root"
+        ],
+        "lifecycle": {"ownership": "case_owned_project_and_asset_sandbox", "reuse_policy": "unique_per_scenario_execution", "success_policy": "delete_project_copy_and_all_owned_assets", "failure_policy": "seal_failed_or_indeterminate_sandbox_and_never_reuse"},
+        "asset_spec": {
+          "contract": "waapi-skill.audio-conversion-fixture/v1",
+          "wav": {"count": 3, "format": "pcm_s16le_mono_48000hz", "filename_pattern": "weapons_{source_key}.wav", "content_policy": "deterministic_distinct_signal_per_source"},
+          "request": {
+            "objects": [
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weapons\\Rifle_Close",
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weapons\\Rifle_Distant",
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weapons\\Shell_Drop"
+            ],
+            "platforms": ["Windows", "Mac"],
+            "languages": ["SFX"]
+          },
+          "conversion_settings": [
+            {"key": "windows_pcm_48k", "name": "SemanticLab_Weapons_Windows_PCM_48k", "codec": "PCM", "sample_rate": 48000, "channels": 1},
+            {"key": "mac_vorbis_48k", "name": "SemanticLab_Weapons_Mac_Vorbis_48k", "codec": "Vorbis", "sample_rate": 48000, "channels": 1}
+          ],
+          "object_bindings": [
+            {"path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weapons\\Rifle_Close", "source_key": "rifle_close", "effective_settings": {"Windows": "windows_pcm_48k", "Mac": "mac_vorbis_48k"}},
+            {"path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weapons\\Rifle_Distant", "source_key": "rifle_distant", "effective_settings": {"Windows": "windows_pcm_48k", "Mac": "mac_vorbis_48k"}},
+            {"path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weapons\\Shell_Drop", "source_key": "shell_drop", "effective_settings": {"Windows": "windows_pcm_48k", "Mac": "mac_vorbis_48k"}}
+          ],
+          "control_objects": [],
+          "baseline_recipe": {
+            "preconvert_objects": [
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weapons\\Rifle_Close",
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weapons\\Rifle_Distant",
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weapons\\Shell_Drop"
+            ],
+            "platforms": ["Windows", "Mac"],
+            "sealed_artifact_fields": ["path", "size", "sha256", "mtime_ns", "media_id"],
+            "freshness_predicate": "seal all six baseline artifacts, delete exactly those six case-owned files and prove them absent before the tested dispatch; each post-dispatch artifact is recreated nonempty with mtime_ns greater than its baseline while source hashes stay equal"
+          },
+          "expected_outputs": {"count": 6, "identity": "object_guid_media_id_platform_language", "artifact_proof": "regular_file_nonzero_size_sha256_and_header", "target_policy": "every_requested_sfx_object_platform_pair_is_fresh", "control_policy": "source_wav_and_non_requested_output_tree_unchanged"},
+          "source_policy": "absolute_regular_non_symlink_size_sha256",
+          "output_policy": "case_owned_conversion_cache_tree",
+          "cleanup_policy": "case_owned_project_copy_and_output_root_discard"
+        }
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.audio.convert", "count": 1, "effect": "convert three SFX objects for Windows and Mac using the SFX language"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "converted_media_inventory_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "source WAV hashes, the one globally assigned composite Conversion ShareSet reference and its Windows/Mac component XML, plus path/size/SHA-256/mtime_ns/media_id for all six pre-converted artifacts are sealed; exactly those six target artifacts are deleted and proved absent before preview"},
+        {"phase": "preview", "adapter": "isolated_io_unchanged_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "no converter process starts and originals, project copy, composite Conversion ShareSet reference/component XML, business conversion outputs, logs, and ports equal baseline; only the exact allowlisted Wwise cache-infrastructure metadata may vary"},
+        {"phase": "after", "adapter": "converted_media_inventory_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "each source object/media ID has one recreated schema-valid nonzero artifact for Windows and Mac; every artifact remains bound to its sealed object/media/platform/language slot and every mtime_ns is strictly greater than the pre-preview value when that target slot was present"},
+        {"phase": "after", "adapter": "conversion_result_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "returned errors contains no Error entries, all source WAV hashes remain baseline, and the single global Conversion ShareSet assignment plus its Windows PCM 48 kHz and Mac Vorbis 48 kHz components are unchanged"},
+        {"phase": "cleanup", "adapter": "isolated_io_cleanup_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "on success the case-owned project copy, cache, every owned asset, and process are gone; on failure or indeterminate outcome the entire sandbox is sealed and never reused; source project and originals remain unchanged"}
+      ],
+      "cleanup": {"adapter": "isolated_conversion_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "no_owned_process_or_output_left", "successful_case_project_copy_and_all_owned_assets_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "VS24-F-AUDIO-CONVERT-02",
+      "api": "ak.wwise.core.audio.convert",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "external_isolated",
+      "scenario_family": "localized_voice_conversion",
+      "scenario_index": 2,
+      "prompt": "重新转换 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Dialogue\\Quest_Intro` 下的 `Line_01`、`Line_02` 两句 Voice，平台只做 Windows，语言做 English(US) 和 Chinese(PRC)。两个对象当前全局引用同一套 Conversion ShareSet，其 Windows 组件是 Vorbis 48 kHz；不要改 ShareSet 引用或内容。所有转换产生的缓存和输出只允许落在 `{io_root}` 以内。请确认四组本地化媒体都对应正确对象和语言，不能拿同一个语言文件重复充数。",
+      "visible_inputs": [
+        {"name": "io_root", "kind": "absolute_directory_path", "description": "用户为本次音频转换明确允许写入的绝对根目录"}
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "明白这些核验限制。当前打开的就是工程副本，不需要切换项目；确认按现有预览转换这两句双语 Voice，并保持复合 Conversion ShareSet 不变。",
+      "fixture": {
+        "adapter": "audio_conversion_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "stage four byte-distinct English(US) and Chinese(PRC) originals for two Voice objects inside a unique case-owned asset root",
+          "import the localized hierarchy into a case-owned project copy, create one composite Conversion ShareSet with a Windows Vorbis 48 kHz component, globally assign it to both Voice objects, and seal the ShareSet reference/component XML plus source/media/cache/process snapshots"
+        ],
+        "lifecycle": {"ownership": "case_owned_project_and_asset_sandbox", "reuse_policy": "unique_per_scenario_execution", "success_policy": "delete_project_copy_and_all_owned_assets", "failure_policy": "seal_failed_or_indeterminate_sandbox_and_never_reuse"},
+        "asset_spec": {
+          "contract": "waapi-skill.audio-conversion-fixture/v1",
+          "wav": {"count": 4, "format": "pcm_s16le_mono_48000hz", "filename_pattern": "dialogue_{source_key}.wav", "content_policy": "deterministic_distinct_signal_per_source"},
+          "request": {
+            "objects": [
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Dialogue\\Quest_Intro\\Line_01",
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Dialogue\\Quest_Intro\\Line_02"
+            ],
+            "platforms": ["Windows"],
+            "languages": ["English(US)", "Chinese(PRC)"]
+          },
+          "conversion_settings": [
+            {"key": "windows_vorbis_48k", "name": "SemanticLab_Dialogue_Windows_Vorbis_48k", "codec": "Vorbis", "sample_rate": 48000, "channels": 1}
+          ],
+          "object_bindings": [
+            {"path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Dialogue\\Quest_Intro\\Line_01", "source_keys_by_language": {"English(US)": "line_01_en_us", "Chinese(PRC)": "line_01_zh_cn"}, "effective_settings": {"Windows": "windows_vorbis_48k"}},
+            {"path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Dialogue\\Quest_Intro\\Line_02", "source_keys_by_language": {"English(US)": "line_02_en_us", "Chinese(PRC)": "line_02_zh_cn"}, "effective_settings": {"Windows": "windows_vorbis_48k"}}
+          ],
+          "control_objects": [],
+          "expected_outputs": {"count": 4, "identity": "object_guid_media_id_platform_language", "artifact_proof": "regular_file_nonzero_size_sha256_and_header", "target_policy": "every_requested_voice_object_language_pair_has_its_own_fresh_windows_artifact", "control_policy": "no_cross_language_source_or_output_identity_reuse"},
+          "source_policy": "absolute_regular_non_symlink_size_sha256",
+          "output_policy": "case_owned_conversion_cache_tree",
+          "cleanup_policy": "case_owned_project_copy_and_output_root_discard"
+        }
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.audio.convert", "count": 1, "effect": "convert two Voice objects for Windows in English(US) and Chinese(PRC)"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "localized_media_inventory_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "four object-language source bindings have distinct expected source hashes and media identities, while both Voice objects have one sealed global reference to the same composite Conversion ShareSet with a Windows Vorbis 48 kHz component"},
+        {"phase": "preview", "adapter": "isolated_io_unchanged_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "no converter process or business conversion output appears and all sealed inputs, project files, global Conversion ShareSet references, and ShareSet component XML remain unchanged; only the exact allowlisted Wwise cache-infrastructure metadata may vary"},
+        {"phase": "after", "adapter": "localized_media_inventory_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "exactly four fresh Windows converted artifacts map one-to-one to two objects times two languages with no cross-language hash/path reuse"},
+        {"phase": "after", "adapter": "conversion_result_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "no Error result is returned, source originals/project source hashes remain baseline, and the shared global Conversion ShareSet assignment plus its Windows Vorbis 48 kHz component are unchanged"},
+        {"phase": "cleanup", "adapter": "isolated_io_cleanup_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "on success all case-owned conversion outputs, localized WAVs, project copy, and processes are deleted; on failure or indeterminate outcome the entire sandbox is sealed and never reused; source state is unchanged"}
+      ],
+      "cleanup": {"adapter": "isolated_conversion_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "no_owned_process_or_output_left", "successful_case_project_copy_and_all_owned_assets_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "VS24-F-AUDIO-CONVERT-03",
+      "api": "ak.wwise.core.audio.convert",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "external_isolated",
+      "scenario_family": "platform_conversion_setting_matrix",
+      "scenario_index": 3,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weather` 下的 `Rain_Light`、`Rain_Heavy`、`Thunder_Close`、`Wind_Gust` 四个 SFX 按现有设置重新转换到 Windows、Mac 和 Android。四个对象共同全局引用同一套 Conversion ShareSet；这套 ShareSet 的 Windows 组件是 PCM 48 kHz，Mac 组件是 Vorbis 48 kHz，Android 组件是 Vorbis 24 kHz。不要改 ShareSet 引用或内容。所有转换产生的缓存和输出只允许落在 `{io_root}` 以内。完成后逐对象、逐平台核对 12 份媒体的编码、采样率、非零文件和错误列表，原始 WAV 与 ShareSet 都要保持不变。",
+      "visible_inputs": [
+        {"name": "io_root", "kind": "absolute_directory_path", "description": "用户为本次音频转换明确允许写入的绝对根目录"}
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，按同一套现有复合 Conversion ShareSet 转换这四个 SFX，不改它的全局引用或平台组件。",
+      "fixture": {
+        "adapter": "audio_conversion_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "generate four deterministic byte-distinct PCM WAVs and import four hidden SFX objects into a disposable Weather hierarchy",
+          "create one composite Conversion ShareSet with Windows PCM 48 kHz, Mac Vorbis 48 kHz, and Android Vorbis 24 kHz components, globally assign it to all four Sounds, and seal its reference/component XML plus object/media/platform identities, source hashes, output tree, and process ownership"
+        ],
+        "lifecycle": {"ownership": "case_owned_project_and_asset_sandbox", "reuse_policy": "unique_per_scenario_execution", "success_policy": "delete_project_copy_and_all_owned_assets", "failure_policy": "seal_failed_or_indeterminate_sandbox_and_never_reuse"},
+        "asset_spec": {
+          "contract": "waapi-skill.audio-conversion-fixture/v1",
+          "wav": {"count": 4, "format": "pcm_s16le_mono_48000hz", "filename_pattern": "weather_{source_key}.wav", "content_policy": "deterministic_distinct_signal_per_source"},
+          "request": {
+            "objects": [
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weather\\Rain_Light",
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weather\\Rain_Heavy",
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weather\\Thunder_Close",
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weather\\Wind_Gust"
+            ],
+            "platforms": ["Windows", "Mac", "Android"],
+            "languages": ["SFX"]
+          },
+          "conversion_settings": [
+            {"key": "desktop_pcm_48k", "name": "SemanticLab_Desktop_PCM_48k", "codec": "PCM", "sample_rate": 48000, "channels": 1},
+            {"key": "desktop_vorbis_48k", "name": "SemanticLab_Desktop_Vorbis_48k", "codec": "Vorbis", "sample_rate": 48000, "channels": 1},
+            {"key": "mobile_vorbis_24k", "name": "SemanticLab_Mobile_Vorbis_24k", "codec": "Vorbis", "sample_rate": 24000, "channels": 1}
+          ],
+          "object_bindings": [
+            {"path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weather\\Rain_Light", "source_key": "rain_light", "effective_settings": {"Windows": "desktop_pcm_48k", "Mac": "desktop_vorbis_48k", "Android": "mobile_vorbis_24k"}},
+            {"path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weather\\Rain_Heavy", "source_key": "rain_heavy", "effective_settings": {"Windows": "desktop_pcm_48k", "Mac": "desktop_vorbis_48k", "Android": "mobile_vorbis_24k"}},
+            {"path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weather\\Thunder_Close", "source_key": "thunder_close", "effective_settings": {"Windows": "desktop_pcm_48k", "Mac": "desktop_vorbis_48k", "Android": "mobile_vorbis_24k"}},
+            {"path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weather\\Wind_Gust", "source_key": "wind_gust", "effective_settings": {"Windows": "desktop_pcm_48k", "Mac": "desktop_vorbis_48k", "Android": "mobile_vorbis_24k"}}
+          ],
+          "control_objects": [],
+          "expected_outputs": {"count": 12, "identity": "object_guid_media_id_platform_language", "artifact_proof": "regular_file_nonzero_size_sha256_and_header", "target_policy": "every requested object_platform_pair_is_fresh_and_matches_effective_setting", "control_policy": "conversion_setting_xml_and_non_requested_output_tree_unchanged"},
+          "source_policy": "absolute_regular_non_symlink_size_sha256",
+          "output_policy": "case_owned_conversion_cache_tree",
+          "cleanup_policy": "case_owned_project_copy_and_output_root_discard"
+        }
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.audio.convert", "count": 1, "effect": "convert four SFX objects for Windows, Mac, and Android through one existing globally assigned composite Conversion ShareSet and its platform components"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "converted_media_inventory_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "four object/media identities, four distinct source hashes, three platform cache roots, and the complete pre-conversion output matrix are sealed"},
+        {"phase": "before", "adapter": "conversion_settings_xml_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "all four objects globally reference the same composite Conversion ShareSet, whose Windows, Mac, and Android components resolve respectively to PCM 48 kHz, Vorbis 48 kHz, and Vorbis 24 kHz"},
+        {"phase": "preview", "adapter": "isolated_io_unchanged_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "no converter process or business-output delta exists and source, project-copy, global Conversion ShareSet reference/component XML, and stable cache outputs equal baseline; only the exact allowlisted Wwise cache-infrastructure metadata may vary"},
+        {"phase": "after", "adapter": "converted_media_inventory_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "exactly 12 fresh nonzero artifacts map one-to-one to four object GUID/media IDs times three platforms; parsed headers match each platform codec and sample rate"},
+        {"phase": "after", "adapter": "conversion_result_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "result matches the reflected errors schema with no Error or Fatal entry, while all source hashes, the single global Conversion ShareSet assignment, and all three platform-component XML records remain baseline"},
+        {"phase": "cleanup", "adapter": "isolated_io_cleanup_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "on success the case-owned process, cache tree, output evidence, input WAVs, and project copy are deleted; on failure or indeterminate outcome the entire sandbox is sealed and never reused; source project and composite Conversion ShareSet remain byte-identical"}
+      ],
+      "cleanup": {"adapter": "isolated_conversion_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "no_owned_process_or_output_left", "successful_case_project_copy_and_all_owned_assets_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "VS24-F-AUDIO-CONVERT-04",
+      "api": "ak.wwise.core.audio.convert",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "external_isolated",
+      "scenario_family": "selective_stale_output_rebuild",
+      "scenario_index": 4,
+      "prompt": "工程副本的 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit` 里，五个对象现在都全局引用当前复合 Conversion ShareSet，其 Windows 组件是 PCM 48 kHz，Mac 组件是 Vorbis 48 kHz。`Changed_Setting` 的全局引用刚从旧复合 Conversion ShareSet（Windows Vorbis 24 kHz、Mac PCM 44.1 kHz）切换到当前 ShareSet，需要重转；`Changed_Source` 的源文件已替换，`Missing_Cache` 的缓存已缺失。请按 SFX 语言为 Windows、Mac 只重转这三个目标，`Current_Control` 与 `Untouched_Decoy` 不在本次范围，也不要再改全局 ShareSet 引用或两套 ShareSet 的内容。所有转换产生的缓存和输出只允许落在 `{io_root}` 以内。确认六份目标媒体都刷新或补齐，同时两个对照对象的媒体哈希和时间戳完全不变；原始文件也不能被改写。",
+      "visible_inputs": [
+        {"name": "io_root", "kind": "absolute_directory_path", "description": "用户为本次音频转换明确允许写入的绝对根目录"}
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，保持当前全局引用与新旧两套复合 Conversion ShareSet 不变，只重转前三个目标并保留两个对照对象。",
+      "fixture": {
+        "adapter": "audio_conversion_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "stage five deterministic SFX sources with one source-changed target, one setting-changed target, one missing-cache target, and two untouched controls",
+          "create a target composite Conversion ShareSet with Windows PCM 48 kHz and Mac Vorbis 48 kHz components plus a baseline composite Conversion ShareSet with Windows Vorbis 24 kHz and Mac PCM 44.1 kHz components; pre-convert and seal all ten baseline object/platform slots, then replace Changed_Source bytes and reimport it with useExisting, switch Changed_Setting exactly once from the baseline ShareSet to the target ShareSet through one global reference, and delete the Missing_Cache artifacts; the current converted identities/paths for all six target slots must be new or deleted and absent before preview, while the sealed old Changed_Source/Changed_Setting baseline WEMs and both control trees remain at their exact path/size/hash/mtime; seal source/ShareSet/reference/output hashes, mtimes, identities, and process ownership"
+        ],
+        "lifecycle": {"ownership": "case_owned_project_and_asset_sandbox", "reuse_policy": "unique_per_scenario_execution", "success_policy": "delete_project_copy_and_all_owned_assets", "failure_policy": "seal_failed_or_indeterminate_sandbox_and_never_reuse"},
+        "asset_spec": {
+          "contract": "waapi-skill.audio-conversion-fixture/v1",
+          "wav": {"count": 5, "format": "pcm_s16le_mono_48000hz", "filename_pattern": "conversion_audit_{source_key}.wav", "content_policy": "deterministic_distinct_signal_per_source"},
+          "request": {
+            "objects": [
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit\\Changed_Setting",
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit\\Changed_Source",
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit\\Missing_Cache"
+            ],
+            "platforms": ["Windows", "Mac"],
+            "languages": ["SFX"]
+          },
+          "conversion_settings": [
+            {"key": "windows_pcm_48k", "name": "SemanticLab_Windows_PCM_48k", "codec": "PCM", "sample_rate": 48000, "channels": 1},
+            {"key": "mac_vorbis_48k", "name": "SemanticLab_Mac_Vorbis_48k", "codec": "Vorbis", "sample_rate": 48000, "channels": 1},
+            {"key": "windows_vorbis_24k_baseline", "name": "SemanticLab_Windows_Vorbis_24k_Baseline", "codec": "Vorbis", "sample_rate": 24000, "channels": 1},
+            {"key": "mac_pcm_44k_baseline", "name": "SemanticLab_Mac_PCM_44k_Baseline", "codec": "PCM", "sample_rate": 44100, "channels": 1}
+          ],
+          "object_bindings": [
+            {"path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit\\Changed_Setting", "source_key": "changed_setting", "effective_settings": {"Windows": "windows_pcm_48k", "Mac": "mac_vorbis_48k"}},
+            {"path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit\\Changed_Source", "source_key": "changed_source", "effective_settings": {"Windows": "windows_pcm_48k", "Mac": "mac_vorbis_48k"}},
+            {"path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit\\Missing_Cache", "source_key": "missing_cache", "effective_settings": {"Windows": "windows_pcm_48k", "Mac": "mac_vorbis_48k"}}
+          ],
+          "control_objects": [
+            "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit\\Current_Control",
+            "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit\\Untouched_Decoy"
+          ],
+          "control_bindings": [
+            {"path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit\\Current_Control", "source_key": "current_control", "effective_settings": {"Windows": "windows_pcm_48k", "Mac": "mac_vorbis_48k"}},
+            {"path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit\\Untouched_Decoy", "source_key": "untouched_decoy", "effective_settings": {"Windows": "windows_pcm_48k", "Mac": "mac_vorbis_48k"}}
+          ],
+          "baseline_recipe": {
+            "preconvert_objects": [
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit\\Changed_Source",
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit\\Changed_Setting",
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit\\Missing_Cache",
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit\\Current_Control",
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit\\Untouched_Decoy"
+            ],
+            "platforms": ["Windows", "Mac"],
+            "sealed_artifact_fields": ["path", "size", "sha256", "mtime_ns", "media_id"],
+            "freshness_predicate": "all ten baseline slots are sealed; before preview all six current target slots are absent, the old Changed_Source/Changed_Setting baseline WEMs plus both controls retain exact path/size/sha256/mtime_ns/media_id, and after dispatch the six current target slots are present"
+          },
+          "delta_plan": [
+            {
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit\\Changed_Source",
+              "kind": "replace_source_bytes",
+              "before": {"source_key": "changed_source", "signal_seed": "changed_source_baseline_v1", "source_sha256": "sealed_from_baseline_seed", "artifacts": "present_for_windows_and_mac"},
+              "after": {"source_key": "changed_source", "signal_seed": "changed_source_replacement_v2", "source_sha256": "sealed_and_distinct_from_baseline", "artifacts": "new_current_identities_absent_for_windows_and_mac; old_baseline_wems_sealed"}
+            },
+            {
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit\\Changed_Setting",
+              "kind": "replace_effective_settings",
+              "before": {"Windows": "windows_vorbis_24k_baseline", "Mac": "mac_pcm_44k_baseline", "artifacts": "present_for_both_platforms"},
+              "after": {"Windows": "windows_pcm_48k", "Mac": "mac_vorbis_48k", "artifacts": "new_current_identities_absent_for_both_platforms; old_baseline_wems_sealed"}
+            },
+            {
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\ConversionAudit\\Missing_Cache",
+              "kind": "delete_converted_artifacts",
+              "before": {"Windows": "sealed_present_artifact", "Mac": "sealed_present_artifact"},
+              "after": {"Windows": "exact_artifact_path_absent", "Mac": "exact_artifact_path_absent"}
+            }
+          ],
+          "expected_outputs": {"count": 6, "identity": "object_guid_media_id_platform_language", "artifact_proof": "regular_file_nonzero_size_sha256_and_header", "target_policy": "all six current target outputs are absent before dispatch and present after dispatch; Changed_Source and Changed_Setting bytes differ from their corresponding sealed baseline SHA-256", "control_policy": "two non-requested control artifact trees and the sealed old Changed_Source/Changed_Setting baseline WEMs keep exact path/size/hash/mtime"},
+          "source_policy": "absolute_regular_non_symlink_size_sha256",
+          "output_policy": "case_owned_conversion_cache_tree",
+          "cleanup_policy": "case_owned_project_copy_and_output_root_discard"
+        }
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.audio.convert", "count": 1, "effect": "convert only the three requested SFX objects for Windows and Mac"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "converted_media_inventory_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "all ten baseline object/platform slots are sealed with path, size, SHA-256, mtime, media identity, source identity, and effective settings; Changed_Source reimport/useExisting and Changed_Setting's global ShareSet change point their four current converted identities to new cache paths that are absent, Missing_Cache's two current paths are absent, and the old Changed_Source/Changed_Setting baseline WEMs plus both control trees remain exact baseline files"},
+        {"phase": "preview", "adapter": "isolated_io_unchanged_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "all six absent current target paths, sealed old Changed_Source/Changed_Setting baseline WEMs, control artifacts, source WAVs, both composite Conversion ShareSet component XML records, every global ShareSet reference, project-copy hashes, and process table equal pre-preview state"},
+        {"phase": "after", "adapter": "converted_media_inventory_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "all six requested current object/platform artifacts are present, fresh, and header-valid against the target composite Conversion ShareSet components; Missing_Cache is created, and Changed_Source/Changed_Setting bytes each differ from the corresponding sealed baseline SHA-256"},
+        {"phase": "after", "adapter": "converted_media_inventory_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "Current_Control and Untouched_Decoy artifact path, size, SHA-256, mtime, and media identity sets exactly equal baseline"},
+        {"phase": "after", "adapter": "conversion_result_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "reflected errors result has no Error/Fatal entry; all five pre-preview source WAV hashes, both composite Conversion ShareSet definitions, and all global ShareSet references remain unchanged"},
+        {"phase": "cleanup", "adapter": "isolated_io_cleanup_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "on success the case-owned project copy, output tree, staged assets, and converter process are gone; on failure or indeterminate outcome the entire sandbox is sealed and never reused; immutable source state matches its initial proof"}
+      ],
+      "cleanup": {"adapter": "isolated_conversion_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "no_owned_process_or_output_left", "successful_case_project_copy_and_all_owned_assets_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "VS24-F-AUDIO-CONVERT-05",
+      "api": "ak.wwise.core.audio.convert",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "external_isolated",
+      "scenario_family": "same_basename_media_identity_conversion",
+      "scenario_index": 5,
+      "prompt": "把四个同名 `Hit` 的 SFX 一次转换到 Windows 和 Mac：路径分别是 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Collisions\\Rifle\\Hit`、`\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Collisions\\Shotgun\\Hit`、`\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Collisions\\Metal\\Hit`、`\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Collisions\\Wood\\Hit`。它们来源不同；`Rifle`、`Shotgun`、`Wood` 全局引用同一套复合 Conversion ShareSet（Windows PCM 48 kHz、Mac Vorbis 48 kHz），`Metal` 全局引用另一套复合 Conversion ShareSet（Windows PCM 48 kHz、Mac ADPCM 48 kHz）。不要改这两套 ShareSet 的引用或内容。所有转换产生的缓存和输出只允许落在 `{io_root}` 以内。请核对八份输出都绑定到各自对象和媒体 ID，`Metal` 的 Mac 格式正确，不能因同名发生覆盖、串源或路径碰撞。",
+      "visible_inputs": [
+        {"name": "io_root", "kind": "absolute_directory_path", "description": "用户为本次音频转换明确允许写入的绝对根目录"}
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，保持两套复合 Conversion ShareSet 及其全局引用不变，转换这四个同名对象并检查媒体身份与碰撞。",
+      "fixture": {
+        "adapter": "audio_conversion_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "generate four byte-distinct WAVs with the same leaf filename and import them below four distinct hidden branches",
+          "create one composite Conversion ShareSet with Windows PCM 48 kHz and Mac Vorbis 48 kHz components for Rifle, Shotgun, and Wood, create a second composite Conversion ShareSet with Windows PCM 48 kHz and Mac ADPCM 48 kHz components for Metal, globally assign each Sound to its complete ShareSet, then seal both ShareSet definitions/references plus GUID/media/source/output identities and process ownership"
+        ],
+        "lifecycle": {"ownership": "case_owned_project_and_asset_sandbox", "reuse_policy": "unique_per_scenario_execution", "success_policy": "delete_project_copy_and_all_owned_assets", "failure_policy": "seal_failed_or_indeterminate_sandbox_and_never_reuse"},
+        "asset_spec": {
+          "contract": "waapi-skill.audio-conversion-fixture/v1",
+          "wav": {"count": 4, "format": "pcm_s16le_mono_48000hz", "filename_pattern": "{source_key}/Hit.wav", "content_policy": "deterministic_distinct_signal_per_source"},
+          "request": {
+            "objects": [
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Collisions\\Rifle\\Hit",
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Collisions\\Shotgun\\Hit",
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Collisions\\Metal\\Hit",
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Collisions\\Wood\\Hit"
+            ],
+            "platforms": ["Windows", "Mac"],
+            "languages": ["SFX"]
+          },
+          "conversion_settings": [
+            {"key": "windows_pcm_48k", "name": "SemanticLab_Windows_PCM_48k", "codec": "PCM", "sample_rate": 48000, "channels": 1},
+            {"key": "mac_vorbis_48k", "name": "SemanticLab_Mac_Vorbis_48k", "codec": "Vorbis", "sample_rate": 48000, "channels": 1},
+            {"key": "mac_adpcm_48k", "name": "SemanticLab_Mac_ADPCM_48k", "codec": "ADPCM", "sample_rate": 48000, "channels": 1}
+          ],
+          "object_bindings": [
+            {"path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Collisions\\Rifle\\Hit", "source_key": "rifle_hit", "effective_settings": {"Windows": "windows_pcm_48k", "Mac": "mac_vorbis_48k"}},
+            {"path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Collisions\\Shotgun\\Hit", "source_key": "shotgun_hit", "effective_settings": {"Windows": "windows_pcm_48k", "Mac": "mac_vorbis_48k"}},
+            {"path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Collisions\\Metal\\Hit", "source_key": "metal_hit", "effective_settings": {"Windows": "windows_pcm_48k", "Mac": "mac_adpcm_48k"}},
+            {"path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Collisions\\Wood\\Hit", "source_key": "wood_hit", "effective_settings": {"Windows": "windows_pcm_48k", "Mac": "mac_vorbis_48k"}}
+          ],
+          "control_objects": [],
+          "expected_outputs": {"count": 8, "identity": "object_guid_media_id_platform_language", "artifact_proof": "regular_file_nonzero_size_sha256_and_header", "target_policy": "same_basename_outputs_keep_unique_object_media_identity_and_expected_codec", "control_policy": "no_output_path_or_hash_is_reused_across_distinct_source_keys"},
+          "source_policy": "absolute_regular_non_symlink_size_sha256",
+          "output_policy": "case_owned_conversion_cache_tree",
+          "cleanup_policy": "case_owned_project_copy_and_output_root_discard"
+        }
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.audio.convert", "count": 1, "effect": "convert four same-basename SFX objects for Windows and Mac without media identity collision"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "converted_media_inventory_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "four Hit objects have distinct GUIDs, media IDs, source paths, and source hashes despite identical leaf names; Rifle, Shotgun, and Wood have global references to one composite Conversion ShareSet, while Metal has a global reference to the second composite Conversion ShareSet, and each ShareSet's exact platform components are sealed"},
+        {"phase": "preview", "adapter": "isolated_io_unchanged_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "no business output path/hash, process, source, project-copy field, global ShareSet reference, or composite Conversion ShareSet component XML changes before confirmation; only the exact allowlisted Wwise cache-infrastructure metadata may vary"},
+        {"phase": "after", "adapter": "converted_media_inventory_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "eight nonzero artifacts form the exact four-object by two-platform matrix with unique object GUID/media ID binding and no output overwrite or cross-source hash reuse"},
+        {"phase": "after", "adapter": "media_format_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "the ordinary composite Conversion ShareSet yields PCM on Windows and Vorbis on Mac for Rifle, Shotgun, and Wood, while the Metal composite Conversion ShareSet yields PCM on Windows and ADPCM 48 kHz on Mac"},
+        {"phase": "after", "adapter": "conversion_result_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "reflected errors contains no Error/Fatal entry and all four source proofs, both composite Conversion ShareSet definitions, and all four global ShareSet assignments remain unchanged"},
+        {"phase": "cleanup", "adapter": "isolated_io_cleanup_oracle", "subject_api": "ak.wwise.core.audio.convert", "expectation": "on success all case-owned output, same-basename assets, process, and project-copy state is gone; on failure or indeterminate outcome the entire sandbox is sealed and never reused; source project retains its initial hashes"}
+      ],
+      "cleanup": {"adapter": "isolated_conversion_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "no_owned_process_or_output_left", "successful_case_project_copy_and_all_owned_assets_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "VS24-F-AUDIO-SETCONVERSIONPLUGIN-01",
+      "api": "ak.wwise.core.audio.setConversionPlugin",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "online_authoring",
+      "scenario_family": "mobile_conversion_plugin_override",
+      "scenario_index": 1,
+      "prompt": "把 `\\Conversion Settings\\Default Work Unit\\SemanticLab_MobileVO` 在 Android 平台使用的转换插件改成 Vorbis；Windows 继续用现有 PCM，采样率、声道和质量参数都不要变。保存后按平台核对插件引用。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，只把 Android 插件改为 Vorbis。",
+      "fixture": {"adapter": "conversion_settings_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden conversion settings with built-in PCM on Windows and Android plus distinct parameter baselines", "record plugin inventory, platform GUIDs, conversion GUID, saved WWU XML, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.audio.setConversionPlugin", "count": 1, "effect": "set Android conversion plugin to the reflected built-in Vorbis plugin"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "conversion_settings_xml_oracle", "subject_api": "ak.wwise.core.audio.setConversionPlugin", "expectation": "Android and Windows plugin references are PCM and all conversion parameters are recorded"},
+        {"phase": "preview", "adapter": "conversion_settings_xml_oracle", "subject_api": "ak.wwise.core.audio.setConversionPlugin", "expectation": "plugin references, parameters, conversion fields, and WWU hash equal baseline"},
+        {"phase": "after", "adapter": "conversion_settings_xml_oracle", "subject_api": "ak.wwise.core.audio.setConversionPlugin", "expectation": "Android plugin reference/name is Vorbis while Windows remains PCM and all non-plugin parameters equal baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.audio.setConversionPlugin", "expectation": "conversion setting restored or removed by GUID and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS24-F-AUDIO-SETCONVERSIONPLUGIN-02",
+      "api": "ak.wwise.core.audio.setConversionPlugin",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "online_authoring",
+      "scenario_family": "console_conversion_plugin_override",
+      "scenario_index": 2,
+      "prompt": "把 `\\Conversion Settings\\Default Work Unit\\SemanticLab_Cinematics` 的 PS5 转换插件切换为 PCM，Xbox 和 Windows 仍保留各自现有插件。不要新建第二份 Conversion Settings，也不要改三个平台的其他参数。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，只切换 PS5 的转换插件。",
+      "fixture": {"adapter": "conversion_settings_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create one hidden conversion setting with distinct reflected built-in plugins and parameters on PS5, Xbox, and Windows", "record exact platform/plugin/parameter XML and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.audio.setConversionPlugin", "count": 1, "effect": "replace only the PS5 plugin reference with PCM"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "conversion_settings_xml_oracle", "subject_api": "ak.wwise.core.audio.setConversionPlugin", "expectation": "single conversion GUID and distinct three-platform plugin/parameter records exist; PS5 is not PCM"},
+        {"phase": "preview", "adapter": "conversion_settings_xml_oracle", "subject_api": "ak.wwise.core.audio.setConversionPlugin", "expectation": "all records, object count, and WWU hash remain baseline"},
+        {"phase": "after", "adapter": "conversion_settings_xml_oracle", "subject_api": "ak.wwise.core.audio.setConversionPlugin", "expectation": "PS5 plugin is PCM, Xbox/Windows plugin GUIDs and all platform parameters equal baseline, and exactly one conversion object remains"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.audio.setConversionPlugin", "expectation": "owned settings restored/removed and source-project hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS24-F-BLEND-ADDASSIGNMENT-01",
+      "api": "ak.wwise.core.blendContainer.addAssignment",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "online_authoring",
+      "scenario_family": "indexed_crossfade_assignment",
+      "scenario_index": 1,
+      "prompt": "在 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Vehicle_Engine` 的 `Speed_Layer` Blend Track（GUID `{speed_track_guid}`）里，把子对象 `High_RPM` 放到索引 1，也就是 `Low_RPM` 和 `Mid_RPM` 之间；左右交叉淡化边缘的完整配置用 {assignment_edges}。完成后核对索引、子对象 GUID 和左右边缘。",
+      "visible_inputs": [{"name": "speed_track_guid", "kind": "string", "description": "Vehicle_Engine 下 Speed_Layer Blend Track 的完整 GUID"}, {"name": "assignment_edges", "kind": "structured_array", "description": "High_RPM assignment 按左、右顺序排列的两个完整 Blend Track edge 对象"}],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，把 `High_RPM` 插到中间并使用这组边缘。",
+      "fixture": {"adapter": "blend_container_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden BlendContainer with Low_RPM, Mid_RPM, High_RPM children and Speed_Layer track", "assign Low/Mid only, establish Speed Game Parameter and deterministic two-edge document, record assignments/XML/source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.blendContainer.addAssignment", "count": 1, "effect": "insert High_RPM at index 1 with the fixture's exact two crossfade edges"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.addAssignment", "expectation": "track assignments contain Low_RPM then Mid_RPM and exclude High_RPM"},
+        {"phase": "preview", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.addAssignment", "expectation": "assignment order/edges, child graph, and project XML equal baseline"},
+        {"phase": "after", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.addAssignment", "expectation": "returned child equals High_RPM GUID, index=1, edges equal fixture pair, and full order is Low/High/Mid"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.blendContainer.addAssignment", "expectation": "all three children and track retain GUIDs/paths/properties and non-target assignments preserve their edges"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.blendContainer.addAssignment", "expectation": "assignment restored or fixture removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS24-F-BLEND-ADDASSIGNMENT-02",
+      "api": "ak.wwise.core.blendContainer.addAssignment",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "online_authoring",
+      "scenario_family": "append_default_assignment",
+      "scenario_index": 2,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Wind_Blend` 的子对象 `Gust` 追加到 `Intensity` Blend Track（GUID `{intensity_track_guid}`）末尾，沿用 Wwise 默认边缘。现有 `Calm`、`Breeze` 的顺序和边缘不能变化，也不要把 `Gust` 从容器层级里移动。",
+      "visible_inputs": [{"name": "intensity_track_guid", "kind": "string", "description": "Wind_Blend 下 Intensity Blend Track 的完整 GUID"}],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，把 `Gust` 追加到轨道末尾。",
+      "fixture": {"adapter": "blend_container_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden Wind_Blend children Calm/Breeze/Gust and one Intensity track", "assign Calm/Breeze with distinct edges and record assignment list, child graph, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.blendContainer.addAssignment", "count": 1, "effect": "append Gust using default edges at the final assignment index"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.addAssignment", "expectation": "Calm/Breeze assignments exist in order, Gust is unassigned but remains a direct child"},
+        {"phase": "preview", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.addAssignment", "expectation": "assignments/edges and child graph equal baseline"},
+        {"phase": "after", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.addAssignment", "expectation": "Gust appears once at final index with returned/default two-edge structure; Calm/Breeze rows are byte-for-byte baseline"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.blendContainer.addAssignment", "expectation": "Gust parent/path/GUID and all container child identities remain baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.blendContainer.addAssignment", "expectation": "owned assignment/objects removed or restored and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS24-F-BLEND-ADDTRACK-01",
+      "api": "ak.wwise.core.blendContainer.addTrack",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "online_authoring",
+      "scenario_family": "named_speed_blend_track",
+      "scenario_index": 1,
+      "prompt": "在 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Vehicle_Engine` 里新增一个名为 `Speed_Layer` 的 Blend Track。容器现有的 `Surface_Layer` 以及所有声音子对象都保留；创建后给我新轨道的 GUID、Short ID、类型和所属容器。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，新增 `Speed_Layer` 轨道。",
+      "fixture": {"adapter": "blend_container_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden BlendContainer with existing Surface_Layer and several Sound children", "prove Speed_Layer absent and record track/child identities plus source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.blendContainer.addTrack", "count": 1, "effect": "create one Speed_Layer BlendTrack under Vehicle_Engine"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "blend_track_xml_oracle", "subject_api": "ak.wwise.core.blendContainer.addTrack", "expectation": "Vehicle_Engine has Surface_Layer only and Speed_Layer path is absent"},
+        {"phase": "preview", "adapter": "blend_track_xml_oracle", "subject_api": "ak.wwise.core.blendContainer.addTrack", "expectation": "track list, child objects, and saved project files equal baseline"},
+        {"phase": "after", "adapter": "blend_track_xml_oracle", "subject_api": "ak.wwise.core.blendContainer.addTrack", "expectation": "exactly one Speed_Layer of type BlendTrack exists under container and its GUID/name/type/shortId equal result"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.blendContainer.addTrack", "expectation": "Surface_Layer and every original child GUID/path/property snapshot remain unchanged"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.blendContainer.addTrack", "expectation": "new track deleted by GUID or container fixture removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS24-F-BLEND-ADDTRACK-02",
+      "api": "ak.wwise.core.blendContainer.addTrack",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "online_authoring",
+      "scenario_family": "second_dimension_blend_track",
+      "scenario_index": 2,
+      "prompt": "给 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Footsteps_Blend` 增加 `Surface_Layer` Blend Track，保留已有 `Speed_Layer` 及其三条 assignment。新轨道开始应为空，不能自动复制旧轨道的 assignment。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，新增空的 `Surface_Layer`。",
+      "fixture": {"adapter": "blend_container_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden Footsteps_Blend with populated Speed_Layer and no Surface_Layer", "record existing track/assignment/child snapshots and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.blendContainer.addTrack", "count": 1, "effect": "create one empty Surface_Layer BlendTrack beside Speed_Layer"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "blend_track_xml_oracle", "subject_api": "ak.wwise.core.blendContainer.addTrack", "expectation": "only Speed_Layer exists with three exact assignments and Surface_Layer is absent"},
+        {"phase": "preview", "adapter": "blend_track_xml_oracle", "subject_api": "ak.wwise.core.blendContainer.addTrack", "expectation": "track and assignment snapshots remain baseline"},
+        {"phase": "after", "adapter": "blend_track_xml_oracle", "subject_api": "ak.wwise.core.blendContainer.addTrack", "expectation": "one Surface_Layer BlendTrack exists with result-matching identifiers and zero assignments"},
+        {"phase": "after", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.addTrack", "expectation": "Speed_Layer assignment list/edges and all child GUIDs equal baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.blendContainer.addTrack", "expectation": "owned track/fixture state removed or restored and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS24-F-BLEND-GETASSIGNMENTS-01",
+      "api": "ak.wwise.core.blendContainer.getAssignments",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "online_authoring",
+      "scenario_family": "assignment_order_and_edges_read",
+      "scenario_index": 1,
+      "prompt": "读取 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Vehicle_Engine` 的 `Speed_Layer` assignments；这个 Blend Track 的 GUID 是 `{speed_track_guid}`。按 index 列出每个 child 的名称、GUID 和左右边缘，再确认索引连续、没有重复 child，并指出是否存在边缘重叠。",
+      "visible_inputs": [{"name": "speed_track_guid", "kind": "string", "description": "Vehicle_Engine 下 Speed_Layer Blend Track 的完整 GUID"}],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，按这个轨道读取并分析。",
+      "fixture": {"adapter": "blend_container_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create Speed_Layer with four ordered child assignments and deliberate overlapping/non-overlapping edge pairs", "record exact normalized assignments, child identities, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.blendContainer.getAssignments", "count": 1, "effect": "read the complete Speed_Layer assignment array"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "runner direct baseline contains four known child/index/edge records"},
+        {"phase": "preview", "adapter": "sandbox_unchanged_oracle", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "generic transaction preview changes no assignment, object, or project file"},
+        {"phase": "after", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "returned normalized array exactly equals baseline child GUIDs, indices, order, and two-edge documents"},
+        {"phase": "after", "adapter": "assignment_analysis_oracle", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "reported continuity, uniqueness, and overlap decisions equal deterministic recomputation from returned edges"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "read leaves state unchanged; fixture removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS24-F-BLEND-GETASSIGNMENTS-02",
+      "api": "ak.wwise.core.blendContainer.getAssignments",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "online_authoring",
+      "scenario_family": "cross_track_assignment_comparison",
+      "scenario_index": 2,
+      "prompt": "比较 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Footsteps_Blend` 的 `Speed_Layer`（GUID `{speed_track_guid}`）和 `Surface_Layer`（GUID `{surface_track_guid}`）。列出两个轨道各自 assignment 顺序、共有 child、只在单边的 child，以及同一 child 在两轨上的边缘差异。",
+      "visible_inputs": [{"name": "speed_track_guid", "kind": "string", "description": "Footsteps_Blend 下 Speed_Layer Blend Track 的完整 GUID"}, {"name": "surface_track_guid", "kind": "string", "description": "Footsteps_Blend 下 Surface_Layer Blend Track 的完整 GUID"}],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "这一步预览没问题，执行它；如果还有下一步，先把下一步预览给我。",
+      "fixture": {"adapter": "blend_container_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create two tracks with overlapping but non-identical child sets, orders, and edge pairs", "record exact arrays, child identities, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.blendContainer.getAssignments", "count": 2, "effect": "read Speed_Layer and Surface_Layer assignment arrays independently"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "two distinct baseline arrays include shared and track-exclusive children with edge differences"},
+        {"phase": "preview", "adapter": "sandbox_unchanged_oracle", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "both arrays, child objects, and project files remain baseline"},
+        {"phase": "after", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "each returned array matches its own track baseline without cross-assignment"},
+        {"phase": "after", "adapter": "assignment_analysis_oracle", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "reported intersection, differences, order, and per-child edge diffs equal set/order comparison of the two arrays"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "read-only scenario leaves state unchanged; fixture removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS24-F-BLEND-REMOVEASSIGNMENT-01",
+      "api": "ak.wwise.core.blendContainer.removeAssignment",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "online_authoring",
+      "scenario_family": "remove_middle_assignment",
+      "scenario_index": 1,
+      "prompt": "从 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Vehicle_Engine\\Speed_Layer`（Blend Track GUID `{speed_track_guid}`）里移除 `Mid_RPM` assignment。`Low_RPM` 和 `High_RPM` 保留原边缘并重新形成连续索引；`Mid_RPM` 声音对象本身仍留在 Blend Container 下面。",
+      "visible_inputs": [{"name": "speed_track_guid", "kind": "string", "description": "Vehicle_Engine 下 Speed_Layer Blend Track 的完整 GUID"}],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，只移除 `Mid_RPM` 的 assignment。",
+      "fixture": {"adapter": "blend_container_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create three ordered assignments with distinct edges and direct child objects", "record exact assignment array, child graph, fields, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.blendContainer.removeAssignment", "count": 1, "effect": "remove only Mid_RPM from the Speed_Layer assignment list"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.removeAssignment", "expectation": "Low/Mid/High appear once at indices 0/1/2 with known edges"},
+        {"phase": "preview", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.removeAssignment", "expectation": "assignment array, child graph, and project XML equal baseline"},
+        {"phase": "after", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.removeAssignment", "expectation": "array contains only Low_RPM index 0 and High_RPM index 1, each preserving baseline child GUID and edges"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.blendContainer.removeAssignment", "expectation": "Mid_RPM object still exists at the same parent/path/GUID and all child fields are unchanged"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.blendContainer.removeAssignment", "expectation": "assignment restored or fixture removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS24-F-BLEND-REMOVEASSIGNMENT-02",
+      "api": "ak.wwise.core.blendContainer.removeAssignment",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "online_authoring",
+      "scenario_family": "remove_track_specific_assignment",
+      "scenario_index": 2,
+      "prompt": "`Gust` 同时在 `Wind_Blend` 的 `Intensity`（GUID `{intensity_track_guid}`）和 `Weather`（GUID `{weather_track_guid}`）两条 Blend Track 里。只从 `Weather` 轨道移除它，`Intensity` 里的 assignment、边缘和索引全部保留，`Gust` 对象本身也保留。",
+      "visible_inputs": [{"name": "intensity_track_guid", "kind": "string", "description": "Wind_Blend 下 Intensity Blend Track 的完整 GUID"}, {"name": "weather_track_guid", "kind": "string", "description": "Wind_Blend 下 Weather Blend Track 的完整 GUID"}],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，只移除 `Weather` 轨道里的 `Gust` assignment。",
+      "fixture": {"adapter": "blend_container_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create two tracks both assigning the same Gust child plus distinct other children", "record both assignment arrays, child graph, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.blendContainer.removeAssignment", "count": 1, "effect": "remove Gust from Weather while preserving its Intensity assignment"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.removeAssignment", "expectation": "Gust GUID appears once in each track with independently recorded edges/indices"},
+        {"phase": "preview", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.removeAssignment", "expectation": "both track arrays and object graph remain baseline"},
+        {"phase": "after", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.removeAssignment", "expectation": "Weather excludes Gust and its remaining rows normalize indices; Intensity array is byte-for-byte baseline including Gust edges/index"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.blendContainer.removeAssignment", "expectation": "Gust object parent/path/GUID/properties remain unchanged"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.blendContainer.removeAssignment", "expectation": "owned assignments/fixtures restored or removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS24-F-GAMEPARAMETER-SETRANGE-01",
+      "api": "ak.wwise.core.gameParameter.setRange",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "online_authoring",
+      "scenario_family": "stretch_game_parameter_range",
+      "scenario_index": 1,
+      "prompt": "把 `\\Game Parameters\\Default Work Unit\\SemanticLab_Speed` 的范围从 0–100 扩到 0–200，并选择拉伸现有曲线。它被一条 RTPC 曲线、一个 Blend Track 和两个 Set Game Parameter Action 使用；完成后核对所有 X 位置和值都按比例缩放，没有元素丢失。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，把范围拉伸到 0–200 并保留所有元素。",
+      "fixture": {"adapter": "game_parameter_range_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden GameParameter range 0..100 with RTPC points, blend edges, and two action values at known X positions", "record full XML/readback graph, IDs, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.gameParameter.setRange", "count": 1, "effect": "set range to 0..200 with onCurveUpdate=stretch"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "game_parameter_graph_oracle", "subject_api": "ak.wwise.core.gameParameter.setRange", "expectation": "range is 0..100 and exact RTPC points, blend edges, action values, and element GUIDs/counts are recorded"},
+        {"phase": "preview", "adapter": "game_parameter_graph_oracle", "subject_api": "ak.wwise.core.gameParameter.setRange", "expectation": "range, every dependent X/value, element count/GUID, and project file hash remain baseline"},
+        {"phase": "after", "adapter": "game_parameter_graph_oracle", "subject_api": "ak.wwise.core.gameParameter.setRange", "expectation": "range is exactly 0..200; every dependent X/action value equals baseline normalized position scaled by two and all GUIDs/counts remain"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.gameParameter.setRange", "expectation": "GameParameter name/path/notes and non-range properties plus dependent object fields equal baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.gameParameter.setRange", "expectation": "range/graph restored or fixture removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS24-F-GAMEPARAMETER-SETRANGE-02",
+      "api": "ak.wwise.core.gameParameter.setRange",
+      "item_type": "function",
+      "versions": ["2024.1"],
+      "lane": "online_authoring",
+      "scenario_family": "preserve_x_game_parameter_range",
+      "scenario_index": 2,
+      "prompt": "把 `\\Game Parameters\\Default Work Unit\\SemanticLab_Distance` 从 0–100 收窄到 20–80，并保持现有 X 坐标。超出范围的 RTPC/Blend 项应按 Wwise 规则删除，Set Game Parameter Action 的值应夹到新范围；请列出保留、删除和夹取的每一项。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，按保持 X 坐标的方式收窄到 20–80。",
+      "fixture": {"adapter": "game_parameter_range_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create range 0..100 with dependent points/edges/actions below 20, inside 20..80, and above 80", "record exact IDs, positions, values, XML graph, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.gameParameter.setRange", "count": 1, "effect": "set range to 20..80 with onCurveUpdate=preserveX"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "game_parameter_graph_oracle", "subject_api": "ak.wwise.core.gameParameter.setRange", "expectation": "baseline has known below/inside/above dependent items and action values"},
+        {"phase": "preview", "adapter": "game_parameter_graph_oracle", "subject_api": "ak.wwise.core.gameParameter.setRange", "expectation": "range and full dependency graph remain unchanged"},
+        {"phase": "after", "adapter": "game_parameter_graph_oracle", "subject_api": "ak.wwise.core.gameParameter.setRange", "expectation": "range is 20..80; inside curve/blend X values stay exact, out-of-range curve/blend items are absent, and action values are clamped to 20 or 80 as applicable"},
+        {"phase": "after", "adapter": "range_change_report_oracle", "subject_api": "ak.wwise.core.gameParameter.setRange", "expectation": "reported kept/deleted/clamped identity sets exactly equal before/after graph diff with no unrelated deletion"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.gameParameter.setRange", "expectation": "owned dependency graph removed or restored and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_authoring_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS25-F-MEDIAPOOL-GET-01",
+      "api": "ak.wwise.core.mediaPool.get",
+      "item_type": "function",
+      "versions": ["2025.1"],
+      "lane": "online_authoring",
+      "scenario_family": "short_footstep_media_search",
+      "scenario_index": 1,
+      "prompt": "在 `\\Databases\\Project Originals` 的 Media Pool 里找文件名中包含小写 `footstep`、时长小于 0.8 秒的素材，最多返回 20 条。按时长再按路径排序，并确认没有把同名但超过时长或只有大小写近似的素材混进来。",
+      "visible_inputs": [],
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "media_pool_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "stage byte-distinct short and long footstep WAVs plus a short name decoy in a unique case-owned Project Originals tree",
+          "refresh the case-owned Media Pool database and seal filesystem metadata, FileIds, exact field names, project-copy hashes, and asset-root ownership"
+        ],
+        "lifecycle": {"ownership": "case_owned_project_and_asset_sandbox", "reuse_policy": "unique_per_scenario_execution", "success_policy": "delete_project_copy_and_all_owned_assets", "failure_policy": "seal_failed_or_indeterminate_sandbox_and_never_reuse"},
+        "asset_spec": {
+          "contract": "waapi-skill.media-pool-fixture/v1",
+          "wav": {"count": 5, "format_policy": "declared_pcm_rate_channels_depth_duration_with_ixml", "content_policy": "deterministic_distinct_signal_per_file"},
+          "databases": [{"key": "project_originals", "path": "\\Databases\\Project Originals"}],
+          "rows": [
+            {"key": "footstep_gravel_short", "database": "project_originals", "relative_path": "SemanticLab/Footsteps/footstep_gravel_short.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 0.32, "ixml": {}, "referenced_by": []},
+            {"key": "footstep_wood_short", "database": "project_originals", "relative_path": "SemanticLab/Footsteps/footstep_wood_short.wav", "sample_rate": 48000, "channels": 2, "bit_depth": 24, "duration_seconds": 0.7, "ixml": {}, "referenced_by": []},
+            {"key": "footstep_metal_long", "database": "project_originals", "relative_path": "SemanticLab/Footsteps/footstep_metal_long.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 1.2, "ixml": {}, "referenced_by": []},
+            {"key": "impact_short_name_decoy", "database": "project_originals", "relative_path": "SemanticLab/Footsteps/impact_gravel_short.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 0.4, "ixml": {}, "referenced_by": []}
+            ,{"key": "uppercase_name_decoy", "database": "project_originals", "relative_path": "SemanticLab/Footsteps/Footstep_Case_Decoy.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 0.3, "ixml": {}, "referenced_by": []}
+          ],
+          "request_template": {
+            "args": {
+              "databases": ["\\Databases\\Project Originals"],
+              "filters": [
+                {"type": "field", "field": "{media_pool_fields.name}", "operator": "contains", "value": "footstep"},
+                {"type": "field", "field": "{media_pool_fields.duration}", "operator": "lessThan", "value": 0.8}
+              ],
+              "maxResults": 200
+            },
+            "options": {"return": ["Path", "FileId", "Db", "{media_pool_fields.name}", "{media_pool_fields.duration}", "{media_pool_fields.sample_rate}", "{media_pool_fields.channels}"]},
+            "post_filter": {"field": "{media_pool_fields.name}", "operator": "containsCaseSensitive", "value": "footstep", "limit": 20}
+          },
+          "expected_candidate_file_keys": ["footstep_gravel_short", "footstep_wood_short", "uppercase_name_decoy"],
+          "expected_file_keys": ["footstep_gravel_short", "footstep_wood_short"],
+          "expected_groups": {},
+          "association_expectations": null,
+          "field_binding": "supporting_mediaPool.getFields_exact_case",
+          "source_policy": "case_owned_regular_wav_size_sha256_and_index_refresh",
+          "cleanup_policy": "case_owned_project_copy_and_media_databases_discard"
+        }
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.mediaPool.getFields", "count": 1, "effect": "discover the current exact-case Media Pool fields before constructing the query"},
+        {"api": "ak.wwise.core.mediaPool.get", "count": 1, "effect": "read a bounded short-footstep candidate superset, then let the packaged Gateway return only exact-case lowercase matches"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "media_pool_index_oracle", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "fixture index contains two lowercase short matches, one uppercase-only short candidate, a long name match, and a non-name decoy with exact WAV metadata/FileIds"},
+        {"phase": "after", "adapter": "media_pool_query_oracle", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "the unsaturated raw WAAPI candidate set exactly contains the two lowercase short rows plus the uppercase-only short decoy; packaged exact-case post-filtering returns only the two lowercase rows and all seven requested values equal WAV/database metadata"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "the model reports no more than 20 rows sorted by duration then path and excludes the long, unrelated-name, and uppercase-only FileIds"},
+        {"phase": "after", "adapter": "sandbox_unchanged_oracle", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "Media Pool database, originals, project files, and search state remain byte-for-byte baseline after the read"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "on success the case-owned project copy, database index, and every staged original are deleted; on failure or indeterminate outcome the entire sandbox is sealed and never reused; source-project hashes match"}
+      ],
+      "cleanup": {"adapter": "media_pool_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_and_all_owned_assets_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "VS25-F-MEDIAPOOL-GET-02",
+      "api": "ak.wwise.core.mediaPool.get",
+      "item_type": "function",
+      "versions": ["2025.1"],
+      "lane": "online_authoring",
+      "scenario_family": "mono_voice_media_filter",
+      "scenario_index": 2,
+      "prompt": "从 `\\Databases\\Project Originals` 的 Media Pool 筛出名称以 `VO_` 开头、48 kHz、单声道的文件，最多 50 条。结果按路径排序；同名的 44.1 kHz、立体声和其他数据库素材都要排除。",
+      "visible_inputs": [],
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "media_pool_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "stage VO_ WAV fixtures spanning 48 kHz mono, 44.1 kHz mono, 48 kHz stereo, a name decoy, and another case-owned database decoy",
+          "refresh both case-owned indexes and seal exact Path/FileId/Db/audio metadata, project-copy hashes, and unique asset-root ownership"
+        ],
+        "lifecycle": {"ownership": "case_owned_project_and_asset_sandbox", "reuse_policy": "unique_per_scenario_execution", "success_policy": "delete_project_copy_and_all_owned_assets", "failure_policy": "seal_failed_or_indeterminate_sandbox_and_never_reuse"},
+        "asset_spec": {
+          "contract": "waapi-skill.media-pool-fixture/v1",
+          "wav": {"count": 6, "format_policy": "declared_pcm_rate_channels_depth_duration_with_ixml", "content_policy": "deterministic_distinct_signal_per_file"},
+          "databases": [
+            {"key": "project_originals", "path": "\\Databases\\Project Originals"},
+            {"key": "semanticlab_other", "path": "\\Databases\\User Databases\\SemanticLab Other"}
+          ],
+          "rows": [
+            {"key": "vo_menu_48k_mono", "database": "project_originals", "relative_path": "SemanticLab/VO/VO_Menu_Confirm.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 0.8, "ixml": {}, "referenced_by": []},
+            {"key": "vo_quest_48k_mono", "database": "project_originals", "relative_path": "SemanticLab/VO/VO_Quest_Start.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 1.4, "ixml": {}, "referenced_by": []},
+            {"key": "vo_rate_decoy", "database": "project_originals", "relative_path": "SemanticLab/VO/VO_Quest_44100.wav", "sample_rate": 44100, "channels": 1, "bit_depth": 24, "duration_seconds": 1.0, "ixml": {}, "referenced_by": []},
+            {"key": "vo_stereo_decoy", "database": "project_originals", "relative_path": "SemanticLab/VO/VO_Menu_Stereo.wav", "sample_rate": 48000, "channels": 2, "bit_depth": 24, "duration_seconds": 0.9, "ixml": {}, "referenced_by": []},
+            {"key": "name_decoy", "database": "project_originals", "relative_path": "SemanticLab/VO/Narration_48k_Mono.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 1.1, "ixml": {}, "referenced_by": []},
+            {"key": "other_database_decoy", "database": "semanticlab_other", "relative_path": "Editorial/VO_External_48k_Mono.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 1.2, "ixml": {}, "referenced_by": []}
+          ],
+          "request_template": {
+            "args": {
+              "databases": ["\\Databases\\Project Originals"],
+              "filters": [
+                {"type": "field", "field": "{media_pool_fields.name}", "operator": "startsWith", "value": "VO_"},
+                {"type": "field", "field": "{media_pool_fields.sample_rate}", "operator": "equals", "value": 48000},
+                {"type": "field", "field": "{media_pool_fields.channels}", "operator": "equals", "value": 1}
+              ],
+              "maxResults": 50
+            },
+            "options": {"return": ["Path", "FileId", "Db", "{media_pool_fields.name}", "{media_pool_fields.sample_rate}", "{media_pool_fields.channels}", "{media_pool_fields.duration}"]}
+          },
+          "expected_file_keys": ["vo_menu_48k_mono", "vo_quest_48k_mono"],
+          "expected_groups": {},
+          "association_expectations": null,
+          "field_binding": "supporting_mediaPool.getFields_exact_case",
+          "source_policy": "case_owned_regular_wav_size_sha256_and_index_refresh",
+          "cleanup_policy": "case_owned_project_copy_and_media_databases_discard"
+        }
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.mediaPool.getFields", "count": 1, "effect": "discover the current exact-case Media Pool fields before constructing the query"},
+        {"api": "ak.wwise.core.mediaPool.get", "count": 1, "effect": "filter Project Originals to VO_ 48kHz mono media with seven return fields"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "media_pool_index_oracle", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "fixture has positive matches and one decoy for each excluded dimension with distinct FileIds"},
+        {"phase": "after", "adapter": "media_pool_query_oracle", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "result FileId set exactly equals VO_ rows in Project Originals with sample rate 48000 and channel count 1; returned values match index"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "the model reports at most 50 rows sorted by path and excludes every 44.1k, stereo, name, and other-database decoy FileId"},
+        {"phase": "after", "adapter": "sandbox_unchanged_oracle", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "database rows, WAV bytes, and project files remain byte-for-byte baseline after the read"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "on success both case-owned database indexes, every staged original, and the project copy are deleted; on failure or indeterminate outcome the entire sandbox is sealed and never reused; immutable source hashes match"}
+      ],
+      "cleanup": {"adapter": "media_pool_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_and_all_owned_assets_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "VS25-F-MEDIAPOOL-GET-03",
+      "api": "ak.wwise.core.mediaPool.get",
+      "item_type": "function",
+      "versions": ["2025.1"],
+      "lane": "online_authoring",
+      "scenario_family": "cross_database_ixml_take_audit",
+      "scenario_index": 3,
+      "prompt": "同时检查 `\\Databases\\Project Originals` 和 `\\Databases\\User Databases\\SemanticLab Editorial`：找出 IXML Scene 以 `DUP_` 开头、48 kHz、时长在 0.4 到 8 秒之间的素材。最多取 40 条，按 Scene+Take 分组列出跨库重复组，并保留每条素材的数据库与路径；Scene 不匹配、44.1 kHz、过短或过长的对照项都不能混入。",
+      "visible_inputs": [],
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "media_pool_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "generate eight deterministic WAVs across disposable Project Originals and SemanticLab Editorial databases with declared IXML Scene/Take and audio metadata",
+          "refresh both Media Pool indexes and seal exact field names, database identities, FileIds, paths, WAV hashes, metadata rows, and source-project hashes"
+        ],
+        "lifecycle": {"ownership": "case_owned_project_and_asset_sandbox", "reuse_policy": "unique_per_scenario_execution", "success_policy": "delete_project_copy_and_all_owned_assets", "failure_policy": "seal_failed_or_indeterminate_sandbox_and_never_reuse"},
+        "asset_spec": {
+          "contract": "waapi-skill.media-pool-fixture/v1",
+          "wav": {"count": 8, "format_policy": "declared_pcm_rate_channels_depth_duration_with_ixml", "content_policy": "deterministic_distinct_signal_per_file"},
+          "databases": [
+            {"key": "project_originals", "path": "\\Databases\\Project Originals"},
+            {"key": "semanticlab_editorial", "path": "\\Databases\\User Databases\\SemanticLab Editorial"}
+          ],
+          "rows": [
+            {"key": "project_dup_battle_01", "database": "project_originals", "relative_path": "SemanticLab/Duplicates/Battle_Project.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 1.2, "ixml": {"Scene": "DUP_BATTLE", "Take": "01"}, "referenced_by": []},
+            {"key": "editorial_dup_battle_01", "database": "semanticlab_editorial", "relative_path": "Editorial/Battle_Editorial.wav", "sample_rate": 48000, "channels": 2, "bit_depth": 24, "duration_seconds": 1.22, "ixml": {"Scene": "DUP_BATTLE", "Take": "01"}, "referenced_by": []},
+            {"key": "project_dup_city_03", "database": "project_originals", "relative_path": "SemanticLab/Duplicates/City_Project.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 3.5, "ixml": {"Scene": "DUP_CITY", "Take": "03"}, "referenced_by": []},
+            {"key": "editorial_dup_city_03", "database": "semanticlab_editorial", "relative_path": "Editorial/City_Editorial.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 3.52, "ixml": {"Scene": "DUP_CITY", "Take": "03"}, "referenced_by": []},
+            {"key": "decoy_scene", "database": "project_originals", "relative_path": "SemanticLab/Duplicates/Keep_Scene.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 1.0, "ixml": {"Scene": "KEEP_BATTLE", "Take": "01"}, "referenced_by": []},
+            {"key": "decoy_rate", "database": "semanticlab_editorial", "relative_path": "Editorial/Battle_44100.wav", "sample_rate": 44100, "channels": 1, "bit_depth": 24, "duration_seconds": 1.3, "ixml": {"Scene": "DUP_BATTLE", "Take": "02"}, "referenced_by": []},
+            {"key": "decoy_short", "database": "project_originals", "relative_path": "SemanticLab/Duplicates/Short.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 0.2, "ixml": {"Scene": "DUP_SHORT", "Take": "01"}, "referenced_by": []},
+            {"key": "decoy_long", "database": "semanticlab_editorial", "relative_path": "Editorial/Long.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 9.5, "ixml": {"Scene": "DUP_LONG", "Take": "01"}, "referenced_by": []}
+          ],
+          "request_template": {
+            "args": {
+              "databases": ["\\Databases\\Project Originals", "\\Databases\\User Databases\\SemanticLab Editorial"],
+              "filters": [
+                {"type": "field", "field": "{media_pool_fields.scene}", "operator": "startsWith", "value": "DUP_"},
+                {"type": "field", "field": "{media_pool_fields.sample_rate}", "operator": "equals", "value": 48000},
+                {"type": "field", "field": "{media_pool_fields.duration}", "operator": "greaterThanOrEqual", "value": 0.4},
+                {"type": "field", "field": "{media_pool_fields.duration}", "operator": "lessThanOrEqual", "value": 8.0}
+              ],
+              "maxResults": 40
+            },
+            "options": {"return": ["Path", "FileId", "Db", "{media_pool_fields.scene}", "{media_pool_fields.take}", "{media_pool_fields.duration}", "{media_pool_fields.sample_rate}"]}
+          },
+          "expected_file_keys": ["project_dup_battle_01", "editorial_dup_battle_01", "project_dup_city_03", "editorial_dup_city_03"],
+          "expected_groups": {"DUP_BATTLE|01": ["project_dup_battle_01", "editorial_dup_battle_01"], "DUP_CITY|03": ["project_dup_city_03", "editorial_dup_city_03"]},
+          "association_expectations": null,
+          "field_binding": "supporting_mediaPool.getFields_exact_case",
+          "source_policy": "case_owned_regular_wav_size_sha256_and_index_refresh",
+          "cleanup_policy": "case_owned_project_copy_and_media_databases_discard"
+        }
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.mediaPool.getFields", "count": 1, "effect": "discover exact-case IXML and audio fields before constructing the query"},
+        {"api": "ak.wwise.core.mediaPool.get", "count": 1, "effect": "query two databases with four reflected field filters and return the exact IXML duplicate candidates"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "media_pool_index_oracle", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "eight indexed rows have sealed FileIds, databases, paths, WAV hashes, exact field values, two positive cross-database Scene/Take groups, and one decoy per excluded predicate"},
+        {"phase": "after", "adapter": "media_pool_query_oracle", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "result has exactly the four expected FileIds and every returned Path/Db/Scene/Take/duration/sample-rate value equals the refreshed fixture index"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "the model groups exactly DUP_BATTLE|01 and DUP_CITY|03 with one row from each database, reports no more than 40 rows, and excludes all scene/rate/duration decoys"},
+        {"phase": "after", "adapter": "sandbox_unchanged_oracle", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "both database indexes, all WAV bytes, and project files remain byte-for-byte baseline after the read"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "on success the case-owned databases, index rows, WAVs, and project copy are deleted; on failure or indeterminate outcome the entire sandbox is sealed and never reused; source-project proofs remain unchanged"}
+      ],
+      "cleanup": {"adapter": "media_pool_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_and_all_owned_assets_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "VS25-F-MEDIAPOOL-GET-04",
+      "api": "ak.wwise.core.mediaPool.get",
+      "item_type": "function",
+      "versions": ["2025.1"],
+      "lane": "online_authoring",
+      "scenario_family": "unreferenced_originals_association_audit",
+      "scenario_index": 4,
+      "prompt": "在 `\\Databases\\Project Originals` 里找名称包含 `SemanticLab_UnusedAudit`、48 kHz、单声道的文件，再和当前工程里的 Audio Source 引用做一次关联，分别列出仍被 Sound 使用和完全未引用的素材。同名但 44.1 kHz、立体声的对照文件要排除；每个“未引用”结论都必须确认没有任何 Audio Source 指向它。",
+      "visible_inputs": [],
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "media_pool_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "generate seven deterministic Project Originals WAVs including two referenced matches, two unreferenced matches, and rate/channel/name decoys",
+          "import the two declared used files plus one referenced name decoy into hidden Sounds, refresh Media Pool, and seal FileId/path/audio-source associations, object GUIDs, WAV hashes, field inventory, and source-project hashes"
+        ],
+        "lifecycle": {"ownership": "case_owned_project_and_asset_sandbox", "reuse_policy": "unique_per_scenario_execution", "success_policy": "delete_project_copy_and_all_owned_assets", "failure_policy": "seal_failed_or_indeterminate_sandbox_and_never_reuse"},
+        "asset_spec": {
+          "contract": "waapi-skill.media-pool-fixture/v1",
+          "wav": {"count": 7, "format_policy": "declared_pcm_rate_channels_depth_duration_with_ixml", "content_policy": "deterministic_distinct_signal_per_file"},
+          "databases": [{"key": "project_originals", "path": "\\Databases\\Project Originals"}],
+          "rows": [
+            {"key": "used_dialogue", "database": "project_originals", "relative_path": "SemanticLab/UnusedAudit/SemanticLab_UnusedAudit_Dialogue_Used.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 1.1, "ixml": {}, "referenced_by": ["\\Containers\\Default Work Unit\\SemanticLab\\UnusedAuditRefs\\Dialogue_Used"]},
+            {"key": "used_foley", "database": "project_originals", "relative_path": "SemanticLab/UnusedAudit/SemanticLab_UnusedAudit_Foley_Used.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 0.7, "ixml": {}, "referenced_by": ["\\Containers\\Default Work Unit\\SemanticLab\\UnusedAuditRefs\\Foley_Used"]},
+            {"key": "unused_roomtone", "database": "project_originals", "relative_path": "SemanticLab/UnusedAudit/SemanticLab_UnusedAudit_Roomtone_Free.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 2.5, "ixml": {}, "referenced_by": []},
+            {"key": "unused_alt", "database": "project_originals", "relative_path": "SemanticLab/UnusedAudit/SemanticLab_UnusedAudit_Alt_Free.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 1.6, "ixml": {}, "referenced_by": []},
+            {"key": "decoy_rate", "database": "project_originals", "relative_path": "SemanticLab/UnusedAudit/SemanticLab_UnusedAudit_44100.wav", "sample_rate": 44100, "channels": 1, "bit_depth": 24, "duration_seconds": 1.0, "ixml": {}, "referenced_by": []},
+            {"key": "decoy_stereo", "database": "project_originals", "relative_path": "SemanticLab/UnusedAudit/SemanticLab_UnusedAudit_Stereo.wav", "sample_rate": 48000, "channels": 2, "bit_depth": 24, "duration_seconds": 1.0, "ixml": {}, "referenced_by": []},
+            {"key": "decoy_name", "database": "project_originals", "relative_path": "SemanticLab/UnusedAudit/Keep_Referenced.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 0.9, "ixml": {}, "referenced_by": ["\\Containers\\Default Work Unit\\SemanticLab\\UnusedAuditRefs\\Keep_Referenced"]}
+          ],
+          "request_template": {
+            "args": {
+              "databases": ["\\Databases\\Project Originals"],
+              "filters": [
+                {"type": "field", "field": "{media_pool_fields.name}", "operator": "contains", "value": "SemanticLab_UnusedAudit"},
+                {"type": "field", "field": "{media_pool_fields.sample_rate}", "operator": "equals", "value": 48000},
+                {"type": "field", "field": "{media_pool_fields.channels}", "operator": "equals", "value": 1}
+              ],
+              "maxResults": 100
+            },
+            "options": {"return": ["Path", "FileId", "Db", "{media_pool_fields.name}", "{media_pool_fields.sample_rate}", "{media_pool_fields.channels}"]}
+          },
+          "expected_file_keys": ["used_dialogue", "used_foley", "unused_roomtone", "unused_alt"],
+          "expected_groups": {},
+          "association_expectations": {"referenced": ["used_dialogue", "used_foley"], "unreferenced": ["unused_roomtone", "unused_alt"]},
+          "field_binding": "supporting_mediaPool.getFields_exact_case",
+          "source_policy": "case_owned_regular_wav_size_sha256_and_index_refresh",
+          "cleanup_policy": "case_owned_project_copy_and_media_databases_discard"
+        }
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.mediaPool.getFields", "count": 1, "effect": "discover exact-case name and audio fields before constructing the query"},
+        {"api": "ak.wwise.core.mediaPool.get", "count": 1, "effect": "return the exact 48 kHz mono UnusedAudit Media Pool candidate set"},
+        {"api": "ak.wwise.core.object.get", "count": 1, "effect": "read Audio Source associations for the returned candidate paths"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "media_pool_index_oracle", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "four positive candidate FileIds and three excluded decoys are sealed with exact database/path/format/hash rows"},
+        {"phase": "after", "adapter": "media_pool_query_oracle", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "Media Pool return contains exactly used_dialogue, used_foley, unused_roomtone, and unused_alt with all six requested fields equal the index; rate/channel/name decoys are absent"},
+        {"phase": "after", "adapter": "project_audio_reference_oracle", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "one independent saved-XML plus object.get association diff classifies exactly used_dialogue/used_foley as referenced and unused_roomtone/unused_alt as having zero Audio Source references"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "the model explicitly reports used_dialogue and used_foley as referenced, unused_roomtone and unused_alt as unreferenced, and does not classify any excluded decoy"},
+        {"phase": "after", "adapter": "sandbox_unchanged_oracle", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "querying and association reads do not alter Media Pool rows, Audio Source graph, WAV bytes, or project files"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "on success the case-owned hidden objects, staged WAVs, index, and project copy are deleted; on failure or indeterminate outcome the entire sandbox is sealed and never reused; immutable source-project hashes match"}
+      ],
+      "cleanup": {"adapter": "media_pool_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_and_all_owned_assets_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "VS25-F-MEDIAPOOL-GET-05",
+      "api": "ak.wwise.core.mediaPool.get",
+      "item_type": "function",
+      "versions": ["2025.1"],
+      "lane": "online_authoring",
+      "scenario_family": "regex_format_duration_quality_gate",
+      "scenario_index": 5,
+      "prompt": "在 `\\Databases\\Project Originals` 做一轮冲击类素材质检：Media Pool 的 Filename 字段要匹配 `^(Impact|Explosion)_[A-Za-z0-9_]+$`，采样率 48 kHz、24 bit，时长大于 0.15 秒且不超过 3.5 秒。最多返回 25 条，结果按时长从长到短、再按路径整理；过短、过长、44.1 kHz 或 16 bit 的同名对照项必须全部排除。",
+      "visible_inputs": [],
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "media_pool_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "generate eight deterministic Project Originals WAVs with four exact matches and one controlled violation for duration-low, duration-high, sample-rate, and bit-depth predicates",
+          "refresh Media Pool and seal exact field names, FileIds, paths, format/duration metadata, WAV hashes, result order input, and source-project hashes"
+        ],
+        "lifecycle": {"ownership": "case_owned_project_and_asset_sandbox", "reuse_policy": "unique_per_scenario_execution", "success_policy": "delete_project_copy_and_all_owned_assets", "failure_policy": "seal_failed_or_indeterminate_sandbox_and_never_reuse"},
+        "asset_spec": {
+          "contract": "waapi-skill.media-pool-fixture/v1",
+          "wav": {"count": 8, "format_policy": "declared_pcm_rate_channels_depth_duration_with_ixml", "content_policy": "deterministic_distinct_signal_per_file"},
+          "databases": [{"key": "project_originals", "path": "\\Databases\\Project Originals"}],
+          "rows": [
+            {"key": "impact_metal", "database": "project_originals", "relative_path": "SemanticLab/QualityGate/Impact_Metal_01.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 0.35, "ixml": {}, "referenced_by": []},
+            {"key": "impact_wood", "database": "project_originals", "relative_path": "SemanticLab/QualityGate/Impact_Wood_Heavy.wav", "sample_rate": 48000, "channels": 2, "bit_depth": 24, "duration_seconds": 1.1, "ixml": {}, "referenced_by": []},
+            {"key": "explosion_small", "database": "project_originals", "relative_path": "SemanticLab/QualityGate/Explosion_Small_02.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 2.4, "ixml": {}, "referenced_by": []},
+            {"key": "explosion_large", "database": "project_originals", "relative_path": "SemanticLab/QualityGate/Explosion_Large_01.wav", "sample_rate": 48000, "channels": 2, "bit_depth": 24, "duration_seconds": 3.4, "ixml": {}, "referenced_by": []},
+            {"key": "decoy_too_short", "database": "project_originals", "relative_path": "SemanticLab/QualityGate/Impact_TooShort.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 0.1, "ixml": {}, "referenced_by": []},
+            {"key": "decoy_too_long", "database": "project_originals", "relative_path": "SemanticLab/QualityGate/Explosion_TooLong.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 24, "duration_seconds": 4.0, "ixml": {}, "referenced_by": []},
+            {"key": "decoy_rate", "database": "project_originals", "relative_path": "SemanticLab/QualityGate/Impact_44100.wav", "sample_rate": 44100, "channels": 1, "bit_depth": 24, "duration_seconds": 1.0, "ixml": {}, "referenced_by": []},
+            {"key": "decoy_depth", "database": "project_originals", "relative_path": "SemanticLab/QualityGate/Explosion_16bit.wav", "sample_rate": 48000, "channels": 1, "bit_depth": 16, "duration_seconds": 1.0, "ixml": {}, "referenced_by": []}
+          ],
+          "request_template": {
+            "args": {
+              "databases": ["\\Databases\\Project Originals"],
+              "filters": [
+                {"type": "field", "field": "{media_pool_fields.name}", "operator": "matchesRegex", "value": "^(Impact|Explosion)_[A-Za-z0-9_]+$"},
+                {"type": "field", "field": "{media_pool_fields.sample_rate}", "operator": "equals", "value": 48000},
+                {"type": "field", "field": "{media_pool_fields.bit_depth}", "operator": "equals", "value": 24},
+                {"type": "field", "field": "{media_pool_fields.duration}", "operator": "greaterThan", "value": 0.15},
+                {"type": "field", "field": "{media_pool_fields.duration}", "operator": "lessThanOrEqual", "value": 3.5}
+              ],
+              "maxResults": 25
+            },
+            "options": {"return": ["Path", "FileId", "Db", "{media_pool_fields.name}", "{media_pool_fields.sample_rate}", "{media_pool_fields.bit_depth}", "{media_pool_fields.duration}", "{media_pool_fields.channels}"]}
+          },
+          "expected_file_keys": ["impact_metal", "impact_wood", "explosion_small", "explosion_large"],
+          "expected_groups": {},
+          "association_expectations": null,
+          "field_binding": "supporting_mediaPool.getFields_exact_case",
+          "source_policy": "case_owned_regular_wav_size_sha256_and_index_refresh",
+          "cleanup_policy": "case_owned_project_copy_and_media_databases_discard"
+        }
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.mediaPool.getFields", "count": 1, "effect": "discover exact-case file and audio fields before constructing the query"},
+        {"api": "ak.wwise.core.mediaPool.get", "count": 1, "effect": "apply one regex and four numeric field predicates to the Project Originals quality-gate set"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "media_pool_index_oracle", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "four exact matches and four single-predicate decoys have distinct FileIds with independently parsed WAV rate/depth/channel/duration and filename values"},
+        {"phase": "after", "adapter": "media_pool_query_oracle", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "returned FileId set is exactly impact_metal, impact_wood, explosion_small, and explosion_large; every requested value equals index/WAV evidence and all four decoy IDs are absent"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "the model reports at most 25 rows sorted by duration descending then path, retains both mono and stereo matches, and excludes all four decoys"},
+        {"phase": "after", "adapter": "sandbox_unchanged_oracle", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "read-only quality audit leaves index rows, WAV bytes, file metadata, and project source exactly unchanged"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.mediaPool.get", "expectation": "on success all case-owned quality-gate WAVs, index files, and the project copy are deleted; on failure or indeterminate outcome the entire sandbox is sealed and never reused; source-project hashes remain baseline"}
+      ],
+      "cleanup": {"adapter": "media_pool_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_and_all_owned_assets_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "VS25-F-MEDIAPOOL-GETFIELDS-01",
+      "api": "ak.wwise.core.mediaPool.getFields",
+      "item_type": "function",
+      "versions": ["2025.1"],
+      "lane": "online_authoring",
+      "scenario_family": "media_field_capability_inventory",
+      "scenario_index": 1,
+      "prompt": "盘点当前 Media Pool 可用于查询的字段。请列出完整去重结果，并另外整理路径/数据库标识、音频格式、时长与响度、IXML 元数据四组候选；Path、FileId、Db 是否存在要明确说明，字段名大小写保持原样。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "media_pool_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["stage WAV fixtures containing standard format data, extracted features, and deterministic IXML metadata", "refresh database and record its actual schema/column inventory, field case, and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.mediaPool.getFields", "count": 1, "effect": "read the complete current Media Pool field-name inventory"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "media_pool_index_schema_oracle", "subject_api": "ak.wwise.core.mediaPool.getFields", "expectation": "fixture database schema and standard/IXML field inventory are sealed with exact case"},
+        {"phase": "after", "adapter": "media_pool_fields_oracle", "subject_api": "ak.wwise.core.mediaPool.getFields", "expectation": "return is a unique exact-case string set equal to fields exposed by the refreshed fixture databases and contains Path, FileId, and Db"},
+        {"phase": "after", "adapter": "media_pool_fields_oracle", "subject_api": "ak.wwise.core.mediaPool.getFields", "expectation": "reported four groups contain only returned fields and match schema-derived categories without invented names"},
+        {"phase": "after", "adapter": "sandbox_unchanged_oracle", "subject_api": "ak.wwise.core.mediaPool.getFields", "expectation": "database schema, originals, and project files remain byte-for-byte unchanged after the read"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.mediaPool.getFields", "expectation": "owned media/index fixtures removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "media_pool_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS25-F-MEDIAPOOL-GETFIELDS-02",
+      "api": "ak.wwise.core.mediaPool.getFields",
+      "item_type": "function",
+      "versions": ["2025.1"],
+      "lane": "online_authoring",
+      "scenario_family": "queryable_field_probe",
+      "scenario_index": 2,
+      "prompt": "读取 Media Pool 字段清单，重点找出和路径、文件名、采样率、声道、时长、描述、场次、镜次有关的字段。对每个找到的字段给出精确名称，并确认它确实能在当前数据库中作为返回字段或筛选字段使用，而不只是凭名字推断。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "media_pool_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["stage standard and IXML-tagged WAVs with filename/sample-rate/channel/duration/description/scene/take data", "refresh database and record schema plus deterministic probe rows and source hashes"]},
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.mediaPool.getFields", "count": 1, "effect": "read available fields for a runner-verified queryability audit"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "media_pool_index_schema_oracle", "subject_api": "ak.wwise.core.mediaPool.getFields", "expectation": "fixture schema maps each requested concept to zero or more exact field names and known row values"},
+        {"phase": "after", "adapter": "media_pool_fields_oracle", "subject_api": "ak.wwise.core.mediaPool.getFields", "expectation": "every reported field appears verbatim in getFields and every available requested concept is represented; unavailable concepts are explicitly reported absent"},
+        {"phase": "after", "adapter": "media_pool_field_probe_oracle", "subject_api": "ak.wwise.core.mediaPool.getFields", "expectation": "runner-owned closed probes can request/filter each claimed field against known rows with schema-valid values; no unreturned field is claimed usable"},
+        {"phase": "after", "adapter": "sandbox_unchanged_oracle", "subject_api": "ak.wwise.core.mediaPool.getFields", "expectation": "database schema/rows, WAV bytes, and project files remain byte-for-byte baseline after the read"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.mediaPool.getFields", "expectation": "owned database/original fixtures removed and source-project hashes match"}
+      ],
+      "cleanup": {"adapter": "media_pool_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS25-T-OBJECT-STRUCTURECHANGED-01",
+      "api": "ak.wwise.core.object.structureChanged",
+      "item_type": "topic",
+      "versions": ["2025.1"],
+      "lane": "online_topic",
+      "scenario_family": "batched_name_notes_structure_event",
+      "scenario_index": 1,
+      "prompt": "监听 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Quest_Old` 的下一次结构变更。有人在一次操作里把它改名为 `Quest_Main` 并更新备注时，返回第一条汇总通知：我要 summary、对象 GUID，以及 nameChange 和 notesChange 的完整新旧值。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "structure_changed_topic_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden Quest_Old with known multiline notes and child hierarchy", "record object/child identities, old name/notes/path, and source hashes"]},
+      "trigger": {"adapter": "structure_changed_topic_trigger", "publisher_api": "ak.wwise.core.object.set", "ownership_assertion": "after subscription readiness, set the hidden root name and notes in one runner-owned call"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.structureChanged", "count": 1, "effect": "observe the first batched nameChange and notesChange summary for the tracked object"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.structureChanged", "expectation": "tracked GUID has name Quest_Old, exact old notes, old path, and recorded child GUIDs"},
+        {"phase": "event", "adapter": "structure_changed_payload_oracle", "subject_api": "ak.wwise.core.object.structureChanged", "expectation": "payload has non-empty summary and an objects row for tracked GUID whose changes include nameChange oldName=Quest_Old/newName=Quest_Main and notesChange exact old/new notes"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.structureChanged", "expectation": "same root/child GUIDs exist under rebased Quest_Main paths, notes equal event new value, and old path is absent"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.structureChanged", "expectation": "subscription removed, hidden hierarchy removed/restored, and source hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "VS25-T-OBJECT-STRUCTURECHANGED-02",
+      "api": "ak.wwise.core.object.structureChanged",
+      "item_type": "topic",
+      "versions": ["2025.1"],
+      "lane": "online_topic",
+      "scenario_family": "subtree_parent_change_event",
+      "scenario_index": 2,
+      "prompt": "盯住 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Shared\\Wind` 的结构变化。它下一次被移到 `Level02` 时，返回第一条汇总事件里的 summary、对象 GUID 和 parentChange 新旧父级；再确认对象及子级 GUID 没有因移动而重建。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "structure_changed_topic_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create Shared and Level02 parents with a hidden Wind subtree under Shared", "record root/descendant GUIDs, paths, parent identities, and source hashes"]},
+      "trigger": {"adapter": "structure_changed_topic_trigger", "publisher_api": "ak.wwise.core.object.move", "ownership_assertion": "after subscription readiness, move the tracked hidden subtree from Shared to Level02 once"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.structureChanged", "count": 1, "effect": "observe the tracked Wind parentChange from Shared to Level02"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.structureChanged", "expectation": "Wind root/descendant GUIDs resolve under Shared and old/new parent GUIDs are recorded"},
+        {"phase": "event", "adapter": "structure_changed_payload_oracle", "subject_api": "ak.wwise.core.object.structureChanged", "expectation": "payload summary is non-empty and tracked object changes contain parentChange oldParent.id=Shared GUID and newParent.id=Level02 GUID"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.structureChanged", "expectation": "same root and descendant GUIDs resolve under Level02, old paths are absent, and no duplicate subtree exists"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.structureChanged", "expectation": "subscription and owned hierarchy cleared/restored and source-project hashes match"}
+      ],
+      "cleanup": {"adapter": "versioned_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    }
+  ]
+}

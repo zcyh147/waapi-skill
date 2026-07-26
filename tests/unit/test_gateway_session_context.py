@@ -21,6 +21,29 @@ PROJECT_GUID = "{11111111-1111-1111-1111-111111111111}"
 POLICIES = ["never", "preview_then_confirm", "allow_with_notice"]
 
 
+def expected_introduction(
+    *,
+    endpoint_url: str | None,
+    version: str | None,
+    policy: str | None,
+) -> dict[str, Any]:
+    return {
+        "contract": "waapi-skill.session-introduction/v1",
+        "emit_condition": "visible_conversation_intro_absent",
+        "emit_timing": "first_agent_message_after_gateway_result",
+        "atomic": True,
+        "style": "natural_prose_in_user_language",
+        "facts": {
+            "skill_name": "waapi-skill",
+            "endpoint_url": endpoint_url,
+            "adapter_version": version,
+            "project_modification_policy": policy,
+            "available_project_modification_policies": POLICIES,
+        },
+        "machine_readable_result_policy": "separate_progress_message",
+    }
+
+
 class FakeClient:
     def __init__(self, responses: Mapping[str, Any]) -> None:
         self.responses = dict(responses)
@@ -84,6 +107,11 @@ def expected_context(
         "adapter_version_source": source,
         "project_modification_policy": policy,
         "available_project_modification_policies": POLICIES,
+        "one_time_introduction": expected_introduction(
+            endpoint_url=f"ws://{host}:{port}/waapi",
+            version=version,
+            policy=policy,
+        ),
     }
 
 
@@ -135,6 +163,11 @@ def test_incomplete_config_marks_session_context_unavailable_without_guessing(tm
         "adapter_version_source": "unavailable",
         "project_modification_policy": "preview_then_confirm",
         "available_project_modification_policies": POLICIES,
+        "one_time_introduction": expected_introduction(
+            endpoint_url=None,
+            version=None,
+            policy="preview_then_confirm",
+        ),
     }
 
 
@@ -320,6 +353,11 @@ def test_invalid_config_error_has_bounded_unavailable_session_context(tmp_path: 
         "adapter_version_source": "unavailable",
         "project_modification_policy": None,
         "available_project_modification_policies": POLICIES,
+        "one_time_introduction": expected_introduction(
+            endpoint_url=None,
+            version=None,
+            policy=None,
+        ),
     }
 
 
@@ -352,10 +390,15 @@ def test_skill_contract_requests_one_natural_notice_without_an_extra_command() -
 
     for phrase in (
         "The first time this Skill is used in a conversation",
+        "do not announce that it is loaded before the first gateway result",
+        "`session_context.one_time_introduction.facts`",
+        "the first Agent message after that result",
+        "one short, atomic introduction",
+        "Do not split those facts across an earlier message and a gateway-backed message",
         "`waapi-skill` is loaded",
         "current WAAPI address",
         "WAAPI adapter version",
-        "current project modification policy",
+        "project modification policy",
         "若有需要，可按需切换模式",
         "ordinary prose, not a status bar, table, field list, or rigid template",
         "Use the first gateway command already required by the user's task",

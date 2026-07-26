@@ -91,6 +91,20 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         # The reflected result schema makes transport optional, but the packaged
         # business verifier deliberately requires a real non-zero uint32 ID.
         expected_result = {"transport": 1}
+    if (
+        entry.version in {"2024.1", "2025.1"}
+        and entry.uri == "ak.wwise.core.audio.convert"
+    ):
+        # The reflected schema allows empty arrays and leaves external item
+        # references unresolved.  Exercise the narrower reviewed product
+        # contract with one canonical value in each required ordered array.
+        args = {
+            "objects": [
+                r"\Actor-Mixer Hierarchy\Default Work Unit\Program Probe"
+            ],
+            "platforms": ["Mac"],
+            "languages": ["SFX"],
+        }
     request_validation = validate_semantic_payload(
         entry.uri,
         args,
@@ -186,6 +200,22 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         "managed_transaction",
         "isolated_transaction",
     }:
+        return
+
+    if "waapi.call" not in entry.transaction_operations:
+        assert entry.transaction_operations
+        with pytest.raises(OperationContractError) as dedicated:
+            parse_operation_request(
+                {
+                    "contract": OPERATION_REQUEST_CONTRACT,
+                    "version": entry.version,
+                    "operation": "waapi.call",
+                    "arguments": {"api": entry.uri, "args": args, "options": options},
+                },
+                expected_version=entry.version,
+            )
+        assert dedicated.value.error_code == "DEDICATED_OPERATION_REQUIRED"
+        assert dedicated.value.details["required_operations"] == list(entry.transaction_operations)
         return
 
     arguments: dict[str, Any] = {"api": entry.uri, "args": args, "options": options}

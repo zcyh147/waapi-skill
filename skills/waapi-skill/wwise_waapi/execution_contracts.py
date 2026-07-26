@@ -112,6 +112,17 @@ FIXED_COMMANDS_BY_URI: Mapping[str, tuple[str, ...]] = MappingProxyType(
     }
 )
 
+DEFAULT_TOPIC_TIMEOUT_SECONDS = 10.0
+TOPIC_TIMEOUT_OVERRIDES: Mapping[str, float] = MappingProxyType(
+    {
+        # SoundBank generation is deliberately started only after the
+        # subscription is established. Real multi-bank/platform generation can
+        # exceed the ordinary short observation window, so this reviewed topic
+        # must not silently cap the gateway's documented 120-second wait at 10.
+        "ak.wwise.core.soundbank.generated": 120.0,
+    }
+)
+
 
 # These functions have a small, side-effect-free request/result contract and
 # may use ``gateway call`` directly. Broader reads intentionally use a reviewed
@@ -122,6 +133,8 @@ BOUNDED_DIRECT_CALL_URIS = frozenset(
         "ak.soundengine.getSwitch",
         "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
         "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
+        "ak.wwise.core.mediaPool.get",
+        "ak.wwise.core.mediaPool.getFields",
         "ak.wwise.core.object.diff",
         "ak.wwise.core.object.isLinked",
         "ak.wwise.core.ping",
@@ -178,6 +191,35 @@ PROJECT_TRANSITION_GUARD_MODES: Mapping[str, str] = MappingProxyType(
         "ak.wwise.ui.project.create": PROJECT_GUARD_TRANSITION_TO_PATH,
         "ak.wwise.ui.project.open": PROJECT_GUARD_TRANSITION_TO_PATH,
         "ak.wwise.ui.project.close": PROJECT_GUARD_TRANSITION_TO_NONE,
+    }
+)
+
+POST_EXECUTION_PROJECT_GUARD_REVALIDATE = "revalidate"
+POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY = "context_runtime_only"
+POST_EXECUTION_PROJECT_GUARD_POLICIES = frozenset(
+    {
+        POST_EXECUTION_PROJECT_GUARD_REVALIDATE,
+        POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY,
+    }
+)
+CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS = frozenset(
+    {
+        "ak.wwise.cli.convertExternalSource",
+        "ak.wwise.cli.generateSoundbank",
+        "ak.wwise.cli.migrate",
+        "ak.wwise.cli.tabDelimitedImport",
+    }
+)
+POST_EXECUTION_PROJECT_GUARD_POLICY_BY_URI: Mapping[str, str] = MappingProxyType(
+    {
+        # These reviewed explicit-project WwiseConsole calls can tear down
+        # their Authoring project context after returning a complete result.
+        # Verification therefore binds the sealed result to the fresh
+        # endpoint/getInfo context and packaged runtime guard without issuing
+        # a second project probe.  Business state remains explicitly
+        # unverified here and is checked independently by live test oracles.
+        uri: POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY
+        for uri in CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS
     }
 )
 
@@ -250,6 +292,7 @@ class ExecutionContract:
     lifecycle_strategy: str = "none"
     companion_uris: tuple[str, ...] = ()
     project_guard_mode: str = PROJECT_GUARD_INVARIANT
+    post_execution_project_guard_policy: str = POST_EXECUTION_PROJECT_GUARD_REVALIDATE
     excluded_reason: str | None = None
 
     @property
@@ -277,6 +320,7 @@ class ExecutionContract:
             "lifecycle_strategy": self.lifecycle_strategy,
             "companion_uris": list(self.companion_uris),
             "project_guard_mode": self.project_guard_mode,
+            "post_execution_project_guard_policy": self.post_execution_project_guard_policy,
             "executable": self.executable,
             "excluded_reason": self.excluded_reason,
         }
@@ -347,7 +391,9 @@ class ExecutionContractRegistry:
                 route="bounded_topic_wait",
                 effect="observation",
                 gateway_commands=("wait-topic",),
-                timeout_seconds=10.0,
+                timeout_seconds=TOPIC_TIMEOUT_OVERRIDES.get(
+                    uri, DEFAULT_TOPIC_TIMEOUT_SECONDS
+                ),
                 result_limit_bytes=256 * 1024,
                 verification_strategy="topic_event_schema",
                 requires_confirmation=False,
@@ -426,6 +472,10 @@ class ExecutionContractRegistry:
             lifecycle_strategy=lifecycle_strategy,
             companion_uris=companions,
             project_guard_mode=project_guard_mode,
+            post_execution_project_guard_policy=POST_EXECUTION_PROJECT_GUARD_POLICY_BY_URI.get(
+                uri,
+                POST_EXECUTION_PROJECT_GUARD_REVALIDATE,
+            ),
         )
 
 
@@ -468,6 +518,49 @@ def validate_packaged_execution_contracts(
         raise ExecutionContractError(
             "Reflected exclusions do not match the approved exclusion registry: "
             f"expected={sorted(APPROVED_EXCLUSIONS)!r}, actual={sorted(reflected_exclusions)!r}"
+        )
+    invalid_post_execution_policies = tuple(
+        (entry.version, entry.uri, entry.post_execution_project_guard_policy)
+        for entry in rows
+        if entry.post_execution_project_guard_policy not in POST_EXECUTION_PROJECT_GUARD_POLICIES
+    )
+    if invalid_post_execution_policies:
+        raise ExecutionContractError(
+            "Execution contracts contain unsupported post-execution project-guard policies: "
+            f"{invalid_post_execution_policies!r}"
+        )
+    context_runtime_only = tuple(
+        entry
+        for entry in rows
+        if entry.post_execution_project_guard_policy
+        == POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY
+    )
+    expected_context_runtime_only = {
+        (version, uri)
+        for version in SUPPORTED_WWISE_VERSION_KEYS
+        for uri in CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS
+    }
+    actual_context_runtime_only = {
+        (entry.version, entry.uri) for entry in context_runtime_only
+    }
+    if actual_context_runtime_only != expected_context_runtime_only or any(
+        entry.route != "isolated_transaction"
+        or entry.project_guard_mode != PROJECT_GUARD_INVARIANT
+        or entry.verification_strategy != "result_schema"
+        for entry in context_runtime_only
+    ):
+        raise ExecutionContractError(
+            "The context/runtime-only post-execution project policy must apply exactly "
+            "to the reviewed explicit-project Wwise CLI isolated/result-schema rows"
+        )
+    if any(
+        entry.post_execution_project_guard_policy
+        != POST_EXECUTION_PROJECT_GUARD_REVALIDATE
+        for entry in rows
+        if (entry.version, entry.uri) not in expected_context_runtime_only
+    ):
+        raise ExecutionContractError(
+            "Every other execution-contract row must retain post-execution project revalidation"
         )
     return {
         "contract": PUBLIC_EXECUTION_CONTRACT,
@@ -554,6 +647,7 @@ def _require_supported_version(version: str) -> None:
 __all__ = [
     "APPROVED_EXCLUSIONS",
     "BOUNDED_DIRECT_CALL_URIS",
+    "CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS",
     "EXPECTED_MANIFEST_VERSION_ROWS",
     "EXPECTED_PUBLIC_UNIQUE_URIS",
     "EXPECTED_PUBLIC_VERSION_ROWS",
@@ -565,6 +659,10 @@ __all__ = [
     "FIXED_COMMANDS_BY_URI",
     "LIFECYCLE_COMPANIONS",
     "PACKAGED_INVENTORY_SHA256",
+    "POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY",
+    "POST_EXECUTION_PROJECT_GUARD_POLICIES",
+    "POST_EXECUTION_PROJECT_GUARD_POLICY_BY_URI",
+    "POST_EXECUTION_PROJECT_GUARD_REVALIDATE",
     "UNDO_GROUP_MEMBER_URIS",
     "PROJECT_GUARD_INVARIANT",
     "PROJECT_GUARD_MODES",

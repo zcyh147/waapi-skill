@@ -41,7 +41,7 @@
         "ak.wwise.core.audio.importTabDelimited: importLanguage, importOperation, importFile",
         "ak.wwise.core.audio.imported: topic payload only"
       ],
-      "return_shape": "Import and importTabDelimited return log, files, and objects arrays. The imported topic publishes objects, files, and the applied operation string.",
+      "return_shape": "audio.import returns required log, files, and objects arrays. importTabDelimited returns an optional objects array. The imported topic publishes objects, files, and the applied operation string.",
       "source_urls": [
         "references/semantic/2024.1/semantic-builder-import.md"
       ],

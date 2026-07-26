@@ -732,6 +732,11 @@ def test_shutdown_records_prefix_scoped_residual_wine_processes(monkeypatch: pyt
 
     monkeypatch.setattr(headless_module.subprocess, "run", fake_run)
     monkeypatch.setattr(headless_module.os, "killpg", lambda pid, sig: None)
+    monkeypatch.setattr(
+        HeadlessLifecycle,
+        "_wait_for_owned_wine_processes_to_exit",
+        lambda self, scoped_prefix: False,
+    )
 
     lifecycle = HeadlessLifecycle(
         console_path=executable,
@@ -742,8 +747,152 @@ def test_shutdown_records_prefix_scoped_residual_wine_processes(monkeypatch: pyt
     lifecycle.shutdown(suppress_errors=True)
 
     assert lifecycle.cleanup_report is not None
-    assert lifecycle.cleanup_report.wineserver_commands == [["wineserver", "-k"], ["wineserver", "-w"], ["wineserver", "-k9"]]
+    assert lifecycle.cleanup_report.wineserver_commands == [
+        ["wineserver", "-k"],
+        ["wineserver", "-k9"],
+    ]
     assert lifecycle.cleanup_report.residual_processes == [ResidualProcess(pid=200, command=f"/usr/bin/env WINEPREFIX={prefix} wineserver")]
+
+
+def test_wineserver_cleanup_uses_explicit_executable_and_scoped_prefix(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    wineserver = make_executable(tmp_path, "wineserver")
+    prefix = tmp_path / "owned prefix"
+    seen: list[tuple[list[str], dict[str, Any]]] = []
+
+    def fake_run(command: list[str], **kwargs: Any) -> object:
+        seen.append((command, kwargs))
+        return types.SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(headless_module.subprocess, "run", fake_run)
+    lifecycle = HeadlessLifecycle(
+        launch_env={
+            "PATH": "/untrusted",
+            "WINESERVER": str(wineserver),
+            "WINEPREFIX": str(prefix),
+        }
+    )
+
+    command = lifecycle._run_wineserver(prefix, "-k")  # pyright: ignore[reportPrivateUsage]
+
+    assert command == [str(wineserver.resolve()), "-k"]
+    assert seen[0][0] == command
+    assert seen[0][1]["env"]["WINEPREFIX"] == str(prefix)
+    assert seen[0][1]["stdout"] is subprocess.DEVNULL
+    assert seen[0][1]["stderr"] is subprocess.DEVNULL
+
+
+def test_wineserver_cleanup_derives_binary_from_wwise_app_bundle(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    console_root = tmp_path / "Wwise.app" / "Contents" / "Tools"
+    server_root = (
+        tmp_path
+        / "Wwise.app"
+        / "Contents"
+        / "SharedSupport"
+        / "Wwise2019x64"
+        / "bin"
+    )
+    console_root.mkdir(parents=True)
+    server_root.mkdir(parents=True)
+    console = make_executable(console_root, "WwiseConsole.sh")
+    wineserver = make_executable(server_root, "wineserver")
+    prefix = tmp_path / "prefix"
+    calls: list[list[str]] = []
+
+    def fake_run(command: list[str], **kwargs: Any) -> object:
+        calls.append(command)
+        return types.SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(headless_module.subprocess, "run", fake_run)
+    lifecycle = HeadlessLifecycle(
+        console_path=console,
+        launch_env={"WINEPREFIX": str(prefix)},
+    )
+
+    command = lifecycle._run_wineserver(prefix, "-k")  # pyright: ignore[reportPrivateUsage]
+
+    assert command == [str(wineserver.resolve()), "-k"]
+    assert calls == [command]
+
+
+@pytest.mark.parametrize("configured", ["relative/wineserver", "/missing/wineserver"])
+def test_wineserver_cleanup_does_not_fall_back_from_invalid_explicit_binary(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    configured: str,
+) -> None:
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        headless_module.subprocess,
+        "run",
+        lambda command, **kwargs: calls.append(command),
+    )
+    prefix = tmp_path / "prefix"
+    lifecycle = HeadlessLifecycle(
+        launch_env={"WINESERVER": configured, "WINEPREFIX": str(prefix)}
+    )
+
+    assert lifecycle._run_wineserver(prefix, "-k") is None  # pyright: ignore[reportPrivateUsage]
+    assert calls == []
+
+
+def test_wineserver_cleanup_polls_before_escalating(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    prefix = tmp_path / "prefix"
+    commands: list[tuple[str, ...]] = []
+    waits = iter((True,))
+
+    def fake_run(self: HeadlessLifecycle, scoped_prefix: Path, *args: str) -> list[str]:
+        assert scoped_prefix == prefix
+        commands.append(args)
+        return ["wineserver", *args]
+
+    monkeypatch.setattr(HeadlessLifecycle, "_run_wineserver", fake_run)
+    monkeypatch.setattr(
+        HeadlessLifecycle,
+        "_wait_for_owned_wine_processes_to_exit",
+        lambda self, scoped_prefix: next(waits),
+    )
+    lifecycle = HeadlessLifecycle(launch_env={"WINEPREFIX": str(prefix)})
+
+    completed = lifecycle._shutdown_owned_wineserver_prefix()  # pyright: ignore[reportPrivateUsage]
+
+    assert commands == [("-k",)]
+    assert completed == [["wineserver", "-k"]]
+
+
+def test_wineserver_cleanup_escalates_after_bounded_poll(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    prefix = tmp_path / "prefix"
+    commands: list[tuple[str, ...]] = []
+    waits = iter((False, True))
+
+    def fake_run(self: HeadlessLifecycle, scoped_prefix: Path, *args: str) -> list[str]:
+        assert scoped_prefix == prefix
+        commands.append(args)
+        return ["wineserver", *args]
+
+    monkeypatch.setattr(HeadlessLifecycle, "_run_wineserver", fake_run)
+    monkeypatch.setattr(
+        HeadlessLifecycle,
+        "_wait_for_owned_wine_processes_to_exit",
+        lambda self, scoped_prefix: next(waits),
+    )
+    lifecycle = HeadlessLifecycle(launch_env={"WINEPREFIX": str(prefix)})
+
+    completed = lifecycle._shutdown_owned_wineserver_prefix()  # pyright: ignore[reportPrivateUsage]
+
+    assert commands == [("-k",), ("-k9",)]
+    assert completed == [["wineserver", "-k"], ["wineserver", "-k9"]]
 
 
 def test_shutdown_handles_process_without_poll_or_terminate(tmp_path: Path) -> None:

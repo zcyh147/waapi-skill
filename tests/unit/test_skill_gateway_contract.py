@@ -38,8 +38,8 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
     assert "unsupported_by_skill_interface" in skill
     assert "A fail-closed execution registry assigns all 814 reflected version/API rows" in skill
     assert "769 executable rows and 45 explicit exclusions" in skill
-    assert "each `transaction_operation` row requires immutable preview/confirmation through its declared closed operation" in skill
-    assert "`waapi.undoGroup` for the three Undo members, `waapi.call` otherwise" in skill
+    assert "each `transaction_operation` row requires immutable preview/confirmation through exactly one declared closed lane" in skill
+    assert "`waapi.undoGroup` for the three Undo members, and `waapi.call` only when the catalog explicitly lists it" in skill
     assert "FIXED_COMMAND_REQUIRED" in skill
     assert "WAIT_TOPIC_REQUIRED" in skill
     assert "--dry-run" in skill
@@ -51,7 +51,7 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
     assert "Do not run `describe` or `capabilities` first" in skill
     assert "run exactly one matching `call` command" in skill
     assert "replacing `<supported-version>` with the exact requested or connected Wwise version" in skill
-    assert "except for an explicit exact reflection call covered by the fast route above" in skill
+    assert "except for an explicit exact reflection call or a reviewed direct `waapi.call` fast route" in skill
     assert "read any later named lane reference exactly once with `cat /absolute/path/to/waapi-skill/references/<file>.md`" in skill
     assert "Never run `wc -l`, `ls`, `rg`, `find`, `stat`, `test`" in skill
     assert "never split one reference across multiple reads" in skill
@@ -61,6 +61,18 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
     ) in skill
     assert "This rule applies to fixed reads as well as transactions" in skill
     assert "do not run another command after receiving it" in skill
+
+
+def test_cli_bootstrap_uses_only_the_injected_absolute_skill_locator() -> None:
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "begin with the injected absolute SKILL.md locator" in skill
+    assert "never search the current workspace or infer a repository-relative Skill path" in skill
+    assert "Bootstrap only from the injected absolute `SKILL.md` locator" in skill
+    assert "Never guess a repository-relative `skills/waapi-skill` path" in skill
+    for forbidden_probe in ("`pwd`", "`git status`", "`ls`", "`find`", "`rg`"):
+        assert forbidden_probe in skill
+    assert "including for Wwise CLI and project-migration requests" in skill
 
 
 def test_query_reference_has_no_raw_client_fallback() -> None:
@@ -100,6 +112,30 @@ def test_query_reference_has_no_raw_client_fallback() -> None:
     assert "repeat the metadata command after success" in query_reference
 
 
+def test_query_reference_exposes_only_the_closed_original_file_match_surface() -> None:
+    query_reference = (SKILL_ROOT / "references" / "waapi-query.md").read_text(
+        encoding="utf-8"
+    )
+    query_flat = " ".join(query_reference.split())
+    command = (
+        "python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version "
+        "2025.1 query-object --type AudioFileSource --take 1000 "
+        "--match-original-file-path '<first-complete-returned-Path>' "
+        "--match-original-file-path '<second-complete-returned-Path>'"
+    )
+
+    assert command in query_flat
+    assert "repeating only the final candidate option" in query_flat
+    assert "Each path is limited to 1024 UTF-8 bytes" in query_flat
+    assert "candidate-limit boundary" in query_flat
+    assert "do not silently truncate" in query_flat
+    assert "Do not add `--where-json`, `--select`, `--all-results`, or `--return-field`" in query_flat
+    assert "never run the old unfiltered 1000-row AudioFileSource projection" in query_flat
+    assert "--return-field originalFilePath" not in query_reference
+    assert "A 1000-row scan returns `ORIGINAL_FILE_REFERENCE_SCAN_INCOMPLETE`" in query_flat
+    assert "with no `agent_result`" in query_flat
+
+
 def test_existing_transaction_continuation_precedes_named_operation_schema() -> None:
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
     operate = (SKILL_ROOT / "references" / "waapi-operate.md").read_text(encoding="utf-8")
@@ -113,6 +149,11 @@ def test_existing_transaction_continuation_precedes_named_operation_schema() -> 
     assert "A transaction id is required: an artifact hash alone is not a lookup key" in operate
     assert "The first gateway command is `transaction-show <transaction-id> --summary-only`" in operate
     assert "Do not call `operations`, `operation-schema`, or `preview` first" in operate
+    assert "always preserves the exact immutable `request`" in operate
+    assert "complete cleanup spec" in operate
+    assert "`summary_contract` and `detail_level`" in operate
+    assert "A digest projection is an intentional bounded review" in operate
+    assert "Never reconstruct omitted" in operate
     assert operate.index("## Choose the transaction phase first") < operate.index("## Closed transaction flow")
 
 
@@ -128,11 +169,24 @@ def test_public_readmes_route_users_only_through_the_packaged_gateway() -> None:
             "python scripts/run.py gateway.py query-object",
             "python scripts/run.py gateway.py operation-schema object.setNotes",
             "python scripts/run.py gateway.py preview",
-            "python scripts/run.py gateway.py confirm <transaction-id> --artifact-hash <artifact-hash>",
+            "python scripts/run.py gateway.py transaction-show <transaction-id> --summary-only",
+            "python scripts/run.py gateway.py confirm <transaction-id> --confirmation-token <confirmation-token>",
             "python scripts/run.py gateway.py execute <transaction-id>",
             "python scripts/run.py gateway.py verify <transaction-id>",
         ):
             assert command in readme
+        assert "confirm <transaction-id> --artifact-hash <full-artifact-hash>" in readme
+        assert readme.index("python scripts/run.py gateway.py preview") < readme.index(
+            "python scripts/run.py gateway.py transaction-show <transaction-id> --summary-only"
+        )
+        assert readme.index(
+            "python scripts/run.py gateway.py transaction-show <transaction-id> --summary-only"
+        ) < readme.index(
+            "python scripts/run.py gateway.py confirm <transaction-id> --confirmation-token <confirmation-token>"
+        )
+        assert readme.count(
+            "python scripts/run.py gateway.py confirm <transaction-id> --artifact-hash"
+        ) == 0
         for internal_route in ("WwiseDispatcher", "waapi_client", "SemanticPlanner", "semantic planner path"):
             assert internal_route not in readme
         assert "inline Python" in readme
@@ -140,9 +194,11 @@ def test_public_readmes_route_users_only_through_the_packaged_gateway() -> None:
         assert "--dry-run" in readme
 
     assert "Manifest reflection is discovery, not permission" in readmes[0]
-    assert "immutable reviewed allowlists" in readmes[0]
+    assert "immutable reviewed set" in readmes[0]
+    assert "only for legacy transactions and programmatic compatibility" in readmes[0]
     assert "Manifest 反射只用于发现能力，不等于授权执行" in readmes[1]
-    assert "immutable reviewed allowlist" in readmes[1]
+    assert "经过 immutable review" in readmes[1]
+    assert "只作为旧 transaction 和程序兼容入口保留" in readmes[1]
 
 
 def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
@@ -165,11 +221,11 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
         assert "**622**" in readme
         assert "**147**" in readme
         assert "**45**" in readme
-        assert "957" in readme
+        assert "1457" in readme
         assert "./skills/waapi-skill/references/waapi-coverage.md" in readme
 
     assert "188 unique executable WAAPI URIs" in english
     assert "188 个唯一可执行 WAAPI URI" in chinese
     assert "not a claim that all 769 rows have been exercised against a real Wwise process" in english
     assert "不等于已经在真实 Wwise 进程中逐一运行了全部 769 行" in chinese
-    assert "currently contains 957 passing tests" in coverage_contract
+    assert "currently contains 1457 passing tests" in coverage_contract

@@ -11,8 +11,8 @@ every endpoint has been exercised against a live Wwise installation.
 | 2022.1 | 144 | 52 | 85 | 7 | 137 (106 functions + 31 topics) |
 | 2023.1 | 181 | 53 | 117 | 11 | 170 (139 functions + 31 topics) |
 | 2024.1 | 178 | 49 | 119 | 10 | 168 (139 functions + 29 topics) |
-| 2025.1 | 185 | 50 | 125 | 10 | 175 (145 functions + 30 topics) |
-| Total version/API rows | 814 | 247 | 522 | 45 | 769 |
+| 2025.1 | 185 | 52 | 123 | 10 | 175 (145 functions + 30 topics) |
+| Total version/API rows | 814 | 249 | 520 | 45 | 769 |
 
 The 769 executable rows represent 188 unique public WAAPI URIs across the five
 versions. A hard boundary is never counted as executable coverage.
@@ -107,7 +107,7 @@ closed until the packaged contract is reviewed and updated.
 
 ## Verification scope
 
-The focused program gate currently contains 957 passing tests and exercises
+The focused program gate currently contains 1457 passing tests and exercises
 all 769 executable version/API rows with
 in-process fake clients. It validates exact URI dispatch, reflected request and
 result/event schemas, timeout/result ceilings, transaction preparation and
@@ -118,8 +118,10 @@ route bypass attempts, model-authored external command hooks, malformed nested
 payloads, and manifest drift. Direct and isolated generic transactions also run
 through complete preview/confirm/execute/verify program chains.
 
-This iteration ran five narrow, memory-off Codex Terra prompt probes only for
-the one-time natural onboarding behavior. It did not run broad endpoint
-semantic A/B tests or the full live-Wwise matrix. Therefore report the API
-result as “program-tested packaged coverage,” not “769 endpoints live-verified in
-Wwise.”
+The completed, memory-off `h80-release-c38` Codex Terra campaign ran 80
+real-Wwise business scenarios for the 16 approved heavy APIs: 70 on 2022.1,
+five on 2024.1, and five on 2025.1. All 80 passed with sandbox cleanup and
+sealed evidence. That result applies only to the exact heavy-suite candidate;
+the later reflected-identical 2025.1 `audio.convert` mapping and the wider 769
+row interface remain “program-tested packaged coverage,” not individually
+live-semantic-verified.

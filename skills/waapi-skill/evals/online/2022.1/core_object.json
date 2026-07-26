@@ -1,0 +1,1931 @@
+{
+  "contract": "waapi-skill.codex-semantic-online-cases/v3",
+  "version": "2022.1",
+  "cases": [
+    {
+      "id": "OBJ22-F-COPY-01",
+      "api": "ak.wwise.core.object.copy",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "subtree_copy_with_collision",
+      "scenario_index": 1,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weapons_Source` 这一整套武器声音复制到 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Variants` 下面。目标里已经有一个同名对象，保留原来的，给新副本自动避让命名；复制后帮我核对两层子结构、音量和备注有没有完整带过去。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，就按这个方案执行，完成后把层级和属性核对结果告诉我。",
+      "fixture": {
+        "adapter": "core_object_tree_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create source ActorMixer Weapons_Source with RandomSequenceContainer and two Sound descendants",
+          "set source notes and Volume and create an existing same-name child under Variants",
+          "record all fixture GUIDs, paths, selected properties, and source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.copy", "count": 1, "effect": "copy the complete source subtree under Variants with onNameConflict=rename"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.copy", "expectation": "source subtree and pre-existing target collision exist with recorded GUIDs; no copied root GUID exists"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.copy", "expectation": "source, target collision, parent child sets, GUIDs, paths, and selected values exactly equal the before snapshot"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.copy", "expectation": "exactly one renamed copied root exists under Variants with a new GUID and the expected two-level child type/name topology"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.copy", "expectation": "copied notes and Volume equal source values while every copied GUID differs and all source GUIDs, paths, and values remain unchanged"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.copy", "expectation": "all hidden-GUID fixture objects are absent after cleanup and immutable source hashes match baseline"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-COPY-02",
+      "api": "ak.wwise.core.object.copy",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "subtree_copy_with_references",
+      "scenario_index": 2,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Ambience_Source` 的完整环境声分支复制到 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Level02`。那里没有同名项，名称必须保持不变；请确认 Blend Container 下面的日夜两个分支、Output Bus 引用和 Pitch 都和源分支一致，源分支不能被改动。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认执行这次复制，结束后把源和副本的差异核对给我。",
+      "fixture": {
+        "adapter": "core_object_tree_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create Ambience_Source BlendContainer with Day and Night ActorMixer descendants and a Level02 target",
+          "assign a sandbox Audio Bus reference and non-default Pitch to the source",
+          "record source tree GUIDs, reference IDs, values, and source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.copy", "count": 1, "effect": "copy Ambience_Source under Level02 without a name collision"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.copy", "expectation": "Level02 has no Ambience_Source child and the source topology, Pitch, and OutputBus GUID are recorded"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.copy", "expectation": "Level02 still has no copy and source tree GUIDs, paths, properties, references, and child graph equal baseline"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.copy", "expectation": "Level02 has exactly one Ambience_Source copy with Day and Night descendants and distinct GUIDs"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.copy", "expectation": "copy Pitch and @OutputBus.id equal the source baseline; source tree GUIDs, paths, and values are unchanged"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.copy", "expectation": "owned copy and fixtures are deleted by hidden GUID and source-project hashes are unchanged"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-CREATE-01",
+      "api": "ak.wwise.core.object.create",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "recursive_hierarchy_create",
+      "scenario_index": 1,
+      "prompt": "在 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab` 下新建一套 `Player_Foley`：根节点用 Actor Mixer，备注写明“角色脚步统一入口”，下面一次建出 `Footsteps` 随机容器和 `Cloth` 混合容器。`Footsteps` 里放 `Footstep_A`、`Footstep_B` 两个 Sound，`Cloth` 里放 `Cloth_A`、`Cloth_B` 两个 Sound。根节点音量设为 -2 dB；创建完请按层级列出对象类型和路径。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "方案没问题，照这个层级创建并核对结果。",
+      "fixture": {
+        "adapter": "core_object_parent_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create empty SemanticLab parent in the sandbox and prove Player_Foley path absent",
+          "record parent GUID, child set, and source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.create", "count": 1, "effect": "recursively create the Player_Foley hierarchy with notes and root Volume"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "Player_Foley and every requested descendant path are absent under SemanticLab"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "all requested paths remain absent and the SemanticLab parent child set equals the before snapshot"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "one ActorMixer root, one RandomSequenceContainer, one BlendContainer, and four named Sound descendants exist at the exact requested paths"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "created result GUIDs match readback GUIDs; root notes equal 角色脚步统一入口 and Volume equals -2.0"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.create", "expectation": "on success, the case-owned project copy and created subtree are deleted and source-project hashes remain unchanged; on failure or an indeterminate result, this sandbox and sealed evidence are quarantined and never reused"}
+      ],
+      "cleanup": {"adapter": "scenario_project_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "OBJ22-F-CREATE-02",
+      "api": "ak.wwise.core.object.create",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "merge_hierarchy_create",
+      "scenario_index": 2,
+      "prompt": "在 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\NPC` 下整理 `Robot_VO` Actor Mixer：它已经有一组 `Idle` 随机容器和一个 `Idle_A` Sound，这部分要原样保留；再合并进 `Alert`、`Combat`、`Damage` 三组随机容器。`Alert` 备注写“警戒对白”，放 `Alert_A`、`Alert_B`；`Combat` 备注写“战斗对白”，放 `Combat_A`、`Combat_B`；`Damage` 备注写“受击对白”，放 `Damage_A`、`Damage_B`。不要另建 `Robot_VO_01`，完成后把四组的路径和类型列给我。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，合并到现有节点并补齐这三组结构。",
+      "fixture": {
+        "adapter": "core_object_parent_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create NPC parent and a Robot_VO ActorMixer collision with an Idle RandomSequenceContainer and Idle_A Sound",
+          "record collision, Idle, and Idle_A GUIDs plus fields, ordered child graph, and source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.create", "count": 1, "effect": "merge three recursive VO groups into Robot_VO while preserving its existing Idle subtree"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "exactly one Robot_VO exists with the recorded Idle and Idle_A GUIDs; no suffixed Robot_VO sibling or requested new group exists"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "Robot_VO and the complete Idle subtree equal their before snapshots and no requested or suffixed path exists"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "the original Robot_VO GUID is retained and now contains Idle, Alert, Combat, and Damage RandomSequenceContainer groups; each requested new group has two named Sound children"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "Idle and Idle_A retain exact GUIDs, paths, fields, and relative order; each new group has its requested notes and no Robot_VO_01 or other collision rename exists"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.create", "expectation": "on success, the case-owned project copy and every case GUID are deleted and source-project hashes remain unchanged; on failure or an indeterminate result, the sealed sandbox is quarantined and never reused"}
+      ],
+      "cleanup": {"adapter": "scenario_project_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "OBJ22-F-CREATE-03",
+      "api": "ak.wwise.core.object.create",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "rename_collision_recursive_create",
+      "scenario_index": 3,
+      "prompt": "在 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Weapons` 下再建一套 `Impact_Library` Actor Mixer。这里已经有一套同名旧分支，旧分支必须完整保留，新分支让 Wwise 自动换个不冲突的名字即可。新分支备注写“新版材质碰撞库”，Volume 设为 -1.5 dB；下面建 `Metal` 和 `Wood` 两个随机容器，各放 `Light`、`Heavy` 两个 Sound。建完告诉我新分支的实际名称，并核对旧分支没有变化。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，保留旧分支，按预览创建自动换名的新分支。",
+      "fixture": {
+        "adapter": "core_object_parent_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create a runner-owned Weapons parent with one Impact_Library collision containing a protected Legacy branch",
+          "record collision subtree GUIDs, notes, Volume, parent child set, absence of other rename candidates, and source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.create", "count": 1, "effect": "create a recursively populated Impact_Library with onNameConflict=rename while preserving the collision"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "one exact-name Impact_Library collision exists with its protected Legacy subtree and no case-created renamed sibling exists"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "the collision subtree, parent child set, notes, Volume, and all GUIDs equal before state and no new sibling path exists"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "exactly one new sibling with a returned GUID distinct from the collision exists; its actual name differs from Impact_Library and its Metal/Wood hierarchy contains the four requested Sounds"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "the new root notes and Volume equal requested values while every original collision and Legacy GUID, path, field, and child edge remains unchanged"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.create", "expectation": "on success, the case-owned project copy, renamed root, and every case GUID are deleted and source hashes remain unchanged; on failure or an indeterminate result, the sealed sandbox is quarantined and never reused"}
+      ],
+      "cleanup": {"adapter": "scenario_project_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "OBJ22-F-CREATE-04",
+      "api": "ak.wwise.core.object.create",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "fail_exact_name_routed_create",
+      "scenario_index": 4,
+      "prompt": "在 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Characters` 下新建 `Hero_VO` Actor Mixer，名称必须保持原样；如果发现同名项就先停下，不要合并或自动改名。根节点备注写“主角对白入口”，Volume 设为 -4 dB，Output Bus 接到 `\\Master-Mixer Hierarchy\\Default Work Unit\\VO_Bus`。下面建 `Story` 和 `Combat` 两个随机容器，`Story` 放 `Greeting`、`Quest`，`Combat` 放 `Attack`、`Damage`、`Death`，这些叶子都用 Sound。完成后核对层级、音量和总线引用。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认名称没有冲突，按这个层级和路由创建。",
+      "fixture": {
+        "adapter": "core_object_parent_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create runner-owned Characters and VO_Bus fixtures and prove Hero_VO plus every requested descendant path absent",
+          "record parent and bus GUIDs, protected sibling graph, complete target-absence guard, and source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.create", "count": 1, "effect": "create an exact-name routed Hero_VO tree with onNameConflict=fail after an absence guard"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "Hero_VO and every requested descendant are absent; Characters protected siblings and the canonical VO_Bus GUID are recorded"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "the complete target graph remains absent and Characters, VO_Bus, and protected sibling snapshots equal before state"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "exactly one unsuffixed Hero_VO exists with Story and Combat containers and the five named Sound descendants at exact paths; no alternate Hero_VO name exists"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "all result GUIDs match readback topology, root notes equal 主角对白入口, Volume equals -4.0, and @OutputBus.id equals the recorded VO_Bus GUID"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.create", "expectation": "on success, the case-owned project copy, returned Hero_VO tree, and owned fixtures are deleted; on failure or an indeterminate result, this sandbox is sealed, quarantined, and never reused; source hashes remain baseline"}
+      ],
+      "cleanup": {"adapter": "scenario_project_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "OBJ22-F-CREATE-05",
+      "api": "ak.wwise.core.object.create",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "owned_collision_replace_create",
+      "scenario_index": 5,
+      "prompt": "`\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Generated` 下的 `Prototype_Footsteps` 是一次性旧结构，可以整支替换。请用新的 `Prototype_Footsteps` Actor Mixer 取代它：备注写“新脚步原型”，下面建 `Sneakers`、`Boots`、`Barefoot` 三个随机容器，每组放 `Walk`、`Run` 两个 Sound。旧分支原来的对象都不需要保留，但同级的 `Keep_Me` 分支绝对不要动；完成后请确认旧对象已经不存在，新结构只出现一套。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认替换这套一次性旧结构，并完整保留 `Keep_Me`。",
+      "fixture": {
+        "adapter": "core_object_parent_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create a runner-owned Generated root with a disposable Prototype_Footsteps collision subtree and a protected Keep_Me sibling",
+          "record every old collision GUID/path, Keep_Me topology and fields, parent child set, ownership proof, and source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.create", "count": 1, "effect": "replace the proven runner-owned Prototype_Footsteps collision with the requested recursive tree"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "the disposable collision and all old descendant GUIDs exist under Generated; Keep_Me has a complete protected snapshot"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "the collision, every old descendant, Keep_Me, and Generated child set exactly equal before state before confirmation"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "every old collision GUID is absent; one exact-name Prototype_Footsteps with a different root GUID contains Sneakers, Boots, Barefoot and six requested Sound descendants"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.create", "expectation": "the new root notes equal 新脚步原型, all returned GUIDs match the new topology, and Keep_Me retains exact GUIDs, paths, fields, child order, and references"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.create", "expectation": "on success, the case-owned project copy, replacement root, and Generated fixture are deleted; because old GUIDs cannot be reconstructed, any failed or indeterminate sandbox is sealed, quarantined, and never reused; source hashes remain unchanged"}
+      ],
+      "cleanup": {"adapter": "scenario_project_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "OBJ22-F-DELETE-01",
+      "api": "ak.wwise.core.object.delete",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "subtree_delete_with_sibling_protection",
+      "scenario_index": 1,
+      "prompt": "删除 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Obsolete_Weapons` 整个废弃分支，包括它下面的两个容器和四个 Sound；同级的 `Weapons_Current` 要完整保留。执行后帮我确认旧路径和所有子对象都已经查不到，保留分支的 GUID 和音量没有变化。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认删除这个废弃分支，保留 `Weapons_Current`。",
+      "fixture": {
+        "adapter": "core_object_tree_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create Obsolete_Weapons subtree with two containers and four Sound descendants",
+          "create Weapons_Current sibling and record all GUIDs, paths, values, and source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.delete", "count": 1, "effect": "delete Obsolete_Weapons and its owned descendants"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.delete", "expectation": "the obsolete root and every recorded descendant GUID exist; Weapons_Current baseline is recorded"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.delete", "expectation": "obsolete root, every descendant, and Weapons_Current all remain present with exact before snapshots"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.delete", "expectation": "object.get by each deleted GUID and old path returns zero rows"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.delete", "expectation": "Weapons_Current retains its exact GUID, path, child set, and Volume baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.delete", "expectation": "remaining owned fixtures are removed and immutable source hashes match baseline"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-DELETE-02",
+      "api": "ak.wwise.core.object.delete",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "specific_branch_delete",
+      "scenario_index": 2,
+      "prompt": "`\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Ambience\\Rain_Old` 已经不用了，把这个随机容器连同三个子 Sound 删除，但不要动同一父级下的 `Rain_New` 和 `Wind`。删除后请确认父级只少了这一支，而且剩余两个分支原来的顺序、路径和 Output Bus 引用都没变。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，删除 `Rain_Old` 这一支并核对其余分支。",
+      "fixture": {
+        "adapter": "core_object_tree_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create Ambience parent with ordered Rain_Old, Rain_New, and Wind branches",
+          "give Rain_Old three Sound children and record all child GUIDs plus sibling references and source hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.delete", "count": 1, "effect": "delete only Rain_Old and its three descendants"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.delete", "expectation": "Ambience contains the three expected branch GUIDs and all Rain_Old descendant GUIDs exist"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.delete", "expectation": "parent ordered child set, Rain_Old subtree, and protected sibling snapshots all equal before state"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.delete", "expectation": "Rain_Old root and three child GUIDs are absent while the parent child count decreases by exactly one branch"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.delete", "expectation": "Rain_New and Wind retain baseline GUIDs, paths, relative order, and @OutputBus.id values"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.delete", "expectation": "all remaining fixture GUIDs are removed and source-project hashes are unchanged"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-DIFF-01",
+      "api": "ak.wwise.core.object.diff",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "property_reference_diff",
+      "scenario_index": 1,
+      "prompt": "比较 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Mix_A` 和 `Mix_B`，我想知道它们在 Volume、Pitch 和 Output Bus 上到底有哪些不同。请只报告 Wwise 实际认定为不同的属性或引用，并顺手确认比较没有改动任何一个对象。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "core_object_pair_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create same-type Mix_A and Mix_B with different Volume, Pitch, and OutputBus values",
+          "record complete before snapshots and source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.diff", "count": 1, "effect": "return property/reference names that differ between Mix_A and Mix_B"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.diff", "expectation": "fixture readback proves Volume, Pitch, and OutputBus differ and both objects share the same object type"},
+        {"phase": "after", "adapter": "waapi_diff_readback", "subject_api": "ak.wwise.core.object.diff", "expectation": "result properties contains the reflected names for Volume, Pitch, and OutputBus and contains no fabricated difference"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.diff", "expectation": "both object snapshots are byte-for-byte equivalent to their before snapshots"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.diff", "expectation": "fixture GUIDs are deleted and source-project hashes match baseline"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-DIFF-02",
+      "api": "ak.wwise.core.object.diff",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "expected_property_diff",
+      "scenario_index": 2,
+      "prompt": "帮我检查 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\VO_Template` 和 `VO_Candidate` 的配置差异。它们应该只有 Lowpass 和 Make-Up Gain 不同，其他配置一致；如果 Wwise 还报告了别的属性或列表差异，也请明确列出来。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "core_object_pair_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create same-type VO_Template and VO_Candidate with only Lowpass and MakeupGain values different",
+          "record object snapshots and source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.diff", "count": 1, "effect": "compare template and candidate property/reference/list configuration"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.diff", "expectation": "fixture proves only reflected Lowpass and MakeupGain fields differ"},
+        {"phase": "after", "adapter": "waapi_diff_readback", "subject_api": "ak.wwise.core.object.diff", "expectation": "result properties is exactly the normalized set for Lowpass and MakeupGain and lists is empty"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.diff", "expectation": "template and candidate retain original GUIDs, paths, and property snapshots"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.diff", "expectation": "owned pair is removed and source-project hashes remain unchanged"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-GET-01",
+      "api": "ak.wwise.core.object.get",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "filtered_descendant_inventory",
+      "scenario_index": 1,
+      "prompt": "盘点 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Combat` 下面三层以内的 Sound，只保留 Volume 低于 -6 dB 或者备注里带 `needs-review` 的项。按完整路径排序，给我名称、GUID、类型、Volume、备注和 Output Bus，最后汇总各类型数量。为避免清单过长，这次最多返回 24 条候选记录；如果达到上限，请明确说明结果可能不完整。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "core_object_query_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create a three-level Combat hierarchy containing matching and non-matching Sound objects plus a depth-four Sound that otherwise satisfies the filter",
+          "assign deterministic Volume, notes, and OutputBus values; seal the expected ordered rows and the excluded depth-four decoy GUID"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.get", "count": 1, "effect": "bounded object query returning filtered descendants and requested fields"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "fixture_expected_rows", "subject_api": "ak.wwise.core.object.get", "expectation": "expected set contains both predicate branches, excludes deliberate near-misses and the sealed depth-four true-match decoy GUID, and has deterministic path order"},
+        {"phase": "after", "adapter": "waapi_object_query_readback", "subject_api": "ak.wwise.core.object.get", "expectation": "returned GUID set and path order exactly match expected rows with id, name, type, path, Volume, notes, and @OutputBus.id; the depth-four decoy GUID is absent"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.object.get", "expectation": "reported per-type counts equal a recomputation from returned rows and no non-matching object is reported"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.get", "expectation": "query changed no fixture state; on success the case-owned project copy is deleted, on failure or an indeterminate result it is sealed and never reused, and source hashes are unchanged"}
+      ],
+      "cleanup": {"adapter": "scenario_project_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "OBJ22-F-GET-02",
+      "api": "ak.wwise.core.object.get",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "prefix_parent_child_inventory",
+      "scenario_index": 2,
+      "prompt": "查一下 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab` 里名字以 `VO_` 开头的随机容器，并把它们直接子级的 Sound 一起整理出来。每个直接子 Sound 单独一行，同时列出父容器和子 Sound 各自的完整路径，以及这个 Sound 的语言、音量和备注；同一个子对象不要重复，结果按父级路径再按子级名称排列。这次最多返回 24 条候选记录；如果达到上限，请明确说明结果可能不完整。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "core_object_query_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create several VO_ and non-VO RandomSequenceContainer branches with overlapping-style names but unique GUIDs",
+          "create direct and nested Sound descendants with deterministic language, Volume, and notes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.get", "count": 1, "effect": "bounded query selecting matching containers and their direct Sound children"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "fixture_expected_rows", "subject_api": "ak.wwise.core.object.get", "expectation": "expected graph distinguishes direct children from deeper descendants and includes deliberate prefix near-misses"},
+        {"phase": "after", "adapter": "waapi_object_query_readback", "subject_api": "ak.wwise.core.object.get", "expectation": "returned container and child GUID sets exactly match the expected direct-parent graph without duplicates"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.object.get", "expectation": "each row includes parent identity, path, language, Volume, and notes and is sorted by parent path then child name"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.get", "expectation": "read operation leaves state unchanged; on success the case-owned project copy and all owned GUIDs are removed, on failure or an indeterminate result the sandbox is sealed and never reused, and source hashes match"}
+      ],
+      "cleanup": {"adapter": "scenario_project_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "OBJ22-F-GET-03",
+      "api": "ak.wwise.core.object.get",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "bounded_mix_review_rollup",
+      "scenario_index": 3,
+      "prompt": "帮我复核 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab_Query03\\CombatMix` 这棵层级里的混音问题：从全部后代中找出同时满足 Sound、Volume 不高于 -6 dB、备注包含 `mix-review`、并且已纳入工程的对象，最多取 12 条。请按完整路径排序，列出名称、GUID、Volume、备注、语言和 Output Bus，再按 Output Bus 汇总数量，并说明结果有没有触及 12 条上限。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "core_object_query_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create an isolated four-level SemanticLab_Query03/CombatMix hierarchy with exactly eight matching Sound descendants distributed 5-to-3 across two owned Output Buses and across SFX and English languages",
+          "create at least eight deliberate decoys that each fail exactly one of type, Volume, notes, inclusion, or subtree membership, including a match-like Sound outside CombatMix",
+          "record every fixture path-to-GUID mapping, selected fields, the exact eight-row path order, the two OutputBus GUID count buckets, all excluded GUIDs, and source-project hashes before the task"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.get", "count": 1, "effect": "query the exact CombatMix path, select descendants, apply type/Volume/notes/isIncluded conjunctions, take at most 12 rows, and return the requested fields"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "fixture_expected_rows", "subject_api": "ak.wwise.core.object.get", "expectation": "hidden baseline contains exactly eight expected path-to-GUID rows, five and three rows for the two recorded OutputBus GUIDs, and distinct excluded GUID sets for every failed predicate and the out-of-subtree decoy"},
+        {"phase": "after", "adapter": "waapi_object_query_readback", "subject_api": "ak.wwise.core.object.get", "expectation": "returned GUID set and path-sorted path list exactly equal the eight-row baseline; every row's name, type, path, Volume, notes, language, isIncluded, and @OutputBus.id equal its recorded values and no excluded GUID appears"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.object.get", "expectation": "reported Output Bus buckets exactly match the independent 5-to-3 GUID counts, total equals eight, and the answer explicitly reports that the 12-row bound was not reached"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.get", "expectation": "the read leaves every fixture GUID and field unchanged; on success the case-owned project copy is deleted, on failure or an indeterminate result it is sealed and never reused, and source-project hashes remain unchanged"}
+      ],
+      "cleanup": {"adapter": "scenario_project_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "OBJ22-F-GET-04",
+      "api": "ak.wwise.core.object.get",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "parent_transform_deduplicated_container_audit",
+      "scenario_index": 4,
+      "prompt": "整理一下 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab_Query04\\ParentReview` 里的武器容器：从其中的 Sound 反查直接父级，只保留类型为 Random Container、至少有 3 个直接子对象、备注包含 `parent-review` 的父容器，最多返回 10 个。结果要去重并按父级完整路径排序，列出名称、GUID、路径、直接子对象数、备注和 Output Bus，最后汇总一共命中了多少个父容器、覆盖多少个直接子 Sound。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "core_object_query_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create three matching RandomSequenceContainer parents below SemanticLab_Query04/ParentReview with three, four, and five direct Sound children, parent-review notes, distinct GUIDs, and two owned Output Bus assignments",
+          "create decoy parents for every near miss: a two-child RandomSequenceContainer, a qualifying ActorMixer, a qualifying RandomSequenceContainer outside ParentReview, and a branch whose Sound is only an indirect descendant",
+          "record the exact three parent path-to-GUID rows, all twelve direct Sound-to-parent GUID edges, expected path order and OutputBus values, every excluded GUID, and source-project hashes before the task"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.get", "count": 1, "effect": "start from Sound objects, select each direct parent, constrain path/type/childrenCount/notes, take at most 10 rows, and return one deduplicated parent inventory"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "fixture_expected_rows", "subject_api": "ak.wwise.core.object.get", "expectation": "hidden baseline contains exactly three expected parent GUID/path rows, twelve exact direct Sound-to-parent GUID edges partitioned 3/4/5, and separate excluded GUIDs for low-child-count, wrong-type, outside-subtree, and indirect-parent decoys"},
+        {"phase": "after", "adapter": "waapi_object_query_readback", "subject_api": "ak.wwise.core.object.get", "expectation": "returned parent GUID set and path-sorted path list exactly equal the three-row baseline with no duplicate GUID; each type, path, childrenCount, notes, and @OutputBus.id matches baseline and no excluded parent appears"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.object.get", "expectation": "reported totals are exactly three unique parents and twelve direct Sound children, recomputed from the sealed 3/4/5 relation graph rather than from duplicate query rows, and the 10-row bound is not reached"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.get", "expectation": "all parent/child GUID edges and fields equal the before snapshot; on success the isolated case project is deleted, on failure or an indeterminate result it is sealed and never reused, and the source project is unchanged"}
+      ],
+      "cleanup": {"adapter": "scenario_project_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "OBJ22-F-GET-05",
+      "api": "ak.wwise.core.object.get",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "bounded_ancestor_ownership_audit",
+      "scenario_index": 5,
+      "prompt": "追一下 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab_Query05\\Player\\Movement\\Footstep_Run` 的归属链：从直接父级一路向上，排除 Project，最多查 8 层。请按离目标由近到远列出每层的名称、GUID、类型、完整路径、直接子对象数和备注，再核对这条链是否恰好经过一个 Random Container、两个 Actor Mixer 和 Default Work Unit，并按类型汇总层数；其他分支里同名的对象不要混进来。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "core_object_query_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create the exact target Sound under Movement RandomSequenceContainer, Player ActorMixer, and SemanticLab_Query05 ActorMixer, yielding a known ancestor chain through Default Work Unit and Actor-Mixer Hierarchy but not Project",
+          "create same-name Footstep_Run, Movement, and Player decoys in sibling and unrelated branches plus one deeper non-ancestor branch so only exact-path ancestor traversal can produce the expected chain",
+          "record the target GUID, every ancestor path-to-GUID row, ordered direct-parent edges from target to hierarchy root, exact per-type counts, all decoy GUIDs, and source-project hashes before the task"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.get", "count": 1, "effect": "query the exact Footstep_Run path, select ancestors, exclude Project, take at most 8 rows, and return ownership fields for application-side depth ordering"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "fixture_expected_rows", "subject_api": "ak.wwise.core.object.get", "expectation": "hidden baseline records the exact target GUID, complete non-Project ancestor GUID/path set, every adjacent child-to-parent GUID edge, expected one RandomSequenceContainer and two ActorMixer ancestors plus Default Work Unit, and all same-name decoy GUIDs"},
+        {"phase": "after", "adapter": "waapi_object_query_readback", "subject_api": "ak.wwise.core.object.get", "expectation": "returned GUID/path set exactly equals the complete recorded non-Project ancestor set within eight rows; every type, childrenCount, and notes value matches baseline, Project and every decoy GUID are absent, and no ancestor is missing"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.object.get", "expectation": "near-to-far presentation exactly follows the sealed adjacent GUID relation chain, the RandomSequenceContainer/ActorMixer/WorkUnit checks and per-type totals match the independent baseline, and the answer states whether the eight-row bound was reached"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.get", "expectation": "the target, ancestor chain, sibling decoys, and all fields remain unchanged; on success the isolated project copy is removed, on failure or an indeterminate result it is sealed and never reused, and source hashes remain unchanged"}
+      ],
+      "cleanup": {"adapter": "scenario_project_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "OBJ22-F-GETATTENUATIONCURVE-01",
+      "api": "ak.wwise.core.object.getAttenuationCurve",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "dry_curve_segment_analysis",
+      "scenario_index": 1,
+      "prompt": "读取 `\\Attenuations\\Default Work Unit\\SemanticLab_NearField` 的干声衰减曲线，告诉我当前是自定义、跟随干声还是使用项目设置，并逐点列出距离、数值和插值形状。再帮我判断 0 到 10 米、10 到 40 米分别衰减了多少。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "core_object_attenuation_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create SemanticLab_NearField Attenuation with VolumeDryUsage Custom points at 0, 10, and 40 meters",
+          "record normalized curve point tuples and source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.getAttenuationCurve", "count": 1, "effect": "read VolumeDryUsage use mode and points for SemanticLab_NearField"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "fixture_curve_baseline", "subject_api": "ak.wwise.core.object.getAttenuationCurve", "expectation": "baseline stores exact curveType, use, ordered x/y/shape points"},
+        {"phase": "after", "adapter": "waapi_attenuation_curve_readback", "subject_api": "ak.wwise.core.object.getAttenuationCurve", "expectation": "curveType is VolumeDryUsage, use is Custom, and normalized points exactly equal baseline in order"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.object.getAttenuationCurve", "expectation": "reported segment deltas equal endpoint y differences for 0-10 and 10-40 meters"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.getAttenuationCurve", "expectation": "read did not alter curve; hidden attenuation GUID is removed and source hashes remain unchanged"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-GETATTENUATIONCURVE-02",
+      "api": "ak.wwise.core.object.getAttenuationCurve",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "filter_curve_comparison",
+      "scenario_index": 2,
+      "prompt": "检查 `\\Attenuations\\Default Work Unit\\SemanticLab_Outdoor` 的低通和高通两条距离曲线。分别列出使用模式和全部控制点，并指出哪条曲线是跟随干声、哪条有自己的点；不要把两条曲线的数据混在一起。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "core_object_attenuation_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create SemanticLab_Outdoor Attenuation with LowPassFilterUsage Custom points and HighPassFilterUsage UseVolumeDry",
+          "record normalized values for both curves and source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.getAttenuationCurve", "count": 2, "effect": "read LowPassFilterUsage and HighPassFilterUsage independently"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "fixture_curve_baseline", "subject_api": "ak.wwise.core.object.getAttenuationCurve", "expectation": "baseline has distinct LPF Custom and HPF UseVolumeDry curve records"},
+        {"phase": "after", "adapter": "waapi_attenuation_curve_readback", "subject_api": "ak.wwise.core.object.getAttenuationCurve", "expectation": "two readbacks are keyed to the requested curveType and each use/points shape exactly matches its own baseline"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.object.getAttenuationCurve", "expectation": "answer clearly separates LPF and HPF and identifies Custom versus UseVolumeDry without cross-assigned points"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.getAttenuationCurve", "expectation": "curves remain unchanged before cleanup and source-project hashes match baseline"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-GETNAMES-01",
+      "api": "ak.wwise.core.object.getPropertyAndReferenceNames",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "object_supported_name_inventory",
+      "scenario_index": 1,
+      "prompt": "我要给 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Footstep_Template` 做批量配置，先查清这个 Sound 实际支持哪些属性和引用。请把结果分成属性候选和引用候选，并明确 Volume、Pitch、OutputBus、Attenuation 这四项是否存在，别凭常见命名猜。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "core_object_metadata_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create a Sound object Footstep_Template and record its GUID and reflected schema expectation",
+          "record source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.getPropertyAndReferenceNames", "count": 1, "effect": "return all reflected property and reference names supported by the Sound object"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "fixture_object_identity", "subject_api": "ak.wwise.core.object.getPropertyAndReferenceNames", "expectation": "Footstep_Template resolves to exactly one Sound GUID"},
+        {"phase": "after", "adapter": "waapi_metadata_readback", "subject_api": "ak.wwise.core.object.getPropertyAndReferenceNames", "expectation": "return is a non-empty unique string set and includes the exact reflected names Volume, Pitch, OutputBus, and Attenuation when supported by the fixture type"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.object.getPropertyAndReferenceNames", "expectation": "existence claims are derived only from returned names and the answer does not invent unsupported names"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.getPropertyAndReferenceNames", "expectation": "metadata read makes no mutation; owned GUID removal and source hash proof succeed"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-GETNAMES-02",
+      "api": "ak.wwise.core.object.getPropertyAndReferenceNames",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "cross_type_name_set_comparison",
+      "scenario_index": 2,
+      "prompt": "比较 `\\Interactive Music Hierarchy\\Default Work Unit\\SemanticLab\\Music_Segment_A` 和 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\VO_Container_A` 可配置的属性与引用名称。请给出两边共有项、只在音乐段上的项、只在语音容器上的项，并确认 MusicPlaylist 和 OutputBus 各属于哪一边。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "core_object_metadata_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create one MusicSegment in Interactive Music Hierarchy and one RandomSequenceContainer in Actor-Mixer Hierarchy at the named paths",
+          "record both GUIDs, object types, and source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.getPropertyAndReferenceNames", "count": 2, "effect": "read supported name sets for two different object classes"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "fixture_object_identity", "subject_api": "ak.wwise.core.object.getPropertyAndReferenceNames", "expectation": "the two paths resolve to exactly one MusicSegment and one RandomSequenceContainer"},
+        {"phase": "after", "adapter": "waapi_metadata_readback", "subject_api": "ak.wwise.core.object.getPropertyAndReferenceNames", "expectation": "two independent unique name sets are captured and normalized without merging responses"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.object.getPropertyAndReferenceNames", "expectation": "reported intersection and two set differences equal recomputed set operations; queried names are assigned only where returned"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.getPropertyAndReferenceNames", "expectation": "fixtures are removed and source-project hashes remain unchanged"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-GETPROPERTYINFO-01",
+      "api": "ak.wwise.core.object.getPropertyInfo",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "property_validation_metadata",
+      "scenario_index": 1,
+      "prompt": "查一下 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\SFX_Template` 的 Volume 属性元数据：类型、默认值、合法范围、显示单位、是否支持随机化、RTPC 和平台 unlink。我要据此做参数校验，所以缺失字段也请明确说没有。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "core_object_metadata_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create SFX_Template ActorMixer and validate the Volume name is advertised for its class",
+          "record GUID and source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.getPropertyInfo", "count": 1, "effect": "read reflected Volume metadata for the fixture object class"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "fixture_object_identity", "subject_api": "ak.wwise.core.object.getPropertyInfo", "expectation": "SFX_Template resolves to one ActorMixer and Volume is a supported property name"},
+        {"phase": "after", "adapter": "waapi_property_info_readback", "subject_api": "ak.wwise.core.object.getPropertyInfo", "expectation": "name is Volume and returned type, default, restriction, supports, display, and ui fields satisfy the 2022.1 schema"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.object.getPropertyInfo", "expectation": "answer faithfully reports range/unit/randomizer/rtpc/unlink from returned fields and labels absent optional fields as absent"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.getPropertyInfo", "expectation": "metadata read is side-effect free; fixture cleanup and source hash proof succeed"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-GETPROPERTYINFO-02",
+      "api": "ak.wwise.core.object.getPropertyInfo",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "property_metadata_comparison",
+      "scenario_index": 2,
+      "prompt": "对比 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\SFX_Template` 的 Pitch 和 Lowpass 两个属性定义。请列出各自默认值、最小最大值、界面单位、随机化与 RTPC 支持方式，并指出两者哪些限制不同。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "core_object_metadata_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create SFX_Template of a class advertising Pitch and Lowpass",
+          "record GUID and source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.getPropertyInfo", "count": 2, "effect": "read Pitch and Lowpass metadata separately for comparison"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "fixture_object_identity", "subject_api": "ak.wwise.core.object.getPropertyInfo", "expectation": "one eligible fixture object exists and both requested property names are advertised"},
+        {"phase": "after", "adapter": "waapi_property_info_readback", "subject_api": "ak.wwise.core.object.getPropertyInfo", "expectation": "two schema-valid responses are keyed to Pitch and Lowpass with their own default, restriction, supports, and ui metadata"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.object.getPropertyInfo", "expectation": "comparison values and stated differences equal a field-wise diff of the two WAAPI responses"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.getPropertyInfo", "expectation": "fixture is removed and immutable source hashes match baseline"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-GETTYPES-01",
+      "api": "ak.wwise.core.object.getTypes",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "type_catalog_filtered_inventory",
+      "scenario_index": 1,
+      "prompt": "我在做一个 2022.1 的对象创建器，先把当前 Wwise 暴露的对象类型盘一下。请找出名称或类型里包含 `Container`、`Sound`、`Bus` 的条目，列出 name、type、classId，去重后按 type 排序，并告诉我这三组各有多少种。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "connected_project_baseline",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["launch Wwise 2022.1 sandbox and record source-project hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.getTypes", "count": 1, "effect": "return the complete Wwise 2022.1 object type catalog"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "wwise_version_identity", "subject_api": "ak.wwise.core.object.getTypes", "expectation": "live getInfo identifies the sandbox as Wwise 2022.1"},
+        {"phase": "after", "adapter": "waapi_object_types_readback", "subject_api": "ak.wwise.core.object.getTypes", "expectation": "return is non-empty; each included row has schema-valid name, type, and integer classId and duplicate normalized types are absent"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.object.getTypes", "expectation": "filter membership, type ordering, and Container/Sound/Bus counts equal recomputation from the full response"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.getTypes", "expectation": "no project mutation occurred and source-project hashes remain unchanged"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-GETTYPES-02",
+      "api": "ak.wwise.core.object.getTypes",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "type_catalog_business_grouping",
+      "scenario_index": 2,
+      "prompt": "帮我确认这个 2022.1 工程能识别哪些音乐、事件和游戏同步器相关对象类型。按 Music、Event/Action、State/Switch/GameParameter 三类整理 name、type、classId；同时明确 Project、Sound、MusicSegment、Event 是否真的在返回结果里。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "connected_project_baseline",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["launch Wwise 2022.1 sandbox and record source-project hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.getTypes", "count": 1, "effect": "read the full type catalog for semantic grouping"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "wwise_version_identity", "subject_api": "ak.wwise.core.object.getTypes", "expectation": "connected Authoring version is 2022.1"},
+        {"phase": "after", "adapter": "waapi_object_types_readback", "subject_api": "ak.wwise.core.object.getTypes", "expectation": "catalog contains exact type-name rows for Project, Sound, MusicSegment, and Event"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.object.getTypes", "expectation": "all reported category rows originate from the response and retain exact name/type/classId values"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.getTypes", "expectation": "call is read-only and source-project hashes remain unchanged"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-ISPROPERTYENABLED-01",
+      "api": "ak.wwise.core.object.isPropertyEnabled",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "property_dependency_enabled_check",
+      "scenario_index": 1,
+      "prompt": "检查 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Dialogue_BusSend` 在 Windows 平台上 UserAuxSendVolume0 和 Volume 这两个属性当前是否可用。分别给出布尔结果，并说明不能把“属性存在”当成“属性已启用”。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "core_object_property_state_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create Dialogue_BusSend Sound with deterministic auxiliary-send override state",
+          "resolve the Windows platform GUID and record object state plus source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.isPropertyEnabled", "count": 2, "effect": "check UserAuxSendVolume0 and Volume enabled state for the Windows platform"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "fixture_property_state", "subject_api": "ak.wwise.core.object.isPropertyEnabled", "expectation": "fixture records the intended enabling dependency state and a concrete Windows platform GUID"},
+        {"phase": "after", "adapter": "waapi_property_enabled_readback", "subject_api": "ak.wwise.core.object.isPropertyEnabled", "expectation": "two boolean returns are associated with the correct property names and platform GUID"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.object.isPropertyEnabled", "expectation": "answer reports each boolean independently and makes no inference from metadata-name presence"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.isPropertyEnabled", "expectation": "fixture state is unchanged by reads, then removed, and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-ISPROPERTYENABLED-02",
+      "api": "ak.wwise.core.object.isPropertyEnabled",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "object_enabled_state_comparison",
+      "scenario_index": 2,
+      "prompt": "对比 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\SFX_Inherit` 和 `SFX_Override` 在 Windows 平台上的 Lowpass 属性是否启用。我要知道两个对象各自的结果，尤其要确认继承配置和本地覆盖不会被混为一谈。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "core_object_property_state_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create same-type SFX_Inherit and SFX_Override objects with distinct override/dependency states for Lowpass",
+          "resolve Windows platform GUID and record both object GUIDs and source hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.isPropertyEnabled", "count": 2, "effect": "check Lowpass enabled state on two objects for one platform"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "fixture_property_state", "subject_api": "ak.wwise.core.object.isPropertyEnabled", "expectation": "fixture stores independent expected enabled booleans for both GUIDs"},
+        {"phase": "after", "adapter": "waapi_property_enabled_readback", "subject_api": "ak.wwise.core.object.isPropertyEnabled", "expectation": "each response is mapped to its input GUID and equals the fixture's independently established expected boolean"},
+        {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.object.isPropertyEnabled", "expectation": "answer does not collapse, swap, or generalize the two object results"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.isPropertyEnabled", "expectation": "read-only calls leave state unchanged; fixtures are removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-MOVE-01",
+      "api": "ak.wwise.core.object.move",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "subtree_move_preserving_identity",
+      "scenario_index": 1,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Shared\\Player_Movement` 整个分支移到 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Player` 下面。分支里两层子对象的 GUID 必须保持不变，旧路径要消失，新路径要完整更新；目标位置没有同名项，不需要改名。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认移动这个分支，完成后核对 GUID 和新旧路径。",
+      "fixture": {
+        "adapter": "core_object_tree_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["create Shared and Player parents plus a two-level Player_Movement subtree", "record every subtree GUID, path, value, parent child set, and source hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.move", "count": 1, "effect": "move the tracked subtree under Player while preserving every object GUID"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.move", "expectation": "source subtree exists only under Shared and target Player has no same-name child"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.move", "expectation": "all recorded GUIDs, paths, parents, child sets, and values equal the before snapshot"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.move", "expectation": "root and descendant GUIDs are unchanged, every path is rebased under Player, old paths return zero rows, and unrelated siblings are unchanged"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.move", "expectation": "owned tree is removed by hidden GUID and source hashes remain unchanged"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-MOVE-02",
+      "api": "ak.wwise.core.object.move",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "collision_safe_subtree_move",
+      "scenario_index": 2,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Level01\\Wind` 移到 `Level02` 下。`Level02` 已有同名环境声，旧的要保留，移过来的这一支自动避让命名；它下面三个 Sound 的音量、备注和 Output Bus 都要保持原样。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，保留目标里的同名项并移动这支环境声。",
+      "fixture": {
+        "adapter": "core_object_tree_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["create Level01 Wind subtree with three Sounds and an existing Level02 Wind collision", "record hidden GUIDs, properties, references, and source hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.move", "count": 1, "effect": "move the tracked Wind subtree under Level02 with a collision-safe name"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.move", "expectation": "both same-name roots exist under different parents with distinct GUIDs and the source descendant snapshot is recorded"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.move", "expectation": "both roots and all descendants remain at original paths with unchanged values"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.move", "expectation": "moved root retains its GUID under Level02 with a collision-safe new name; original Level02 Wind retains its GUID and state"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.move", "expectation": "all three moved child GUIDs, Volume, notes, and @OutputBus.id values equal baseline and Level01 old paths are absent"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.move", "expectation": "all owned GUIDs are removed and source-project hashes match baseline"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-PASTEPROPERTIES-01",
+      "api": "ak.wwise.core.object.pasteProperties",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "included_fields_multi_target_paste",
+      "scenario_index": 1,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\SFX_Template` 的 Volume、Pitch、Lowpass 和备注复制到 `Impact_A`、`Impact_B`、`Impact_C` 三个对象上，只复制这四项。三个目标原来的 Output Bus 和 Highpass 都要保留，完成后逐个核对。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认把这四项配置粘贴到三个目标，其他配置保持不变。",
+      "fixture": {
+        "adapter": "core_object_property_copy_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["create one source and three same-type targets with distinct selected and excluded values", "record source and target notes, properties, references, GUIDs, and source hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.pasteProperties", "count": 1, "effect": "paste only Volume, Pitch, Lowpass, and Notes from one source to three targets"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.pasteProperties", "expectation": "each target differs from source in included fields and has independently recorded OutputBus and Highpass values"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.pasteProperties", "expectation": "all source and target fields exactly match before snapshots"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.pasteProperties", "expectation": "all three targets' Volume, Pitch, Lowpass, and notes equal source values"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.pasteProperties", "expectation": "each target retains its own baseline @OutputBus.id and Highpass; source state is unchanged"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.pasteProperties", "expectation": "all hidden-GUID fixtures are removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-PASTEPROPERTIES-02",
+      "api": "ak.wwise.core.object.pasteProperties",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "excluded_fields_preserving_paste",
+      "scenario_index": 2,
+      "prompt": "用 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\VO_Master` 的设置统一 `VO_Guard` 和 `VO_Merchant`，但不要覆盖名称、备注、Output Bus 和现有子列表。除了这几项，其余能复制的属性按模板覆盖；完成后列出真正发生变化的字段。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，按这些排除项执行，完成后给我字段级核对。",
+      "fixture": {
+        "adapter": "core_object_property_copy_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["create VO_Master and two same-type targets with different property sets, notes, buses, and child lists", "record complete WAAPI snapshots and source hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.pasteProperties", "count": 1, "effect": "paste template settings to two targets while excluding names, notes, OutputBus, and child lists"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.pasteProperties", "expectation": "targets contain deliberate included and excluded differences and their child GUID sets are recorded"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.pasteProperties", "expectation": "no target field, reference, note, name, or child list changes before confirmation"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.pasteProperties", "expectation": "non-excluded supported properties on both targets equal template values"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.pasteProperties", "expectation": "target names, notes, @OutputBus.id, and ordered child GUID lists equal their own baselines; reported changed fields equal before/after diff"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.pasteProperties", "expectation": "owned fixtures are deleted and source-project hashes remain unchanged"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-SET-01",
+      "api": "ak.wwise.core.object.set",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "mixed_hierarchy_and_field_set",
+      "scenario_index": 1,
+      "prompt": "一次整理 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Combat`：把根节点备注改成“战斗音频入口”，Volume 设为 -3 dB，并在下面补一个 `Melee` 随机容器和 `Light`、`Heavy` 两个 Sound；已有的 `Ranged` 分支保持不变。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认按这个结构和属性一次更新，保留现有 `Ranged`。",
+      "fixture": {
+        "adapter": "core_object_set_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["create Combat ActorMixer with existing Ranged subtree and no Melee child", "record root fields, Ranged subtree GUIDs, child order, and source hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.set", "count": 1, "effect": "update Combat notes and Volume and add the recursive Melee hierarchy in one call"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "Combat baseline is recorded, Ranged exists, and all requested Melee paths are absent"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "Combat fields and child graph equal before state and no requested object exists"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "Combat notes and Volume match requested values and exactly one Melee container with Light and Heavy Sound children exists"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "result-created GUIDs match readback and the Ranged subtree GUIDs, paths, order, and fields are unchanged"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.set", "expectation": "on success, the case-owned project copy and all case state are deleted and source hashes match; on failure or an indeterminate result, the sealed sandbox is quarantined and never reused"}
+      ],
+      "cleanup": {"adapter": "scenario_project_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "OBJ22-F-SET-02",
+      "api": "ak.wwise.core.object.set",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "multi_object_bulk_set",
+      "scenario_index": 2,
+      "prompt": "批量更新 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\UI` 下的 `Confirm`、`Cancel`、`Error`：分别把 Volume 设为 -1、-2、-4 dB，备注依次写成“确认操作反馈”“取消操作反馈”“错误操作反馈”，同时给 `Error` 新增一个 `Error_Layer` Sound 子对象。其他属性和已有子对象都不要动。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，一次完成这三项更新并核对未涉及的内容。",
+      "fixture": {
+        "adapter": "core_object_set_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["create Confirm, Cancel, and Error objects with distinct baselines and existing children", "record all GUIDs, selected and untouched properties, child sets, and source hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.set", "count": 1, "effect": "bulk update three UI objects and add Error_Layer under Error"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "three target snapshots exist and Error_Layer path is absent"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "all three snapshots and child sets remain unchanged before confirmation"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "target Volumes equal -1, -2, and -4 and each notes value equals its requested interaction purpose"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "one Error_Layer Sound with result-matching GUID exists; all untouched properties and pre-existing child GUIDs remain baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.set", "expectation": "on success, the case-owned project copy and all owned state are deleted and source-project hashes are unchanged; on failure or an indeterminate result, the sealed scenario sandbox is quarantined and never reused"}
+      ],
+      "cleanup": {"adapter": "scenario_project_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "OBJ22-F-SET-03",
+      "api": "ak.wwise.core.object.set",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "multi_object_property_reference_set",
+      "scenario_index": 3,
+      "prompt": "批量整理 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Ambience` 下的 `Day`、`Night`、`Storm` 三个 Actor Mixer。`Day` 的 Volume/Pitch 设为 -2 dB、1 semitone，备注写“白天环境层”，Output Bus 接 `\\Master-Mixer Hierarchy\\Default Work Unit\\Ambience_Bus`；`Night` 设为 -5 dB、-1 semitone，备注写“夜间环境层”，也接 `Ambience_Bus`；`Storm` 设为 -3 dB、-2 semitones，备注写“风暴环境层”，Output Bus 改接 `\\Master-Mixer Hierarchy\\Default Work Unit\\Weather_Bus`。三个对象的名字、已有子对象和其他属性都保持不变。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，一次更新这三个环境对象，并核对未涉及的内容。",
+      "fixture": {
+        "adapter": "core_object_set_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create Day, Night, and Storm targets with distinct notes, Volume, Pitch, OutputBus, protected fields, and existing child subtrees",
+          "create canonical Ambience_Bus and Weather_Bus fixtures and record every target/bus GUID, full protected snapshots, and source-project hashes",
+          "read the Wwise 2022.1 Pitch property metadata and seal the semitone-to-cents mapping: Day=100, Night=-100, Storm=-200"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.set", "count": 1, "effect": "batch-set notes, Volume, exact raw Pitch values 100/-100/-200 cents, and an existing OutputBus reference on three ambience targets"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "the three unique target GUIDs and two bus GUIDs resolve exactly once and all requested plus protected field and child snapshots are recorded"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "all three target notes, properties, references, names, and child GUID graphs equal before state before confirmation"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "Day, Night, and Storm retain their GUID/name; notes equal 白天环境层/夜间环境层/风暴环境层, Volume equals -2/-5/-3 dB, and raw Pitch equals exactly 100/-100/-200 cents"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "Day and Night @OutputBus.id equal Ambience_Bus, Storm @OutputBus.id equals Weather_Bus, and every unrequested property plus ordered child GUID graph equals baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.set", "expectation": "on success, the case-owned project copy, Ambience fixture, and buses are deleted and source hashes remain unchanged; on failure or an indeterminate result, the sealed sandbox is quarantined and never reused"}
+      ],
+      "cleanup": {"adapter": "scenario_project_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "OBJ22-F-SET-04",
+      "api": "ak.wwise.core.object.set",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "multi_target_recursive_merge_set",
+      "scenario_index": 4,
+      "prompt": "一次补齐 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Foley` 下的 `Player` 和 `NPC` 两套脚步。两边都已经有 `Footsteps` 随机容器和一个 `Walk_A` Sound，请在原来的 `Footsteps` 里各补一个 `Walk_B`，不要生成 `Footsteps_01`。同时给 `Player` 新增 `Cloth` 随机容器，里面放 `Cloth_Light`、`Cloth_Heavy`；给 `NPC` 新增 `Armor` 随机容器，里面放 `Armor_Light`、`Armor_Heavy`。`Player` 备注改为“玩家 Foley”，Volume 设为 -1 dB；`NPC` 备注改为“NPC Foley”，Volume 设为 -3 dB。其他分支都保留。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认合并到两边现有的 `Footsteps`，并补上各自的新分支。",
+      "fixture": {
+        "adapter": "core_object_set_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create Player and NPC with distinct existing Footsteps/Walk_A GUIDs plus protected unrelated branches; prove Walk_B, Cloth, and Armor paths absent",
+          "record both root fields, complete Footsteps and protected-subtree topology, child order, and source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.set", "count": 1, "effect": "batch-update two roots and recursively merge children into their existing Footsteps containers"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "Player/NPC and their Footsteps/Walk_A objects resolve by recorded GUID; requested Walk_B, Cloth, and Armor paths are absent"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "both roots, existing Footsteps subtrees, protected branches, fields, and child orders equal before state and every requested new path remains absent"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "original Footsteps and Walk_A GUIDs are retained, each Footsteps gains exactly one Walk_B, and no Footsteps_01 or other renamed duplicate exists"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "Player has Cloth with two requested Sounds and notes/Volume 玩家 Foley/-1; NPC has Armor with two requested Sounds and notes/Volume NPC Foley/-3; all protected branch GUIDs, fields, and order remain baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.set", "expectation": "on success, the case-owned project copy and all old/new case GUIDs are deleted and source hashes stay unchanged; on failure or an indeterminate result, the sealed sandbox is quarantined and never reused"}
+      ],
+      "cleanup": {"adapter": "scenario_project_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "OBJ22-F-SET-05",
+      "api": "ak.wwise.core.object.set",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "multi_target_child_rename_set",
+      "scenario_index": 5,
+      "prompt": "给 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\UI` 下的 `Confirm` 和 `Error` 各加一套新的 `Feedback_Layer` 随机容器。两边都已经有同名旧层，旧层和里面的 `Legacy` Sound 必须保留，新层让 Wwise 自动换名。`Confirm` 的新层里放 `Confirm_Soft`、`Confirm_Hard`，根节点备注改成“确认反馈双层”，Volume 设为 -1 dB；`Error` 的新层里放 `Error_Soft`、`Error_Hard`，根节点备注改成“错误反馈双层”，Volume 设为 -4 dB。完成后告诉我两个新层各自的实际名称，并确认旧层没动。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，保留两个旧层，创建自动换名的新层并更新根节点。",
+      "fixture": {
+        "adapter": "core_object_set_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "create Confirm and Error roots, each with one protected Feedback_Layer/Legacy subtree and no other rename candidates",
+          "record both collision subtree GUIDs, root fields, parent child sets, protected siblings, and source-project hashes"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {"api": "ak.wwise.core.object.set", "count": 1, "effect": "batch-update two UI roots and create recursively populated children with onNameConflict=rename"}
+      ],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "each target has exactly one protected exact-name Feedback_Layer with Legacy child and no case-created renamed sibling"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "both roots, collision subtrees, root fields, and child sets equal before state and no new layer GUID/path exists"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "Confirm and Error each have exactly one new result-bound layer GUID whose actual name differs from Feedback_Layer and whose two requested Sound children match the correct target"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.set", "expectation": "root notes/Volumes equal 确认反馈双层/-1 and 错误反馈双层/-4; both original Feedback_Layer and Legacy GUIDs, paths, fields, and edges remain unchanged"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.set", "expectation": "on success, the case-owned project copy, both renamed layers, and the UI fixture are deleted and source hashes remain unchanged; on failure or an indeterminate result, the sealed sandbox is quarantined and never reused"}
+      ],
+      "cleanup": {"adapter": "scenario_project_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged", "successful_case_project_copy_removed", "failed_or_indeterminate_case_sandbox_sealed_and_never_reused"]}
+    },
+    {
+      "id": "OBJ22-F-SETATTENUATIONCURVE-01",
+      "api": "ak.wwise.core.object.setAttenuationCurve",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "custom_attenuation_curve_update",
+      "scenario_index": 1,
+      "prompt": "把 `\\Attenuations\\Default Work Unit\\SemanticLab_Weapon` 的干声距离曲线改成自定义：0 米 0 dB、8 米 -3 dB、25 米 -18 dB、60 米 -96 dB，各段用线性插值。只改这条曲线，湿声、低通和高通曲线保持原样。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认更新这条干声曲线，其他曲线保持不变。",
+      "fixture": {
+        "adapter": "core_object_attenuation_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["create a disposable Attenuation with distinct baseline values for dry, wet, LPF, and HPF curves", "record normalized curve readbacks, hidden GUID, and source hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.setAttenuationCurve", "count": 1, "effect": "replace only VolumeDryUsage with the requested four-point Custom curve"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_attenuation_curve_readback", "subject_api": "ak.wwise.core.object.setAttenuationCurve", "expectation": "all four baseline curves are recorded and dry curve differs from requested points"},
+        {"phase": "preview", "adapter": "waapi_attenuation_curve_readback", "subject_api": "ak.wwise.core.object.setAttenuationCurve", "expectation": "dry, wet, LPF, and HPF normalized curve records exactly equal before state"},
+        {"phase": "after", "adapter": "waapi_attenuation_curve_readback", "subject_api": "ak.wwise.core.object.setAttenuationCurve", "expectation": "VolumeDryUsage use is Custom and ordered normalized points exactly equal (0,0), (8,-3), (25,-18), (60,-96) with Linear shapes"},
+        {"phase": "after", "adapter": "waapi_attenuation_curve_readback", "subject_api": "ak.wwise.core.object.setAttenuationCurve", "expectation": "wet, LPF, and HPF curves exactly equal their before records"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.setAttenuationCurve", "expectation": "attenuation is restored or deleted by GUID and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-SETATTENUATIONCURVE-02",
+      "api": "ak.wwise.core.object.setAttenuationCurve",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "attenuation_curve_link_mode_update",
+      "scenario_index": 2,
+      "prompt": "把 `\\Attenuations\\Default Work Unit\\SemanticLab_Outdoor` 的高通距离曲线改为跟随干声曲线；干声仍保留自己的点，低通仍保留自定义设置。完成后核对三条曲线各自的使用模式。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，只把高通切到跟随干声并核对其他曲线。",
+      "fixture": {
+        "adapter": "core_object_attenuation_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["create disposable Attenuation whose dry, LPF, and HPF curves all have distinct Custom baselines", "record exact uses, points, hidden GUID, and source hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.setAttenuationCurve", "count": 1, "effect": "change only HighPassFilterUsage from Custom to UseVolumeDry"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_attenuation_curve_readback", "subject_api": "ak.wwise.core.object.setAttenuationCurve", "expectation": "HPF baseline use is Custom and dry/LPF baselines are recorded"},
+        {"phase": "preview", "adapter": "waapi_attenuation_curve_readback", "subject_api": "ak.wwise.core.object.setAttenuationCurve", "expectation": "all three curve uses and points equal before state"},
+        {"phase": "after", "adapter": "waapi_attenuation_curve_readback", "subject_api": "ak.wwise.core.object.setAttenuationCurve", "expectation": "HighPassFilterUsage use is UseVolumeDry with schema-valid points while VolumeDryUsage and LowPassFilterUsage exactly match baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.setAttenuationCurve", "expectation": "hidden attenuation state is removed or restored and source-project hashes are unchanged"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-SETNAME-01",
+      "api": "ak.wwise.core.object.setName",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "branch_rename_with_descendants",
+      "scenario_index": 1,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Player_Footstep_Old` 重命名为 `Player_Footsteps`。它下面还有三层结构，所有子对象的 GUID 必须保持，路径要一起更新；同级对象、备注和音量都不要变。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认重命名，并核对子层级路径和 GUID。",
+      "fixture": {
+        "adapter": "core_object_tree_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["create a three-level Player_Footstep_Old subtree and unrelated siblings", "record every GUID, path, notes, Volume, sibling order, and source hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.setName", "count": 1, "effect": "rename Player_Footstep_Old to Player_Footsteps without changing subtree identities"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setName", "expectation": "old root and descendant paths exist and requested new root path is absent"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setName", "expectation": "old name, all old paths, GUIDs, fields, and sibling order remain unchanged"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setName", "expectation": "root and descendant GUIDs match baseline, root name is Player_Footsteps, paths are rebased, and every old path is absent"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setName", "expectation": "notes, Volume, unrelated siblings, and ordering equal baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.setName", "expectation": "renamed tree is deleted by hidden GUID and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-SETNAME-02",
+      "api": "ak.wwise.core.object.setName",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "specific_sibling_rename",
+      "scenario_index": 2,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\UI\\Error_02` 改名为 `Network_Error`。它同级已经有 `Error_01` 和 `Error_03`，不要改错对象，也不要生成重名避让版本；重命名后确认原 GUID、Output Bus 和子 Sound 都保留。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，把 `Error_02` 精确改成 `Network_Error`。",
+      "fixture": {
+        "adapter": "core_object_tree_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["create Error_01, Error_02 with one Sound child, and Error_03 under UI", "record IDs, paths, OutputBus reference, child set, and source hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.setName", "count": 1, "effect": "rename exactly the Error_02 GUID to Network_Error"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setName", "expectation": "three sibling identities are distinct, Error_02 is uniquely resolved, and Network_Error is absent"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setName", "expectation": "all three sibling snapshots remain exactly unchanged"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setName", "expectation": "Error_02 GUID now has exact name Network_Error, old path is absent, and no suffixed variant exists"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setName", "expectation": "renamed object's @OutputBus.id and child GUID set are unchanged; Error_01 and Error_03 snapshots are unchanged"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.setName", "expectation": "owned sibling group is removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-SETNOTES-01",
+      "api": "ak.wwise.core.object.setNotes",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "multiline_unicode_notes_update",
+      "scenario_index": 1,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Boss_Phase2` 的备注更新为三行：负责人 `AudioTeam`、状态 `ready-for-review`、注意事项 `loop seam pending`。保留换行和英文标记，其他属性、引用和子层级都不变。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认写入这三行备注，并核对其他内容没有变化。",
+      "fixture": {
+        "adapter": "core_object_notes_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["create Boss_Phase2 with old multiline notes, child hierarchy, properties, and references", "record exact UTF-8 notes, object snapshot, child GUIDs, and source hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.setNotes", "count": 1, "effect": "replace Boss_Phase2 notes with the exact requested three-line text"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setNotes", "expectation": "old notes differ from requested three-line text and complete object baseline is recorded"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setNotes", "expectation": "notes and all other fields still equal baseline"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setNotes", "expectation": "notes exactly equal the requested Unicode text including line order, punctuation, and newline boundaries"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setNotes", "expectation": "GUID, name, path, properties, references, and ordered child GUIDs equal baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.setNotes", "expectation": "owned object is removed or notes restored and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-SETNOTES-02",
+      "api": "ak.wwise.core.object.setNotes",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "notes_clear_to_empty_string",
+      "scenario_index": 2,
+      "prompt": "清空 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Temp_Commented` 的旧备注，它现在有一大段过期说明。只把备注变成空字符串，不要删除对象，也不要把空备注误写成空格；完成后确认下面两个子对象仍在。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，只清空备注，其他内容保持原样。",
+      "fixture": {
+        "adapter": "core_object_notes_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["create Temp_Commented with non-empty notes and two children", "record exact object fields, child GUIDs, and source hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.setNotes", "count": 1, "effect": "set Temp_Commented notes to the exact empty string"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setNotes", "expectation": "notes length is greater than zero and two child GUIDs exist"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setNotes", "expectation": "notes remain exactly the non-empty baseline and child snapshots are unchanged"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setNotes", "expectation": "notes is exactly the empty string with length zero, not whitespace or null"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setNotes", "expectation": "object GUID, path, properties, references, and both child GUIDs equal baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.setNotes", "expectation": "owned hierarchy is removed and source-project hashes remain unchanged"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-SETPROPERTY-01",
+      "api": "ak.wwise.core.object.setProperty",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "parent_property_with_inherited_children",
+      "scenario_index": 1,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Cinematic_Duck` 的 Volume 调到 -8.5 dB。这个节点下面的对象靠继承工作，所以只改父节点；Pitch、Lowpass、Output Bus 和所有子对象的本地值都不能变。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认只调整父节点 Volume 到 -8.5 dB。",
+      "fixture": {
+        "adapter": "core_object_property_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["create Cinematic_Duck parent with children carrying distinct local property states", "record parent and child Volume/Pitch/Lowpass/reference snapshots and source hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.setProperty", "count": 1, "effect": "set only Cinematic_Duck Volume to -8.5"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setProperty", "expectation": "parent Volume differs from -8.5 and all protected fields and child local values are recorded"},
+        {"phase": "preview", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setProperty", "expectation": "parent Volume and every protected parent/child field equal before snapshot"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setProperty", "expectation": "parent GUID Volume equals numeric -8.5 exactly within WAAPI numeric tolerance"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setProperty", "expectation": "parent Pitch, Lowpass, @OutputBus.id and each child GUID/local property snapshot equal baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.setProperty", "expectation": "owned hierarchy is removed or property restored and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-SETPROPERTY-02",
+      "api": "ak.wwise.core.object.setProperty",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "platform_unlinked_property_update",
+      "scenario_index": 2,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Radio_VO` 在 Windows 平台（GUID `{windows_platform_guid}`）上的 Lowpass 设为 42，只改 Windows 的未链接值。其他平台和全平台基线都要保留，Volume、Pitch、备注和子层级也不要动。",
+      "visible_inputs": [{"name": "windows_platform_guid", "kind": "string", "description": "当前临时工程中 Windows 平台的完整 GUID"}],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，只改 Windows 平台的 Lowpass 到 42。",
+      "fixture": {
+        "adapter": "core_object_platform_property_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["create Radio_VO with linked baseline then establish distinct Windows and another-platform property readbacks", "record platform GUIDs, all values, object fields, and source hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.setProperty", "count": 1, "effect": "set only the Windows-unlinked Lowpass value to 42"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_platform_property_readback", "subject_api": "ak.wwise.core.object.setProperty", "expectation": "Windows Lowpass differs from 42 and linked plus comparison-platform baselines are recorded"},
+        {"phase": "preview", "adapter": "waapi_platform_property_readback", "subject_api": "ak.wwise.core.object.setProperty", "expectation": "all platform-specific and linked values plus object snapshot remain unchanged"},
+        {"phase": "after", "adapter": "waapi_platform_property_readback", "subject_api": "ak.wwise.core.object.setProperty", "expectation": "Windows platform GUID readback for Lowpass equals 42 while linked and comparison-platform values equal baseline"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setProperty", "expectation": "Volume, Pitch, notes, path, references, and child GUID set equal baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.setProperty", "expectation": "platform override is restored or owned object removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-SETRANDOMIZER-01",
+      "api": "ak.wwise.core.object.setRandomizer",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "pitch_randomizer_enable",
+      "scenario_index": 1,
+      "prompt": "给 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Debris_Random` 的 Pitch 开启随机化，范围设为 -120 到 +180 cents。基础 Pitch、Volume、Output Bus 和子对象都保持不变；完成后确认随机化确实被写进工程，而不只是表面上显示成功。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认开启 Pitch 随机化，范围 -120 到 +180 cents。",
+      "fixture": {
+        "adapter": "core_object_randomizer_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["create Debris_Random with Pitch randomizer disabled and deterministic base properties", "record hidden GUID, WAAPI fields, owning WWU XML node, and source hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.setRandomizer", "count": 1, "effect": "enable Pitch randomization with min -120 and max 180"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "wwu_randomizer_xml_readback", "subject_api": "ak.wwise.core.object.setRandomizer", "expectation": "saved sandbox WWU shows Pitch randomizer disabled or absent and stores no requested min/max pair"},
+        {"phase": "preview", "adapter": "wwu_randomizer_xml_readback", "subject_api": "ak.wwise.core.object.setRandomizer", "expectation": "after project save the object's randomizer XML and project file hash equal before snapshot"},
+        {"phase": "after", "adapter": "wwu_randomizer_xml_readback", "subject_api": "ak.wwise.core.object.setRandomizer", "expectation": "after sandbox save, the node identified by hidden GUID records Pitch randomizer enabled with min -120 and max 180"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setRandomizer", "expectation": "base Pitch, Volume, @OutputBus.id, path, and child GUID set equal baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.setRandomizer", "expectation": "randomizer state is restored or fixture removed; source WWU/WPROJ hashes remain unchanged"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-SETRANDOMIZER-02",
+      "api": "ak.wwise.core.object.setRandomizer",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "volume_randomizer_range_update",
+      "scenario_index": 2,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Crowd_Loop` 的 Volume 随机化范围从现在的设置改为 -2.5 到 +1 dB，并保持启用。不要改基础 Volume，也不要碰 Pitch 随机化；保存后帮我核对两个随机器的状态。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，只更新 Volume 随机化范围并保持启用。",
+      "fixture": {
+        "adapter": "core_object_randomizer_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["create Crowd_Loop with enabled Volume and Pitch randomizers using distinct ranges", "record both randomizers from saved sandbox WWU, base properties, hidden GUID, and source hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.setRandomizer", "count": 1, "effect": "keep Volume randomization enabled and set min -2.5 and max 1.0"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "wwu_randomizer_xml_readback", "subject_api": "ak.wwise.core.object.setRandomizer", "expectation": "Volume range differs from requested pair and Pitch randomizer plus base Volume baselines are recorded"},
+        {"phase": "preview", "adapter": "wwu_randomizer_xml_readback", "subject_api": "ak.wwise.core.object.setRandomizer", "expectation": "saved WWU randomizer nodes and hashes exactly equal before snapshot"},
+        {"phase": "after", "adapter": "wwu_randomizer_xml_readback", "subject_api": "ak.wwise.core.object.setRandomizer", "expectation": "hidden-GUID node records Volume enabled=true, min=-2.5, max=1.0"},
+        {"phase": "after", "adapter": "wwu_randomizer_xml_readback", "subject_api": "ak.wwise.core.object.setRandomizer", "expectation": "Pitch randomizer XML and WAAPI base Volume/Pitch fields exactly equal baseline"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.setRandomizer", "expectation": "owned state is restored or removed and source-project hashes remain unchanged"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-SETREFERENCE-01",
+      "api": "ak.wwise.core.object.setReference",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "output_bus_reference_update",
+      "scenario_index": 1,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Boss_SFX` 的 Output Bus 从 `\\Master-Mixer Hierarchy\\Default Work Unit\\Master Audio Bus\\SFX_Old` 改到 `SFX_Boss`。Volume、Pitch、Attenuation 引用和子层级都不要变，完成后按 GUID 核对新旧总线。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认把 Output Bus 切到 `SFX_Boss`，其他内容不变。",
+      "fixture": {
+        "adapter": "core_object_reference_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["create Boss_SFX plus two sandbox Audio Buses and assign OutputBus to SFX_Old", "record object fields, @OutputBus.id, @Attenuation.id, child GUIDs, and source hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.setReference", "count": 1, "effect": "replace Boss_SFX OutputBus reference with the SFX_Boss GUID"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_reference_readback", "subject_api": "ak.wwise.core.object.setReference", "expectation": "Boss_SFX @OutputBus.id equals SFX_Old GUID and differs from SFX_Boss GUID"},
+        {"phase": "preview", "adapter": "waapi_reference_readback", "subject_api": "ak.wwise.core.object.setReference", "expectation": "OutputBus, Attenuation, properties, and child graph equal before snapshot"},
+        {"phase": "after", "adapter": "waapi_reference_readback", "subject_api": "ak.wwise.core.object.setReference", "expectation": "Boss_SFX @OutputBus.id equals exact SFX_Boss GUID and no longer equals SFX_Old GUID"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setReference", "expectation": "Volume, Pitch, @Attenuation.id, name, path, and child GUIDs equal baseline; both bus objects remain unchanged"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.setReference", "expectation": "reference is restored or owned object removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-F-SETREFERENCE-02",
+      "api": "ak.wwise.core.object.setReference",
+      "item_type": "function",
+      "versions": ["2022.1"],
+      "lane": "online_authoring",
+      "scenario_family": "attenuation_reference_update",
+      "scenario_index": 2,
+      "prompt": "把 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Outdoor_Ambience` 的 Attenuation 引用改为 `\\Attenuations\\Default Work Unit\\SemanticLab_OutdoorWide`。Output Bus 和所有数值属性保留，原来的衰减对象也不要删除；改完请确认引用目标类型和 GUID。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，把 Attenuation 切到 `SemanticLab_OutdoorWide`。",
+      "fixture": {
+        "adapter": "core_object_reference_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": ["create Outdoor_Ambience and two Attenuation fixtures and assign the old one", "record both attenuation identities, @Attenuation.id, @OutputBus.id, properties, and source hashes"]
+      },
+      "trigger": null,
+      "expected_dispatches": [{"api": "ak.wwise.core.object.setReference", "count": 1, "effect": "replace Outdoor_Ambience Attenuation reference with SemanticLab_OutdoorWide"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_reference_readback", "subject_api": "ak.wwise.core.object.setReference", "expectation": "current @Attenuation.id equals old attenuation GUID and requested target is a distinct Attenuation GUID"},
+        {"phase": "preview", "adapter": "waapi_reference_readback", "subject_api": "ak.wwise.core.object.setReference", "expectation": "all references, properties, target objects, and paths equal before state"},
+        {"phase": "after", "adapter": "waapi_reference_readback", "subject_api": "ak.wwise.core.object.setReference", "expectation": "@Attenuation.id equals SemanticLab_OutdoorWide GUID and referenced object type is Attenuation"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.setReference", "expectation": "@OutputBus.id and all recorded numeric properties equal baseline; old attenuation object still exists unchanged"},
+        {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.setReference", "expectation": "owned reference state and fixtures are removed or restored and source hashes remain unchanged"}
+      ],
+      "cleanup": {"adapter": "core_object_owned_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-ATTENUATIONCURVECHANGED-01",
+      "api": "ak.wwise.core.object.attenuationCurveChanged",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "attenuation_curve_edit_observation",
+      "scenario_index": 1,
+      "prompt": "帮我盯一下 `\\Attenuations\\Default Work Unit\\SemanticLab_Weapon` 的距离曲线变化。下一次干声衰减曲线被调整时，只等第一条通知，告诉我是哪个衰减对象、哪种曲线变了，并把对象 GUID 和路径一起给我。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_attenuation_topic_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden-GUID SemanticLab_Weapon Attenuation with a known VolumeDryUsage curve", "record attenuation identity, baseline points, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.setAttenuationCurve", "ownership_assertion": "after subscription readiness, change only the hidden attenuation VolumeDryUsage points once"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.attenuationCurveChanged", "count": 1, "effect": "observe the first VolumeDryUsage curve-change event for the tracked attenuation"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_attenuation_curve_readback", "subject_api": "ak.wwise.core.object.attenuationCurveChanged", "expectation": "watched attenuation GUID/path and exact pre-trigger VolumeDryUsage points are recorded"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.attenuationCurveChanged", "expectation": "first accepted payload has attenuation.id/path equal fixture identity and curveType exactly VolumeDryUsage"},
+        {"phase": "after", "adapter": "waapi_attenuation_curve_readback", "subject_api": "ak.wwise.core.object.attenuationCurveChanged", "expectation": "post-trigger points equal the runner publisher payload and differ from baseline; exactly one accepted event is reported"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.attenuationCurveChanged", "expectation": "subscription is removed, attenuation is restored or deleted, and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-ATTENUATIONCURVECHANGED-02",
+      "api": "ak.wwise.core.object.attenuationCurveChanged",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "attenuation_filter_curve_observation",
+      "scenario_index": 2,
+      "prompt": "监听 `\\Attenuations\\Default Work Unit\\SemanticLab_Outdoor` 的滤波距离曲线。下次低通曲线有改动时返回第一条事件，确认通知没有被同一对象的干声或高通变化误匹配，并给出曲线类型和对象身份。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_attenuation_topic_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden Attenuation with distinct dry, LPF, and HPF curves", "record GUID/path, all curve baselines, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.setAttenuationCurve", "ownership_assertion": "after subscription readiness, change only LowPassFilterUsage points on the hidden fixture"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.attenuationCurveChanged", "count": 1, "effect": "observe the first LowPassFilterUsage curve-change event for the tracked attenuation"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_attenuation_curve_readback", "subject_api": "ak.wwise.core.object.attenuationCurveChanged", "expectation": "three curve baselines and watched attenuation identity are recorded"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.attenuationCurveChanged", "expectation": "accepted payload attenuation identity matches and curveType is LowPassFilterUsage, not dry or HPF"},
+        {"phase": "after", "adapter": "waapi_attenuation_curve_readback", "subject_api": "ak.wwise.core.object.attenuationCurveChanged", "expectation": "only LPF points changed to publisher values; dry and HPF equal baseline"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.attenuationCurveChanged", "expectation": "no active subscription remains and owned state/source integrity checks pass"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-ATTENUATIONCURVELINKCHANGED-01",
+      "api": "ak.wwise.core.object.attenuationCurveLinkChanged",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "attenuation_curve_link_to_dry_observation",
+      "scenario_index": 1,
+      "prompt": "盯住 `\\Attenuations\\Default Work Unit\\SemanticLab_Outdoor` 的高通曲线链接状态。它下一次从自定义切到跟随干声时，返回第一条通知，告诉我对象 GUID、路径和发生链接变化的曲线类型。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_attenuation_topic_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden Attenuation with HighPassFilterUsage=Custom", "record HPF use/points, dry curve, identity, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.setAttenuationCurve", "ownership_assertion": "after subscription readiness, set hidden fixture HighPassFilterUsage to UseVolumeDry exactly once"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.attenuationCurveLinkChanged", "count": 1, "effect": "observe the tracked HPF curve becoming linked to VolumeDryUsage"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_attenuation_curve_readback", "subject_api": "ak.wwise.core.object.attenuationCurveLinkChanged", "expectation": "HPF use is Custom and watched attenuation GUID/path are recorded"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.attenuationCurveLinkChanged", "expectation": "payload attenuation.id/path match fixture and curveType is HighPassFilterUsage"},
+        {"phase": "after", "adapter": "waapi_attenuation_curve_readback", "subject_api": "ak.wwise.core.object.attenuationCurveLinkChanged", "expectation": "HPF use is UseVolumeDry and all non-target curves equal baseline"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.attenuationCurveLinkChanged", "expectation": "subscription is removed, curve restored or fixture deleted, and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-ATTENUATIONCURVELINKCHANGED-02",
+      "api": "ak.wwise.core.object.attenuationCurveLinkChanged",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "attenuation_curve_unlink_observation",
+      "scenario_index": 2,
+      "prompt": "监听 `\\Attenuations\\Default Work Unit\\SemanticLab_Cave` 的低通曲线链接变化。下一次它从跟随干声改成自己的曲线时，只接收第一条匹配事件，并确认通知指向的是低通而不是其他曲线。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_attenuation_topic_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden Attenuation with LowPassFilterUsage=UseVolumeDry", "record all curve modes, fixture identity, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.setAttenuationCurve", "ownership_assertion": "after subscription readiness, assign a Custom LPF curve to only the hidden fixture"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.attenuationCurveLinkChanged", "count": 1, "effect": "observe the tracked LPF curve becoming unlinked and Custom"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_attenuation_curve_readback", "subject_api": "ak.wwise.core.object.attenuationCurveLinkChanged", "expectation": "LPF use is UseVolumeDry and complete baseline is recorded"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.attenuationCurveLinkChanged", "expectation": "payload matches fixture attenuation identity and curveType exactly LowPassFilterUsage"},
+        {"phase": "after", "adapter": "waapi_attenuation_curve_readback", "subject_api": "ak.wwise.core.object.attenuationCurveLinkChanged", "expectation": "LPF use is Custom with publisher points; other curves remain baseline and only one event is accepted"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.attenuationCurveLinkChanged", "expectation": "subscription and hidden attenuation state are cleared and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-CHILDADDED-01",
+      "api": "ak.wwise.core.object.childAdded",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "direct_child_create_observation",
+      "scenario_index": 1,
+      "prompt": "帮我监听 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\UI_Alerts` 的直接子级。下一次有人往里面加对象时，只等第一条，告诉我新增子对象和父对象的名称、类型、GUID、完整路径；更深层的孙级不要当成这次目标。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_topic_tree_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden UI_Alerts parent with a baseline child set", "record parent GUID/path, child GUIDs, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.create", "ownership_assertion": "after subscription readiness, create one hidden RandomSequenceContainer direct child with nested Sound descendants"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.childAdded", "count": 1, "effect": "observe the first direct child created under UI_Alerts"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.childAdded", "expectation": "parent baseline child set excludes the planned child and parent identity is fixed"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.childAdded", "expectation": "payload has required child and parent objects; parent.id equals UI_Alerts GUID and child.id/path/type equal created direct child"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.childAdded", "expectation": "parent gains exactly the direct child GUID and nested descendants exist without being reported as the accepted direct-child event"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.childAdded", "expectation": "subscription is inactive, created subtree absent, and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-CHILDADDED-02",
+      "api": "ak.wwise.core.object.childAdded",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "moved_child_added_observation",
+      "scenario_index": 2,
+      "prompt": "监听 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Level02` 的子对象增加。下一次有现成分支被移进来时，把被移入对象和新父级的 GUID、路径、类型告诉我，并确认它不是新建出来的另一个 GUID。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_topic_tree_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create Level01 and Level02 parents plus a hidden Ambience subtree under Level01", "record moving root GUID, old path, parent child sets, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.move", "ownership_assertion": "after subscription readiness, move the tracked hidden subtree from Level01 to Level02 once"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.childAdded", "count": 1, "effect": "observe the tracked existing subtree being added under Level02"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.childAdded", "expectation": "moving root exists under Level01 and Level02 child set excludes its GUID"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.childAdded", "expectation": "payload child.id equals original moving GUID and parent.id equals Level02 GUID with new child path"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.childAdded", "expectation": "same GUID now resolves under Level02, old path is absent, and no duplicate object GUID/name was created"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.childAdded", "expectation": "subscription and all owned GUIDs are cleared and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-CHILDREMOVED-01",
+      "api": "ak.wwise.core.object.childRemoved",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "deleted_child_removed_observation",
+      "scenario_index": 1,
+      "prompt": "盯住 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Legacy` 的直接子级。下一次删掉一支内容时，返回第一条子级移除通知，给出被移除对象和原父级的 GUID、名称、类型和路径，并确认同级其他对象还在。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_topic_tree_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create Legacy parent with one deletion target subtree and two protected siblings", "record all identities, parent child set, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.delete", "ownership_assertion": "after subscription readiness, delete only the hidden target subtree root"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.childRemoved", "count": 1, "effect": "observe the deleted subtree leaving the Legacy parent"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.childRemoved", "expectation": "target and protected siblings are direct children of the recorded parent"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.childRemoved", "expectation": "payload required child and parent identities equal deleted root baseline and Legacy parent baseline"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.childRemoved", "expectation": "target GUID/path and descendants are absent while both protected sibling snapshots remain unchanged"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.childRemoved", "expectation": "subscription inactive, remaining fixtures removed, and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-CHILDREMOVED-02",
+      "api": "ak.wwise.core.object.childRemoved",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "moved_child_removed_observation",
+      "scenario_index": 2,
+      "prompt": "监听 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Shared` 的直接子级。下一次某个分支被移到别处时，给我第一条移除事件，说明离开的子对象和原父级，并核对这个对象仍以原 GUID 存在于新位置。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_topic_tree_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create Shared and Destination parents with a hidden movable subtree under Shared", "record root GUID, old path, descendants, parent identities, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.move", "ownership_assertion": "after subscription readiness, move the hidden subtree from Shared to Destination once"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.childRemoved", "count": 1, "effect": "observe the moved subtree leaving the Shared parent"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.childRemoved", "expectation": "tracked root is a direct Shared child and absent from Destination"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.childRemoved", "expectation": "payload child.id equals moving GUID and parent.id equals original Shared GUID"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.childRemoved", "expectation": "old path is absent and the same root and descendant GUIDs resolve under Destination"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.childRemoved", "expectation": "subscription and owned hierarchy are cleared and source hashes remain unchanged"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-CREATED-01",
+      "api": "ak.wwise.core.object.created",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "hierarchy_root_created_observation",
+      "scenario_index": 1,
+      "prompt": "监听 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab` 里的对象创建。下一次有人建 `Quest_Audio` 根节点时，只返回这个根节点对应的第一条通知，给出名称、类型、GUID 和完整路径；同时确认它下面一并创建的子层级确实存在。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_topic_tree_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create empty SemanticLab parent and prove Quest_Audio path absent", "record parent identity and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.create", "ownership_assertion": "after subscription readiness, recursively create hidden Quest_Audio root with two child containers while filtering accepted event to root GUID"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.created", "count": 1, "effect": "observe the Quest_Audio root creation event and filter descendant events"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.created", "expectation": "Quest_Audio and requested descendants are absent"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.created", "expectation": "payload has required object whose id/name/type/path equal created Quest_Audio root, not a descendant event"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.created", "expectation": "payload root GUID exists with exact two-child hierarchy and result-created descendant GUIDs"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.created", "expectation": "subscription inactive, created tree absent, and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-CREATED-02",
+      "api": "ak.wwise.core.object.created",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "specific_sound_created_observation",
+      "scenario_index": 2,
+      "prompt": "帮我等 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\VO` 下一个 Sound 被创建。创建完成后给出它的 GUID、类型、最终路径、备注和 Volume，并确认最终名称是 `VO_NewLine`。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_topic_tree_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create VO parent and prove target path absent", "record parent identity and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.create", "ownership_assertion": "after subscription readiness, create exactly one hidden Sound under VO, then apply deterministic VO_NewLine name, notes, and Volume"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.created", "count": 1, "effect": "observe only the VO_NewLine Sound creation event"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.created", "expectation": "VO_NewLine target path is absent and target parent GUID is recorded"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.created", "expectation": "the sole accepted payload identifies the newly created Sound; post-event readback resolves its final VO_NewLine path, notes, and Volume"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.created", "expectation": "target GUID resolves exactly once under VO with matching notes and Volume"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.created", "expectation": "subscription and created fixture are cleared and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-CURVECHANGED-01",
+      "api": "ak.wwise.core.object.curveChanged",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "rtpc_curve_points_observation",
+      "scenario_index": 1,
+      "prompt": "监听 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Engine_Loop` 的 RTPC 曲线编辑。下一次曲线控制点变化时，给我第一条通知里的变更类型、曲线对象和所属对象，三者都要带可核对的 GUID 或路径。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_curve_topic_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create Engine_Loop with a hidden RTPC curve owned by the object", "record curve GUID, owner GUID/path, points, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.set", "ownership_assertion": "after subscription readiness, replace only the hidden RTPC curve points once"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.curveChanged", "count": 1, "effect": "observe the tracked Engine_Loop RTPC curve point replacement"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_curve_object_readback", "subject_api": "ak.wwise.core.object.curveChanged", "expectation": "curve and owner identities plus baseline points are recorded"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.curveChanged", "expectation": "payload has required notification, curve, and owner; curve.id and owner.id/path equal fixture identities"},
+        {"phase": "after", "adapter": "waapi_curve_object_readback", "subject_api": "ak.wwise.core.object.curveChanged", "expectation": "curve points equal publisher values, owner remains same, and exactly one accepted event is reported"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.curveChanged", "expectation": "subscription cleared, curve owner removed or restored, and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-CURVECHANGED-02",
+      "api": "ak.wwise.core.object.curveChanged",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "rtpc_curve_structure_observation",
+      "scenario_index": 2,
+      "prompt": "帮我监控 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Wind_Blend` 的曲线结构。下次有人新增一个控制点时只取第一条事件，告诉我 notification、curve 和 owner，并确认通知对应的是这条对象自己的曲线，而不是旁边的测试曲线。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_curve_topic_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create Wind_Blend and decoy owner, each with distinct hidden curve GUIDs", "record both owners/curves, target points, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.set", "ownership_assertion": "after subscription readiness, add one point to only the target hidden curve"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.curveChanged", "count": 1, "effect": "observe one point being added to the tracked Wind_Blend curve"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_curve_object_readback", "subject_api": "ak.wwise.core.object.curveChanged", "expectation": "target and decoy curve/owner identities and target point count are distinct"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.curveChanged", "expectation": "payload notification is non-empty, curve.id equals target curve GUID, owner.id equals Wind_Blend GUID, and decoy IDs are absent"},
+        {"phase": "after", "adapter": "waapi_curve_object_readback", "subject_api": "ak.wwise.core.object.curveChanged", "expectation": "target point count increases by one while decoy curve snapshot remains unchanged"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.curveChanged", "expectation": "subscription and owned curve fixtures are cleared and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-NAMECHANGED-01",
+      "api": "ak.wwise.core.object.nameChanged",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "branch_rename_observation",
+      "scenario_index": 1,
+      "prompt": "监听 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Footstep_Old` 的重命名。下一次名称变化时，给我第一条通知里的 oldName、newName 和对象 GUID，并核对它下面的子路径也跟着更新了。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_topic_tree_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden Footstep_Old branch with descendants", "record root/descendant GUIDs, old paths, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.setName", "ownership_assertion": "after subscription readiness, rename only the hidden root to Footsteps"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.nameChanged", "count": 1, "effect": "observe Footstep_Old changing to Footsteps"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.nameChanged", "expectation": "root name is Footstep_Old and descendant paths share its old path prefix"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.nameChanged", "expectation": "payload required fields object, oldName, newName equal hidden root, Footstep_Old, and Footsteps"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.nameChanged", "expectation": "same root/descendant GUIDs resolve under rebased paths and old paths are absent"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.nameChanged", "expectation": "subscription and renamed fixture are cleared and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-NAMECHANGED-02",
+      "api": "ak.wwise.core.object.nameChanged",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "specific_sibling_rename_observation",
+      "scenario_index": 2,
+      "prompt": "盯住 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\UI\\Error_02` 的名称变化。它改名时只返回这个 GUID 的第一条通知，告诉我新旧名称和新路径；同级 `Error_01` 的重命名不要误报。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_topic_tree_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden Error_01 and Error_02 siblings with distinct GUIDs", "record identities, paths, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.setName", "ownership_assertion": "after subscription readiness, rename decoy Error_01 then target Error_02 to Network_Error"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.nameChanged", "count": 1, "effect": "observe only Error_02 changing to Network_Error after a decoy rename"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.nameChanged", "expectation": "target and decoy GUID/name/path triples are recorded"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.nameChanged", "expectation": "accepted payload object.id equals Error_02 GUID with oldName Error_02 and newName Network_Error; Error_01 event is filtered"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.nameChanged", "expectation": "target GUID resolves at Network_Error path and decoy final state equals trigger record"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.nameChanged", "expectation": "subscription inactive, siblings removed, and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-NOTESCHANGED-01",
+      "api": "ak.wwise.core.object.notesChanged",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "multiline_notes_observation",
+      "scenario_index": 1,
+      "prompt": "监听 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Boss_Phase2` 的备注变化。下一次更新后，把第一条通知里的 oldNotes、newNotes 和对象身份完整返回，换行和中英文内容都要原样保留。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_notes_topic_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden Boss_Phase2 with known multiline Chinese/English notes", "record exact UTF-8 notes, GUID/path, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.setNotes", "ownership_assertion": "after subscription readiness, replace only hidden object's notes with a distinct multiline value"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.notesChanged", "count": 1, "effect": "observe the exact multiline notes replacement on Boss_Phase2"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.notesChanged", "expectation": "exact old notes bytes and object identity are recorded"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.notesChanged", "expectation": "payload object.id matches and oldNotes/newNotes exactly equal runner values including newline boundaries"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.notesChanged", "expectation": "object notes exactly equal event newNotes and all other recorded fields are unchanged"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.notesChanged", "expectation": "subscription removed, notes restored or object deleted, and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-NOTESCHANGED-02",
+      "api": "ak.wwise.core.object.notesChanged",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "notes_cleared_observation",
+      "scenario_index": 2,
+      "prompt": "等 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Temp_Commented` 的备注被清空。只接受这个对象的第一条变化通知，告诉我原备注和新备注，并确认新值真的是空字符串而不是空格。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_notes_topic_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden Temp_Commented with non-empty notes and a decoy notes object", "record both identities, notes, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.setNotes", "ownership_assertion": "after subscription readiness, mutate decoy then set target notes to exact empty string"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.notesChanged", "count": 1, "effect": "observe Temp_Commented notes becoming an empty string after a decoy event"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.notesChanged", "expectation": "target old notes length is positive and target/decoy GUIDs differ"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.notesChanged", "expectation": "accepted payload object.id is target, oldNotes equals baseline, and newNotes is string length zero; decoy event is filtered"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.notesChanged", "expectation": "target notes is exact empty string and other target fields remain baseline"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.notesChanged", "expectation": "subscription and fixtures are removed and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-POSTDELETED-01",
+      "api": "ak.wwise.core.object.postDeleted",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "subtree_post_delete_observation",
+      "scenario_index": 1,
+      "prompt": "监听 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Obsolete_Ambience` 的删除完成通知。对象真正删掉后，把第一条事件里的对象名称、类型、GUID、旧路径给我，并确认这个 GUID 和它的子级已经查不到。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_delete_topic_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden Obsolete_Ambience subtree and protected sibling", "record root/descendant identities and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.delete", "ownership_assertion": "after subscription readiness, delete only the hidden obsolete root"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.postDeleted", "count": 1, "effect": "observe completion of the Obsolete_Ambience subtree deletion"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.postDeleted", "expectation": "root and all descendant GUIDs exist and protected sibling snapshot is recorded"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.postDeleted", "expectation": "payload required object identity equals deleted root baseline including GUID/type/old path"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.postDeleted", "expectation": "root and every descendant GUID/path return zero rows after event while protected sibling is unchanged"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.postDeleted", "expectation": "subscription inactive, remaining fixtures removed, and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-POSTDELETED-02",
+      "api": "ak.wwise.core.object.postDeleted",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "specific_child_post_delete_observation",
+      "scenario_index": 2,
+      "prompt": "等 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\UI\\Unused_Click` 删除完成。只匹配这个对象的第一条通知；返回它原来的 GUID、类型和路径，并确认同级 `Confirm_Click` 还在原位。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_delete_topic_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden Unused_Click and protected Confirm_Click siblings", "record exact identities and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.delete", "ownership_assertion": "after subscription readiness, delete only Unused_Click hidden GUID"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.postDeleted", "count": 1, "effect": "observe completion of the specific Unused_Click deletion"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.postDeleted", "expectation": "target and protected sibling exist with recorded snapshots"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.postDeleted", "expectation": "payload object.id/type/path exactly equal Unused_Click baseline"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.postDeleted", "expectation": "Unused_Click GUID/path are absent and Confirm_Click snapshot remains identical"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.postDeleted", "expectation": "subscription and remaining fixture are cleared and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-PREDELETED-01",
+      "api": "ak.wwise.core.object.preDeleted",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "subtree_pre_delete_observation",
+      "scenario_index": 1,
+      "prompt": "监听 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Legacy_VO` 的删除前通知。它被移除前先把第一条事件里的对象 GUID、名称、类型和当时路径记录下来，随后再确认删除完成以及同级保留项没有变化。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_delete_topic_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden Legacy_VO subtree and protected sibling", "record identities, fields, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.delete", "ownership_assertion": "after subscription readiness, delete only hidden Legacy_VO root"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.preDeleted", "count": 1, "effect": "observe Legacy_VO immediately before its subtree deletion"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.preDeleted", "expectation": "target exists with readable GUID/name/type/path and protected sibling baseline"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.preDeleted", "expectation": "payload object exactly matches target's still-known pre-delete identity"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.preDeleted", "expectation": "target subtree is absent after publisher completion and protected sibling is unchanged"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.preDeleted", "expectation": "subscription inactive, remaining owned state removed, and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-PREDELETED-02",
+      "api": "ak.wwise.core.object.preDeleted",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "leaf_pre_delete_observation",
+      "scenario_index": 2,
+      "prompt": "等 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Foley\\Temp_Step` 被删除前的通知。只取这个 Sound 的第一条事件，记录它的 GUID、路径、备注和 Volume；删除结束后确认父容器只少了这个子对象。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_delete_topic_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create Foley parent with Temp_Step and two protected Sound siblings", "record object fields, ordered child set, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.delete", "ownership_assertion": "after subscription readiness, delete only Temp_Step hidden GUID"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.preDeleted", "count": 1, "effect": "observe Temp_Step immediately before its leaf deletion"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.preDeleted", "expectation": "target fields and parent ordered child GUID set are recorded"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.preDeleted", "expectation": "payload object.id/path/notes/Volume equal Temp_Step baseline before deletion"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.preDeleted", "expectation": "target is absent and parent child set equals baseline minus exactly target GUID"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.preDeleted", "expectation": "subscription and remaining fixtures are cleared and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-PROPERTYCHANGED-01",
+      "api": "ak.wwise.core.object.propertyChanged",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "volume_property_observation",
+      "scenario_index": 1,
+      "prompt": "监听 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Cinematic_Duck` 的 Volume。下次这个属性被调整时，返回第一条通知里的旧值、新值、属性名、平台和对象 GUID；同一对象的 Pitch 变化不要算。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_property_topic_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden Cinematic_Duck with deterministic Volume and Pitch", "record object identity, property values, platform IDs, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.setProperty", "ownership_assertion": "after subscription readiness, change Pitch as decoy then change Volume once on hidden object"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.propertyChanged", "count": 1, "effect": "observe only Cinematic_Duck Volume changing after a Pitch decoy"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.propertyChanged", "expectation": "target GUID and exact old Volume/Pitch values are recorded"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.propertyChanged", "expectation": "payload has required object, property, old, new, platform; object.id matches, property is Volume, values equal runner transition, and Pitch event is filtered"},
+        {"phase": "after", "adapter": "waapi_object_readback", "subject_api": "ak.wwise.core.object.propertyChanged", "expectation": "Volume equals event new value and platform identity is valid; other protected state matches trigger record"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.propertyChanged", "expectation": "subscription and fixture state are removed or restored and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-PROPERTYCHANGED-02",
+      "api": "ak.wwise.core.object.propertyChanged",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "platform_property_observation",
+      "scenario_index": 2,
+      "prompt": "盯住 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Radio_VO` 在 Windows 平台（GUID `{windows_platform_guid}`）上的 Lowpass。下一次这个平台值变化时，告诉我旧值、新值、平台 GUID 和对象身份；其他平台或 Volume 的变化都不要混进来。",
+      "visible_inputs": [{"name": "windows_platform_guid", "kind": "string", "description": "当前临时工程中 Windows 平台的完整 GUID，用于只匹配该平台的事件"}],
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_property_topic_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden Radio_VO with distinct Windows and comparison-platform Lowpass values", "record platform GUIDs, properties, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.setProperty", "ownership_assertion": "after subscription readiness, change comparison platform as decoy then Windows Lowpass once"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.propertyChanged", "count": 1, "effect": "observe only the Windows Lowpass value changing after another-platform decoy"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_platform_property_readback", "subject_api": "ak.wwise.core.object.propertyChanged", "expectation": "target identity and independent platform values are recorded"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.propertyChanged", "expectation": "accepted payload object.id and property Lowpass match, platform equals Windows GUID, and old/new equal Windows transition"},
+        {"phase": "after", "adapter": "waapi_platform_property_readback", "subject_api": "ak.wwise.core.object.propertyChanged", "expectation": "Windows value equals event new; comparison platform equals decoy trigger record and no decoy event is reported"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.propertyChanged", "expectation": "subscription and platform state are cleared/restored and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-REFERENCECHANGED-01",
+      "api": "ak.wwise.core.object.referenceChanged",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "output_bus_reference_observation",
+      "scenario_index": 1,
+      "prompt": "监听 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Boss_SFX` 的 Output Bus 引用。下次切换总线时，把第一条通知里的旧引用、新引用、reference 名称和对象 GUID 返回，并按 GUID 确认两条总线。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_reference_topic_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden Boss_SFX and two hidden Audio Buses, assigning the first as OutputBus", "record object and bus identities, baseline reference, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.setReference", "ownership_assertion": "after subscription readiness, switch only Boss_SFX OutputBus from old hidden bus to new hidden bus"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.referenceChanged", "count": 1, "effect": "observe Boss_SFX OutputBus changing from the old bus to the new bus"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_reference_readback", "subject_api": "ak.wwise.core.object.referenceChanged", "expectation": "object @OutputBus.id equals old bus GUID and differs from new bus GUID"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.referenceChanged", "expectation": "payload required object, old, new, reference match Boss_SFX GUID, old/new bus GUIDs, and reference=OutputBus"},
+        {"phase": "after", "adapter": "waapi_reference_readback", "subject_api": "ak.wwise.core.object.referenceChanged", "expectation": "object @OutputBus.id equals event new.id and both referenced bus identities still exist"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.referenceChanged", "expectation": "subscription and all owned reference fixtures are cleared/restored and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    },
+    {
+      "id": "OBJ22-T-REFERENCECHANGED-02",
+      "api": "ak.wwise.core.object.referenceChanged",
+      "item_type": "topic",
+      "versions": ["2022.1"],
+      "lane": "online_topic",
+      "scenario_family": "attenuation_reference_observation",
+      "scenario_index": 2,
+      "prompt": "盯住 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Outdoor_Ambience` 的 Attenuation 引用变化。下一次换衰减设置时，返回第一条匹配通知，给出对象、旧衰减、新衰减和 reference 名称；Output Bus 的变化不要误报。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {"adapter": "core_object_reference_topic_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create hidden ambience, two Attenuations, and two buses; assign old references", "record all GUIDs, object fields, and source hashes"]},
+      "trigger": {"adapter": "core_object_topic_trigger", "publisher_api": "ak.wwise.core.object.setReference", "ownership_assertion": "after subscription readiness, change OutputBus as decoy then switch hidden object's Attenuation reference"},
+      "expected_dispatches": [{"api": "ak.wwise.core.object.referenceChanged", "count": 1, "effect": "observe Outdoor_Ambience Attenuation changing after an OutputBus decoy"}],
+      "oracle_assertions": [
+        {"phase": "before", "adapter": "waapi_reference_readback", "subject_api": "ak.wwise.core.object.referenceChanged", "expectation": "old/new attenuation GUIDs and baseline OutputBus/Attenuation references are distinct and recorded"},
+        {"phase": "event", "adapter": "waapi_topic_payload_readback", "subject_api": "ak.wwise.core.object.referenceChanged", "expectation": "accepted payload object.id matches, reference is Attenuation, old/new IDs equal attenuation transition, and bus decoy event is filtered"},
+        {"phase": "after", "adapter": "waapi_reference_readback", "subject_api": "ak.wwise.core.object.referenceChanged", "expectation": "@Attenuation.id equals event new.id and @OutputBus.id equals decoy trigger record without being reported"},
+        {"phase": "cleanup", "adapter": "subscription_and_sandbox_integrity", "subject_api": "ak.wwise.core.object.referenceChanged", "expectation": "subscription and all hidden fixtures are cleared/restored and source hashes match"}
+      ],
+      "cleanup": {"adapter": "core_object_topic_cleanup", "postconditions": ["owned_state_removed_or_restored", "project_source_unchanged"]}
+    }
+  ]
+}

@@ -404,10 +404,33 @@ run_program() {
     tests/unit/test_public_route_coverage_contract.py
     tests/unit/test_public_route_program_matrix.py
     tests/unit/test_public_route_negative_contracts.py
+    tests/unit/test_subscriptions.py
     tests/unit/test_io_policy.py
+    tests/unit/test_platform_paths.py
     tests/unit/test_transaction_cleanup.py
+    tests/unit/test_operation_import.py
+    tests/unit/test_operation_object.py
+    tests/unit/test_operation_soundbank.py
+    tests/unit/test_operation_registry.py
+    tests/unit/test_operation_registry_import_verifier.py
+    tests/unit/test_operation_registry_soundbank.py
+    tests/unit/test_object_create_replace.py
+    tests/unit/test_object_reference_activation.py
+    tests/unit/test_object_set_merge.py
+    tests/unit/test_operation_soundbank_version_matrix.py
+    tests/unit/test_skill_contract_protocol.py
+    tests/unit/test_transaction_gateway.py::test_operation_schema_owns_exact_audio_convert_fast_route_contract
     tests/unit/test_transaction_gateway.py::test_generic_manifest_call_runs_full_preview_confirm_execute_verify_chain
     tests/unit/test_transaction_gateway.py::test_generic_isolated_call_runs_full_chain_with_bound_io_audit
+    tests/unit/test_transaction_gateway.py::test_local_wine_cli_execute_translates_only_the_transient_dispatch_paths
+    tests/unit/test_transaction_gateway.py::test_local_wine_cli_mapping_failure_requires_repreview_before_execution_start
+    tests/unit/test_transaction_gateway.py::test_generate_soundbank_verify_uses_sealed_result_context_and_runtime_without_project_probe
+    tests/unit/test_transaction_gateway.py::test_tab_delimited_import_verify_uses_sealed_result_context_and_runtime_without_project_probe
+    tests/unit/test_transaction_gateway.py::test_additional_reviewed_explicit_project_cli_calls_verify_without_project_probe
+    tests/unit/test_transaction_gateway.py::test_generate_soundbank_preview_requires_strong_get_info_process_identity
+    tests/unit/test_transaction_gateway.py::test_generate_soundbank_verify_rejects_same_version_process_identity_drift_without_project_probe
+    tests/unit/test_transaction_gateway.py::test_generate_soundbank_verify_rejects_endpoint_drift_without_project_probe
+    tests/unit/test_transaction_gateway.py::test_generate_soundbank_verify_rejects_runtime_drift_without_project_probe
     tests/unit/test_transaction_gateway.py::test_lifecycle_opener_cleanup_spec_survives_the_full_gateway_chain
     tests/unit/test_transaction_gateway.py::test_load_bank_cleanup_binding_cannot_be_overridden_by_execution_result
     tests/unit/test_transaction_gateway.py::test_transport_create_materializes_destroy_request_in_execute_verify_and_agent_result
@@ -417,9 +440,6 @@ run_program() {
     tests/unit/test_transaction_gateway.py::test_lifecycle_opener_execution_exception_reports_unknown_cleanup
     tests/unit/test_transaction_gateway.py::test_work_unit_load_is_available_reversal_through_the_full_gateway_chain
     tests/unit/test_transaction_gateway.py::test_lifecycle_closer_is_not_reported_as_needing_more_cleanup
-    tests/unit/test_operation_registry.py::test_undo_group_builds_one_exact_versioned_immutable_plan
-    tests/unit/test_operation_registry.py::test_undo_group_rejects_independent_members_version_drift_and_large_requests
-    tests/unit/test_operation_registry.py::test_undo_group_version_allowlist_is_exact_and_only_grows_at_reviewed_boundaries
     tests/unit/test_transaction_gateway.py::test_undo_group_success_uses_one_client_and_verifies_only_result_schemas
     tests/unit/test_transaction_gateway.py::test_undo_group_success_keeps_one_phase_copy_below_the_final_gateway_ceiling
     tests/unit/test_transaction_gateway.py::test_undo_group_success_with_journal_failure_is_not_replayed

@@ -12,7 +12,11 @@ import pytest  # pyright: ignore[reportMissingImports]
 import wwise_waapi.dispatcher as dispatcher_module  # pyright: ignore[reportMissingImports]
 from wwise_waapi.dispatcher import DispatcherRequest, WwiseDispatcher  # pyright: ignore[reportMissingImports]
 from wwise_waapi.manifest import ManifestStore  # pyright: ignore[reportMissingImports]
-from wwise_waapi.subscriptions import SubscriptionEvent  # pyright: ignore[reportMissingImports]
+from wwise_waapi.subscriptions import (  # pyright: ignore[reportMissingImports]
+    SubscriptionCleanupError,
+    SubscriptionEvent,
+    SubscriptionTimeout,
+)
 
 
 class FakeWaapiClient:
@@ -60,6 +64,31 @@ class PredicateSubscriptionManager:
         event = SubscriptionEvent(topic=topic, args=({"object": {"id": "wanted", "name": "UI"}},))
         self.predicate_result = predicate(event) if predicate is not None else None
         return event
+
+
+class MultiEventSubscriptionManager:
+    def __init__(self) -> None:
+        self.waits: list[tuple[str, int, float, dict[str, Any] | None]] = []
+        self.predicate_results: list[bool] = []
+
+    def wait_for_events(
+        self,
+        topic: str,
+        event_count: int,
+        timeout: float = 5.0,
+        options: dict[str, Any] | None = None,
+        predicate: Any | None = None,
+    ) -> tuple[SubscriptionEvent, ...]:
+        self.waits.append((topic, event_count, timeout, options))
+        events = tuple(
+            SubscriptionEvent(
+                topic=topic,
+                args=({"object": {"id": "wanted"}, "sequence": sequence},),
+            )
+            for sequence in range(1, event_count + 1)
+        )
+        self.predicate_results = [predicate(event) for event in events] if predicate is not None else []
+        return events
 
 
 class KeywordOnlyOptionsClient:
@@ -211,7 +240,34 @@ def test_topic_dispatch_uses_subscription_manager_without_reimplementing_subscri
         "args": ({"event": "payload"},),
         "kwargs": {"sequence": 1},
     }
+    assert result["details"]["subscription_cleanup"] == {"status": "unsubscribed"}
     assert manager.waits == [("ak.wwise.core.object.created", 0.25, {"filter": "fixture"})]
+
+
+def test_topic_cleanup_false_preserves_timeout_and_marks_cleanup_failure() -> None:
+    class FailedCleanupManager:
+        def wait_for_event(self, *args: Any, **kwargs: Any) -> SubscriptionEvent:
+            del args, kwargs
+            timeout = SubscriptionTimeout("Timed out waiting for topic")
+            raise SubscriptionCleanupError(
+                f"{timeout}; cleanup returned false",
+                primary_error=timeout,
+                reason="unsubscribe_returned_false",
+            )
+
+    dispatcher = WwiseDispatcher(
+        manifest_store=manifest_store(),
+        subscription_manager=FailedCleanupManager(),  # type: ignore[arg-type]
+    )
+
+    result = dispatcher.dispatch("ak.wwise.core.object.created", timeout=0.25)
+
+    assert result["ok"] is False
+    assert result["error_code"] == "TIMEOUT"
+    assert result["details"]["subscription_cleanup"] == {
+        "status": "unsubscribe_failed",
+        "reason": "unsubscribe_returned_false",
+    }
 
 
 def test_topic_dispatch_supports_a_recursive_payload_match() -> None:
@@ -226,6 +282,42 @@ def test_topic_dispatch_supports_a_recursive_payload_match() -> None:
 
     assert result["ok"] is True
     assert manager.predicate_result is True
+
+
+def test_topic_dispatch_collects_a_bounded_matching_event_count() -> None:
+    manager = MultiEventSubscriptionManager()
+    dispatcher = WwiseDispatcher(manifest_store=manifest_store(), subscription_manager=manager)  # type: ignore[arg-type]
+
+    result = dispatcher.dispatch(
+        "ak.wwise.core.object.created",
+        timeout=0.25,
+        options={"return": ["id"]},
+        topic_match={"object": {"id": "wanted"}},
+        topic_event_count=3,
+    )
+
+    assert result["ok"] is True
+    assert result["result"]["requested_event_count"] == 3
+    assert [event["payload"]["sequence"] for event in result["result"]["events"]] == [1, 2, 3]
+    assert manager.waits == [
+        ("ak.wwise.core.object.created", 3, 0.25, {"return": ["id"]})
+    ]
+    assert manager.predicate_results == [True, True, True]
+
+
+@pytest.mark.parametrize("event_count", (0, 65, True))
+def test_dispatcher_rejects_invalid_topic_event_count(event_count: object) -> None:
+    manager = MultiEventSubscriptionManager()
+    dispatcher = WwiseDispatcher(manifest_store=manifest_store(), subscription_manager=manager)  # type: ignore[arg-type]
+
+    result = dispatcher.dispatch(
+        "ak.wwise.core.object.created",
+        topic_event_count=event_count,  # type: ignore[arg-type]
+    )
+
+    assert result["ok"] is False
+    assert result["error_code"] == "INVALID_TOPIC_EVENT_COUNT"
+    assert manager.waits == []
 
 
 def test_function_timeout_returns_structured_error() -> None:

@@ -150,6 +150,36 @@ def test_generic_transaction_accepts_only_registered_transaction_lanes(api: str)
         )
 
 
+@pytest.mark.parametrize(
+    ("api", "required_operation"),
+    (
+        ("ak.wwise.core.object.create", "object.create"),
+        ("ak.wwise.core.object.set", "object.set"),
+        ("ak.wwise.core.audio.import", "audio.import"),
+        ("ak.wwise.core.audio.importTabDelimited", "audio.importTabDelimited"),
+        ("ak.wwise.core.soundbank.generate", "soundbank.generate"),
+        ("ak.wwise.core.soundbank.convertExternalSources", "soundbank.convertExternalSources"),
+        ("ak.wwise.core.soundbank.processDefinitionFiles", "soundbank.processDefinitionFiles"),
+    ),
+)
+def test_generic_transaction_cannot_bypass_an_implemented_dedicated_operation(
+    api: str,
+    required_operation: str,
+) -> None:
+    with pytest.raises(OperationContractError) as blocked:
+        parse_operation_request(
+            {
+                "contract": OPERATION_REQUEST_CONTRACT,
+                "version": "2022.1",
+                "operation": "waapi.call",
+                "arguments": {"api": api, "args": {}, "options": {}},
+            }
+        )
+
+    assert blocked.value.error_code == "DEDICATED_OPERATION_REQUIRED"
+    assert blocked.value.details["required_operations"] == [required_operation]
+
+
 def test_recursive_schema_validation_rejects_nested_range_and_bad_result() -> None:
     with pytest.raises(SemanticValidationError, match="above the reflected maximum"):
         validate_semantic_payload(

@@ -218,11 +218,24 @@ def launch_sandboxed_wwise(
     env: Mapping[str, str] | None = None,
     *,
     timeouts: LifecycleTimeouts | None = None,
+    wine_prefix_path: Path | None = None,
+    case_owned_root: Path | None = None,
 ) -> HeadlessLifecycle:
     """Launch WwiseConsole only against the sandbox copy."""
 
     env_map = dict(env if env is not None else os.environ)
     env_map.update(sandbox.env)
+    launch_wine_prefix = sandbox.wine_prefix_path
+    if wine_prefix_path is not None or case_owned_root is not None:
+        launch_wine_prefix = _resolve_case_owned_wine_prefix(
+            env_map,
+            wine_prefix_path=wine_prefix_path,
+            case_owned_root=case_owned_root,
+        )
+        # Sandbox-owned values win over caller environment first.  The one
+        # explicit case-owned exception is then installed as the real prefix
+        # passed to HeadlessLifecycle; validation never creates the prefix.
+        env_map["WINEPREFIX"] = str(launch_wine_prefix)
     env_map["WWISE_LIVE"] = env_map.get("WWISE_LIVE", "1")
     env_map["WWISE_DESTRUCTIVE"] = env_map.get("WWISE_DESTRUCTIVE", "1")
     contract = require_destructive_environment(env_map)
@@ -243,7 +256,7 @@ def launch_sandboxed_wwise(
         sandbox.metadata.selected_port = lifecycle.port
         sandbox.metadata.command = list(lifecycle.command)
         sandbox.metadata.process_pid = getattr(lifecycle.process, "pid", None)
-        sandbox.metadata.wine_prefix_path = str(sandbox.wine_prefix_path)
+        sandbox.metadata.wine_prefix_path = str(launch_wine_prefix)
         sandbox.metadata.launch_project_path = str(sandbox.sandbox_project)
         sandbox.metadata.ready_duration_seconds = ready_duration
         sandbox.metadata.get_info_version = dict(ready_info["version"])
@@ -267,7 +280,7 @@ def launch_sandboxed_wwise(
             if cleanup_report is not None and cleanup_report.launch_pid is not None
             else process_pid_before_cleanup
         )
-        sandbox.metadata.wine_prefix_path = str(sandbox.wine_prefix_path)
+        sandbox.metadata.wine_prefix_path = str(launch_wine_prefix)
         sandbox.metadata.launch_project_path = str(sandbox.sandbox_project)
         sandbox.metadata.process_cleanup_details = asdict(cleanup_report) if cleanup_report is not None else None
         if cleanup_error is not None:
@@ -492,6 +505,85 @@ def _timeouts_from_env(env: Mapping[str, str]) -> LifecycleTimeouts:
         probe=float(env.get("WWISE_PROBE_TIMEOUT", "5")),
         shutdown=float(env.get("WWISE_SHUTDOWN_TIMEOUT", "10")),
     )
+
+
+def _resolve_case_owned_wine_prefix(
+    env: Mapping[str, str],
+    *,
+    wine_prefix_path: Path | None,
+    case_owned_root: Path | None,
+) -> Path:
+    """Validate one fresh Wine prefix under a real case-owned HOME/root."""
+
+    if wine_prefix_path is None or case_owned_root is None:
+        raise SandboxFixtureError(
+            "wine_prefix_path and case_owned_root must be provided together"
+        )
+
+    root = Path(case_owned_root)
+    if not root.is_absolute():
+        raise SandboxFixtureError("case_owned_root must be an absolute path")
+    if root.is_symlink() or not root.is_dir():
+        raise SandboxFixtureError(
+            f"case_owned_root must be an existing real directory: {root}"
+        )
+    root = root.resolve(strict=True)
+
+    home_text = env.get("HOME")
+    if not isinstance(home_text, str) or not home_text:
+        raise SandboxFixtureError(
+            "HOME must name an existing real directory for a case-owned Wine prefix"
+        )
+    home = Path(home_text)
+    if not home.is_absolute():
+        raise SandboxFixtureError("HOME must be an absolute path")
+    if home.is_symlink() or not home.is_dir():
+        raise SandboxFixtureError(
+            f"HOME must be an existing real directory: {home}"
+        )
+    home = home.resolve(strict=True)
+    if root not in home.parents:
+        raise SandboxFixtureError(
+            f"HOME must be strictly under case_owned_root: {home} outside {root}"
+        )
+
+    prefix = Path(wine_prefix_path)
+    if not prefix.is_absolute():
+        raise SandboxFixtureError("wine_prefix_path must be an absolute path")
+    if os.path.lexists(prefix):
+        kind = "symlink" if prefix.is_symlink() else "existing path"
+        raise SandboxFixtureError(
+            f"wine_prefix_path must not already exist ({kind}): {prefix}"
+        )
+    prefix = Path(os.path.abspath(os.path.normpath(str(prefix))))
+    try:
+        relative_prefix = prefix.relative_to(home)
+    except ValueError as exc:
+        raise SandboxFixtureError(
+            f"wine_prefix_path must be strictly under HOME: {prefix} outside {home}"
+        ) from exc
+    if not relative_prefix.parts:
+        raise SandboxFixtureError("wine_prefix_path must be strictly under HOME")
+    current = home
+    for component in relative_prefix.parts[:-1]:
+        current /= component
+        if not os.path.lexists(current):
+            continue
+        if current.is_symlink() or not current.is_dir():
+            raise SandboxFixtureError(
+                "wine_prefix_path contains a non-directory or symlink parent: "
+                f"{current}"
+            )
+    prefix = prefix.resolve(strict=False)
+    if home not in prefix.parents:
+        raise SandboxFixtureError(
+            f"wine_prefix_path must be strictly under HOME: {prefix} outside {home}"
+        )
+    if root not in prefix.parents:
+        raise SandboxFixtureError(
+            f"wine_prefix_path must be strictly under case_owned_root: {prefix} outside {root}"
+        )
+    return prefix
 
 
 def _preserve_sandbox(sandbox: SandboxProject) -> Path:

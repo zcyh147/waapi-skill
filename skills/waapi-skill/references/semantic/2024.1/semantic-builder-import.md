@@ -44,7 +44,7 @@
 
 ## Return shape
 
-Import and importTabDelimited return log, files, and objects arrays. The imported topic publishes objects, files, and the applied operation string.
+audio.import returns required log, files, and objects arrays. importTabDelimited returns an optional objects array. The imported topic publishes objects, files, and the applied operation string.
 
 ## Destructive behavior
 

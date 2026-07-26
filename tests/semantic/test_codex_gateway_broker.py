@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shlex
@@ -23,15 +24,77 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     GatewayInvocationError,
     ResponseBinding,
     SemanticJsonArgument,
+    SUBSCRIPTION_ACK_CONTRACT,
+    SUBSCRIPTION_ACK_NONCE_ENV,
+    SUBSCRIPTION_ACK_PATH_ENV,
+    SUBSCRIPTION_ACK_STEP_ENV,
+    SUBSCRIPTION_ACK_TOPIC_ENV,
+    TrustedSubscriptionAckExpectation,
+    TrustedSubscriptionAckSpec,
+    reconcile_gateway_command_prefix,
     reconcile_gateway_commands,
     resolve_gateway_invocation,
 )
+from wwise_waapi.transactions import confirmation_token_for
+
+
+FAKE_ARTIFACT_HASH = "a" * 64
+FAKE_LAST_EVENT_HASH = "b" * 64
+FAKE_EVENT_SEQUENCE = 2
+
+
+def fake_confirmation_token(transaction_id: str) -> str:
+    return confirmation_token_for(
+        transaction_id=transaction_id,
+        artifact_hash=FAKE_ARTIFACT_HASH,
+        state="awaiting_confirmation",
+        event_sequence=FAKE_EVENT_SEQUENCE,
+        last_event_hash=FAKE_LAST_EVENT_HASH,
+    )
+
+
+def expected_fake_confirmation_next_command(
+    runner_path: Path,
+    transaction_id: str,
+) -> dict[str, object]:
+    token = fake_confirmation_token(transaction_id)
+    gateway_argv = (
+        "confirm",
+        transaction_id,
+        "--confirmation-token",
+        token,
+    )
+    full_argv = (
+        "python",
+        str(runner_path.resolve()),
+        "gateway.py",
+        *gateway_argv,
+    )
+    result: dict[str, object] = {
+        "contract": "waapi-skill.gateway-next-command/v1",
+        "command": "confirm",
+        "gateway_argv": list(gateway_argv),
+        "full_argv": list(full_argv),
+        "copy_exactly": True,
+        "requires_explicit_user_confirmation": True,
+    }
+    if os.name == "nt":
+        result["shell_family"] = "windows-cmd"
+        result["shell_command"] = subprocess.list2cmdline(full_argv)
+    else:
+        result["shell_family"] = "posix-sh"
+        result["shell_command"] = shlex.join(full_argv)
+    return result
 
 
 FAKE_RUNNER = r'''from __future__ import annotations
+import hashlib
 import json
 import os
+import shlex
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 state = Path(os.environ["WAAPI_SKILL_STATE_DIR"])
@@ -67,6 +130,42 @@ if mode == "hang-ignore-term":
     (state / "fake-runner-pid").write_text(str(os.getpid()), encoding="utf-8")
     while True:
         time.sleep(1)
+ack_path = os.environ.get("WAAPI_SKILL_BROKER_SUBSCRIPTION_ACK_PATH", "")
+if ack_path and mode != "subscription-ack-missing":
+    ack_writer = """
+import json
+import os
+import time
+
+ack_path = os.environ["WAAPI_SKILL_BROKER_SUBSCRIPTION_ACK_PATH"]
+mode = os.environ.get("FAKE_GATEWAY_MODE", "")
+ack_payload = {
+    "contract": "waapi-skill.broker-subscription-ack/v2",
+    "step_name": os.environ["WAAPI_SKILL_BROKER_SUBSCRIPTION_ACK_STEP"],
+    "topic": os.environ["WAAPI_SKILL_BROKER_SUBSCRIPTION_ACK_TOPIC"],
+    "nonce": os.environ["WAAPI_SKILL_BROKER_SUBSCRIPTION_ACK_NONCE"],
+    "runner_parent_process_id": os.getppid(),
+    "gateway_process_id": os.getpid(),
+    "subscribed_at_unix_ns": time.time_ns(),
+    "subscribed_at_monotonic_ns": time.monotonic_ns(),
+}
+if mode == "subscription-ack-wrong-topic":
+    ack_payload["topic"] = "ak.wwise.core.object.created"
+encoded_ack = (
+    json.dumps(ack_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    + "\\n"
+).encode("utf-8")
+descriptor = os.open(ack_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(descriptor, "wb") as stream:
+    stream.write(encoded_ack)
+    stream.flush()
+    os.fsync(stream.fileno())
+if mode == "subscription-ack-duplicate":
+    os.open(ack_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+"""
+    completed_ack = subprocess.run([sys.executable, "-c", ack_writer], check=False)
+    if completed_ack.returncode != 0:
+        raise SystemExit(completed_ack.returncode)
 payload = {
     "contract": "waapi-skill.gateway-result/v1",
     "ok": True,
@@ -80,39 +179,185 @@ payload = {
     "bash_env_visible": "BASH_ENV" in os.environ,
     "gateway_required_visible": "WAAPI_CODEX_GATEWAY_REQUIRED" in os.environ,
 }
+transaction_id = os.environ.get("FAKE_GATEWAY_TRANSACTION_ID", "tx-dynamic-123")
+artifact_hash = "a" * 64
+event_sequence = 2
+last_event_hash = "b" * 64
+confirmation_material = {
+    "contract": "waapi-skill.confirmation-token-material/v1",
+    "transaction_id": transaction_id,
+    "artifact_hash": artifact_hash,
+    "state": "awaiting_confirmation",
+    "event_sequence": event_sequence,
+    "last_event_hash": last_event_hash,
+}
+digest_prefix = hashlib.sha256(
+    json.dumps(
+        confirmation_material,
+        ensure_ascii=False,
+        allow_nan=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+).hexdigest()[:30]
+alphabet = "0123456789abcdefghjkmnpqrstvwxyz"
+token_value = int(digest_prefix, 16)
+token_characters = ["0"] * 24
+for token_index in range(23, -1, -1):
+    token_characters[token_index] = alphabet[token_value & 0x1F]
+    token_value >>= 5
+confirmation_token = "ct1-" + "".join(token_characters)
 if command == "preview":
     (state / "preview-marker.json").write_text(
-        json.dumps({"transaction_id": "tx-dynamic-123", "artifact_hash": "sha256-dynamic-456"}),
+        json.dumps(
+            {
+                "transaction_id": transaction_id,
+                "artifact_hash": artifact_hash,
+                "event_sequence": event_sequence,
+                "last_event_hash": last_event_hash,
+            }
+        ),
         encoding="utf-8",
     )
     payload.update({
         "status": "awaiting_confirmation",
-        "transaction_id": "tx-dynamic-123",
-        "artifact_hash": "sha256-dynamic-456",
+        "transaction_id": transaction_id,
+        "artifact_hash": artifact_hash,
         "request": json.loads(command_arguments[1]),
     })
 elif command == "confirm":
-    assert (state / "preview-marker.json").is_file()
+    marker = json.loads((state / "preview-marker.json").read_text(encoding="utf-8"))
+    assert command_arguments == [
+        marker["transaction_id"],
+        "--confirmation-token",
+        confirmation_token,
+    ]
     payload.update({
         "status": "confirmed",
         "transaction_id": command_arguments[0],
-        "artifact_hash": command_arguments[2],
+        "artifact_hash": marker["artifact_hash"],
     })
 elif command == "transaction-show":
     marker = json.loads((state / "preview-marker.json").read_text(encoding="utf-8"))
     payload.update(marker)
+    payload["state"] = "awaiting_confirmation"
+    payload["confirmation"] = {
+        "contract": "waapi-skill.confirmation-binding/v1",
+        "token": confirmation_token,
+        "binding": {
+            "material_contract": "waapi-skill.confirmation-token-material/v1",
+            "transaction_id": marker["transaction_id"],
+            "artifact_hash": marker["artifact_hash"],
+            "state": "awaiting_confirmation",
+            "event_sequence": marker["event_sequence"],
+            "last_event_hash": marker["last_event_hash"],
+        },
+    }
+    gateway_argv = [
+        "confirm",
+        marker["transaction_id"],
+        "--confirmation-token",
+        confirmation_token,
+    ]
+    full_argv = [
+        "python",
+        str(Path(__file__).resolve()),
+        "gateway.py",
+        *gateway_argv,
+    ]
+    payload["next_command"] = {
+        "contract": "waapi-skill.gateway-next-command/v1",
+        "command": "confirm",
+        "gateway_argv": gateway_argv,
+        "full_argv": full_argv,
+        "copy_exactly": True,
+        "requires_explicit_user_confirmation": True,
+        "shell_family": "windows-cmd" if os.name == "nt" else "posix-sh",
+        "shell_command": (
+            subprocess.list2cmdline(full_argv)
+            if os.name == "nt"
+            else shlex.join(full_argv)
+        ),
+    }
+    if mode == "confirmation-token-only":
+        payload["confirmation"] = {"token": confirmation_token}
+    elif mode == "confirmation-wrong-journal-head":
+        payload["confirmation"]["binding"]["last_event_hash"] = "c" * 64
+    elif mode == "status-show-confirmed":
+        payload["status"] = "ok"
+        payload["state"] = "confirmed"
+        payload.pop("confirmation")
+        payload.pop("next_command")
 elif command == "execute":
+    marker_path = state / "preview-marker.json"
+    marker = (
+        json.loads(marker_path.read_text(encoding="utf-8"))
+        if marker_path.is_file()
+        else {
+            "transaction_id": command_arguments[0],
+            "artifact_hash": artifact_hash,
+        }
+    )
     (state / "mutation-executed").write_text("yes", encoding="utf-8")
+    payload.update(marker)
+    if mode in {"terminal-success", "terminal-success-exit2"}:
+        payload.update({
+            "status": "executed_unverified",
+            "state": "executed_unverified",
+            "executed": True,
+            "verified": False,
+            "automatic_retry": False,
+        })
+    elif mode == "terminal-indeterminate":
+        payload.update({
+            "ok": False,
+            "status": "indeterminate",
+            "state": "indeterminate",
+            "automatic_retry": False,
+        })
+    elif mode == "terminal-generic-error":
+        payload.update({
+            "ok": False,
+            "status": "error",
+            "error_code": "CONNECTION_FAILED",
+            "automatic_retry": False,
+        })
+elif command == "verify":
+    marker_path = state / "preview-marker.json"
+    marker = (
+        json.loads(marker_path.read_text(encoding="utf-8"))
+        if marker_path.is_file()
+        else {
+            "transaction_id": command_arguments[0],
+            "artifact_hash": artifact_hash,
+        }
+    )
+    payload.update(marker)
 if mode == "bad-ok":
     payload["ok"] = False
 elif mode == "bad-command":
     payload["command"] = "buses"
 elif mode == "bad-contract":
     payload["contract"] = "forged/v1"
+elif mode == "expected-error":
+    payload["ok"] = os.environ.get("FAKE_GATEWAY_ERROR_OK", "false") == "true"
+    payload["error_code"] = os.environ.get(
+        "FAKE_GATEWAY_ERROR_CODE",
+        "PACKAGED_PREVIEW_UNAVAILABLE",
+    )
+    payload["command"] = os.environ.get("FAKE_GATEWAY_ERROR_COMMAND", command)
+    payload["contract"] = os.environ.get(
+        "FAKE_GATEWAY_ERROR_CONTRACT",
+        "waapi-skill.gateway-result/v1",
+    )
 print("fake setup log before payload")
 print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
 if mode == "bad-exit":
     raise SystemExit(7)
+if mode == "expected-error":
+    raise SystemExit(int(os.environ.get("FAKE_GATEWAY_ERROR_EXIT", "2")))
+if mode in {"terminal-success-exit2", "terminal-indeterminate", "terminal-generic-error"}:
+    raise SystemExit(2)
 '''
 
 
@@ -162,12 +407,20 @@ def test_broker_executes_exact_order_with_semantic_json_and_response_bindings(
             ("--request-json", SemanticJsonArgument(request)),
         ),
         ExpectedGatewayStep(
+            "show",
+            "transaction-show",
+            (
+                ResponseBinding("preview", "/transaction_id"),
+                "--summary-only",
+            ),
+        ),
+        ExpectedGatewayStep(
             "confirm",
             "confirm",
             (
-                ResponseBinding("preview", "/transaction_id"),
-                "--artifact-hash",
-                ResponseBinding("preview", "/artifact_hash"),
+                ResponseBinding("show", "/transaction_id"),
+                "--confirmation-token",
+                ResponseBinding("show", "/confirmation/token"),
             ),
         ),
     )
@@ -196,16 +449,49 @@ def test_broker_executes_exact_order_with_semantic_json_and_response_bindings(
                 "python",
                 str(broker.runner_path),
                 "gateway.py",
+                "transaction-show",
+                "tx-dynamic-123",
+                "--summary-only",
+            ],
+            [
+                "python",
+                str(broker.runner_path),
+                "gateway.py",
                 "confirm",
                 "tx-dynamic-123",
-                "--artifact-hash",
-                "sha256-dynamic-456",
+                "--confirmation-token",
+                fake_confirmation_token("tx-dynamic-123"),
             ],
         ]
         results = [run_model_command(broker, command[3:]) for command in observed]
 
-        assert [result.returncode for result in results] == [0, 0, 0]
+        assert [result.returncode for result in results] == [0, 0, 0, 0]
         preview = json.loads(results[1].stdout[results[1].stdout.index("{") :])
+        shown = json.loads(results[2].stdout[results[2].stdout.index("{") :])
+        confirm_output = results[3].stdout
+        assert confirm_output
+        confirm = json.loads(confirm_output[confirm_output.index("{") :])
+        assert confirm["command"] == "confirm"
+        assert confirm["status"] == "confirmed"
+        assert confirm["transaction_id"] == "tx-dynamic-123"
+        assert confirm["artifact_hash"] == FAKE_ARTIFACT_HASH
+        assert shown["confirmation"] == {
+            "contract": "waapi-skill.confirmation-binding/v1",
+            "token": fake_confirmation_token("tx-dynamic-123"),
+            "binding": {
+                "material_contract": "waapi-skill.confirmation-token-material/v1",
+                "transaction_id": "tx-dynamic-123",
+                "artifact_hash": FAKE_ARTIFACT_HASH,
+                "state": "awaiting_confirmation",
+                "event_sequence": FAKE_EVENT_SEQUENCE,
+                "last_event_hash": FAKE_LAST_EVENT_HASH,
+            },
+        }
+        assert shown["next_command"] == expected_fake_confirmation_next_command(
+            skill / "scripts" / "run.py",
+            "tx-dynamic-123",
+        )
+        assert results[3].stderr == ""
         assert preview["request"] == request
         assert preview["broker_token_visible"] is False
         assert preview["bash_env_visible"] is False
@@ -217,17 +503,924 @@ def test_broker_executes_exact_order_with_semantic_json_and_response_bindings(
         evidence = broker.evidence()
         assert evidence.passed is True
         assert evidence.complete is True
-        assert evidence.consumed_step_names == ("schema", "preview", "confirm")
-        assert len(evidence.records) == 3
+        assert evidence.consumed_step_names == ("schema", "preview", "show", "confirm")
+        assert len(evidence.records) == 4
         assert all(record.accepted and record.succeeded for record in evidence.records)
         assert all(record.argv_sha256 and record.payload_sha256 for record in evidence.records)
         assert all(record.runner_command_sha256 for record in evidence.records)
         assert all(record.duration_seconds >= 0 for record in evidence.records)
         assert evidence.records[1].payload == preview
+        assert evidence.records[2].payload == shown
+        assert evidence.records[3].payload == confirm
+        assert evidence.records[3].stdout == confirm_output
         assert broker.reconcile(observed).passed is True
 
         calls = (broker.state_directory / "fake-runner-calls.jsonl").read_text(encoding="utf-8").splitlines()
-        assert len(calls) == 3
+        assert len(calls) == 4
+
+
+def test_broker_accepts_non_awaiting_status_show_without_confirmation(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    request = {"operation": "object.setNotes", "value": "status-only"}
+    steps = (
+        ExpectedGatewayStep(
+            "preview",
+            "preview",
+            ("--request-json", SemanticJsonArgument(request)),
+        ),
+        ExpectedGatewayStep(
+            "status-show",
+            "transaction-show",
+            (
+                ResponseBinding("preview", "/transaction_id"),
+                "--summary-only",
+            ),
+        ),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        transport="tcp",
+        runner_environment={
+            "PATH": os.environ.get("PATH", os.defpath),
+            "FAKE_GATEWAY_MODE": "status-show-confirmed",
+        },
+    ) as broker:
+        preview = run_model_command(
+            broker,
+            ["preview", "--request-json", json.dumps(request, separators=(",", ":"))],
+        )
+        assert preview.returncode == 0
+
+        shown_result = run_model_command(
+            broker,
+            ["transaction-show", "tx-dynamic-123", "--summary-only"],
+        )
+
+        assert shown_result.returncode == 0
+        shown = json.loads(
+            shown_result.stdout[shown_result.stdout.index("{") :]
+        )
+        assert shown["command"] == "transaction-show"
+        assert shown["state"] == "confirmed"
+        assert shown["status"] == "ok"
+        assert "confirmation" not in shown
+        assert "next_command" not in shown
+        assert broker.evidence().passed is True
+
+
+def test_query_object_accepts_a_permutation_of_unique_return_fields(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    expected_arguments = (
+        "--path",
+        r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab",
+        "--select",
+        "descendants",
+        "--take",
+        "24",
+        "--return-field",
+        "id",
+        "--return-field",
+        "name",
+        "--return-field",
+        "type",
+        "--return-field",
+        "path",
+        "--return-field",
+        "parent",
+        "--return-field",
+        "audioSource:language",
+        "--return-field",
+        "@Volume",
+        "--return-field",
+        "notes",
+    )
+    supplied_arguments = (
+        *expected_arguments[:7],
+        "path",
+        "--return-field",
+        "parent",
+        "--return-field",
+        "@Volume",
+        "--return-field",
+        "id",
+        "--return-field",
+        "notes",
+        "--return-field",
+        "type",
+        "--return-field",
+        "audioSource:language",
+        "--return-field",
+        "name",
+    )
+    step = ExpectedGatewayStep(
+        "query-object",
+        "query-object",
+        expected_arguments,
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            ["query-object", *supplied_arguments],
+        )
+
+        assert result.returncode == 0
+        assert broker.evidence().passed is True
+
+
+@pytest.mark.parametrize(
+    ("supplied_arguments", "error_fragment"),
+    (
+        (
+            (
+                "--path",
+                r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab",
+                "--take",
+                "24",
+                "--return-field",
+                "id",
+                "--return-field",
+                "id",
+                "--return-field",
+                "type",
+            ),
+            "must not contain duplicates",
+        ),
+        (
+            (
+                "--path",
+                r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab",
+                "--take",
+                "24",
+                "--return-field",
+                "id",
+                "--return-field",
+                "",
+                "--return-field",
+                "type",
+            ),
+            "must be non-empty strings",
+        ),
+        (
+            (
+                "--path",
+                r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab",
+                "--take",
+                "24",
+                "--return-field",
+                "id",
+                "--return-field",
+                "name",
+                "--return-field",
+                "notes",
+            ),
+            "set must match",
+        ),
+        (
+            (
+                "--path",
+                r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab",
+                "--take",
+                "25",
+                "--return-field",
+                "type",
+                "--return-field",
+                "id",
+                "--return-field",
+                "name",
+            ),
+            "must be exactly '24'",
+        ),
+    ),
+)
+def test_query_object_return_field_equivalence_remains_closed(
+    tmp_path: Path,
+    supplied_arguments: tuple[str, ...],
+    error_fragment: str,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    step = ExpectedGatewayStep(
+        "query-object",
+        "query-object",
+        (
+            "--path",
+            r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab",
+            "--take",
+            "24",
+            "--return-field",
+            "id",
+            "--return-field",
+            "name",
+            "--return-field",
+            "type",
+        ),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            ["query-object", *supplied_arguments],
+        )
+
+        assert result.returncode == 126
+        assert error_fragment in result.stderr
+        assert broker.evidence().terminal_state == "FAILED"
+        assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
+
+
+def test_return_field_order_remains_exact_for_non_query_object_steps(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    step = ExpectedGatewayStep(
+        "call",
+        "call",
+        (
+            "ak.wwise.test",
+            "--return-field",
+            "id",
+            "--return-field",
+            "name",
+        ),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            [
+                "call",
+                "ak.wwise.test",
+                "--return-field",
+                "name",
+                "--return-field",
+                "id",
+            ],
+        )
+
+        assert result.returncode == 126
+        assert "argument 2 must be exactly 'id'" in result.stderr
+        assert broker.evidence().terminal_state == "FAILED"
+        assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
+
+
+def test_broker_keeps_json_number_wire_types_exact_before_execution(
+    tmp_path: Path,
+) -> None:
+    """The real Media Pool endpoint can distinguish integer and float values."""
+
+    skill = make_fake_skill(tmp_path)
+    expected = {
+        "filters": [
+            {
+                "type": "field",
+                "field": "WAV/Duration",
+                "operator": "lessThanOrEqual",
+                "value": 8.0,
+            }
+        ],
+        "maxResults": 40,
+    }
+    observed = {
+        **expected,
+        "filters": [{**expected["filters"][0], "value": 8}],
+    }
+    step = ExpectedGatewayStep(
+        "media.get",
+        "preview",
+        ("--request-json", SemanticJsonArgument(expected)),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            ["preview", "--request-json", json.dumps(observed)],
+        )
+
+        assert result.returncode == 126
+        assert "not semantically equal" in result.stderr
+        assert broker.evidence().terminal_state == "FAILED"
+        assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
+
+
+@pytest.mark.parametrize(
+    "observed_arguments",
+    (
+        {
+            "parent": {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Default Work Unit"},
+            "type": "ActorMixer",
+            "name": "Player_Foley",
+            "properties": [{"name": "Volume", "value": -2.0}],
+            "on_name_conflict": "fail",
+        },
+        {
+            "parent": {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Default Work Unit"},
+            "type": "ActorMixer",
+            "name": "Player_Foley",
+            "properties": [{"name": "Volume", "value": -2.0}],
+        },
+        {
+            "parent": {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Default Work Unit"},
+            "type": "ActorMixer",
+            "name": "Player_Foley",
+            "properties": [{"name": "Volume", "value": -2}],
+            "on_name_conflict": "fail",
+        },
+        {
+            "parent": {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Default Work Unit"},
+            "type": "ActorMixer",
+            "name": "Player_Foley",
+            "properties": [{"name": "Volume", "value": -2}],
+            "children": [],
+        },
+    ),
+)
+def test_broker_accepts_only_closed_object_operation_equivalences(
+    tmp_path: Path,
+    observed_arguments: dict[str, object],
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    expected_arguments = {
+        "parent": {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Default Work Unit"},
+        "type": "ActorMixer",
+        "name": "Player_Foley",
+        "properties": [{"name": "Volume", "value": -2.0}],
+        "on_name_conflict": "fail",
+    }
+    expected = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.create",
+        "arguments": expected_arguments,
+    }
+    observed = {**expected, "arguments": observed_arguments}
+    step = ExpectedGatewayStep(
+        "preview",
+        "preview",
+        (
+            "--request-json",
+            SemanticJsonArgument(expected, equivalence="object_operation_v1"),
+        ),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            ["preview", "--request-json", json.dumps(observed)],
+        )
+
+        assert result.returncode == 0
+        assert broker.evidence().passed
+
+
+def test_object_operation_equivalence_accepts_integral_float_for_reviewed_pitch_int(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    expected = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Default Work Unit\Target"},
+                    "properties": [{"name": "Pitch", "value": 100}],
+                }
+            ],
+            "on_name_conflict": "fail",
+        },
+    }
+    observed = json.loads(json.dumps(expected))
+    observed["arguments"]["objects"][0]["properties"][0]["value"] = 100.0
+    observed["arguments"].pop("on_name_conflict")
+    step = ExpectedGatewayStep(
+        "preview",
+        "preview",
+        (
+            "--request-json",
+            SemanticJsonArgument(expected, equivalence="object_operation_v1"),
+        ),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            ["preview", "--request-json", json.dumps(observed)],
+        )
+
+        assert result.returncode == 0
+        assert broker.evidence().passed
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ("wrong_value", "boolean_value", "extra_field", "omit_nondefault_conflict"),
+)
+def test_broker_rejects_values_outside_closed_object_operation_equivalence(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    arguments = {
+        "objects": [
+            {
+                "object": {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Default Work Unit\Target"},
+                "properties": [{"name": "Volume", "value": -2.0}],
+            }
+        ],
+        "on_name_conflict": "merge",
+    }
+    observed_arguments = json.loads(json.dumps(arguments))
+    if mutation == "wrong_value":
+        observed_arguments["objects"][0]["properties"][0]["value"] = -3
+    elif mutation == "boolean_value":
+        observed_arguments["objects"][0]["properties"][0]["value"] = True
+    elif mutation == "extra_field":
+        observed_arguments["objects"][0]["unreviewed"] = True
+    else:
+        observed_arguments.pop("on_name_conflict")
+    expected = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.set",
+        "arguments": arguments,
+    }
+    observed = {**expected, "arguments": observed_arguments}
+    step = ExpectedGatewayStep(
+        "preview",
+        "preview",
+        (
+            "--request-json",
+            SemanticJsonArgument(expected, equivalence="object_operation_v1"),
+        ),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            ["preview", "--request-json", json.dumps(observed)],
+        )
+
+        assert result.returncode == 126
+        assert broker.evidence().terminal_state == "FAILED"
+
+
+def test_broker_reconciles_only_an_exact_running_prefix_then_full_completion(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    request = {"operation": "object.setNotes", "arguments": {"value": "prefix"}}
+    steps = (
+        ExpectedGatewayStep("schema", "operation-schema", ("object.setNotes",)),
+        ExpectedGatewayStep(
+            "preview",
+            "preview",
+            ("--request-json", SemanticJsonArgument(request)),
+        ),
+        ExpectedGatewayStep(
+            "show",
+            "transaction-show",
+            (
+                ResponseBinding("preview", "/transaction_id"),
+                "--summary-only",
+            ),
+        ),
+        ExpectedGatewayStep(
+            "confirm",
+            "confirm",
+            (
+                ResponseBinding("show", "/transaction_id"),
+                "--confirmation-token",
+                ResponseBinding("show", "/confirmation/token"),
+            ),
+        ),
+    )
+    observed = [
+        ["python", str(skill / "scripts" / "run.py"), "gateway.py", "operation-schema", "object.setNotes"],
+        [
+            "python",
+            str(skill / "scripts" / "run.py"),
+            "gateway.py",
+            "preview",
+            "--request-json",
+            json.dumps(request),
+        ],
+        [
+            "python",
+            str(skill / "scripts" / "run.py"),
+            "gateway.py",
+            "transaction-show",
+            "tx-dynamic-123",
+            "--summary-only",
+        ],
+        [
+            "python",
+            str(skill / "scripts" / "run.py"),
+            "gateway.py",
+            "confirm",
+            "tx-dynamic-123",
+            "--confirmation-token",
+            fake_confirmation_token("tx-dynamic-123"),
+        ],
+    ]
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        transport="tcp",
+    ) as broker:
+        assert run_model_command(broker, observed[0][3:]).returncode == 0
+        assert run_model_command(broker, observed[1][3:]).returncode == 0
+
+        evidence = broker.evidence()
+        checkpoint = broker.reconcile_prefix(observed[:2], expected_step_count=2)
+        standalone = reconcile_gateway_command_prefix(
+            observed[:2],
+            evidence,
+            expected_step_count=2,
+            skill_source=skill,
+            shim_directory=broker.shim_directory,
+        )
+        assert evidence.terminal_state == "RUNNING"
+        assert evidence.complete is False
+        assert checkpoint.passed is True
+        assert standalone.passed is True
+        assert broker.reconcile(observed[:2]).passed is False
+        assert broker.reconcile_prefix(observed[:1], expected_step_count=2).passed is False
+        assert broker.reconcile_prefix(observed, expected_step_count=2).passed is False
+        assert broker.reconcile_prefix(observed[:2], expected_step_count=1).passed is False
+        with pytest.raises(ValueError, match="between 1 and 4"):
+            broker.reconcile_prefix((), expected_step_count=0)
+        with pytest.raises(ValueError, match="between 1 and 4"):
+            broker.reconcile_prefix(observed, expected_step_count=5)
+        with pytest.raises(ValueError, match="integer"):
+            broker.reconcile_prefix(observed[:1], expected_step_count=True)  # type: ignore[arg-type]
+
+        assert run_model_command(broker, observed[2][3:]).returncode == 0
+        assert run_model_command(broker, observed[3][3:]).returncode == 0
+        assert broker.reconcile_prefix(observed, expected_step_count=4).passed is True
+        assert broker.reconcile(observed).passed is True
+        assert broker.reconcile_prefix(observed[:2], expected_step_count=2).passed is False
+
+
+def test_broker_prefix_checkpoint_rejects_terminal_rejection_record(tmp_path: Path) -> None:
+    skill = make_fake_skill(tmp_path)
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(
+            ExpectedGatewayStep("schema", "operation-schema", ("object.setNotes",)),
+            ExpectedGatewayStep("preview", "preview", ("--request-json", SemanticJsonArgument({}))),
+        ),
+        transport="tcp",
+    ) as broker:
+        wrong = ["python", str(broker.runner_path), "gateway.py", "buses"]
+        assert run_model_command(broker, wrong[3:]).returncode == 126
+
+        checkpoint = broker.reconcile_prefix((wrong,), expected_step_count=1)
+        assert checkpoint.passed is False
+        assert any("rejected" in error for error in checkpoint.errors)
+        assert broker.evidence().terminal_state == "FAILED"
+
+
+def test_broker_accepts_only_explicit_structured_gateway_exit_2_step(tmp_path: Path) -> None:
+    skill = make_fake_skill(tmp_path)
+    request = {"operation": "audio.importTabDelimited", "arguments": {"path": "fixture.tsv"}}
+    step = ExpectedGatewayStep(
+        "preview-error",
+        "preview",
+        ("--request-json", SemanticJsonArgument(request)),
+        allowed_exit_codes=(2,),
+        expected_error_code="PACKAGED_PREVIEW_UNAVAILABLE",
+        expected_result_command="preview",
+    )
+    observed = [
+        "python",
+        str(skill / "scripts" / "run.py"),
+        "gateway.py",
+        "preview",
+        "--request-json",
+        json.dumps(request),
+    ]
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        runner_environment={
+            "PATH": os.environ.get("PATH", os.defpath),
+            "FAKE_GATEWAY_MODE": "expected-error",
+        },
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, observed[3:])
+
+        assert result.returncode == 2
+        evidence = broker.evidence()
+        assert evidence.passed is True
+        assert evidence.complete is True
+        assert len(evidence.records) == 1
+        record = evidence.records[0]
+        assert record.succeeded is True
+        assert record.exit_code == 2
+        assert record.runner_exit_code == 2
+        assert record.allowed_exit_codes == (2,)
+        assert record.payload is not None
+        assert record.payload["contract"] == "waapi-skill.gateway-result/v1"
+        assert record.payload["ok"] is False
+        assert record.payload["error_code"] == "PACKAGED_PREVIEW_UNAVAILABLE"
+        assert record.payload["command"] == "preview"
+        assert broker.reconcile((observed,)).passed is True
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected_exit", "expected_ok", "expected_status"),
+    (
+        ("terminal-success", 0, True, "executed_unverified"),
+        ("terminal-success-exit2", 2, True, "executed_unverified"),
+        ("terminal-indeterminate", 2, False, "indeterminate"),
+    ),
+)
+def test_broker_accepts_only_closed_terminal_execute_shapes(
+    tmp_path: Path,
+    mode: str,
+    expected_exit: int,
+    expected_ok: bool,
+    expected_status: str,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    step = ExpectedGatewayStep(
+        "migrate.execute",
+        "execute",
+        ("tx-migrate",),
+        allowed_exit_codes=(0, 2),
+        terminal_execute=True,
+    )
+    observed = [
+        "python",
+        str(skill / "scripts" / "run.py"),
+        "gateway.py",
+        "execute",
+        "tx-migrate",
+    ]
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        runner_environment={
+            "PATH": os.environ.get("PATH", os.defpath),
+            "FAKE_GATEWAY_MODE": mode,
+        },
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, observed[3:])
+        evidence = broker.evidence()
+
+    assert result.returncode == expected_exit
+    assert evidence.passed is True
+    assert evidence.records[0].runner_exit_code == expected_exit
+    assert evidence.records[0].payload is not None
+    assert evidence.records[0].payload["ok"] is expected_ok
+    assert evidence.records[0].payload["status"] == expected_status
+
+
+def test_ordinary_execute_success_still_requires_the_allow_listed_verify(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    steps = (
+        ExpectedGatewayStep(
+            "execute",
+            "execute",
+            ("tx",),
+            allowed_exit_codes=(0, 2),
+        ),
+        ExpectedGatewayStep("verify", "verify", ("tx",)),
+    )
+    execute_argv = [
+        "python",
+        str(skill / "scripts" / "run.py"),
+        "gateway.py",
+        "execute",
+        "tx",
+    ]
+    verify_argv = [
+        "python",
+        str(skill / "scripts" / "run.py"),
+        "gateway.py",
+        "verify",
+        "tx",
+    ]
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        runner_environment={
+            "PATH": os.environ.get("PATH", os.defpath),
+            "FAKE_GATEWAY_MODE": "terminal-success",
+        },
+        transport="tcp",
+    ) as broker:
+        execute = run_model_command(broker, ["execute", "tx"])
+        checkpoint = broker.evidence()
+
+        assert execute.returncode == 0
+        assert checkpoint.terminal_state == "RUNNING"
+        assert checkpoint.complete is False
+        assert checkpoint.terminal_indeterminate is False
+        assert broker.reconcile_prefix(
+            (execute_argv,), expected_step_count=1
+        ).passed is True
+
+        verify = run_model_command(broker, ["verify", "tx"])
+        assert verify.returncode == 0
+        assert broker.evidence().passed is True
+        assert broker.reconcile((execute_argv, verify_argv)).passed is True
+
+
+def test_ordinary_execute_exact_indeterminate_is_a_terminal_nonpassing_prefix(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    execute_argv = [
+        "python",
+        str(skill / "scripts" / "run.py"),
+        "gateway.py",
+        "execute",
+        "tx",
+    ]
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(
+            ExpectedGatewayStep(
+                "execute",
+                "execute",
+                ("tx",),
+                allowed_exit_codes=(0, 2),
+            ),
+            ExpectedGatewayStep("verify", "verify", ("tx",)),
+        ),
+        runner_environment={
+            "PATH": os.environ.get("PATH", os.defpath),
+            "FAKE_GATEWAY_MODE": "terminal-indeterminate",
+        },
+        transport="tcp",
+    ) as broker:
+        execute = run_model_command(broker, ["execute", "tx"])
+        evidence = broker.evidence()
+
+        assert execute.returncode == 2
+        assert evidence.terminal_state == "INDETERMINATE"
+        assert evidence.complete is False
+        assert evidence.passed is False
+        assert evidence.terminal_indeterminate is True
+        assert evidence.consumed_step_names == ("execute",)
+        assert evidence.records[0].succeeded is True
+        assert broker.reconcile_prefix(
+            (execute_argv,), expected_step_count=1
+        ).passed is True
+
+        rejected = run_model_command(broker, ["verify", "tx"])
+        assert rejected.returncode == 126
+        assert "terminal INDETERMINATE" in rejected.stderr
+        assert broker.evidence().terminal_state == "FAILED"
+
+
+def test_ordinary_execute_rejects_non_exact_exit_two_error(tmp_path: Path) -> None:
+    skill = make_fake_skill(tmp_path)
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(
+            ExpectedGatewayStep(
+                "execute",
+                "execute",
+                ("tx",),
+                allowed_exit_codes=(0, 2),
+            ),
+            ExpectedGatewayStep("verify", "verify", ("tx",)),
+        ),
+        runner_environment={
+            "PATH": os.environ.get("PATH", os.defpath),
+            "FAKE_GATEWAY_MODE": "terminal-generic-error",
+        },
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, ["execute", "tx"])
+        evidence = broker.evidence()
+
+    assert result.returncode == 125
+    assert "must be exactly non-retryable indeterminate" in result.stderr
+    assert evidence.terminal_state == "FAILED"
+    assert evidence.terminal_indeterminate is False
+    assert evidence.records[0].succeeded is False
+
+
+def test_broker_rejects_generic_exit_two_as_terminal_execute(tmp_path: Path) -> None:
+    skill = make_fake_skill(tmp_path)
+    step = ExpectedGatewayStep(
+        "migrate.execute",
+        "execute",
+        ("tx-migrate",),
+        allowed_exit_codes=(0, 2),
+        terminal_execute=True,
+    )
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        runner_environment={
+            "PATH": os.environ.get("PATH", os.defpath),
+            "FAKE_GATEWAY_MODE": "terminal-generic-error",
+        },
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, ["execute", "tx-migrate"])
+        evidence = broker.evidence()
+
+    assert result.returncode == 125
+    assert evidence.passed is False
+    assert "exactly indeterminate" in evidence.records[0].payload_error
+
+
+@pytest.mark.parametrize(
+    ("runner_overrides", "error_fragment"),
+    (
+        ({"FAKE_GATEWAY_ERROR_CODE": "WRONG"}, "error_code"),
+        ({"FAKE_GATEWAY_ERROR_COMMAND": "execute"}, "command"),
+        ({"FAKE_GATEWAY_ERROR_OK": "true"}, "ok"),
+        ({"FAKE_GATEWAY_ERROR_CONTRACT": "forged/v1"}, "contract"),
+        ({"FAKE_GATEWAY_ERROR_EXIT": "3"}, "runner exit"),
+    ),
+)
+def test_broker_rejects_non_exact_or_arbitrary_nonzero_structured_error(
+    tmp_path: Path,
+    runner_overrides: dict[str, str],
+    error_fragment: str,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    request = {"operation": "soundbank.processDefinitionFiles", "arguments": {}}
+    runner_environment = {
+        "PATH": os.environ.get("PATH", os.defpath),
+        "FAKE_GATEWAY_MODE": "expected-error",
+        **runner_overrides,
+    }
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(
+            ExpectedGatewayStep(
+                "preview-error",
+                "preview",
+                ("--request-json", SemanticJsonArgument(request)),
+                allowed_exit_codes=(2,),
+                expected_error_code="PACKAGED_PREVIEW_UNAVAILABLE",
+                expected_result_command="preview",
+            ),
+        ),
+        runner_environment=runner_environment,
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            ["preview", "--request-json", json.dumps(request)],
+        )
+
+        assert result.returncode == 125
+        evidence = broker.evidence()
+        assert evidence.passed is False
+        assert evidence.terminal_state == "FAILED"
+        assert evidence.records[0].succeeded is False
+        assert error_fragment in evidence.records[0].payload_error
 
 
 @pytest.mark.parametrize(
@@ -441,6 +1634,212 @@ def test_empty_call_json_equivalence_rejects_partial_reordered_or_nonempty_forms
         assert result.returncode == 126
         assert broker.evidence().terminal_state == "FAILED"
         assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
+
+
+def test_wait_topic_default_event_count_omission_executes_canonical_one_and_preserves_evidence(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    topic = "ak.wwise.core.soundbank.generated"
+    canonical_arguments = (
+        topic,
+        "--event-count",
+        "1",
+        "--match-json",
+        SemanticJsonArgument({"platform": "Windows"}),
+    )
+    variants = (
+        (
+            topic,
+            "--event-count",
+            "1",
+            "--match-json",
+            '{"platform":"Windows"}',
+        ),
+        (
+            topic,
+            "--match-json",
+            '{"platform": "Windows"}',
+        ),
+    )
+    semantic_hashes: list[str] = []
+
+    for index, arguments in enumerate(variants):
+        step = ExpectedGatewayStep(
+            "soundbank.generated.wait",
+            "wait-topic",
+            canonical_arguments,
+            allow_omitted_default_event_count_one=True,
+        )
+        with CodexGatewayBroker(
+            skill_source=skill,
+            expected_steps=(step,),
+            working_root=tmp_path / f"broker-{index}",
+            transport="tcp",
+        ) as broker:
+            result = run_model_command(broker, ["wait-topic", *arguments])
+            assert result.returncode == 0, result.stderr
+
+            evidence = broker.evidence()
+            assert evidence.passed is True
+            record = evidence.records[0]
+            semantic_hashes.append(record.semantic_argv_sha256)
+            assert record.gateway_arguments == ("wait-topic", *arguments)
+
+            executed = json.loads(
+                (
+                    broker.state_directory / "fake-runner-calls.jsonl"
+                ).read_text(encoding="utf-8")
+            )
+            assert executed == [
+                "gateway.py",
+                "wait-topic",
+                topic,
+                "--event-count",
+                "1",
+                "--match-json",
+                arguments[-1],
+            ]
+            observed = (
+                "python",
+                str(broker.runner_path),
+                "gateway.py",
+                "wait-topic",
+                *arguments,
+            )
+            assert broker.reconcile((observed,)).passed is True
+
+    assert len(set(semantic_hashes)) == 1
+
+
+def test_wait_topic_event_count_greater_than_one_cannot_be_omitted(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    topic = "ak.wwise.core.soundbank.generated"
+    step = ExpectedGatewayStep(
+        "soundbank.generated.wait",
+        "wait-topic",
+        (topic, "--event-count", "2"),
+    )
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, ["wait-topic", topic])
+
+        assert result.returncode == 126
+        assert broker.evidence().terminal_state == "FAILED"
+        assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    (
+        (
+            "ak.wwise.core.soundbank.generated",
+            "--event-count",
+            "1",
+        ),
+        (
+            "ak.wwise.core.soundbank.generated",
+            "--match-json",
+            "{}",
+        ),
+        (
+            "ak.wwise.core.soundbank.generated",
+            "--event-count",
+            "2",
+            "--match-json",
+            "{}",
+        ),
+    ),
+)
+def test_wait_topic_event_count_equivalence_rejects_unrelated_omissions_or_wrong_values(
+    tmp_path: Path,
+    arguments: tuple[str, ...],
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    step = ExpectedGatewayStep(
+        "soundbank.generated.wait",
+        "wait-topic",
+        (
+            "ak.wwise.core.soundbank.generated",
+            "--event-count",
+            "1",
+            "--match-json",
+            SemanticJsonArgument({"platform": "Windows"}),
+        ),
+        allow_omitted_default_event_count_one=True,
+    )
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, ["wait-topic", *arguments])
+
+        assert result.returncode == 126
+        assert broker.evidence().terminal_state == "FAILED"
+        assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
+
+
+@pytest.mark.parametrize(
+    "step",
+    (
+        ExpectedGatewayStep(
+            "call",
+            "call",
+            ("ak.wwise.waapi.getFunctions",),
+        ),
+        ExpectedGatewayStep(
+            "missing",
+            "wait-topic",
+            ("ak.wwise.core.soundbank.generated",),
+        ),
+        ExpectedGatewayStep(
+            "multiple",
+            "wait-topic",
+            (
+                "ak.wwise.core.soundbank.generated",
+                "--event-count",
+                "2",
+            ),
+        ),
+        ExpectedGatewayStep(
+            "duplicate",
+            "wait-topic",
+            (
+                "ak.wwise.core.soundbank.generated",
+                "--event-count",
+                "1",
+                "--event-count",
+                "1",
+            ),
+        ),
+    ),
+)
+def test_wait_topic_omitted_default_flag_rejects_invalid_step_shapes(
+    step: ExpectedGatewayStep,
+) -> None:
+    with pytest.raises(ValueError, match="canonical --event-count 1"):
+        ExpectedGatewayStep(
+            step.name,
+            step.subcommand,
+            step.arguments,
+            allow_omitted_default_event_count_one=True,
+        )
+
+
+def test_wait_topic_omitted_default_flag_must_be_boolean() -> None:
+    with pytest.raises(ValueError, match="must be a bool"):
+        ExpectedGatewayStep(
+            "wait",
+            "wait-topic",
+            ("ak.wwise.core.soundbank.generated", "--event-count", "1"),
+            allow_omitted_default_event_count_one=1,  # type: ignore[arg-type]
+        )
 
 
 def test_authenticated_rejection_is_terminal_and_never_executes_later_command(tmp_path: Path) -> None:
@@ -666,6 +2065,156 @@ def test_trusted_pre_observer_runs_after_argv_validation_before_gateway_process(
         assert broker.evidence().passed is True
 
 
+def test_subscription_ack_is_secret_fresh_step_bound_and_broker_validated(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    topic = "ak.wwise.core.soundbank.generated"
+    step = ExpectedGatewayStep("soundbank.generated.wait", "wait-topic", (topic,))
+    observed: list[TrustedSubscriptionAckExpectation] = []
+    ambient = {
+        **os.environ,
+        SUBSCRIPTION_ACK_PATH_ENV: "/tmp/model-forged-ack.json",
+        SUBSCRIPTION_ACK_NONCE_ENV: "model-visible-nonce",
+        SUBSCRIPTION_ACK_TOPIC_ENV: "wrong",
+        SUBSCRIPTION_ACK_STEP_ENV: "wrong",
+    }
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        trusted_subscription_ack=TrustedSubscriptionAckSpec(step.name, topic),
+        trusted_subscription_ack_observer=observed.append,
+        transport="tcp",
+    ) as broker:
+        model_environment = broker.model_environment(ambient)
+        for name in (
+            SUBSCRIPTION_ACK_PATH_ENV,
+            SUBSCRIPTION_ACK_NONCE_ENV,
+            SUBSCRIPTION_ACK_TOPIC_ENV,
+            SUBSCRIPTION_ACK_STEP_ENV,
+        ):
+            assert name not in model_environment
+            assert name not in broker.model_environment_overrides()
+        expectation = broker.subscription_ack_expectation
+        assert expectation is not None
+        assert expectation.contract == SUBSCRIPTION_ACK_CONTRACT
+        assert expectation.step_name == step.name
+        assert expectation.topic == topic
+        assert expectation.path.parent == broker.evidence_directory
+        assert not expectation.path.exists()
+        assert len(expectation.nonce_sha256) == 64
+        assert not hasattr(expectation, "nonce")
+
+        result = run_model_command(broker, ["wait-topic", topic])
+
+        assert result.returncode == 0
+        assert observed == [expectation]
+        assert expectation.path.is_file()
+        payload = json.loads(expectation.path.read_text(encoding="utf-8"))
+        assert payload["contract"] == SUBSCRIPTION_ACK_CONTRACT
+        assert payload["step_name"] == step.name
+        assert payload["topic"] == topic
+        assert (
+            hashlib.sha256(payload["nonce"].encode("utf-8")).hexdigest()
+            == expectation.nonce_sha256
+        )
+        evidence = broker.evidence()
+        assert evidence.passed is True
+        validated = evidence.records[0].subscription_ack
+        assert validated is not None
+        assert validated["contract"] == broker_module.VALIDATED_SUBSCRIPTION_ACK_CONTRACT
+        assert validated["ack_file_sha256"] == hashlib.sha256(
+            expectation.path.read_bytes()
+        ).hexdigest()
+        assert validated["runner_parent_process_id"] == payload[
+            "runner_parent_process_id"
+        ]
+        assert validated["gateway_process_id"] == payload["gateway_process_id"]
+        assert (
+            evidence.records[0].started_at_unix_ns
+            <= validated["subscribed_at_unix_ns"]
+            <= validated["validated_at_unix_ns"]
+            <= evidence.records[0].finished_at_unix_ns
+        )
+
+
+@pytest.mark.parametrize(
+    "mode",
+    (
+        "subscription-ack-missing",
+        "subscription-ack-wrong-topic",
+        "subscription-ack-duplicate",
+    ),
+)
+def test_subscription_ack_missing_wrong_or_duplicate_fails_broker_record(
+    tmp_path: Path,
+    mode: str,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    topic = "ak.wwise.core.soundbank.generated"
+    step = ExpectedGatewayStep("soundbank.generated.wait", "wait-topic", (topic,))
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        trusted_subscription_ack=TrustedSubscriptionAckSpec(step.name, topic),
+        runner_environment={**os.environ, "FAKE_GATEWAY_MODE": mode},
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, ["wait-topic", topic])
+        evidence = broker.evidence()
+
+        assert result.returncode == 125
+        assert evidence.passed is False
+        assert evidence.terminal_state == "FAILED"
+        assert evidence.records[0].payload_error
+
+
+def test_subscription_ack_forged_between_validation_and_launch_fails_closed(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    topic = "ak.wwise.core.soundbank.generated"
+    step = ExpectedGatewayStep("soundbank.generated.wait", "wait-topic", (topic,))
+
+    def forge(expectation: TrustedSubscriptionAckExpectation) -> None:
+        expectation.path.write_text("{}\n", encoding="utf-8")
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        trusted_subscription_ack=TrustedSubscriptionAckSpec(step.name, topic),
+        trusted_subscription_ack_observer=forge,
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, ["wait-topic", topic])
+        assert result.returncode == 125
+        assert broker.evidence().passed is False
+        assert broker.evidence().records[0].payload_error
+
+
+@pytest.mark.parametrize(
+    "spec",
+    (
+        TrustedSubscriptionAckSpec("missing", "ak.test.topic"),
+        TrustedSubscriptionAckSpec("wait", "ak.test.other"),
+    ),
+)
+def test_subscription_ack_spec_must_match_exact_wait_step(
+    tmp_path: Path,
+    spec: TrustedSubscriptionAckSpec,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    with pytest.raises(ValueError, match="subscription ACK"):
+        CodexGatewayBroker(
+            skill_source=skill,
+            expected_steps=(
+                ExpectedGatewayStep("wait", "wait-topic", ("ak.test.topic",)),
+            ),
+            trusted_subscription_ack=spec,
+        )
+
+
 def test_trusted_step_observer_failure_is_terminal_and_prevents_progression(
     tmp_path: Path,
 ) -> None:
@@ -740,12 +2289,20 @@ def test_broker_rejects_wrong_preview_json_and_bad_dynamic_binding(tmp_path: Pat
             ("--request-json", SemanticJsonArgument(expected_request)),
         ),
         ExpectedGatewayStep(
+            "show",
+            "transaction-show",
+            (
+                ResponseBinding("preview", "/transaction_id"),
+                "--summary-only",
+            ),
+        ),
+        ExpectedGatewayStep(
             "confirm",
             "confirm",
             (
-                ResponseBinding("preview", "/transaction_id"),
-                "--artifact-hash",
-                ResponseBinding("preview", "/artifact_hash"),
+                ResponseBinding("show", "/transaction_id"),
+                "--confirmation-token",
+                ResponseBinding("show", "/confirmation/token"),
             ),
         ),
     )
@@ -765,20 +2322,37 @@ def test_broker_rejects_wrong_preview_json_and_bad_dynamic_binding(tmp_path: Pat
         assert "terminal FAILED" in blocked.stderr
         assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
 
-    mutation_steps = (*steps, ExpectedGatewayStep("execute", "execute", ("tx-dynamic-123",)))
+    mutation_steps = (
+        *steps,
+        ExpectedGatewayStep(
+            "execute",
+            "execute",
+            (ResponseBinding("confirm", "/transaction_id"),),
+        ),
+    )
     with CodexGatewayBroker(skill_source=skill, expected_steps=mutation_steps, transport="tcp") as broker:
         preview = run_model_command(
             broker,
             ["preview", "--request-json", json.dumps(expected_request, separators=(",", ":"))],
         )
         assert preview.returncode == 0
+        shown = run_model_command(
+            broker,
+            ["transaction-show", "tx-dynamic-123", "--summary-only"],
+        )
+        assert shown.returncode == 0
         wrong_binding = run_model_command(
             broker,
-            ["confirm", "tx-invented", "--artifact-hash", "sha256-dynamic-456"],
+            [
+                "confirm",
+                "tx-invented",
+                "--confirmation-token",
+                "ct1-0123456789abcdefghjkmnpq",
+            ],
         )
         assert wrong_binding.returncode == 126
         assert "does not match" in wrong_binding.stderr
-        assert len((broker.state_directory / "fake-runner-calls.jsonl").read_text().splitlines()) == 1
+        assert len((broker.state_directory / "fake-runner-calls.jsonl").read_text().splitlines()) == 2
 
         blocked_mutation = run_model_command(
             broker,
@@ -786,8 +2360,212 @@ def test_broker_rejects_wrong_preview_json_and_bad_dynamic_binding(tmp_path: Pat
         )
         assert blocked_mutation.returncode == 126
         assert "terminal FAILED" in blocked_mutation.stderr
-        assert len((broker.state_directory / "fake-runner-calls.jsonl").read_text().splitlines()) == 1
+        assert len((broker.state_directory / "fake-runner-calls.jsonl").read_text().splitlines()) == 2
         assert not (broker.state_directory / "mutation-executed").exists()
+
+
+def test_broker_rejects_a_confirmation_token_not_returned_by_transaction_show(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    expected_request = {
+        "operation": "ak.wwise.core.object.setNotes",
+        "value": "expected",
+    }
+    steps = (
+        ExpectedGatewayStep(
+            "preview",
+            "preview",
+            ("--request-json", SemanticJsonArgument(expected_request)),
+        ),
+        ExpectedGatewayStep(
+            "show",
+            "transaction-show",
+            (
+                ResponseBinding("preview", "/transaction_id"),
+                "--summary-only",
+            ),
+        ),
+        ExpectedGatewayStep(
+            "confirm",
+            "confirm",
+            (
+                ResponseBinding("show", "/transaction_id"),
+                "--confirmation-token",
+                ResponseBinding("show", "/confirmation/token"),
+            ),
+        ),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        transport="tcp",
+    ) as broker:
+        assert run_model_command(
+            broker,
+            [
+                "preview",
+                "--request-json",
+                json.dumps(expected_request, separators=(",", ":")),
+            ],
+        ).returncode == 0
+        assert run_model_command(
+            broker,
+            ["transaction-show", "tx-dynamic-123", "--summary-only"],
+        ).returncode == 0
+
+        rejected = run_model_command(
+            broker,
+            [
+                "confirm",
+                "tx-dynamic-123",
+                "--confirmation-token",
+                "ct1-0123456789abcdefghjkmnpr",
+            ],
+        )
+
+        assert rejected.returncode == 126
+        assert "does not match show/confirmation/token" in rejected.stderr
+        assert (
+            len(
+                (
+                    broker.state_directory / "fake-runner-calls.jsonl"
+                ).read_text().splitlines()
+            )
+            == 2
+        )
+        assert broker.evidence().terminal_state == "FAILED"
+
+
+@pytest.mark.parametrize(
+    "mode",
+    ("confirmation-token-only", "confirmation-wrong-journal-head"),
+)
+def test_broker_rejects_incomplete_or_misbound_transaction_show_confirmation(
+    tmp_path: Path,
+    mode: str,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    request = {"operation": "object.setNotes", "arguments": {"value": "closed"}}
+    steps = (
+        ExpectedGatewayStep(
+            "preview",
+            "preview",
+            ("--request-json", SemanticJsonArgument(request)),
+        ),
+        ExpectedGatewayStep(
+            "show",
+            "transaction-show",
+            (
+                ResponseBinding("preview", "/transaction_id"),
+                "--summary-only",
+            ),
+        ),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        transport="tcp",
+        runner_environment={
+            "PATH": os.environ.get("PATH", os.defpath),
+            "FAKE_GATEWAY_MODE": mode,
+        },
+    ) as broker:
+        assert run_model_command(
+            broker,
+            [
+                "preview",
+                "--request-json",
+                json.dumps(request, separators=(",", ":")),
+            ],
+        ).returncode == 0
+
+        shown = run_model_command(
+            broker,
+            ["transaction-show", "tx-dynamic-123", "--summary-only"],
+        )
+
+        assert shown.returncode == 125
+        assert "confirmation" in shown.stderr
+        evidence = broker.evidence()
+        assert evidence.terminal_state == "FAILED"
+        assert evidence.records[-1].succeeded is False
+
+
+def test_broker_rejects_inserted_characters_in_compact_transaction_id(tmp_path: Path) -> None:
+    skill = make_fake_skill(tmp_path)
+    expected_request = {"operation": "ak.wwise.core.object.setNotes", "value": "expected"}
+    compact_transaction_id = "tx1-0123456789abcdefghjk"
+    inserted_transaction_id = (
+        compact_transaction_id[:-2] + "af" + compact_transaction_id[-2:]
+    )
+    steps = (
+        ExpectedGatewayStep(
+            "preview",
+            "preview",
+            ("--request-json", SemanticJsonArgument(expected_request)),
+        ),
+        ExpectedGatewayStep(
+            "show",
+            "transaction-show",
+            (
+                ResponseBinding("preview", "/transaction_id"),
+                "--summary-only",
+            ),
+        ),
+        ExpectedGatewayStep(
+            "confirm",
+            "confirm",
+            (
+                ResponseBinding("show", "/transaction_id"),
+                "--confirmation-token",
+                ResponseBinding("show", "/confirmation/token"),
+            ),
+        ),
+        ExpectedGatewayStep(
+            "execute",
+            "execute",
+            (ResponseBinding("confirm", "/transaction_id"),),
+        ),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        transport="tcp",
+        runner_environment={
+            "PATH": os.environ.get("PATH", os.defpath),
+            "FAKE_GATEWAY_TRANSACTION_ID": compact_transaction_id,
+        },
+    ) as broker:
+        preview = run_model_command(
+            broker,
+            ["preview", "--request-json", json.dumps(expected_request, separators=(",", ":"))],
+        )
+        assert preview.returncode == 0
+        shown = run_model_command(
+            broker,
+            ["transaction-show", compact_transaction_id, "--summary-only"],
+        )
+        assert shown.returncode == 0
+
+        wrong_binding = run_model_command(
+            broker,
+            [
+                "confirm",
+                inserted_transaction_id,
+                "--confirmation-token",
+                "ct1-0123456789abcdefghjkmnpq",
+            ],
+        )
+
+        assert wrong_binding.returncode == 126
+        assert "does not match" in wrong_binding.stderr
+        assert len((broker.state_directory / "fake-runner-calls.jsonl").read_text().splitlines()) == 2
+        assert not (broker.state_directory / "mutation-executed").exists()
+        assert broker.evidence().terminal_state == "FAILED"
 
 
 def test_broker_token_authentication_fails_before_runner(tmp_path: Path) -> None:
@@ -816,6 +2594,18 @@ def test_broker_installs_both_shims_and_exposes_small_harness_overlay(tmp_path: 
     ) as broker:
         assert (broker.shim_directory / "python").is_file()
         assert (broker.shim_directory / "python3").is_file()
+        shim_source = (broker.shim_directory / "python").read_text(encoding="utf-8")
+        assert "connection.settimeout(135.0)" in shim_source
+        assert "os.write(descriptor, remaining)" in shim_source
+        assert "stdout_written = write_all(1" in shim_source
+        assert "stderr_written = write_all(2" in shim_source
+        assert "OUTPUT_ARM_SECONDS = 0.25" in shim_source
+        assert "OUTPUT_DRAIN_SECONDS = 0.25" in shim_source
+        assert shim_source.count("time.sleep(OUTPUT_ARM_SECONDS)") == 2
+        assert shim_source.count("time.sleep(OUTPUT_DRAIN_SECONDS)") == 2
+        assert shim_source.index("time.sleep(OUTPUT_ARM_SECONDS)") < shim_source.index(
+            "stdout_written = write_all(1"
+        )
         overlay = broker.model_environment_overrides("/trusted/bin")
         assert "HOME" not in overlay
         assert "CODEX_HOME" not in overlay
@@ -842,10 +2632,35 @@ def test_broker_installs_both_shims_and_exposes_small_harness_overlay(tmp_path: 
             check=False,
         )
         assert result.returncode == 0
+        assert result.stdout
+        visible_payload = json.loads(result.stdout[result.stdout.index("{") :])
+        assert visible_payload["command"] == "status"
+        assert result.stderr == ""
         record = broker.evidence().records[0]
+        assert record.stdout == result.stdout
         assert record.normalized_model_argv[0] == "python3"
         assert record.payload is not None
         assert record.payload["gateway_required_visible"] is False
+
+
+@pytest.mark.parametrize(
+    ("runner_timeout", "expected_response_timeout"),
+    ((0.05, 30.0), (120.0, 135.0), (240.0, 255.0)),
+)
+def test_broker_shim_response_timeout_is_finite_and_outlives_runner_budget(
+    tmp_path: Path,
+    runner_timeout: float,
+    expected_response_timeout: float,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(ExpectedGatewayStep("status", "status"),),
+        transport="tcp",
+        runner_timeout_seconds=runner_timeout,
+    ) as broker:
+        source = (broker.shim_directory / "python").read_text(encoding="utf-8")
+        assert f"connection.settimeout({expected_response_timeout!r})" in source
 
 
 def test_broker_fails_closed_and_records_invalid_runner_evidence(tmp_path: Path) -> None:
@@ -1130,8 +2945,24 @@ def test_constructor_rejects_empty_steps_and_runner_owned_global_overrides(tmp_p
     skill = make_fake_skill(tmp_path)
     with pytest.raises(ValueError, match="at least one"):
         CodexGatewayBroker(skill_source=skill, expected_steps=())
-    with pytest.raises(ValueError, match="exactly"):
+    with pytest.raises(ValueError, match="only for execute"):
         ExpectedGatewayStep("status", "status", allowed_exit_codes=(0, 2))
+    with pytest.raises(ValueError, match="only for execute"):
+        ExpectedGatewayStep(
+            "status",
+            "status",
+            allowed_exit_codes=(0, 2),
+            terminal_execute=True,
+        )
+    with pytest.raises(ValueError, match="expected_error_code"):
+        ExpectedGatewayStep("status", "status", allowed_exit_codes=(2,))
+    with pytest.raises(ValueError, match="only when allowed_exit_codes"):
+        ExpectedGatewayStep(
+            "status",
+            "status",
+            expected_error_code="WRONG",
+            expected_result_command="status",
+        )
     with pytest.raises(ValueError, match="runner-owned"):
         ExpectedGatewayStep(
             "status",
@@ -1156,6 +2987,20 @@ def test_constructor_rejects_empty_steps_and_runner_owned_global_overrides(tmp_p
             skill_source=skill,
             expected_steps=(ExpectedGatewayStep("status", "status"),),
             expected_wwise_version="2030.1",
+        )
+    with pytest.raises(ValueError, match="final broker step"):
+        CodexGatewayBroker(
+            skill_source=skill,
+            expected_steps=(
+                ExpectedGatewayStep(
+                    "execute",
+                    "execute",
+                    ("tx",),
+                    allowed_exit_codes=(0, 2),
+                    terminal_execute=True,
+                ),
+                ExpectedGatewayStep("status", "status"),
+            ),
         )
     for arguments in (
         ("--state-dir", "/tmp/model-state"),

@@ -209,8 +209,12 @@ class CapabilityCatalog:
                     "transaction",
                     "managed_transaction",
                     "isolated_transaction",
-                }:
-                    transaction_operations = tuple(sorted({*transaction_operations, "waapi.call"}))
+                } and not transaction_operations:
+                    # A dedicated operation is the hard public boundary for its
+                    # reflected URI.  Keeping waapi.call beside it would let a
+                    # caller bypass the closed request builder and its
+                    # operation-specific verifier with raw args/options.
+                    transaction_operations = ("waapi.call",)
                 schema_entry = schemas.get(uri, {})
                 schema_status = str(schema_entry.get("status") or "missing")
                 raw_schema = schema_entry.get("schema")

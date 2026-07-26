@@ -2,19 +2,40 @@
 
 from __future__ import annotations
 
+import json
+import os
 import queue
+import re
+import secrets
 import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Mapping, Protocol
 
 DEFAULT_WAIT_TIMEOUT = 5.0
 DEFAULT_QUEUE_SIZE = 1
 DEFAULT_LISTENER_QUEUE_SIZE = 64
+MAX_WAIT_EVENT_COUNT = 64
 DEFAULT_CANCEL_JOIN_TIMEOUT = 1.0
 DEFAULT_LISTENER_POLL_INTERVAL = 0.05
 DEFAULT_CALLBACK_ERROR_LIMIT = 1
 DEFAULT_CALLBACK_EXECUTOR = "waapi.SequentialThreadExecutor"
+SUBSCRIPTION_ACK_CONTRACT = "waapi-skill.broker-subscription-ack/v2"
+SUBSCRIPTION_ACK_PATH_ENV = "WAAPI_SKILL_BROKER_SUBSCRIPTION_ACK_PATH"
+SUBSCRIPTION_ACK_NONCE_ENV = "WAAPI_SKILL_BROKER_SUBSCRIPTION_ACK_NONCE"
+SUBSCRIPTION_ACK_TOPIC_ENV = "WAAPI_SKILL_BROKER_SUBSCRIPTION_ACK_TOPIC"
+SUBSCRIPTION_ACK_STEP_ENV = "WAAPI_SKILL_BROKER_SUBSCRIPTION_ACK_STEP"
+SUBSCRIPTION_ACK_EVIDENCE_DIR_ENV = "WWISE_EVIDENCE_DIR"
+SUBSCRIPTION_ACK_ENV_NAMES = frozenset(
+    {
+        SUBSCRIPTION_ACK_PATH_ENV,
+        SUBSCRIPTION_ACK_NONCE_ENV,
+        SUBSCRIPTION_ACK_TOPIC_ENV,
+        SUBSCRIPTION_ACK_STEP_ENV,
+    }
+)
+_SUBSCRIPTION_ACK_NONCE_RE = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
 
 
 class SubscriptionError(RuntimeError):
@@ -25,12 +46,31 @@ class SubscriptionUnavailable(SubscriptionError):
     """Raised when the WAAPI client cannot create a subscription."""
 
 
+class SubscriptionAcknowledgementError(SubscriptionUnavailable):
+    """Raised when a trusted broker subscription ACK cannot be published."""
+
+
 class SubscriptionTimeout(SubscriptionError):
     """Raised when a bounded wait expires before an event arrives."""
 
 
 class SubscriptionCallbackError(SubscriptionError):
     """Raised by listener checks when the user callback failed."""
+
+
+class SubscriptionCleanupError(SubscriptionError):
+    """Raised when a bounded wait cannot prove that unsubscribe succeeded."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        primary_error: Exception | None = None,
+        reason: str,
+    ) -> None:
+        super().__init__(message)
+        self.primary_error = primary_error
+        self.reason = reason
 
 
 @dataclass(slots=True, frozen=True)
@@ -82,6 +122,7 @@ class SubscriptionHandle:
     active_topics: set[str] | None = None
     _lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
     _unsubscribed: bool = field(default=False, init=False, repr=False)
+    _unsubscribe_in_progress: bool = field(default=False, init=False, repr=False)
 
     @property
     def unsubscribed(self) -> bool:
@@ -90,25 +131,39 @@ class SubscriptionHandle:
         return self._unsubscribed
 
     def unsubscribe(self) -> bool:
-        """Unsubscribe exactly once; repeated calls are safe and return False."""
+        """Record cleanup only after the client explicitly returns ``True``.
+
+        A ``False`` result is not successful cleanup: the handle remains active
+        and its topic remains registered so a later close/unsubscribe attempt
+        can retry without claiming that the WAAPI subscription was removed.
+        """
 
         with self._lock:
-            if self._unsubscribed:
+            if self._unsubscribed or self._unsubscribe_in_progress:
                 return False
-            self._unsubscribed = True
-            if self.active_topics is not None:
-                self.active_topics.discard(self.topic)
-
-        return self._unsubscribe_handler()
+            self._unsubscribe_in_progress = True
+        try:
+            succeeded = self._unsubscribe_handler()
+        except BaseException:
+            with self._lock:
+                self._unsubscribe_in_progress = False
+            raise
+        with self._lock:
+            self._unsubscribe_in_progress = False
+            if succeeded:
+                self._unsubscribed = True
+                if self.active_topics is not None:
+                    self.active_topics.discard(self.topic)
+        return succeeded
 
     def _unsubscribe_handler(self) -> bool:
         if self.handler is None:
             return True
         unsubscribe = getattr(self.handler, "unsubscribe", None)
         if callable(unsubscribe):
-            return bool(unsubscribe())
+            return unsubscribe() is True
         if self.client is not None:
-            return bool(self.client.unsubscribe(self.handler))
+            return self.client.unsubscribe(self.handler) is True
         return True
 
     def __enter__(self) -> "SubscriptionHandle":
@@ -211,7 +266,28 @@ class SubscriptionManager:
             return None
         handler = self._subscribe_client(topic, callback, options)
         self.active_topics.add(topic)
-        return SubscriptionHandle(topic=topic, handler=handler, client=self.client, active_topics=self.active_topics)
+        handle = SubscriptionHandle(
+            topic=topic,
+            handler=handler,
+            client=self.client,
+            active_topics=self.active_topics,
+        )
+        try:
+            _publish_subscription_ack(topic)
+        except SubscriptionAcknowledgementError as exc:
+            try:
+                cleanup_succeeded = handle.unsubscribe()
+            except BaseException as cleanup_exc:  # noqa: BLE001 - preserve both fail-closed facts
+                raise SubscriptionAcknowledgementError(
+                    f"{exc}; subscription cleanup also failed: "
+                    f"{type(cleanup_exc).__name__}: {cleanup_exc}"
+                ) from cleanup_exc
+            if not cleanup_succeeded:
+                raise SubscriptionAcknowledgementError(
+                    f"{exc}; subscription cleanup returned false and remains active"
+                ) from exc
+            raise
+        return handle
 
     def wait_for_event(
         self,
@@ -223,9 +299,60 @@ class SubscriptionManager:
     ) -> SubscriptionEvent:
         """Block for one matching event, bounded by ``timeout``, and always unsubscribe."""
 
+        return self._wait_for_events(
+            topic,
+            event_count=1,
+            timeout=timeout,
+            options=options,
+            queue_size=max(1, queue_size),
+            predicate=predicate,
+        )[0]
+
+    def wait_for_events(
+        self,
+        topic: str,
+        event_count: int,
+        timeout: float = DEFAULT_WAIT_TIMEOUT,
+        options: dict[str, Any] | None = None,
+        predicate: Callable[[SubscriptionEvent], bool] | None = None,
+    ) -> tuple[SubscriptionEvent, ...]:
+        """Collect an exact bounded count of matching events, then unsubscribe.
+
+        ``timeout`` is one deadline shared by subscription setup and the entire
+        collection.  Candidate events that fail ``predicate`` do not count
+        toward ``event_count``.  The public multi-event lane is deliberately
+        capped so a caller cannot turn this helper into an unbounded listener.
+        """
+
+        if not isinstance(event_count, int) or isinstance(event_count, bool):
+            raise ValueError("event_count must be an integer")
+        if not 1 <= event_count <= MAX_WAIT_EVENT_COUNT:
+            raise ValueError(f"event_count must be between 1 and {MAX_WAIT_EVENT_COUNT}")
+        return self._wait_for_events(
+            topic,
+            event_count=event_count,
+            timeout=timeout,
+            options=options,
+            queue_size=MAX_WAIT_EVENT_COUNT,
+            predicate=predicate,
+        )
+
+    def _wait_for_events(
+        self,
+        topic: str,
+        *,
+        event_count: int,
+        timeout: float,
+        options: dict[str, Any] | None,
+        queue_size: int,
+        predicate: Callable[[SubscriptionEvent], bool] | None,
+    ) -> tuple[SubscriptionEvent, ...]:
+        """Internal shared implementation for single- and multi-event waits."""
+
         if timeout < 0:
             raise ValueError("timeout must be non-negative")
         event_queue: queue.Queue[SubscriptionEvent] = queue.Queue(maxsize=max(1, queue_size))
+        matched: list[SubscriptionEvent] = []
 
         def callback(*args: Any, **kwargs: Any) -> None:
             _put_bounded(event_queue, SubscriptionEvent(topic=topic, args=args, kwargs=dict(kwargs)))
@@ -236,17 +363,47 @@ class SubscriptionManager:
         handle = self.subscribe(topic, callback=callback, options=options)
         if handle is None:
             raise SubscriptionUnavailable("A WAAPI client is required for bounded topic waits")
+        primary_error: Exception | None = None
         try:
-            while True:
+            while len(matched) < event_count:
                 remaining = max(0.0, deadline - time.monotonic())
                 try:
                     event = event_queue.get(timeout=remaining)
                 except queue.Empty as exc:
-                    raise SubscriptionTimeout(f"Timed out waiting {timeout:.3f}s for WAAPI topic {topic}") from exc
+                    raise SubscriptionTimeout(
+                        f"Timed out waiting {timeout:.3f}s for {event_count} matching "
+                        f"WAAPI topic event(s) on {topic}; received {len(matched)}"
+                    ) from exc
                 if predicate is None or predicate(event):
-                    return event
-        finally:
-            handle.unsubscribe()
+                    matched.append(event)
+        except Exception as exc:  # cleanup must remain independently observable
+            primary_error = exc
+
+        try:
+            cleanup_succeeded = handle.unsubscribe()
+        except Exception as cleanup_exc:
+            message = (
+                f"Subscription cleanup raised {type(cleanup_exc).__name__}: {cleanup_exc}"
+            )
+            if primary_error is not None:
+                message = f"{primary_error}; {message}"
+            raise SubscriptionCleanupError(
+                message,
+                primary_error=primary_error,
+                reason="unsubscribe_raised",
+            ) from cleanup_exc
+        if not cleanup_succeeded:
+            message = "Subscription cleanup returned false and remains active"
+            if primary_error is not None:
+                message = f"{primary_error}; {message}"
+            raise SubscriptionCleanupError(
+                message,
+                primary_error=primary_error,
+                reason="unsubscribe_returned_false",
+            ) from primary_error
+        if primary_error is not None:
+            raise primary_error
+        return tuple(matched)
 
     def listen(
         self,
@@ -295,6 +452,136 @@ class SubscriptionManager:
         if handler is None:
             raise SubscriptionUnavailable(f"WAAPI did not create a subscription for {topic}")
         return handler
+
+
+def _publish_subscription_ack(topic: str) -> Mapping[str, Any] | None:
+    """Atomically publish one broker-only proof after subscribe succeeds.
+
+    Normal production use does not set any ACK environment variable and takes
+    the immediate ``None`` path.  The fresh-Codex broker supplies all four
+    values only to one packaged ``wait-topic`` runner.  A partial, stale,
+    duplicated, wrong-topic, or out-of-evidence request fails closed before the
+    bounded wait can continue.
+    """
+
+    values = {name: os.environ.get(name) for name in SUBSCRIPTION_ACK_ENV_NAMES}
+    configured = {name: value for name, value in values.items() if value not in {None, ""}}
+    if not configured:
+        return None
+    if len(configured) != len(SUBSCRIPTION_ACK_ENV_NAMES):
+        missing = sorted(SUBSCRIPTION_ACK_ENV_NAMES.difference(configured))
+        raise SubscriptionAcknowledgementError(
+            "Broker subscription ACK environment is incomplete: " + ", ".join(missing)
+        )
+
+    path_text = str(values[SUBSCRIPTION_ACK_PATH_ENV])
+    nonce = str(values[SUBSCRIPTION_ACK_NONCE_ENV])
+    expected_topic = str(values[SUBSCRIPTION_ACK_TOPIC_ENV])
+    step_name = str(values[SUBSCRIPTION_ACK_STEP_ENV])
+    if expected_topic != topic:
+        raise SubscriptionAcknowledgementError(
+            "Broker subscription ACK topic does not match the successful subscription."
+        )
+    if not step_name.strip() or len(step_name.encode("utf-8")) > 256:
+        raise SubscriptionAcknowledgementError(
+            "Broker subscription ACK step identity is invalid."
+        )
+    if _SUBSCRIPTION_ACK_NONCE_RE.fullmatch(nonce) is None:
+        raise SubscriptionAcknowledgementError(
+            "Broker subscription ACK nonce is invalid."
+        )
+
+    evidence_text = os.environ.get(SUBSCRIPTION_ACK_EVIDENCE_DIR_ENV, "")
+    target = Path(path_text)
+    evidence_directory = Path(evidence_text)
+    if not target.is_absolute() or not evidence_directory.is_absolute():
+        raise SubscriptionAcknowledgementError(
+            "Broker subscription ACK requires absolute target and evidence paths."
+        )
+    try:
+        real_evidence = evidence_directory.resolve(strict=True)
+        real_parent = target.parent.resolve(strict=True)
+    except OSError as exc:
+        raise SubscriptionAcknowledgementError(
+            f"Broker subscription ACK evidence directory is unavailable: {exc}"
+        ) from exc
+    if (
+        evidence_directory.is_symlink()
+        or not real_evidence.is_dir()
+        or target.parent != evidence_directory
+        or real_parent != real_evidence
+        or target.name in {"", ".", ".."}
+        or not target.name.startswith("subscription-ack-")
+        or not target.name.endswith(".json")
+    ):
+        raise SubscriptionAcknowledgementError(
+            "Broker subscription ACK target is outside its exact real evidence directory."
+        )
+    if target.is_symlink() or target.exists():
+        raise SubscriptionAcknowledgementError(
+            "Broker subscription ACK target is not fresh and exclusive."
+        )
+
+    payload = {
+        "contract": SUBSCRIPTION_ACK_CONTRACT,
+        "step_name": step_name,
+        "topic": topic,
+        "nonce": nonce,
+        "runner_parent_process_id": os.getppid(),
+        "gateway_process_id": os.getpid(),
+        "subscribed_at_unix_ns": time.time_ns(),
+        "subscribed_at_monotonic_ns": time.monotonic_ns(),
+    }
+    encoded = (
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        + "\n"
+    ).encode("utf-8")
+    temporary = real_evidence / (
+        f".{target.name}.{os.getpid()}.{secrets.token_hex(16)}.tmp"
+    )
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(temporary, flags, 0o600)
+        offset = 0
+        while offset < len(encoded):
+            written = os.write(descriptor, encoded[offset:])
+            if written <= 0:
+                raise OSError("subscription ACK write made no progress")
+            offset += written
+        os.fsync(descriptor)
+        os.close(descriptor)
+        descriptor = None
+        # A same-directory hard link is an atomic, no-overwrite publication.
+        # It cannot replace a forged/pre-existing target as os.replace could.
+        os.link(temporary, target, follow_symlinks=False)
+        temporary.unlink()
+        try:
+            directory_descriptor = os.open(real_evidence, os.O_RDONLY)
+        except OSError:
+            directory_descriptor = None
+        if directory_descriptor is not None:
+            try:
+                os.fsync(directory_descriptor)
+            finally:
+                os.close(directory_descriptor)
+    except OSError as exc:
+        raise SubscriptionAcknowledgementError(
+            f"Broker subscription ACK could not be published exclusively: {exc}"
+        ) from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        temporary.unlink(missing_ok=True)
+    return payload
 
 
 def _put_bounded(event_queue: queue.Queue[SubscriptionEvent], event: SubscriptionEvent) -> None:

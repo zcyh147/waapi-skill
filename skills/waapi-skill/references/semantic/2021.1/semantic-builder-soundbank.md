@@ -15,8 +15,6 @@
 - https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_getinclusions.html
 - https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_setinclusions.html
 - https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_generate.html
-- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_convertexternalsources.html
-- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_processdefinitionfiles.html
 - https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_generated.html
 - https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_generationdone.html
 
@@ -25,8 +23,6 @@
 - `ak.wwise.core.soundbank.getInclusions`
 - `ak.wwise.core.soundbank.setInclusions`
 - `ak.wwise.core.soundbank.generate`
-- `ak.wwise.core.soundbank.convertExternalSources`
-- `ak.wwise.core.soundbank.processDefinitionFiles`
 - `ak.wwise.core.soundbank.generated`
 - `ak.wwise.core.soundbank.generationDone`
 
@@ -35,8 +31,6 @@
 - `ak.wwise.core.soundbank.getInclusions: soundbank`
 - `ak.wwise.core.soundbank.setInclusions: soundbank, operation, inclusions`
 - `ak.wwise.core.soundbank.generate: no required fields when generating all, otherwise identify supplied soundbanks`
-- `ak.wwise.core.soundbank.convertExternalSources: sources array with source input path and platform`
-- `ak.wwise.core.soundbank.processDefinitionFiles: files array`
 - `ak.wwise.core.soundbank.generated: topic payload only`
 - `ak.wwise.core.soundbank.generationDone: topic payload only`
 
@@ -51,12 +45,11 @@
 - `clearAudioFileCache`
 - `writeToDisk`
 - `rebuildInitBank`
-- `sources output path for convertExternalSources`
-- `infoFile, bankData, pluginInfo, and return array for generated topic options`
+- `infoFile, bankData, pluginInfo, and return array for generated topic options; the 2021.1 publish payload spells the returned plug-in document PluginInfo`
 
 ## Return shape
 
-getInclusions returns an inclusions array. setInclusions and convertExternalSources return empty JSON objects. processDefinitionFiles reports status through the WAAPI log. generate returns logs and error fields. generated publishes the soundbank object with optional infoFile, bankData, or pluginInfo. generationDone publishes logs.
+getInclusions returns an inclusions array. setInclusions and generate return strict empty JSON objects. generated publishes soundbank, platform, language, and error details with optional bankInfo, bankData, or capitalized PluginInfo. generationDone publishes optional logs and a deprecated error string.
 
 ## Destructive behavior
 
@@ -75,8 +68,6 @@ Do not include profiler, transport, soundengine, UI, CLI, remote, or debug APIs.
 - `ak.wwise.core.soundbank.getInclusions: soundbank`
 - `ak.wwise.core.soundbank.setInclusions: soundbank, operation, inclusions`
 - `ak.wwise.core.soundbank.generate: no required fields when generating all, otherwise identify supplied soundbanks`
-- `ak.wwise.core.soundbank.convertExternalSources: sources array with source input path and platform`
-- `ak.wwise.core.soundbank.processDefinitionFiles: files array`
 - `ak.wwise.core.soundbank.generated: topic payload only`
 - `ak.wwise.core.soundbank.generationDone: topic payload only`
 

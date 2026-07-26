@@ -503,9 +503,38 @@ def _reject_unknown_fields(uri: str, version: str, section: str, schema: Mapping
     if schema.get("additionalProperties") is not False:
         return
     properties = schema.get("properties")
-    if not isinstance(properties, Mapping):
+    pattern_properties = schema.get("patternProperties")
+    if not isinstance(properties, Mapping) and not isinstance(
+        pattern_properties, Mapping
+    ):
+        # A top-level $ref is resolved by the schema walker below.  Preserve
+        # that path instead of treating the unresolved wrapper as a closed,
+        # empty object.
         return
-    unknown = tuple(sorted(field for field in payload if field not in properties))
+    property_names = properties if isinstance(properties, Mapping) else {}
+    raw_patterns = pattern_properties if isinstance(pattern_properties, Mapping) else {}
+    compiled_patterns: list[re.Pattern[str]] = []
+    for pattern in raw_patterns:
+        if not isinstance(pattern, str):
+            continue
+        try:
+            compiled_patterns.append(re.compile(pattern))
+        except re.error as exc:
+            raise _schema_error(
+                uri,
+                version,
+                f"WAAPI URI {uri!r} contains an invalid packaged schema pattern.",
+                section=section,
+                pattern=pattern,
+            ) from exc
+    unknown = tuple(
+        sorted(
+            field
+            for field in payload
+            if field not in property_names
+            and not any(pattern.search(field) is not None for pattern in compiled_patterns)
+        )
+    )
     if unknown:
         raise _schema_error(uri, version, f"WAAPI URI {uri!r} has unsupported {section} fields: {', '.join(unknown)}", unknown_fields=unknown, section=section)
 

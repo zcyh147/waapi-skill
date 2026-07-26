@@ -17,6 +17,7 @@ from tests.semantic.support.codex_transaction_seal import (
     create_preview_seal,
     parse_preview_seal,
     serialize_preview_seal,
+    validate_transaction_show_confirmation_against_store,
     verify_preview_seal,
 )
 from wwise_waapi.canonical import canonical_sha256
@@ -109,6 +110,51 @@ def _preview_path(state_directory: Path, transaction_id: str = "tx-sealed") -> P
 
 def _events_path(state_directory: Path, transaction_id: str = "tx-sealed") -> Path:
     return state_directory / "transactions" / transaction_id / "events.jsonl"
+
+
+def test_confirmation_binding_matches_current_and_historical_journal_head(
+    tmp_path: Path,
+) -> None:
+    store = _awaiting_store(tmp_path)
+    snapshot = store.load_snapshot("tx-sealed")
+    assert snapshot.confirmation_token is not None
+    payload = {
+        "contract": "waapi-skill.gateway-result/v1",
+        "ok": True,
+        "command": "transaction-show",
+        "transaction_id": "tx-sealed",
+        "artifact_hash": snapshot.preview.artifact_hash,
+        "state": "awaiting_confirmation",
+        "confirmation": {
+            "contract": "waapi-skill.confirmation-binding/v1",
+            "token": snapshot.confirmation_token,
+            "binding": {
+                "material_contract": "waapi-skill.confirmation-token-material/v1",
+                "transaction_id": "tx-sealed",
+                "artifact_hash": snapshot.preview.artifact_hash,
+                "state": "awaiting_confirmation",
+                "event_sequence": snapshot.record.event_sequence,
+                "last_event_hash": snapshot.record.last_event_hash,
+            },
+        },
+    }
+
+    evidence = validate_transaction_show_confirmation_against_store(
+        payload,
+        tmp_path,
+    )
+    assert evidence["event_sequence"] == snapshot.record.event_sequence
+
+    store.confirm("tx-sealed", confirmation_token=snapshot.confirmation_token)
+    assert (
+        validate_transaction_show_confirmation_against_store(payload, tmp_path)
+        == evidence
+    )
+
+    tampered = json.loads(json.dumps(payload))
+    tampered["confirmation"]["binding"]["last_event_hash"] = "c" * 64
+    with pytest.raises(TransactionSealError, match="confirmation"):
+        validate_transaction_show_confirmation_against_store(tampered, tmp_path)
 
 
 def test_phase_a_seal_is_immutable_closed_json_and_verifies_awaiting_state(tmp_path: Path) -> None:

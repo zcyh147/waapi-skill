@@ -14,12 +14,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
+import re
 import secrets
 import shlex
 import shutil
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -32,6 +35,12 @@ from typing import Any, Callable, Mapping, Sequence
 
 
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
+TRANSACTION_CONFIRMATION_BINDING_CONTRACT = (
+    "waapi-skill.confirmation-binding/v1"
+)
+CONFIRMATION_TOKEN_MATERIAL_CONTRACT = (
+    "waapi-skill.confirmation-token-material/v1"
+)
 STATE_DIRECTORY_ENV = "WAAPI_SKILL_STATE_DIR"
 EVIDENCE_DIRECTORY_ENV = "WWISE_EVIDENCE_DIR"
 CONFIG_PATH_ENV = "WAAPI_SKILL_CONFIG_PATH"
@@ -39,7 +48,23 @@ BROKER_TRANSPORT_ENV = "WAAPI_CODEX_GATEWAY_BROKER_TRANSPORT"
 BROKER_ENDPOINT_ENV = "WAAPI_CODEX_GATEWAY_BROKER_ENDPOINT"
 BROKER_TOKEN_ENV = "WAAPI_CODEX_GATEWAY_BROKER_TOKEN"
 GATEWAY_REQUIRED_ENV = "WAAPI_CODEX_GATEWAY_REQUIRED"
+SUBSCRIPTION_ACK_CONTRACT = "waapi-skill.broker-subscription-ack/v2"
+VALIDATED_SUBSCRIPTION_ACK_CONTRACT = (
+    "waapi-skill.broker-validated-subscription-ack/v1"
+)
+SUBSCRIPTION_ACK_PATH_ENV = "WAAPI_SKILL_BROKER_SUBSCRIPTION_ACK_PATH"
+SUBSCRIPTION_ACK_NONCE_ENV = "WAAPI_SKILL_BROKER_SUBSCRIPTION_ACK_NONCE"
+SUBSCRIPTION_ACK_TOPIC_ENV = "WAAPI_SKILL_BROKER_SUBSCRIPTION_ACK_TOPIC"
+SUBSCRIPTION_ACK_STEP_ENV = "WAAPI_SKILL_BROKER_SUBSCRIPTION_ACK_STEP"
 BASH_ENV_NAME = "BASH_ENV"
+_SUBSCRIPTION_ACK_ENV_NAMES = frozenset(
+    {
+        SUBSCRIPTION_ACK_PATH_ENV,
+        SUBSCRIPTION_ACK_NONCE_ENV,
+        SUBSCRIPTION_ACK_TOPIC_ENV,
+        SUBSCRIPTION_ACK_STEP_ENV,
+    }
+)
 _BROKER_ENV_NAMES = frozenset(
     {
         BROKER_TRANSPORT_ENV,
@@ -48,6 +73,7 @@ _BROKER_ENV_NAMES = frozenset(
         GATEWAY_REQUIRED_ENV,
         BASH_ENV_NAME,
         CONFIG_PATH_ENV,
+        *_SUBSCRIPTION_ACK_ENV_NAMES,
     }
 )
 _PYTHON_NAMES = frozenset({"python", "python3"})
@@ -56,6 +82,7 @@ _BROKER_READY = "READY"
 _BROKER_RUNNING = "RUNNING"
 _BROKER_FAILED = "FAILED"
 _BROKER_COMPLETE = "COMPLETE"
+_BROKER_INDETERMINATE = "INDETERMINATE"
 _FORBIDDEN_GLOBAL_ARGUMENTS = frozenset({"--state-dir", "--evidence-dir"})
 _MODEL_VERSION_SELECTORS = frozenset({"--version", "--wwise-version"})
 _GATEWAY_GLOBAL_OPTIONS_WITH_VALUES = frozenset(
@@ -72,6 +99,18 @@ _GATEWAY_GLOBAL_OPTIONS_WITH_VALUES = frozenset(
 _RUNNER_TERMINATE_GRACE_SECONDS = 0.25
 _RUNNER_REAP_TIMEOUT_SECONDS = 5.0
 _BROKER_THREAD_JOIN_SECONDS = 5.0
+_SHIM_RESPONSE_GRACE_SECONDS = 15.0
+_SHIM_OUTPUT_ARM_SECONDS = 0.25
+_SHIM_OUTPUT_DRAIN_SECONDS = 0.25
+_SUBSCRIPTION_ACK_MAX_BYTES = 4096
+_SUBSCRIPTION_ACK_WAIT_SECONDS = 30.0
+_SUBSCRIPTION_ACK_POLL_SECONDS = 0.01
+_SUBSCRIPTION_ACK_NONCE_RE = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_CROCKFORD_BASE32_ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz"
+_CONFIRMATION_TOKEN_RE = re.compile(
+    rf"^ct1-[{_CROCKFORD_BASE32_ALPHABET}]{{24}}$"
+)
 
 
 class GatewayBrokerError(RuntimeError):
@@ -84,17 +123,24 @@ class GatewayInvocationError(GatewayBrokerError, ValueError):
 
 @dataclass(frozen=True, slots=True)
 class SemanticJsonArgument:
-    """One argv value compared by canonical JSON semantics, not spelling."""
+    """One argv value compared by a closed JSON equivalence contract."""
 
     expected: Any
+    equivalence: str = "wire_exact"
+
+    def __post_init__(self) -> None:
+        if self.equivalence not in {"wire_exact", "object_operation_v1"}:
+            raise ValueError(
+                "SemanticJsonArgument.equivalence must be wire_exact or object_operation_v1"
+            )
 
 
 @dataclass(frozen=True, slots=True)
 class ResponseBinding:
     """Bind one argv value to a JSON field returned by an earlier step.
 
-    ``pointer`` is an RFC 6901 JSON pointer.  Top-level examples are
-    ``/transaction_id`` and ``/artifact_hash``.
+    ``pointer`` is an RFC 6901 JSON pointer.  Examples include
+    ``/transaction_id`` and the nested ``/confirmation/token``.
     """
 
     step: str
@@ -114,16 +160,60 @@ class ExpectedGatewayStep:
     allowed_exit_codes: tuple[int, ...] = (0,)
     gateway_global_arguments: tuple[str, ...] = ()
     allow_omitted_empty_json_objects: bool = False
+    allow_omitted_default_event_count_one: bool = False
+    expected_error_code: str = ""
+    expected_result_command: str = ""
+    terminal_execute: bool = False
 
     def __post_init__(self) -> None:
         if not self.name or not self.name.strip():
             raise ValueError("ExpectedGatewayStep.name must be non-empty")
         if not self.subcommand or not self.subcommand.strip():
             raise ValueError("ExpectedGatewayStep.subcommand must be non-empty")
-        if not self.allowed_exit_codes:
-            raise ValueError("ExpectedGatewayStep.allowed_exit_codes must be non-empty")
-        if self.allowed_exit_codes != (0,):
-            raise ValueError("ExpectedGatewayStep.allowed_exit_codes must be exactly (0,)")
+        if type(self.allow_omitted_default_event_count_one) is not bool:
+            raise ValueError(
+                "ExpectedGatewayStep.allow_omitted_default_event_count_one must be a bool"
+            )
+        allowed_shapes = {(0,), (2,), (0, 2)}
+        if self.allowed_exit_codes not in allowed_shapes:
+            raise ValueError(
+                "ExpectedGatewayStep.allowed_exit_codes must be exactly (0,), the "
+                "explicit structured-error form (2,), or the terminal-disconnect "
+                "form (0, 2)"
+            )
+        if self.terminal_execute:
+            if self.subcommand != "execute":
+                raise ValueError(
+                    "terminal_execute is valid only for execute"
+                )
+            if self.allowed_exit_codes != (0, 2):
+                raise ValueError(
+                    "terminal_execute requires allowed_exit_codes=(0, 2)"
+                )
+            if self.expected_error_code or self.expected_result_command:
+                raise ValueError(
+                    "terminal disconnect cannot also declare a structured error"
+                )
+        elif self.allowed_exit_codes == (0, 2) and self.subcommand != "execute":
+            raise ValueError(
+                "allowed_exit_codes=(0, 2) is valid only for execute"
+            )
+        if self.allowed_exit_codes == (2,):
+            if not self.expected_error_code or not self.expected_error_code.strip():
+                raise ValueError(
+                    "exit 2 requires a non-empty ExpectedGatewayStep.expected_error_code"
+                )
+            if not self.expected_result_command or not self.expected_result_command.strip():
+                raise ValueError(
+                    "exit 2 requires a non-empty ExpectedGatewayStep.expected_result_command"
+                )
+        elif (
+            not self.terminal_execute
+            and (self.expected_error_code or self.expected_result_command)
+        ):
+            raise ValueError(
+                "structured error expectations are valid only when allowed_exit_codes is (2,)"
+            )
         for argument in self.gateway_global_arguments:
             if not isinstance(argument, str) or not argument:
                 raise ValueError(
@@ -150,6 +240,29 @@ class ExpectedGatewayStep:
                     "allow_omitted_empty_json_objects requires a call step with canonical "
                     "--args-json {} --options-json {} arguments"
                 )
+        if self.allow_omitted_default_event_count_one:
+            event_count_indexes = tuple(
+                index
+                for index, argument in enumerate(self.arguments)
+                if argument == "--event-count"
+            )
+            has_joined_event_count = any(
+                isinstance(argument, str)
+                and argument.startswith("--event-count=")
+                for argument in self.arguments
+            )
+            expected_shape = (
+                self.subcommand == "wait-topic"
+                and len(event_count_indexes) == 1
+                and event_count_indexes[0] + 1 < len(self.arguments)
+                and self.arguments[event_count_indexes[0] + 1] == "1"
+                and not has_joined_event_count
+            )
+            if not expected_shape:
+                raise ValueError(
+                    "allow_omitted_default_event_count_one requires a wait-topic "
+                    "step containing exactly the canonical --event-count 1 pair"
+                )
 
 
 TrustedStepObserver = Callable[
@@ -158,6 +271,51 @@ TrustedStepObserver = Callable[
 ]
 TrustedStepPreObserver = Callable[
     [ExpectedGatewayStep, Path, Path],
+    None,
+]
+
+
+@dataclass(frozen=True, slots=True)
+class TrustedSubscriptionAckSpec:
+    """One broker-owned wait-topic step that requires a post-subscribe ACK."""
+
+    step_name: str
+    topic: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.step_name, str) or not self.step_name.strip():
+            raise ValueError("TrustedSubscriptionAckSpec.step_name must be non-empty")
+        if not isinstance(self.topic, str) or not self.topic.strip():
+            raise ValueError("TrustedSubscriptionAckSpec.topic must be non-empty")
+
+
+@dataclass(frozen=True, slots=True)
+class TrustedSubscriptionAckExpectation:
+    """Non-secret ACK view delivered to a trusted publisher observer.
+
+    The raw nonce remains broker-private and is injected only into the exact
+    packaged gateway child.  A publisher can authenticate a completed ACK by
+    hashing the nonce found in that file, but cannot pre-create the file from
+    this observer view.
+    """
+
+    contract: str
+    step_name: str
+    topic: str
+    path: Path
+    nonce_sha256: str
+
+
+@dataclass(frozen=True, slots=True)
+class _TrustedSubscriptionAckCredential:
+    """Broker-private raw credential for one exact wait-topic step."""
+
+    expectation: TrustedSubscriptionAckExpectation
+    nonce: str
+
+
+TrustedSubscriptionAckObserver = Callable[
+    [TrustedSubscriptionAckExpectation],
     None,
 ]
 
@@ -206,6 +364,9 @@ class GatewayBrokerRecord:
     payload_error: str
     runner_command_sha256: str
     allowed_exit_codes: tuple[int, ...]
+    started_at_unix_ns: int = 0
+    finished_at_unix_ns: int = 0
+    subscription_ack: Mapping[str, Any] | None = None
 
     @property
     def succeeded(self) -> bool:
@@ -255,6 +416,35 @@ class GatewayBrokerEvidence:
             and all(record.succeeded for record in self.records)
         )
 
+    @property
+    def terminal_indeterminate(self) -> bool:
+        """Whether an exact ordinary execute ended the protocol ambiguously.
+
+        This is a valid, non-retryable protocol branch, not a passing business
+        outcome.  The successful transaction path still has to consume its
+        later ``verify`` step and reach ``COMPLETE``.
+        """
+
+        if (
+            self.terminal_state != _BROKER_INDETERMINATE
+            or self.complete
+            or not self.records
+            or len(self.records) != len(self.consumed_step_names)
+            or self.rejected_records
+            or not all(record.succeeded for record in self.records)
+        ):
+            return False
+        final = self.records[-1]
+        return (
+            final.step_name == self.consumed_step_names[-1]
+            and final.runner_exit_code == 2
+            and isinstance(final.payload, Mapping)
+            and _is_exact_indeterminate_execute_payload(
+                final.payload,
+                exit_code=final.runner_exit_code,
+            )
+        )
+
     def as_dict(self, *, include_output: bool = False) -> dict[str, Any]:
         payload = asdict(self)
         payload["passed"] = self.passed
@@ -301,6 +491,71 @@ def _gateway_subcommand(arguments: Sequence[str]) -> str:
     return ""
 
 
+def _query_object_return_field_value_indexes(
+    supplied_arguments: Sequence[str],
+    expected_arguments: Sequence[ExpectedArgument],
+) -> frozenset[int]:
+    """Validate unordered ``query-object --return-field`` projections.
+
+    The repeated option positions remain exact.  Only their values may be
+    permuted, and both sides must describe the same non-empty, duplicate-free
+    field set.
+    """
+
+    expected_option_indexes = tuple(
+        index
+        for index, value in enumerate(expected_arguments)
+        if value == "--return-field"
+    )
+    if not expected_option_indexes:
+        return frozenset()
+
+    supplied_option_indexes = tuple(
+        index
+        for index, value in enumerate(supplied_arguments)
+        if value == "--return-field"
+    )
+    if supplied_option_indexes != expected_option_indexes:
+        raise GatewayInvocationError(
+            "query-object --return-field option positions must match the allow-list"
+        )
+    if any(index + 1 >= len(expected_arguments) for index in expected_option_indexes):
+        raise GatewayInvocationError(
+            "query-object allow-listed --return-field values must be present"
+        )
+
+    expected_fields = tuple(
+        expected_arguments[index + 1] for index in expected_option_indexes
+    )
+    supplied_fields = tuple(
+        supplied_arguments[index + 1] for index in supplied_option_indexes
+    )
+    if any(
+        not isinstance(field, str) or not field.strip()
+        for field in expected_fields
+    ):
+        raise GatewayInvocationError(
+            "query-object allow-listed --return-field values must be non-empty strings"
+        )
+    if any(not field.strip() for field in supplied_fields):
+        raise GatewayInvocationError(
+            "query-object supplied --return-field values must be non-empty strings"
+        )
+    if len(set(expected_fields)) != len(expected_fields):
+        raise GatewayInvocationError(
+            "query-object allow-listed --return-field values must not contain duplicates"
+        )
+    if len(set(supplied_fields)) != len(supplied_fields):
+        raise GatewayInvocationError(
+            "query-object supplied --return-field values must not contain duplicates"
+        )
+    if set(supplied_fields) != set(expected_fields):
+        raise GatewayInvocationError(
+            "query-object supplied --return-field set must match the allow-list"
+        )
+    return frozenset(index + 1 for index in expected_option_indexes)
+
+
 def _canonical_json_bytes(value: Any) -> bytes:
     try:
         return json.dumps(
@@ -312,6 +567,205 @@ def _canonical_json_bytes(value: Any) -> bytes:
         ).encode("utf-8")
     except (TypeError, ValueError) as exc:
         raise GatewayInvocationError(f"value is not canonical JSON: {exc}") from exc
+
+
+def _encode_crockford_120(value: int) -> str:
+    """Encode one 120-bit confirmation digest prefix independently."""
+
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value < 1 << 120:
+        raise GatewayInvocationError("confirmation token digest is outside 120 bits")
+    encoded = ["0"] * 24
+    for index in range(23, -1, -1):
+        encoded[index] = _CROCKFORD_BASE32_ALPHABET[value & 0x1F]
+        value >>= 5
+    return "".join(encoded)
+
+
+def validate_transaction_show_confirmation_payload(
+    payload: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    """Validate one complete state-bound ``transaction-show`` confirmation.
+
+    The broker deliberately derives the expected token independently from the
+    public binding fields.  A scalar at ``/confirmation/token`` is insufficient:
+    the contract, immutable artifact, awaiting state, and exact journal head
+    must all form one closed binding before a later confirm argv may consume it.
+    """
+
+    transaction_id = payload.get("transaction_id")
+    artifact_hash = payload.get("artifact_hash")
+    state = payload.get("state")
+    confirmation = payload.get("confirmation")
+    if (
+        not isinstance(transaction_id, str)
+        or not transaction_id
+        or not isinstance(artifact_hash, str)
+        or _SHA256_RE.fullmatch(artifact_hash) is None
+        or state != "awaiting_confirmation"
+        or not isinstance(confirmation, Mapping)
+        or set(confirmation) != {"contract", "token", "binding"}
+    ):
+        raise GatewayInvocationError(
+            "transaction-show lacks a complete awaiting-confirmation binding"
+        )
+    token = confirmation.get("token")
+    binding = confirmation.get("binding")
+    if (
+        confirmation.get("contract")
+        != TRANSACTION_CONFIRMATION_BINDING_CONTRACT
+        or not isinstance(token, str)
+        or _CONFIRMATION_TOKEN_RE.fullmatch(token) is None
+        or not isinstance(binding, Mapping)
+        or set(binding)
+        != {
+            "material_contract",
+            "transaction_id",
+            "artifact_hash",
+            "state",
+            "event_sequence",
+            "last_event_hash",
+        }
+    ):
+        raise GatewayInvocationError(
+            "transaction-show confirmation contract or closed binding is invalid"
+        )
+    event_sequence = binding.get("event_sequence")
+    last_event_hash = binding.get("last_event_hash")
+    if (
+        binding.get("material_contract")
+        != CONFIRMATION_TOKEN_MATERIAL_CONTRACT
+        or binding.get("transaction_id") != transaction_id
+        or binding.get("artifact_hash") != artifact_hash
+        or binding.get("state") != state
+        or type(event_sequence) is not int
+        or event_sequence < 1
+        or not isinstance(last_event_hash, str)
+        or _SHA256_RE.fullmatch(last_event_hash) is None
+    ):
+        raise GatewayInvocationError(
+            "transaction-show confirmation binding differs from its response"
+        )
+    material = {
+        "contract": CONFIRMATION_TOKEN_MATERIAL_CONTRACT,
+        "transaction_id": transaction_id,
+        "artifact_hash": artifact_hash,
+        "state": state,
+        "event_sequence": event_sequence,
+        "last_event_hash": last_event_hash,
+    }
+    digest_prefix = hashlib.sha256(_canonical_json_bytes(material)).hexdigest()[:30]
+    expected_token = "ct1-" + _encode_crockford_120(int(digest_prefix, 16))
+    if not secrets.compare_digest(token, expected_token):
+        raise GatewayInvocationError(
+            "transaction-show confirmation token does not bind its journal head"
+        )
+    return MappingProxyType(
+        {
+            "contract": confirmation["contract"],
+            "token": token,
+            "binding": MappingProxyType(dict(binding)),
+        }
+    )
+
+
+def _semantic_json_equal(actual: Any, expected: SemanticJsonArgument) -> bool:
+    if expected.equivalence == "wire_exact":
+        return _canonical_json_bytes(actual) == _canonical_json_bytes(
+            expected.expected
+        )
+    return _object_operation_json_equal(actual, expected.expected)
+
+
+def _object_operation_json_equal(actual: Any, expected: Any) -> bool:
+    """Compare one operation request with closed public-schema equivalences.
+
+    The public object operations default an omitted ``on_name_conflict`` to
+    ``fail``.  Their live property metadata also accepts an integral JSON number
+    for the real-valued ``Volume`` and ``Pitch`` properties.  Empty optional
+    node arrays have the same normalized tree meaning as omission.  Those forms
+    are equivalent only inside this matcher; generic WAAPI JSON remains exact.
+    """
+
+    if not isinstance(expected, Mapping) or expected.get("operation") not in {
+        "object.create",
+        "object.set",
+    }:
+        return False
+
+    def compare(
+        left: Any,
+        right: Any,
+        path: tuple[str | int, ...],
+        *,
+        real_property_value: bool = False,
+    ) -> bool:
+        if isinstance(right, Mapping):
+            if not isinstance(left, Mapping):
+                return False
+            right_keys = set(right)
+            left_keys = set(left)
+            ignored_right: set[Any] = set()
+            ignored_left: set[Any] = set()
+            if (
+                path == ("arguments",)
+                and right.get("on_name_conflict") == "fail"
+                and "on_name_conflict" not in left
+            ):
+                ignored_right.add("on_name_conflict")
+
+            node_mapping = (
+                {"type", "name"}.issubset(right_keys | left_keys)
+                or (
+                    "object" in (right_keys | left_keys)
+                    and len(path) >= 2
+                    and isinstance(path[-1], int)
+                    and path[-2] == "objects"
+                )
+            )
+            if node_mapping:
+                for key in ("properties", "references", "children"):
+                    if key in right and right[key] == [] and key not in left:
+                        ignored_right.add(key)
+                    if key in left and left[key] == [] and key not in right:
+                        ignored_left.add(key)
+
+            if left_keys - ignored_left != right_keys - ignored_right:
+                return False
+            return all(
+                compare(
+                    left[key],
+                    value,
+                    (*path, str(key)),
+                    real_property_value=(
+                        key == "value"
+                        and right.get("name") in {"Volume", "Pitch"}
+                    ),
+                )
+                for key, value in right.items()
+                if key not in ignored_right
+            )
+        if isinstance(right, list):
+            return (
+                isinstance(left, list)
+                and len(left) == len(right)
+                and all(
+                    compare(left_item, right_item, (*path, index))
+                    for index, (left_item, right_item) in enumerate(
+                        zip(left, right, strict=True)
+                    )
+                )
+            )
+        if real_property_value and {type(left), type(right)} == {int, float}:
+            float_value = left if type(left) is float else right
+            int_value = left if type(left) is int else right
+            return (
+                math.isfinite(float_value)
+                and float_value.is_integer()
+                and int(float_value) == int_value
+            )
+        return _canonical_json_bytes(left) == _canonical_json_bytes(right)
+
+    return compare(actual, expected, ())
 
 
 def _sha256_bytes(value: bytes) -> str:
@@ -467,6 +921,112 @@ def reconcile_gateway_commands(
     )
 
 
+def reconcile_gateway_command_prefix(
+    command_argvs: Sequence[Sequence[str]],
+    evidence: GatewayBrokerEvidence,
+    *,
+    expected_step_count: int,
+    skill_source: Path,
+    shim_directory: Path | None = None,
+) -> GatewayBrokerReconciliation:
+    """Reconcile one exact successful prefix without weakening final checks.
+
+    A V3 scenario may span several Codex turns while using one broker.  This
+    checkpoint proves that the broker has consumed exactly the caller-selected
+    prefix and that the cumulative harness commands match it byte-for-byte
+    after canonical gateway normalization.  It never accepts a failed broker
+    or an extra/missing step.  The sole early terminal checkpoint is the exact
+    non-retryable indeterminate branch of an ordinary execute step.
+    """
+
+    if isinstance(expected_step_count, bool) or not isinstance(expected_step_count, int):
+        raise ValueError("expected_step_count must be an integer")
+    total_steps = len(evidence.expected_step_names)
+    if not 1 <= expected_step_count <= total_steps:
+        raise ValueError(
+            f"expected_step_count must be between 1 and {total_steps}, inclusive"
+        )
+
+    expected_prefix = evidence.expected_step_names[:expected_step_count]
+    errors: list[str] = []
+    resolved: list[ResolvedGatewayInvocation] = []
+    for index, argv in enumerate(command_argvs):
+        try:
+            resolved.append(
+                resolve_gateway_invocation(
+                    argv,
+                    skill_source=skill_source,
+                    shim_directory=shim_directory,
+                )
+            )
+        except GatewayInvocationError as exc:
+            errors.append(f"command {index}: {exc}")
+
+    accepted = evidence.accepted_records
+    if len(command_argvs) != expected_step_count:
+        errors.append(
+            f"observed command count {len(command_argvs)} does not match expected prefix count "
+            f"{expected_step_count}"
+        )
+    if evidence.consumed_step_names != expected_prefix:
+        errors.append(
+            "broker consumed steps do not match the requested expected-step prefix"
+        )
+    if len(evidence.records) != expected_step_count:
+        errors.append(
+            f"broker record count {len(evidence.records)} does not match expected prefix count "
+            f"{expected_step_count}"
+        )
+    if len(accepted) != expected_step_count:
+        errors.append(
+            f"accepted broker record count {len(accepted)} does not match expected prefix count "
+            f"{expected_step_count}"
+        )
+    if tuple(record.step_name for record in accepted) != expected_prefix:
+        errors.append("accepted broker record names do not match the expected-step prefix")
+    if len(resolved) != len(accepted):
+        errors.append(
+            f"resolved command count {len(resolved)} does not match accepted broker record count "
+            f"{len(accepted)}"
+        )
+    for index, (command, record) in enumerate(zip(resolved, accepted)):
+        if command.normalized_model_argv != record.normalized_model_argv:
+            errors.append(f"command {index}: normalized argv differs from broker record")
+        if command.argv_sha256 != record.argv_sha256:
+            errors.append(f"command {index}: argv hash differs from broker record")
+        if not record.succeeded:
+            errors.append(f"command {index}: broker record did not succeed")
+    if evidence.rejected_records:
+        errors.append("broker recorded one or more rejected shim requests")
+    if len(evidence.successful_records) != expected_step_count:
+        errors.append("broker successful record count does not match the expected prefix")
+
+    if expected_step_count == total_steps:
+        if not evidence.complete:
+            errors.append("broker did not consume every expected step")
+        if not evidence.passed:
+            errors.append("broker evidence did not pass its terminal success contract")
+    else:
+        if evidence.complete:
+            errors.append("broker completed before the requested partial prefix checkpoint")
+        if evidence.terminal_indeterminate:
+            if expected_step_count != len(evidence.consumed_step_names):
+                errors.append(
+                    "terminal indeterminate checkpoint must end at the consumed execute step"
+                )
+        elif evidence.terminal_state != _BROKER_RUNNING:
+            errors.append(
+                "partial prefix checkpoint requires broker terminal_state RUNNING"
+            )
+
+    return GatewayBrokerReconciliation(
+        passed=not errors,
+        observed_command_count=len(command_argvs),
+        accepted_record_count=len(accepted),
+        errors=tuple(errors),
+    )
+
+
 def _json_pointer(payload: Any, pointer: str) -> Any:
     if pointer == "":
         return payload
@@ -532,12 +1092,137 @@ def _extract_payload(stdout: str, *, required_contract: str | None = None) -> Ma
     return dict(payload)
 
 
+def _validate_terminal_execute_payload(
+    payload: Mapping[str, Any],
+    *,
+    exit_code: int | None,
+) -> None:
+    """Accept only the closed migration terminal execute shapes.
+
+    ``ak.wwise.cli.migrate`` may terminate its isolated WAAPI host server while
+    the execute request is returning, but it may also leave the separate
+    control host alive.  This exception is deliberately much narrower than a
+    generic exit-2 allowance: the command must be ``execute`` and the durable
+    transaction state must prove either completed execution or an
+    indeterminate, non-retryable attempt.  It does not assert a disconnect;
+    lifecycle evidence classifies that later.  Pre-dispatch ``status:error``
+    envelopes are never accepted here.
+    """
+
+    if payload.get("command") != "execute":
+        raise GatewayInvocationError(
+            "terminal-execute payload command must be exactly 'execute'"
+        )
+    status = payload.get("status")
+    state = payload.get("state")
+    if payload.get("automatic_retry") is not False:
+        raise GatewayInvocationError(
+            "terminal-execute payload automatic_retry must be exactly false"
+        )
+    if payload.get("ok") is True:
+        if status != "executed_unverified" or state != "executed_unverified":
+            raise GatewayInvocationError(
+                "successful terminal-execute payload must be executed_unverified"
+            )
+        if payload.get("executed") is not True or payload.get("verified") is not False:
+            raise GatewayInvocationError(
+                "successful terminal-execute payload must prove executed=true and verified=false"
+            )
+        if exit_code not in {0, 2}:
+            raise GatewayInvocationError(
+                "successful terminal-execute payload requires runner exit 0 or 2"
+            )
+        return
+    if payload.get("ok") is False:
+        if exit_code != 2:
+            raise GatewayInvocationError(
+                "indeterminate terminal-execute payload requires runner exit 2"
+            )
+        if status != "indeterminate" or state != "indeterminate":
+            raise GatewayInvocationError(
+                "failed terminal-execute payload must be exactly indeterminate"
+            )
+        return
+    raise GatewayInvocationError(
+        "terminal-execute payload ok must be exactly true or false"
+    )
+
+
+def _is_exact_indeterminate_execute_payload(
+    payload: Mapping[str, Any],
+    *,
+    exit_code: int | None,
+) -> bool:
+    return (
+        exit_code == 2
+        and payload.get("contract") == GATEWAY_RESULT_CONTRACT
+        and payload.get("ok") is False
+        and payload.get("command") == "execute"
+        and payload.get("status") == "indeterminate"
+        and payload.get("state") == "indeterminate"
+        and payload.get("automatic_retry") is False
+    )
+
+
+def _validate_branching_execute_payload(
+    payload: Mapping[str, Any],
+    *,
+    exit_code: int | None,
+) -> None:
+    """Validate an ordinary execute with success and indeterminate branches.
+
+    A successful ordinary mutation must continue to its separately allow-listed
+    ``verify`` step.  Only the exact non-retryable exit-2 shape may terminate at
+    execute; arbitrary gateway errors never become an accepted branch.
+    """
+
+    if payload.get("command") != "execute":
+        raise GatewayInvocationError(
+            "branching execute payload command must be exactly 'execute'"
+        )
+    if payload.get("ok") is True:
+        if exit_code != 0:
+            raise GatewayInvocationError(
+                "successful branching execute payload requires runner exit 0"
+            )
+        if (
+            payload.get("status") != "executed_unverified"
+            or payload.get("state") != "executed_unverified"
+            or payload.get("executed") is not True
+            or payload.get("verified") is not False
+            or payload.get("automatic_retry") is not False
+        ):
+            raise GatewayInvocationError(
+                "successful branching execute payload must be exactly executed_unverified"
+            )
+        return
+    if _is_exact_indeterminate_execute_payload(payload, exit_code=exit_code):
+        return
+    raise GatewayInvocationError(
+        "failed branching execute payload must be exactly non-retryable indeterminate"
+    )
+
+
 _SHIM_SOURCE = r'''#!{python}
 from __future__ import annotations
 import json
 import os
 import socket
 import sys
+import time
+
+OUTPUT_ARM_SECONDS = {output_arm!r}
+OUTPUT_DRAIN_SECONDS = {output_drain!r}
+
+def write_all(descriptor, value):
+    encoded = str(value).encode("utf-8")
+    remaining = memoryview(encoded)
+    while remaining:
+        written = os.write(descriptor, remaining)
+        if written <= 0:
+            raise RuntimeError("Codex gateway broker shim could not publish output")
+        remaining = remaining[written:]
+    return bool(encoded)
 
 transport = os.environ.get({transport_env!r}, "")
 endpoint = os.environ.get({endpoint_env!r}, "")
@@ -553,6 +1238,11 @@ try:
     else:
         raise RuntimeError("Codex gateway broker transport is not configured")
     with connection:
+        # ``socket.create_connection(..., timeout=30)`` leaves that timeout on
+        # the TCP socket.  Heavy bounded calls such as a 120-second topic wait
+        # legitimately outlive it, so give the local relay the broker runner's
+        # finite execution budget plus a small response/reaping margin.
+        connection.settimeout({response_timeout!r})
         connection.sendall(request.encode("utf-8"))
         chunks = []
         while True:
@@ -561,11 +1251,28 @@ try:
                 break
             chunks.append(chunk)
     response = json.loads(b"".join(chunks).decode("utf-8"))
-    sys.stdout.write(response.get("stdout", ""))
-    sys.stderr.write(response.get("stderr", ""))
+    stdout_value = response.get("stdout", "")
+    stderr_value = response.get("stderr", "")
+    if stdout_value or stderr_value:
+        # Fast broker calls can finish before the bundled Codex collector has
+        # armed its command-output subscription.  Wait before the first byte;
+        # a post-write delay cannot recover bytes that were published early.
+        time.sleep(OUTPUT_ARM_SECONDS)
+    stdout_written = write_all(1, stdout_value)
+    stderr_written = write_all(2, stderr_value)
+    if stdout_written or stderr_written:
+        # The bundled Codex command collector has intermittently archived a
+        # short final gateway payload as an empty ``aggregated_output`` when
+        # the shim exits in the same scheduling slice.  The broker already
+        # validated this payload; publish it without Python text buffering and
+        # give the collector one small, finite drain window before exit.
+        time.sleep(OUTPUT_DRAIN_SECONDS)
     raise SystemExit(int(response.get("exit_code", 125)))
 except Exception as exc:
-    sys.stderr.write("Codex gateway broker shim failed: " + str(exc) + "\n")
+    error_value = "Codex gateway broker shim failed: " + str(exc) + "\n"
+    time.sleep(OUTPUT_ARM_SECONDS)
+    write_all(2, error_value)
+    time.sleep(OUTPUT_DRAIN_SECONDS)
     raise SystemExit(125)
 '''
 
@@ -590,6 +1297,8 @@ class CodexGatewayBroker:
         required_contract: str | None = GATEWAY_RESULT_CONTRACT,
         trusted_step_pre_observer: TrustedStepPreObserver | None = None,
         trusted_step_observer: TrustedStepObserver | None = None,
+        trusted_subscription_ack: TrustedSubscriptionAckSpec | None = None,
+        trusted_subscription_ack_observer: TrustedSubscriptionAckObserver | None = None,
     ) -> None:
         self.skill_source = _absolute_lexical(skill_source)
         self.runner_path = self.skill_source / "scripts" / "run.py"
@@ -609,6 +1318,8 @@ class CodexGatewayBroker:
         self.required_contract = required_contract
         self.trusted_step_pre_observer = trusted_step_pre_observer
         self.trusted_step_observer = trusted_step_observer
+        self.trusted_subscription_ack = trusted_subscription_ack
+        self.trusted_subscription_ack_observer = trusted_subscription_ack_observer
         self._runner_environment = dict(os.environ if runner_environment is None else runner_environment)
 
         if transport not in {"auto", "unix", "tcp"}:
@@ -632,6 +1343,26 @@ class CodexGatewayBroker:
             self.trusted_step_pre_observer
         ):
             raise TypeError("trusted_step_pre_observer must be callable or None")
+        if self.trusted_subscription_ack is not None and not isinstance(
+            self.trusted_subscription_ack,
+            TrustedSubscriptionAckSpec,
+        ):
+            raise TypeError(
+                "trusted_subscription_ack must be TrustedSubscriptionAckSpec or None"
+            )
+        if self.trusted_subscription_ack_observer is not None and not callable(
+            self.trusted_subscription_ack_observer
+        ):
+            raise TypeError(
+                "trusted_subscription_ack_observer must be callable or None"
+            )
+        if (
+            self.trusted_subscription_ack is None
+            and self.trusted_subscription_ack_observer is not None
+        ):
+            raise ValueError(
+                "trusted_subscription_ack_observer requires trusted_subscription_ack"
+            )
         for argument in self.gateway_global_arguments:
             option = argument.split("=", 1)[0]
             if option in _FORBIDDEN_GLOBAL_ARGUMENTS:
@@ -641,6 +1372,36 @@ class CodexGatewayBroker:
         names = [step.name for step in self.expected_steps]
         if len(names) != len(set(names)):
             raise ValueError("ExpectedGatewayStep names must be unique")
+        terminal_execute_steps = tuple(
+            index
+            for index, step in enumerate(self.expected_steps)
+            if step.terminal_execute
+        )
+        if terminal_execute_steps and terminal_execute_steps != (
+            len(self.expected_steps) - 1,
+        ):
+            raise ValueError(
+                "terminal_execute must be the one final broker step"
+            )
+        if self.trusted_subscription_ack is not None:
+            matching_steps = tuple(
+                step
+                for step in self.expected_steps
+                if step.name == self.trusted_subscription_ack.step_name
+            )
+            if len(matching_steps) != 1:
+                raise ValueError(
+                    "trusted subscription ACK step must identify one expected step"
+                )
+            ack_step = matching_steps[0]
+            if (
+                ack_step.subcommand != "wait-topic"
+                or not ack_step.arguments
+                or ack_step.arguments[0] != self.trusted_subscription_ack.topic
+            ):
+                raise ValueError(
+                    "trusted subscription ACK must bind the exact literal wait-topic URI"
+                )
 
         self._temporary_directory: tempfile.TemporaryDirectory[str] | None = None
         self._working_root: Path | None = None
@@ -649,6 +1410,8 @@ class CodexGatewayBroker:
         self._state_directory: Path | None = None
         self._evidence_directory: Path | None = None
         self._config_path: Path | None = None
+        self._subscription_ack_path: Path | None = None
+        self._subscription_ack_nonce = ""
         self._socket: socket.socket | None = None
         self._socket_path: Path | None = None
         self._transport = ""
@@ -693,6 +1456,35 @@ class CodexGatewayBroker:
         if self._config_path is None:
             raise GatewayBrokerError("broker has not started")
         return self._config_path
+
+    @property
+    def subscription_ack_expectation(self) -> TrustedSubscriptionAckExpectation | None:
+        """Return the non-secret trusted ACK binding after broker startup."""
+
+        if self.trusted_subscription_ack is None:
+            return None
+        if self._subscription_ack_path is None or not self._subscription_ack_nonce:
+            raise GatewayBrokerError("broker subscription ACK is not initialized")
+        return TrustedSubscriptionAckExpectation(
+            contract=SUBSCRIPTION_ACK_CONTRACT,
+            step_name=self.trusted_subscription_ack.step_name,
+            topic=self.trusted_subscription_ack.topic,
+            path=self._subscription_ack_path,
+            nonce_sha256=hashlib.sha256(
+                self._subscription_ack_nonce.encode("utf-8")
+            ).hexdigest(),
+        )
+
+    def _subscription_ack_credential(
+        self,
+    ) -> _TrustedSubscriptionAckCredential | None:
+        expectation = self.subscription_ack_expectation
+        if expectation is None:
+            return None
+        return _TrustedSubscriptionAckCredential(
+            expectation=expectation,
+            nonce=self._subscription_ack_nonce,
+        )
 
     @property
     def bash_env_path(self) -> Path:
@@ -758,6 +1550,18 @@ class CodexGatewayBroker:
             for directory in (self._shim_directory, self._evidence_directory, config_directory):
                 directory.mkdir(parents=True, exist_ok=False)
                 self._created_directories.append(directory)
+            if self.trusted_subscription_ack is not None:
+                self._subscription_ack_nonce = secrets.token_urlsafe(32)
+                self._subscription_ack_path = self._evidence_directory / (
+                    f"subscription-ack-{secrets.token_hex(16)}.json"
+                )
+                if (
+                    self._subscription_ack_path.exists()
+                    or self._subscription_ack_path.is_symlink()
+                ):
+                    raise GatewayBrokerError(
+                        "fresh broker subscription ACK target already exists"
+                    )
             if self._existing_state_directory is None:
                 self._state_directory.mkdir(parents=True, exist_ok=False)
                 self._created_directories.append(self._state_directory)
@@ -893,6 +1697,8 @@ class CodexGatewayBroker:
         self._state_directory = None
         self._evidence_directory = None
         self._config_path = None
+        self._subscription_ack_path = None
+        self._subscription_ack_nonce = ""
         self._socket = None
         self._socket_path = None
         self._transport = ""
@@ -911,6 +1717,8 @@ class CodexGatewayBroker:
         if not self._started:
             raise GatewayBrokerError("broker has not started")
         environment = dict(os.environ if base is None else base)
+        for name in _SUBSCRIPTION_ACK_ENV_NAMES:
+            environment.pop(name, None)
         environment.update(self.model_environment_overrides(environment.get("PATH")))
         return environment
 
@@ -965,6 +1773,20 @@ class CodexGatewayBroker:
             shim_directory=self.shim_directory,
         )
 
+    def reconcile_prefix(
+        self,
+        command_argvs: Sequence[Sequence[str]],
+        *,
+        expected_step_count: int,
+    ) -> GatewayBrokerReconciliation:
+        return reconcile_gateway_command_prefix(
+            command_argvs,
+            self.evidence(),
+            expected_step_count=expected_step_count,
+            skill_source=self.skill_source,
+            shim_directory=self.shim_directory,
+        )
+
     def _bind_socket(self, root: Path) -> None:
         use_unix = self.transport_preference in {"auto", "unix"} and hasattr(socket, "AF_UNIX")
         socket_path = root / "broker.sock"
@@ -1005,6 +1827,12 @@ class CodexGatewayBroker:
             transport_env=BROKER_TRANSPORT_ENV,
             endpoint_env=BROKER_ENDPOINT_ENV,
             token_env=BROKER_TOKEN_ENV,
+            response_timeout=max(
+                30.0,
+                self.runner_timeout_seconds + _SHIM_RESPONSE_GRACE_SECONDS,
+            ),
+            output_arm=_SHIM_OUTPUT_ARM_SECONDS,
+            output_drain=_SHIM_OUTPUT_DRAIN_SECONDS,
         )
         for name in sorted(_PYTHON_NAMES):
             path = self.shim_directory / name
@@ -1047,6 +1875,16 @@ class CodexGatewayBroker:
                 os.killpg(process.pid, signum)
             except ProcessLookupError:
                 pass
+            except PermissionError:
+                # A short-lived wrapper can leave/reap its process group
+                # between validation and teardown on macOS.  Fall back to the
+                # still-owned leader without converting an ACK rejection into
+                # an unrelated close failure.
+                if process.poll() is None:
+                    try:
+                        process.terminate() if terminate else process.kill()
+                    except ProcessLookupError:
+                        pass
             return
 
         # Non-POSIX fallback cannot portably address a descendant process tree,
@@ -1091,6 +1929,192 @@ class CodexGatewayBroker:
             self._active_process_done.clear()
             self._active_process = process
         return process
+
+    def _subscription_ack_for_step(
+        self,
+        step: ExpectedGatewayStep,
+    ) -> _TrustedSubscriptionAckCredential | None:
+        credential = self._subscription_ack_credential()
+        if (
+            credential is None
+            or credential.expectation.step_name != step.name
+        ):
+            return None
+        return credential
+
+    @staticmethod
+    def _validate_subscription_ack(
+        credential: _TrustedSubscriptionAckCredential,
+        *,
+        runner_process: subprocess.Popen[str],
+        started_at_unix_ns: int,
+    ) -> Mapping[str, Any]:
+        """Wait for and independently validate a live packaged-child ACK."""
+
+        expectation = credential.expectation
+        path = expectation.path
+        deadline = time.monotonic() + _SUBSCRIPTION_ACK_WAIT_SECONDS
+        while True:
+            if path.is_symlink():
+                raise GatewayInvocationError(
+                    "broker subscription ACK target became a symlink"
+                )
+            try:
+                candidate_metadata = path.lstat()
+            except FileNotFoundError:
+                candidate_metadata = None
+            except OSError as exc:
+                raise GatewayInvocationError(
+                    f"broker subscription ACK is unavailable: {exc}"
+                ) from exc
+            if candidate_metadata is not None:
+                if (
+                    stat.S_ISREG(candidate_metadata.st_mode)
+                    and candidate_metadata.st_nlink == 1
+                ):
+                    break
+                if (
+                    not stat.S_ISREG(candidate_metadata.st_mode)
+                    or candidate_metadata.st_nlink != 2
+                ):
+                    raise GatewayInvocationError(
+                        "broker subscription ACK is not an exclusive regular file"
+                    )
+                # The packaged writer briefly exposes the completed inode with
+                # two hard links, then removes its private temp name.  Only
+                # that exact transitional state is retryable.
+            if runner_process.poll() is not None and candidate_metadata is None:
+                raise GatewayInvocationError(
+                    "broker subscription ACK is missing after packaged runner exit"
+                )
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise GatewayInvocationError(
+                    "broker subscription ACK did not arrive before its bounded deadline"
+                )
+            time.sleep(min(_SUBSCRIPTION_ACK_POLL_SECONDS, remaining))
+
+        flags = os.O_RDONLY
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        if path.parent.is_symlink() or not path.parent.is_dir():
+            raise GatewayInvocationError(
+                "broker subscription ACK parent is not one exact real directory"
+            )
+        descriptor: int | None = None
+        try:
+            descriptor = os.open(path, flags)
+            metadata = os.fstat(descriptor)
+            chunks: list[bytes] = []
+            remaining_bytes = _SUBSCRIPTION_ACK_MAX_BYTES + 1
+            while remaining_bytes > 0:
+                chunk = os.read(descriptor, min(65536, remaining_bytes))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                remaining_bytes -= len(chunk)
+            raw = b"".join(chunks)
+            final_metadata = path.lstat()
+            payload = json.loads(raw.decode("utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise GatewayInvocationError(
+                f"broker subscription ACK is not strict UTF-8 JSON: {exc}"
+            ) from exc
+        finally:
+            if descriptor is not None:
+                os.close(descriptor)
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_nlink != 1
+            or metadata.st_size <= 0
+            or metadata.st_size > _SUBSCRIPTION_ACK_MAX_BYTES
+            or metadata.st_size != len(raw)
+            or stat.S_IMODE(metadata.st_mode) & 0o077
+            or final_metadata.st_dev != metadata.st_dev
+            or final_metadata.st_ino != metadata.st_ino
+            or final_metadata.st_nlink != 1
+        ):
+            raise GatewayInvocationError(
+                "broker subscription ACK is not one private bounded regular file"
+            )
+        expected_keys = {
+            "contract",
+            "step_name",
+            "topic",
+            "nonce",
+            "runner_parent_process_id",
+            "gateway_process_id",
+            "subscribed_at_unix_ns",
+            "subscribed_at_monotonic_ns",
+        }
+        nonce = payload.get("nonce") if isinstance(payload, Mapping) else None
+        nonce_sha256 = (
+            hashlib.sha256(nonce.encode("utf-8")).hexdigest()
+            if isinstance(nonce, str)
+            else ""
+        )
+        validated_at_unix_ns = time.time_ns()
+        if (
+            not isinstance(payload, Mapping)
+            or set(payload) != expected_keys
+            or payload.get("contract") != expectation.contract
+            or payload.get("step_name") != expectation.step_name
+            or payload.get("topic") != expectation.topic
+            or not isinstance(nonce, str)
+            or _SUBSCRIPTION_ACK_NONCE_RE.fullmatch(nonce) is None
+            or not secrets.compare_digest(nonce, credential.nonce)
+            or not secrets.compare_digest(
+                nonce_sha256,
+                expectation.nonce_sha256,
+            )
+            or type(payload.get("runner_parent_process_id")) is not int
+            or payload.get("runner_parent_process_id") != runner_process.pid
+            or type(payload.get("gateway_process_id")) is not int
+            or payload.get("gateway_process_id", 0) <= 0
+            or payload.get("gateway_process_id") == runner_process.pid
+            or type(payload.get("subscribed_at_unix_ns")) is not int
+            or type(payload.get("subscribed_at_monotonic_ns")) is not int
+            or payload.get("subscribed_at_monotonic_ns", 0) <= 0
+        ):
+            raise GatewayInvocationError(
+                "broker subscription ACK identity, nonce, or packaged process binding is invalid"
+            )
+        subscribed_at_unix_ns = int(payload["subscribed_at_unix_ns"])
+        if not started_at_unix_ns <= subscribed_at_unix_ns <= validated_at_unix_ns:
+            raise GatewayInvocationError(
+                "broker subscription ACK timestamp is outside its gateway step"
+            )
+        canonical = _canonical_json_bytes(payload) + b"\n"
+        if raw != canonical:
+            raise GatewayInvocationError(
+                "broker subscription ACK is not canonical JSON"
+            )
+        temporary_pattern = f".{path.name}.*.tmp"
+        if any(path.parent.glob(temporary_pattern)):
+            raise GatewayInvocationError(
+                "broker subscription ACK left an ambiguous temporary artifact"
+            )
+        return MappingProxyType(
+            {
+                "contract": VALIDATED_SUBSCRIPTION_ACK_CONTRACT,
+                "ack_contract": expectation.contract,
+                "step_name": expectation.step_name,
+                "topic": expectation.topic,
+                "ack_path": str(path),
+                "ack_file_sha256": hashlib.sha256(raw).hexdigest(),
+                "nonce_sha256": nonce_sha256,
+                "runner_parent_process_id": int(
+                    payload["runner_parent_process_id"]
+                ),
+                "gateway_process_id": int(payload["gateway_process_id"]),
+                "subscribed_at_unix_ns": subscribed_at_unix_ns,
+                "subscribed_at_monotonic_ns": int(
+                    payload["subscribed_at_monotonic_ns"]
+                ),
+                "step_started_at_unix_ns": started_at_unix_ns,
+                "validated_at_unix_ns": validated_at_unix_ns,
+            }
+        )
 
     def _communicate_runner(
         self,
@@ -1291,6 +2315,7 @@ class CodexGatewayBroker:
             )
         supplied_arguments = actual_values[len(expected_prefix) :]
         validation_arguments = supplied_arguments
+        execution_arguments = actual_values
         if (
             step.allow_omitted_empty_json_objects
             and supplied_arguments == (step.arguments[0],)
@@ -1302,10 +2327,37 @@ class CodexGatewayBroker:
                 "--options-json",
                 "{}",
             )
+            execution_arguments = (*expected_prefix, *validation_arguments)
+        if (
+            step.allow_omitted_default_event_count_one
+            and len(supplied_arguments) == len(step.arguments) - 2
+            and "--event-count" not in supplied_arguments
+            and not any(
+                value.startswith("--event-count=")
+                for value in supplied_arguments
+            )
+        ):
+            event_count_index = step.arguments.index("--event-count")
+            validation_arguments = (
+                *supplied_arguments[:event_count_index],
+                "--event-count",
+                "1",
+                *supplied_arguments[event_count_index:],
+            )
+            execution_arguments = (*expected_prefix, *validation_arguments)
         if len(validation_arguments) != len(step.arguments):
             raise GatewayInvocationError(
                 f"expected step {step.name!r} to have {len(step.arguments)} arguments; "
                 f"received {len(supplied_arguments)}"
+            )
+
+        unordered_return_field_indexes = frozenset()
+        if step.subcommand == "query-object":
+            unordered_return_field_indexes = (
+                _query_object_return_field_value_indexes(
+                    validation_arguments,
+                    step.arguments,
+                )
             )
 
         semantic_values: list[Any] = [
@@ -1317,14 +2369,17 @@ class CodexGatewayBroker:
             zip(validation_arguments, step.arguments)
         ):
             if isinstance(expected, str):
-                if supplied != expected:
+                if (
+                    index not in unordered_return_field_indexes
+                    and supplied != expected
+                ):
                     raise GatewayInvocationError(
                         f"step {step.name!r} argument {index} must be exactly {expected!r}"
                     )
                 semantic_values.append(expected)
             elif isinstance(expected, SemanticJsonArgument):
                 actual_json = _decode_json_argument(supplied)
-                if _canonical_json_bytes(actual_json) != _canonical_json_bytes(expected.expected):
+                if not _semantic_json_equal(actual_json, expected):
                     raise GatewayInvocationError(
                         f"step {step.name!r} argument {index} JSON is not semantically equal to the allow-list"
                     )
@@ -1347,7 +2402,10 @@ class CodexGatewayBroker:
                 semantic_values.append(bound)
             else:  # pragma: no cover - type checker prevents this for normal callers
                 raise GatewayInvocationError(f"unsupported expected argument at index {index}")
-        return _sha256_bytes(_canonical_json_bytes(semantic_values)), actual_values
+        return (
+            _sha256_bytes(_canonical_json_bytes(semantic_values)),
+            tuple(execution_arguments),
+        )
 
     def _execute(
         self,
@@ -1357,7 +2415,8 @@ class CodexGatewayBroker:
         *,
         execution_arguments: Sequence[str],
     ) -> dict[str, Any]:
-        started = time.time()
+        started_at_unix_ns = time.time_ns()
+        started = started_at_unix_ns / 1_000_000_000
         started_monotonic = time.monotonic()
         command = [
             str(self.trusted_python),
@@ -1369,6 +2428,9 @@ class CodexGatewayBroker:
         stdout = ""
         stderr = ""
         failures: list[str] = []
+        validated_ack: dict[str, Any] | None = None
+        terminal_indeterminate = False
+        ack_credential = self._subscription_ack_for_step(step)
         try:
             command[1] = str(self.runner_path.resolve(strict=True))
             runner_env = dict(self._runner_environment)
@@ -1377,6 +2439,20 @@ class CodexGatewayBroker:
             runner_env[STATE_DIRECTORY_ENV] = str(self.state_directory)
             runner_env[EVIDENCE_DIRECTORY_ENV] = str(self.evidence_directory)
             runner_env[CONFIG_PATH_ENV] = str(self.config_path)
+            if ack_credential is not None:
+                ack_expectation = ack_credential.expectation
+                if ack_expectation.path.exists() or ack_expectation.path.is_symlink():
+                    raise GatewayBrokerError(
+                        "broker subscription ACK target was pre-created or forged"
+                    )
+                runner_env.update(
+                    {
+                        SUBSCRIPTION_ACK_PATH_ENV: str(ack_expectation.path),
+                        SUBSCRIPTION_ACK_NONCE_ENV: ack_credential.nonce,
+                        SUBSCRIPTION_ACK_TOPIC_ENV: ack_expectation.topic,
+                        SUBSCRIPTION_ACK_STEP_ENV: ack_expectation.step_name,
+                    }
+                )
             shim_path = str(self.shim_directory)
             runner_env["PATH"] = os.pathsep.join(
                 part
@@ -1389,7 +2465,32 @@ class CodexGatewayBroker:
                     self.state_directory,
                     self.evidence_directory,
                 )
+            if (
+                ack_credential is not None
+                and self.trusted_subscription_ack_observer is not None
+            ):
+                self.trusted_subscription_ack_observer(
+                    ack_credential.expectation
+                )
             process = self._launch_runner(command, runner_env=runner_env)
+            if ack_credential is not None:
+                try:
+                    validated_ack = dict(
+                        self._validate_subscription_ack(
+                            ack_credential,
+                            runner_process=process,
+                            started_at_unix_ns=started_at_unix_ns,
+                        )
+                    )
+                except GatewayInvocationError as exc:
+                    failures.append(str(exc))
+                    self._signal_runner_group(process, terminate=True)
+                except Exception as exc:  # noqa: BLE001 - malformed ACK fails the record
+                    failures.append(
+                        "unexpected broker subscription ACK failure: "
+                        f"{type(exc).__name__}: {exc}"
+                    )
+                    self._signal_runner_group(process, terminate=True)
             stdout, stderr = self._communicate_runner(process)
             exit_code = int(process.returncode)
             stdout = stdout or ""
@@ -1415,12 +2516,51 @@ class CodexGatewayBroker:
                 raise GatewayInvocationError(
                     f"gateway payload contract must be {self.required_contract!r}"
                 )
-            if payload.get("ok") is not True:
-                raise GatewayInvocationError("gateway payload ok must be exactly true")
-            if payload.get("command") != step.subcommand:
-                raise GatewayInvocationError(
-                    f"gateway payload command must be exactly {step.subcommand!r}"
+            confirmation_is_consumed_later = any(
+                isinstance(argument, ResponseBinding)
+                and argument.step == step.name
+                and argument.pointer == "/confirmation/token"
+                for later_step in self.expected_steps[self._next_step + 1 :]
+                for argument in later_step.arguments
+            )
+            if (
+                step.subcommand == "transaction-show"
+                and (
+                    "confirmation" in payload
+                    or confirmation_is_consumed_later
                 )
+            ):
+                validate_transaction_show_confirmation_payload(payload)
+            if step.terminal_execute:
+                _validate_terminal_execute_payload(payload, exit_code=exit_code)
+            elif step.allowed_exit_codes == (0, 2):
+                _validate_branching_execute_payload(payload, exit_code=exit_code)
+                terminal_indeterminate = _is_exact_indeterminate_execute_payload(
+                    payload,
+                    exit_code=exit_code,
+                )
+            elif step.allowed_exit_codes == (0,):
+                if payload.get("ok") is not True:
+                    raise GatewayInvocationError("gateway payload ok must be exactly true")
+                if payload.get("command") != step.subcommand:
+                    raise GatewayInvocationError(
+                        f"gateway payload command must be exactly {step.subcommand!r}"
+                    )
+            else:
+                if payload.get("ok") is not False:
+                    raise GatewayInvocationError(
+                        "expected exit-2 gateway payload ok must be exactly false"
+                    )
+                if payload.get("error_code") != step.expected_error_code:
+                    raise GatewayInvocationError(
+                        "expected exit-2 gateway payload error_code must be exactly "
+                        f"{step.expected_error_code!r}"
+                    )
+                if payload.get("command") != step.expected_result_command:
+                    raise GatewayInvocationError(
+                        "expected exit-2 gateway payload command must be exactly "
+                        f"{step.expected_result_command!r}"
+                    )
         except GatewayInvocationError as exc:
             failures.append(str(exc))
         except Exception as exc:  # noqa: BLE001 - malformed payload evidence must fail closed
@@ -1445,7 +2585,10 @@ class CodexGatewayBroker:
                     f"trusted step observer failed: {type(exc).__name__}: {exc}"
                 )
 
-        finished = time.time()
+        finished_at_unix_ns = time.time_ns()
+        finished = finished_at_unix_ns / 1_000_000_000
+        if validated_ack is not None:
+            validated_ack["step_finished_at_unix_ns"] = finished_at_unix_ns
         payload_error = "; ".join(failures)
         response_stderr = stderr
         response_exit = exit_code if exit_code is not None else 125
@@ -1477,13 +2620,18 @@ class CodexGatewayBroker:
             payload_error=payload_error,
             runner_command_sha256=_argv_sha256(command),
             allowed_exit_codes=step.allowed_exit_codes,
+            started_at_unix_ns=started_at_unix_ns,
+            finished_at_unix_ns=finished_at_unix_ns,
+            subscription_ack=validated_ack,
         )
         with self._lock:
             record = self._append_record_locked(record)
             if record.succeeded:
                 self._payloads_by_step[step.name] = payload
                 self._next_step += 1
-                if self._next_step == len(self.expected_steps):
+                if terminal_indeterminate:
+                    self._terminal_state = _BROKER_INDETERMINATE
+                elif self._next_step == len(self.expected_steps):
                     self._terminal_state = _BROKER_COMPLETE
             else:
                 self._terminal_state = _BROKER_FAILED
@@ -1529,7 +2677,8 @@ class CodexGatewayBroker:
     ) -> dict[str, Any]:
         if authenticated:
             self._terminal_state = _BROKER_FAILED
-        now = time.time()
+        now_ns = time.time_ns()
+        now = now_ns / 1_000_000_000
         normalized = resolved.normalized_model_argv if resolved is not None else ()
         raw = tuple(model_argv) if model_argv else normalized
         response_stderr = f"Gateway broker rejected command: {reason}\n"
@@ -1561,6 +2710,9 @@ class CodexGatewayBroker:
             payload_error=payload_error,
             runner_command_sha256="",
             allowed_exit_codes=(),
+            started_at_unix_ns=now_ns,
+            finished_at_unix_ns=now_ns,
+            subscription_ack=None,
         )
         self._append_record_locked(record)
         return {"exit_code": response_exit, "stdout": "", "stderr": response_stderr}
@@ -1586,8 +2738,20 @@ __all__ = [
     "ResolvedGatewayInvocation",
     "ResponseBinding",
     "SemanticJsonArgument",
+    "SUBSCRIPTION_ACK_CONTRACT",
+    "SUBSCRIPTION_ACK_NONCE_ENV",
+    "SUBSCRIPTION_ACK_PATH_ENV",
+    "SUBSCRIPTION_ACK_STEP_ENV",
+    "SUBSCRIPTION_ACK_TOPIC_ENV",
+    "CONFIRMATION_TOKEN_MATERIAL_CONTRACT",
+    "TRANSACTION_CONFIRMATION_BINDING_CONTRACT",
+    "VALIDATED_SUBSCRIPTION_ACK_CONTRACT",
+    "TrustedSubscriptionAckExpectation",
+    "TrustedSubscriptionAckObserver",
+    "TrustedSubscriptionAckSpec",
     "TrustedStepObserver",
     "TrustedStepPreObserver",
     "reconcile_gateway_commands",
     "resolve_gateway_invocation",
+    "validate_transaction_show_confirmation_payload",
 ]

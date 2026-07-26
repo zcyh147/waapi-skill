@@ -39,14 +39,13 @@
 - `notes`
 - `switchAssignation`
 - `autoAddToSourceControl`
-- `autoCheckOutToSourceControl`
 - `audioFileBase64`
 - `options.return`
 - `per-import objectType and @PropertyName values`
 
 ## Return shape
 
-Import returns log, files, and objects arrays. importTabDelimited returns an objects array. imported publishes topic payloads.
+Import and importTabDelimited return an optional objects array. imported publishes the required objects array for the completed import operation.
 
 ## Destructive behavior
 
@@ -54,7 +53,7 @@ Mutating. replaceExisting, ReplaceFile, and ReplaceObject can overwrite or destr
 
 ## Ambiguity constraints
 
-Per-import properties take precedence over fallback parameters. Base64 audio inputs need a vertical bar separator between the target relative file path and the encoded WAV payload. Import logs must be parsed because import can report failures through log entries.
+Per-import properties take precedence over fallback parameters. Base64 audio inputs need a vertical bar separator between the target relative file path and the encoded WAV payload.
 
 ## Unsupported cases
 

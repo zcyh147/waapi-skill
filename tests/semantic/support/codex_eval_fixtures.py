@@ -33,6 +33,10 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Literal, Protocol, TypeAlias
 
+from tests.semantic.support.codex_gateway_broker import (
+    GatewayInvocationError,
+    validate_transaction_show_confirmation_payload,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
@@ -576,23 +580,74 @@ class _TransactionRunner:
         if not isinstance(summary, Mapping) or summary.get("request") != request:
             raise FixtureContractError("fixture preview did not preserve the exact closed request")
 
+        shown = self._call(
+            command="transaction-show",
+            state_dir=state_dir,
+            evidence_dir=evidence_dir,
+            command_args=("transaction-show", transaction_id, "--summary-only"),
+        )
+        shown_transaction_id = _required_string(
+            shown,
+            "transaction_id",
+            context="transaction-show",
+        )
+        if (
+            shown_transaction_id != transaction_id
+            or shown.get("state") != "awaiting_confirmation"
+            or shown.get("artifact_hash") != artifact_hash
+        ):
+            raise FixtureContractError(
+                f"fixture transaction-show mismatch: {_safe_json(shown)}"
+            )
+        try:
+            confirmation = validate_transaction_show_confirmation_payload(shown)
+        except GatewayInvocationError as exc:
+            raise FixtureContractError(
+                f"fixture transaction-show has an invalid confirmation binding: {exc}"
+            ) from exc
+        confirmation_token = _required_string(
+            confirmation,
+            "token",
+            context="transaction-show confirmation",
+        )
+
         confirmed = self._call(
             command="confirm",
             state_dir=state_dir,
             evidence_dir=evidence_dir,
-            command_args=("confirm", transaction_id, "--artifact-hash", artifact_hash),
+            command_args=(
+                "confirm",
+                shown_transaction_id,
+                "--confirmation-token",
+                confirmation_token,
+            ),
         )
-        if confirmed.get("state") != "confirmed" or confirmed.get("artifact_hash") != artifact_hash:
+        confirmed_transaction_id = _required_string(
+            confirmed,
+            "transaction_id",
+            context="confirm",
+        )
+        if (
+            confirmed_transaction_id != shown_transaction_id
+            or confirmed.get("state") != "confirmed"
+            or confirmed.get("artifact_hash") != artifact_hash
+        ):
             raise FixtureContractError(f"fixture confirmation mismatch: {_safe_json(confirmed)}")
 
         executed = self._call(
             command="execute",
             state_dir=state_dir,
             evidence_dir=evidence_dir,
-            command_args=("execute", transaction_id),
+            command_args=("execute", confirmed_transaction_id),
+        )
+        executed_transaction_id = _required_string(
+            executed,
+            "transaction_id",
+            context="execute",
         )
         if (
-            executed.get("state") != "executed_unverified"
+            executed_transaction_id != confirmed_transaction_id
+            or executed.get("state") != "executed_unverified"
             or executed.get("artifact_hash") != artifact_hash
             or executed.get("executed") is not True
         ):
@@ -606,12 +661,18 @@ class _TransactionRunner:
             command="verify",
             state_dir=state_dir,
             evidence_dir=evidence_dir,
-            command_args=("verify", transaction_id),
+            command_args=("verify", executed_transaction_id),
+        )
+        verified_transaction_id = _required_string(
+            verified,
+            "transaction_id",
+            context="verify",
         )
         verification = verified.get("verification")
         assertions = verification.get("assertions") if isinstance(verification, Mapping) else None
         if (
-            verified.get("state") != "verified"
+            verified_transaction_id != executed_transaction_id
+            or verified.get("state") != "verified"
             or verified.get("artifact_hash") != artifact_hash
             or verified.get("verified") is not True
             or not isinstance(assertions, list)

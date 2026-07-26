@@ -12,7 +12,7 @@ import stat
 import subprocess
 import tempfile
 import time
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterator, Mapping, Sequence
@@ -164,6 +164,28 @@ _CODEX_INFRASTRUCTURE_ERROR_MARKERS: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 class CodexHarnessError(RuntimeError):
     """Raised when a Codex semantic run cannot satisfy the isolation contract."""
+
+
+@dataclass(frozen=True, slots=True)
+class CodexGatewayErrorExpectation:
+    """One explicitly expected, structured gateway error result.
+
+    Exit status 2 remains a failed shell command.  The harness treats it as an
+    accepted packaged-gateway result only when the caller names both the exact
+    gateway command and the exact top-level ``error_code`` expected from a
+    ``gateway-result/v1`` payload whose ``ok`` value is ``false``.
+    """
+
+    command: str
+    error_code: str
+
+    def __post_init__(self) -> None:
+        if self.command not in GATEWAY_SUBCOMMANDS:
+            raise ValueError(
+                "CodexGatewayErrorExpectation.command must be a known gateway subcommand"
+            )
+        if not self.error_code or not self.error_code.strip():
+            raise ValueError("CodexGatewayErrorExpectation.error_code must be non-empty")
 
 
 @dataclass(frozen=True, slots=True)
@@ -372,6 +394,17 @@ class CodexHarnessConfig:
     sandbox_mode: str = "workspace-write"
     allow_output_write: bool = True
     network_access: bool = True
+    expected_gateway_errors: tuple[CodexGatewayErrorExpectation, ...] = ()
+
+    def __post_init__(self) -> None:
+        commands = tuple(expectation.command for expectation in self.expected_gateway_errors)
+        if len(commands) != len(set(commands)):
+            raise ValueError("CodexHarnessConfig.expected_gateway_errors commands must be unique")
+        expected = frozenset(self.expected_gateway_subcommands)
+        if expected and any(command not in expected for command in commands):
+            raise ValueError(
+                "CodexHarnessConfig.expected_gateway_errors must name expected gateway subcommands"
+            )
 
 
 class CodexCliHarness:
@@ -438,76 +471,18 @@ class CodexCliHarness:
             command = build_exec_command(self.config, prompt=prompt, writable_dir=output_dir)
             completed = run_process(command, cwd=self.config.workspace, env=exec_env, timeout=self.config.timeout_seconds)
 
-        isolation_audit = CodexIsolationAudit(
-            prompt_audit_environment=prompt_environment,
-            execution_environment=execution_environment,
-        )
-        after_workspace = snapshot_workspace(self.config.workspace)
-        after_outputs = snapshot_workspace(output_dir)
-        after_skill = snapshot_workspace(self.config.skill_source)
-        skill_tree_sha256_after = snapshot_tree_hash(after_skill)
-        workspace_created, workspace_modified = workspace_changes(before_workspace, after_workspace)
-        output_created, output_modified = workspace_changes(before_outputs, after_outputs)
-        workspace_deleted = tuple(sorted(set(before_workspace) - set(after_workspace)))
-        output_deleted = tuple(sorted(set(before_outputs) - set(after_outputs)))
-        created = tuple(workspace_created) + tuple(f"outputs/{path}" for path in output_created)
-        modified = tuple(workspace_modified) + tuple(f"outputs/{path}" for path in output_modified)
-        deleted = tuple(workspace_deleted) + tuple(f"outputs/{path}" for path in output_deleted)
-        events = parse_jsonl_events(completed.stdout)
-        command_records = completed_command_records(events)
-        command_facts = classify_commands(
-            command_records,
-            skill_source=self.config.skill_source,
-            expected_gateway_subcommands=self.config.expected_gateway_subcommands,
-            expected_wwise_version=self.config.expected_wwise_version,
-        )
-        final_response = final_agent_message(events)
-        usage = turn_usage(events)
-        session_audit = audit_session_events(
-            events,
-            invalid_json_line_count=count_invalid_jsonl_lines(completed.stdout),
-        )
-        collab_calls = session_audit.collab_call_count
-        file_changes = session_audit.file_change_count
-        thread_ids = session_audit.thread_ids
-        created_source_files = tuple(path for path in created if Path(path).suffix.lower() in SOURCE_SUFFIXES)
-        modified_source_files = tuple(path for path in modified if Path(path).suffix.lower() in SOURCE_SUFFIXES)
-        deleted_source_files = tuple(path for path in deleted if Path(path).suffix.lower() in SOURCE_SUFFIXES)
-        result = CodexRunResult(
-            command=tuple(command),
-            exit_status=completed.exit_status,
-            stdout=completed.stdout,
-            stderr=completed.stderr,
-            duration_seconds=completed.duration_seconds,
-            timed_out=completed.timed_out,
-            thread_id=thread_ids[0] if len(thread_ids) == 1 else "",
-            final_response=final_response,
-            usage=usage,
-            event_count=len(events),
-            collab_call_count=collab_calls,
-            file_change_count=file_changes,
+        return _finalize_codex_run(
+            config=self.config,
+            command=command,
+            completed=completed,
+            output_dir=output_dir,
             prompt_audit=audit,
-            isolation_audit=isolation_audit,
-            session_audit=session_audit,
-            command_facts=command_facts,
-            created_files=created,
-            modified_files=modified,
-            deleted_files=deleted,
-            created_source_files=created_source_files,
-            modified_source_files=modified_source_files,
-            deleted_source_files=deleted_source_files,
+            prompt_environment=prompt_environment,
+            execution_environment=execution_environment,
+            before_workspace=before_workspace,
+            before_outputs=before_outputs,
             skill_tree_sha256_before=skill_tree_sha256_before,
-            skill_tree_sha256_after=skill_tree_sha256_after,
-            skill_tree_unchanged=skill_tree_sha256_before == skill_tree_sha256_after,
         )
-        infrastructure_failure = classify_codex_infrastructure_failure(
-            events,
-            stderr=completed.stderr,
-            timed_out=completed.timed_out,
-        )
-        if infrastructure_failure is not None:
-            raise CodexInfrastructureError(infrastructure_failure, result)
-        return result
 
     def audit_prompt(self, prompt: str, *, env: Mapping[str, str]) -> CodexPromptAudit:
         command = build_prompt_audit_command(self.config, prompt=prompt)
@@ -540,6 +515,205 @@ class CodexCliHarness:
         )
 
 
+class CodexCliTask:
+    """One scenario-scoped Codex thread in one disposable state directory.
+
+    The initial turn uses a non-ephemeral ``codex exec`` so the CLI can persist
+    the thread inside the task's private ``CODEX_HOME``.  Every later turn
+    resumes the exact thread id emitted by that initial process.  The task is
+    deliberately one-shot: leaving the context destroys both ``HOME`` and
+    ``CODEX_HOME`` and the instance cannot be re-entered.
+    """
+
+    def __init__(
+        self,
+        config: CodexHarnessConfig,
+        *,
+        extra_env: Mapping[str, str] | None = None,
+    ) -> None:
+        self.config = config
+        self._harness = CodexCliHarness(config)
+        self._extra_env = dict(extra_env or {})
+        self._exit_stack: ExitStack | None = None
+        self._execution_env: dict[str, str] | None = None
+        self._execution_environment: CodexEnvironmentAudit | None = None
+        self._thread_id = ""
+        self._turn_results: list[CodexRunResult] = []
+        self._state = "new"
+        self._failed = False
+
+    @property
+    def thread_id(self) -> str:
+        return self._thread_id
+
+    @property
+    def turn_results(self) -> tuple[CodexRunResult, ...]:
+        return tuple(self._turn_results)
+
+    @property
+    def execution_environment(self) -> CodexEnvironmentAudit:
+        if self._execution_environment is None:
+            raise CodexHarnessError("CodexCliTask has not entered its isolated environment")
+        return self._execution_environment
+
+    def __enter__(self) -> CodexCliTask:
+        if self._state != "new":
+            raise CodexHarnessError("CodexCliTask is one-shot and cannot be re-entered")
+        self._harness.verify()
+        stack = ExitStack()
+        try:
+            execution_env = stack.enter_context(
+                isolated_codex_environment(self.config.auth_json, extra_env=self._extra_env)
+            )
+            execution_environment = inspect_isolated_environment(
+                execution_env,
+                auth_json=self.config.auth_json,
+            )
+            if not execution_environment.passed:
+                raise CodexHarnessError(
+                    f"Execution environment is not pristine: {execution_environment}"
+                )
+        except BaseException:
+            stack.close()
+            self._state = "closed"
+            raise
+        self._exit_stack = stack
+        self._execution_env = execution_env
+        self._execution_environment = execution_environment
+        self._state = "active"
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, traceback: Any) -> None:
+        stack = self._exit_stack
+        try:
+            if stack is not None:
+                stack.__exit__(exc_type, exc, traceback)
+        finally:
+            self._execution_env = None
+            self._exit_stack = None
+            self._state = "closed"
+
+    def run_initial(self, prompt: str, *, output_dir: Path) -> CodexRunResult:
+        """Start the task's only thread and capture its exact emitted id."""
+
+        self._require_active()
+        if self._turn_results or self._thread_id:
+            raise CodexHarnessError("CodexCliTask initial turn has already run")
+        output_dir = output_dir.expanduser().resolve(strict=False)
+        command = build_task_exec_command(self.config, prompt=prompt, writable_dir=output_dir)
+        result = self._record_turn(prompt, output_dir=output_dir, command=command)
+        if not result.thread_id:
+            self._failed = True
+            raise CodexHarnessError("CodexCliTask initial turn did not emit exactly one thread id")
+        self._thread_id = result.thread_id
+        return result
+
+    def run_followup(self, prompt: str, *, output_dir: Path) -> CodexRunResult:
+        """Resume the task's exact initial thread for one additional turn."""
+
+        self._require_active()
+        if not self._thread_id:
+            raise CodexHarnessError("CodexCliTask follow-up requires a successful initial turn")
+        expected_thread_id = self._thread_id
+        output_dir = output_dir.expanduser().resolve(strict=False)
+        command = build_task_resume_command(
+            self.config,
+            thread_id=expected_thread_id,
+            prompt=prompt,
+            writable_dir=output_dir,
+        )
+        result = self._record_turn(prompt, output_dir=output_dir, command=command)
+        if result.thread_id != expected_thread_id:
+            self._failed = True
+            raise CodexHarnessError(
+                "CodexCliTask resumed thread id mismatch: "
+                f"expected {expected_thread_id!r}, observed {result.thread_id!r}"
+            )
+        return result
+
+    def _require_active(self) -> None:
+        if self._state != "active" or self._execution_env is None:
+            raise CodexHarnessError("CodexCliTask must be used inside its active context")
+        if self._failed:
+            raise CodexHarnessError("CodexCliTask is terminal after a harness failure")
+
+    def _record_turn(
+        self,
+        prompt: str,
+        *,
+        output_dir: Path,
+        command: Sequence[str],
+    ) -> CodexRunResult:
+        try:
+            result = self._run_turn(prompt, output_dir=output_dir, command=command)
+        except CodexInfrastructureError as exc:
+            self._turn_results.append(exc.result)
+            self._failed = True
+            raise
+        except BaseException:
+            self._failed = True
+            raise
+        self._turn_results.append(result)
+        return result
+
+    def _run_turn(
+        self,
+        prompt: str,
+        *,
+        output_dir: Path,
+        command: Sequence[str],
+    ) -> CodexRunResult:
+        execution_env = self._execution_env
+        execution_environment = self._execution_environment
+        if execution_env is None or execution_environment is None:
+            raise CodexHarnessError("CodexCliTask execution environment is unavailable")
+
+        output_dir = output_dir.expanduser().resolve(strict=False)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        before_workspace = snapshot_workspace(self.config.workspace)
+        before_outputs = snapshot_workspace(output_dir)
+        before_skill = snapshot_workspace(self.config.skill_source)
+        skill_tree_sha256_before = snapshot_tree_hash(before_skill)
+
+        with isolated_codex_environment(self.config.auth_json, extra_env=self._extra_env) as audit_env:
+            prompt_environment = inspect_isolated_environment(
+                audit_env,
+                auth_json=self.config.auth_json,
+            )
+            if not prompt_environment.passed:
+                raise CodexHarnessError(
+                    f"Prompt audit environment is not pristine: {prompt_environment}"
+                )
+            audit = self._harness.audit_prompt(prompt, env=audit_env)
+            if not audit.passed:
+                raise CodexHarnessError(f"Codex prompt isolation audit failed: {audit}")
+        if snapshot_workspace(self.config.workspace) != before_workspace:
+            raise CodexHarnessError("codex debug prompt-input modified the isolated agent workspace")
+        if snapshot_workspace(output_dir) != before_outputs:
+            raise CodexHarnessError("codex debug prompt-input modified the evaluation output directory")
+        if snapshot_tree_hash(snapshot_workspace(self.config.skill_source)) != skill_tree_sha256_before:
+            raise CodexHarnessError("codex debug prompt-input modified the target Skill tree")
+
+        completed = run_process(
+            command,
+            cwd=self.config.workspace,
+            env=execution_env,
+            timeout=self.config.timeout_seconds,
+        )
+        return _finalize_codex_run(
+            config=self.config,
+            command=command,
+            completed=completed,
+            output_dir=output_dir,
+            prompt_audit=audit,
+            prompt_environment=prompt_environment,
+            execution_environment=execution_environment,
+            before_workspace=before_workspace,
+            before_outputs=before_outputs,
+            skill_tree_sha256_before=skill_tree_sha256_before,
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class ProcessResult:
     exit_status: int
@@ -547,6 +721,92 @@ class ProcessResult:
     stderr: str
     duration_seconds: float
     timed_out: bool = False
+
+
+def _finalize_codex_run(
+    *,
+    config: CodexHarnessConfig,
+    command: Sequence[str],
+    completed: ProcessResult,
+    output_dir: Path,
+    prompt_audit: CodexPromptAudit,
+    prompt_environment: CodexEnvironmentAudit,
+    execution_environment: CodexEnvironmentAudit,
+    before_workspace: Mapping[str, str],
+    before_outputs: Mapping[str, str],
+    skill_tree_sha256_before: str,
+) -> CodexRunResult:
+    """Build one immutable turn result using the shared V2/V3 audit logic."""
+
+    isolation_audit = CodexIsolationAudit(
+        prompt_audit_environment=prompt_environment,
+        execution_environment=execution_environment,
+    )
+    after_workspace = snapshot_workspace(config.workspace)
+    after_outputs = snapshot_workspace(output_dir)
+    after_skill = snapshot_workspace(config.skill_source)
+    skill_tree_sha256_after = snapshot_tree_hash(after_skill)
+    workspace_created, workspace_modified = workspace_changes(before_workspace, after_workspace)
+    output_created, output_modified = workspace_changes(before_outputs, after_outputs)
+    workspace_deleted = tuple(sorted(set(before_workspace) - set(after_workspace)))
+    output_deleted = tuple(sorted(set(before_outputs) - set(after_outputs)))
+    created = tuple(workspace_created) + tuple(f"outputs/{path}" for path in output_created)
+    modified = tuple(workspace_modified) + tuple(f"outputs/{path}" for path in output_modified)
+    deleted = tuple(workspace_deleted) + tuple(f"outputs/{path}" for path in output_deleted)
+    events = parse_jsonl_events(completed.stdout)
+    command_records = completed_command_records(events)
+    command_facts = classify_commands(
+        command_records,
+        skill_source=config.skill_source,
+        expected_gateway_subcommands=config.expected_gateway_subcommands,
+        expected_gateway_errors=config.expected_gateway_errors,
+        expected_wwise_version=config.expected_wwise_version,
+    )
+    final_response = final_agent_message(events)
+    usage = turn_usage(events)
+    session_audit = audit_session_events(
+        events,
+        invalid_json_line_count=count_invalid_jsonl_lines(completed.stdout),
+    )
+    thread_ids = session_audit.thread_ids
+    created_source_files = tuple(path for path in created if Path(path).suffix.lower() in SOURCE_SUFFIXES)
+    modified_source_files = tuple(path for path in modified if Path(path).suffix.lower() in SOURCE_SUFFIXES)
+    deleted_source_files = tuple(path for path in deleted if Path(path).suffix.lower() in SOURCE_SUFFIXES)
+    result = CodexRunResult(
+        command=tuple(command),
+        exit_status=completed.exit_status,
+        stdout=completed.stdout,
+        stderr=completed.stderr,
+        duration_seconds=completed.duration_seconds,
+        timed_out=completed.timed_out,
+        thread_id=thread_ids[0] if len(thread_ids) == 1 else "",
+        final_response=final_response,
+        usage=usage,
+        event_count=len(events),
+        collab_call_count=session_audit.collab_call_count,
+        file_change_count=session_audit.file_change_count,
+        prompt_audit=prompt_audit,
+        isolation_audit=isolation_audit,
+        session_audit=session_audit,
+        command_facts=command_facts,
+        created_files=created,
+        modified_files=modified,
+        deleted_files=deleted,
+        created_source_files=created_source_files,
+        modified_source_files=modified_source_files,
+        deleted_source_files=deleted_source_files,
+        skill_tree_sha256_before=skill_tree_sha256_before,
+        skill_tree_sha256_after=skill_tree_sha256_after,
+        skill_tree_unchanged=skill_tree_sha256_before == skill_tree_sha256_after,
+    )
+    infrastructure_failure = classify_codex_infrastructure_failure(
+        events,
+        stderr=completed.stderr,
+        timed_out=completed.timed_out,
+    )
+    if infrastructure_failure is not None:
+        raise CodexInfrastructureError(infrastructure_failure, result)
+    return result
 
 
 def run_process(
@@ -827,33 +1087,80 @@ def build_prompt_audit_command(config: CodexHarnessConfig, *, prompt: str) -> li
 
 
 def build_exec_command(config: CodexHarnessConfig, *, prompt: str, writable_dir: Path) -> list[str]:
+    """Build the historical V2 one-process, ephemeral execution command."""
+
+    command = _build_exec_prefix(config, writable_dir=writable_dir, ephemeral=True)
+    command.append(prompt)
+    return command
+
+
+def build_task_exec_command(
+    config: CodexHarnessConfig,
+    *,
+    prompt: str,
+    writable_dir: Path,
+) -> list[str]:
+    """Build the non-ephemeral initial turn for a scenario-scoped task."""
+
+    command = _build_exec_prefix(config, writable_dir=writable_dir, ephemeral=False)
+    command.append(prompt)
+    return command
+
+
+def build_task_resume_command(
+    config: CodexHarnessConfig,
+    *,
+    thread_id: str,
+    prompt: str,
+    writable_dir: Path,
+) -> list[str]:
+    """Build an exact-id resume turn; implicit ``--last`` is never allowed."""
+
+    if not thread_id or not thread_id.strip() or thread_id == "--last":
+        raise CodexHarnessError("scenario task resume requires an explicit thread id")
+    command = _build_exec_prefix(config, writable_dir=writable_dir, ephemeral=False)
+    command.extend(("resume", thread_id, prompt))
+    return command
+
+
+def _build_exec_prefix(
+    config: CodexHarnessConfig,
+    *,
+    writable_dir: Path,
+    ephemeral: bool,
+) -> list[str]:
     if config.sandbox_mode not in {"read-only", "workspace-write"}:
         raise CodexHarnessError(f"unsupported semantic sandbox mode: {config.sandbox_mode}")
     command = [
         str(config.codex_binary),
         "exec",
-        "--ephemeral",
-        "--model",
-        config.model,
-        "-c",
-        f'model_reasoning_effort="{config.reasoning_effort}"',
-        "-c",
-        f'service_tier="{config.service_tier}"',
-        "-c",
-        'approval_policy="never"',
-        "-c",
-        f"sandbox_workspace_write.network_access={'true' if config.network_access else 'false'}",
-        "--disable",
-        "memories",
-        "--ignore-user-config",
-        "--json",
-        "--sandbox",
-        config.sandbox_mode,
-        "--skip-git-repo-check",
     ]
+    if ephemeral:
+        command.append("--ephemeral")
+    command.extend(
+        [
+            "--model",
+            config.model,
+            "-c",
+            f'model_reasoning_effort="{config.reasoning_effort}"',
+            "-c",
+            f'service_tier="{config.service_tier}"',
+            "-c",
+            'approval_policy="never"',
+            "-c",
+            f"sandbox_workspace_write.network_access={'true' if config.network_access else 'false'}",
+            "--disable",
+            "memories",
+            "--ignore-user-config",
+            "--json",
+            "--sandbox",
+            config.sandbox_mode,
+            "--skip-git-repo-check",
+        ]
+    )
     if config.allow_output_write:
         command.extend(("--add-dir", str(writable_dir)))
-    command.extend(("-C", str(config.workspace), prompt))
+    command.extend(("-C", str(config.workspace)))
     return command
 
 
@@ -1293,6 +1600,7 @@ def classify_commands(
     *,
     skill_source: Path,
     expected_gateway_subcommands: Sequence[str] = (),
+    expected_gateway_errors: Sequence[CodexGatewayErrorExpectation] = (),
     expected_wwise_version: str = "",
 ) -> CodexCommandFacts:
     records = tuple(command_record(command) for command in commands)
@@ -1310,6 +1618,11 @@ def classify_commands(
     non_gateway_unexpected: list[str] = []
     skill_read = False
     expected = frozenset(str(value) for value in expected_gateway_subcommands)
+    error_expectations: dict[str, str] = {}
+    for expectation in expected_gateway_errors:
+        if expectation.command in error_expectations:
+            raise ValueError("expected_gateway_errors commands must be unique")
+        error_expectations[expectation.command] = expectation.error_code
 
     for record in records:
         command = record.command
@@ -1328,6 +1641,16 @@ def classify_commands(
             expected_gateway_subcommands=expected,
             expected_wwise_version=expected_wwise_version,
         )
+        if gateway_payload is None and gateway_shape is not None and (not expected or gateway_shape in expected):
+            expected_error_code = error_expectations.get(gateway_shape)
+            if expected_error_code is not None:
+                gateway_payload = expected_gateway_error_payload(
+                    record,
+                    skill_source=skill_source,
+                    expected_subcommand=gateway_shape,
+                    expected_error_code=expected_error_code,
+                    expected_wwise_version=expected_wwise_version,
+                )
         is_gateway = gateway_payload is not None
         if is_gateway:
             gateway.append(command)
@@ -1592,6 +1915,50 @@ def successful_gateway_payload(
     return dict(payload)
 
 
+def expected_gateway_error_payload(
+    record: CodexCommandRecord,
+    *,
+    skill_source: Path,
+    expected_subcommand: str,
+    expected_error_code: str,
+    expected_wwise_version: str = "",
+) -> Mapping[str, Any] | None:
+    """Return one explicitly expected gateway exit-2 payload, or ``None``.
+
+    This is intentionally separate from :attr:`CodexCommandRecord.succeeded`:
+    an exit-2 process is still a failed shell command and becomes acceptable
+    only under the caller's closed command/error-code expectation.
+    """
+
+    subcommand = gateway_invocation(
+        record,
+        skill_source=skill_source,
+        expected_wwise_version=expected_wwise_version,
+    )
+    if (
+        subcommand != expected_subcommand
+        or record.exit_code != 2
+        or record.status != "failed"
+        or record.has_shell_operators
+        or record.parse_error
+    ):
+        return None
+    try:
+        payload = json.loads(record.aggregated_output.strip())
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, Mapping):
+        return None
+    if (
+        payload.get("contract") != GATEWAY_RESULT_CONTRACT
+        or payload.get("command") != expected_subcommand
+        or payload.get("ok") is not False
+        or payload.get("error_code") != expected_error_code
+    ):
+        return None
+    return dict(payload)
+
+
 def gateway_runtime_apis(payload: Any) -> tuple[str, ...]:
     apis: list[str] = []
     if isinstance(payload, Mapping):
@@ -1628,6 +1995,7 @@ def allowed_skill_read(record: CodexCommandRecord, *, skill_source: Path) -> str
     if record.has_shell_operators:
         return allowed_skill_bootstrap_read(record, skill_source=skill_source)
     executable = Path(record.argv[0]).name.lower()
+    complete_skill_read = False
     if executable == "cat":
         if len(record.argv) != 2:
             return None
@@ -1637,16 +2005,19 @@ def allowed_skill_read(record: CodexCommandRecord, *, skill_source: Path) -> str
         if len(record.argv) != 4 or record.argv[1] != "-n":
             return None
         match = re.fullmatch(r"1,(\d+)p", record.argv[2])
-        if match is None:
+        complete_skill_read = record.argv[2] == "1,$p"
+        if match is None and not complete_skill_read:
             return None
         path_text = record.argv[3]
-        minimum_lines = int(match.group(1))
+        minimum_lines = int(match.group(1)) if match is not None else None
     else:
         return None
     validated = validated_skill_read(path_text, record.aggregated_output, skill_source=skill_source)
     if validated is None:
         return None
     relative, content = validated
+    if executable == "sed" and complete_skill_read and relative != "SKILL.md":
+        return None
     if minimum_lines is not None and minimum_lines < len(content.splitlines()):
         return None
     return relative
@@ -1771,6 +2142,44 @@ def final_agent_message(events: Sequence[Mapping[str, Any]]) -> str:
     return ""
 
 
+def first_gateway_backed_agent_message(
+    stdout: str,
+    *,
+    validated_gateway_commands: Sequence[str],
+) -> str | None:
+    """Return the first visible reply after the first validated gateway result.
+
+    The caller supplies commands already accepted as gateway results by the
+    common grader.  We intentionally inspect only completed ``agent_message``
+    items after the first matching completed command, rather than searching raw
+    stdout or falling back to the final response.  A later message therefore
+    cannot satisfy a first-response contract retroactively.
+    """
+
+    gateway_commands = frozenset(str(command) for command in validated_gateway_commands)
+    if not gateway_commands:
+        return None
+
+    first_gateway_completed = False
+    for event in parse_jsonl_events(stdout):
+        item = event.get("item")
+        if event.get("type") != "item.completed" or not isinstance(item, Mapping):
+            continue
+        if (
+            item.get("type") == "command_execution"
+            and item.get("command") in gateway_commands
+        ):
+            first_gateway_completed = True
+            continue
+        if (
+            first_gateway_completed
+            and item.get("type") == "agent_message"
+            and isinstance(item.get("text"), str)
+        ):
+            return item["text"]
+    return None
+
+
 def turn_usage(events: Sequence[Mapping[str, Any]]) -> dict[str, int]:
     for event in reversed(events):
         usage = event.get("usage")
@@ -1863,6 +2272,7 @@ __all__ = [
     "completed_commands",
     "count_invalid_jsonl_lines",
     "final_agent_message",
+    "first_gateway_backed_agent_message",
     "gateway_runtime_apis",
     "inspect_isolated_environment",
     "is_protected_environment_key",

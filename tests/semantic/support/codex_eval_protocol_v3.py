@@ -1,0 +1,429 @@
+"""Closed broker protocols for one executable V3 heavy scenario.
+
+The scenario adapters own business requests.  This module only translates
+those already-closed requests into exact, ordered packaged-gateway steps and
+turn-boundary prefix counts for a single fresh Codex task.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+from dataclasses import dataclass
+from typing import Any, Mapping, Sequence
+
+from tests.semantic.support.codex_gateway_broker import (
+    ExpectedGatewayStep,
+    ResponseBinding,
+    SemanticJsonArgument,
+)
+
+
+OPERATION_REQUEST_CONTRACT = "waapi-skill.operation-request/v1"
+
+
+class V3ProtocolError(ValueError):
+    """A materialized scenario cannot form an exact broker allow-list."""
+
+
+@dataclass(frozen=True, slots=True)
+class V3GatewayProtocol:
+    steps: tuple[ExpectedGatewayStep, ...]
+    turn_prefix_counts: tuple[int, ...]
+
+    def __post_init__(self) -> None:
+        if not self.steps:
+            raise ValueError("V3GatewayProtocol.steps must be non-empty")
+        if not self.turn_prefix_counts:
+            raise ValueError("V3GatewayProtocol.turn_prefix_counts must be non-empty")
+        if tuple(sorted(self.turn_prefix_counts)) != self.turn_prefix_counts:
+            raise ValueError("turn prefix counts must be ordered")
+        if len(set(self.turn_prefix_counts)) != len(self.turn_prefix_counts):
+            raise ValueError("turn prefix counts must be unique")
+        if self.turn_prefix_counts[-1] != len(self.steps):
+            raise ValueError("final turn prefix must consume the complete protocol")
+        names = tuple(step.name for step in self.steps)
+        if len(names) != len(set(names)):
+            raise ValueError("V3 gateway step names must be unique")
+
+
+@dataclass(frozen=True, slots=True)
+class StructuredRefusal:
+    error_code: str
+    result_command: str = "preview"
+
+    def __post_init__(self) -> None:
+        if not self.error_code or not self.error_code.strip():
+            raise ValueError("structured refusal error_code must be non-empty")
+        if not self.result_command or not self.result_command.strip():
+            raise ValueError("structured refusal result_command must be non-empty")
+
+
+def build_transaction_protocol(
+    requests: Sequence[Mapping[str, Any]],
+    *,
+    refusal: StructuredRefusal | None = None,
+    terminal_execute: bool = False,
+) -> V3GatewayProtocol:
+    """Build one or more separately confirmed immutable transactions.
+
+    A multi-transaction scenario previews the first request on turn one.  Each
+    confirmation turn completes only the currently visible transaction and,
+    except for the final confirmation, obtains a new schema and preview for the
+    next request.  The transaction-show call starts from the exact preview
+    transaction id.  Confirmation then binds both its transaction id and its
+    short state-scoped token to that show response; execute and verify each bind
+    to the immediately preceding response.  No continuation value is guessed
+    or injected into the prompt.
+    """
+
+    normalized = tuple(_validate_operation_request(request) for request in requests)
+    if not normalized:
+        raise V3ProtocolError("transaction protocol requires at least one request")
+    if refusal is not None and len(normalized) != 1:
+        raise V3ProtocolError("a structured refusal supports exactly one preview request")
+    if terminal_execute and len(normalized) != 1:
+        raise V3ProtocolError(
+            "a terminal-execute transaction supports exactly one request"
+        )
+    if terminal_execute and refusal is not None:
+        raise V3ProtocolError(
+            "terminal execute and structured preview refusal are mutually exclusive"
+        )
+
+    steps: list[ExpectedGatewayStep] = []
+    prefixes: list[int] = []
+    for index, request in enumerate(normalized, start=1):
+        label = f"tx{index:02d}"
+        operation = str(request["operation"])
+        steps.append(
+            ExpectedGatewayStep(
+                name=f"{label}.operation-schema",
+                subcommand="operation-schema",
+                arguments=(operation,),
+            )
+        )
+        preview_name = f"{label}.preview"
+        steps.append(
+            ExpectedGatewayStep(
+                name=preview_name,
+                subcommand="preview",
+                arguments=(
+                    "--request-json",
+                    SemanticJsonArgument(
+                        request,
+                        equivalence=(
+                            "object_operation_v1"
+                            if operation in {"object.create", "object.set"}
+                            else "wire_exact"
+                        ),
+                    ),
+                ),
+                allowed_exit_codes=(2,) if refusal is not None else (0,),
+                expected_error_code=refusal.error_code if refusal is not None else "",
+                expected_result_command=(
+                    refusal.result_command if refusal is not None else ""
+                ),
+            )
+        )
+        if index == 1:
+            prefixes.append(len(steps))
+        if refusal is not None:
+            continue
+
+        preview_transaction_id = ResponseBinding(
+            preview_name,
+            "/transaction_id",
+        )
+        show_name = f"{label}.transaction-show"
+        confirm_name = f"{label}.confirm"
+        execute_name = f"{label}.execute"
+        steps.extend(
+            (
+                ExpectedGatewayStep(
+                    name=show_name,
+                    subcommand="transaction-show",
+                    arguments=(preview_transaction_id, "--summary-only"),
+                ),
+                ExpectedGatewayStep(
+                    name=confirm_name,
+                    subcommand="confirm",
+                    arguments=(
+                        ResponseBinding(show_name, "/transaction_id"),
+                        "--confirmation-token",
+                        ResponseBinding(show_name, "/confirmation/token"),
+                    ),
+                ),
+                ExpectedGatewayStep(
+                    name=execute_name,
+                    subcommand="execute",
+                    arguments=(ResponseBinding(confirm_name, "/transaction_id"),),
+                    # Ordinary mutations have two closed outcomes: success
+                    # continues to verify, while one exact non-retryable
+                    # indeterminate result terminates at execute.  Migration's
+                    # terminal_execute flag additionally makes successful
+                    # execute terminal because its oracle is caller-owned.
+                    allowed_exit_codes=(0, 2),
+                    terminal_execute=terminal_execute,
+                ),
+            )
+        )
+        if not terminal_execute:
+            steps.append(
+                ExpectedGatewayStep(
+                    name=f"{label}.verify",
+                    subcommand="verify",
+                    arguments=(ResponseBinding(execute_name, "/transaction_id"),),
+                )
+            )
+        if index == len(normalized):
+            prefixes.append(len(steps))
+        else:
+            # The next loop appends its schema/preview into this same
+            # confirmation turn.  Its prefix is recorded after that append.
+            continue
+
+    if refusal is not None:
+        prefixes = [len(steps)]
+    elif terminal_execute:
+        prefixes = [2, 5]
+    elif len(normalized) > 1:
+        # Reconstruct the exact cumulative boundary after every confirmation:
+        # initial schema+preview, then four continuation steps plus the next
+        # schema+preview, with the final turn ending after four steps.
+        prefixes = [2]
+        consumed = 2
+        for index in range(len(normalized)):
+            consumed += 4
+            if index + 1 < len(normalized):
+                consumed += 2
+            prefixes.append(consumed)
+    return V3GatewayProtocol(tuple(steps), tuple(prefixes))
+
+
+def build_direct_protocol(
+    steps: Sequence[ExpectedGatewayStep],
+) -> V3GatewayProtocol:
+    """Build a single-turn exact read/topic protocol supplied by an adapter."""
+
+    values = tuple(steps)
+    if not values:
+        raise V3ProtocolError("direct protocol requires at least one gateway step")
+    return V3GatewayProtocol(values, (len(values),))
+
+
+def call_step(
+    name: str,
+    api: str,
+    *,
+    args: Mapping[str, Any] | None = None,
+    options: Mapping[str, Any] | None = None,
+    post_filter: Mapping[str, Any] | None = None,
+) -> ExpectedGatewayStep:
+    argument_values = _normalize_json_object(
+        {} if args is None else args,
+        field="call args",
+    )
+    option_values = _normalize_json_object(
+        {} if options is None else options,
+        field="call options",
+    )
+    gateway_arguments: tuple[Any, ...] = (
+        api,
+        "--args-json",
+        SemanticJsonArgument(argument_values),
+        "--options-json",
+        SemanticJsonArgument(option_values),
+    )
+    if post_filter is not None:
+        post_filter_value = _normalize_json_object(
+            post_filter,
+            field="call post filter",
+        )
+        if not post_filter_value:
+            raise V3ProtocolError("call post filter must not be empty")
+        gateway_arguments = (
+            *gateway_arguments,
+            "--post-filter-json",
+            SemanticJsonArgument(post_filter_value),
+        )
+    return ExpectedGatewayStep(
+        name=name,
+        subcommand="call",
+        arguments=gateway_arguments,
+        allow_omitted_empty_json_objects=(
+            not argument_values and not option_values and post_filter is None
+        ),
+    )
+
+
+def query_object_step(name: str, arguments: Sequence[str]) -> ExpectedGatewayStep:
+    if not arguments or arguments[0] != "query-object":
+        raise V3ProtocolError("query-object arguments must start with the subcommand")
+    return ExpectedGatewayStep(
+        name=name,
+        subcommand="query-object",
+        arguments=tuple(arguments[1:]),
+    )
+
+
+def wait_topic_step(
+    name: str,
+    topic: str,
+    *,
+    event_count: int,
+    match: Mapping[str, Any] | None = None,
+    options: Mapping[str, Any] | None = None,
+    timeout_seconds: float = 120.0,
+) -> ExpectedGatewayStep:
+    if not isinstance(event_count, int) or isinstance(event_count, bool) or not 1 <= event_count <= 64:
+        raise V3ProtocolError("wait-topic event_count must be an integer from 1 through 64")
+    if timeout_seconds <= 0:
+        raise V3ProtocolError("wait-topic timeout must be positive")
+    arguments: list[Any] = [topic]
+    if options is not None:
+        arguments.extend(
+            (
+                "--options-json",
+                SemanticJsonArgument(
+                    _normalize_json_object(options, field="wait-topic options")
+                ),
+            )
+        )
+    arguments.extend(("--event-count", str(event_count)))
+    if match is not None:
+        arguments.extend(
+            (
+                "--match-json",
+                SemanticJsonArgument(
+                    _normalize_json_object(match, field="wait-topic match")
+                ),
+            )
+        )
+    return ExpectedGatewayStep(
+        name=name,
+        subcommand="wait-topic",
+        gateway_global_arguments=("--timeout", _format_timeout(timeout_seconds)),
+        arguments=tuple(arguments),
+        allow_omitted_default_event_count_one=event_count == 1,
+    )
+
+
+def _validate_operation_request(request: Mapping[str, Any]) -> dict[str, Any]:
+    if not isinstance(request, Mapping):
+        raise V3ProtocolError("operation request must be a mapping")
+    result = _normalize_json_object(request, field="operation request")
+    if set(result) != {"contract", "version", "operation", "arguments"}:
+        raise V3ProtocolError("operation request must use the closed v1 envelope")
+    if result["contract"] != OPERATION_REQUEST_CONTRACT:
+        raise V3ProtocolError("operation request contract is invalid")
+    if not isinstance(result["version"], str) or not result["version"]:
+        raise V3ProtocolError("operation request version must be non-empty")
+    if not isinstance(result["operation"], str) or not result["operation"]:
+        raise V3ProtocolError("operation request operation must be non-empty")
+    if not isinstance(result["arguments"], Mapping) or not result["arguments"]:
+        raise V3ProtocolError("operation request arguments must be a non-empty mapping")
+    return result
+
+
+def _normalize_json_object(value: Any, *, field: str) -> dict[str, Any]:
+    """Copy one protocol-owned object into strict, recursively plain JSON.
+
+    Reviewed V3 builders freeze data with mapping proxies and tuples.  Broker
+    allow-list values must instead be directly serializable by the broker's
+    unchanged canonical JSON encoder.  Reject unknown values and malformed
+    object keys here, at protocol construction, rather than during a live
+    model command.
+    """
+
+    if not isinstance(value, Mapping):
+        raise V3ProtocolError(f"{field} must be a mapping")
+    try:
+        normalized = _normalize_json_value(value, field=field, active=set())
+        if not isinstance(normalized, dict):  # defensive for runtime callers
+            raise V3ProtocolError(f"{field} must normalize to a JSON object")
+        json.dumps(
+            normalized,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    except V3ProtocolError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - input mappings must fail as protocol data
+        raise V3ProtocolError(f"{field} is not canonical JSON: {exc}") from exc
+    return normalized
+
+
+def _normalize_json_value(
+    value: Any,
+    *,
+    field: str,
+    active: set[int],
+) -> Any:
+    if value is None or type(value) in {str, bool, int}:
+        return value
+    if type(value) is float:
+        if not math.isfinite(value):
+            raise V3ProtocolError(f"{field} contains a non-finite number")
+        return value
+    if isinstance(value, Mapping):
+        identity = id(value)
+        if identity in active:
+            raise V3ProtocolError(f"{field} contains a recursive object")
+        active.add(identity)
+        try:
+            result: dict[str, Any] = {}
+            for key, nested in value.items():
+                if type(key) is not str:
+                    raise V3ProtocolError(
+                        f"{field} contains a non-string object key"
+                    )
+                if key in result:
+                    raise V3ProtocolError(
+                        f"{field} contains a duplicate object key {key!r}"
+                    )
+                result[key] = _normalize_json_value(
+                    nested,
+                    field=f"{field}[{key!r}]",
+                    active=active,
+                )
+            return result
+        finally:
+            active.remove(identity)
+    if isinstance(value, (list, tuple)):
+        identity = id(value)
+        if identity in active:
+            raise V3ProtocolError(f"{field} contains a recursive array")
+        active.add(identity)
+        try:
+            return [
+                _normalize_json_value(
+                    nested,
+                    field=f"{field}[{index}]",
+                    active=active,
+                )
+                for index, nested in enumerate(value)
+            ]
+        finally:
+            active.remove(identity)
+    raise V3ProtocolError(
+        f"{field} contains non-JSON value {type(value).__name__}"
+    )
+
+
+def _format_timeout(value: float) -> str:
+    return str(int(value)) if float(value).is_integer() else str(value)
+
+
+__all__ = [
+    "StructuredRefusal",
+    "V3GatewayProtocol",
+    "V3ProtocolError",
+    "build_direct_protocol",
+    "build_transaction_protocol",
+    "call_step",
+    "query_object_step",
+    "wait_topic_step",
+]

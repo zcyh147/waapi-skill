@@ -557,11 +557,34 @@ class _PathScanner:
                         depth=depth + 1,
                     )
                 return
+            if all(isinstance(item, list) for item in value):
+                if any(
+                    len(item) != 2
+                    or not isinstance(item[0], str)
+                    or not isinstance(item[1], str)
+                    for item in value
+                ):
+                    raise IOPolicyError(
+                        "AMBIGUOUS_PLATFORM_PATH_MAPPING",
+                        f"Filesystem field {_json_path(path)} must be a path string, a platform-to-path object, "
+                        "an even PLATFORM/PATH string array, or an array of [PLATFORM, PATH] pairs.",
+                        details={"json_path": _json_path(path)},
+                    )
+                for index, item in enumerate(value):
+                    self._append_candidate(
+                        section,
+                        field_name,
+                        role,
+                        item[1],
+                        schema,
+                        (*path, index, 1),
+                    )
+                return
             if not all(isinstance(item, str) for item in value) or len(value) % 2:
                 raise IOPolicyError(
                     "AMBIGUOUS_PLATFORM_PATH_MAPPING",
                     f"Filesystem field {_json_path(path)} must be a path string, a platform-to-path object, "
-                    "or an even PLATFORM/PATH string array.",
+                    "an even PLATFORM/PATH string array, or an array of [PLATFORM, PATH] pairs.",
                     details={"json_path": _json_path(path)},
                 )
             for index in range(1, len(value), 2):

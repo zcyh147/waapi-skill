@@ -21,12 +21,23 @@ from .category_policy import (  # pyright: ignore[reportMissingImports]
 from .deferred_registry import ApiClassifier
 from .manifest import ManifestResourceMissingError, ManifestStore
 from .safety import requires_destructive_gate  # pyright: ignore[reportMissingImports]
-from .subscriptions import SubscriptionManager, SubscriptionTimeout, SubscriptionUnavailable, payload_matches
+from .subscriptions import (
+    MAX_WAIT_EVENT_COUNT,
+    SubscriptionCleanupError,
+    SubscriptionEvent,
+    SubscriptionManager,
+    SubscriptionTimeout,
+    SubscriptionUnavailable,
+    payload_matches,
+)
 
 DEFAULT_WWISE_VERSION = "2022.1"
 DEFAULT_TIMEOUT_SECONDS = 10.0
 MAX_LIVE_RESULT_JSON_BYTES = 1024 * 1024
 LIVE_RESULT_CEILING_PROVENANCE = "waapi-skill.dispatcher.live-result-json-ceiling/v1"
+SUBSCRIPTION_CLEANUP_DETAILS_KEY = "subscription_cleanup"
+SUBSCRIPTION_CLEANUP_UNSUBSCRIBED = "unsubscribed"
+SUBSCRIPTION_CLEANUP_FAILED = "unsubscribe_failed"
 MAX_EXCEPTION_MESSAGE_BYTES = 2048
 MAX_EXCEPTION_URI_BYTES = 512
 MAX_EXCEPTION_METADATA_DEPTH = 16
@@ -79,6 +90,7 @@ class DispatcherRequest:
     topic_match: Mapping[str, Any] | None = None
     live_behavior: bool = False
     result_limit_bytes: int = MAX_LIVE_RESULT_JSON_BYTES
+    topic_event_count: int = 1
 
 
 @dataclass(slots=True, frozen=True)
@@ -98,6 +110,46 @@ class _JsonSizeProbe:
     size_bytes: int | None = None
     observed_at_least_bytes: int | None = None
     encoding_failed: bool = False
+
+
+def _subscription_event_envelope(event: SubscriptionEvent) -> dict[str, Any]:
+    """Keep one callback event in the dispatcher's private exact envelope."""
+
+    return {
+        "topic": event.topic,
+        "payload": event.payload,
+        "args": event.args,
+        "kwargs": event.kwargs,
+    }
+
+
+def _subscription_cleanup_details(result: Mapping[str, Any]) -> dict[str, Any] | None:
+    details = result.get("details")
+    cleanup = (
+        details.get(SUBSCRIPTION_CLEANUP_DETAILS_KEY)
+        if isinstance(details, Mapping)
+        else None
+    )
+    return dict(cleanup) if isinstance(cleanup, Mapping) else None
+
+
+def _with_subscription_cleanup(
+    result: Mapping[str, Any],
+    *,
+    status: str,
+    reason: str | None = None,
+) -> dict[str, Any]:
+    """Attach one explicit bounded topic-cleanup fact to a dispatcher result."""
+
+    published = dict(result)
+    current_details = published.get("details")
+    details = dict(current_details) if isinstance(current_details, Mapping) else {}
+    cleanup: dict[str, Any] = {"status": status}
+    if reason is not None:
+        cleanup["reason"] = reason
+    details[SUBSCRIPTION_CLEANUP_DETAILS_KEY] = cleanup
+    published["details"] = details
+    return published
 
 
 @dataclass(slots=True)
@@ -127,6 +179,7 @@ class WwiseDispatcher:
         evidence_dir: str | Path | None = None,
         topic_mode: str = "wait",
         topic_match: Mapping[str, Any] | None = None,
+        topic_event_count: int = 1,
         live_behavior: bool = False,
         result_limit_bytes: int = MAX_LIVE_RESULT_JSON_BYTES,
     ) -> dict[str, Any]:
@@ -143,6 +196,7 @@ class WwiseDispatcher:
             evidence_dir=evidence_dir,
             topic_mode=topic_mode,
             topic_match=topic_match,
+            topic_event_count=topic_event_count,
             live_behavior=live_behavior,
             result_limit_bytes=result_limit_bytes,
         )
@@ -168,6 +222,17 @@ class WwiseDispatcher:
                 request.version,
                 "INVALID_RESULT_LIMIT",
                 "result_limit_bytes must be a positive integer",
+            )
+        if (
+            not isinstance(request.topic_event_count, int)
+            or isinstance(request.topic_event_count, bool)
+            or not 1 <= request.topic_event_count <= MAX_WAIT_EVENT_COUNT
+        ):
+            return self._error_result(
+                request.api,
+                request.version,
+                "INVALID_TOPIC_EVENT_COUNT",
+                f"topic_event_count must be an integer between 1 and {MAX_WAIT_EVENT_COUNT}",
             )
 
         entry = self._lookup_entry(request.version, request.api)
@@ -242,9 +307,50 @@ class WwiseDispatcher:
             if request.topic_match is not None:
                 expected = dict(request.topic_match)
                 wait_kwargs["predicate"] = lambda event: payload_matches(event.payload, expected)
-            event = manager.wait_for_event(request.api, **wait_kwargs)
+            if request.topic_event_count == 1:
+                event = manager.wait_for_event(request.api, **wait_kwargs)
+                payload: Any = _subscription_event_envelope(event)
+            else:
+                events = manager.wait_for_events(
+                    request.api,
+                    event_count=request.topic_event_count,
+                    **wait_kwargs,
+                )
+                payload = {
+                    "requested_event_count": request.topic_event_count,
+                    "events": [_subscription_event_envelope(event) for event in events],
+                }
+        except SubscriptionCleanupError as exc:
+            primary = exc.primary_error
+            if isinstance(primary, SubscriptionTimeout):
+                result = self._exception_result(
+                    request,
+                    primary,
+                    item_type=entry.item_type,
+                    error_code="TIMEOUT",
+                )
+            else:
+                result = self._exception_result(
+                    request,
+                    exc,
+                    item_type=entry.item_type,
+                    error_code="SUBSCRIPTION_CLEANUP_FAILED",
+                )
+            return _with_subscription_cleanup(
+                result,
+                status=SUBSCRIPTION_CLEANUP_FAILED,
+                reason=exc.reason,
+            )
         except SubscriptionTimeout as exc:
-            return self._exception_result(request, exc, item_type=entry.item_type, error_code="TIMEOUT")
+            return _with_subscription_cleanup(
+                self._exception_result(
+                    request,
+                    exc,
+                    item_type=entry.item_type,
+                    error_code="TIMEOUT",
+                ),
+                status=SUBSCRIPTION_CLEANUP_UNSUBSCRIBED,
+            )
         except SubscriptionUnavailable as exc:
             return self._exception_result(
                 request,
@@ -252,10 +358,13 @@ class WwiseDispatcher:
                 item_type=entry.item_type,
                 error_code="SUBSCRIPTION_UNAVAILABLE",
             )
-        return self._success_result(
-            request,
-            entry,
-            {"topic": event.topic, "payload": event.payload, "args": event.args, "kwargs": event.kwargs},
+        return _with_subscription_cleanup(
+            self._success_result(
+                request,
+                entry,
+                payload,
+            ),
+            status=SUBSCRIPTION_CLEANUP_UNSUBSCRIBED,
         )
 
     def _lookup_entry(self, version: str, api: str) -> ManifestApiEntry | None:
@@ -402,29 +511,36 @@ class WwiseDispatcher:
         }
         bounded_api = _bounded_public_string(request.api, "<omitted>", 512)
         bounded_version = _bounded_public_string(request.version, "<omitted>", 80)
+        cleanup_details = _subscription_cleanup_details(result)
         if probe.encoding_failed:
+            details: dict[str, Any] = {
+                "provenance": LIVE_RESULT_CEILING_PROVENANCE,
+                "reason": "not_json_serializable",
+            }
+            if cleanup_details is not None:
+                details[SUBSCRIPTION_CLEANUP_DETAILS_KEY] = cleanup_details
             return self._error_result(
                 bounded_api,
                 bounded_version,
                 "RESULT_NOT_JSON",
                 "Live WAAPI result is not a strict JSON document",
-                details={
-                    "provenance": LIVE_RESULT_CEILING_PROVENANCE,
-                    "reason": "not_json_serializable",
-                },
+                details=details,
                 **common,
             )
         if probe.observed_at_least_bytes is not None:
+            details = {
+                "limit_bytes": effective_limit,
+                "observed_at_least_bytes": probe.observed_at_least_bytes,
+                "provenance": LIVE_RESULT_CEILING_PROVENANCE,
+            }
+            if cleanup_details is not None:
+                details[SUBSCRIPTION_CLEANUP_DETAILS_KEY] = cleanup_details
             return self._error_result(
                 bounded_api,
                 bounded_version,
                 "RESULT_TOO_LARGE",
                 "Live WAAPI result exceeded the public JSON size limit",
-                details={
-                    "limit_bytes": effective_limit,
-                    "observed_at_least_bytes": probe.observed_at_least_bytes,
-                    "provenance": LIVE_RESULT_CEILING_PROVENANCE,
-                },
+                details=details,
                 **common,
             )
         return result
@@ -444,6 +560,7 @@ class WwiseDispatcher:
             evidence_dir=Path(evidence) if evidence is not None else None,
             topic_mode=str(kwargs["topic_mode"]),
             topic_match=kwargs["topic_match"],
+            topic_event_count=kwargs["topic_event_count"],
             live_behavior=bool(kwargs["live_behavior"]),
             result_limit_bytes=int(kwargs["result_limit_bytes"]),
         )

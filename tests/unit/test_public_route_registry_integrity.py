@@ -7,6 +7,9 @@ from typing import Mapping
 from wwise_waapi.capabilities import CapabilityCatalog
 from wwise_waapi.execution_contracts import (
     LIFECYCLE_COMPANIONS,
+    POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY,
+    POST_EXECUTION_PROJECT_GUARD_REVALIDATE,
+    PROJECT_GUARD_INVARIANT,
     PROJECT_GUARD_TRANSITION_TO_NONE,
     PROJECT_GUARD_TRANSITION_TO_PATH,
     ExecutionContractRegistry,
@@ -38,14 +41,14 @@ def test_every_registry_row_has_one_complete_route_contract() -> None:
     assert len(rows) == 814
     assert len({(row.version, row.item_type, row.uri) for row in rows}) == 814
     assert Counter(row.route for row in rows) == {
-        "bounded_call": 58,
+        "bounded_call": 60,
         "bounded_topic_wait": 147,
         "excluded": 45,
         "fixed_command": 42,
         "isolated_transaction": 135,
         "managed_transaction": 234,
         "compound_transaction_member": 15,
-        "transaction": 138,
+        "transaction": 136,
     }
 
     for row in rows:
@@ -86,6 +89,38 @@ def test_all_six_project_transition_apis_have_explicit_versioned_guard_modes() -
         assert entry.verification_strategy == "result_schema_and_project_transition"
         if uri.endswith((".open", ".create")):
             assert entry.route == "isolated_transaction"
+
+
+def test_only_reviewed_explicit_project_cli_calls_skip_the_post_execution_project_probe() -> None:
+    registry = ExecutionContractRegistry()
+    rows = [
+        entry
+        for version in SUPPORTED_WWISE_VERSION_KEYS
+        for entry in registry.entries(version)
+    ]
+    context_only = [
+        entry
+        for entry in rows
+        if entry.post_execution_project_guard_policy
+        == POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY
+    ]
+
+    assert len(context_only) == 20
+    assert {entry.version for entry in context_only} == set(SUPPORTED_WWISE_VERSION_KEYS)
+    assert {entry.uri for entry in context_only} == {
+        "ak.wwise.cli.convertExternalSource",
+        "ak.wwise.cli.generateSoundbank",
+        "ak.wwise.cli.migrate",
+        "ak.wwise.cli.tabDelimitedImport",
+    }
+    assert all(entry.project_guard_mode == PROJECT_GUARD_INVARIANT for entry in context_only)
+    assert all(entry.verification_strategy == "result_schema" for entry in context_only)
+    assert all(
+        entry.post_execution_project_guard_policy
+        == POST_EXECUTION_PROJECT_GUARD_REVALIDATE
+        for entry in rows
+        if entry not in context_only
+    )
 
 
 def test_execution_contract_and_reflected_schema_are_one_to_one() -> None:

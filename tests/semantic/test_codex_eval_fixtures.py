@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import copy
 import json
+import os
+import shlex
+import subprocess
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from types import SimpleNamespace
@@ -26,6 +29,7 @@ from tests.semantic.support.codex_eval_fixtures import (
     create_shared_fixture_bundle,
     normalize_typed_import_object_path,
 )
+from wwise_waapi.transactions import confirmation_token_for
 
 
 GATEWAY_CONTRACT = "waapi-skill.gateway-result/v1"
@@ -37,6 +41,43 @@ ROOT_PATH_IDS = {
 }
 FACTORY_QUERY_ID = "{52F6FBC8-499A-411D-A790-CB4FACBE6F6D}"
 FACTORY_QUERY_PATH = r"\Queries\Factory Queries\Sound = SFX"
+FAKE_TRUSTED_GATEWAY_RUNNER = (
+    Path(__file__).resolve().parent
+    / "fixtures"
+    / "fake-waapi-skill"
+    / "scripts"
+    / "run.py"
+)
+
+
+def _fake_trusted_next_command(
+    command: str,
+    gateway_argv: tuple[str, ...],
+    *,
+    requires_explicit_user_confirmation: bool = False,
+) -> dict[str, Any]:
+    full_argv = (
+        "python",
+        str(FAKE_TRUSTED_GATEWAY_RUNNER),
+        "gateway.py",
+        *gateway_argv,
+    )
+    result: dict[str, Any] = {
+        "contract": "waapi-skill.gateway-next-command/v1",
+        "command": command,
+        "gateway_argv": list(gateway_argv),
+        "full_argv": list(full_argv),
+        "copy_exactly": True,
+    }
+    if requires_explicit_user_confirmation:
+        result["requires_explicit_user_confirmation"] = True
+    if os.name == "nt":
+        result["shell_family"] = "windows-cmd"
+        result["shell_command"] = subprocess.list2cmdline(full_argv)
+    else:
+        result["shell_family"] = "posix-sh"
+        result["shell_command"] = shlex.join(full_argv)
+    return result
 
 
 class FakeTrustedWwise:
@@ -63,9 +104,20 @@ class FakeTrustedWwise:
             tx = f"tx-{self._next_tx}"
             self._next_tx += 1
             artifact_hash = f"{self._next_tx:064x}"[-64:]
+            event_sequence = 2
+            last_event_hash = "b" * 64
             self.transactions[tx] = {
                 "request": copy.deepcopy(request),
                 "artifact_hash": artifact_hash,
+                "confirmation_token": confirmation_token_for(
+                    transaction_id=tx,
+                    artifact_hash=artifact_hash,
+                    state="awaiting_confirmation",
+                    event_sequence=event_sequence,
+                    last_event_hash=last_event_hash,
+                ),
+                "event_sequence": event_sequence,
+                "last_event_hash": last_event_hash,
                 "state": "awaiting_confirmation",
             }
             return {
@@ -80,7 +132,43 @@ class FakeTrustedWwise:
             }
         transaction_id = command_args[0]
         transaction = self.transactions[transaction_id]
+        if command == "transaction-show":
+            assert command_args == (transaction_id, "--summary-only")
+            confirmation_token = transaction["confirmation_token"]
+            return {
+                **common,
+                "state": transaction["state"],
+                "transaction_id": transaction_id,
+                "artifact_hash": transaction["artifact_hash"],
+                "confirmation": {
+                    "contract": "waapi-skill.confirmation-binding/v1",
+                    "token": confirmation_token,
+                    "binding": {
+                        "material_contract": "waapi-skill.confirmation-token-material/v1",
+                        "transaction_id": transaction_id,
+                        "artifact_hash": transaction["artifact_hash"],
+                        "state": "awaiting_confirmation",
+                        "event_sequence": transaction["event_sequence"],
+                        "last_event_hash": transaction["last_event_hash"],
+                    },
+                },
+                "next_command": _fake_trusted_next_command(
+                    "confirm",
+                    (
+                        "confirm",
+                        transaction_id,
+                        "--confirmation-token",
+                        confirmation_token,
+                    ),
+                    requires_explicit_user_confirmation=True,
+                ),
+            }
         if command == "confirm":
+            assert command_args == (
+                transaction_id,
+                "--confirmation-token",
+                transaction["confirmation_token"],
+            )
             transaction["state"] = "confirmed"
             return {
                 **common,
@@ -290,6 +378,54 @@ def fake_runtime(tmp_path: Path) -> tuple[FakeTrustedWwise, dict[str, Any]]:
         "fixture_token": "fixed-token",
     }
     return fake, kwargs
+
+
+def test_fake_trusted_wwise_show_returns_exact_token_continuation() -> None:
+    fake = FakeTrustedWwise()
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.setNotes",
+        "arguments": {"target": {"id": "{fixture}"}, "value": "notes"},
+    }
+    preview = fake.gateway(
+        (
+            "preview",
+            "--request-json",
+            json.dumps(request, ensure_ascii=False, separators=(",", ":")),
+        ),
+        {},
+    )
+    transaction_id = str(preview["transaction_id"])
+    transaction = fake.transactions[transaction_id]
+
+    shown = fake.gateway(
+        ("transaction-show", transaction_id, "--summary-only"),
+        {},
+    )
+
+    assert shown["confirmation"] == {
+        "contract": "waapi-skill.confirmation-binding/v1",
+        "token": transaction["confirmation_token"],
+        "binding": {
+            "material_contract": "waapi-skill.confirmation-token-material/v1",
+            "transaction_id": transaction_id,
+            "artifact_hash": transaction["artifact_hash"],
+            "state": "awaiting_confirmation",
+            "event_sequence": transaction["event_sequence"],
+            "last_event_hash": transaction["last_event_hash"],
+        },
+    }
+    assert shown["next_command"] == _fake_trusted_next_command(
+        "confirm",
+        (
+            "confirm",
+            transaction_id,
+            "--confirmation-token",
+            transaction["confirmation_token"],
+        ),
+        requires_explicit_user_confirmation=True,
+    )
 
 
 def test_packaged_gateway_binding_derives_exact_runner_and_cwd(

@@ -11,7 +11,10 @@ from tests.semantic.support.codex_eval_protocol import (
     build_expected_gateway_steps,
 )
 from tests.semantic.support.codex_eval_suite import EvalSession, load_eval_suite
-from tests.semantic.support.codex_gateway_broker import SemanticJsonArgument
+from tests.semantic.support.codex_gateway_broker import (
+    ResponseBinding,
+    SemanticJsonArgument,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -368,7 +371,9 @@ def test_boundaries_report_only_the_packaged_operation_schema(case_id: str) -> N
 
 
 @pytest.mark.parametrize("case_id", ["M1", "M3", "M4", "M5", "M6", "M7", "I1", "S1", "W1", "W2"])
-def test_confirm_uses_only_runner_supplied_preview_artifacts_as_exact_literals(case_id: str) -> None:
+def test_confirm_uses_runner_transaction_then_strict_response_binding_chain(
+    case_id: str,
+) -> None:
     session = next(
         item for item in screening_sessions() if item.case.id == case_id and item.phase == "confirm"
     )
@@ -380,12 +385,16 @@ def test_confirm_uses_only_runner_supplied_preview_artifacts_as_exact_literals(c
 
     assert show.arguments == (CONFIRM_RUNTIME["transaction_id"], "--summary-only")
     assert confirm.arguments == (
-        CONFIRM_RUNTIME["transaction_id"],
-        "--artifact-hash",
-        CONFIRM_RUNTIME["preview_hash"],
+        ResponseBinding("transaction-show", "/transaction_id"),
+        "--confirmation-token",
+        ResponseBinding("transaction-show", "/confirmation/token"),
     )
-    assert execute.arguments == (CONFIRM_RUNTIME["transaction_id"],)
-    assert verify.arguments == (CONFIRM_RUNTIME["transaction_id"],)
+    assert execute.arguments == (
+        ResponseBinding("confirm", "/transaction_id"),
+    )
+    assert verify.arguments == (
+        ResponseBinding("execute", "/transaction_id"),
+    )
 
 
 def test_matching_explicit_version_and_confirm_runtime_values_are_closed() -> None:

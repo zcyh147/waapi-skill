@@ -17,6 +17,7 @@ import hmac
 import json
 import os
 import re
+import secrets
 import shutil
 import uuid
 from contextlib import contextmanager
@@ -36,7 +37,26 @@ except ImportError:  # pragma: no cover - exercised on Windows, not POSIX CI.
 
 STATE_DIRECTORY_ENV = "WAAPI_SKILL_STATE_DIR"
 TRANSACTION_SCHEMA_VERSION = 1
+CONFIRMATION_TOKEN_MATERIAL_CONTRACT = (
+    "waapi-skill.confirmation-token-material/v1"
+)
 _TRANSACTION_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+_COMPACT_TRANSACTION_ID_PREFIX = "tx1-"
+_CROCKFORD_BASE32_ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz"
+_COMPACT_TRANSACTION_ID_RANDOM_BITS = 100
+_COMPACT_TRANSACTION_ID_LENGTH = 20
+_COMPACT_TRANSACTION_ID_PATTERN = re.compile(
+    rf"^{re.escape(_COMPACT_TRANSACTION_ID_PREFIX)}"
+    rf"[{_CROCKFORD_BASE32_ALPHABET}]{{{_COMPACT_TRANSACTION_ID_LENGTH}}}$"
+)
+_CONFIRMATION_TOKEN_PREFIX = "ct1-"
+_CONFIRMATION_TOKEN_BITS = 120
+_CONFIRMATION_TOKEN_LENGTH = 24
+_CONFIRMATION_TOKEN_PATTERN = re.compile(
+    rf"^{re.escape(_CONFIRMATION_TOKEN_PREFIX)}"
+    rf"[{_CROCKFORD_BASE32_ALPHABET}]{{{_CONFIRMATION_TOKEN_LENGTH}}}$"
+)
+_SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 class TransactionError(RuntimeError):
@@ -69,6 +89,10 @@ class StateConflict(TransactionError):
 
 class ArtifactIntegrityError(TransactionError):
     """A preview, state record, or event no longer matches its stored hash."""
+
+
+class ConfirmationTokenMismatch(TransactionError, ValueError):
+    """A confirmation token is malformed or does not bind current durable state."""
 
 
 class StateCorruptionError(TransactionError):
@@ -174,6 +198,16 @@ class TransactionRecord:
         }
 
 
+@dataclass(slots=True, frozen=True)
+class TransactionSnapshot:
+    """One atomic integrity-checked view of preview, state, and journal."""
+
+    preview: PreviewArtifact
+    record: TransactionRecord
+    events: tuple[Mapping[str, Any], ...]
+    confirmation_token: str | None
+
+
 def resolve_state_directory(state_dir: Path | None = None) -> Path:
     """Resolve an explicit :class:`Path` or ``WAAPI_SKILL_STATE_DIR``.
 
@@ -195,15 +229,132 @@ def resolve_state_directory(state_dir: Path | None = None) -> Path:
     return candidate.expanduser().resolve()
 
 
-def validate_transaction_id(transaction_id: str) -> str:
-    """Return a safe transaction id or raise :class:`UnsafeTransactionId`."""
+def _encode_crockford(value: int, *, length: int) -> str:
+    """Encode one non-negative integer into fixed-width lowercase Crockford."""
 
-    if not isinstance(transaction_id, str) or not _TRANSACTION_ID_PATTERN.fullmatch(transaction_id):
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError("Crockford value must be a non-negative integer")
+    if isinstance(length, bool) or not isinstance(length, int) or length < 1:
+        raise ValueError("Crockford length must be a positive integer")
+    if value >= 1 << (length * 5):
+        raise ValueError("Crockford value does not fit the requested length")
+    encoded = ["0"] * length
+    for index in range(length - 1, -1, -1):
+        encoded[index] = _CROCKFORD_BASE32_ALPHABET[value & 0x1F]
+        value >>= 5
+    return "".join(encoded)
+
+
+def new_transaction_id() -> str:
+    """Return a compact transaction id containing 100 random bits."""
+
+    value = secrets.randbits(_COMPACT_TRANSACTION_ID_RANDOM_BITS)
+    return (
+        f"{_COMPACT_TRANSACTION_ID_PREFIX}"
+        f"{_encode_crockford(value, length=_COMPACT_TRANSACTION_ID_LENGTH)}"
+    )
+
+
+def validate_transaction_id(transaction_id: str) -> str:
+    """Return a safe compact or legacy transaction id."""
+
+    if not isinstance(transaction_id, str):
+        raise UnsafeTransactionId("transaction_id must be a string")
+    if transaction_id.startswith(_COMPACT_TRANSACTION_ID_PREFIX):
+        if not _COMPACT_TRANSACTION_ID_PATTERN.fullmatch(transaction_id):
+            raise UnsafeTransactionId(
+                "tx1 transaction_id must contain exactly 20 lowercase Crockford "
+                "Base32 characters after 'tx1-'"
+            )
+        return transaction_id
+    if not _TRANSACTION_ID_PATTERN.fullmatch(transaction_id):
         raise UnsafeTransactionId(
             "transaction_id must be 1-128 characters, start with an ASCII "
             "letter or digit, and contain only ASCII letters, digits, '.', '_' or '-'"
         )
     return transaction_id
+
+
+def validate_confirmation_token(confirmation_token: str) -> str:
+    """Return one strictly versioned 120-bit confirmation token."""
+
+    if not isinstance(confirmation_token, str):
+        raise ConfirmationTokenMismatch("confirmation_token must be a string")
+    if not _CONFIRMATION_TOKEN_PATTERN.fullmatch(confirmation_token):
+        raise ConfirmationTokenMismatch(
+            "ct1 confirmation_token must contain exactly 24 lowercase Crockford "
+            "Base32 characters after 'ct1-'"
+        )
+    return confirmation_token
+
+
+def confirmation_token_for(
+    *,
+    transaction_id: str,
+    artifact_hash: str,
+    state: TransactionState | str,
+    event_sequence: int,
+    last_event_hash: str,
+) -> str:
+    """Derive the public short handle for one exact confirmation-state head."""
+
+    transaction_id = validate_transaction_id(transaction_id)
+    normalized_state = _coerce_state(state, field="state")
+    if normalized_state is not TransactionState.AWAITING_CONFIRMATION:
+        raise StateConflict(
+            "A confirmation token exists only while a transaction is awaiting confirmation."
+        )
+    if not isinstance(artifact_hash, str) or not _SHA256_PATTERN.fullmatch(
+        artifact_hash
+    ):
+        raise ValueError("artifact_hash must be exactly 64 lowercase hexadecimal characters")
+    if (
+        isinstance(event_sequence, bool)
+        or not isinstance(event_sequence, int)
+        or event_sequence < 1
+    ):
+        raise ValueError("event_sequence must be a positive integer")
+    if not isinstance(last_event_hash, str) or not _SHA256_PATTERN.fullmatch(
+        last_event_hash
+    ):
+        raise ValueError(
+            "last_event_hash must be exactly 64 lowercase hexadecimal characters"
+        )
+    material = {
+        "contract": CONFIRMATION_TOKEN_MATERIAL_CONTRACT,
+        "transaction_id": transaction_id,
+        "artifact_hash": artifact_hash,
+        "state": normalized_state.value,
+        "event_sequence": event_sequence,
+        "last_event_hash": last_event_hash,
+    }
+    digest_prefix = canonical_sha256(material)[: _CONFIRMATION_TOKEN_BITS // 4]
+    encoded = _encode_crockford(
+        int(digest_prefix, 16),
+        length=_CONFIRMATION_TOKEN_LENGTH,
+    )
+    return f"{_CONFIRMATION_TOKEN_PREFIX}{encoded}"
+
+
+def _confirmation_token_for_record(
+    record: TransactionRecord,
+    preview: PreviewArtifact,
+) -> str:
+    if record.transaction_id != preview.transaction_id:
+        raise ArtifactIntegrityError(
+            "Transaction state and immutable preview identify different transactions."
+        )
+    if not hmac.compare_digest(record.artifact_hash, preview.artifact_hash):
+        raise ArtifactIntegrityError(
+            "Transaction state artifact hash does not match the immutable preview."
+        )
+    return confirmation_token_for(
+        transaction_id=record.transaction_id,
+        artifact_hash=preview.artifact_hash,
+        state=record.state,
+        event_sequence=record.event_sequence,
+        last_event_hash=record.last_event_hash,
+    )
 
 
 class TransactionStore:
@@ -285,6 +436,32 @@ class TransactionStore:
             events = self._read_events_unlocked(transaction_id, preview.artifact_hash)
             return tuple(events)
 
+    def load_snapshot(self, transaction_id: str) -> TransactionSnapshot:
+        """Load one atomic integrity-checked view and its state-scoped token."""
+
+        transaction_id = validate_transaction_id(transaction_id)
+        with self._transaction_lock(transaction_id):
+            preview = self._load_preview_unlocked(transaction_id)
+            record = self._load_record_unlocked(
+                transaction_id,
+                preview,
+                repair=True,
+            )
+            events = tuple(
+                self._read_events_unlocked(transaction_id, preview.artifact_hash)
+            )
+            confirmation_token = (
+                _confirmation_token_for_record(record, preview)
+                if record.state is TransactionState.AWAITING_CONFIRMATION
+                else None
+            )
+            return TransactionSnapshot(
+                preview=preview,
+                record=record,
+                events=events,
+                confirmation_token=confirmation_token,
+            )
+
     def verify_artifact(self, transaction_id: str) -> str:
         """Recompute and return the preview artifact hash.
 
@@ -300,6 +477,7 @@ class TransactionStore:
         *,
         expected_state: TransactionState | str | None = None,
         expected_artifact_hash: str | None = None,
+        expected_confirmation_token: str | None = None,
         event_type: str = "state_transition",
         details: Mapping[str, Any] | None = None,
     ) -> TransactionRecord:
@@ -313,6 +491,17 @@ class TransactionStore:
         normalized_details = json.loads(canonical_json_bytes(dict(details or {})).decode("utf-8"))
         if expected_artifact_hash is not None and not isinstance(expected_artifact_hash, str):
             raise TypeError("expected_artifact_hash must be a string or None")
+        if (
+            expected_artifact_hash is not None
+            and expected_confirmation_token is not None
+        ):
+            raise ValueError(
+                "expected_artifact_hash and expected_confirmation_token are mutually exclusive"
+            )
+        if expected_confirmation_token is not None:
+            expected_confirmation_token = validate_confirmation_token(
+                expected_confirmation_token
+            )
 
         with self._transaction_lock(transaction_id):
             preview = self._load_preview_unlocked(transaction_id)
@@ -328,6 +517,19 @@ class TransactionStore:
                 raise ArtifactIntegrityError(
                     "The supplied artifact hash does not match the immutable preview; re-preview is required."
                 )
+            if expected_confirmation_token is not None:
+                current_confirmation_token = _confirmation_token_for_record(
+                    record,
+                    preview,
+                )
+                if not hmac.compare_digest(
+                    current_confirmation_token,
+                    expected_confirmation_token,
+                ):
+                    raise ConfirmationTokenMismatch(
+                        "The supplied confirmation token does not match the current "
+                        "immutable preview and transaction state."
+                    )
             if target not in ALLOWED_TRANSITIONS[record.state]:
                 allowed = sorted(state.value for state in ALLOWED_TRANSITIONS[record.state])
                 suffix = f" Allowed: {', '.join(allowed)}." if allowed else " This state is terminal."
@@ -372,16 +574,31 @@ class TransactionStore:
             event_type="confirmation_requested",
         )
 
-    def confirm(self, transaction_id: str, *, artifact_hash: str) -> TransactionRecord:
-        """Confirm exactly the preview identified by *artifact_hash*."""
+    def confirm(
+        self,
+        transaction_id: str,
+        *,
+        confirmation_token: str | None = None,
+        artifact_hash: str | None = None,
+    ) -> TransactionRecord:
+        """Confirm by one state-scoped token or the legacy full artifact hash."""
 
-        if not isinstance(artifact_hash, str) or not artifact_hash:
+        if (confirmation_token is None) == (artifact_hash is None):
+            raise ValueError(
+                "exactly one of confirmation_token or artifact_hash is required"
+            )
+        if confirmation_token is not None:
+            confirmation_token = validate_confirmation_token(confirmation_token)
+        if artifact_hash is not None and (
+            not isinstance(artifact_hash, str) or not artifact_hash
+        ):
             raise ValueError("artifact_hash must be a non-empty string")
         return self.transition(
             transaction_id,
             TransactionState.CONFIRMED,
             expected_state=TransactionState.AWAITING_CONFIRMATION,
             expected_artifact_hash=artifact_hash,
+            expected_confirmation_token=confirmation_token,
             event_type="confirmed",
         )
 

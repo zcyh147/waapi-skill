@@ -138,6 +138,9 @@ def _payloads(session: EvalSession) -> tuple[dict[str, object], ...]:
                     "artifact_hash": artifact_hash,
                     "state": "awaiting_confirmation",
                     "preview_summary": {"request": request},
+                    "confirmation": {
+                        "token": "ct1-0123456789abcdefghjkmnpq",
+                    },
                 },
                 {
                     "contract": "waapi-skill.gateway-result/v1",

@@ -6,7 +6,7 @@
   "generated_at": "2026-05-02T00:00:00Z",
   "notes": {
     "import": {
-      "ambiguity_constraints": "Per-import properties take precedence over fallback parameters. Base64 audio inputs need a vertical bar separator between the target relative file path and the encoded WAV payload. Import logs must be parsed because import can report failures through log entries.",
+      "ambiguity_constraints": "Per-import properties take precedence over fallback parameters. Base64 audio inputs need a vertical bar separator between the target relative file path and the encoded WAV payload.",
       "cited_required_fields": [
         "ak.wwise.core.audio.import: imports array",
         "ak.wwise.core.audio.import: objectPath and audioFile or audioFileBase64 for media import items",
@@ -37,7 +37,6 @@
         "notes",
         "switchAssignation",
         "autoAddToSourceControl",
-        "autoCheckOutToSourceControl",
         "audioFileBase64",
         "options.return",
         "per-import objectType and @PropertyName values"
@@ -48,7 +47,7 @@
         "ak.wwise.core.audio.importTabDelimited: importLanguage, importOperation, importFile",
         "ak.wwise.core.audio.imported: topic payload only"
       ],
-      "return_shape": "Import returns log, files, and objects arrays. importTabDelimited returns an objects array. imported publishes topic payloads.",
+      "return_shape": "Import and importTabDelimited return an optional objects array. imported publishes the required objects array for the completed import operation.",
       "source_urls": [
         "references/semantic/2021.1/semantic-builder-import.md"
       ],
@@ -60,43 +59,31 @@
       "ambiguity_constraints": "Name collisions must be resolved explicitly with onNameConflict. String identifiers need enough scope to avoid matching the wrong object.",
       "cited_required_fields": [
         "ak.wwise.core.object.create: parent, type, name",
-        "ak.wwise.core.object.set: objects array",
         "ak.wwise.core.object.delete: object",
         "ak.wwise.core.object.copy: object, parent",
         "ak.wwise.core.object.move: object, parent",
-        "ak.wwise.core.object.diff: source, target",
-        "ak.wwise.core.object.pasteProperties: source, targets array",
         "ak.wwise.core.undo.beginGroup: no required fields",
-        "ak.wwise.core.undo.endGroup: displayName",
-        "ak.wwise.core.undo.undo: no required fields"
+        "ak.wwise.core.undo.endGroup: displayName"
       ],
-      "destructive_behavior": "Mutating. delete removes objects permanently, onNameConflict=replace can delete existing destination objects before creation, and list replacement or paste replacement can clear existing list items.",
+      "destructive_behavior": "Mutating. delete removes objects permanently, and onNameConflict=replace can delete existing destination objects before creation.",
       "endpoints": [
         "ak.wwise.core.object.create",
-        "ak.wwise.core.object.set",
         "ak.wwise.core.object.delete",
         "ak.wwise.core.object.copy",
         "ak.wwise.core.object.move",
-        "ak.wwise.core.object.diff",
-        "ak.wwise.core.object.pasteProperties",
         "ak.wwise.core.undo.beginGroup",
-        "ak.wwise.core.undo.endGroup",
-        "ak.wwise.core.undo.undo"
+        "ak.wwise.core.undo.endGroup"
       ],
       "family": "object-mutation",
       "official_urls": [
         "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=waapi.html",
         "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=waapi_functions_index.html",
         "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_object_create.html",
-        "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_object_set.html",
         "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_object_delete.html",
         "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_object_copy.html",
         "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_object_move.html",
-        "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_object_diff.html",
-        "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_object_pasteproperties.html",
         "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_undo_begingroup.html",
-        "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_undo_endgroup.html",
-        "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_undo_undo.html"
+        "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_undo_endgroup.html"
       ],
       "optional_fields": [
         "onNameConflict",
@@ -104,25 +91,17 @@
         "autoAddToSourceControl",
         "notes",
         "children",
-        "listMode",
-        "pasteMode",
-        "inclusion",
-        "exclusion",
         "options.return"
       ],
       "required_fields": [
         "ak.wwise.core.object.create: parent, type, name",
-        "ak.wwise.core.object.set: objects array",
         "ak.wwise.core.object.delete: object",
         "ak.wwise.core.object.copy: object, parent",
         "ak.wwise.core.object.move: object, parent",
-        "ak.wwise.core.object.diff: source, target",
-        "ak.wwise.core.object.pasteProperties: source, targets array",
         "ak.wwise.core.undo.beginGroup: no required fields",
-        "ak.wwise.core.undo.endGroup: displayName",
-        "ak.wwise.core.undo.undo: no required fields"
+        "ak.wwise.core.undo.endGroup: displayName"
       ],
-      "return_shape": "Create, set, copy, and move return object data; delete, pasteProperties, and undo return empty JSON objects.",
+      "return_shape": "Create, copy, and move return object data; delete and undo group calls return empty JSON objects.",
       "source_urls": [
         "references/semantic/2021.1/semantic-builder-object-mutation.md"
       ],
@@ -239,8 +218,6 @@
         "ak.wwise.core.soundbank.getInclusions: soundbank",
         "ak.wwise.core.soundbank.setInclusions: soundbank, operation, inclusions",
         "ak.wwise.core.soundbank.generate: no required fields when generating all, otherwise identify supplied soundbanks",
-        "ak.wwise.core.soundbank.convertExternalSources: sources array with source input path and platform",
-        "ak.wwise.core.soundbank.processDefinitionFiles: files array",
         "ak.wwise.core.soundbank.generated: topic payload only",
         "ak.wwise.core.soundbank.generationDone: topic payload only"
       ],
@@ -249,8 +226,6 @@
         "ak.wwise.core.soundbank.getInclusions",
         "ak.wwise.core.soundbank.setInclusions",
         "ak.wwise.core.soundbank.generate",
-        "ak.wwise.core.soundbank.convertExternalSources",
-        "ak.wwise.core.soundbank.processDefinitionFiles",
         "ak.wwise.core.soundbank.generated",
         "ak.wwise.core.soundbank.generationDone"
       ],
@@ -262,8 +237,6 @@
         "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_getinclusions.html",
         "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_setinclusions.html",
         "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_generate.html",
-        "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_convertexternalsources.html",
-        "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_processdefinitionfiles.html",
         "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_generated.html",
         "https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_soundbank_generationdone.html"
       ],
@@ -277,19 +250,16 @@
         "clearAudioFileCache",
         "writeToDisk",
         "rebuildInitBank",
-        "sources output path for convertExternalSources",
-        "infoFile, bankData, pluginInfo, and return array for generated topic options"
+        "infoFile, bankData, pluginInfo, and return array for generated topic options; the 2021.1 publish payload spells the returned plug-in document PluginInfo"
       ],
       "required_fields": [
         "ak.wwise.core.soundbank.getInclusions: soundbank",
         "ak.wwise.core.soundbank.setInclusions: soundbank, operation, inclusions",
         "ak.wwise.core.soundbank.generate: no required fields when generating all, otherwise identify supplied soundbanks",
-        "ak.wwise.core.soundbank.convertExternalSources: sources array with source input path and platform",
-        "ak.wwise.core.soundbank.processDefinitionFiles: files array",
         "ak.wwise.core.soundbank.generated: topic payload only",
         "ak.wwise.core.soundbank.generationDone: topic payload only"
       ],
-      "return_shape": "getInclusions returns an inclusions array. setInclusions and convertExternalSources return empty JSON objects. processDefinitionFiles reports status through the WAAPI log. generate returns logs and error fields. generated publishes the soundbank object with optional infoFile, bankData, or pluginInfo. generationDone publishes logs.",
+      "return_shape": "getInclusions returns an inclusions array. setInclusions and generate return strict empty JSON objects. generated publishes soundbank, platform, language, and error details with optional bankInfo, bankData, or capitalized PluginInfo. generationDone publishes optional logs and a deprecated error string.",
       "source_urls": [
         "references/semantic/2021.1/semantic-builder-soundbank.md"
       ],

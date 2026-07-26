@@ -51,7 +51,20 @@ for Wwise Authoring. Read this file before changing the Skill or running tests.
 - `skills/waapi-skill/references/waapi-*.md`
   - the only lane references loaded by the current agent-facing Skill.
 - `skills/waapi-skill/evals/evals-v2.json`
-  - canonical fresh-Codex semantic suite.
+  - frozen historical fresh-Codex semantic suite and the 40/98/168 profiles.
+- `skills/waapi-skill/evals/suite-v3.json`, `online_tests.json`,
+  `offline_tests.json`, `adapter_registry.json`, and
+  `request_mapping_registry.json`
+  - review-oriented definitions for the five-version unique executable URI
+    union (not all version/API rows). Online means a real sandboxed Wwise
+    connection; offline cases receive no functional coverage credit. The
+    approved `heavy_cross_version_80` subset has implemented adapters and a
+    completed sealed real campaign recorded in `tests/TEST_INVENTORY.md`; the
+    rest of V3 remains review material rather than executable evidence.
+    Adapter names outside the implemented subset are specifications, not
+    implementations. A v3 scenario listed under any unresolved request-mapping
+    requirement is blocked from execution; never guess an enum number,
+    unresolved token, structured request shape, or missing route.
 - `tests/`
   - program, non-live, live, destructive, and agent-semantic validation.
 

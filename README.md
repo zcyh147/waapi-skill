@@ -71,7 +71,7 @@ The skill supports:
 
 - read-only first paths for ordinary inspection
 - preview-then-confirm mutation flow
-- preview artifact hash confirmation for closed transactions
+- gateway-issued confirmation tokens bound to immutable transaction previews
 - bounded destructive opt-in
 - post-action verification and readback
 
@@ -104,7 +104,9 @@ Coverage is counted by **Wwise version/API row** because the same URI can have a
 
 Those 769 rows represent **188 unique executable WAAPI URIs**. They are routed through fixed commands, bounded direct calls, bounded topic waits, confirmed transactions, isolated I/O transactions, or the same-connection Undo Group composite. The 45 excluded version rows represent 12 unique URIs limited to arbitrary Lua execution, unsafe/private debug surfaces, and unrestricted UI command registration/execution.
 
-The focused code-only gate currently runs **957 program tests**, including one executable-route case for every covered version/API row plus the gateway-owned conversation-context contract. This proves packaged routing, schema handling, safety boundaries, I/O confinement, transaction behavior, fake-dispatch execution, and deterministic onboarding facts; it is not a claim that all 769 rows have been exercised against a real Wwise process. See [the detailed five-version coverage contract](./skills/waapi-skill/references/waapi-coverage.md).
+The named operation layer also provides closed, version-aware business contracts for `ak.wwise.core.object.create`, `ak.wwise.core.object.set`, `ak.wwise.core.audio.import`, `ak.wwise.core.audio.importTabDelimited`, `ak.wwise.core.soundbank.generate`, `ak.wwise.core.soundbank.convertExternalSources`, and `ak.wwise.core.soundbank.processDefinitionFiles`. `object.create`, both import routes, and `soundbank.generate` are reflected and packaged for all five versions; `object.set`, External Sources conversion, and Definition-file processing are packaged for `2022.1`–`2025.1` because those URIs are not reflected in the `2021.1` inventory. For `soundbank.generate`, Wwise `2021.1` derives its project and output context from the live Project object's `filePath` and `workunitIsDirty` accessors plus a contained, hashed, strictly parsed `.wproj`; no caller-authored project layout is accepted. Later versions bind the reflected `core.getProjectInfo` result. These routes bind an immutable preview to the later confirmation and verify the resulting object topology, imported source evidence, inclusions, or generated artifacts instead of trusting only a successful WAAPI response. Once a URI has an implemented dedicated operation, the generic `waapi.call` fallback is rejected with `DEDICATED_OPERATION_REQUIRED` so raw payloads cannot bypass that contract.
+
+The focused code-only gate currently runs **1457 program tests**, including one executable-route case for every covered version/API row, the gateway-owned conversation-context contract, and the named-operation contract/verifier matrices above. This proves packaged routing, schema handling, safety boundaries, I/O confinement, transaction behavior, fake-dispatch execution, and deterministic onboarding facts; it is not a claim that all 769 rows have been exercised against a real Wwise process. The completed memory-off `h80-release-c38` campaign separately passed all 80 approved real-Wwise heavy-API scenarios (70 on 2022.1, five on 2024.1, and five on 2025.1); that evidence applies to those scenarios and their sealed candidate, not the whole interface. See [the detailed five-version coverage contract](./skills/waapi-skill/references/waapi-coverage.md).
 
 ---
 
@@ -165,7 +167,7 @@ When config and connection details are already known, ordinary inspection reques
 
 ### Bounded topic handling
 
-Topic waits are supported with explicit bounded behavior instead of loose long-lived listener assumptions. The command timeout is an end-to-end budget, so the event wait reserves a small part of it for unsubscribe, evidence publication, and transport close. A successful `wait-topic` result exposes the validated WAAPI publish payload directly under `event`, while the dispatcher-only callback envelope remains private. Do not match `object.created` by the requested final name: the notification is emitted before naming completes. For the packaged ActorMixer probe, Wwise 2021.1-2024.1 reports `ActorMixer` at notification time and Wwise 2025.1 reports its underlying `PropertyContainer`; correlate the returned object GUID with a trusted publisher when exact event ownership matters.
+Topic waits are supported with explicit bounded behavior instead of loose long-lived listener assumptions. `wait-topic` defaults to one event and can collect a fixed `--event-count` from 1 through 64; its recursive JSON match is applied to each candidate event. The command timeout is one end-to-end budget for setup and the complete collection, while reserving a small part for unsubscribe, evidence publication, and transport close. The aggregate dispatcher result remains under the topic contract's 256 KiB ceiling. Single-event success exposes the validated publish payload under `event`; multi-event success exposes ordered `events` plus requested/actual counts, and every payload is validated against the versioned publish schema. Collection stops at the requested count, so an independent publisher/oracle is still required to prove that no extra later event occurred. Do not match `object.created` by the requested final name: the notification is emitted before naming completes. For the packaged ActorMixer probe, Wwise 2021.1-2024.1 reports `ActorMixer` at notification time and Wwise 2025.1 reports its underlying `PropertyContainer`; correlate the returned object GUID with a trusted publisher when exact event ownership matters.
 
 ### Explicit unsupported boundaries
 
@@ -228,20 +230,31 @@ python scripts/run.py gateway.py query-object \
 
 ### 4. Use the closed transaction lane for project changes
 
-Inspect the packaged request contract first. `preview` returns the transaction id and artifact hash that must be reused unchanged by the remaining commands:
+Inspect the packaged request contract first. `preview` returns an immutable
+transaction id and full artifact hash for review. After the user confirms that
+preview in a later message, `transaction-show --summary-only` reopens the stored
+transaction and returns its short, state-bound `confirmation.token` plus the
+exact next command. Use that token for the normal confirmation flow:
 
 ```bash
 python scripts/run.py gateway.py operation-schema object.setNotes
 python scripts/run.py gateway.py preview \
   --request-json '{"contract":"waapi-skill.operation-request/v1","operation":"object.setNotes","arguments":{"object":{"kind":"path","value":"\\Events\\Default Work Unit\\Target"},"value":"Reviewed"}}'
-python scripts/run.py gateway.py confirm <transaction-id> --artifact-hash <artifact-hash>
+python scripts/run.py gateway.py transaction-show <transaction-id> --summary-only
+python scripts/run.py gateway.py confirm <transaction-id> --confirmation-token <confirmation-token>
 python scripts/run.py gateway.py execute <transaction-id>
 python scripts/run.py gateway.py verify <transaction-id>
 ```
 
+Run each phase separately and use the complete returned
+`next_command.shell_command` rather than rebuilding it. The alternative
+`confirm <transaction-id> --artifact-hash <full-artifact-hash>` spelling remains
+available only for legacy transactions and programmatic compatibility; new
+agent workflows should use the token returned by `transaction-show`.
+
 The gateway is the public interface. Do not import internal runtime modules, construct a `WaapiClient`, create a one-off helper script, or use inline Python to complete a Wwise task. If the gateway reports no packaged route, return that unsupported boundary instead of synthesizing code.
 
-Manifest reflection is discovery, not permission. The generic `call` route exposes only the two zero-input, strictly validated reflection lists (`ak.wwise.waapi.getFunctions` and `ak.wwise.waapi.getTopics`). Other reads require a dedicated bounded command; fixed commands and topic waits are exposed only for exact URIs in immutable reviewed allowlists. New or unreviewed functions and topics fail closed regardless of names such as `get`, `verify`, or `dump`; `--dry-run` cannot bypass a fixed, transaction, topic, or unsupported route boundary.
+Manifest reflection is discovery, not permission. The generic `call` route exposes only an immutable reviewed set of recursively validated, result-bounded reads; the two zero-input reflection inventories are merely fast paths within that set. Wwise 2025.1 Media Pool queries first discover exact field names through `mediaPool.getFields`, then call `mediaPool.get` with enforced limits of 200 results, 16 filters, 8 databases, and 32 unique return fields. Broader reads require a confirmed transaction, while fixed commands and topic waits remain exact allowlists. New or unreviewed functions and topics fail closed regardless of names such as `get`, `verify`, or `dump`; `--dry-run` cannot bypass a fixed, transaction, topic, or unsupported route boundary.
 
 ---
 

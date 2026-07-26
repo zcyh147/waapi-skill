@@ -1,0 +1,33 @@
+{
+  "contract": "waapi-skill.codex-semantic-online-tests/v3",
+  "online_means": "requires a real sandboxed Wwise WAAPI connection; it does not mean internet access",
+  "definition_scope_versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
+  "execution_profile_version": "2022.1",
+  "inventory_source": "five-version union of packaged CapabilityCatalog executable entries",
+  "required_scenarios_per_api": 2,
+  "prompt_materialization": {
+    "template_field": "prompt",
+    "declared_inputs_field": "visible_inputs",
+    "render_timing": "before the fresh Codex task starts",
+    "evidence": "archive the fully rendered prompt",
+    "required_argument_rule": "every raw required call argument must be literal in the prompt, supplied as a visible input, or obtained by a declared supporting dispatch",
+    "hidden_boundary": "independent oracle GUIDs, hashes, controls, and expected readbacks remain model-invisible"
+  },
+  "case_files": [
+    "online/2022.1/core_object.json",
+    "online/2022.1/runtime.json",
+    "online/2022.1/other.json",
+    "online/version_specific/runtime.json",
+    "online/version_specific/authoring.json",
+    "online/version_specific/other.json"
+  ],
+  "isolation": {
+    "codex_task": "one scenario per fresh CLI process, thread, and memory-isolated task",
+    "mutation_confirmation": "each packaged mutation call receives its own natural confirmation turn in the same fresh task after an immutable preview; the confirmation applies only to the currently visible preview",
+    "wwise_lifecycle": "version-scoped, lane-appropriate isolated host lifecycles; GUI, WwiseConsole, and runtime profiles are never conflated",
+    "scenario_namespace": "unique runner-owned object and file namespace",
+    "source_project": "immutable; hash and mtime attested before and after the campaign",
+    "success_cleanup": "remove scenario-owned state and delete the sandbox after final version verification",
+    "failure_cleanup": "for a failed or indeterminate case, retain the sandbox and sealed evidence, mark it quarantined, and never reuse it for another scenario; never report a skip or blocked prerequisite as a pass"
+  }
+}

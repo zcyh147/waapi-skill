@@ -9,9 +9,11 @@ from typing import Any
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+import wwise_waapi.transactions as transaction_module
 from wwise_waapi.canonical import canonical_json, canonical_json_bytes, canonical_sha256, sha256_hex
 from wwise_waapi.transactions import (
     ArtifactIntegrityError,
+    ConfirmationTokenMismatch,
     FileLockUnavailable,
     InvalidTransition,
     PreviewAlreadyExists,
@@ -22,7 +24,11 @@ from wwise_waapi.transactions import (
     TransactionState,
     TransactionStore,
     UnsafeTransactionId,
+    confirmation_token_for,
+    new_transaction_id,
     resolve_state_directory,
+    validate_confirmation_token,
+    validate_transaction_id,
 )
 
 
@@ -82,6 +88,186 @@ def test_transaction_ids_cannot_escape_state_root(tmp_path, transaction_id) -> N
 
     with pytest.raises(UnsafeTransactionId):
         store.create_preview(transaction_id, {"plan": []})
+
+
+@pytest.mark.parametrize(
+    ("random_value", "encoded"),
+    [
+        (0, "0" * 20),
+        (1, ("0" * 19) + "1"),
+        ((1 << 100) - 1, "z" * 20),
+    ],
+)
+def test_new_transaction_id_uses_exact_100_bit_crockford_encoding(
+    monkeypatch,
+    random_value: int,
+    encoded: str,
+) -> None:
+    requested_bits: list[int] = []
+
+    def fake_randbits(bits: int) -> int:
+        requested_bits.append(bits)
+        return random_value
+
+    monkeypatch.setattr(transaction_module.secrets, "randbits", fake_randbits)
+
+    transaction_id = new_transaction_id()
+
+    assert transaction_id == f"tx1-{encoded}"
+    assert requested_bits == [100]
+    assert validate_transaction_id(transaction_id) == transaction_id
+
+
+@pytest.mark.parametrize(
+    "transaction_id",
+    [
+        "tx1-",
+        f"tx1-{'0' * 19}",
+        f"tx1-{'0' * 21}",
+        "tx1-0123456789ABCDEFGHJK",
+        f"tx1-{'0' * 19}i",
+        f"tx1-{'0' * 19}u",
+        f"tx1-{'0' * 19}-",
+    ],
+)
+def test_malformed_tx1_ids_are_rejected_before_creating_a_lock(
+    tmp_path,
+    transaction_id: str,
+) -> None:
+    store = TransactionStore(tmp_path)
+
+    with pytest.raises(UnsafeTransactionId, match="tx1"):
+        store.load(transaction_id)
+
+    assert list(store.locks_dir.iterdir()) == []
+
+
+def test_legacy_transaction_ids_remain_compatible(tmp_path) -> None:
+    legacy_transaction_id = f"tx-{'a' * 32}"
+    store = TransactionStore(tmp_path)
+
+    record = store.create_preview(legacy_transaction_id, {"legacy": True})
+
+    assert validate_transaction_id(legacy_transaction_id) == legacy_transaction_id
+    assert store.load(legacy_transaction_id) == record
+
+
+def test_confirmation_token_has_stable_120_bit_crockford_contract() -> None:
+    token = confirmation_token_for(
+        transaction_id=f"tx1-{'0' * 20}",
+        artifact_hash="a" * 64,
+        state=TransactionState.AWAITING_CONFIRMATION,
+        event_sequence=2,
+        last_event_hash="b" * 64,
+    )
+
+    assert token == "ct1-wxjn6v2daavzssxm2x59pe24"
+    assert validate_confirmation_token(token) == token
+
+
+@pytest.mark.parametrize(
+    "confirmation_token",
+    [
+        "ct1-",
+        f"ct1-{'0' * 23}",
+        f"ct1-{'0' * 25}",
+        f"ct1-{'0' * 23}i",
+        f"ct1-{'0' * 23}u",
+        f"ct1-{'0' * 23}-",
+        f"ct1-{'A' * 24}",
+        f"ct2-{'0' * 24}",
+    ],
+)
+def test_malformed_confirmation_tokens_are_rejected_before_locking(
+    tmp_path: Path,
+    confirmation_token: str,
+) -> None:
+    store = TransactionStore(tmp_path)
+
+    with pytest.raises(ConfirmationTokenMismatch, match="ct1"):
+        store.confirm("tx-never-created", confirmation_token=confirmation_token)
+
+    assert list(store.locks_dir.iterdir()) == []
+
+
+def test_confirmation_token_binds_every_durable_material_field() -> None:
+    base = {
+        "transaction_id": f"tx1-{'0' * 20}",
+        "artifact_hash": "a" * 64,
+        "state": TransactionState.AWAITING_CONFIRMATION,
+        "event_sequence": 2,
+        "last_event_hash": "b" * 64,
+    }
+    original = confirmation_token_for(**base)
+    variants = (
+        {**base, "transaction_id": f"tx1-{'1' * 20}"},
+        {**base, "artifact_hash": "c" * 64},
+        {**base, "event_sequence": 3},
+        {**base, "last_event_hash": "d" * 64},
+    )
+
+    assert all(confirmation_token_for(**variant) != original for variant in variants)
+    with pytest.raises(StateConflict, match="awaiting confirmation"):
+        confirmation_token_for(
+            **{**base, "state": TransactionState.CONFIRMED}
+        )
+
+
+def test_atomic_snapshot_token_confirms_once_and_replay_fails_closed(
+    tmp_path: Path,
+) -> None:
+    store = TransactionStore(tmp_path)
+    transaction_id = "tx-token-once"
+    created = store.create_preview(transaction_id, {"operation": "rename"})
+    awaiting = store.submit_for_confirmation(transaction_id)
+
+    snapshot = store.load_snapshot(transaction_id)
+
+    assert snapshot.preview.artifact_hash == created.artifact_hash
+    assert snapshot.record == awaiting
+    assert snapshot.events[-1]["event_hash"] == awaiting.last_event_hash
+    assert snapshot.confirmation_token is not None
+    assert validate_confirmation_token(snapshot.confirmation_token) == (
+        snapshot.confirmation_token
+    )
+    confirmed = store.confirm(
+        transaction_id,
+        confirmation_token=snapshot.confirmation_token,
+    )
+    assert confirmed.state is TransactionState.CONFIRMED
+    with pytest.raises(StateConflict, match="caller expected"):
+        store.confirm(
+            transaction_id,
+            confirmation_token=snapshot.confirmation_token,
+        )
+    assert len(store.read_events(transaction_id)) == 3
+
+
+def test_confirmation_token_mismatch_and_cross_transaction_use_do_not_mutate(
+    tmp_path: Path,
+) -> None:
+    store = TransactionStore(tmp_path)
+    transaction_ids = ("tx-token-a", "tx-token-b")
+    for transaction_id in transaction_ids:
+        store.create_preview(transaction_id, {"transaction": transaction_id})
+        store.submit_for_confirmation(transaction_id)
+    token_a = store.load_snapshot(transaction_ids[0]).confirmation_token
+    token_b = store.load_snapshot(transaction_ids[1]).confirmation_token
+    assert token_a is not None and token_b is not None and token_a != token_b
+    wrong_character = "0" if token_a[-1] != "0" else "1"
+    mistyped_token = f"{token_a[:-1]}{wrong_character}"
+
+    for transaction_id, token in (
+        (transaction_ids[0], mistyped_token),
+        (transaction_ids[0], token_b),
+    ):
+        with pytest.raises(ConfirmationTokenMismatch, match="does not match"):
+            store.confirm(transaction_id, confirmation_token=token)
+        assert (
+            store.load(transaction_id).state
+            is TransactionState.AWAITING_CONFIRMATION
+        )
+        assert len(store.read_events(transaction_id)) == 2
 
 
 def test_preview_is_atomic_write_once_and_events_are_canonical_jsonl(tmp_path) -> None:
@@ -266,6 +452,14 @@ def test_transition_input_validation_is_explicit(tmp_path) -> None:
     store.submit_for_confirmation("tx-inputs")
     with pytest.raises(ValueError, match="artifact_hash"):
         store.confirm("tx-inputs", artifact_hash="")
+    with pytest.raises(ValueError, match="exactly one"):
+        store.confirm("tx-inputs")
+    with pytest.raises(ValueError, match="exactly one"):
+        store.confirm(
+            "tx-inputs",
+            artifact_hash="a" * 64,
+            confirmation_token=f"ct1-{'0' * 24}",
+        )
 
 
 def test_preview_artifact_tampering_is_detected_before_transition(tmp_path) -> None:

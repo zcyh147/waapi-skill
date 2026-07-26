@@ -12,41 +12,29 @@
 - https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=waapi.html
 - https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=waapi_functions_index.html
 - https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_object_create.html
-- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_object_set.html
 - https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_object_delete.html
 - https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_object_copy.html
 - https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_object_move.html
-- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_object_diff.html
-- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_object_pasteproperties.html
 - https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_undo_begingroup.html
 - https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_undo_endgroup.html
-- https://www.audiokinetic.com/en/public-library/2021.1.14_8108/?id=ak_wwise_core_undo_undo.html
 
 ## Endpoint inventory
 
 - `ak.wwise.core.object.create`
-- `ak.wwise.core.object.set`
 - `ak.wwise.core.object.delete`
 - `ak.wwise.core.object.copy`
 - `ak.wwise.core.object.move`
-- `ak.wwise.core.object.diff`
-- `ak.wwise.core.object.pasteProperties`
 - `ak.wwise.core.undo.beginGroup`
 - `ak.wwise.core.undo.endGroup`
-- `ak.wwise.core.undo.undo`
 
 ## Required fields
 
 - `ak.wwise.core.object.create: parent, type, name`
-- `ak.wwise.core.object.set: objects array`
 - `ak.wwise.core.object.delete: object`
 - `ak.wwise.core.object.copy: object, parent`
 - `ak.wwise.core.object.move: object, parent`
-- `ak.wwise.core.object.diff: source, target`
-- `ak.wwise.core.object.pasteProperties: source, targets array`
 - `ak.wwise.core.undo.beginGroup: no required fields`
 - `ak.wwise.core.undo.endGroup: displayName`
-- `ak.wwise.core.undo.undo: no required fields`
 
 ## Optional fields
 
@@ -55,19 +43,15 @@
 - `autoAddToSourceControl`
 - `notes`
 - `children`
-- `listMode`
-- `pasteMode`
-- `inclusion`
-- `exclusion`
 - `options.return`
 
 ## Return shape
 
-Create, set, copy, and move return object data; delete, pasteProperties, and undo return empty JSON objects.
+Create, copy, and move return object data; delete and undo group calls return empty JSON objects.
 
 ## Destructive behavior
 
-Mutating. delete removes objects permanently, onNameConflict=replace can delete existing destination objects before creation, and list replacement or paste replacement can clear existing list items.
+Mutating. delete removes objects permanently, and onNameConflict=replace can delete existing destination objects before creation.
 
 ## Ambiguity constraints
 
@@ -80,15 +64,11 @@ Do not create Query objects or plug-in Source, Effect, or Metadata objects throu
 ## Cited required fields
 
 - `ak.wwise.core.object.create: parent, type, name`
-- `ak.wwise.core.object.set: objects array`
 - `ak.wwise.core.object.delete: object`
 - `ak.wwise.core.object.copy: object, parent`
 - `ak.wwise.core.object.move: object, parent`
-- `ak.wwise.core.object.diff: source, target`
-- `ak.wwise.core.object.pasteProperties: source, targets array`
 - `ak.wwise.core.undo.beginGroup: no required fields`
 - `ak.wwise.core.undo.endGroup: displayName`
-- `ak.wwise.core.undo.undo: no required fields`
 
 ## Evidence caveat
 

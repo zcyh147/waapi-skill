@@ -1,0 +1,933 @@
+"""Scenario-scoped fresh Codex task execution for the V3 heavy suite."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import shutil
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any, Callable, Mapping, Sequence
+
+from tests.semantic.support.codex_business_oracle_plan_v3 import (
+    BUSINESS_ORACLE_PLAN_FILE,
+    BusinessOraclePlanEvidence,
+    BusinessOraclePlanError,
+    business_family_for_api,
+    read_business_oracle_plan_envelope,
+)
+from tests.semantic.support.codex_eval_bundle_v3 import OnlineScenario
+from tests.semantic.support.codex_eval_protocol_v3 import V3GatewayProtocol
+from tests.semantic.support.codex_gateway_broker import (
+    CodexGatewayBroker,
+    GatewayBrokerEvidence,
+    GatewayBrokerReconciliation,
+    TrustedSubscriptionAckObserver,
+    TrustedSubscriptionAckSpec,
+    TrustedStepObserver,
+    TrustedStepPreObserver,
+)
+from tests.semantic.support.codex_harness import (
+    CodexCliTask,
+    CodexGatewayErrorExpectation,
+    CodexHarnessConfig,
+    CodexHarnessError,
+    CodexInfrastructureError,
+    CodexInfrastructureFailure,
+    CodexRunResult,
+    normalized_gateway_command_argv,
+)
+from tests.semantic.support.codex_prompt_provenance_v3 import (
+    PROMPT_MATERIALIZATION_RECEIPT_CONTRACT,
+    PROMPT_MATERIALIZATION_RECEIPT_FILE,
+    PROMPT_PROVENANCE_FILE,
+    prompt_materialization_receipt,
+    read_prompt_provenance,
+)
+
+
+TASK_RESULT_CONTRACT = "waapi-skill.codex-semantic-task-result/v5"
+TASK_INFRASTRUCTURE_FAILURE_CONTRACT = (
+    "waapi-skill.codex-semantic-task-infrastructure-failure/v3"
+)
+TASK_COMMAND_LIFECYCLE_FAILURE_CONTRACT = (
+    "waapi-skill.codex-semantic-command-lifecycle-failure/v1"
+)
+PROMPT_MATERIALIZATION_CONTRACT = PROMPT_MATERIALIZATION_RECEIPT_CONTRACT
+PROMPT_MATERIALIZATION_FILE = PROMPT_MATERIALIZATION_RECEIPT_FILE
+_CODEX_INFRASTRUCTURE_CATEGORIES = frozenset(
+    {
+        "authentication",
+        "quota_or_rate_limit",
+        "service_unavailable",
+        "timeout_before_agent_action",
+        "turn_failed_before_agent_action",
+    }
+)
+
+
+class V3TaskRunnerError(RuntimeError):
+    """The fresh task failed a harness/broker invariant."""
+
+
+class V3CommandLifecycleError(CodexHarnessError):
+    """Codex ended a turn while one or more command items were incomplete."""
+
+
+@dataclass(frozen=True, slots=True)
+class V3TurnGrade:
+    index: int
+    prompt_sha256: str
+    broker_prefix_count: int
+    reconciliation: GatewayBrokerReconciliation
+    common_gates: Mapping[str, bool]
+    errors: tuple[str, ...]
+
+    @property
+    def passed(self) -> bool:
+        return (
+            self.reconciliation.passed
+            and bool(self.common_gates)
+            and all(self.common_gates.values())
+            and not self.errors
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class V3TaskRun:
+    scenario_id: str
+    version: str
+    task_root: Path
+    thread_id: str
+    turns: tuple[CodexRunResult, ...]
+    turn_grades: tuple[V3TurnGrade, ...]
+    broker_evidence: GatewayBrokerEvidence
+
+    @property
+    def passed(self) -> bool:
+        return self.broker_evidence.passed and all(item.passed for item in self.turn_grades)
+
+    @property
+    def terminal_indeterminate(self) -> bool:
+        return (
+            bool(getattr(self.broker_evidence, "terminal_indeterminate", False))
+            and bool(self.turn_grades)
+            and all(item.passed for item in self.turn_grades)
+        )
+
+    @property
+    def final_response(self) -> str:
+        return self.turns[-1].final_response if self.turns else ""
+
+
+TurnObserver = Callable[[int, CodexRunResult, GatewayBrokerEvidence], None]
+
+
+def run_v3_codex_task(
+    *,
+    scenario_id: str,
+    version: str,
+    scenario: OnlineScenario,
+    prompts: Sequence[str],
+    protocol: V3GatewayProtocol,
+    task_root: Path,
+    skill_source: Path,
+    codex_binary: Path,
+    auth_json: Path,
+    model: str,
+    reasoning_effort: str,
+    service_tier: str,
+    timeout_seconds: float,
+    runner_environment: Mapping[str, str],
+    required_reference: str,
+    business_oracle_plan: BusinessOraclePlanEvidence,
+    trusted_subscription_ack: TrustedSubscriptionAckSpec | None = None,
+    trusted_subscription_ack_observer: TrustedSubscriptionAckObserver | None = None,
+    trusted_step_pre_observer: TrustedStepPreObserver | None = None,
+    trusted_step_observer: TrustedStepObserver | None = None,
+    turn_observer: TurnObserver | None = None,
+) -> V3TaskRun:
+    """Run every natural turn in one exact, memory-isolated Codex thread."""
+
+    prompt_values = tuple(str(prompt) for prompt in prompts)
+    if len(prompt_values) != len(protocol.turn_prefix_counts):
+        raise V3TaskRunnerError(
+            "prompt count must equal protocol turn-boundary count: "
+            f"prompts={len(prompt_values)} prefixes={len(protocol.turn_prefix_counts)}"
+        )
+    if not required_reference.startswith("references/waapi-") or not required_reference.endswith(".md"):
+        raise V3TaskRunnerError("required_reference must be one packaged waapi lane reference")
+    root = Path(task_root).expanduser().resolve(strict=False)
+    if (
+        root.name != "codex-task"
+        or root.parent.name != "evidence"
+        or root.parent.parent / "evidence" / PROMPT_PROVENANCE_FILE
+        != root.parent / PROMPT_PROVENANCE_FILE
+    ):
+        raise V3TaskRunnerError(
+            "task root must be the fixed scenario_root/evidence/codex-task path"
+        )
+    if root.exists():
+        raise V3TaskRunnerError(f"fresh task root already exists: {root}")
+    if scenario.id != scenario_id or version not in scenario.versions:
+        raise V3TaskRunnerError("task scenario/version identity is misbound")
+    root.mkdir(parents=True, exist_ok=False)
+    provenance = read_prompt_provenance(
+        root.parent / PROMPT_PROVENANCE_FILE,
+        scenario=scenario,
+        version=version,
+        scenario_root=root.parent.parent,
+        expected_prompts=prompt_values,
+        expected_protocol=protocol,
+        require_paths=True,
+    )
+    plan_payload = business_oracle_plan.payload
+    expected_family = business_family_for_api(str(scenario.api))
+    expected_runner = "cli" if expected_family == "cli" else "project"
+    primary_dispatch = getattr(scenario, "primary_dispatch", None)
+    expected_primary_count = getattr(primary_dispatch, "count", None)
+    if (
+        business_oracle_plan.path != root.parent / BUSINESS_ORACLE_PLAN_FILE
+        or plan_payload.get("scenario_id") != scenario_id
+        or plan_payload.get("version") != version
+        or plan_payload.get("api") != scenario.api
+        or plan_payload.get("runner") != expected_runner
+        or plan_payload.get("family") != expected_family
+        or plan_payload.get("scenario_root") != str(root.parent.parent)
+        or plan_payload.get("protocol_sha256")
+        != provenance.payload["protocol"]["sha256"]
+        or plan_payload.get("provenance_sha256") != provenance.sha256
+        or type(expected_primary_count) is not int
+        or plan_payload.get("primary_dispatch_count") != expected_primary_count
+    ):
+        raise V3TaskRunnerError(
+            "business-oracle plan common identity is not bound to the task"
+        )
+    try:
+        sealed_plan = read_business_oracle_plan_envelope(
+            business_oracle_plan.path,
+            scenario_id=scenario_id,
+            version=version,
+            api=str(scenario.api),
+            runner=expected_runner,
+            family=expected_family,
+            scenario_root=root.parent.parent,
+            fixture_spec=plan_payload["fixture_spec"],
+            protocol_sha256=provenance.payload["protocol"]["sha256"],
+            provenance_sha256=provenance.sha256,
+            primary_dispatch_count=expected_primary_count,
+        )
+    except (BusinessOraclePlanError, KeyError, TypeError) as exc:
+        raise V3TaskRunnerError(
+            f"business-oracle plan cannot be independently re-read: {exc}"
+        ) from exc
+    if (
+        sealed_plan.path != business_oracle_plan.path
+        or sealed_plan.sha256 != business_oracle_plan.sha256
+        or sealed_plan.payload != business_oracle_plan.payload
+    ):
+        raise V3TaskRunnerError(
+            "business-oracle plan evidence changed before task startup"
+        )
+    prompt_materialization_path = _archive_prompt_materialization(
+        root,
+        provenance=provenance,
+        business_oracle_plan=sealed_plan,
+    )
+    workspace = root / "agent-workspace"
+    _prepare_agent_workspace(workspace, skill_source)
+    broker_root = root / "broker"
+    results: list[CodexRunResult] = []
+    grades: list[V3TurnGrade] = []
+    cumulative_gateway_argvs: list[tuple[str, ...]] = []
+    previous_prefix = 0
+    broker_evidence: GatewayBrokerEvidence | None = None
+    infrastructure_error: CodexInfrastructureError | None = None
+
+    subcommands = _ordered_unique(step.subcommand for step in protocol.steps)
+    gateway_errors = tuple(
+        CodexGatewayErrorExpectation(
+            command=step.expected_result_command,
+            error_code=step.expected_error_code,
+        )
+        for step in protocol.steps
+        if step.allowed_exit_codes == (2,)
+    )
+    config = CodexHarnessConfig(
+        workspace=workspace,
+        skill_source=skill_source,
+        codex_binary=codex_binary,
+        auth_json=auth_json,
+        model=model,
+        reasoning_effort=reasoning_effort,
+        service_tier=service_tier,
+        timeout_seconds=timeout_seconds,
+        expected_gateway_subcommands=subcommands,
+        expected_wwise_version=version,
+        sandbox_mode="workspace-write",
+        allow_output_write=False,
+        network_access=True,
+        expected_gateway_errors=gateway_errors,
+    )
+    broker = CodexGatewayBroker(
+        skill_source=skill_source,
+        expected_steps=protocol.steps,
+        expected_wwise_version=version,
+        runner_environment=runner_environment,
+        working_root=broker_root,
+        transport="tcp",
+        runner_timeout_seconds=max(120.0, timeout_seconds),
+        trusted_step_pre_observer=trusted_step_pre_observer,
+        trusted_step_observer=trusted_step_observer,
+        trusted_subscription_ack=trusted_subscription_ack,
+        trusted_subscription_ack_observer=trusted_subscription_ack_observer,
+    )
+    try:
+        with broker:
+            with CodexCliTask(config, extra_env=broker.model_environment_overrides()) as task:
+                for turn_index, (prompt, expected_prefix) in enumerate(
+                    zip(prompt_values, protocol.turn_prefix_counts, strict=True),
+                    start=1,
+                ):
+                    output_dir = root / "turns" / f"turn-{turn_index:02d}"
+                    try:
+                        result = (
+                            task.run_initial(prompt, output_dir=output_dir)
+                            if turn_index == 1
+                            else task.run_followup(prompt, output_dir=output_dir)
+                        )
+                    except CodexInfrastructureError as exc:
+                        # Snapshot the trusted broker before either context is
+                        # allowed to unwind.  A failed archive is deliberately
+                        # not suppressed: without complete fixed-path evidence,
+                        # the caller must not treat this task as retryable.
+                        failure_broker_evidence = broker.evidence()
+                        _validate_infrastructure_failure(
+                            prompt=prompt,
+                            result=exc.result,
+                            failure=exc.failure,
+                            broker_evidence=failure_broker_evidence,
+                            expected_step_names=tuple(
+                                step.name for step in protocol.steps
+                            ),
+                            previous_broker_prefix=previous_prefix,
+                        )
+                        _archive_infrastructure_failure(
+                            root,
+                            output_dir=output_dir,
+                            scenario_id=scenario_id,
+                            version=version,
+                            turn_index=turn_index,
+                            expected_turn_count=len(prompt_values),
+                            prior_completed_turn_count=len(results),
+                            previous_broker_prefix=previous_prefix,
+                            expected_failed_turn_prefix=expected_prefix,
+                            prior_thread_id=(results[0].thread_id if results else None),
+                            prompt=prompt,
+                            result=exc.result,
+                            failure=exc.failure,
+                            broker_evidence=failure_broker_evidence,
+                            prompt_materialization_path=prompt_materialization_path,
+                        )
+                        infrastructure_error = exc
+                        break
+                    results.append(result)
+                    turn_gateway = _gateway_candidate_argvs(
+                        result,
+                        skill_source=skill_source,
+                        expected_wwise_version=version,
+                    )
+                    cumulative_gateway_argvs.extend(turn_gateway)
+                    broker_evidence = broker.evidence()
+                    terminal_indeterminate = bool(
+                        getattr(broker_evidence, "terminal_indeterminate", False)
+                    )
+                    effective_prefix = (
+                        len(broker_evidence.consumed_step_names)
+                        if terminal_indeterminate
+                        else expected_prefix
+                    )
+                    reconciliation = broker.reconcile_prefix(
+                        cumulative_gateway_argvs,
+                        expected_step_count=effective_prefix,
+                    )
+                    terminal_execute_exit2_count = _terminal_execute_exit2_count(
+                        protocol,
+                        broker_evidence,
+                        start=previous_prefix,
+                        stop=effective_prefix,
+                    )
+                    errors, gates = _grade_common_turn(
+                        result,
+                        turn_index=turn_index,
+                        required_reference=required_reference,
+                        expected_gateway_count=effective_prefix - previous_prefix,
+                        expected_terminal_execute_exit2_count=(
+                            terminal_execute_exit2_count
+                        ),
+                    )
+                    grade = V3TurnGrade(
+                        index=turn_index,
+                        prompt_sha256=_sha256_text(prompt),
+                        broker_prefix_count=effective_prefix,
+                        reconciliation=reconciliation,
+                        common_gates=gates,
+                        errors=errors,
+                    )
+                    grades.append(grade)
+                    _archive_turn(output_dir, prompt=prompt, result=result, grade=grade)
+                    if result.session_audit.incomplete_command_count:
+                        _archive_command_lifecycle_failure(
+                            root,
+                            output_dir=output_dir,
+                            scenario_id=scenario_id,
+                            version=version,
+                            turn_index=turn_index,
+                            expected_turn_count=len(prompt_values),
+                            prompt=prompt,
+                            result=result,
+                            broker_evidence=broker_evidence,
+                        )
+                        raise V3CommandLifecycleError(
+                            f"{scenario_id} turn {turn_index} ended with "
+                            f"{result.session_audit.incomplete_command_count} "
+                            "incomplete Codex command lifecycle item(s); the "
+                            "scenario is blocked and must use a fresh sandbox"
+                        )
+                    if not grade.passed:
+                        common_failures = errors or tuple(
+                            key for key, value in gates.items() if not value
+                        )
+                        raise V3TaskRunnerError(
+                            f"{scenario_id} turn {turn_index} failed task gates: "
+                            f"common={common_failures}; "
+                            f"reconciliation={grade.reconciliation.errors}"
+                        )
+                    if turn_observer is not None:
+                        turn_observer(turn_index, result, broker_evidence)
+                    previous_prefix = effective_prefix
+                    if terminal_indeterminate:
+                        break
+            if infrastructure_error is None:
+                broker_evidence = broker.evidence()
+        if infrastructure_error is not None:
+            raise infrastructure_error
+    finally:
+        if workspace.exists():
+            shutil.rmtree(workspace, ignore_errors=False)
+
+    if broker_evidence is None:
+        raise V3TaskRunnerError("fresh task completed without broker evidence")
+    run = V3TaskRun(
+        scenario_id=scenario_id,
+        version=version,
+        task_root=root,
+        thread_id=results[0].thread_id if results else "",
+        turns=tuple(results),
+        turn_grades=tuple(grades),
+        broker_evidence=broker_evidence,
+    )
+    _write_json(
+        root / "task-result.json",
+        {
+            "contract": TASK_RESULT_CONTRACT,
+            "scenario_id": scenario_id,
+            "version": version,
+            "thread_id": run.thread_id,
+            "turn_count": len(run.turns),
+            "passed": run.passed,
+            "prompt_materialization_sha256": _sha256_file(
+                prompt_materialization_path
+            ),
+            "broker": run.broker_evidence.as_dict(include_output=False),
+            "turn_grades": [
+                {
+                    **asdict(item),
+                    "passed": item.passed,
+                }
+                for item in run.turn_grades
+            ],
+        },
+    )
+    return run
+
+
+def _grade_common_turn(
+    result: CodexRunResult,
+    *,
+    turn_index: int,
+    required_reference: str,
+    expected_gateway_count: int,
+    expected_terminal_execute_exit2_count: int = 0,
+) -> tuple[tuple[str, ...], dict[str, bool]]:
+    facts = result.command_facts
+    allowed_reads = tuple(facts.allowed_read_commands)
+    read_files = tuple(facts.skill_read_files)
+    expected_reads = ("SKILL.md", required_reference) if turn_index == 1 else ()
+    records = facts.command_records
+    gateway_count = len(facts.gateway_attempt_commands)
+    terminal_unexpected = tuple(facts.unexpected_commands)
+    expected_terminal_unexpected = (
+        len(terminal_unexpected) == expected_terminal_execute_exit2_count
+        and all(
+            command in facts.gateway_attempt_commands
+            for command in terminal_unexpected
+        )
+    )
+    gates = {
+        "memory_isolated": result.isolation_audit.passed and not result.prompt_audit.has_memory,
+        "one_completed_turn": (
+            result.exit_status == 0
+            and not result.timed_out
+            and result.session_audit.passed
+            and result.file_change_count == 0
+        ),
+        "one_target_skill": result.prompt_audit.passed,
+        "no_collaboration": result.collab_call_count == 0,
+        "skill_reads_exact": read_files == expected_reads and len(allowed_reads) == len(read_files),
+        "read_prefix_exact": tuple(record.command for record in records[: len(allowed_reads)]) == allowed_reads,
+        "gateway_count_exact": gateway_count == expected_gateway_count,
+        "no_other_commands": len(records) == len(allowed_reads) + expected_gateway_count,
+        "no_discovery": not facts.discovery_commands,
+        "no_direct_waapi": not facts.direct_waapi_client_commands,
+        "no_write_like": not facts.write_like_commands,
+        "no_unexpected_commands": (
+            expected_terminal_unexpected
+            and not facts.non_gateway_unexpected_commands
+        ),
+        "no_files_changed": (
+            not result.created_files
+            and not result.modified_files
+            and not result.deleted_files
+            and not result.created_source_files
+            and not result.modified_source_files
+            and not result.deleted_source_files
+            and result.skill_tree_unchanged
+        ),
+    }
+    errors = tuple(key for key, value in gates.items() if not value)
+    return errors, gates
+
+
+def _terminal_execute_exit2_count(
+    protocol: V3GatewayProtocol,
+    evidence: GatewayBrokerEvidence,
+    *,
+    start: int,
+    stop: int,
+) -> int:
+    expected = {
+        step.name
+        for step in protocol.steps[start:stop]
+        if step.subcommand == "execute" and step.allowed_exit_codes == (0, 2)
+    }
+    if not expected:
+        return 0
+    records = {
+        record.step_name: record
+        for record in evidence.records
+        if record.step_name in expected
+    }
+    return sum(
+        record.succeeded and record.runner_exit_code == 2
+        for record in records.values()
+    )
+
+
+def _gateway_candidate_argvs(
+    result: CodexRunResult,
+    *,
+    skill_source: Path,
+    expected_wwise_version: str,
+) -> tuple[tuple[str, ...], ...]:
+    expected_runner = os.path.abspath(os.fspath(skill_source / "scripts" / "run.py"))
+    candidates: list[tuple[str, ...]] = []
+    for record in result.command_facts.command_records:
+        argv = normalized_gateway_command_argv(
+            record.argv,
+            expected_wwise_version=expected_wwise_version,
+        )
+        if (
+            len(argv) >= 4
+            and os.path.abspath(os.path.expanduser(argv[1])) == expected_runner
+            and argv[2] == "gateway.py"
+        ):
+            candidates.append(argv)
+    return tuple(candidates)
+
+
+def _prepare_agent_workspace(workspace: Path, skill_source: Path) -> None:
+    install = workspace / ".agents" / "skills" / "waapi-skill"
+    install.parent.mkdir(parents=True, exist_ok=False)
+    install.symlink_to(skill_source, target_is_directory=True)
+
+
+def _archive_turn(
+    output_dir: Path,
+    *,
+    prompt: str,
+    result: CodexRunResult,
+    grade: V3TurnGrade,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "prompt.txt").write_text(prompt + "\n", encoding="utf-8")
+    (output_dir / "events.jsonl").write_text(result.stdout, encoding="utf-8")
+    (output_dir / "stderr.txt").write_text(result.stderr, encoding="utf-8")
+    (output_dir / "final.txt").write_text(result.final_response + "\n", encoding="utf-8")
+    _write_json(output_dir / "codex-facts.json", result.facts_dict())
+    _write_json(
+        output_dir / "turn-grade.json",
+        {**asdict(grade), "passed": grade.passed},
+    )
+
+
+def _archive_command_lifecycle_failure(
+    root: Path,
+    *,
+    output_dir: Path,
+    scenario_id: str,
+    version: str,
+    turn_index: int,
+    expected_turn_count: int,
+    prompt: str,
+    result: CodexRunResult,
+    broker_evidence: GatewayBrokerEvidence,
+) -> None:
+    """Seal an unmatched Codex command lifecycle as non-retryable BLOCKED.
+
+    The command may already have affected the disposable Wwise sandbox, so
+    this is intentionally distinct from the pre-agent infrastructure contract.
+    The caller must quarantine the scenario and start a fresh lifecycle.
+    """
+
+    anomalies = _command_lifecycle_anomalies(result.stdout)
+    if not anomalies:
+        raise V3TaskRunnerError(
+            "incomplete command count cannot be reconstructed from Codex events"
+        )
+    broker_path = root / "command-lifecycle-broker-evidence.json"
+    _write_json(broker_path, broker_evidence.as_dict(include_output=False))
+    artifact_paths = (
+        output_dir / "prompt.txt",
+        output_dir / "events.jsonl",
+        output_dir / "stderr.txt",
+        output_dir / "final.txt",
+        output_dir / "codex-facts.json",
+        output_dir / "turn-grade.json",
+        broker_path,
+    )
+    _write_json(
+        root / "command-lifecycle-failure.json",
+        {
+            "contract": TASK_COMMAND_LIFECYCLE_FAILURE_CONTRACT,
+            "scenario_id": scenario_id,
+            "version": version,
+            "failed_turn_index": turn_index,
+            "expected_turn_count": expected_turn_count,
+            "prompt_sha256": _sha256_text(prompt),
+            "incomplete_command_count": (
+                result.session_audit.incomplete_command_count
+            ),
+            "anomalies": anomalies,
+            "non_retryable": True,
+            "fresh_sandbox_required": True,
+            "artifact_sha256": {
+                path.relative_to(root).as_posix(): _sha256_file(path)
+                for path in artifact_paths
+            },
+        },
+    )
+
+
+def _command_lifecycle_anomalies(stdout: str) -> list[dict[str, Any]]:
+    phases: dict[str, dict[str, Mapping[str, Any]]] = {
+        "item.started": {},
+        "item.completed": {},
+    }
+    anonymous: list[dict[str, Any]] = []
+    for event_index, line in enumerate(stdout.splitlines(), start=1):
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        event_type = event.get("type") if isinstance(event, Mapping) else None
+        item = event.get("item") if isinstance(event, Mapping) else None
+        if (
+            event_type not in phases
+            or not isinstance(item, Mapping)
+            or item.get("type") != "command_execution"
+        ):
+            continue
+        item_id = item.get("id")
+        if not isinstance(item_id, str) or not item_id:
+            anonymous.append(
+                {
+                    "event_index": event_index,
+                    "phase": event_type,
+                    "item_id": None,
+                    "command": str(item.get("command") or ""),
+                    "status": str(item.get("status") or ""),
+                }
+            )
+            continue
+        phases[event_type][item_id] = item
+    started = phases["item.started"]
+    completed = phases["item.completed"]
+    anomalies = list(anonymous)
+    for item_id in sorted(set(started) ^ set(completed)):
+        phase = (
+            "started_without_completed"
+            if item_id in started
+            else "completed_without_started"
+        )
+        item = started.get(item_id) or completed[item_id]
+        anomalies.append(
+            {
+                "event_index": None,
+                "phase": phase,
+                "item_id": item_id,
+                "command": str(item.get("command") or ""),
+                "status": str(item.get("status") or ""),
+            }
+        )
+    return anomalies
+
+
+def _archive_infrastructure_failure(
+    root: Path,
+    *,
+    output_dir: Path,
+    scenario_id: str,
+    version: str,
+    turn_index: int,
+    expected_turn_count: int,
+    prior_completed_turn_count: int,
+    previous_broker_prefix: int,
+    expected_failed_turn_prefix: int,
+    prior_thread_id: str | None,
+    prompt: str,
+    result: CodexRunResult,
+    failure: CodexInfrastructureFailure,
+    broker_evidence: GatewayBrokerEvidence,
+    prompt_materialization_path: Path,
+) -> None:
+    """Seal a pre-agent Codex failure without persisting exception prose."""
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    failed_turn_files = {
+        "prompt.txt": prompt + "\n",
+        "events.jsonl": result.stdout,
+        "stderr.txt": result.stderr,
+        "final.txt": result.final_response + "\n",
+    }
+    for name, value in failed_turn_files.items():
+        (output_dir / name).write_text(value, encoding="utf-8")
+    _write_json(output_dir / "codex-facts.json", result.facts_dict())
+
+    broker_path = root / "broker-evidence.json"
+    _write_json(broker_path, broker_evidence.as_dict(include_output=False))
+
+    artifact_paths = (
+        prompt_materialization_path,
+        output_dir / "prompt.txt",
+        output_dir / "events.jsonl",
+        output_dir / "stderr.txt",
+        output_dir / "final.txt",
+        output_dir / "codex-facts.json",
+        broker_path,
+    )
+    artifact_sha256 = {
+        path.relative_to(root).as_posix(): _sha256_file(path)
+        for path in artifact_paths
+    }
+    _write_json(
+        root / "infrastructure-failure.json",
+        {
+            "contract": TASK_INFRASTRUCTURE_FAILURE_CONTRACT,
+            "scenario_id": scenario_id,
+            "version": version,
+            "failed_turn_index": turn_index,
+            "expected_turn_count": expected_turn_count,
+            "prior_completed_turn_count": prior_completed_turn_count,
+            "previous_broker_prefix": previous_broker_prefix,
+            "expected_failed_turn_prefix": expected_failed_turn_prefix,
+            "prior_thread_id": prior_thread_id,
+            "prompt_sha256": _sha256_text(prompt),
+            "failure": {
+                "category": failure.category,
+                "turn_failed": failure.turn_failed,
+                "timed_out": failure.timed_out,
+                "agent_item_event_count": failure.agent_item_event_count,
+            },
+            "artifact_sha256": artifact_sha256,
+        },
+    )
+
+
+def _archive_prompt_materialization(
+    root: Path,
+    *,
+    provenance: Any,
+    business_oracle_plan: BusinessOraclePlanEvidence,
+) -> Path:
+    """Archive one receipt joining the fixed prompt and business plan."""
+
+    path = root / PROMPT_MATERIALIZATION_FILE
+    _write_json(
+        path,
+        prompt_materialization_receipt(
+            provenance,
+            business_oracle_plan=business_oracle_plan,
+        ),
+    )
+    return path
+
+
+def _validate_infrastructure_failure(
+    *,
+    prompt: str,
+    result: CodexRunResult,
+    failure: CodexInfrastructureFailure,
+    broker_evidence: GatewayBrokerEvidence,
+    expected_step_names: tuple[str, ...],
+    previous_broker_prefix: int,
+) -> None:
+    """Prove the infrastructure failure preceded every model-side action."""
+
+    facts = result.command_facts
+    session = result.session_audit
+    command_collections = (
+        facts.commands,
+        facts.inline_python_commands,
+        facts.direct_waapi_client_commands,
+        facts.write_like_commands,
+        facts.gateway_commands,
+        facts.discovery_commands,
+        facts.command_records,
+        facts.gateway_attempt_commands,
+        facts.gateway_subcommands,
+        facts.gateway_results,
+        facts.gateway_evidence_apis,
+        facts.allowed_read_commands,
+        facts.skill_read_files,
+        facts.unexpected_commands,
+        facts.non_gateway_unexpected_commands,
+    )
+    file_collections = (
+        result.created_files,
+        result.modified_files,
+        result.deleted_files,
+        result.created_source_files,
+        result.modified_source_files,
+        result.deleted_source_files,
+    )
+    expected_prefix_names = expected_step_names[:previous_broker_prefix]
+    broker_records = broker_evidence.records
+    gates = {
+        "failure_shape": (
+            failure.category in _CODEX_INFRASTRUCTURE_CATEGORIES
+            and type(failure.turn_failed) is bool
+            and type(failure.timed_out) is bool
+            and type(failure.agent_item_event_count) is int
+        ),
+        "failure_pre_agent": failure.agent_item_event_count == 0,
+        "failure_timeout_consistent": failure.timed_out is result.timed_out,
+        "command_facts_empty": (
+            all(not values for values in command_collections)
+            and not facts.skill_read
+            and not facts.gateway_before_discovery
+        ),
+        "session_has_no_actions": (
+            session.collab_call_count == 0
+            and session.file_change_count == 0
+            and session.command_started_count == 0
+            and session.command_completed_count == 0
+            and session.incomplete_command_count == 0
+            and not session.unexpected_item_types
+        ),
+        "result_has_no_actions": (
+            result.collab_call_count == 0
+            and result.file_change_count == 0
+            and result.final_response == ""
+            and all(not values for values in file_collections)
+        ),
+        "jsonl_valid": session.invalid_json_line_count == 0,
+        "prompt_isolated": (
+            result.prompt_audit.passed
+            and not result.prompt_audit.has_memory
+            and result.isolation_audit.passed
+        ),
+        "prompt_bound": bool(prompt),
+        "skill_tree_unchanged": (
+            result.skill_tree_unchanged
+            and _is_sha256(result.skill_tree_sha256_before)
+            and result.skill_tree_sha256_before == result.skill_tree_sha256_after
+        ),
+        "broker_expected_steps_exact": (
+            broker_evidence.expected_step_names == expected_step_names
+        ),
+        "broker_prefix_exact": (
+            0 <= previous_broker_prefix < len(expected_step_names)
+            and broker_evidence.consumed_step_names == expected_prefix_names
+            and len(broker_records) == previous_broker_prefix
+            and tuple(record.step_name for record in broker_records)
+            == expected_prefix_names
+            and all(record.succeeded for record in broker_records)
+            and not broker_evidence.complete
+            and broker_evidence.terminal_state == "RUNNING"
+        ),
+    }
+    failures = tuple(name for name, passed in gates.items() if not passed)
+    if failures:
+        raise V3TaskRunnerError(
+            "Codex infrastructure failure lacks clean pre-agent proof: "
+            + ", ".join(failures)
+        )
+
+
+def _ordered_unique(values: Sequence[str] | Any) -> tuple[str, ...]:
+    result: list[str] = []
+    for value in values:
+        if value not in result:
+            result.append(value)
+    return tuple(result)
+
+
+def _sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _is_sha256(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _write_json(path: Path, value: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(value, ensure_ascii=False, allow_nan=False, sort_keys=True, indent=2, default=str)
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+__all__ = [
+    "PROMPT_MATERIALIZATION_CONTRACT",
+    "PROMPT_MATERIALIZATION_FILE",
+    "TASK_COMMAND_LIFECYCLE_FAILURE_CONTRACT",
+    "TASK_INFRASTRUCTURE_FAILURE_CONTRACT",
+    "TASK_RESULT_CONTRACT",
+    "V3CommandLifecycleError",
+    "V3TaskRun",
+    "V3TaskRunnerError",
+    "V3TurnGrade",
+    "run_v3_codex_task",
+]

@@ -176,6 +176,7 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
     console = make_console(tmp_path)
     source_project = make_sample_project(tmp_path / "source")
     env = base_env(console, source_project, tmp_path / "sandbox-root")
+    env["WINEPREFIX"] = str(tmp_path / "caller-prefix-must-be-ignored")
     sandbox = prepare_sample_project_sandbox(env)
     seen_project_paths: list[Path] = []
 
@@ -224,9 +225,204 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
     assert sandbox.metadata.get_info_display_name == "fake Wwise 2024.1"
     assert sandbox.metadata.identity_verified is True
     assert sandbox.metadata.wine_prefix_path == str(sandbox.wine_prefix_path)
+    assert lifecycle.launch_env["WINEPREFIX"] == str(sandbox.wine_prefix_path)
     assert sandbox.metadata.process_cleanup_result == "cleaned"
     assert seen_project_paths == [sandbox.sandbox_project]
     cleanup_sandbox(sandbox)
+
+
+def test_launch_uses_fresh_case_owned_wine_prefix_without_precreating_it(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    console = make_console(tmp_path)
+    source_project = make_sample_project(tmp_path / "source")
+    env = base_env(console, source_project, tmp_path / "sandbox-root")
+    case_owned_root = tmp_path / "case-owned"
+    home = case_owned_root / "home"
+    home.mkdir(parents=True)
+    wine_prefix = home / "wine-prefix"
+    env["HOME"] = str(home)
+    env["WINEPREFIX"] = str(tmp_path / "caller-prefix-must-be-ignored")
+    sandbox = prepare_sample_project_sandbox(env)
+    prefix_exists_at_construction: list[bool] = []
+
+    class FakeLifecycle:
+        def __init__(self, **kwargs: Any) -> None:
+            self.process = FakeProcess()
+            self.port = 31341
+            self.project_path = kwargs["project_path"]
+            self.launch_env = kwargs["launch_env"]
+            self.command = [str(kwargs["console_path"]), "waapi-server", str(self.project_path)]
+            self.ready_result: object = None
+            self.cleanup_report: CleanupReport | None = None
+            prefix_exists_at_construction.append(wine_prefix.exists() or wine_prefix.is_symlink())
+
+        def run_until_ready(self) -> object:
+            self.ready_result = {"version": {"displayName": "fake Wwise 2022.1"}}
+            return self.ready_result
+
+        def shutdown(self, suppress_errors: bool = True) -> None:
+            self.process = None
+            self.cleanup_report = CleanupReport(
+                launch_pid=FakeProcess.pid,
+                wine_prefix=self.launch_env.get("WINEPREFIX"),
+                process_exited=True,
+            )
+
+    monkeypatch.setattr(sandbox_fixture, "HeadlessLifecycle", FakeLifecycle)
+
+    lifecycle = launch_sandboxed_wwise(
+        sandbox,
+        env,
+        wine_prefix_path=wine_prefix,
+        case_owned_root=case_owned_root,
+    )
+
+    assert prefix_exists_at_construction == [False]
+    assert not wine_prefix.exists()
+    assert lifecycle.launch_env["HOME"] == str(home.resolve(strict=True))
+    assert lifecycle.launch_env["WINEPREFIX"] == str(wine_prefix.resolve(strict=False))
+    assert sandbox.metadata.wine_prefix_path == str(wine_prefix.resolve(strict=False))
+    persisted = json.loads((sandbox.sandbox_path / "sandbox-metadata.json").read_text(encoding="utf-8"))
+    assert persisted["wine_prefix_path"] == str(wine_prefix.resolve(strict=False))
+
+    shutdown_sandboxed_wwise(lifecycle, sandbox)
+
+    assert sandbox.metadata.process_cleanup_result == "cleaned"
+    assert sandbox.metadata.process_cleanup_details is not None
+    assert sandbox.metadata.process_cleanup_details["wine_prefix"] == str(
+        wine_prefix.resolve(strict=False)
+    )
+    cleanup_sandbox(sandbox)
+
+
+def test_case_owned_wine_prefix_parameters_must_be_supplied_together(tmp_path: Path) -> None:
+    console = make_console(tmp_path)
+    source_project = make_sample_project(tmp_path / "source")
+    env = base_env(console, source_project, tmp_path / "sandbox-root")
+    case_owned_root = tmp_path / "case-owned"
+    home = case_owned_root / "home"
+    home.mkdir(parents=True)
+    env["HOME"] = str(home)
+    sandbox = prepare_sample_project_sandbox(env)
+
+    try:
+        with pytest.raises(SandboxFixtureError, match="provided together"):
+            launch_sandboxed_wwise(
+                sandbox,
+                env,
+                wine_prefix_path=home / "wine-prefix",
+            )
+        with pytest.raises(SandboxFixtureError, match="provided together"):
+            launch_sandboxed_wwise(
+                sandbox,
+                env,
+                case_owned_root=case_owned_root,
+            )
+    finally:
+        cleanup_sandbox(sandbox, failed=True)
+
+
+def test_case_owned_wine_prefix_rejects_invalid_home_existing_symlink_and_escape(
+    tmp_path: Path,
+) -> None:
+    console = make_console(tmp_path)
+    source_project = make_sample_project(tmp_path / "source")
+    env = base_env(console, source_project, tmp_path / "sandbox-root")
+    case_owned_root = tmp_path / "case-owned"
+    home = case_owned_root / "home"
+    home.mkdir(parents=True)
+    sandbox = prepare_sample_project_sandbox(env)
+
+    try:
+        missing_home_env = dict(env)
+        missing_home_env.pop("HOME", None)
+        with pytest.raises(SandboxFixtureError, match="HOME must name"):
+            launch_sandboxed_wwise(
+                sandbox,
+                missing_home_env,
+                wine_prefix_path=home / "missing-home-prefix",
+                case_owned_root=case_owned_root,
+            )
+
+        nonexistent_home_env = {**env, "HOME": str(case_owned_root / "missing-home")}
+        with pytest.raises(SandboxFixtureError, match="HOME must be an existing real directory"):
+            launch_sandboxed_wwise(
+                sandbox,
+                nonexistent_home_env,
+                wine_prefix_path=case_owned_root / "missing-home" / "wine-prefix",
+                case_owned_root=case_owned_root,
+            )
+
+        real_home = case_owned_root / "real-home"
+        real_home.mkdir()
+        symlink_home = case_owned_root / "symlink-home"
+        symlink_home.symlink_to(real_home, target_is_directory=True)
+        symlink_home_env = {**env, "HOME": str(symlink_home)}
+        with pytest.raises(SandboxFixtureError, match="HOME must be an existing real directory"):
+            launch_sandboxed_wwise(
+                sandbox,
+                symlink_home_env,
+                wine_prefix_path=symlink_home / "wine-prefix",
+                case_owned_root=case_owned_root,
+            )
+
+        valid_env = {**env, "HOME": str(home)}
+        existing_prefix = home / "existing-prefix"
+        existing_prefix.mkdir()
+        with pytest.raises(SandboxFixtureError, match="must not already exist .*existing path"):
+            launch_sandboxed_wwise(
+                sandbox,
+                valid_env,
+                wine_prefix_path=existing_prefix,
+                case_owned_root=case_owned_root,
+            )
+
+        symlink_target = home / "symlink-target"
+        symlink_target.mkdir()
+        symlink_prefix = home / "symlink-prefix"
+        symlink_prefix.symlink_to(symlink_target, target_is_directory=True)
+        with pytest.raises(SandboxFixtureError, match="must not already exist .*symlink"):
+            launch_sandboxed_wwise(
+                sandbox,
+                valid_env,
+                wine_prefix_path=symlink_prefix,
+                case_owned_root=case_owned_root,
+            )
+
+        escaped_parent_target = tmp_path / "escaped-prefix-parent"
+        escaped_parent_target.mkdir()
+        symlink_parent = home / "linked-parent"
+        symlink_parent.symlink_to(escaped_parent_target, target_is_directory=True)
+        with pytest.raises(SandboxFixtureError, match="symlink parent"):
+            launch_sandboxed_wwise(
+                sandbox,
+                valid_env,
+                wine_prefix_path=symlink_parent / "wine-prefix",
+                case_owned_root=case_owned_root,
+            )
+
+        with pytest.raises(SandboxFixtureError, match="strictly under HOME"):
+            launch_sandboxed_wwise(
+                sandbox,
+                valid_env,
+                wine_prefix_path=case_owned_root / "outside-home-prefix",
+                case_owned_root=case_owned_root,
+            )
+
+        outside_home = tmp_path / "outside-home"
+        outside_home.mkdir()
+        outside_env = {**env, "HOME": str(outside_home)}
+        with pytest.raises(SandboxFixtureError, match="HOME must be strictly under case_owned_root"):
+            launch_sandboxed_wwise(
+                sandbox,
+                outside_env,
+                wine_prefix_path=outside_home / "wine-prefix",
+                case_owned_root=case_owned_root,
+            )
+    finally:
+        cleanup_sandbox(sandbox, failed=True)
 
 
 def test_strict_real_launch_audit_is_written_after_shutdown(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -352,10 +548,16 @@ def test_launch_shuts_down_when_ready_proof_is_invalid(monkeypatch: pytest.Monke
     console = make_console(tmp_path)
     source_project = make_sample_project(tmp_path / "source")
     env = base_env(console, source_project, tmp_path / "sandbox-root")
+    case_owned_root = tmp_path / "case-owned"
+    home = case_owned_root / "home"
+    home.mkdir(parents=True)
+    wine_prefix = home / "wine-prefix"
+    env["HOME"] = str(home)
     sandbox = prepare_sample_project_sandbox(env)
     shutdown_calls: list[bool] = []
     lifecycles: list[FakeLifecycle] = []
     metadata_writes: list[Path] = []
+    prefix_exists_at_construction: list[bool] = []
     original_write_metadata = sandbox_fixture.SandboxProject.write_metadata
 
     def tracked_write_metadata(project: sandbox_fixture.SandboxProject) -> Path:
@@ -380,6 +582,7 @@ def test_launch_shuts_down_when_ready_proof_is_invalid(monkeypatch: pytest.Monke
             self.ready_result: object = None
             self.cleanup_report: CleanupReport | None = None
             lifecycles.append(self)
+            prefix_exists_at_construction.append(wine_prefix.exists() or wine_prefix.is_symlink())
 
         def run_until_ready(self) -> object:
             self.ready_result = {"version": {}}
@@ -399,19 +602,29 @@ def test_launch_shuts_down_when_ready_proof_is_invalid(monkeypatch: pytest.Monke
 
     try:
         with pytest.raises(SandboxFixtureError, match="displayName"):
-            launch_sandboxed_wwise(sandbox, env)
+            launch_sandboxed_wwise(
+                sandbox,
+                env,
+                wine_prefix_path=wine_prefix,
+                case_owned_root=case_owned_root,
+            )
         assert shutdown_calls == [True]
         assert len(lifecycles) == 1
+        assert prefix_exists_at_construction == [False]
+        assert lifecycles[0].launch_env["WINEPREFIX"] == str(wine_prefix.resolve(strict=False))
         assert lifecycles[0].process is None
         assert metadata_writes == [sandbox.sandbox_path]
         persisted = json.loads((sandbox.sandbox_path / "sandbox-metadata.json").read_text(encoding="utf-8"))
         assert persisted["selected_port"] == 31338
         assert persisted["command"] == lifecycles[0].command
         assert persisted["process_pid"] == FakeProcess.pid
-        assert persisted["wine_prefix_path"] == str(sandbox.wine_prefix_path)
+        assert persisted["wine_prefix_path"] == str(wine_prefix.resolve(strict=False))
         assert persisted["launch_project_path"] == str(sandbox.sandbox_project)
         assert persisted["process_cleanup_result"] == "cleaned"
         assert persisted["process_cleanup_details"]["launch_pid"] == FakeProcess.pid
+        assert persisted["process_cleanup_details"]["wine_prefix"] == str(
+            wine_prefix.resolve(strict=False)
+        )
         assert persisted["get_info_version"] is None
         assert persisted["get_info_display_name"] is None
         assert persisted["identity_verified"] is None

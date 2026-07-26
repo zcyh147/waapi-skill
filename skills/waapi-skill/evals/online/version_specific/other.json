@@ -1,0 +1,2484 @@
+{
+  "contract": "waapi-skill.codex-semantic-online-cases/v3",
+  "version_scope": [
+    "2023.1",
+    "2024.1",
+    "2025.1"
+  ],
+  "cases": [
+    {
+      "id": "VS-CONSOLE-CLOSE-01",
+      "api": "ak.wwise.console.project.close",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "online_lifecycle",
+      "scenario_family": "console_clean_project_close",
+      "scenario_index": 1,
+      "prompt": "当前独立 WwiseConsole 应打开工程 {project_path}。请先核对当前路径，再关闭这个已经保存的副本但保留进程；关闭后读取当前工程和进程信息，确认工程为空、进程仍可用，而且另一个 Wwise 实例不受影响。",
+      "visible_inputs": [
+        {
+          "name": "project_path",
+          "kind": "absolute_file_path",
+          "description": "本场景一次性 Wwise 工程的绝对 .wproj 路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，关闭这个独立进程里的工程副本。",
+      "fixture": {
+        "adapter": "console_project_lifecycle_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 2023.1 WwiseConsole 进程、私有端口和进程组",
+          "已保存的一次性 Chapter20 工程副本",
+          "源工程哈希及干扰实例 PID/工程身份已封存",
+          "无法证明进程、端口或工程归属时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.console.project.close",
+          "count": 1,
+          "effect": "external"
+        },
+        {
+          "api": "ak.wwise.core.getProjectInfo",
+          "count": 2,
+          "effect": "read"
+        },
+        {
+          "api": "ak.wwise.core.getInfo",
+          "count": 1,
+          "effect": "read"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.console.project.close",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "console_project_transition_oracle",
+          "subject_api": "ak.wwise.console.project.close",
+          "expectation": "目标进程仍存活且 current project 转为空，私有端口继续响应进程身份读取"
+        },
+        {
+          "phase": "after",
+          "adapter": "process_isolation_oracle",
+          "subject_api": "ak.wwise.console.project.close",
+          "expectation": "干扰实例身份不变，副本和源工程文件哈希均未变化"
+        }
+      ],
+      "cleanup": {
+        "adapter": "console_lifecycle_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "owned_port_released"
+        ]
+      }
+    },
+    {
+      "id": "VS-CONSOLE-CLOSE-02",
+      "api": "ak.wwise.console.project.close",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "online_lifecycle",
+      "scenario_family": "console_build_then_close",
+      "scenario_index": 2,
+      "prompt": "当前独立 WwiseConsole 应打开工程 {project_path}，三语 SoundBank 产物位于 {build_output_directory}。请关闭已保存的工程，确认项目锁释放、同一进程保持待命，并核对构建产物没有被关闭操作改写。",
+      "visible_inputs": [
+        {
+          "name": "project_path",
+          "kind": "absolute_file_path",
+          "description": "本场景一次性 Wwise 工程的绝对 .wproj 路径"
+        },
+        {
+          "name": "build_output_directory",
+          "kind": "absolute_directory_path",
+          "description": "关闭前已经完成的三语 SoundBank 绝对输出目录"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，关闭这个临时构建工程。",
+      "fixture": {
+        "adapter": "console_project_lifecycle_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 2023.1 WwiseConsole 打开一次性工程副本",
+          "三语构建产物、工程保存哈希和锁文件基线已封存",
+          "输出目录和进程组均由 runner 独占",
+          "隔离或保存证明不足时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.console.project.close",
+          "count": 1,
+          "effect": "external"
+        },
+        {
+          "api": "ak.wwise.core.getProjectInfo",
+          "count": 2,
+          "effect": "read"
+        },
+        {
+          "api": "ak.wwise.core.getInfo",
+          "count": 1,
+          "effect": "read"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.console.project.close",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "console_project_transition_oracle",
+          "subject_api": "ak.wwise.console.project.close",
+          "expectation": "current project 为空、进程仍存活且工程锁文件被释放"
+        },
+        {
+          "phase": "after",
+          "adapter": "soundbank_output_oracle",
+          "subject_api": "ak.wwise.console.project.close",
+          "expectation": "三语 Bank 与媒体产物哈希等于关闭前基线，工程源文件未变化"
+        }
+      ],
+      "cleanup": {
+        "adapter": "console_lifecycle_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "owned_port_released"
+        ]
+      }
+    },
+    {
+      "id": "VS-CONSOLE-CREATE-01",
+      "api": "ak.wwise.console.project.create",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "online_lifecycle",
+      "scenario_family": "console_multilingual_project_create",
+      "scenario_index": 1,
+      "prompt": "请把 Dialogue_Pipeline_2023 工程创建为 {project_path}，默认语言设为 Chinese，另外加入 English(US) 和 Japanese，并建立 Windows、Mac 两个平台；核对语言顺序、平台和核心 Work Unit，所有工程文件只应出现在指定父目录。",
+      "visible_inputs": [
+        {
+          "name": "project_path",
+          "kind": "absolute_file_path",
+          "description": "本场景一次性 Wwise 工程的绝对 .wproj 路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，在隔离目录创建这个工程。",
+      "fixture": {
+        "adapter": "console_project_lifecycle_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立无工程的 2023.1 WwiseConsole、私有端口和进程组",
+          "空的一次性父目录及独立 HOME/日志",
+          "语言和平台定义在当前版本可用",
+          "目标存在、版本不符或写入范围不可证明时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.console.project.create",
+          "count": 1,
+          "effect": "external"
+        },
+        {
+          "api": "ak.wwise.core.getProjectInfo",
+          "count": 1,
+          "effect": "read"
+        },
+        {
+          "api": "ak.wwise.core.object.get",
+          "count": 1,
+          "effect": "read"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.console.project.create",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "project_open_readback_oracle",
+          "subject_api": "ak.wwise.console.project.create",
+          "expectation": "新工程名称、路径、默认语言 Chinese、附加语言和两个平台精确匹配请求"
+        },
+        {
+          "phase": "after",
+          "adapter": "filesystem_tree_oracle",
+          "subject_api": "ak.wwise.console.project.create",
+          "expectation": "唯一 .wproj 与核心 Work Unit 均可解析，全部新增文件位于隔离父目录"
+        }
+      ],
+      "cleanup": {
+        "adapter": "console_lifecycle_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "owned_port_released"
+        ]
+      }
+    },
+    {
+      "id": "VS-CONSOLE-CREATE-02",
+      "api": "ak.wwise.console.project.create",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "online_lifecycle",
+      "scenario_family": "console_unicode_project_create",
+      "scenario_index": 2,
+      "prompt": "请把“关卡二十一 音频制作”工程创建为 {project_path}，只启用 Windows，默认使用 Japanese；创建完成后读取当前工程信息，确认名称、规范化路径和语言没有乱码。",
+      "visible_inputs": [
+        {
+          "name": "project_path",
+          "kind": "absolute_file_path",
+          "description": "本场景一次性 Wwise 工程的绝对 .wproj 路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，创建并重开这个 Unicode 工程。",
+      "fixture": {
+        "adapter": "console_project_lifecycle_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 2023.1 WwiseConsole 进程与私有端口",
+          "带空格和 Unicode 的空隔离父目录",
+          "独立 HOME、缓存与日志",
+          "路径冲突、编码或隔离验证失败时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.console.project.create",
+          "count": 1,
+          "effect": "external"
+        },
+        {
+          "api": "ak.wwise.core.getProjectInfo",
+          "count": 1,
+          "effect": "read"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.console.project.create",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "project_reopen_oracle",
+          "subject_api": "ak.wwise.console.project.create",
+          "expectation": "首次及重开后工程名称、规范化路径和默认语言 Japanese 完整一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "filesystem_tree_oracle",
+          "subject_api": "ak.wwise.console.project.create",
+          "expectation": "工程仅含 Windows 平台且所有文件变更局限于隔离父目录"
+        }
+      ],
+      "cleanup": {
+        "adapter": "console_lifecycle_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "owned_port_released"
+        ]
+      }
+    },
+    {
+      "id": "VS-CONSOLE-OPEN-01",
+      "api": "ak.wwise.console.project.open",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "online_lifecycle",
+      "scenario_family": "console_branch_project_open",
+      "scenario_index": 1,
+      "prompt": "请在独立控制台进程里打开工程 {project_path}。加载完成后核对版本、规范化路径、三种语言和 Actor-Mixer/Events/SoundBanks 核心 Work Unit，不能切换我正在使用的 Wwise。",
+      "visible_inputs": [
+        {
+          "name": "project_path",
+          "kind": "absolute_file_path",
+          "description": "本场景一次性 Wwise 工程的绝对 .wproj 路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，只在独立进程里打开这个副本。",
+      "fixture": {
+        "adapter": "console_project_lifecycle_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立无工程的 2023.1 WwiseConsole、私有端口和进程组",
+          "Chapter22 一次性工程副本及身份/对象基线",
+          "用户 Authoring 实例作为禁止触碰的干扰进程",
+          "无法证明唯一进程和路径时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.console.project.open",
+          "count": 1,
+          "effect": "external"
+        },
+        {
+          "api": "ak.wwise.core.getInfo",
+          "count": 1,
+          "effect": "read"
+        },
+        {
+          "api": "ak.wwise.core.getProjectInfo",
+          "count": 1,
+          "effect": "read"
+        },
+        {
+          "api": "ak.wwise.core.object.get",
+          "count": 1,
+          "effect": "read"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.console.project.open",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "project_open_readback_oracle",
+          "subject_api": "ak.wwise.console.project.open",
+          "expectation": "getInfo/getProjectInfo 证明版本为 2023.1 且路径/GUID 精确等于 Chapter22 副本"
+        },
+        {
+          "phase": "after",
+          "adapter": "project_object_tree_oracle",
+          "subject_api": "ak.wwise.console.project.open",
+          "expectation": "三语和三个核心 Work Unit 对象集合匹配基线，用户实例身份不变"
+        }
+      ],
+      "cleanup": {
+        "adapter": "console_lifecycle_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "owned_port_released"
+        ]
+      }
+    },
+    {
+      "id": "VS-CONSOLE-OPEN-02",
+      "api": "ak.wwise.console.project.open",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "online_lifecycle",
+      "scenario_family": "console_migrated_project_open",
+      "scenario_index": 2,
+      "prompt": "请在独立控制台里打开刚迁移到 2023.1 的工程 {project_path}，重点确认 Event GUID、SoundBank 定义和 External Source Cookie 都能读到；如果版本或路径不对，不要改开同名旧工程。",
+      "visible_inputs": [
+        {
+          "name": "project_path",
+          "kind": "absolute_file_path",
+          "description": "本场景一次性 Wwise 工程的绝对 .wproj 路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，只打开指定的迁移副本。",
+      "fixture": {
+        "adapter": "console_project_lifecycle_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 2023.1 WwiseConsole 与私有端口",
+          "迁移副本及同名旧版干扰工程路径",
+          "迁移后 Event、Bank、Cookie 基线已封存",
+          "版本、路径或进程归属不匹配时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.console.project.open",
+          "count": 1,
+          "effect": "external"
+        },
+        {
+          "api": "ak.wwise.core.getInfo",
+          "count": 1,
+          "effect": "read"
+        },
+        {
+          "api": "ak.wwise.core.getProjectInfo",
+          "count": 1,
+          "effect": "read"
+        },
+        {
+          "api": "ak.wwise.core.object.get",
+          "count": 1,
+          "effect": "read"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.console.project.open",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "project_open_readback_oracle",
+          "subject_api": "ak.wwise.console.project.open",
+          "expectation": "当前路径/GUID 为迁移副本且版本 2023.1，不是同名旧版工程"
+        },
+        {
+          "phase": "after",
+          "adapter": "project_reference_oracle",
+          "subject_api": "ak.wwise.console.project.open",
+          "expectation": "Event GUID、SoundBank inclusion 和 External Source Cookie 集合等于迁移基线"
+        }
+      ],
+      "cleanup": {
+        "adapter": "console_lifecycle_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "owned_port_released"
+        ]
+      }
+    },
+    {
+      "id": "VS-SC-ADD-01",
+      "api": "ak.wwise.core.sourceControl.add",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "add_new_workunit_media_set",
+      "scenario_index": 1,
+      "prompt": "要加入版本管理的绝对文件路径是 {files}。请处理新建的 Chapter23 Dialogue Work Unit 和中、英、日三语源文件；核对每个目标都处于待新增状态，已有的 Chapter22 文件不要重复加入。",
+      "visible_inputs": [
+        {
+          "name": "files",
+          "kind": "structured_array",
+          "description": "一个新 Work Unit 与三语源文件的四个绝对路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，把这批新文件加入临时工作区的版本管理。",
+      "fixture": {
+        "adapter": "source_control_provider_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "runner 独占的一次性 Perforce 服务、用户、workspace 和 depot",
+          "一次性工程副本含一个新 Work Unit 与三语媒体，Chapter22 已受控跟踪",
+          "Wwise 2023.1 Perforce provider 可用且凭据只授予隔离 depot",
+          "provider、插件、路径或归属证明不足时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.sourceControl.add",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.add",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_status_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.add",
+          "expectation": "新 Work Unit 与三语媒体四个绝对路径均为 opened for add 且 changelist 归 runner workspace"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_depot_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.add",
+          "expectation": "Chapter22 已跟踪文件状态和 depot revision 不变，无隔离 depot 外文件"
+        }
+      ],
+      "cleanup": {
+        "adapter": "source_control_provider_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "source_control_provider_stopped"
+        ]
+      }
+    },
+    {
+      "id": "VS-SC-ADD-02",
+      "api": "ak.wwise.core.sourceControl.add",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "partial_tracked_batch_add",
+      "scenario_index": 2,
+      "prompt": "本批候选绝对路径是 {files}。Weapons 重构产生了两个新 Work Unit 和四个媒体文件，其中一条媒体已经在版本库里；只加入真正的新文件，保持已跟踪文件原状态，并明确报告被跳过的路径。",
+      "visible_inputs": [
+        {
+          "name": "files",
+          "kind": "structured_array",
+          "description": "六个候选文件的绝对路径，包含一个已跟踪媒体干扰项"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，在临时工作区处理这批文件。",
+      "fixture": {
+        "adapter": "source_control_provider_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 Perforce 服务和一次性 workspace/depot",
+          "工程副本含六个新路径及一条已跟踪媒体干扰项",
+          "文件集合、depot 状态和 changelist 基线已封存",
+          "provider 连接或隔离失败时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.sourceControl.add",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.add",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_status_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.add",
+          "expectation": "五个真正新文件为 add，已跟踪媒体 revision/status 保持原样且被明确区分"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_depot_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.add",
+          "expectation": "待新增集合无重复路径，所有操作只属于 runner changelist"
+        }
+      ],
+      "cleanup": {
+        "adapter": "source_control_provider_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "source_control_provider_stopped"
+        ]
+      }
+    },
+    {
+      "id": "VS-SC-CHECKOUT-01",
+      "api": "ak.wwise.core.sourceControl.checkOut",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "coordinated_workunit_checkout",
+      "scenario_index": 1,
+      "prompt": "要签出的绝对文件路径是 {files}。请签出 Actor-Mixer 和 Events 两个 Chapter24 Work Unit，确认它们由当前临时工作区独占并变为可写，SoundBanks Work Unit 仍保持未签出。",
+      "visible_inputs": [
+        {
+          "name": "files",
+          "kind": "structured_array",
+          "description": "Actor-Mixer、Events 两个目标 Work Unit 的绝对路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，在临时工作区签出这两个 Work Unit。",
+      "fixture": {
+        "adapter": "source_control_provider_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 Perforce 服务、用户、workspace 和 depot",
+          "三个已提交且只读的 Work Unit 位于一次性工程副本",
+          "provider 状态和文件权限基线已封存",
+          "独占签出能力或隔离无法证明时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.sourceControl.checkOut",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.checkOut",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_status_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.checkOut",
+          "expectation": "Actor-Mixer 与 Events 均 opened for edit 且所有者为 runner workspace，文件可写"
+        },
+        {
+          "phase": "after",
+          "adapter": "filesystem_permission_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.checkOut",
+          "expectation": "SoundBanks 保持未签出和原权限，三个文件内容哈希尚未变化"
+        }
+      ],
+      "cleanup": {
+        "adapter": "source_control_provider_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "source_control_provider_stopped"
+        ]
+      }
+    },
+    {
+      "id": "VS-SC-CHECKOUT-02",
+      "api": "ak.wwise.core.sourceControl.checkOut",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "localized_workunit_checkout",
+      "scenario_index": 2,
+      "prompt": "要尝试签出的绝对文件路径是 {files}。其中 Chinese、English(US)、Japanese 三个 Work Unit 应可签出，Korean 已被另一个工作区锁定；请列出成功项和冲突项，不能把部分失败说成全部成功。",
+      "visible_inputs": [
+        {
+          "name": "files",
+          "kind": "structured_array",
+          "description": "三份可签出 Work Unit 与一份被其他工作区锁定文件的绝对路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，签出可用的三语文件并保留冲突。",
+      "fixture": {
+        "adapter": "source_control_provider_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 Perforce 服务含 runner workspace 和受控干扰 workspace",
+          "三语 Work Unit 可签出，Korean 由干扰 workspace 锁定",
+          "文件、锁所有者和 revision 基线已封存",
+          "provider/锁证明不足时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.sourceControl.checkOut",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.checkOut",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_status_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.checkOut",
+          "expectation": "中英日三个文件由 runner workspace opened for edit，Korean 明确冲突且所有者未变"
+        },
+        {
+          "phase": "after",
+          "adapter": "filesystem_permission_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.checkOut",
+          "expectation": "成功项可写，冲突项内容、revision 和锁状态保持基线"
+        }
+      ],
+      "cleanup": {
+        "adapter": "source_control_provider_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "source_control_provider_stopped"
+        ]
+      }
+    },
+    {
+      "id": "VS-SC-COMMIT-01",
+      "api": "ak.wwise.core.sourceControl.commit",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "atomic_hierarchy_event_commit",
+      "scenario_index": 1,
+      "prompt": "要提交的绝对文件路径是 {files}。请把 Chapter25 的 Actor-Mixer 与 Events 两个已签出 Work Unit 作为一个提交交付，说明写“Chapter25 hierarchy and events”；确认两份文件进入同一变更、revision 都增加，工作区恢复干净。",
+      "visible_inputs": [
+        {
+          "name": "files",
+          "kind": "structured_array",
+          "description": "Chapter25 两份已签出且已修改 Work Unit 的绝对路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，用这个说明提交临时分支的两份文件。",
+      "fixture": {
+        "adapter": "source_control_provider_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 Perforce depot/workspace 中两个文件已由 runner 签出并含受控修改",
+          "修改内容、提交前 revision 和预期说明已封存",
+          "没有其他待提交文件",
+          "provider 或隔离前置不足时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.sourceControl.commit",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.commit",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_depot_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.commit",
+          "expectation": "两个 depot 文件进入同一新 changelist，说明精确匹配且 revision 各增加一"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_status_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.commit",
+          "expectation": "runner workspace 两文件恢复 clean，未提交文件集合为空，工程副本内容匹配新 revision"
+        }
+      ],
+      "cleanup": {
+        "adapter": "source_control_provider_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "source_control_provider_stopped"
+        ]
+      }
+    },
+    {
+      "id": "VS-SC-COMMIT-02",
+      "api": "ak.wwise.core.sourceControl.commit",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "localized_media_revision_commit",
+      "scenario_index": 2,
+      "prompt": "要提交的绝对文件路径是 {files}。请提交 Japanese Pickup 对白的 Work Unit 和三条替换媒体，提交说明带任务号 AUDIO-2526；核对四个文件的 depot revision、Cookie 对应关系和提交作者，其他语言文件不要进入这次提交。",
+      "visible_inputs": [
+        {
+          "name": "files",
+          "kind": "structured_array",
+          "description": "Japanese Pickup Work Unit 与三条替换媒体的四个绝对路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，以 AUDIO-2526 提交这四个临时文件。",
+      "fixture": {
+        "adapter": "source_control_provider_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "runner 独占 Perforce workspace 中四个目标文件已签出并修改",
+          "中英语言文件作为 clean 干扰项",
+          "revision、Cookie、作者和内容哈希基线已封存",
+          "凭据、provider 或文件集合不确定时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.sourceControl.commit",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.commit",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_depot_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.commit",
+          "expectation": "新 changelist 作者为 runner、说明含 AUDIO-2526 且仅包含目标四文件"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_depot_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.commit",
+          "expectation": "四个 revision/内容哈希更新并保持 Cookie 映射，中英文件 revision 不变"
+        }
+      ],
+      "cleanup": {
+        "adapter": "source_control_provider_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "source_control_provider_stopped"
+        ]
+      }
+    },
+    {
+      "id": "VS-SC-DELETE-01",
+      "api": "ak.wwise.core.sourceControl.delete",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "obsolete_workunit_delete",
+      "scenario_index": 1,
+      "prompt": "要标记删除的绝对文件路径是 {files}。请从临时分支删除废弃的 Debug_Audio Work Unit 和它独占的两条媒体，保留仍被 Gameplay 引用的共享媒体；核对待删除状态、工作区文件和对象引用。",
+      "visible_inputs": [
+        {
+          "name": "files",
+          "kind": "structured_array",
+          "description": "Debug_Audio Work Unit 与两条独占媒体的三个绝对路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，只删除废弃 Work Unit 和两条独占媒体。",
+      "fixture": {
+        "adapter": "source_control_provider_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 Perforce workspace/depot 与一次性工程副本",
+          "Debug_Audio、两条独占媒体和一条共享媒体均已跟踪",
+          "文件引用图、depot revision 和状态基线已封存",
+          "provider 或引用归属不明时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.sourceControl.delete",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.delete",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_status_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.delete",
+          "expectation": "三个目标路径为 opened for delete 且本地文件按 provider 语义移除"
+        },
+        {
+          "phase": "after",
+          "adapter": "project_reference_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.delete",
+          "expectation": "共享媒体仍存在、保持 clean 且 Gameplay 引用可解析；其他 depot 文件不变"
+        }
+      ],
+      "cleanup": {
+        "adapter": "source_control_provider_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "source_control_provider_stopped"
+        ]
+      }
+    },
+    {
+      "id": "VS-SC-DELETE-02",
+      "api": "ak.wwise.core.sourceControl.delete",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "localized_orphan_delete",
+      "scenario_index": 2,
+      "prompt": "要标记删除的日文媒体绝对路径是 {files}。请删除其中两条已经没有对象使用的旧媒体；English(US) 下同名文件和日文里仍被使用的三条媒体都要保留，并按完整路径和使用关系核对。",
+      "visible_inputs": [
+        {
+          "name": "files",
+          "kind": "structured_array",
+          "description": "两条未使用 Japanese 媒体的绝对路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，只删除两条日文孤立媒体。",
+      "fixture": {
+        "adapter": "source_control_provider_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 Perforce 服务与一次性多语言工程副本",
+          "两条日文 unused、三条日文 used 和两条英文同名媒体已跟踪",
+          "使用关系与路径/revision 基线已封存",
+          "无法证明完整路径与 provider 状态时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.sourceControl.delete",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.delete",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_status_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.delete",
+          "expectation": "仅两条 Japanese unused 路径为 delete，英文同名和日文 used 路径保持 clean"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_file_usage_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.delete",
+          "expectation": "保留媒体的对象 usage 可解析，删除集合与 runner unused 基线完全一致"
+        }
+      ],
+      "cleanup": {
+        "adapter": "source_control_provider_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "source_control_provider_stopped"
+        ]
+      }
+    },
+    {
+      "id": "VS-SC-SOURCE-FILES-01",
+      "api": "ak.wwise.core.sourceControl.getSourceFiles",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "used_unused_media_inventory",
+      "scenario_index": 1,
+      "prompt": "要递归扫描的目录选择器是 {source_folder}，它相对当前工程的 Originals。请把已使用、未使用和版本库存在但本地缺失的媒体分开；已使用项列出引用它们的 Wwise 对象，并包含所有子目录。",
+      "visible_inputs": [
+        {
+          "name": "source_folder",
+          "kind": "string",
+          "description": "相对 Originals 的 Weapons 目录选择器"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，读取这个临时工作区的媒体清单。",
+      "fixture": {
+        "adapter": "source_control_provider_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 Perforce provider 和一次性工程副本",
+          "Weapons 下预置 used、unused、depot-only missing 三类媒体",
+          "递归文件树、usage GUID 与 provider 基线已封存",
+          "provider 或目录归属不明时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.sourceControl.getSourceFiles",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.getSourceFiles",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_file_usage_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.getSourceFiles",
+          "expectation": "递归结果按 used/unused/missing 精确匹配基线，路径均相对 Originals"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_file_usage_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.getSourceFiles",
+          "expectation": "used 项的对象 GUID/路径集合正确，读取没有改变文件、provider 或工程"
+        }
+      ],
+      "cleanup": {
+        "adapter": "source_control_provider_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "source_control_provider_stopped"
+        ]
+      }
+    },
+    {
+      "id": "VS-SC-SOURCE-FILES-02",
+      "api": "ak.wwise.core.sourceControl.getSourceFiles",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "localized_usage_crosscheck",
+      "scenario_index": 2,
+      "prompt": "要比较的三语目录选择器是 {source_folders}，它们都相对当前工程的 Originals。请列出每种语言被使用的台词、孤立文件和缺失文件，并按台词键指出 Chinese、English(US)、Japanese 的不一致。",
+      "visible_inputs": [
+        {
+          "name": "source_folders",
+          "kind": "structured_array",
+          "description": "Chapter26 中英日三个相对 Originals 的目录选择器"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "这一步预览没问题，执行它；如果还有下一步，先把下一步预览给我。",
+      "fixture": {
+        "adapter": "source_control_provider_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 provider 与三语一次性工程副本",
+          "三语目录含受控共同、孤立和缺失媒体",
+          "台词键、usage GUID 和文件状态基线已封存",
+          "路径或 provider 前置不完整时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.sourceControl.getSourceFiles",
+          "count": 3,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.getSourceFiles",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_file_usage_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.getSourceFiles",
+          "expectation": "三次目录结果各自匹配对应语言的 used/unused/missing 基线"
+        },
+        {
+          "phase": "after",
+          "adapter": "localized_media_diff_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.getSourceFiles",
+          "expectation": "共同、孤立、缺失台词键差异按规范化路径计算正确且状态未改变"
+        }
+      ],
+      "cleanup": {
+        "adapter": "source_control_provider_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "source_control_provider_stopped"
+        ]
+      }
+    },
+    {
+      "id": "VS-SC-STATUS-01",
+      "api": "ak.wwise.core.sourceControl.getStatus",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "mixed_workspace_status_audit",
+      "scenario_index": 1,
+      "prompt": "要检查的绝对文件路径是 {files}。它们分别是一个干净 Work Unit、一个已签出并修改的 Work Unit、一个待新增媒体和一个被别人锁定的文件；请逐项给出状态、revision 和所有者。",
+      "visible_inputs": [
+        {
+          "name": "files",
+          "kind": "structured_array",
+          "description": "四个分别处于 clean、edit、add、other-locked 状态的绝对路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，读取这四个临时文件的状态。",
+      "fixture": {
+        "adapter": "source_control_provider_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 Perforce depot 含 runner 和受控干扰 workspace",
+          "四个绝对路径分别预置 clean/edit/add/other-locked 状态",
+          "revision、owner 和文件哈希基线已封存",
+          "provider 或状态准备失败时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.sourceControl.getStatus",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.getStatus",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_status_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.getStatus",
+          "expectation": "四个文件的状态、revision、owner 与 provider 基线逐项一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "filesystem_hash_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.getStatus",
+          "expectation": "状态读取未改变工作区权限、内容、changelist 或锁"
+        }
+      ],
+      "cleanup": {
+        "adapter": "source_control_provider_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "source_control_provider_stopped"
+        ]
+      }
+    },
+    {
+      "id": "VS-SC-STATUS-02",
+      "api": "ak.wwise.core.sourceControl.getStatus",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "precommit_scope_audit",
+      "scenario_index": 2,
+      "prompt": "要检查的 Chapter27 绝对文件路径是 {files}。请区分已修改、只是签出未改和不在版本管理中的文件，按完整路径分组，并确认没有把 Chapter28 的同名文件算进来。",
+      "visible_inputs": [
+        {
+          "name": "files",
+          "kind": "structured_array",
+          "description": "Chapter27 六个目标文件的绝对路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，读取 Chapter27 这批文件的状态。",
+      "fixture": {
+        "adapter": "source_control_provider_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 provider 中 Chapter27/28 有同名文件但路径不同",
+          "Chapter27 六文件含 modified、opened-unchanged、untracked 三类",
+          "完整状态、路径和 revision 基线已封存",
+          "provider 或绝对路径不明确时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.sourceControl.getStatus",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.getStatus",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_status_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.getStatus",
+          "expectation": "六个 Chapter27 文件按三类状态精确分组，路径和 revision 正确"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_status_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.getStatus",
+          "expectation": "Chapter28 同名文件不在结果且所有工作区/depot 状态不变"
+        }
+      ],
+      "cleanup": {
+        "adapter": "source_control_provider_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "source_control_provider_stopped"
+        ]
+      }
+    },
+    {
+      "id": "VS-SC-MOVE-01",
+      "api": "ak.wwise.core.sourceControl.move",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "workunit_folder_refactor",
+      "scenario_index": 1,
+      "prompt": "版本管理移动关系是 {file_moves}。请把 Weapons_Ranged Work Unit 从 Actor-Mixer 根目录移动到 Weapons/Shared，并保留为一次移动而不是删除再新增；核对对象 GUID、引用和 depot 历史。",
+      "visible_inputs": [
+        {
+          "name": "file_moves",
+          "kind": "structured_array",
+          "description": "源绝对文件路径与目标绝对文件路径的一组对应关系"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，在临时分支完成这个 Work Unit 移动。",
+      "fixture": {
+        "adapter": "source_control_provider_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 Perforce workspace/depot 与一次性工程副本",
+          "源 Work Unit 已跟踪且目标目录为空",
+          "对象 GUID、引用图、源 revision 与路径基线已封存",
+          "provider 不支持 move 或隔离不足时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.sourceControl.move",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.move",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_move_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.move",
+          "expectation": "provider 将源/目标记录为一对 move，源路径消失且目标文件内容可解析"
+        },
+        {
+          "phase": "after",
+          "adapter": "project_reference_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.move",
+          "expectation": "Work Unit 内对象 GUID 与跨单元引用保持不变，depot ancestry 指向源 revision"
+        }
+      ],
+      "cleanup": {
+        "adapter": "source_control_provider_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "source_control_provider_stopped"
+        ]
+      }
+    },
+    {
+      "id": "VS-SC-MOVE-02",
+      "api": "ak.wwise.core.sourceControl.move",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "localized_media_relocation",
+      "scenario_index": 2,
+      "prompt": "三条日文媒体的移动关系是 {file_moves}。请把它们从 Japanese/Chapter28 移到 Japanese/Chapter28/Pickups，保持对象引用和 Media ID 不变；English(US) 下同名文件不要移动。",
+      "visible_inputs": [
+        {
+          "name": "file_moves",
+          "kind": "structured_array",
+          "description": "三组 Japanese 媒体源绝对路径与目标绝对路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，只移动三条日文 Pickup 媒体。",
+      "fixture": {
+        "adapter": "source_control_provider_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 provider 与多语言工程副本",
+          "三条日文源路径已跟踪，英文同名路径作为干扰",
+          "对象引用、Media ID、内容哈希和 depot revision 已封存",
+          "完整路径或 provider move 能力不明时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.sourceControl.move",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.move",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_move_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.move",
+          "expectation": "三对日文源/目标均记录为 provider move，内容哈希和 revision ancestry 保留"
+        },
+        {
+          "phase": "after",
+          "adapter": "project_audio_reference_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.move",
+          "expectation": "三个对象引用和 Media ID 指向新路径，英文同名文件路径/状态不变"
+        }
+      ],
+      "cleanup": {
+        "adapter": "source_control_provider_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "source_control_provider_stopped"
+        ]
+      }
+    },
+    {
+      "id": "VS-SC-REVERT-01",
+      "api": "ak.wwise.core.sourceControl.revert",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "mixed_edit_add_revert",
+      "scenario_index": 1,
+      "prompt": "要撤销的绝对文件路径是 {files}。请恢复 Chapter29 的两个已编辑 Work Unit，并撤销一条待新增临时媒体；完成后工作区应干净，文件内容和对象层级回到 depot 基线。",
+      "visible_inputs": [
+        {
+          "name": "files",
+          "kind": "structured_array",
+          "description": "两个 tracked edit 与一个 opened-for-add 文件的绝对路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，放弃 Chapter29 这批临时改动。",
+      "fixture": {
+        "adapter": "source_control_provider_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 Perforce workspace 中两个 tracked edit 和一个 opened for add",
+          "depot 基线字节、对象树和状态已封存",
+          "没有其他待处理文件",
+          "provider 或文件归属不明时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.sourceControl.revert",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.revert",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_status_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.revert",
+          "expectation": "两个 tracked 文件恢复 clean，待新增文件从 changelist 与工作区消失"
+        },
+        {
+          "phase": "after",
+          "adapter": "project_xml_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.revert",
+          "expectation": "两个 Work Unit 字节和对象树等于 depot 基线，其他文件不变"
+        }
+      ],
+      "cleanup": {
+        "adapter": "source_control_provider_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "source_control_provider_stopped"
+        ]
+      }
+    },
+    {
+      "id": "VS-SC-REVERT-02",
+      "api": "ak.wwise.core.sourceControl.revert",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "move_operation_revert",
+      "scenario_index": 2,
+      "prompt": "未提交移动涉及的绝对路径是 {move_paths}。请撤销 Ambience_Night Work Unit 到 Shared 的移动，让它回到原目录；对象 GUID、引用和 depot revision 都要恢复，目标目录不能留下副本。",
+      "visible_inputs": [
+        {
+          "name": "move_paths",
+          "kind": "structured_array",
+          "description": "未提交 move 的源、目标绝对文件路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，撤销这次临时移动。",
+      "fixture": {
+        "adapter": "source_control_provider_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 provider workspace 中存在一对未提交 move",
+          "移动前路径、revision、对象 GUID 与引用图已封存",
+          "目标路径仅由本场景拥有",
+          "provider move/revert 状态不明确时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.sourceControl.revert",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.revert",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_move_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.revert",
+          "expectation": "revert 后源路径恢复 clean、目标路径消失且没有 opened move 记录"
+        },
+        {
+          "phase": "after",
+          "adapter": "project_reference_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.revert",
+          "expectation": "Work Unit 内容、对象 GUID、引用与 depot revision 等于移动前基线"
+        }
+      ],
+      "cleanup": {
+        "adapter": "source_control_provider_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "source_control_provider_stopped"
+        ]
+      }
+    },
+    {
+      "id": "VS-SC-PROVIDER-01",
+      "api": "ak.wwise.core.sourceControl.setProvider",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "ephemeral_perforce_provider_enable",
+      "scenario_index": 1,
+      "prompt": "本次专用 Perforce 连接参数是 {provider_settings}。请把当前工程连接到指定工作区；这组临时凭据只用于当前工程副本，连接完成后告诉我操作结果。",
+      "visible_inputs": [
+        {
+          "name": "provider_settings",
+          "kind": "structured_object",
+          "description": "包含 provider、host、port、server、username、一次性 password 或 ticket 及 workspace 的连接参数"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，为临时工程启用这个 Perforce 工作区。",
+      "fixture": {
+        "adapter": "source_control_provider_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "runner 独占的临时 p4d 进程、端口、用户、ticket、workspace 和 depot",
+          "一次性工程副本及三个已跟踪 Work Unit",
+          "Wwise 2023.1 Perforce provider 插件可用",
+          "任一凭据、插件、端口或工程归属无法证明时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.sourceControl.setProvider",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.setProvider",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_provider_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.setProvider",
+          "expectation": "当前工程 provider 为 Perforce 且 server/user/workspace 精确等于 runner 分配值"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_status_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.setProvider",
+          "expectation": "三个 Work Unit 状态可从临时 depot 读回，用户工程 provider 配置与凭据均未变化"
+        }
+      ],
+      "cleanup": {
+        "adapter": "source_control_provider_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "source_control_provider_stopped"
+        ]
+      }
+    },
+    {
+      "id": "VS-SC-PROVIDER-02",
+      "api": "ak.wwise.core.sourceControl.setProvider",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "provider_disable_and_isolation",
+      "scenario_index": 2,
+      "prompt": "目标 provider 配置是 {provider_settings}。请把当前工程切回不使用版本管理，确认 provider 已停用、原先的 depot 文件没有被删除，另一个临时工程仍保持自己的 Perforce 连接。",
+      "visible_inputs": [
+        {
+          "name": "provider_settings",
+          "kind": "structured_object",
+          "description": "明确指定禁用版本管理的 provider 配置，不包含永久凭据"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，只停用这个工程副本的版本管理。",
+      "fixture": {
+        "adapter": "source_control_provider_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "两个一次性工程分别连接同一临时 p4d 的不同 workspace",
+          "目标工程 provider 为 Perforce，干扰工程连接基线已封存",
+          "depot revision 和工作区文件哈希已封存",
+          "无法唯一识别目标工程/provider 时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.sourceControl.setProvider",
+          "count": 1,
+          "effect": "external"
+        },
+        {
+          "api": "ak.wwise.core.getProjectInfo",
+          "count": 1,
+          "effect": "read"
+        },
+        {
+          "api": "ak.wwise.core.object.get",
+          "count": 1,
+          "effect": "read"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.setProvider",
+          "expectation": "确认前目标调用尚未执行，隔离工程、提供方状态、文件树、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_provider_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.setProvider",
+          "expectation": "目标工程 provider 变为空且后续 provider 状态调用明确表现为未配置"
+        },
+        {
+          "phase": "after",
+          "adapter": "source_control_depot_oracle",
+          "subject_api": "ak.wwise.core.sourceControl.setProvider",
+          "expectation": "depot 文件/revision 均保留，干扰工程 provider/workspace 状态不变"
+        }
+      ],
+      "cleanup": {
+        "adapter": "source_control_provider_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "source_control_provider_stopped"
+        ]
+      }
+    },
+    {
+      "id": "VS-UNDO-REDO-01",
+      "api": "ak.wwise.core.undo.redo",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "online_authoring",
+      "scenario_family": "redo_grouped_mix_adjustment",
+      "scenario_index": 1,
+      "prompt": "刚才撤销了“Chapter30 混音平衡”，请把这一步重新做回来。Music、SFX、Dialogue 三条总线的音量都应恢复到调整后的值，更晚的对象不能受到影响。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，只重做这一个混音步骤。",
+      "fixture": {
+        "adapter": "redo_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "一次性 2023.1 工程的 redo 栈顶部为 runner 创建并撤销的三总线组",
+          "三条 Bus 的撤销前、撤销后和目标 Volume 均已封存",
+          "当前进程没有更晚历史操作",
+          "redo 栈或项目归属无法证明时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.undo.redo",
+          "count": 1,
+          "effect": "runtime_mutation"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "runtime_state_unchanged_oracle",
+          "subject_api": "ak.wwise.core.undo.redo",
+          "expectation": "确认前目标调用尚未执行，隔离工程、文件树、受控运行时、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "waapi_property_readback",
+          "subject_api": "ak.wwise.core.undo.redo",
+          "expectation": "一次 redo 后三条 Bus 的 Volume 分别等于组提交后的目标值"
+        },
+        {
+          "phase": "after",
+          "adapter": "undo_history_oracle",
+          "subject_api": "ak.wwise.core.undo.redo",
+          "expectation": "只消费一个 redo 步骤，非目标属性和对象快照不变"
+        }
+      ],
+      "cleanup": {
+        "adapter": "scenario_project_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged"
+        ]
+      }
+    },
+    {
+      "id": "VS-UNDO-REDO-02",
+      "api": "ak.wwise.core.undo.redo",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "online_authoring",
+      "scenario_family": "redo_hierarchy_assignment_refactor",
+      "scenario_index": 2,
+      "prompt": "把刚撤销的“Footstep Surface 重构”重新应用：三个子容器应回到新的父级，Wood 和 Gravel 分配也要恢复。完成后核对层级和分配一起回来，只重做这一组。",
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，只重做这组层级与分配修改。",
+      "fixture": {
+        "adapter": "redo_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "一次性工程 redo 栈顶部为 runner 封存的层级与 assignment 复合组",
+          "对象 parent GUID、Switch 映射和执行前状态已封存",
+          "沙箱进程无其他历史修改",
+          "redo 身份不唯一时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.undo.redo",
+          "count": 1,
+          "effect": "runtime_mutation"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "runtime_state_unchanged_oracle",
+          "subject_api": "ak.wwise.core.undo.redo",
+          "expectation": "确认前目标调用尚未执行，隔离工程、文件树、受控运行时、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "waapi_object_tree_readback",
+          "subject_api": "ak.wwise.core.undo.redo",
+          "expectation": "三个子容器 parent GUID 恢复为重构后的目标父级"
+        },
+        {
+          "phase": "after",
+          "adapter": "waapi_switch_assignment_oracle",
+          "subject_api": "ak.wwise.core.undo.redo",
+          "expectation": "Wood/Gravel assignment 精确恢复，Metal 与非目标映射不变且只消费一个 redo"
+        }
+      ],
+      "cleanup": {
+        "adapter": "scenario_project_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged"
+        ]
+      }
+    },
+    {
+      "id": "VS-TONE-WAV-01",
+      "api": "ak.wwise.debug.generateToneWAV",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "stereo_calibration_tone",
+      "scenario_index": 1,
+      "prompt": "请在 {output_file} 生成一条 48 kHz、16 位、双声道的 1 kHz 正弦校准音：起音 0.1 秒、持续 1.5 秒、释音 0.2 秒，持续段为 -12 dB；核对 WAV 头、时长、频率和包络。",
+      "visible_inputs": [
+        {
+          "name": "output_file",
+          "kind": "absolute_file_path",
+          "description": "本场景唯一且尚不存在的绝对 WAV 输出路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，生成到隔离的音频目录。",
+      "fixture": {
+        "adapter": "tone_wav_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立空输出目录和唯一 WAV 路径",
+          "专用 2023.1 Authoring/WAAPI 进程",
+          "runner PCM 分析 oracle 支持 WAV 头、频谱和 ADSR",
+          "目标存在、进程或路径隔离不明确时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.debug.generateToneWAV",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.debug.generateToneWAV",
+          "expectation": "确认前目标调用尚未执行，隔离工程、文件树、受控运行时、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "wav_header_oracle",
+          "subject_api": "ak.wwise.debug.generateToneWAV",
+          "expectation": "文件可解码，sampleRate=48000、bitDepth=int16、channelCount=2 且帧数对应 1.8 秒"
+        },
+        {
+          "phase": "after",
+          "adapter": "pcm_signal_oracle",
+          "subject_api": "ak.wwise.debug.generateToneWAV",
+          "expectation": "双声道主频在 1 kHz 容差内，持续段电平为 -12 dB，attack/release 斜率与时长匹配"
+        }
+      ],
+      "cleanup": {
+        "adapter": "isolated_io_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left"
+        ]
+      }
+    },
+    {
+      "id": "VS-TONE-WAV-02",
+      "api": "ak.wwise.debug.generateToneWAV",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "external_isolated",
+      "scenario_family": "surround_noise_bed",
+      "scenario_index": 2,
+      "prompt": "请在 {output_file} 生成一条 96 kHz、32 位浮点、5.1 声道的白噪声校验素材，起音和释音各 0.25 秒，中间持续 2 秒，持续电平 -24 dB；确认六个声道都有效、长度一致。",
+      "visible_inputs": [
+        {
+          "name": "output_file",
+          "kind": "absolute_file_path",
+          "description": "本场景唯一且尚不存在的 5.1 WAV 绝对输出路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，生成这条临时 5.1 素材。",
+      "fixture": {
+        "adapter": "tone_wav_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立空输出目录、唯一 WAV 路径和文件树快照",
+          "专用 2023.1 Authoring/WAAPI 进程",
+          "runner 支持多声道 float32 WAV 与统计包络分析",
+          "路径、格式支持或进程归属不明时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.debug.generateToneWAV",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.debug.generateToneWAV",
+          "expectation": "确认前目标调用尚未执行，隔离工程、文件树、受控运行时、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "wav_header_oracle",
+          "subject_api": "ak.wwise.debug.generateToneWAV",
+          "expectation": "WAV 为 96000 Hz、float32、5.1 六声道且总时长 2.5 秒"
+        },
+        {
+          "phase": "after",
+          "adapter": "pcm_signal_oracle",
+          "subject_api": "ak.wwise.debug.generateToneWAV",
+          "expectation": "六声道均非静音、长度一致、频谱符合白噪声且持续段 RMS 接近 -24 dB，所有写入局限于隔离根"
+        }
+      ],
+      "cleanup": {
+        "adapter": "isolated_io_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left"
+        ]
+      }
+    },
+    {
+      "id": "VS-UI-CREATE-01",
+      "api": "ak.wwise.ui.project.create",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "online_lifecycle",
+      "scenario_family": "ui_multilingual_project_create",
+      "scenario_index": 1,
+      "prompt": "请在独立的临时 Wwise 窗口中把 Cinematic_Audio_2023 工程创建为 {project_path}，默认语言设为 English(US)，再加入 Japanese 和 Chinese，并启用 Windows、Mac；确认工程已加载、核心 Work Unit 和语言平台齐全。",
+      "visible_inputs": [
+        {
+          "name": "project_path",
+          "kind": "absolute_file_path",
+          "description": "Cinematic_Audio_2023 工程的绝对 .wproj 目标路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，只在独立临时窗口里创建。",
+      "fixture": {
+        "adapter": "ui_project_create_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 2023.1 GUI Authoring 进程、私有端口和进程组",
+          "空的一次性父目录、独立 HOME 和日志",
+          "用户 Authoring 作为禁止触碰的干扰实例",
+          "UI、路径、版本或进程归属无法证明时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.ui.project.create",
+          "count": 1,
+          "effect": "external"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.ui.project.create",
+          "expectation": "确认前目标调用尚未执行，隔离工程、文件树、受控运行时、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "project_open_readback_oracle",
+          "subject_api": "ak.wwise.ui.project.create",
+          "expectation": "新工程在目标进程中加载，名称、路径、默认/附加语言和两个平台精确匹配"
+        },
+        {
+          "phase": "after",
+          "adapter": "filesystem_tree_oracle",
+          "subject_api": "ak.wwise.ui.project.create",
+          "expectation": "核心 Work Unit 可解析、全部新增文件位于隔离父目录且用户实例身份不变"
+        }
+      ],
+      "cleanup": {
+        "adapter": "wwise_lifecycle_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "owned_port_released"
+        ]
+      }
+    },
+    {
+      "id": "VS-UI-CREATE-02",
+      "api": "ak.wwise.ui.project.create",
+      "item_type": "function",
+      "versions": [
+        "2023.1"
+      ],
+      "lane": "online_lifecycle",
+      "scenario_family": "ui_unicode_project_create",
+      "scenario_index": 2,
+      "prompt": "请在临时 Wwise 进程中把“关卡三十二 音频验证”工程创建为 {project_path}，只启用 Windows、默认语言为 Chinese；创建完成后读取当前工程信息，确认字符、规范化路径、语言和项目 GUID 正确。",
+      "visible_inputs": [
+        {
+          "name": "project_path",
+          "kind": "absolute_file_path",
+          "description": "父目录含中文和空格的工程绝对 .wproj 目标路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，在隔离进程中创建并重开。",
+      "fixture": {
+        "adapter": "ui_project_create_fixture",
+        "sandbox": "isolated_io_root",
+        "prerequisites": [
+          "独立 2023.1 GUI Authoring、私有端口和进程组",
+          "Unicode 空父目录与唯一项目路径",
+          "独立 HOME、缓存和日志",
+          "编码、路径或进程隔离不能证明时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.ui.project.create",
+          "count": 1,
+          "effect": "external"
+        },
+        {
+          "api": "ak.wwise.core.getProjectInfo",
+          "count": 1,
+          "effect": "read"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "isolated_io_unchanged_oracle",
+          "subject_api": "ak.wwise.ui.project.create",
+          "expectation": "确认前目标调用尚未执行，隔离工程、文件树、受控运行时、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "project_reopen_oracle",
+          "subject_api": "ak.wwise.ui.project.create",
+          "expectation": "创建后与保存重开后名称、规范化路径、GUID 和默认语言 Chinese 一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "filesystem_tree_oracle",
+          "subject_api": "ak.wwise.ui.project.create",
+          "expectation": "仅有 Windows 平台且所有文件变更位于隔离目录，源工程未变化"
+        }
+      ],
+      "cleanup": {
+        "adapter": "wwise_lifecycle_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "no_owned_process_or_output_left",
+          "owned_port_released"
+        ]
+      }
+    },
+    {
+      "id": "VS-PING-01",
+      "api": "ak.wwise.core.ping",
+      "item_type": "function",
+      "versions": [
+        "2024.1"
+      ],
+      "lane": "online_authoring",
+      "scenario_family": "ready_endpoint_health_check",
+      "scenario_index": 1,
+      "prompt": "确认这个刚加载完大型工程的 Wwise 现在是否真的可以接收操作，并把检查发生时的进程、工程和时间点对应起来；不要只根据端口能连接就判断。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "waapi_ping_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "独立 2024.1 Authoring 已完成大型沙箱工程加载",
+          "私有端点、PID、工程 GUID 和 readiness 时间戳已封存",
+          "当前没有模态对话框"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.ping",
+          "count": 1,
+          "effect": "read"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "after",
+          "adapter": "waapi_ping_oracle",
+          "subject_api": "ak.wwise.core.ping",
+          "expectation": "isAvailable 为 true，读取时间晚于工程 loaded 证明且连接属于目标 PID/端点"
+        },
+        {
+          "phase": "after",
+          "adapter": "project_identity_oracle",
+          "subject_api": "ak.wwise.core.ping",
+          "expectation": "当前工程 GUID/路径匹配沙箱，健康检查未改变工程或 UI 状态"
+        }
+      ],
+      "cleanup": {
+        "adapter": "scenario_project_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged"
+        ]
+      }
+    },
+    {
+      "id": "VS-PING-02",
+      "api": "ak.wwise.core.ping",
+      "item_type": "function",
+      "versions": [
+        "2024.1"
+      ],
+      "lane": "online_ui",
+      "scenario_family": "modal_dialog_unavailable_check",
+      "scenario_index": 2,
+      "prompt": "Wwise 现在开着一个需要处理的模态窗口，请确认它此刻是否还能安全接收新的操作；关闭窗口后再由我继续，不要把“端口还在”误报成“当前可用”。",
+      "protocol": "single",
+      "confirmation_prompt": null,
+      "fixture": {
+        "adapter": "waapi_ping_modal_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "独立 2024.1 Authoring 由 runner 打开一个无破坏性的受控模态窗口",
+          "目标 PID、窗口身份和端点已封存",
+          "模态窗口不属于用户实例；无法唯一识别时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.ping",
+          "count": 1,
+          "effect": "read"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "after",
+          "adapter": "waapi_ping_oracle",
+          "subject_api": "ak.wwise.core.ping",
+          "expectation": "模态窗口存在期间 isAvailable 为 false，并记录目标 PID 与窗口时间范围"
+        },
+        {
+          "phase": "cleanup",
+          "adapter": "ui_window_state_oracle",
+          "subject_api": "ak.wwise.core.ping",
+          "expectation": "runner 关闭受控模态窗口后目标进程恢复可用且工程快照不变"
+        }
+      ],
+      "cleanup": {
+        "adapter": "ui_session_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged",
+          "controlled_modal_closed"
+        ]
+      }
+    },
+    {
+      "id": "VS-WU-LOAD-01",
+      "api": "ak.wwise.core.workUnit.load",
+      "item_type": "function",
+      "versions": [
+        "2025.1"
+      ],
+      "lane": "online_lifecycle",
+      "scenario_family": "dialogue_workunit_restore",
+      "scenario_index": 1,
+      "prompt": "要加载的 Work Unit 是 {work_unit}。请加载它并确认角色层级、三语 Sound 和 Event 引用重新可见，GUID 与磁盘文件一致，同时说明这次加载是否清空了撤销历史。",
+      "visible_inputs": [
+        {
+          "name": "work_unit",
+          "kind": "object_path",
+          "description": "已卸载 Dialogue_Chapter33 Work Unit 的完整对象路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "可以，加载这个临时 Work Unit。",
+      "fixture": {
+        "adapter": "workunit_lifecycle_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "一次性 2025.1 工程中 Dialogue_Chapter33 已卸载且磁盘 WWU 可解析",
+          "内部对象 GUID、三语层级和引用图已封存",
+          "undo 栈含 runner 哨兵步骤",
+          "Work Unit、工程或进程归属不明时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.workUnit.load",
+          "count": 1,
+          "effect": "runtime_mutation"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "runtime_state_unchanged_oracle",
+          "subject_api": "ak.wwise.core.workUnit.load",
+          "expectation": "确认前目标调用尚未执行，隔离工程、文件树、受控运行时、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "waapi_workunit_state_oracle",
+          "subject_api": "ak.wwise.core.workUnit.load",
+          "expectation": "目标 Work Unit 变为 loaded，内部角色、三语 Sound 和 Event GUID 均可查询"
+        },
+        {
+          "phase": "after",
+          "adapter": "project_reference_oracle",
+          "subject_api": "ak.wwise.core.workUnit.load",
+          "expectation": "对象/引用与 WWU 基线一致，undo 哨兵历史按 API 语义被清空且其他 Work Unit 不变"
+        }
+      ],
+      "cleanup": {
+        "adapter": "workunit_lifecycle_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged"
+        ]
+      }
+    },
+    {
+      "id": "VS-WU-LOAD-02",
+      "api": "ak.wwise.core.workUnit.load",
+      "item_type": "function",
+      "versions": [
+        "2025.1"
+      ],
+      "lane": "online_lifecycle",
+      "scenario_family": "cross_workunit_dependency_restore",
+      "scenario_index": 2,
+      "prompt": "要依次加载的 Work Unit 是 {work_units}。请按给定顺序加载 Ambience_Shared 和 Level_Desert，核对 Desert 中对象能重新解析到 Shared 的音频与 Bus 引用，两个单元的 GUID 和层级都与保存文件一致。",
+      "visible_inputs": [
+        {
+          "name": "work_units",
+          "kind": "structured_array",
+          "description": "Ambience_Shared、Level_Desert 两个已卸载 Work Unit 的有序完整对象路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "这一步预览没问题，执行它；如果还有下一步，先把下一步预览给我。",
+      "fixture": {
+        "adapter": "workunit_lifecycle_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "一次性 2025.1 工程中两个目标 Work Unit 均已卸载",
+          "跨单元引用、对象 GUID、加载顺序和 WWU 哈希已封存",
+          "其他加载单元作为不变基线",
+          "任何文件或依赖缺失时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.workUnit.load",
+          "count": 2,
+          "effect": "runtime_mutation"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "runtime_state_unchanged_oracle",
+          "subject_api": "ak.wwise.core.workUnit.load",
+          "expectation": "确认前目标调用尚未执行，隔离工程、文件树、受控运行时、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "waapi_workunit_state_oracle",
+          "subject_api": "ak.wwise.core.workUnit.load",
+          "expectation": "Ambience_Shared 与 Level_Desert 均 loaded，内部 GUID/层级匹配各自 WWU"
+        },
+        {
+          "phase": "after",
+          "adapter": "project_reference_oracle",
+          "subject_api": "ak.wwise.core.workUnit.load",
+          "expectation": "Desert 到 Shared 的音频与 Bus 引用全部可解析，非目标 Work Unit 状态不变且 undo 历史已清空"
+        }
+      ],
+      "cleanup": {
+        "adapter": "workunit_lifecycle_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged"
+        ]
+      }
+    },
+    {
+      "id": "VS-WU-UNLOAD-01",
+      "api": "ak.wwise.core.workUnit.unload",
+      "item_type": "function",
+      "versions": [
+        "2025.1"
+      ],
+      "lane": "online_lifecycle",
+      "scenario_family": "clean_workunit_memory_release",
+      "scenario_index": 1,
+      "prompt": "要卸载的 Work Unit 是 {work_units}。请卸载已经保存的 Cinematics_Chapter34 和 Dialogue_Chapter34；卸载后其内部对象应不可查询，但磁盘文件、GUID 和其他 Work Unit 必须保持完整。",
+      "visible_inputs": [
+        {
+          "name": "work_units",
+          "kind": "structured_array",
+          "description": "两个已加载且已保存 Work Unit 的完整对象路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "这一步预览没问题，执行它；如果还有下一步，先把下一步预览给我。",
+      "fixture": {
+        "adapter": "workunit_lifecycle_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "一次性 2025.1 工程中两个目标 Work Unit 已加载、已保存且无脏状态",
+          "内部 GUID、WWU 文件哈希和其他 Work Unit 快照已封存",
+          "undo 栈含 runner 哨兵",
+          "保存或归属证明不足时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.workUnit.unload",
+          "count": 2,
+          "effect": "runtime_mutation"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "runtime_state_unchanged_oracle",
+          "subject_api": "ak.wwise.core.workUnit.unload",
+          "expectation": "确认前目标调用尚未执行，隔离工程、文件树、受控运行时、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "waapi_workunit_state_oracle",
+          "subject_api": "ak.wwise.core.workUnit.unload",
+          "expectation": "两个 Work Unit 变为 unloaded 且内部对象 GUID 均无法由在线对象查询获得"
+        },
+        {
+          "phase": "after",
+          "adapter": "filesystem_hash_oracle",
+          "subject_api": "ak.wwise.core.workUnit.unload",
+          "expectation": "两个 WWU 文件哈希不变、其他 Work Unit 可见且 undo 哨兵按 API 语义被清空"
+        }
+      ],
+      "cleanup": {
+        "adapter": "workunit_lifecycle_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged"
+        ]
+      }
+    },
+    {
+      "id": "VS-WU-UNLOAD-02",
+      "api": "ak.wwise.core.workUnit.unload",
+      "item_type": "function",
+      "versions": [
+        "2025.1"
+      ],
+      "lane": "online_lifecycle",
+      "scenario_family": "dirty_workunit_rejection",
+      "scenario_index": 2,
+      "prompt": "要尝试卸载的 Work Unit 是 {work_unit}。它当前有未保存修改；如果 Wwise 不允许，就保持继续加载并保留内存修改，明确说明原因，不要为了卸载而保存或丢弃修改。",
+      "visible_inputs": [
+        {
+          "name": "work_unit",
+          "kind": "object_path",
+          "description": "含未保存修改的 Weapons_Chapter35 Work Unit 完整对象路径"
+        }
+      ],
+      "protocol": "preview_confirm",
+      "confirmation_prompt": "确认，尝试卸载；若有未保存修改就保持原状。",
+      "fixture": {
+        "adapter": "workunit_lifecycle_fixture",
+        "sandbox": "scenario_project_copy",
+        "prerequisites": [
+          "一次性 2025.1 工程的目标 Work Unit 已加载且有 runner 受控未保存 notes/Volume 修改",
+          "磁盘 WWU 哈希、内存对象值和 loaded 状态已封存",
+          "无自动保存或模态交互",
+          "脏状态无法证明时失败关闭"
+        ]
+      },
+      "trigger": null,
+      "expected_dispatches": [
+        {
+          "api": "ak.wwise.core.workUnit.unload",
+          "count": 1,
+          "effect": "runtime_mutation"
+        }
+      ],
+      "oracle_assertions": [
+        {
+          "phase": "preview",
+          "adapter": "runtime_state_unchanged_oracle",
+          "subject_api": "ak.wwise.core.workUnit.unload",
+          "expectation": "确认前目标调用尚未执行，隔离工程、文件树、受控运行时、进程和端口均与预览前快照一致"
+        },
+        {
+          "phase": "after",
+          "adapter": "waapi_workunit_state_oracle",
+          "subject_api": "ak.wwise.core.workUnit.unload",
+          "expectation": "调用明确失败，Work Unit 仍 loaded 且内部对象继续可查询"
+        },
+        {
+          "phase": "after",
+          "adapter": "project_snapshot_oracle",
+          "subject_api": "ak.wwise.core.workUnit.unload",
+          "expectation": "内存 notes/Volume 保持受控修改，磁盘 WWU 哈希不变且没有自动保存或丢弃"
+        }
+      ],
+      "cleanup": {
+        "adapter": "workunit_lifecycle_cleanup",
+        "postconditions": [
+          "owned_state_removed_or_restored",
+          "project_source_unchanged"
+        ]
+      }
+    }
+  ]
+}

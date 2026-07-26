@@ -47,7 +47,13 @@ SUPPORTED_IMPORT_ITEM_FIELDS = {
     "objectType",
     "originalsSubFolder",
 }
-TAB_DELIMITED_COLUMNS = ("Audio File", "Object Path", "Object Type", "Import Language", "Originals Sub Folder", "Notes")
+TAB_DELIMITED_COLUMNS = (
+    "Audio File",
+    "Object Path",
+    "Object Type",
+    "OriginalsSubFolder",
+    "Notes",
+)
 
 
 @dataclass(slots=True, frozen=True)
@@ -309,8 +315,7 @@ def tab_delimited_plan(items: Sequence[ImportItem | Mapping[str, Any]], *, filen
                 "Audio File": str(normalized.get("audioFile", "")),
                 "Object Path": str(normalized["objectPath"]),
                 "Object Type": str(normalized.get("objectType", "")),
-                "Import Language": str(normalized.get("importLanguage", "")),
-                "Originals Sub Folder": str(normalized.get("originalsSubFolder", "")),
+                "OriginalsSubFolder": str(normalized.get("originalsSubFolder", "")),
                 "Notes": str(normalized.get("notes", "")),
             }
         )

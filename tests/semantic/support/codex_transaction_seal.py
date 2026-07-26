@@ -24,6 +24,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
+from tests.semantic.support.codex_gateway_broker import (
+    validate_transaction_show_confirmation_payload,
+)
 from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
 from wwise_waapi.operation_registry import OperationContractError, parse_operation_request
 from wwise_waapi.transaction_runtime import (
@@ -323,6 +326,65 @@ def verify_preview_seal(
         runtime_guard_fingerprint=snapshot.runtime_guard_fingerprint,
         request_canonical_sha256=snapshot.request_canonical_sha256,
     )
+
+
+def validate_transaction_show_confirmation_against_store(
+    payload: Mapping[str, Any],
+    state_directory: Path,
+) -> dict[str, Any]:
+    """Bind a complete show response to the production transaction journal.
+
+    This works both while the transaction is awaiting confirmation and after
+    later phases have extended the journal: the binding's event sequence must
+    still identify the exact historical awaiting-confirmation event.
+    """
+
+    try:
+        confirmation = validate_transaction_show_confirmation_payload(payload)
+        transaction_id = str(payload["transaction_id"])
+        artifact_hash = str(payload["artifact_hash"])
+        binding = confirmation["binding"]
+        event_sequence = int(binding["event_sequence"])
+        last_event_hash = str(binding["last_event_hash"])
+        store = TransactionStore(_absolute_lexical_path(state_directory))
+        preview = store.load_preview(transaction_id)
+        record = store.load(transaction_id)
+        events = store.read_events(transaction_id)
+    except (KeyError, TypeError, ValueError, TransactionError) as exc:
+        raise TransactionSealError(
+            f"Transaction-show confirmation cannot be bound to durable state: {exc}"
+        ) from exc
+    if (
+        preview.transaction_id != transaction_id
+        or preview.artifact_hash != artifact_hash
+        or record.transaction_id != transaction_id
+        or record.artifact_hash != artifact_hash
+        or record.event_sequence < event_sequence
+        or len(events) < event_sequence
+    ):
+        raise TransactionSealError(
+            "Transaction-show confirmation differs from durable transaction identity."
+        )
+    event = events[event_sequence - 1]
+    if (
+        event.get("sequence") != event_sequence
+        or event.get("event_hash") != last_event_hash
+        or event.get("transaction_id") != transaction_id
+        or event.get("artifact_hash") != artifact_hash
+        or event.get("to_state") != TransactionState.AWAITING_CONFIRMATION.value
+    ):
+        raise TransactionSealError(
+            "Transaction-show confirmation does not identify the durable "
+            "awaiting-confirmation journal head."
+        )
+    return {
+        "contract": str(confirmation["contract"]),
+        "token": str(confirmation["token"]),
+        "transaction_id": transaction_id,
+        "artifact_hash": artifact_hash,
+        "event_sequence": event_sequence,
+        "last_event_hash": last_event_hash,
+    }
 
 
 def serialize_preview_seal(seal: PreviewTransactionSeal) -> str:
@@ -847,5 +909,6 @@ __all__ = [
     "create_preview_seal",
     "parse_preview_seal",
     "serialize_preview_seal",
+    "validate_transaction_show_confirmation_against_store",
     "verify_preview_seal",
 ]

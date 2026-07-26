@@ -71,7 +71,7 @@
 
 - 普通 inspection 请求优先走 read-only 路径
 - preview-then-confirm 的 mutation 流程
-- closed transaction 的 preview artifact hash 确认
+- 由 Gateway 签发、绑定不可变 transaction preview 的确认 token
 - bounded destructive opt-in
 - 执行后 verification / readback
 
@@ -104,7 +104,9 @@
 
 这 769 个版本/API 行对应 **188 个唯一可执行 WAAPI URI**，分别通过 fixed command、bounded direct call、bounded topic wait、确认式 transaction、隔离 I/O transaction，或同连接 Undo Group 组合执行。45 个排除行对应 12 个唯一 URI，仅限任意 Lua 执行、危险/private debug 接口，以及不受限的 UI command 注册与执行。
 
-当前固定的纯程序 gate 包含 **957 项程序测试**，其中每一个已覆盖的版本/API 行都有一项可执行路由用例，并覆盖由 gateway 提供的会话提示上下文。它验证 packaged 路由、schema、安全边界、I/O 约束、transaction 行为、fake dispatch 执行和确定性的 onboarding 信息；这不等于已经在真实 Wwise 进程中逐一运行了全部 769 行。完整口径见[五版本覆盖契约](./skills/waapi-skill/references/waapi-coverage.md)。
+命名操作层还为 `ak.wwise.core.object.create`、`ak.wwise.core.object.set`、`ak.wwise.core.audio.import`、`ak.wwise.core.audio.importTabDelimited`、`ak.wwise.core.soundbank.generate`、`ak.wwise.core.soundbank.convertExternalSources` 和 `ak.wwise.core.soundbank.processDefinitionFiles` 提供闭合、按版本约束的业务合同。`object.create`、两种导入和 `soundbank.generate` 覆盖五个版本；`object.set`、External Sources 转换和 Definition Files 处理从 `2022.1` 起提供，因为 `2021.1` 清单没有这些 URI。Wwise `2021.1` 的 SoundBank 生成只从实时 Project 的 `filePath`、`workunitIsDirty` 和受约束、带哈希、严格解析的 `.wproj` 获取工程上下文；后续版本绑定实时 `core.getProjectInfo`。一旦 URI 已有实现完成的命名操作，generic `waapi.call` 会以 `DEDICATED_OPERATION_REQUIRED` 拒绝该 URI，避免原始 payload 绕过专用合同。
+
+当前固定的纯程序 gate 包含 **1457 项程序测试**，其中每一个已覆盖的版本/API 行都有一项可执行路由用例，并覆盖由 gateway 提供的会话提示上下文和上述命名操作的合同/验证矩阵。它验证 packaged 路由、schema、安全边界、I/O 约束、transaction 行为、fake dispatch 执行和确定性的 onboarding 信息；这不等于已经在真实 Wwise 进程中逐一运行了全部 769 行。另有一轮关闭 memory 的 `h80-release-c38` 真实 Wwise campaign，已通过全部 80 个获批重型 API 场景（2022.1 为 70 个，2024.1 和 2025.1 各 5 个）；这份证据只覆盖这些场景及其封存候选版本，不代表整个接口都做过真实语义测试。完整口径见[五版本覆盖契约](./skills/waapi-skill/references/waapi-coverage.md)。
 
 ---
 
@@ -230,20 +232,28 @@ python scripts/run.py gateway.py query-object \
 
 ### 4. 工程修改必须走 closed transaction lane
 
-先查询 packaged request contract。`preview` 返回的 transaction id 和 artifact hash 必须原样用于后续命令：
+先查询 packaged request contract。`preview` 会返回不可变 transaction id 和供审核的完整
+artifact hash。用户在后续消息中确认该 preview 后，先用
+`transaction-show --summary-only` 重新读取已保存的 transaction；其结果会提供一个与当前状态绑定的短
+`confirmation.token` 和准确的下一条命令。正常确认流程使用这个 token：
 
 ```bash
 python scripts/run.py gateway.py operation-schema object.setNotes
 python scripts/run.py gateway.py preview \
   --request-json '{"contract":"waapi-skill.operation-request/v1","operation":"object.setNotes","arguments":{"object":{"kind":"path","value":"\\Events\\Default Work Unit\\Target"},"value":"Reviewed"}}'
-python scripts/run.py gateway.py confirm <transaction-id> --artifact-hash <artifact-hash>
+python scripts/run.py gateway.py transaction-show <transaction-id> --summary-only
+python scripts/run.py gateway.py confirm <transaction-id> --confirmation-token <confirmation-token>
 python scripts/run.py gateway.py execute <transaction-id>
 python scripts/run.py gateway.py verify <transaction-id>
 ```
 
+每个阶段应分开执行，并直接使用完整返回的 `next_command.shell_command`，不要自行重建命令。
+`confirm <transaction-id> --artifact-hash <full-artifact-hash>` 只作为旧 transaction 和程序兼容入口保留；
+新的 agent 工作流应使用 `transaction-show` 返回的 token。
+
 Gateway 是唯一公开接口。完成普通 Wwise 任务时，不要 import 内部 runtime module、构造 `WaapiClient`、创建一次性 helper script，也不要使用 inline Python。如果 gateway 返回没有 packaged route，就直接报告 unsupported boundary，不要自行合成代码。
 
-Manifest 反射只用于发现能力，不等于授权执行。generic `call` 仅开放两个零输入、严格校验结果的反射列表：`ak.wwise.waapi.getFunctions` 与 `ak.wwise.waapi.getTopics`。其他读取必须先有专用的 bounded command；fixed command 和 bounded topic wait 也只对 immutable reviewed allowlist 中的精确 URI 开放。新的或尚未 review 的 function/topic 即使名字以 `get`、`verify`、`dump` 开头也会 fail closed；`--dry-run` 不能绕过 fixed、transaction、topic 或 unsupported 路由边界。
+Manifest 反射只用于发现能力，不等于授权执行。generic `call` 只开放经过 immutable review、递归校验且结果有界的读取集合；两个零输入反射列表只是其中的快速路径。Wwise `2025.1` 的 Media Pool 查询会先通过 `mediaPool.getFields` 发现精确字段名，再调用 `mediaPool.get`，并强制限制最多 200 个结果、16 个过滤器、8 个数据库和 32 个唯一返回字段。更广的读取必须进入确认式 transaction，fixed command 和 bounded topic wait 仍只开放精确 allowlist。新的或尚未 review 的 function/topic 即使名字以 `get`、`verify`、`dump` 开头也会 fail closed；`--dry-run` 不能绕过 fixed、transaction、topic 或 unsupported 路由边界。
 
 ---
 

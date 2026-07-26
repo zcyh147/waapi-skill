@@ -6,20 +6,24 @@ import signal
 import subprocess
 import sys
 from pathlib import Path
-from typing import Mapping
+from typing import Mapping, Sequence
 
 import pytest
 
 from .support import codex_harness as codex_harness_module
 from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     CodexCliHarness,
+    CodexCliTask,
     CodexCommandRecord,
+    CodexGatewayErrorExpectation,
     CodexHarnessError,
     CodexHarnessConfig,
     audit_prompt_input_payload,
     audit_session_events,
     build_exec_command,
     build_prompt_audit_command,
+    build_task_exec_command,
+    build_task_resume_command,
     classify_commands,
     classify_codex_infrastructure_failure,
     completed_command_records,
@@ -52,12 +56,13 @@ def completed_record(
     output: Mapping[str, object] | str | None = None,
     *,
     exit_code: int = 0,
+    status: str = "completed",
 ) -> CodexCommandRecord:
     argv, has_operators, parse_error = parse_command_argv(command)
     return CodexCommandRecord(
         command=command,
         exit_code=exit_code,
-        status="completed",
+        status=status,
         aggregated_output=(
             output
             if isinstance(output, str)
@@ -68,6 +73,20 @@ def completed_record(
         argv=argv,
         has_shell_operators=has_operators,
         parse_error=parse_error,
+    )
+
+
+def passing_prompt_audit() -> codex_harness_module.CodexPromptAudit:
+    return codex_harness_module.CodexPromptAudit(
+        item_count=1,
+        prompt_sha256="a" * 64,
+        has_memory=False,
+        has_target_skill=True,
+        has_user_agent_skills=False,
+        has_codex_system_skills=False,
+        skill_inventory=(("waapi-skill", "/isolated/waapi-skill/SKILL.md"),),
+        target_skill_count=1,
+        target_skill_locator_matches=True,
     )
 
 
@@ -279,6 +298,46 @@ def test_exec_command_supports_brokered_read_only_model_sandbox_without_writable
     assert "sandbox_workspace_write.network_access=false" in command
 
 
+def test_task_commands_start_non_ephemeral_then_resume_exact_thread_with_isolation_flags(
+    tmp_path: Path,
+) -> None:
+    config = CodexHarnessConfig(
+        workspace=tmp_path,
+        skill_source=tmp_path / "skill",
+        codex_binary=Path("/Applications/ChatGPT.app/Contents/Resources/codex"),
+    )
+    output_dir = tmp_path / "outputs"
+
+    initial = build_task_exec_command(config, prompt="Preview it.", writable_dir=output_dir)
+    followup = build_task_resume_command(
+        config,
+        thread_id="thread-exact-123",
+        prompt="Confirm it.",
+        writable_dir=output_dir,
+    )
+
+    assert initial[:2] == [str(config.codex_binary), "exec"]
+    assert "--ephemeral" not in initial
+    assert "resume" not in initial
+    assert initial[-1] == "Preview it."
+    assert followup[:2] == [str(config.codex_binary), "exec"]
+    assert "--ephemeral" not in followup
+    assert "--last" not in followup
+    assert followup[-3:] == ["resume", "thread-exact-123", "Confirm it."]
+    for command in (initial, followup):
+        assert command[command.index("--disable") + 1] == "memories"
+        assert "--ignore-user-config" in command
+        assert 'model_reasoning_effort="medium"' in command
+
+    with pytest.raises(CodexHarnessError, match="explicit thread id"):
+        build_task_resume_command(
+            config,
+            thread_id="--last",
+            prompt="Do not pick implicitly.",
+            writable_dir=output_dir,
+        )
+
+
 def test_prompt_audit_command_uses_supported_global_flags_with_pristine_codex_home(tmp_path: Path) -> None:
     config = CodexHarnessConfig(
         workspace=tmp_path,
@@ -464,6 +523,174 @@ def test_isolated_environment_preserves_only_complete_runner_owned_broker_overla
             assert "WWISE_WAAPI_PORT" not in environment
             assert "WWISE_EVIDENCE_DIR" not in environment
             assert "WAAPI_SKILL_STATE_DIR" not in environment
+
+
+def test_codex_cli_task_reuses_one_disposable_state_and_resumes_exact_thread(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binary = tmp_path / "codex"
+    binary.write_text("#!/bin/sh\n", encoding="utf-8")
+    binary.chmod(0o755)
+    auth = tmp_path / "auth.json"
+    auth.write_text("{}\n", encoding="utf-8")
+    skill = tmp_path / "waapi-skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    skills = workspace / ".agents" / "skills"
+    skills.mkdir(parents=True)
+    (skills / "waapi-skill").symlink_to(skill, target_is_directory=True)
+    commands: list[tuple[str, ...]] = []
+    execution_environments: list[dict[str, str]] = []
+    prompt_audit_homes: list[str] = []
+
+    def fake_audit_prompt(
+        self: CodexCliHarness,
+        prompt: str,
+        *,
+        env: Mapping[str, str],
+    ) -> codex_harness_module.CodexPromptAudit:
+        prompt_audit_homes.append(env["HOME"])
+        return passing_prompt_audit()
+
+    def fake_run_process(
+        command: Sequence[str],
+        *,
+        cwd: Path,
+        env: Mapping[str, str],
+        timeout: float,
+    ) -> codex_harness_module.ProcessResult:
+        argv = tuple(str(value) for value in command)
+        commands.append(argv)
+        execution_environments.append(dict(env))
+        session_marker = Path(env["CODEX_HOME"]) / "sessions" / "thread-task-1"
+        if "resume" in argv:
+            assert argv[-3:] == ("resume", "thread-task-1", "Confirm the preview.")
+            assert session_marker.is_file()
+        else:
+            session_marker.parent.mkdir()
+            session_marker.write_text("persisted", encoding="utf-8")
+        stdout = "\n".join(
+            (
+                json.dumps({"type": "thread.started", "thread_id": "thread-task-1"}),
+                json.dumps({"type": "turn.started"}),
+                json.dumps(
+                    {
+                        "type": "item.completed",
+                        "item": {"type": "agent_message", "text": "done"},
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "turn.completed",
+                        "usage": {"input_tokens": 5, "output_tokens": 1},
+                    }
+                ),
+            )
+        )
+        return codex_harness_module.ProcessResult(0, stdout, "", 0.01)
+
+    monkeypatch.setattr(CodexCliHarness, "audit_prompt", fake_audit_prompt)
+    monkeypatch.setattr(codex_harness_module, "run_process", fake_run_process)
+    config = CodexHarnessConfig(
+        workspace=workspace,
+        skill_source=skill,
+        codex_binary=binary,
+        auth_json=auth,
+        model="gpt-5.6-terra",
+        reasoning_effort="medium",
+        service_tier="default",
+    )
+    task = CodexCliTask(config)
+
+    with task:
+        with pytest.raises(CodexHarnessError, match="requires a successful initial turn"):
+            task.run_followup("Too early.", output_dir=tmp_path / "too-early")
+        initial = task.run_initial("Create a preview.", output_dir=tmp_path / "initial")
+        followup = task.run_followup(
+            "Confirm the preview.",
+            output_dir=tmp_path / "followup",
+        )
+        execution_home = Path(task.execution_environment.home)
+        execution_codex_home = Path(task.execution_environment.codex_home)
+        assert execution_home.is_dir()
+        assert execution_codex_home.is_dir()
+        assert (execution_codex_home / "sessions" / "thread-task-1").is_file()
+
+    assert task.thread_id == "thread-task-1"
+    assert task.turn_results == (initial, followup)
+    assert initial.session_audit.passed is True
+    assert followup.session_audit.passed is True
+    assert initial.isolation_audit.execution_environment == followup.isolation_audit.execution_environment
+    assert execution_environments[0]["HOME"] == execution_environments[1]["HOME"]
+    assert execution_environments[0]["CODEX_HOME"] == execution_environments[1]["CODEX_HOME"]
+    assert len(set(prompt_audit_homes)) == 2
+    assert all(home != execution_environments[0]["HOME"] for home in prompt_audit_homes)
+    assert "--ephemeral" not in commands[0]
+    assert "resume" not in commands[0]
+    assert "--last" not in commands[1]
+    assert not execution_home.exists()
+    assert not execution_codex_home.exists()
+    with pytest.raises(CodexHarnessError, match="active context"):
+        task.run_followup("After teardown.", output_dir=tmp_path / "closed")
+    with pytest.raises(CodexHarnessError, match="cannot be re-entered"):
+        with task:
+            pass
+
+
+def test_codex_cli_task_fails_closed_on_resumed_thread_id_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binary = tmp_path / "codex"
+    binary.write_text("#!/bin/sh\n", encoding="utf-8")
+    binary.chmod(0o755)
+    auth = tmp_path / "auth.json"
+    auth.write_text("{}\n", encoding="utf-8")
+    skill = tmp_path / "waapi-skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    skills = workspace / ".agents" / "skills"
+    skills.mkdir(parents=True)
+    (skills / "waapi-skill").symlink_to(skill, target_is_directory=True)
+    thread_ids = iter(("thread-initial", "thread-wrong"))
+
+    monkeypatch.setattr(
+        CodexCliHarness,
+        "audit_prompt",
+        lambda *args, **kwargs: passing_prompt_audit(),
+    )
+
+    def fake_run_process(*args: object, **kwargs: object) -> codex_harness_module.ProcessResult:
+        thread_id = next(thread_ids)
+        stdout = "\n".join(
+            (
+                json.dumps({"type": "thread.started", "thread_id": thread_id}),
+                json.dumps({"type": "turn.started"}),
+                json.dumps({"type": "turn.completed", "usage": {}}),
+            )
+        )
+        return codex_harness_module.ProcessResult(0, stdout, "", 0.01)
+
+    monkeypatch.setattr(codex_harness_module, "run_process", fake_run_process)
+    task = CodexCliTask(
+        CodexHarnessConfig(
+            workspace=workspace,
+            skill_source=skill,
+            codex_binary=binary,
+            auth_json=auth,
+        )
+    )
+
+    with task:
+        task.run_initial("Initial.", output_dir=tmp_path / "initial")
+        with pytest.raises(CodexHarnessError, match="thread id mismatch"):
+            task.run_followup("Follow-up.", output_dir=tmp_path / "followup")
+        assert len(task.turn_results) == 2
+        with pytest.raises(CodexHarnessError, match="terminal"):
+            task.run_followup("Retry is forbidden.", output_dir=tmp_path / "retry")
 
 
 def test_run_process_keyboard_interrupt_terminates_kills_reaps_and_reraises(
@@ -726,6 +953,73 @@ def test_command_classifier_distinguishes_gateway_from_inline_code_and_discovery
     assert facts.unexpected_commands == (commands[2].command, commands[3].command)
 
 
+def test_command_classifier_accepts_only_explicit_exact_gateway_exit_2_error(
+    tmp_path: Path,
+) -> None:
+    skill = tmp_path / "waapi-skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    payload = {
+        "contract": "waapi-skill.gateway-result/v1",
+        "command": "preview",
+        "ok": False,
+        "status": "error",
+        "error_code": "PACKAGED_PREVIEW_UNAVAILABLE",
+    }
+    record = completed_record(
+        gateway_command(skill, "preview --request-json '{}'"),
+        payload,
+        exit_code=2,
+        status="failed",
+    )
+    expectation = CodexGatewayErrorExpectation(
+        command="preview",
+        error_code="PACKAGED_PREVIEW_UNAVAILABLE",
+    )
+
+    accepted = classify_commands(
+        (record,),
+        skill_source=skill,
+        expected_gateway_subcommands=("preview",),
+        expected_gateway_errors=(expectation,),
+    )
+    default_rejected = classify_commands(
+        (record,),
+        skill_source=skill,
+        expected_gateway_subcommands=("preview",),
+    )
+
+    assert accepted.gateway_commands == (record.command,)
+    assert accepted.gateway_results == (payload,)
+    assert accepted.unexpected_commands == ()
+    assert default_rejected.gateway_commands == ()
+    assert default_rejected.unexpected_commands == (record.command,)
+
+    invalid_variants = (
+        (dict(payload, ok=True), 2, "failed"),
+        (dict(payload, command="execute"), 2, "failed"),
+        (dict(payload, error_code="WRONG"), 2, "failed"),
+        (dict(payload, contract="forged/v1"), 2, "failed"),
+        (payload, 3, "failed"),
+        (payload, 2, "completed"),
+    )
+    for invalid_payload, exit_code, status in invalid_variants:
+        invalid_record = completed_record(
+            record.command,
+            invalid_payload,
+            exit_code=exit_code,
+            status=status,
+        )
+        facts = classify_commands(
+            (invalid_record,),
+            skill_source=skill,
+            expected_gateway_subcommands=("preview",),
+            expected_gateway_errors=(expectation,),
+        )
+        assert facts.gateway_commands == ()
+        assert facts.unexpected_commands == (record.command,)
+
+
 def test_command_classifier_accepts_offline_gateway_config_commands(tmp_path: Path) -> None:
     skill = tmp_path / "waapi-skill"
     skill.mkdir()
@@ -905,6 +1199,39 @@ def test_command_classifier_allows_only_exact_initial_skill_bootstrap_read(tmp_p
     assert facts.skill_read_files == ("SKILL.md",)
     assert facts.write_like_commands == ()
     assert facts.unexpected_commands == ()
+
+
+def test_command_classifier_accepts_codex_full_range_sed_only_for_exact_skill_read(
+    tmp_path: Path,
+) -> None:
+    skill = tmp_path / "waapi-skill"
+    references = skill / "references"
+    references.mkdir(parents=True)
+    skill_md = skill / "SKILL.md"
+    content = "first\nsecond\n"
+    skill_md.write_text(content, encoding="utf-8")
+    reference = references / "waapi-operate.md"
+    reference.write_text(content, encoding="utf-8")
+    command = f'''/bin/bash -lc "sed -n '1,"'$p'"' {skill_md}"'''
+    record = completed_record(command, content)
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert record.argv == ("sed", "-n", "1,$p", str(skill_md))
+    assert facts.skill_read is True
+    assert facts.allowed_read_commands == (command,)
+    assert facts.skill_read_files == ("SKILL.md",)
+    assert facts.write_like_commands == ()
+    assert facts.unexpected_commands == ()
+
+    partial = completed_record(command, "first\n")
+    reference_command = f"sed -n '1,$p' {reference}"
+    reference_read = completed_record(reference_command, content)
+    for rejected in (partial, reference_read):
+        rejected_facts = classify_commands((rejected,), skill_source=skill)
+        assert rejected_facts.allowed_read_commands == ()
+        assert rejected_facts.skill_read_files == ()
+        assert rejected_facts.unexpected_commands == (rejected.command,)
 
 
 def test_command_classifier_rejects_other_skill_reads_with_shell_operators(tmp_path: Path) -> None:

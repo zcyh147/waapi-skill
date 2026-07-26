@@ -12,6 +12,11 @@ from typing import Any, Mapping
 
 from .canonical import canonical_sha256, sha256_hex
 from .execution_contracts import (
+    CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS,
+    ExecutionContractRegistry,
+    POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY,
+    POST_EXECUTION_PROJECT_GUARD_POLICIES,
+    POST_EXECUTION_PROJECT_GUARD_REVALIDATE,
     PROJECT_GUARD_INVARIANT,
     PROJECT_GUARD_MODES,
     PROJECT_GUARD_TRANSITION_TO_NONE,
@@ -74,6 +79,9 @@ class TransactionArtifact:
             "execution_policy": {
                 "confirmation_required": True,
                 "automatic_retry_allowed": False,
+                # Historical v1 key: this is the pre-execution project guard
+                # revalidation. The URI-specific post-execution policy is
+                # sealed in prepared_operation.pre_state.execution_contract.
                 "revalidate_project_guard": True,
                 "revalidate_runtime_guard": True,
                 "revalidate_resolved_roles": True,
@@ -97,19 +105,11 @@ def build_project_guard(
             "PROJECT_REQUIRED",
             "Invariant transactions require one explicit active-project identity.",
         )
-    context = {
-        "endpoint": {
-            key: endpoint.get(key)
-            for key in ("host", "port", "url")
-            if endpoint.get(key) is not None
-        },
-        "version": version,
-        "wwise": {
-            "displayName": live_info.get("displayName"),
-            "isCommandLine": live_info.get("isCommandLine"),
-            "version": live_info.get("version"),
-        },
-    }
+    context = _runtime_context(
+        endpoint=endpoint,
+        version=version,
+        live_info=live_info,
+    )
     project_snapshot = (
         {"state": "none"}
         if project is None
@@ -152,6 +152,33 @@ def build_project_guard(
         **body,
         "context_fingerprint": canonical_sha256(context),
         "fingerprint": canonical_sha256(body),
+    }
+
+
+def _runtime_context(
+    *,
+    endpoint: Mapping[str, Any],
+    version: str,
+    live_info: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "endpoint": {
+            key: endpoint.get(key)
+            for key in ("host", "port", "url")
+            if endpoint.get(key) is not None
+        },
+        "version": version,
+        "wwise": {
+            "displayName": live_info.get("displayName"),
+            "isCommandLine": live_info.get("isCommandLine"),
+            "version": live_info.get("version"),
+            "sessionId": live_info.get("sessionId"),
+            "processId": live_info.get("processId"),
+            "processPath": live_info.get("processPath"),
+            "apiVersion": live_info.get("apiVersion"),
+            "platform": live_info.get("platform"),
+            "configuration": live_info.get("configuration"),
+        },
     }
 
 
@@ -223,6 +250,14 @@ def build_transaction_artifact(
         raise ValueError("ttl_seconds must be greater than zero")
     request = parse_operation_request(request_payload, expected_version=live_version)
     prepared = prepare_operation(request, read_call=read_call)
+    post_execution_project_guard_policy = _prepared_post_execution_project_guard_policy(
+        prepared
+    )
+    if (
+        post_execution_project_guard_policy
+        == POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY
+    ):
+        _require_strong_project_guard_runtime_identity(project_guard)
     created = _utc(now)
     expires = created + timedelta(seconds=ttl_seconds)
     return TransactionArtifact(
@@ -233,6 +268,238 @@ def build_transaction_artifact(
         created_at=_timestamp(created),
         expires_at=_timestamp(expires),
     )
+
+
+def _prepared_post_execution_project_guard_policy(prepared: PreparedOperation) -> str:
+    if prepared.request.operation != "waapi.call":
+        return POST_EXECUTION_PROJECT_GUARD_REVALIDATE
+    execution_contract = prepared.pre_state.get("execution_contract")
+    if not isinstance(execution_contract, Mapping):
+        raise TransactionGuardError(
+            "INVALID_PREVIEW",
+            "Prepared waapi.call is missing its execution contract.",
+        )
+    policy = execution_contract.get("post_execution_project_guard_policy")
+    if not isinstance(policy, str) or policy not in POST_EXECUTION_PROJECT_GUARD_POLICIES:
+        raise TransactionGuardError(
+            "INVALID_PREVIEW",
+            "Prepared waapi.call has an unsupported post-execution project-guard policy.",
+            details={"policy": policy},
+        )
+    return policy
+
+
+def _require_strong_project_guard_runtime_identity(
+    project_guard: Mapping[str, Any],
+) -> None:
+    wwise = project_guard.get("wwise")
+    if not isinstance(wwise, Mapping):
+        raise TransactionGuardError(
+            "RUNTIME_CONTEXT_IDENTITY_MISSING",
+            "Context/runtime-only verification requires a strong Wwise process identity at preview.",
+        )
+    for identity, expected_type in (
+        ("sessionId", str),
+        ("processId", int),
+        ("processPath", str),
+    ):
+        value = wwise.get(identity)
+        if (
+            not isinstance(value, expected_type)
+            or isinstance(value, bool)
+            or not value
+        ):
+            raise TransactionGuardError(
+                "RUNTIME_CONTEXT_IDENTITY_MISSING",
+                "Context/runtime-only verification requires a strong Wwise process identity at preview.",
+                details={"field": identity},
+            )
+
+
+def validate_transaction_context_runtime_guards(
+    artifact: Mapping[str, Any],
+    *,
+    endpoint: Mapping[str, Any],
+    version: str,
+    live_info: Mapping[str, Any],
+    skill_root: Path,
+) -> Mapping[str, Any]:
+    """Validate post-execution context/runtime guards without a project probe."""
+
+    if artifact.get("contract") != TRANSACTION_PREVIEW_CONTRACT:
+        raise TransactionGuardError(
+            "INVALID_PREVIEW",
+            "Transaction preview contract is missing or unsupported.",
+        )
+    request = artifact.get("request")
+    if not isinstance(request, Mapping) or not isinstance(request.get("version"), str):
+        raise TransactionGuardError(
+            "INVALID_PREVIEW",
+            "Transaction preview lacks a versioned request.",
+        )
+    if request.get("version") != version:
+        raise TransactionGuardError(
+            "PROJECT_GUARD_MISMATCH",
+            "Live Wwise version no longer matches the confirmed preview.",
+            details={"expected_version": request.get("version"), "actual_version": version},
+        )
+    if request.get("operation") != "waapi.call":
+        raise TransactionGuardError(
+            "INVALID_PREVIEW",
+            "Context/runtime-only verification is restricted to a sealed waapi.call request.",
+        )
+    arguments = request.get("arguments")
+    api = arguments.get("api") if isinstance(arguments, Mapping) else None
+    if api not in CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS:
+        raise TransactionGuardError(
+            "INVALID_PREVIEW",
+            "Context/runtime-only verification is restricted to the reviewed explicit-project Wwise CLI calls.",
+        )
+    prepared = artifact.get("prepared_operation")
+    if not isinstance(prepared, Mapping) or prepared.get("request") != request:
+        raise TransactionGuardError(
+            "INVALID_PREVIEW",
+            "Prepared request does not match the sealed transaction request.",
+        )
+    dispatch = prepared.get("dispatch")
+    verification_plan = prepared.get("verification_plan")
+    pre_state = prepared.get("pre_state")
+    sealed_contract = (
+        pre_state.get("execution_contract")
+        if isinstance(pre_state, Mapping)
+        else None
+    )
+    if (
+        not isinstance(dispatch, Mapping)
+        or dict(dispatch)
+        != {
+            "uri": api,
+            "args": dict(arguments.get("args", {}))
+            if isinstance(arguments.get("args", {}), Mapping)
+            else None,
+            "options": dict(arguments.get("options", {}))
+            if isinstance(arguments.get("options", {}), Mapping)
+            else None,
+        }
+        or not isinstance(verification_plan, Mapping)
+        or dict(verification_plan)
+        != {
+            "kind": "result-schema",
+            "uri": api,
+            "version": version,
+            "strategy": "result_schema",
+        }
+        or not isinstance(sealed_contract, Mapping)
+    ):
+        raise TransactionGuardError(
+            "INVALID_PREVIEW",
+            "Prepared dispatch, verification plan, or execution contract does not match the sealed request.",
+        )
+    current_contract = ExecutionContractRegistry().describe(
+        version,
+        api,
+    )
+    required_contract_fields = {
+        "version": version,
+        "uri": api,
+        "route": "isolated_transaction",
+        "verification_strategy": "result_schema",
+        "project_guard_mode": PROJECT_GUARD_INVARIANT,
+        "post_execution_project_guard_policy": (
+            POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY
+        ),
+    }
+    if any(
+        sealed_contract.get(field) != expected
+        or current_contract.as_dict().get(field) != expected
+        for field, expected in required_contract_fields.items()
+    ):
+        raise TransactionGuardError(
+            "INVALID_PREVIEW",
+            "Sealed and current execution contracts do not match the context/runtime-only policy.",
+        )
+    stored_project = artifact.get("project_guard")
+    stored_runtime = artifact.get("runtime_guard")
+    if not isinstance(stored_project, Mapping) or not isinstance(stored_runtime, Mapping):
+        raise TransactionGuardError(
+            "INVALID_PREVIEW",
+            "Transaction preview lacks project/runtime guards.",
+        )
+    mode = _require_project_guard_mode(stored_project.get("project_guard_mode"))
+    if mode != PROJECT_GUARD_INVARIANT:
+        raise TransactionGuardError(
+            "INVALID_PREVIEW",
+            "Context/runtime-only verification requires an invariant pre-execution project guard.",
+        )
+    current_context = _runtime_context(
+        endpoint=endpoint,
+        version=version,
+        live_info=live_info,
+    )
+    stored_wwise = stored_project.get("wwise")
+    current_wwise = current_context.get("wwise")
+    if not isinstance(stored_wwise, Mapping) or not isinstance(current_wwise, Mapping):
+        raise TransactionGuardError(
+            "RUNTIME_CONTEXT_IDENTITY_MISSING",
+            "Transaction context lacks a strong Wwise process identity.",
+        )
+    for identity, expected_type in (
+        ("sessionId", str),
+        ("processId", int),
+        ("processPath", str),
+    ):
+        stored_value = stored_wwise.get(identity)
+        current_value = current_wwise.get(identity)
+        if (
+            not isinstance(stored_value, expected_type)
+            or isinstance(stored_value, bool)
+            or not stored_value
+            or not isinstance(current_value, expected_type)
+            or isinstance(current_value, bool)
+            or not current_value
+        ):
+            raise TransactionGuardError(
+                "RUNTIME_CONTEXT_IDENTITY_MISSING",
+                "Transaction context lacks a strong Wwise process identity.",
+                details={"field": identity},
+            )
+    current_context_fingerprint = canonical_sha256(current_context)
+    stored_context_fingerprint = stored_project.get("context_fingerprint")
+    if stored_context_fingerprint != current_context_fingerprint:
+        raise TransactionGuardError(
+            "PROJECT_GUARD_MISMATCH",
+            "Live endpoint/version/getInfo context no longer matches the confirmed preview.",
+            details={
+                "expected_context_fingerprint": stored_context_fingerprint,
+                "actual_context_fingerprint": current_context_fingerprint,
+            },
+        )
+    current_runtime = build_runtime_guard(skill_root, version)
+    if stored_runtime.get("fingerprint") != current_runtime.get("fingerprint"):
+        raise TransactionGuardError(
+            "RUNTIME_GUARD_MISMATCH",
+            "Packaged builders, schemas, or transaction runtime changed after preview.",
+            details={
+                "expected_fingerprint": stored_runtime.get("fingerprint"),
+                "actual_fingerprint": current_runtime.get("fingerprint"),
+            },
+        )
+    return {
+        "ok": True,
+        "status": "valid",
+        "post_execution_project_guard_policy": (
+            POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY
+        ),
+        "project_guard_mode": mode,
+        "project_guard_phase": PROJECT_GUARD_PHASE_POST_VERIFICATION,
+        "project_probe_performed": False,
+        "project_identity_revalidated": False,
+        "context_guard_validated": True,
+        "runtime_guard_validated": True,
+        "context_fingerprint": current_context_fingerprint,
+        "runtime_guard_fingerprint": current_runtime["fingerprint"],
+        "expires_at": artifact.get("expires_at"),
+    }
 
 
 def validate_transaction_guards(
@@ -451,5 +718,6 @@ __all__ = [
     "canonical_project_path",
     "build_runtime_guard",
     "build_transaction_artifact",
+    "validate_transaction_context_runtime_guards",
     "validate_transaction_guards",
 ]

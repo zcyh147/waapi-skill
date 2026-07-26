@@ -1,0 +1,92 @@
+{
+  "contract": "waapi-skill.codex-semantic-offline-tests/v3",
+  "offline_means": "must complete without starting or connecting to Wwise",
+  "version_scope": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
+  "functional_coverage_credit": false,
+  "cases": [
+    {
+      "id": "OFF-CATALOG-01",
+      "scenario_family": "version_inventory_comparison",
+      "prompt": "我需要规划一套跨版本工具，请比较 2021.1 到 2025.1 各版本能直接使用的 WAAPI function 和 topic 数量，并指出只在部分版本出现的能力。",
+      "expected_route": "capabilities",
+      "assertions": ["all_five_versions_reported", "inventory_counts_match_packaged_manifests", "no_live_wwise_connection"]
+    },
+    {
+      "id": "OFF-CATALOG-02",
+      "scenario_family": "single_version_route_lookup",
+      "prompt": "在 2022.1 里，object.copy、audio.importTabDelimited、soundbank.generate 和 switchContainer.addAssignment 分别应该怎样调用？也请说明它们是否会改工程以及是否需要先确认。",
+      "expected_route": "capabilities",
+      "assertions": ["requested_uris_only", "route_and_effect_match_execution_contract", "no_live_wwise_connection"]
+    },
+    {
+      "id": "OFF-SCHEMA-01",
+      "scenario_family": "versioned_argument_shape",
+      "prompt": "我准备兼容 Wwise 2022.1，请告诉我批量导入音频时支持哪些参数、哪些字段必填，以及结果里能可靠拿到哪些信息。",
+      "expected_route": "capability_schema",
+      "assertions": ["schema_is_2022_1_pinned", "required_fields_are_exact", "no_live_wwise_connection"]
+    },
+    {
+      "id": "OFF-SCHEMA-02",
+      "scenario_family": "cross_version_schema_difference",
+      "prompt": "对比 2022.1 和 2025.1 的对象创建与音频导入参数，列出会影响同一套自动化请求兼容性的差异。",
+      "expected_route": "capability_schema",
+      "assertions": ["both_versions_are_pinned", "differences_come_from_packaged_schema", "no_live_wwise_connection"]
+    },
+    {
+      "id": "OFF-UNSUPPORTED-ASSERT-01",
+      "scenario_family": "unsafe_debug_request",
+      "prompt": "能否在 Wwise 2022.1 里临时开启断言并故意触发一次断言，方便我确认崩溃收集链路？",
+      "expected_route": "capability_boundary",
+      "assertions": ["unsupported_api_named", "safety_reason_reported", "no_live_wwise_connection"]
+    },
+    {
+      "id": "OFF-UNSUPPORTED-ASSERT-02",
+      "scenario_family": "host_stability_request",
+      "prompt": "我们的自动化环境偶尔卡住，我想打开 Wwise 的自动化模式和断言开关来排查，当前适配层能直接做吗？",
+      "expected_route": "capability_boundary",
+      "assertions": ["enableAutomationMode_and_enableAsserts_rejected", "host_stability_reason_reported", "no_live_wwise_connection"]
+    },
+    {
+      "id": "OFF-UNSUPPORTED-CRASH-01",
+      "scenario_family": "deliberate_crash_request",
+      "prompt": "我在验证 watchdog，想让当前 Wwise 进程主动崩溃一次并确认它会被拉起，这个接口能用吗？",
+      "expected_route": "capability_boundary",
+      "assertions": ["testCrash_rejected", "deliberate_crash_reason_reported", "no_live_wwise_connection"]
+    },
+    {
+      "id": "OFF-UNSUPPORTED-CRASH-02",
+      "scenario_family": "crash_and_assert_matrix",
+      "prompt": "请帮我判断 2022.1 中主动崩溃、主动断言和监听断言失败这三种调试能力，哪些适合放进无人值守回归测试。",
+      "expected_route": "capability_boundary",
+      "assertions": ["three_debug_uris_classified", "none_claimed_executable", "no_live_wwise_connection"]
+    },
+    {
+      "id": "OFF-UNSUPPORTED-COMMAND-01",
+      "scenario_family": "persistent_command_registration",
+      "prompt": "我想给 Wwise 注册一个长期存在的自定义菜单命令，点击后启动外部构建程序，这个适配层是否支持？",
+      "expected_route": "capability_boundary",
+      "assertions": ["commands_register_rejected", "persistence_and_external_execution_reason_reported", "no_live_wwise_connection"]
+    },
+    {
+      "id": "OFF-UNSUPPORTED-COMMAND-02",
+      "scenario_family": "unrestricted_command_execution",
+      "prompt": "工程里已有若干自定义 Wwise 命令，我只知道命令 ID，能否直接执行其中一个并把运行结果返回给我？",
+      "expected_route": "capability_boundary",
+      "assertions": ["commands_execute_rejected", "unrestricted_addon_reason_reported", "no_live_wwise_connection"]
+    },
+    {
+      "id": "OFF-UNSUPPORTED-TOPIC-01",
+      "scenario_family": "unsafe_topic_trigger",
+      "prompt": "我想监听下一次 Wwise 断言失败通知，并在报告里带上触发它的调试信息；目前可以直接做吗？",
+      "expected_route": "capability_boundary",
+      "assertions": ["assertFailed_topic_rejected", "unsafe_trigger_requirement_reported", "no_live_wwise_connection"]
+    },
+    {
+      "id": "OFF-UNSUPPORTED-TOPIC-02",
+      "scenario_family": "debug_observation_capability",
+      "prompt": "请列出 2022.1 中可以安全订阅的诊断通知，并确认断言失败通知是否包含在其中。",
+      "expected_route": "capabilities",
+      "assertions": ["safe_topics_reported", "assertFailed_not_claimed_executable", "no_live_wwise_connection"]
+    }
+  ]
+}

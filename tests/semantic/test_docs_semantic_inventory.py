@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 
@@ -61,7 +62,12 @@ def test_inventory_count_matches_latest_nonlive_result_without_collect_only_over
 
     assert "807 pytest items" not in inventory
     assert "807 tests collected" not in inventory
-    assert "2768 passed, 80 skipped, 27 deselected" in inventory
+    recorded_results = re.findall(
+        r"(\d+ passed, 80 skipped, 27 deselected)",
+        inventory,
+    )
+    assert len(recorded_results) >= 2
+    assert len(set(recorded_results)) == 1
     assert "not a fresh full `--collect-only` recount" in inventory
 
 

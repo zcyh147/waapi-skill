@@ -68,6 +68,55 @@ def test_source_note_family_uri_inventory() -> None:
     assert not any(token in uri.lower() for uri in all_uris for token in EXCLUDED_URI_TOKENS)
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_versioned_source_note_uris_are_reflected_in_their_manifest(version: str) -> None:
+    semantic_path = SKILL_ROOT / "resources" / "semantic" / version / "source_notes.json"
+    manifest_root = SKILL_ROOT / "resources" / "manifest" / version
+    reflected: set[str] = set()
+    for kind in ("functions", "topics"):
+        payload = json.loads((manifest_root / f"{kind}.json").read_text(encoding="utf-8"))
+        reflected.update(str(row["uri"]) for row in payload[kind])
+
+    inventory = source_note_uri_inventory(semantic_path)
+    source_note_uris = {uri for endpoints in inventory.values() for uri in endpoints}
+
+    assert source_note_uris <= reflected
+
+
+def test_versioned_heavy_import_and_soundbank_schema_facts_remain_distinct() -> None:
+    expected_import_results = {
+        "2021.1": {"objects"},
+        "2022.1": {"objects"},
+        "2023.1": {"files", "log", "objects"},
+        "2024.1": {"files", "log", "objects"},
+        "2025.1": {"files", "log", "objects"},
+    }
+    expected_generate_results = {
+        "2021.1": set(),
+        "2022.1": {"logs"},
+        "2023.1": {"logs"},
+        "2024.1": {"logs"},
+        "2025.1": {"error", "logs"},
+    }
+
+    for version in SUPPORTED_WWISE_VERSION_KEYS:
+        schema_payload = json.loads(
+            (SKILL_ROOT / "resources" / "manifest" / version / "schemas.json").read_text(encoding="utf-8")
+        )
+        schemas = {row["uri"]: row["schema"] for row in schema_payload["schemas"]}
+        import_schema = schemas["ak.wwise.core.audio.import"]
+        tab_schema = schemas["ak.wwise.core.audio.importTabDelimited"]
+        generate_schema = schemas["ak.wwise.core.soundbank.generate"]
+        generated_schema = schemas["ak.wwise.core.soundbank.generated"]
+
+        assert set(import_schema["resultSchema"]["properties"]) == expected_import_results[version]
+        assert set(tab_schema["resultSchema"]["properties"]) == {"objects"}
+        assert set(generate_schema["resultSchema"]["properties"]) == expected_generate_results[version]
+        assert ("autoCheckOutToSourceControl" in import_schema["argsSchema"]["properties"]) is (version >= "2023.1")
+        expected_plugin_key = "PluginInfo" if version == "2021.1" else "pluginInfo"
+        assert expected_plugin_key in generated_schema["publishSchema"]["properties"]
+
+
 def test_source_notes_have_explicit_status_and_required_sections() -> None:
     data = load_resource()
 
@@ -233,7 +282,7 @@ def test_source_note_uri_inventory_accepts_every_packaged_version_specific_endpo
         for version in SUPPORTED_WWISE_VERSION_KEYS
     }
 
-    assert counts == {"2021.1": 37, "2022.1": 37, "2023.1": 37, "2024.1": 38, "2025.1": 38}
+    assert counts == {"2021.1": 31, "2022.1": 37, "2023.1": 37, "2024.1": 38, "2025.1": 38}
 
 
 def test_every_packaged_source_note_has_a_versioned_runtime_mirror_inside_the_skill() -> None:

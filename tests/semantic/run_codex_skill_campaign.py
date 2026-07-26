@@ -1,26 +1,30 @@
 #!/usr/bin/env python3
 """Run or resume an immutable fresh-Codex WAAPI semantic campaign.
 
-Each child process is the existing v2 semantic matrix runner.  A campaign
-groups all currently pending pairs for one live Wwise version into one child,
-preserving the matrix runner's one-Wwise-lifecycle-per-version behavior while
-adding append-only attempts, strict resume compatibility, evidence sealing,
-and narrow pre-agent-action retries.
+Each child process reuses the existing semantic matrix runner.  Frozen v2
+profiles group pending pairs by live Wwise version; the reviewed V3 heavy
+profile sends its pending scenarios to the matrix in suite order, where every
+case owns a fresh lifecycle.  The campaign adds immutable fingerprints,
+append-only attempts, strict resume compatibility, and evidence sealing.
 """
 
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import fcntl
 import hashlib
 import importlib.metadata
+import json
+import math
 import os
+import re
 import signal
 import stat
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, fields, is_dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -33,6 +37,11 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from tests.semantic import run_codex_skill_matrix as matrix  # noqa: E402
+from tests.destructive.support.live_environment import (  # noqa: E402
+    LiveEnvironmentError,
+    require_live_environment,
+)
+from tests.destructive.support.sandbox_fixture import hash_project  # noqa: E402
 from tests.semantic.support.codex_campaign import (  # noqa: E402
     ATTEMPT_MANIFEST_FILE,
     CampaignEvidenceError,
@@ -45,14 +54,17 @@ from tests.semantic.support.codex_campaign import (  # noqa: E402
     load_immutable_campaign_config,
     seal_attempt,
     sha256_file,
+    stable_tree_manifest,
     stable_tree_sha256,
     verify_attempt_seal,
 )
 from tests.semantic.support.codex_campaign_runner import (  # noqa: E402
     AUTO_RETRY_CATEGORIES,
+    BLOCKED_INFRASTRUCTURE_CATEGORIES,
     PAUSE_RETRY_CATEGORIES,
     ChildValidation,
     PhaseVerdict,
+    load_strict_regular_json,
     replace_expected_skill_symlinks,
     validate_child_run,
 )
@@ -63,6 +75,115 @@ from tests.semantic.support.codex_eval_suite import (  # noqa: E402
     EvalSession,
     EvalSuiteError,
     load_eval_suite,
+)
+from tests.semantic.support.codex_business_oracle_plan_v3 import (  # noqa: E402
+    BUSINESS_ORACLE_PLAN_FILE,
+    BusinessOraclePlanError,
+    BusinessOraclePlanEvidence,
+    business_family_for_api,
+    read_business_oracle_plan_envelope,
+)
+from tests.semantic.support.codex_audio_media_business_plan_v3 import (  # noqa: E402
+    AudioMediaBusinessPlanError,
+    AudioMediaBusinessPlanSections,
+    parse_audio_media_business_plan_sections,
+    validate_audio_archived_verification,
+    validate_audio_media_business_plan_archive,
+    validate_media_archived_verification,
+)
+from tests.semantic.support.codex_audio_conversion_runtime_v3 import (  # noqa: E402
+    AudioConversionRuntimeError,
+    audio_conversion_volatile_cache_paths,
+)
+from tests.semantic.support.codex_media_pool_runtime_v3 import (  # noqa: E402
+    MEDIA_POOL_CLOSED_GROUP_REPORT_CASE_ID,
+    REFERENCE_MATCH_RESULT_CONTRACT,
+    REFERENCE_MATCH_SCAN_LIMIT,
+    MediaReportRowExpectation,
+    media_answer_requires_order,
+    media_grouped_report_failures,
+    media_near_classification,
+)
+from tests.semantic.support.codex_import_business_plan_v3 import (  # noqa: E402
+    ImportBusinessPlanError,
+    ImportBusinessPlanSections,
+    parse_import_business_plan_sections,
+    validate_import_archived_verification,
+    validate_import_business_plan_archive,
+)
+from tests.semantic.support.codex_cli_business_plan_v3 import (  # noqa: E402
+    CliBusinessPlanError,
+    CliBusinessPlanSections,
+    parse_cli_business_plan_sections,
+    validate_cli_archived_verification,
+    validate_cli_business_plan_archive,
+    validate_cli_convert_archived_side_effects,
+)
+from tests.semantic.support.codex_cli_runtime_v3 import (  # noqa: E402
+    authored_project_archive_projection,
+)
+from tests.semantic.support.codex_object_business_plan_v3 import (  # noqa: E402
+    ObjectBusinessPlanError,
+    ObjectBusinessPlanSections,
+    parse_object_business_plan_sections,
+    validate_archived_object_business_plan,
+    validate_object_archived_verification,
+)
+from tests.semantic.support.codex_soundbank_business_plan_v3 import (  # noqa: E402
+    SoundBankBusinessPlanError,
+    SoundBankBusinessPlanSections,
+    TOPIC_ACK_CONTRACT,
+    TOPIC_ACK_PROOF_CONTRACT,
+    TOPIC_ACK_REQUIREMENT_CONTRACT,
+    parse_soundbank_business_plan_sections,
+    validate_soundbank_archived_verification,
+    validate_soundbank_business_plan_archive,
+)
+from tests.semantic.support.codex_soundbank_runtime_v3 import (  # noqa: E402
+    PROCESS_REFUSAL_ERROR_CODE,
+    SOUNDBANK_TOPIC,
+)
+from tests.semantic.support.codex_object_heavy_v3 import (  # noqa: E402
+    ObjectHeavyRecipeError,
+    build_object_heavy_v3_recipe,
+)
+from tests.semantic.support.codex_object_runtime_v3 import (  # noqa: E402
+    bounded_result_disclosure,
+)
+from tests.semantic.support.codex_prompt_provenance_v3 import (  # noqa: E402
+    PROMPT_MATERIALIZATION_RECEIPT_CONTRACT,
+    PROMPT_MATERIALIZATION_RECEIPT_FILE,
+    PROMPT_PROVENANCE_FILE,
+    PromptProvenanceEvidence,
+    read_prompt_provenance,
+    serialize_protocol,
+)
+from tests.semantic.support.codex_harness import (  # noqa: E402
+    CodexGatewayErrorExpectation,
+    CodexHarnessConfig,
+    audit_session_events,
+    build_task_exec_command,
+    build_task_resume_command,
+    classify_commands,
+    classify_codex_infrastructure_failure,
+    completed_command_records,
+    count_invalid_jsonl_lines,
+    final_agent_message,
+    parse_jsonl_events,
+    turn_usage,
+)
+from tests.semantic.support.codex_gateway_broker import (  # noqa: E402
+    CodexGatewayBroker,
+    GatewayInvocationError,
+    ResponseBinding,
+    SemanticJsonArgument,
+    VALIDATED_SUBSCRIPTION_ACK_CONTRACT,
+    resolve_gateway_invocation,
+    validate_transaction_show_confirmation_payload,
+)
+from tests.semantic.support.codex_transaction_seal import (  # noqa: E402
+    TransactionSealError,
+    validate_transaction_show_confirmation_against_store,
 )
 
 
@@ -80,10 +201,74 @@ EXIT_CONFIG = 2
 EXIT_BLOCKED = 3
 EXIT_PENDING = 75
 EXIT_INTERRUPTED = 130
+HEAVY_V3_PROFILE_ID = matrix.HEAVY_V3_PROFILE_ID
+HEAVY_V3_EFFECTIVE_CONTRACT = "waapi-skill.codex-semantic-campaign-effective/v3"
+HEAVY_V3_PHASE = "scenario"
+HEAVY_V3_GROUP_ID = "heavy-v3"
+HEAVY_V3_PROJECT_OUTCOME_CONTRACT = "waapi-skill.codex-heavy-project-run/v3"
+HEAVY_V3_CLI_OUTCOME_CONTRACT = "waapi-skill.codex-heavy-cli-run/v3"
+HEAVY_V3_PROJECT_LIFECYCLE_CONTRACT = (
+    "waapi-skill.codex-semantic-scenario-lifecycle/v3"
+)
+HEAVY_V3_CLI_LIFECYCLE_CONTRACT = "waapi-skill.codex-heavy-cli-lifecycle/v3"
+HEAVY_V3_PROJECT_QUARANTINE_CONTRACT = (
+    "waapi-skill.codex-semantic-scenario-quarantine/v3"
+)
+HEAVY_V3_TASK_INFRASTRUCTURE_FAILURE_CONTRACT = (
+    "waapi-skill.codex-semantic-task-infrastructure-failure/v3"
+)
+HEAVY_V3_TASK_RESULT_CONTRACT = "waapi-skill.codex-semantic-task-result/v5"
+HEAVY_V3_TOPIC_PUBLISHER_DIAGNOSTICS_CONTRACT = (
+    "waapi-skill.topic-publisher-diagnostics/v1"
+)
+HEAVY_V3_PROMPT_MATERIALIZATION_CONTRACT = (
+    PROMPT_MATERIALIZATION_RECEIPT_CONTRACT
+)
+HEAVY_V3_PROMPT_MATERIALIZATION_FILE = PROMPT_MATERIALIZATION_RECEIPT_FILE
+HEAVY_V3_PROMPT_PROVENANCE_FILE = PROMPT_PROVENANCE_FILE
+HEAVY_V3_ORACLE_CONTRACT = "waapi-skill.heavy-oracle/v2"
+HEAVY_V3_LIVE_PREFLIGHT_CONTRACT = "waapi-skill.codex-semantic-live-preflight/v1"
+HEAVY_V3_MIGRATION_API = "ak.wwise.cli.migrate"
+HEAVY_V3_MIGRATION_SOURCE = REPO_ROOT / "tests" / "_org" / "2021.1" / "SampleProject.wproj"
+_HEAVY_V3_REQUIRED_COMMON_GATES = frozenset(
+    {
+        "memory_isolated",
+        "one_completed_turn",
+        "one_target_skill",
+        "no_collaboration",
+        "skill_reads_exact",
+        "read_prefix_exact",
+        "gateway_count_exact",
+        "no_other_commands",
+        "no_discovery",
+        "no_direct_waapi",
+        "no_write_like",
+        "no_unexpected_commands",
+        "no_files_changed",
+    }
+)
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_HEAVY_V3_CODEX_INFRASTRUCTURE_CATEGORIES = frozenset(
+    {
+        "authentication",
+        "quota_or_rate_limit",
+        "service_unavailable",
+        "timeout_before_agent_action",
+        "turn_failed_before_agent_action",
+    }
+)
 
 
 class CampaignConfigError(RuntimeError):
     """The requested invocation does not match a safe immutable campaign."""
+
+
+class _HeavyV3UnitEvidenceError(CampaignEvidenceError):
+    """One identified heavy scenario has untrusted child evidence."""
+
+    def __init__(self, unit_id: str, reason: str) -> None:
+        self.unit_id = unit_id
+        super().__init__(reason)
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +292,21 @@ class CampaignOptions:
     offline_only: bool
     lock_timeout_seconds: float
     max_pre_action_retries: int
+
+
+@dataclass(frozen=True, slots=True)
+class HeavyV3PromptEvidence:
+    prompts: tuple[str, ...]
+    provenance: PromptProvenanceEvidence
+    business_oracle_plan: BusinessOraclePlanEvidence
+    typed_sections: (
+        ObjectBusinessPlanSections
+        | ImportBusinessPlanSections
+        | AudioMediaBusinessPlanSections
+        | SoundBankBusinessPlanSections
+        | CliBusinessPlanSections
+        | None
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -214,6 +414,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def run_campaign(options: CampaignOptions) -> int:
+    if options.profile == HEAVY_V3_PROFILE_ID:
+        return run_heavy_v3_campaign(options)
     try:
         suite = load_eval_suite(options.suite_path)
         sessions = matrix.select_sessions(
@@ -439,6 +641,402 @@ def run_campaign(options: CampaignOptions) -> int:
                 )
 
 
+def run_heavy_v3_campaign(options: CampaignOptions) -> int:
+    """Run or resume the reviewed V3 heavy units through the existing matrix."""
+
+    if options.pair_ids:
+        raise CampaignConfigError("heavy V3 campaigns do not accept pair filters")
+    if options.offline_only:
+        raise CampaignConfigError("heavy V3 campaigns require real Wwise execution")
+    try:
+        units = load_heavy_v3_campaign_units(options)
+    except (SystemExit, ValueError) as exc:
+        raise CampaignConfigError(str(exc)) from exc
+    required_units = {str(unit.unit_id): (HEAVY_V3_PHASE,) for unit in units}
+    try:
+        effective = build_heavy_v3_effective_config(
+            options,
+            units=units,
+            required_units=required_units,
+        )
+    except (CampaignEvidenceError, OSError, subprocess.SubprocessError) as exc:
+        raise CampaignConfigError(f"cannot fingerprint heavy campaign inputs: {exc}") from exc
+
+    root = prepare_campaign_root(options)
+    with CampaignLock(root, timeout_seconds=options.lock_timeout_seconds):
+        if options.resume:
+            config = load_immutable_campaign_config(root)
+            if config.get("effective") != effective:
+                raise CampaignConfigError(
+                    "resume invocation does not exactly match immutable campaign config"
+                )
+            expected_effective_hash = hashlib.sha256(
+                canonical_json_bytes(effective)
+            ).hexdigest()
+            if config.get("effective_sha256") != expected_effective_hash:
+                raise CampaignEvidenceError("campaign effective config digest is invalid")
+            verify_campaign_marker(root, campaign_id=config.get("campaign_id"))
+        else:
+            config = create_immutable_campaign_config(
+                root,
+                {
+                    "created_at": utc_now(),
+                    "effective": effective,
+                    "effective_sha256": hashlib.sha256(
+                        canonical_json_bytes(effective)
+                    ).hexdigest(),
+                },
+            )
+            write_campaign_marker(root, campaign_id=str(config["campaign_id"]))
+
+        manifests = load_verified_attempts(root)
+        consolidated = consolidate_units(required_units, manifests)
+        write_consolidated(root, consolidated)
+        terminal = heavy_v3_consolidated_exit(consolidated)
+        if terminal is not None:
+            return terminal
+        if options.verify_only:
+            return EXIT_PENDING
+
+        scheduled_id_set = frozenset(
+            consolidated["pending_unit_ids"]
+            + consolidated["retryable_unit_ids"]
+        )
+        if not scheduled_id_set:
+            return EXIT_PENDING
+        # Preserve suite order across resume.  ``pending + retryable`` is a
+        # status grouping, not an execution order; putting a formerly blocked
+        # first unit at the end would disagree with the matrix's canonical
+        # selection order and make a trustworthy resume impossible.
+        scheduled_units = tuple(
+            unit for unit in units if str(unit.unit_id) in scheduled_id_set
+        )
+        if {str(unit.unit_id) for unit in scheduled_units} != scheduled_id_set:
+            raise CampaignEvidenceError(
+                "heavy consolidated state references an unknown schedulable unit"
+            )
+        attempt_id, attempt_root = create_attempt(root)
+        print(
+            f"[campaign] {attempt_id} scheduled_units={len(scheduled_units)}",
+            flush=True,
+        )
+        observations: list[dict[str, Any]] = []
+        validation: ChildValidation | None = None
+        group_root = attempt_root / "runs" / HEAVY_V3_GROUP_ID
+        matrix_root = group_root / "matrix"
+        group_root.mkdir(parents=True, exist_ok=False)
+
+        with InterruptLatch() as interrupts:
+            try:
+                assert_heavy_v3_effective_inputs_frozen(
+                    options,
+                    effective=effective,
+                )
+            except CampaignEvidenceError as exc:
+                validation = blocked_heavy_v3_validation(
+                    scheduled_units,
+                    reason=str(exc),
+                )
+                atomic_write_json_with_digest(
+                    attempt_root / "candidate-drift.json",
+                    {
+                        "group_id": HEAVY_V3_GROUP_ID,
+                        "error": str(exc),
+                        "recorded_at": utc_now(),
+                    },
+                )
+            else:
+                argv_child = build_heavy_v3_child_argv(
+                    options,
+                    units=scheduled_units,
+                    matrix_root=matrix_root,
+                )
+                request_payload = heavy_v3_child_request(
+                    options,
+                    units=scheduled_units,
+                    argv=argv_child,
+                )
+                atomic_write_json_with_digest(
+                    group_root / "child-request.json",
+                    request_payload,
+                )
+                print(
+                    f"[campaign] start group={HEAVY_V3_GROUP_ID} "
+                    f"scenarios={len(scheduled_units)}",
+                    flush=True,
+                )
+                completed = run_child(argv_child, cwd=REPO_ROOT)
+                (group_root / "stdout.txt").write_text(
+                    completed.stdout,
+                    encoding="utf-8",
+                )
+                (group_root / "stderr.txt").write_text(
+                    completed.stderr,
+                    encoding="utf-8",
+                )
+                atomic_write_json_with_digest(
+                    group_root / "child-result.json",
+                    {
+                        "contract": CHILD_EXECUTION_CONTRACT,
+                        "group_id": HEAVY_V3_GROUP_ID,
+                        "returncode": completed.returncode,
+                        "completed_at": utc_now(),
+                    },
+                )
+                print(
+                    f"[campaign] end group={HEAVY_V3_GROUP_ID} "
+                    f"returncode={completed.returncode}",
+                    flush=True,
+                )
+                replaced_links: tuple[str, ...] = ()
+                try:
+                    observed_candidate_sha256 = current_candidate_sha256(
+                        options.skill_source,
+                        effective=effective,
+                    )
+                    replaced_links = replace_expected_skill_symlinks(
+                        group_root,
+                        skill_source=options.skill_source,
+                        candidate_sha256=observed_candidate_sha256,
+                    )
+                    if observed_candidate_sha256 != effective["candidate"]["tree_sha256"]:
+                        raise CampaignEvidenceError(
+                            "candidate Skill changed during child execution"
+                        )
+                    validate_heavy_v3_child_request(
+                        group_root / "child-request.json",
+                        expected=request_payload,
+                    )
+                    validation = validate_heavy_v3_child_run(
+                        matrix_root,
+                        expected_units=scheduled_units,
+                        options=options,
+                        returncode=completed.returncode,
+                    )
+                    assert_heavy_v3_effective_inputs_frozen(
+                        options,
+                        effective=effective,
+                    )
+                except (CampaignEvidenceError, OSError, TypeError, ValueError) as exc:
+                    validation = blocked_heavy_v3_validation(
+                        scheduled_units,
+                        reason=str(exc),
+                        blocked_unit_id=(
+                            exc.unit_id
+                            if isinstance(exc, _HeavyV3UnitEvidenceError)
+                            else None
+                        ),
+                    )
+                atomic_write_json_with_digest(
+                    group_root / "classification.json",
+                    {
+                        "contract": CHILD_CLASSIFICATION_CONTRACT,
+                        "group_id": HEAVY_V3_GROUP_ID,
+                        "skill_link_attestations": list(replaced_links),
+                        **validation.as_dict(),
+                    },
+                )
+
+            if validation is None:
+                raise CampaignEvidenceError("heavy child produced no classification")
+            observations.extend(validation.observations)
+            if interrupts.requested and not observations:
+                atomic_write_json_with_digest(
+                    attempt_root / "interrupted.json",
+                    {
+                        "signal": interrupts.signal_number,
+                        "recorded_at": utc_now(),
+                    },
+                )
+            try:
+                assert_heavy_v3_effective_inputs_frozen(
+                    options,
+                    effective=effective,
+                )
+            except CampaignEvidenceError as exc:
+                atomic_write_json_with_digest(
+                    attempt_root / "candidate-drift-before-seal.json",
+                    {"error": str(exc), "recorded_at": utc_now()},
+                )
+                observations = list(
+                    blocked_heavy_v3_validation(
+                        scheduled_units,
+                        reason=str(exc),
+                    ).observations
+                )
+
+            manifest = seal_attempt(attempt_root, observations)
+            verified = verify_attempt_seal(attempt_root)
+            if verified != manifest:
+                raise CampaignEvidenceError(
+                    f"sealed attempt failed immediate verification: {attempt_id}"
+                )
+            manifests.append(verified)
+            consolidated = consolidate_units(required_units, manifests)
+            write_consolidated(root, consolidated)
+            print_status(consolidated)
+            if interrupts.requested:
+                return EXIT_INTERRUPTED
+            terminal = heavy_v3_consolidated_exit(consolidated)
+            return terminal if terminal is not None else EXIT_PENDING
+
+
+def load_heavy_v3_campaign_units(options: CampaignOptions) -> tuple[Any, ...]:
+    matrix_options = matrix.RunnerOptions(
+        profile=HEAVY_V3_PROFILE_ID,
+        iteration_root=options.campaign_root / ".selection-only",
+        suite_path=options.suite_path,
+        skill_source=options.skill_source,
+        codex_binary=options.codex_binary,
+        auth_json=options.auth_json,
+        live_config=options.live_config,
+        model=options.model,
+        reasoning_effort=options.reasoning_effort,
+        service_tier=options.service_tier,
+        timeout_seconds=options.timeout_seconds,
+        case_ids=options.case_ids,
+        versions=options.versions,
+        pair_ids=(),
+        offline_only=False,
+        overwrite=False,
+    )
+    return tuple(matrix.load_heavy_v3_units(matrix_options))
+
+
+def build_heavy_v3_child_argv(
+    options: CampaignOptions,
+    *,
+    units: Sequence[Any],
+    matrix_root: Path,
+) -> list[str]:
+    if not units:
+        raise CampaignEvidenceError("heavy child requires at least one scenario")
+    argv = [
+        sys.executable,
+        str(REPO_ROOT / "tests" / "semantic" / "run_codex_skill_matrix.py"),
+        "--profile",
+        HEAVY_V3_PROFILE_ID,
+        "--suite",
+        str(options.suite_path),
+        "--iteration-root",
+        str(matrix_root),
+        "--skill-source",
+        str(options.skill_source),
+        "--codex-binary",
+        str(options.codex_binary),
+        "--auth-json",
+        str(options.auth_json),
+        "--live-config",
+        str(options.live_config),
+        "--model",
+        options.model,
+        "--reasoning-effort",
+        options.reasoning_effort,
+        "--service-tier",
+        options.service_tier,
+        "--timeout",
+        str(options.timeout_seconds),
+    ]
+    for unit in units:
+        argv.extend(("--case-id", str(unit.unit_id)))
+    return argv
+
+
+def heavy_v3_child_request(
+    options: CampaignOptions,
+    *,
+    units: Sequence[Any],
+    argv: Sequence[str],
+) -> dict[str, Any]:
+    return {
+        "contract": CHILD_EXECUTION_CONTRACT,
+        "group_id": HEAVY_V3_GROUP_ID,
+        "scenario_ids": [str(unit.unit_id) for unit in units],
+        "units": [
+            heavy_v3_unit_row(unit, sequence=index)
+            for index, unit in enumerate(units, start=1)
+        ],
+        "request": {
+            "profile": HEAVY_V3_PROFILE_ID,
+            "suite_path": str(options.suite_path),
+            "skill_source": str(options.skill_source),
+            "codex_binary": str(options.codex_binary),
+            "auth_json": str(options.auth_json),
+            "live_config": str(options.live_config),
+            "model": options.model,
+            "reasoning_effort": options.reasoning_effort,
+            "service_tier": options.service_tier,
+            "timeout_seconds": options.timeout_seconds,
+            "memory": "disabled",
+            "sequential": True,
+        },
+        "argv": list(argv),
+        "started_at": utc_now(),
+    }
+
+
+def validate_heavy_v3_child_request(
+    path: Path,
+    *,
+    expected: Mapping[str, Any],
+) -> None:
+    from tests.semantic.support.codex_campaign import load_verified_json
+
+    observed = load_verified_json(path)
+    if observed != expected:
+        raise CampaignEvidenceError("heavy child request differs from its sealed request")
+
+
+def blocked_heavy_v3_validation(
+    units: Sequence[Any],
+    *,
+    reason: str,
+    blocked_unit_id: str | None = None,
+) -> ChildValidation:
+    if not units:
+        raise CampaignEvidenceError("cannot block an empty heavy child selection")
+    unit_ids = tuple(str(unit.unit_id) for unit in units)
+    scenario_id = blocked_unit_id or unit_ids[0]
+    if scenario_id not in unit_ids:
+        raise CampaignEvidenceError(
+            "heavy evidence error identifies a unit outside the scheduled selection"
+        )
+    verdict = PhaseVerdict(
+        session_id=scenario_id,
+        phase=HEAVY_V3_PHASE,
+        status="BLOCKED",
+        reason=reason,
+    )
+    return ChildValidation(
+        observations=(
+            {
+                "unit_id": scenario_id,
+                "status": "BLOCKED",
+                "phases": [verdict.phase_row()],
+            },
+        ),
+        phase_verdicts=(verdict,),
+        executed_session_ids=(),
+        pending_session_ids=tuple(
+            unit_id for unit_id in unit_ids if unit_id != scenario_id
+        ),
+        retry_categories=(),
+        summary={"validation_error": reason},
+    )
+
+
+def heavy_v3_consolidated_exit(consolidated: Mapping[str, Any]) -> int | None:
+    if consolidated.get("blocked_unit_ids"):
+        return EXIT_BLOCKED
+    if consolidated.get("pending_unit_ids") or consolidated.get("retryable_unit_ids"):
+        return None
+    if consolidated.get("failed_unit_ids"):
+        return EXIT_FAIL
+    if consolidated.get("all_selected_passed") is True:
+        return EXIT_PASS
+    return None
+
+
 def prepare_campaign_root(options: CampaignOptions) -> Path:
     root = options.campaign_root.expanduser().resolve(strict=False)
     allowed = WORKSPACE_ROOT.resolve(strict=False)
@@ -565,6 +1163,8661 @@ def build_effective_config(
             "pause_categories": sorted(PAUSE_RETRY_CATEGORIES),
         },
     }
+
+
+def build_heavy_v3_effective_config(
+    options: CampaignOptions,
+    *,
+    units: Sequence[Any],
+    required_units: Mapping[str, Sequence[str]],
+) -> dict[str, Any]:
+    """Fingerprint every immutable input of the V3 matrix campaign."""
+
+    if not units:
+        raise CampaignEvidenceError("heavy campaign requires at least one unit")
+    skill_excludes = (".venv", "__pycache__", ".pytest_cache", ".DS_Store", ".coverage")
+    harness_excludes = ("__pycache__", ".pytest_cache", ".DS_Store", ".coverage")
+    interpreter = Path(sys.executable).resolve(strict=True)
+    matrix_runner = Path(matrix.__file__).resolve(strict=True)
+    campaign_runner = Path(__file__).resolve(strict=True)
+    codex_version = subprocess.run(
+        [str(options.codex_binary), "--version"],
+        cwd=REPO_ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=15,
+        check=False,
+    )
+    if codex_version.returncode != 0 or not codex_version.stdout.strip():
+        raise CampaignConfigError(
+            "cannot fingerprint Codex binary: "
+            f"{codex_version.stderr.strip() or codex_version.returncode}"
+        )
+    distributions = sorted(
+        {
+            (
+                str(distribution.metadata.get("Name") or "").casefold(),
+                str(distribution.version),
+            )
+            for distribution in importlib.metadata.distributions()
+            if distribution.metadata.get("Name")
+        }
+    )
+    unit_rows = [
+        {
+            **heavy_v3_unit_row(unit, sequence=index),
+            "prompt_sha256": str(unit.scenario.prompt_sha256),
+            "user_turn_count": int(unit.user_turn_count),
+            "transaction_count": int(unit.transaction_count),
+        }
+        for index, unit in enumerate(units, start=1)
+    ]
+    live_inputs = _heavy_v3_live_input_fingerprints(
+        options,
+        unit_rows=unit_rows,
+    )
+    return {
+        "contract": HEAVY_V3_EFFECTIVE_CONTRACT,
+        "selection": {
+            "profile": HEAVY_V3_PROFILE_ID,
+            "case_ids": list(options.case_ids),
+            "versions": list(options.versions),
+            "pair_ids": [],
+            "offline_only": False,
+            "units": unit_rows,
+            "required_units": {
+                str(key): list(value) for key, value in required_units.items()
+            },
+        },
+        "candidate": {
+            "path": str(options.skill_source),
+            "tree_sha256": stable_tree_sha256(
+                options.skill_source,
+                exclude_names=skill_excludes,
+            ),
+            "excluded_names": list(skill_excludes),
+        },
+        "suite": {
+            "path": str(options.suite_path),
+            "sha256": sha256_file(options.suite_path),
+        },
+        "runner": {
+            "campaign_path": str(campaign_runner),
+            "campaign_sha256": sha256_file(campaign_runner),
+            "matrix_path": str(matrix_runner),
+            "matrix_sha256": sha256_file(matrix_runner),
+        },
+        "harness": {
+            "semantic_tree_sha256": stable_tree_sha256(
+                REPO_ROOT / "tests" / "semantic",
+                exclude_names=harness_excludes,
+            ),
+            "destructive_support_tree_sha256": stable_tree_sha256(
+                REPO_ROOT / "tests" / "destructive" / "support",
+                exclude_names=harness_excludes,
+            ),
+            "excluded_names": list(harness_excludes),
+        },
+        "live_config": {
+            "path": str(options.live_config),
+            "sha256": sha256_file(options.live_config),
+        },
+        "live_inputs": live_inputs,
+        "codex": {
+            "path": str(options.codex_binary),
+            "sha256": sha256_file(options.codex_binary),
+            "version": codex_version.stdout.strip(),
+            "model": options.model,
+            "reasoning_effort": options.reasoning_effort,
+            "service_tier": options.service_tier,
+            "timeout_seconds": options.timeout_seconds,
+            "memory": "disabled",
+            "fresh_process_thread_and_task_per_scenario": True,
+        },
+        "auth": {
+            "mode": "ephemeral-codex-home-auth-link",
+            "path": str(options.auth_json),
+            "content_hashed": False,
+        },
+        "runtime": {
+            "interpreter": str(interpreter),
+            "interpreter_sha256": sha256_file(interpreter),
+            "python_version": sys.version,
+            "platform": sys.platform,
+            "distributions": [[name, version] for name, version in distributions],
+        },
+        "options": heavy_v3_immutable_options(options),
+        "execution_policy": {
+            "matrix_reuse": True,
+            "sequential_wwise_lifecycles": True,
+            "semantic_fail": "continue_and_preserve_later_case_evidence",
+            "blocked_or_indeterminate": "stop",
+            "resume": "schedule_pending_and_proven_retryable_units_in_suite_order",
+        },
+    }
+
+
+def heavy_v3_immutable_options(options: CampaignOptions) -> dict[str, Any]:
+    return {
+        "campaign_root": str(options.campaign_root),
+        "profile": options.profile,
+        "suite_path": str(options.suite_path),
+        "skill_source": str(options.skill_source),
+        "codex_binary": str(options.codex_binary),
+        "auth_json": str(options.auth_json),
+        "live_config": str(options.live_config),
+        "model": options.model,
+        "reasoning_effort": options.reasoning_effort,
+        "service_tier": options.service_tier,
+        "timeout_seconds": options.timeout_seconds,
+        "case_ids": list(options.case_ids),
+        "versions": list(options.versions),
+        "pair_ids": [],
+        "offline_only": False,
+        "lock_timeout_seconds": options.lock_timeout_seconds,
+        "max_pre_action_retries": options.max_pre_action_retries,
+    }
+
+
+def _heavy_v3_live_input_fingerprints(
+    options: CampaignOptions,
+    *,
+    unit_rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Resolve and freeze every selected real-Wwise input, not only its config path."""
+
+    if not unit_rows:
+        raise CampaignEvidenceError("heavy live-input fingerprint requires selected units")
+    versions: list[str] = []
+    migration_selected = False
+    for row in unit_rows:
+        if not isinstance(row, Mapping):
+            raise CampaignEvidenceError("heavy selected-unit fingerprint row is malformed")
+        version = row.get("version")
+        api = row.get("api")
+        if not isinstance(version, str) or not version:
+            raise CampaignEvidenceError("heavy selected unit has no fingerprintable version")
+        if not isinstance(api, str) or not api:
+            raise CampaignEvidenceError("heavy selected unit has no fingerprintable API")
+        if version not in versions:
+            versions.append(version)
+        migration_selected = migration_selected or api == HEAVY_V3_MIGRATION_API
+
+    resolved_versions: dict[str, Any] = {}
+    for version in versions:
+        environment = {
+            "WWISE_LIVE": "1",
+            "WWISE_DESTRUCTIVE": "1",
+            "WWISE_VERSION": version,
+            "WWISE_TEST_CONFIG": str(options.live_config),
+        }
+        try:
+            contract = require_live_environment(environment)
+        except (LiveEnvironmentError, OSError, ValueError, TypeError) as exc:
+            raise CampaignEvidenceError(
+                f"cannot resolve immutable live inputs for Wwise {version}: {exc}"
+            ) from exc
+        if (
+            contract.version != version
+            or contract.console_path is None
+            or contract.sample_project_source is None
+        ):
+            raise CampaignEvidenceError(
+                f"live config did not resolve exact launcher and SampleProject for {version}"
+            )
+        launcher = Path(contract.console_path).expanduser().resolve(strict=True)
+        project = Path(contract.sample_project_source).expanduser().resolve(strict=True)
+        resolved_versions[version] = {
+            "version": version,
+            "launcher": _heavy_v3_launcher_fingerprint(launcher),
+            "sample_project": _heavy_v3_project_fingerprint(project),
+        }
+
+    migration_source = (
+        _heavy_v3_project_fingerprint(
+            HEAVY_V3_MIGRATION_SOURCE.expanduser().resolve(strict=True)
+        )
+        if migration_selected
+        else None
+    )
+    return {
+        "versions": resolved_versions,
+        "migration_source": migration_source,
+    }
+
+
+def _heavy_v3_launcher_fingerprint(path: Path) -> dict[str, Any]:
+    launcher = Path(path)
+    info = launcher.stat(follow_symlinks=False)
+    if not stat.S_ISREG(info.st_mode) or launcher.is_symlink():
+        raise CampaignEvidenceError(
+            f"resolved Wwise launcher must be a real regular file: {launcher}"
+        )
+    return {
+        "path": str(launcher),
+        "sha256": sha256_file(launcher),
+        "size": info.st_size,
+        "mode": stat.S_IMODE(info.st_mode),
+        "mtime_ns": info.st_mtime_ns,
+    }
+
+
+def _heavy_v3_project_fingerprint(path: Path) -> dict[str, Any]:
+    project = Path(path)
+    info = project.stat(follow_symlinks=False)
+    if (
+        project.suffix.casefold() != ".wproj"
+        or project.is_symlink()
+        or not stat.S_ISREG(info.st_mode)
+    ):
+        raise CampaignEvidenceError(
+            f"immutable Wwise source must be a real .wproj file: {project}"
+        )
+    root = project.parent.resolve(strict=True)
+    full_hash = hash_project(root, preferred_strategy="full")
+    if full_hash.strategy != "full":
+        raise CampaignEvidenceError(
+            f"immutable Wwise source did not receive a full-tree hash: {root}"
+        )
+    return {
+        "project_path": str(project),
+        "source_root": str(root),
+        "project_sha256": sha256_file(project),
+        "project_mtime_ns": info.st_mtime_ns,
+        "full_project_hash": asdict(full_hash),
+        "tree_sha256": stable_tree_sha256(root),
+        "tree_mtime_sha256": _heavy_v3_tree_mtime_sha256(root),
+    }
+
+
+def _heavy_v3_tree_mtime_sha256(root: Path) -> str:
+    tree = Path(root).resolve(strict=True)
+    rows: list[dict[str, Any]] = []
+    for manifest_row in stable_tree_manifest(tree):
+        relative = str(manifest_row["path"])
+        entry = tree / relative
+        info = entry.stat(follow_symlinks=False)
+        rows.append(
+            {
+                "path": relative,
+                "type": manifest_row["type"],
+                "mode": stat.S_IMODE(info.st_mode),
+                "size": info.st_size,
+                "mtime_ns": info.st_mtime_ns,
+            }
+        )
+    return hashlib.sha256(canonical_json_bytes(rows)).hexdigest()
+
+
+def heavy_v3_unit_row(unit: Any, *, sequence: int) -> dict[str, Any]:
+    scenario_id = getattr(unit, "unit_id", None)
+    version = getattr(unit, "version", None)
+    scenario = getattr(unit, "scenario", None)
+    api = getattr(scenario, "api", None)
+    if (
+        type(sequence) is not int
+        or sequence < 1
+        or not isinstance(scenario_id, str)
+        or not scenario_id
+        or not isinstance(version, str)
+        or not version
+        or not isinstance(api, str)
+        or not api
+    ):
+        raise CampaignEvidenceError("heavy unit has an invalid identity")
+    return {
+        "sequence": sequence,
+        "scenario_id": scenario_id,
+        "version": version,
+        "api": api,
+        "runner": "cli" if api.startswith("ak.wwise.cli.") else "project",
+    }
+
+
+def assert_heavy_v3_effective_inputs_frozen(
+    options: CampaignOptions,
+    *,
+    effective: Mapping[str, Any],
+) -> None:
+    assert_effective_inputs_frozen(options, effective=effective)
+    runner = effective.get("runner")
+    if not isinstance(runner, Mapping):
+        raise CampaignEvidenceError("heavy campaign runner fingerprint is malformed")
+    campaign_path = Path(__file__).resolve(strict=True)
+    matrix_path = Path(matrix.__file__).resolve(strict=True)
+    expected_runner = {
+        "campaign_path": str(campaign_path),
+        "campaign_sha256": sha256_file(campaign_path),
+        "matrix_path": str(matrix_path),
+        "matrix_sha256": sha256_file(matrix_path),
+    }
+    if dict(runner) != expected_runner:
+        raise CampaignEvidenceError(
+            "heavy campaign runner drifted from the immutable fingerprint"
+        )
+    if effective.get("options") != heavy_v3_immutable_options(options):
+        raise CampaignEvidenceError(
+            "heavy campaign execution options drifted from the immutable fingerprint"
+        )
+    selection = effective.get("selection")
+    if not isinstance(selection, Mapping) or not isinstance(
+        selection.get("units"), list
+    ):
+        raise CampaignEvidenceError(
+            "heavy campaign selected-unit fingerprint is malformed"
+        )
+    observed_live_inputs = _heavy_v3_live_input_fingerprints(
+        options,
+        unit_rows=selection["units"],
+    )
+    if effective.get("live_inputs") != observed_live_inputs:
+        raise CampaignEvidenceError(
+            "heavy campaign Wwise launcher or immutable source project drifted"
+        )
+
+
+def validate_heavy_v3_child_run(
+    matrix_root: Path,
+    *,
+    expected_units: Sequence[Any],
+    options: CampaignOptions,
+    returncode: int,
+) -> ChildValidation:
+    """Validate incremental V3 matrix evidence and classify every completed case."""
+
+    root = Path(matrix_root).resolve(strict=True)
+    units = tuple(expected_units)
+    if not units:
+        raise CampaignEvidenceError("heavy child validation requires expected units")
+    expected_rows = tuple(
+        heavy_v3_unit_row(unit, sequence=index)
+        for index, unit in enumerate(units, start=1)
+    )
+    expected_ids = tuple(str(row["scenario_id"]) for row in expected_rows)
+    run_config = load_strict_regular_json(root / "run-config.json")
+    summary = load_strict_regular_json(root / "summary.json")
+    _validate_heavy_v3_run_config(
+        run_config,
+        expected_rows=expected_rows,
+        options=options,
+    )
+    _validate_heavy_v3_summary(
+        summary,
+        expected_ids=expected_ids,
+        returncode=returncode,
+    )
+    _validate_heavy_v3_live_preflight(root, summary=summary)
+    _validate_heavy_v3_progress(run_config["progress"], summary=summary)
+
+    case_rows = summary["case_records"]
+    attempted_ids = tuple(summary["attempted_unit_ids"])
+    actual_scenario_dirs = _heavy_v3_scenario_directories(root)
+    expected_scenario_names = {
+        f"{index:03d}-{scenario_id}"
+        for index, scenario_id in enumerate(attempted_ids, start=1)
+    }
+    if set(actual_scenario_dirs) != expected_scenario_names:
+        raise CampaignEvidenceError(
+            "heavy scenario directories differ from the completed matrix records: "
+            f"expected={sorted(expected_scenario_names)} "
+            f"actual={sorted(actual_scenario_dirs)}"
+        )
+
+    verdicts: list[PhaseVerdict] = []
+    observations: list[dict[str, Any]] = []
+    retry_categories: list[str] = []
+
+    def append_blocked(scenario_id: str, reason: str) -> None:
+        verdict = PhaseVerdict(
+            session_id=scenario_id,
+            phase=HEAVY_V3_PHASE,
+            status="BLOCKED",
+            reason=reason,
+        )
+        verdicts.append(verdict)
+        observations.append(
+            {
+                "unit_id": scenario_id,
+                "status": "BLOCKED",
+                "phases": [verdict.phase_row()],
+            }
+        )
+
+    for index, (summary_row, expected_row) in enumerate(
+        zip(case_rows, expected_rows, strict=False),
+        start=1,
+    ):
+        scenario_id = str(expected_row["scenario_id"])
+        if index > len(attempted_ids):
+            break
+        scenario_root = actual_scenario_dirs[f"{index:03d}-{scenario_id}"]
+        try:
+            matrix_case = load_strict_regular_json(
+                scenario_root / "matrix-case.json"
+            )
+            _validate_heavy_v3_matrix_case(
+                matrix_case,
+                expected_unit=units[index - 1],
+                expected_row=expected_row,
+                summary_row=summary_row,
+                scenario_root=scenario_root,
+                options=options,
+            )
+        except (CampaignEvidenceError, OSError) as exc:
+            append_blocked(
+                scenario_id,
+                f"untrusted heavy case evidence: {exc}",
+            )
+            continue
+        status = str(matrix_case["status"])
+        try:
+            retry_category = _heavy_v3_retryable_infrastructure_category(
+                matrix_case,
+                scenario_root=scenario_root,
+                expected_unit=units[index - 1],
+                options=options,
+            )
+        except (CampaignEvidenceError, OSError) as exc:
+            append_blocked(
+                scenario_id,
+                f"untrusted heavy retry-classification evidence: {exc}",
+            )
+            continue
+        campaign_status = "BLOCKED" if status == "INDETERMINATE" else status
+        if retry_category is not None:
+            campaign_status = "RETRYABLE"
+            retry_categories.append(retry_category)
+        reason = str(matrix_case.get("reason") or "")
+        if not reason:
+            reason = (
+                "runner and independent business oracle passed"
+                if campaign_status == "PASS"
+                else f"matrix classified scenario as {campaign_status}"
+            )
+        verdict = PhaseVerdict(
+            session_id=scenario_id,
+            phase=HEAVY_V3_PHASE,
+            status=campaign_status,
+            reason=reason,
+            retry_category=retry_category,
+        )
+        verdicts.append(verdict)
+        observations.append(
+            {
+                "unit_id": scenario_id,
+                "status": campaign_status,
+                "phases": [verdict.phase_row()],
+            }
+        )
+
+    pending_ids = list(summary["pending_unit_ids"])
+    if not observations and returncode == 1 and summary["preflight"] == "blocked":
+        first_id = expected_ids[0]
+        reason = "; ".join(summary["run_errors"]) or "heavy matrix live preflight blocked"
+        verdict = PhaseVerdict(
+            session_id=first_id,
+            phase=HEAVY_V3_PHASE,
+            status="BLOCKED",
+            reason=reason,
+        )
+        verdicts.append(verdict)
+        observations.append(
+            {
+                "unit_id": first_id,
+                "status": "BLOCKED",
+                "phases": [verdict.phase_row()],
+            }
+        )
+        pending_ids = [unit_id for unit_id in pending_ids if unit_id != first_id]
+
+    return ChildValidation(
+        observations=tuple(observations),
+        phase_verdicts=tuple(verdicts),
+        executed_session_ids=attempted_ids,
+        pending_session_ids=tuple(pending_ids),
+        retry_categories=tuple(retry_categories),
+        summary=summary,
+    )
+
+
+def _validate_heavy_v3_run_config(
+    value: Any,
+    *,
+    expected_rows: Sequence[Mapping[str, Any]],
+    options: CampaignOptions,
+) -> None:
+    required_keys = {
+        "contract",
+        "started_at",
+        "updated_at",
+        "completed_at",
+        "profile",
+        "expected_unit_count",
+        "selected_units",
+        "case_ids",
+        "versions",
+        "pair_ids",
+        "offline_only",
+        "model",
+        "reasoning_effort",
+        "service_tier",
+        "timeout_seconds",
+        "memory",
+        "fresh_process_thread_and_task_per_scenario",
+        "sequential_wwise_lifecycles",
+        "semantic_fail_policy",
+        "blocked_or_indeterminate_policy",
+        "skill_source",
+        "suite_path",
+        "live_config",
+        "progress",
+    }
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != required_keys
+        or value.get("contract") != matrix.HEAVY_V3_RUN_CONFIG_CONTRACT
+    ):
+        raise CampaignEvidenceError("invalid heavy matrix run-config contract")
+    expected_ids = [str(row["scenario_id"]) for row in expected_rows]
+    expected = {
+        "profile": HEAVY_V3_PROFILE_ID,
+        "expected_unit_count": len(expected_rows),
+        "selected_units": [dict(row) for row in expected_rows],
+        "case_ids": expected_ids,
+        "versions": [],
+        "pair_ids": [],
+        "offline_only": False,
+        "model": options.model,
+        "reasoning_effort": options.reasoning_effort,
+        "service_tier": options.service_tier,
+        "timeout_seconds": options.timeout_seconds,
+        "memory": "disabled",
+        "fresh_process_thread_and_task_per_scenario": True,
+        "sequential_wwise_lifecycles": True,
+        "semantic_fail_policy": "continue",
+        "blocked_or_indeterminate_policy": "stop",
+        "skill_source": str(options.skill_source),
+        "suite_path": str(options.suite_path),
+        "live_config": str(options.live_config),
+    }
+    for key, expected_value in expected.items():
+        if value.get(key) != expected_value:
+            raise CampaignEvidenceError(
+                f"heavy matrix run-config mismatch for {key}"
+            )
+    if not _valid_heavy_timestamp(value.get("started_at")) or not _valid_heavy_timestamp(
+        value.get("updated_at")
+    ):
+        raise CampaignEvidenceError("heavy matrix run-config timestamps are invalid")
+    if value.get("completed_at") is not None and not _valid_heavy_timestamp(
+        value.get("completed_at")
+    ):
+        raise CampaignEvidenceError("heavy matrix completion timestamp is invalid")
+    progress = value.get("progress")
+    if not isinstance(progress, Mapping) or set(progress) != {
+        "preflight",
+        "attempted_unit_count",
+        "attempted_unit_ids",
+        "pending_unit_ids",
+        "status_counts",
+        "stop_reason",
+        "run_error_count",
+    }:
+        raise CampaignEvidenceError("heavy matrix run-config progress is malformed")
+
+
+def _validate_heavy_v3_summary(
+    value: Any,
+    *,
+    expected_ids: Sequence[str],
+    returncode: int,
+) -> None:
+    required_keys = {
+        "contract",
+        "started_at",
+        "updated_at",
+        "completed_at",
+        "profile",
+        "preflight",
+        "selected_unit_count",
+        "attempted_unit_count",
+        "attempted_unit_ids",
+        "status_counts",
+        "passed_unit_ids",
+        "failed_unit_ids",
+        "blocked_unit_ids",
+        "indeterminate_unit_ids",
+        "pending_unit_ids",
+        "stop_reason",
+        "stopped_early",
+        "all_selected_passed",
+        "run_errors",
+        "case_records",
+    }
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != required_keys
+        or value.get("contract") != matrix.HEAVY_V3_SUMMARY_CONTRACT
+        or value.get("profile") != HEAVY_V3_PROFILE_ID
+    ):
+        raise CampaignEvidenceError("invalid heavy matrix summary contract")
+    if value.get("selected_unit_count") != len(expected_ids):
+        raise CampaignEvidenceError("heavy matrix summary selection count mismatch")
+    attempted = value.get("attempted_unit_ids")
+    pending = value.get("pending_unit_ids")
+    case_records = value.get("case_records")
+    run_errors = value.get("run_errors")
+    if not all(isinstance(item, list) for item in (attempted, pending, case_records, run_errors)):
+        raise CampaignEvidenceError("heavy matrix summary arrays are malformed")
+    if any(not isinstance(item, str) for item in (*attempted, *pending, *run_errors)):
+        raise CampaignEvidenceError("heavy matrix summary string arrays are malformed")
+    if attempted != list(expected_ids[: len(attempted)]):
+        raise CampaignEvidenceError("heavy matrix attempted units are not an ordered prefix")
+    if pending != list(expected_ids[len(attempted) :]):
+        raise CampaignEvidenceError("heavy matrix pending units are not the remaining suffix")
+    if value.get("attempted_unit_count") != len(attempted) or len(case_records) != len(attempted):
+        raise CampaignEvidenceError("heavy matrix attempted counts disagree")
+    statuses: list[str] = []
+    for index, record in enumerate(case_records):
+        if not isinstance(record, Mapping) or set(record) != {
+            "sequence",
+            "scenario_id",
+            "version",
+            "api",
+            "runner",
+            "status",
+            "reason",
+            "scenario_root",
+        }:
+            raise CampaignEvidenceError("heavy matrix summary case record is malformed")
+        if record.get("sequence") != index + 1 or record.get("scenario_id") != attempted[index]:
+            raise CampaignEvidenceError("heavy matrix summary case order drifted")
+        status = record.get("status")
+        if status not in matrix.HEAVY_V3_STATUSES:
+            raise CampaignEvidenceError("heavy matrix summary has an invalid status")
+        statuses.append(str(status))
+    expected_status_counts = {
+        status: statuses.count(status)
+        for status in ("PASS", "FAIL", "BLOCKED", "INDETERMINATE")
+    }
+    if value.get("status_counts") != expected_status_counts:
+        raise CampaignEvidenceError("heavy matrix summary status counts disagree")
+    status_lists = {
+        "passed_unit_ids": "PASS",
+        "failed_unit_ids": "FAIL",
+        "blocked_unit_ids": "BLOCKED",
+        "indeterminate_unit_ids": "INDETERMINATE",
+    }
+    for key, status in status_lists.items():
+        expected = [
+            attempted[index]
+            for index, observed_status in enumerate(statuses)
+            if observed_status == status
+        ]
+        if value.get(key) != expected:
+            raise CampaignEvidenceError(f"heavy matrix summary {key} disagrees")
+    stop_reason = value.get("stop_reason")
+    if stop_reason is not None and (not isinstance(stop_reason, str) or not stop_reason):
+        raise CampaignEvidenceError("heavy matrix stop reason is malformed")
+    if value.get("stopped_early") is not bool(stop_reason):
+        raise CampaignEvidenceError("heavy matrix stopped flag disagrees")
+    all_pass = (
+        len(attempted) == len(expected_ids)
+        and bool(attempted)
+        and statuses == ["PASS"] * len(attempted)
+        and not run_errors
+        and stop_reason is None
+        and value.get("preflight") == "passed"
+        and value.get("completed_at") is not None
+    )
+    if value.get("all_selected_passed") is not all_pass:
+        raise CampaignEvidenceError("heavy matrix all-pass flag disagrees")
+    if value.get("preflight") not in {"pending", "passed", "blocked"}:
+        raise CampaignEvidenceError("heavy matrix preflight state is invalid")
+    if not _valid_heavy_timestamp(value.get("started_at")) or not _valid_heavy_timestamp(
+        value.get("updated_at")
+    ):
+        raise CampaignEvidenceError("heavy matrix summary timestamps are invalid")
+    completed_at = value.get("completed_at")
+    if completed_at is not None and not _valid_heavy_timestamp(completed_at):
+        raise CampaignEvidenceError("heavy matrix summary completion timestamp is invalid")
+    preflight = value.get("preflight")
+    if returncode == 0:
+        if not all_pass or completed_at is None:
+            raise CampaignEvidenceError(
+                "heavy matrix exited zero without one terminal all-pass summary"
+            )
+        return
+
+    if returncode == 1:
+        if completed_at is None:
+            raise CampaignEvidenceError(
+                "normally exited heavy matrix lacks terminal summary"
+            )
+        if preflight == "blocked":
+            if (
+                attempted
+                or statuses
+                or pending != list(expected_ids)
+                or stop_reason != "live-dependency-preflight"
+                or not run_errors
+            ):
+                raise CampaignEvidenceError(
+                    "heavy matrix preflight block contradicts its terminal summary"
+                )
+            return
+        if preflight != "passed":
+            raise CampaignEvidenceError(
+                "terminal heavy matrix has no passed or blocked live preflight"
+            )
+        blocking_statuses = {"BLOCKED", "INDETERMINATE"}
+        if any(status in blocking_statuses for status in statuses):
+            terminal_status = statuses[-1] if statuses else ""
+            terminal_id = attempted[-1] if attempted else ""
+            if (
+                terminal_status not in blocking_statuses
+                or stop_reason != f"{terminal_status.casefold()}:{terminal_id}"
+                or not run_errors
+                or not any(f"heavy-unit:{terminal_id}" in error for error in run_errors)
+            ):
+                raise CampaignEvidenceError(
+                    "heavy matrix blocking status is not bound to its terminal error"
+                )
+            return
+        if (
+            "FAIL" not in statuses
+            or len(attempted) != len(expected_ids)
+            or pending
+            or stop_reason is not None
+            or run_errors
+        ):
+            raise CampaignEvidenceError(
+                "heavy matrix exited one without a complete semantic failure or block"
+            )
+        return
+
+    # The matrix persists one non-terminal prefix after every completed case.
+    # Preserve that prefix only when at least one real suffix unit remains.  An
+    # abnormal child must never turn a final non-terminal all-PASS snapshot into
+    # completed campaign evidence.
+    if (
+        completed_at is not None
+        or preflight != "passed"
+        or not attempted
+        or not pending
+        or stop_reason is not None
+        or run_errors
+        or any(status in {"BLOCKED", "INDETERMINATE"} for status in statuses)
+    ):
+        raise CampaignEvidenceError(
+            "abnormally exited heavy matrix lacks one trustworthy completed prefix "
+            "with a real pending suffix"
+        )
+
+
+def _validate_heavy_v3_live_preflight(
+    root: Path,
+    *,
+    summary: Mapping[str, Any],
+) -> None:
+    payload = load_strict_regular_json(root / "live-preflight.json")
+    if not isinstance(payload, Mapping):
+        raise CampaignEvidenceError("heavy matrix live preflight must be an object")
+    state = summary.get("preflight")
+    if state == "passed":
+        required = {
+            "contract",
+            "ok",
+            "dependency",
+            "module",
+            "required_symbols",
+            "current_interpreter",
+            "automatic_install_attempted",
+        }
+        if (
+            set(payload) != required
+            or payload.get("contract") != HEAVY_V3_LIVE_PREFLIGHT_CONTRACT
+            or payload.get("ok") is not True
+            or payload.get("dependency") != "waapi-client"
+            or payload.get("module") != "waapi"
+            or payload.get("required_symbols")
+            != ["WaapiClient", "WaapiRequestFailed"]
+            or payload.get("current_interpreter")
+            != str(Path(sys.executable).expanduser().resolve(strict=False))
+            or payload.get("automatic_install_attempted") is not False
+        ):
+            raise CampaignEvidenceError(
+                "heavy matrix passing live-preflight evidence is malformed"
+            )
+        return
+    if state == "blocked":
+        if (
+            payload.get("contract") != HEAVY_V3_LIVE_PREFLIGHT_CONTRACT
+            or payload.get("ok") is not False
+        ):
+            raise CampaignEvidenceError(
+                "heavy matrix blocked live-preflight evidence is malformed"
+            )
+        return
+    raise CampaignEvidenceError(
+        "heavy matrix child ended without terminal live-preflight evidence"
+    )
+
+
+def _validate_heavy_v3_progress(
+    progress: Mapping[str, Any],
+    *,
+    summary: Mapping[str, Any],
+) -> None:
+    expected = {
+        "preflight": summary["preflight"],
+        "attempted_unit_count": summary["attempted_unit_count"],
+        "attempted_unit_ids": summary["attempted_unit_ids"],
+        "pending_unit_ids": summary["pending_unit_ids"],
+        "status_counts": summary["status_counts"],
+        "stop_reason": summary["stop_reason"],
+        "run_error_count": len(summary["run_errors"]),
+    }
+    if dict(progress) != expected:
+        raise CampaignEvidenceError(
+            "heavy matrix run-config progress differs from summary"
+        )
+
+
+def _validate_heavy_v3_matrix_case(
+    value: Any,
+    *,
+    expected_unit: Any,
+    expected_row: Mapping[str, Any],
+    summary_row: Mapping[str, Any],
+    scenario_root: Path,
+    options: CampaignOptions,
+) -> None:
+    required_keys = {
+        "contract",
+        "sequence",
+        "scenario_id",
+        "version",
+        "api",
+        "runner",
+        "status",
+        "reason",
+        "scenario_root",
+        "runner_outcome",
+    }
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != required_keys
+        or value.get("contract") != matrix.HEAVY_V3_CASE_RECORD_CONTRACT
+    ):
+        raise CampaignEvidenceError("invalid heavy matrix-case contract")
+    for key, expected_value in expected_row.items():
+        if value.get(key) != expected_value:
+            raise CampaignEvidenceError(f"heavy matrix-case mismatch for {key}")
+    if value.get("scenario_root") != str(scenario_root):
+        raise CampaignEvidenceError("heavy matrix-case scenario root is misbound")
+    expected_summary = {
+        key: value.get(key)
+        for key in (
+            "sequence",
+            "scenario_id",
+            "version",
+            "api",
+            "runner",
+            "status",
+            "reason",
+            "scenario_root",
+        )
+    }
+    if dict(summary_row) != expected_summary:
+        raise CampaignEvidenceError("heavy matrix-case differs from summary record")
+    status = value.get("status")
+    if status not in matrix.HEAVY_V3_STATUSES or not isinstance(value.get("reason"), str):
+        raise CampaignEvidenceError("heavy matrix-case status/reason is malformed")
+    outcome_path = scenario_root / "outcome.json"
+    runner_outcome = value.get("runner_outcome")
+    if runner_outcome is None:
+        if status != "BLOCKED" or outcome_path.exists():
+            raise CampaignEvidenceError(
+                "runner-less matrix-case must be BLOCKED with no outcome file"
+            )
+        return
+    if not isinstance(runner_outcome, Mapping):
+        raise CampaignEvidenceError("heavy matrix-case runner outcome is malformed")
+    outcome = load_strict_regular_json(outcome_path)
+    if outcome != runner_outcome:
+        raise CampaignEvidenceError("heavy outcome file differs from matrix-case")
+    expected_outcome_keys = {
+        "contract",
+        "scenario_id",
+        "version",
+        "status",
+        "reason",
+        "scenario_root",
+        "task_root",
+        "thread_id",
+        "checks",
+        "lifecycle",
+    }
+    if not isinstance(outcome, Mapping) or set(outcome) != expected_outcome_keys:
+        raise CampaignEvidenceError("heavy runner outcome has an invalid shape")
+    for key in ("scenario_id", "version", "status", "reason", "scenario_root"):
+        if outcome.get(key) != value.get(key):
+            raise CampaignEvidenceError(f"heavy runner outcome mismatch for {key}")
+    expected_contract = _heavy_v3_outcome_contract(str(value["runner"]))
+    if outcome.get("contract") != expected_contract:
+        raise CampaignEvidenceError("heavy runner outcome contract mismatch")
+    if not isinstance(outcome.get("checks"), Mapping):
+        raise CampaignEvidenceError("heavy runner outcome checks are malformed")
+    task_root = outcome.get("task_root")
+    if task_root is not None and not _path_is_within(Path(task_root), scenario_root):
+        raise CampaignEvidenceError("heavy runner task root escapes the scenario root")
+    if status == "PASS":
+        _validate_heavy_v3_pass_outcome(
+            outcome,
+            expected_unit=expected_unit,
+            expected_row=expected_row,
+            scenario_root=scenario_root,
+            options=options,
+        )
+    elif outcome["checks"].get("codex_infrastructure_failure") is None:
+        # A semantic FAIL, ordinary BLOCKED result, or INDETERMINATE mutation
+        # still has to prove which reviewed request and business contract were
+        # frozen before Codex ran.  Do not accept a failure label as a way to
+        # bypass prompt provenance or the family-specific typed plan parser.
+        # A runner-owned setup failure is the one exception: when it blocks
+        # before prompt provenance, a business plan, or a Codex task exists,
+        # there is no prompt-plan chain to re-read.  Validate that negative
+        # boundary explicitly instead of treating the expected absence as
+        # corrupt model evidence.
+        # Codex infrastructure failures keep their stronger, partial-task
+        # validation in _heavy_v3_retryable_infrastructure_category(), which
+        # applies to both retryable and permanently blocked categories.
+        if not _validate_heavy_v3_pre_materialization_block(
+            outcome,
+            scenario_root=scenario_root,
+        ):
+            _validate_heavy_v3_failure_prompt_plan(
+                outcome,
+                expected_unit=expected_unit,
+                scenario_root=scenario_root,
+            )
+
+
+def _validate_heavy_v3_pre_materialization_block(
+    outcome: Mapping[str, Any],
+    *,
+    scenario_root: Path,
+) -> bool:
+    """Accept only a proven runner block that predates all prompt/model evidence."""
+
+    if (
+        outcome.get("status") != "BLOCKED"
+        or outcome.get("task_root") is not None
+        or outcome.get("thread_id") is not None
+    ):
+        return False
+    checks = outcome.get("checks")
+    reason = outcome.get("reason")
+    if (
+        not isinstance(checks, Mapping)
+        or not isinstance(reason, str)
+        or not reason
+        or checks.get("exception") != reason
+        or checks.get("failure_classification") != "BLOCKED"
+    ):
+        raise CampaignEvidenceError(
+            "pre-materialization heavy block lacks its exact runner exception"
+        )
+
+    evidence_root = scenario_root / "evidence"
+    if (
+        evidence_root.is_symlink()
+        or not evidence_root.is_dir()
+        or any(
+            os.path.lexists(path)
+            for path in (
+                evidence_root / "codex-task",
+                evidence_root / HEAVY_V3_PROMPT_PROVENANCE_FILE,
+                evidence_root / BUSINESS_ORACLE_PLAN_FILE,
+            )
+        )
+    ):
+        raise CampaignEvidenceError(
+            "pre-materialization heavy block contradicts prompt or plan evidence"
+        )
+    return True
+
+
+def _validate_heavy_v3_failure_prompt_plan(
+    outcome: Mapping[str, Any],
+    *,
+    expected_unit: Any,
+    scenario_root: Path,
+) -> HeavyV3PromptEvidence:
+    """Re-read the immutable prompt/common/typed plan chain for a failed case."""
+
+    task_root_value = outcome.get("task_root")
+    if not isinstance(task_root_value, str) or not task_root_value:
+        raise CampaignEvidenceError(
+            "failed heavy outcome has no frozen prompt-plan task root"
+        )
+    task_root = Path(task_root_value)
+    evidence_root = scenario_root / "evidence"
+    expected_task_root = evidence_root / "codex-task"
+    try:
+        resolved_task_root = task_root.resolve(strict=True)
+        resolved_expected_root = expected_task_root.resolve(strict=True)
+    except OSError as exc:
+        raise CampaignEvidenceError(
+            f"failed heavy prompt-plan task root is unavailable: {exc}"
+        ) from exc
+    if (
+        not task_root.is_absolute()
+        or task_root.is_symlink()
+        or not task_root.is_dir()
+        or evidence_root.is_symlink()
+        or not evidence_root.is_dir()
+        or resolved_task_root != resolved_expected_root
+    ):
+        raise CampaignEvidenceError(
+            "failed heavy prompt-plan task root is not the fixed real evidence path"
+        )
+
+    receipt_path = task_root / HEAVY_V3_PROMPT_MATERIALIZATION_FILE
+    raw_receipt = _load_strict_regular_text(receipt_path)
+    receipt_sha256 = hashlib.sha256(raw_receipt.encode("utf-8")).hexdigest()
+    return _validate_heavy_v3_prompt_materialization(
+        task_root,
+        scenario_root=scenario_root,
+        expected_unit=expected_unit,
+        expected_sha256=receipt_sha256,
+    )
+
+
+def _heavy_v3_retryable_infrastructure_category(
+    matrix_case: Mapping[str, Any],
+    *,
+    scenario_root: Path,
+    expected_unit: Any,
+    options: CampaignOptions,
+) -> str | None:
+    """Return a proven pre-agent retry category from one blocked heavy case.
+
+    The matrix/lifecycle layer continues to classify the stopped case as
+    ``BLOCKED`` and quarantine its owned state.  Only this campaign evidence
+    layer may reinterpret a closed, runner-authored Codex infrastructure record
+    as ``RETRYABLE``.  Cleanup or source-project uncertainty always fails
+    closed and never becomes resumable.
+    """
+
+    outcome = matrix_case.get("runner_outcome")
+    if not isinstance(outcome, Mapping):
+        return None
+    checks = outcome.get("checks")
+    if not isinstance(checks, Mapping):
+        return None
+    failure = checks.get("codex_infrastructure_failure")
+    if failure is None:
+        return None
+    required_failure_keys = {
+        "category",
+        "turn_failed",
+        "timed_out",
+        "agent_item_event_count",
+    }
+    if not isinstance(failure, Mapping) or set(failure) != required_failure_keys:
+        raise CampaignEvidenceError(
+            "heavy Codex infrastructure evidence has an invalid shape"
+        )
+    category = failure.get("category")
+    if (
+        not isinstance(category, str)
+        or category not in _HEAVY_V3_CODEX_INFRASTRUCTURE_CATEGORIES
+    ):
+        raise CampaignEvidenceError(
+            "heavy Codex infrastructure evidence has an unknown category"
+        )
+    if (
+        type(failure.get("turn_failed")) is not bool
+        or type(failure.get("timed_out")) is not bool
+        or type(failure.get("agent_item_event_count")) is not int
+        or failure.get("agent_item_event_count") != 0
+    ):
+        raise CampaignEvidenceError(
+            "heavy Codex infrastructure evidence does not prove pre-agent failure"
+        )
+    if (
+        category == "timeout_before_agent_action"
+        and failure.get("timed_out") is not True
+    ) or (
+        category == "turn_failed_before_agent_action"
+        and (
+            failure.get("turn_failed") is not True
+            or failure.get("timed_out") is not False
+        )
+    ):
+        raise CampaignEvidenceError(
+            "heavy Codex infrastructure category contradicts its typed flags"
+        )
+    reason_prefix = (
+        "CodexInfrastructureError: Codex CLI infrastructure failure "
+        f"({category}):"
+    )
+    if (
+        matrix_case.get("status") != "BLOCKED"
+        or outcome.get("status") != "BLOCKED"
+        or checks.get("failure_classification") != "BLOCKED"
+        or outcome.get("thread_id") is not None
+        or not isinstance(outcome.get("reason"), str)
+        or not str(outcome.get("reason")).startswith(reason_prefix)
+    ):
+        raise CampaignEvidenceError(
+            "heavy Codex infrastructure evidence contradicts the blocked outcome"
+        )
+    _validate_heavy_v3_retryable_task_failure(
+        outcome,
+        failure=failure,
+        scenario_root=scenario_root,
+        expected_unit=expected_unit,
+        options=options,
+    )
+    if category in BLOCKED_INFRASTRUCTURE_CATEGORIES:
+        return None
+    _validate_heavy_v3_retryable_lifecycle(
+        outcome,
+        scenario_root=scenario_root,
+        runner=str(matrix_case.get("runner")),
+    )
+    return category
+
+
+def _validate_heavy_v3_retryable_task_failure(
+    outcome: Mapping[str, Any],
+    *,
+    failure: Mapping[str, Any],
+    scenario_root: Path,
+    expected_unit: Any,
+    options: CampaignOptions,
+) -> None:
+    """Validate the failed turn, every prior turn, and the stopped broker prefix."""
+
+    task_root = scenario_root / "evidence" / "codex-task"
+    if (
+        outcome.get("task_root") != str(task_root)
+        or task_root.is_symlink()
+        or not task_root.is_dir()
+    ):
+        raise CampaignEvidenceError(
+            "retryable heavy Codex failure lacks its fixed task evidence root"
+        )
+    if os.path.lexists(task_root / "task-result.json"):
+        raise CampaignEvidenceError(
+            "retryable heavy task cannot coexist with a completed task result"
+        )
+    sidecar = load_strict_regular_json(task_root / "infrastructure-failure.json")
+    sidecar_keys = {
+        "contract",
+        "scenario_id",
+        "version",
+        "failed_turn_index",
+        "expected_turn_count",
+        "prior_completed_turn_count",
+        "previous_broker_prefix",
+        "expected_failed_turn_prefix",
+        "prior_thread_id",
+        "prompt_sha256",
+        "failure",
+        "artifact_sha256",
+    }
+    expected_turn_count = getattr(expected_unit, "user_turn_count", None)
+    failed_turn_index = sidecar.get("failed_turn_index") if isinstance(sidecar, Mapping) else None
+    prior_turn_count = (
+        sidecar.get("prior_completed_turn_count")
+        if isinstance(sidecar, Mapping)
+        else None
+    )
+    previous_prefix = (
+        sidecar.get("previous_broker_prefix")
+        if isinstance(sidecar, Mapping)
+        else None
+    )
+    failed_prefix = (
+        sidecar.get("expected_failed_turn_prefix")
+        if isinstance(sidecar, Mapping)
+        else None
+    )
+    prior_thread_id = sidecar.get("prior_thread_id") if isinstance(sidecar, Mapping) else None
+    if (
+        not isinstance(sidecar, Mapping)
+        or set(sidecar) != sidecar_keys
+        or sidecar.get("contract")
+        != HEAVY_V3_TASK_INFRASTRUCTURE_FAILURE_CONTRACT
+        or sidecar.get("scenario_id") != outcome.get("scenario_id")
+        or sidecar.get("scenario_id") != getattr(expected_unit, "unit_id", None)
+        or sidecar.get("version") != outcome.get("version")
+        or sidecar.get("version") != getattr(expected_unit, "version", None)
+        or type(expected_turn_count) is not int
+        or expected_turn_count < 1
+        or sidecar.get("expected_turn_count") != expected_turn_count
+        or type(failed_turn_index) is not int
+        or not 1 <= failed_turn_index <= expected_turn_count
+        or type(prior_turn_count) is not int
+        or prior_turn_count != failed_turn_index - 1
+        or type(previous_prefix) is not int
+        or previous_prefix < 0
+        or type(failed_prefix) is not int
+        or failed_prefix <= previous_prefix
+        or sidecar.get("failure") != dict(failure)
+        or not isinstance(sidecar.get("prompt_sha256"), str)
+        or _SHA256_RE.fullmatch(str(sidecar.get("prompt_sha256"))) is None
+        or (
+            prior_turn_count == 0
+            and prior_thread_id is not None
+        )
+        or (
+            prior_turn_count > 0
+            and (not isinstance(prior_thread_id, str) or not prior_thread_id)
+        )
+    ):
+        raise CampaignEvidenceError(
+            "retryable heavy task infrastructure sidecar is misbound"
+        )
+
+    failed_turn_root = task_root / "turns" / f"turn-{failed_turn_index:02d}"
+    expected_artifacts = {
+        HEAVY_V3_PROMPT_MATERIALIZATION_FILE,
+        f"turns/turn-{failed_turn_index:02d}/prompt.txt",
+        f"turns/turn-{failed_turn_index:02d}/events.jsonl",
+        f"turns/turn-{failed_turn_index:02d}/stderr.txt",
+        f"turns/turn-{failed_turn_index:02d}/final.txt",
+        f"turns/turn-{failed_turn_index:02d}/codex-facts.json",
+        "broker-evidence.json",
+    }
+    artifact_sha256 = sidecar.get("artifact_sha256")
+    if (
+        not isinstance(artifact_sha256, Mapping)
+        or set(artifact_sha256) != expected_artifacts
+    ):
+        raise CampaignEvidenceError(
+            "retryable heavy task artifact digest set is incomplete"
+        )
+    for relative, digest in artifact_sha256.items():
+        artifact = task_root / str(relative)
+        if (
+            not isinstance(digest, str)
+            or _SHA256_RE.fullmatch(digest) is None
+            or hashlib.sha256(
+                _load_strict_regular_text(artifact).encode("utf-8")
+            ).hexdigest()
+            != digest
+        ):
+            raise CampaignEvidenceError(
+                "retryable heavy task artifact digest is invalid"
+            )
+
+    prompt_evidence = _validate_heavy_v3_prompt_materialization(
+        task_root,
+        scenario_root=scenario_root,
+        expected_unit=expected_unit,
+        expected_sha256=str(
+            artifact_sha256[HEAVY_V3_PROMPT_MATERIALIZATION_FILE]
+        ),
+    )
+    expected_prompts = prompt_evidence.prompts
+    protocol = prompt_evidence.provenance.protocol
+    required_reference = _heavy_v3_required_reference(expected_unit)
+
+    prompt = _load_strict_regular_text(failed_turn_root / "prompt.txt")
+    if (
+        not prompt.endswith("\n")
+        or not prompt[:-1]
+        or hashlib.sha256(prompt[:-1].encode("utf-8")).hexdigest()
+        != sidecar.get("prompt_sha256")
+        or prompt[:-1] != expected_prompts[failed_turn_index - 1]
+    ):
+        raise CampaignEvidenceError(
+            "retryable heavy failed-turn prompt digest is invalid"
+        )
+    if _load_strict_regular_text(failed_turn_root / "final.txt") != "\n":
+        raise CampaignEvidenceError(
+            "retryable heavy failed turn unexpectedly has a final response"
+        )
+    _load_strict_regular_text(failed_turn_root / "events.jsonl")
+    _load_strict_regular_text(failed_turn_root / "stderr.txt")
+    failed_facts = load_strict_regular_json(failed_turn_root / "codex-facts.json")
+    _validate_heavy_v3_retryable_failed_facts(
+        failed_facts,
+        failure=failure,
+        prior_thread_id=prior_thread_id,
+        expected_prompt=expected_prompts[failed_turn_index - 1],
+        turn_index=failed_turn_index,
+        task_root=task_root,
+        turn_root=failed_turn_root,
+        options=options,
+    )
+
+    turns_root = task_root / "turns"
+    expected_turn_directories = {
+        f"turn-{index:02d}" for index in range(1, failed_turn_index + 1)
+    }
+    if _strict_real_subdirectory_names(turns_root) != expected_turn_directories:
+        raise CampaignEvidenceError(
+            "retryable heavy partial task has unexpected turn directories"
+        )
+    prior_prefixes: list[int] = []
+    prior_gateway_records: list[Mapping[str, Any]] = []
+    previous_validated_prefix = 0
+    for index in range(1, prior_turn_count + 1):
+        turn_root = turns_root / f"turn-{index:02d}"
+        grade = load_strict_regular_json(turn_root / "turn-grade.json")
+        expected_prefix = (
+            protocol.turn_prefix_counts[index - 1]
+        )
+        turn_gateway_records = _validate_heavy_v3_turn_grade(
+            grade,
+            index=index,
+            turn_root=turn_root,
+            expected_thread_id=str(prior_thread_id),
+            expected_prompt=expected_prompts[index - 1],
+            task_root=task_root,
+            options=options,
+            previous_broker_prefix=previous_validated_prefix,
+            expected_broker_prefix=expected_prefix,
+            expected_steps=protocol.steps[previous_validated_prefix:expected_prefix],
+            version=str(getattr(expected_unit, "version", "")),
+            required_reference=required_reference,
+        )
+        prior_gateway_records.extend(turn_gateway_records)
+        if len(prior_gateway_records) != expected_prefix:
+            raise CampaignEvidenceError(
+                "retryable heavy turn command allocation differs from its broker prefix"
+            )
+        previous_validated_prefix = expected_prefix
+        prefix = grade.get("broker_prefix_count")
+        if type(prefix) is not int:
+            raise CampaignEvidenceError(
+                "retryable heavy prior turn broker prefix is malformed"
+            )
+        prior_prefixes.append(prefix)
+    if (
+        prior_prefixes != sorted(set(prior_prefixes))
+        or (prior_prefixes[-1] if prior_prefixes else 0) != previous_prefix
+    ):
+        raise CampaignEvidenceError(
+            "retryable heavy prior turns do not bind the stopped broker prefix"
+        )
+
+    broker = load_strict_regular_json(task_root / "broker-evidence.json")
+    expected_previous_prefix = (
+        0
+        if failed_turn_index == 1
+        else protocol.turn_prefix_counts[failed_turn_index - 2]
+    )
+    expected_failed_prefix = protocol.turn_prefix_counts[failed_turn_index - 1]
+    if (
+        previous_prefix != expected_previous_prefix
+        or failed_prefix != expected_failed_prefix
+    ):
+        raise CampaignEvidenceError(
+            "retryable heavy broker prefixes differ from sealed turn boundaries"
+        )
+    _validate_heavy_v3_retryable_partial_broker(
+        broker,
+        task_root=task_root,
+        previous_prefix=previous_prefix,
+        failed_prefix=failed_prefix,
+        protocol=protocol,
+        command_records=tuple(prior_gateway_records),
+        options=options,
+        version=str(getattr(expected_unit, "version", "")),
+    )
+
+
+def _validate_heavy_v3_retryable_failed_facts(
+    value: Any,
+    *,
+    failure: Mapping[str, Any],
+    prior_thread_id: Any,
+    expected_prompt: str,
+    turn_index: int,
+    task_root: Path,
+    turn_root: Path,
+    options: CampaignOptions,
+) -> None:
+    required_keys = {
+        "command",
+        "exit_status",
+        "duration_seconds",
+        "timed_out",
+        "thread_id",
+        "final_response",
+        "usage",
+        "event_count",
+        "collab_call_count",
+        "file_change_count",
+        "prompt_audit",
+        "isolation_audit",
+        "session_audit",
+        "command_facts",
+        "created_files",
+        "modified_files",
+        "deleted_files",
+        "created_source_files",
+        "modified_source_files",
+        "deleted_source_files",
+        "skill_tree_sha256_before",
+        "skill_tree_sha256_after",
+        "skill_tree_unchanged",
+    }
+    if not isinstance(value, Mapping) or set(value) != required_keys:
+        raise CampaignEvidenceError(
+            "retryable heavy failed-turn Codex facts have an invalid shape"
+        )
+    events_path = turn_root / "events.jsonl"
+    _validate_heavy_v3_events_against_facts(
+        events_path,
+        value,
+        label="retryable heavy failed turn",
+    )
+    events_text = _load_strict_regular_text(events_path)
+    stderr = _load_strict_regular_text(turn_root / "stderr.txt")
+    reconstructed_failure = classify_codex_infrastructure_failure(
+        parse_jsonl_events(events_text),
+        stderr=stderr,
+        timed_out=value.get("timed_out") is True,
+    )
+    reconstructed_failure_row = (
+        {
+            "category": reconstructed_failure.category,
+            "turn_failed": reconstructed_failure.turn_failed,
+            "timed_out": reconstructed_failure.timed_out,
+            "agent_item_event_count": reconstructed_failure.agent_item_event_count,
+        }
+        if reconstructed_failure is not None
+        else None
+    )
+    if reconstructed_failure_row != dict(failure):
+        raise CampaignEvidenceError(
+            "retryable heavy infrastructure category cannot be reconstructed "
+            "from events.jsonl and stderr.txt"
+        )
+    prompt_audit = value.get("prompt_audit")
+    isolation_audit = value.get("isolation_audit")
+    session_audit = value.get("session_audit")
+    command_facts = value.get("command_facts")
+    thread_id = value.get("thread_id")
+    if (
+        type(value.get("exit_status")) is not int
+        or value.get("exit_status") == 0
+        or value.get("timed_out") is not failure.get("timed_out")
+        or value.get("final_response") != ""
+        or value.get("collab_call_count") != 0
+        or value.get("file_change_count") != 0
+        or value.get("skill_tree_unchanged") is not True
+        or not isinstance(value.get("skill_tree_sha256_before"), str)
+        or _SHA256_RE.fullmatch(str(value.get("skill_tree_sha256_before"))) is None
+        or value.get("skill_tree_sha256_before")
+        != value.get("skill_tree_sha256_after")
+        or not isinstance(prompt_audit, Mapping)
+        or prompt_audit.get("passed") is not True
+        or prompt_audit.get("has_memory") is not False
+        # prompt_audit hashes Codex's serialized prompt-input payload.  The
+        # runner-owned materialization archive binds the raw prompt instead.
+        or not isinstance(prompt_audit.get("prompt_sha256"), str)
+        or _SHA256_RE.fullmatch(str(prompt_audit.get("prompt_sha256"))) is None
+        or not isinstance(isolation_audit, Mapping)
+        or isolation_audit.get("passed") is not True
+        or not isinstance(session_audit, Mapping)
+        or session_audit.get("collab_call_count") != 0
+        or session_audit.get("file_change_count") != 0
+        or session_audit.get("command_started_count") != 0
+        or session_audit.get("command_completed_count") != 0
+        or session_audit.get("incomplete_command_count") != 0
+        or session_audit.get("unexpected_item_types") != []
+        or session_audit.get("invalid_json_line_count") != 0
+        or not isinstance(command_facts, Mapping)
+        or command_facts.get("skill_read") is not False
+        or command_facts.get("gateway_before_discovery") is not False
+        or (
+            thread_id not in {"", prior_thread_id}
+            if prior_thread_id is not None
+            else not isinstance(thread_id, str)
+        )
+    ):
+        raise CampaignEvidenceError(
+            "retryable heavy failed-turn facts do not prove no agent action"
+        )
+    config = CodexHarnessConfig(
+        workspace=task_root / "agent-workspace",
+        skill_source=options.skill_source,
+        codex_binary=options.codex_binary,
+        auth_json=options.auth_json,
+        model=options.model,
+        reasoning_effort=options.reasoning_effort,
+        service_tier=options.service_tier,
+        timeout_seconds=options.timeout_seconds,
+        sandbox_mode="workspace-write",
+        allow_output_write=False,
+        network_access=True,
+    )
+    expected_command = (
+        build_task_exec_command(
+            config,
+            prompt=expected_prompt,
+            writable_dir=turn_root,
+        )
+        if turn_index == 1
+        else build_task_resume_command(
+            config,
+            thread_id=str(prior_thread_id),
+            prompt=expected_prompt,
+            writable_dir=turn_root,
+        )
+    )
+    if value.get("command") != expected_command:
+        raise CampaignEvidenceError(
+            "retryable heavy failed turn used the wrong initial/resume argv"
+        )
+    for key in (
+        "created_files",
+        "modified_files",
+        "deleted_files",
+        "created_source_files",
+        "modified_source_files",
+        "deleted_source_files",
+    ):
+        if value.get(key) != []:
+            raise CampaignEvidenceError(
+                f"retryable heavy failed turn unexpectedly records {key}"
+            )
+    for key in (
+        "commands",
+        "inline_python_commands",
+        "direct_waapi_client_commands",
+        "write_like_commands",
+        "gateway_commands",
+        "discovery_commands",
+        "command_records",
+        "gateway_attempt_commands",
+        "gateway_subcommands",
+        "gateway_results",
+        "gateway_evidence_apis",
+        "allowed_read_commands",
+        "skill_read_files",
+        "unexpected_commands",
+        "non_gateway_unexpected_commands",
+    ):
+        if command_facts.get(key) != []:
+            raise CampaignEvidenceError(
+                f"retryable heavy failed turn unexpectedly records command facts: {key}"
+            )
+
+
+def _validate_heavy_v3_retryable_partial_broker(
+    value: Any,
+    *,
+    task_root: Path,
+    previous_prefix: int,
+    failed_prefix: int,
+    protocol: Any,
+    command_records: Sequence[Mapping[str, Any]],
+    options: CampaignOptions,
+    version: str,
+) -> None:
+    if not isinstance(value, Mapping) or set(value) != {
+        "expected_step_names",
+        "consumed_step_names",
+        "records",
+        "state_directory",
+        "evidence_directory",
+        "runner_path",
+        "terminal_state",
+        "complete",
+        "passed",
+    }:
+        raise CampaignEvidenceError(
+            "retryable heavy partial broker evidence has an invalid shape"
+        )
+    expected_names = [step.name for step in protocol.steps]
+    consumed_names = value.get("consumed_step_names")
+    records = value.get("records")
+    if (
+        value.get("terminal_state") != "RUNNING"
+        or value.get("complete") is not False
+        or value.get("passed") is not False
+        or not expected_names
+        or len(expected_names) != len(set(expected_names))
+        or failed_prefix > len(expected_names)
+        or value.get("expected_step_names") != expected_names
+        or consumed_names != expected_names[:previous_prefix]
+        or not isinstance(records, list)
+        or len(records) != previous_prefix
+        or len(command_records) != previous_prefix
+        or value.get("runner_path")
+        != str(Path(os.path.abspath(os.fspath(options.skill_source / "scripts" / "run.py"))))
+    ):
+        raise CampaignEvidenceError(
+            "retryable heavy broker did not stop at the prior proven prefix"
+        )
+    _validate_heavy_v3_broker_records(
+        records,
+        task_root=task_root,
+        steps=protocol.steps[:previous_prefix],
+        command_records=command_records,
+        options=options,
+        version=version,
+        label="retryable heavy partial",
+    )
+    expected_directories = {
+        "state_directory": task_root / "broker" / "state",
+        "evidence_directory": task_root / "broker" / "evidence",
+    }
+    for key, expected in expected_directories.items():
+        raw = value.get(key)
+        if (
+            raw != str(expected)
+            or expected.is_symlink()
+            or not expected.is_dir()
+        ):
+            raise CampaignEvidenceError(
+                f"retryable heavy partial broker {key} is misbound"
+            )
+
+
+def _validate_heavy_v3_retryable_lifecycle(
+    outcome: Mapping[str, Any],
+    *,
+    scenario_root: Path,
+    runner: str,
+) -> None:
+    lifecycle = outcome.get("lifecycle")
+    if not isinstance(lifecycle, Mapping):
+        raise CampaignEvidenceError(
+            "retryable heavy infrastructure evidence lacks lifecycle proof"
+        )
+    evidence_root = scenario_root / "evidence"
+    task_root = evidence_root / "codex-task"
+    owned_root = scenario_root / "owned"
+    if (
+        outcome.get("task_root") != str(task_root)
+        or task_root.is_symlink()
+        or not task_root.is_dir()
+        or owned_root.is_symlink()
+        or not owned_root.is_dir()
+    ):
+        raise CampaignEvidenceError(
+            "retryable heavy infrastructure evidence lacks retained task/owned roots"
+        )
+    archived_lifecycle = load_strict_regular_json(evidence_root / "lifecycle.json")
+    if archived_lifecycle != lifecycle:
+        raise CampaignEvidenceError(
+            "retryable heavy embedded lifecycle differs from its archived lifecycle"
+        )
+    expected_contract = (
+        HEAVY_V3_CLI_LIFECYCLE_CONTRACT
+        if runner == "cli"
+        else HEAVY_V3_PROJECT_LIFECYCLE_CONTRACT
+    )
+    common_keys = {
+        "contract",
+        "requested_status",
+        "final_status",
+        "source_hash_before",
+        "source_hash_after",
+        "source_mtime_before_ns",
+        "source_mtime_after_ns",
+        "errors",
+        "quarantine_path",
+    }
+    runner_keys = (
+        {"owned_state_retained", "phases"}
+        if runner == "cli"
+        else {"scenario_id", "version", "sandbox_retained"}
+    )
+    if set(lifecycle) != common_keys | runner_keys:
+        raise CampaignEvidenceError(
+            "retryable heavy infrastructure lifecycle has an invalid shape"
+        )
+    source_hash = lifecycle.get("source_hash_before")
+    if (
+        lifecycle.get("contract") != expected_contract
+        or lifecycle.get("requested_status") != "BLOCKED"
+        or lifecycle.get("final_status") != "BLOCKED"
+        or not _valid_heavy_project_hash(source_hash)
+        or source_hash != lifecycle.get("source_hash_after")
+        or type(lifecycle.get("source_mtime_before_ns")) is not int
+        or lifecycle.get("source_mtime_before_ns")
+        != lifecycle.get("source_mtime_after_ns")
+    ):
+        raise CampaignEvidenceError(
+            "retryable heavy infrastructure lifecycle did not preserve its source"
+        )
+    errors = lifecycle.get("errors")
+    if not isinstance(errors, list) or any(not isinstance(item, str) for item in errors):
+        raise CampaignEvidenceError(
+            "retryable heavy infrastructure lifecycle errors are malformed"
+        )
+    if runner == "cli":
+        clean = (
+            lifecycle.get("owned_state_retained") is True
+            and not errors
+            and _heavy_v3_retryable_cli_phases_are_clean(
+                lifecycle.get("phases"),
+                owned_root=owned_root,
+            )
+        )
+    elif runner == "project":
+        checks = outcome.get("checks")
+        reason = str(outcome.get("reason"))
+        clean = (
+            lifecycle.get("scenario_id") == outcome.get("scenario_id")
+            and lifecycle.get("version") == outcome.get("version")
+            and lifecycle.get("sandbox_retained") is True
+            and errors == [f"scenario:{reason}"]
+            and isinstance(checks, Mapping)
+            and checks.get("direct_client_closed") is True
+            and not any(
+                key in checks
+                for key in (
+                    "direct_client_close_error",
+                    "early_media_isolation_error",
+                    "topic_publisher_teardown_error",
+                )
+            )
+        )
+    else:
+        raise CampaignEvidenceError("retryable heavy outcome has an unknown runner")
+    if not clean:
+        raise CampaignEvidenceError(
+            "retryable heavy infrastructure lifecycle contains cleanup uncertainty"
+        )
+    quarantine_value = lifecycle.get("quarantine_path")
+    if not isinstance(quarantine_value, str) or not quarantine_value:
+        raise CampaignEvidenceError(
+            "retryable heavy infrastructure lifecycle lacks quarantine evidence"
+        )
+    quarantine = Path(quarantine_value)
+    if (
+        quarantine != evidence_root / "quarantine.json"
+        or not quarantine.is_absolute()
+        or not _path_is_within(quarantine, scenario_root)
+        or quarantine.is_symlink()
+        or not quarantine.is_file()
+    ):
+        raise CampaignEvidenceError(
+            "retryable heavy infrastructure quarantine is not scenario-owned"
+        )
+    quarantine_payload = load_strict_regular_json(quarantine)
+    expected_quarantine_keys = (
+        {
+            "contract",
+            "status",
+            "owned_root",
+            "owned_tree_sha256",
+            "never_reuse",
+        }
+        if runner == "cli"
+        else {
+            "contract",
+            "scenario_id",
+            "version",
+            "status",
+            "sealed_at",
+            "owned_root",
+            "owned_tree_sha256",
+            "never_reuse",
+            "errors",
+        }
+    )
+    if not isinstance(quarantine_payload, Mapping) or set(
+        quarantine_payload
+    ) != expected_quarantine_keys:
+        raise CampaignEvidenceError(
+            "retryable heavy infrastructure quarantine has an invalid shape"
+        )
+    expected_quarantine_contract = (
+        HEAVY_V3_CLI_LIFECYCLE_CONTRACT
+        if runner == "cli"
+        else HEAVY_V3_PROJECT_QUARANTINE_CONTRACT
+    )
+    try:
+        observed_owned_tree_sha256 = stable_tree_sha256(owned_root)
+    except (OSError, ValueError) as exc:
+        raise CampaignEvidenceError(
+            f"cannot verify retryable heavy owned tree: {exc}"
+        ) from exc
+    if (
+        quarantine_payload.get("contract") != expected_quarantine_contract
+        or quarantine_payload.get("status") != "BLOCKED"
+        or quarantine_payload.get("never_reuse") is not True
+        or quarantine_payload.get("owned_root") != str(owned_root)
+        or quarantine_payload.get("owned_tree_sha256")
+        != observed_owned_tree_sha256
+    ):
+        raise CampaignEvidenceError(
+            "retryable heavy quarantine does not seal the retained owned tree"
+        )
+    if runner == "project":
+        if (
+            quarantine_payload.get("scenario_id") != outcome.get("scenario_id")
+            or quarantine_payload.get("version") != outcome.get("version")
+            or not _valid_heavy_utc_timestamp(quarantine_payload.get("sealed_at"))
+            or quarantine_payload.get("errors") != errors
+        ):
+            raise CampaignEvidenceError(
+                "retryable heavy project quarantine identity is misbound"
+            )
+        _validate_heavy_v3_retryable_project_start(
+            outcome,
+            lifecycle=lifecycle,
+            scenario_root=scenario_root,
+            owned_root=owned_root,
+        )
+
+
+def _valid_heavy_project_hash(value: Any) -> bool:
+    if not isinstance(value, Mapping) or set(value) != {
+        "algorithm",
+        "strategy",
+        "digest",
+        "file_count",
+        "bytes_hashed",
+    }:
+        return False
+    return (
+        value.get("algorithm") == "sha256"
+        and value.get("strategy") == "full"
+        and isinstance(value.get("digest"), str)
+        and _SHA256_RE.fullmatch(str(value.get("digest"))) is not None
+        and type(value.get("file_count")) is int
+        and value.get("file_count", -1) >= 1
+        and type(value.get("bytes_hashed")) is int
+        and value.get("bytes_hashed", -1) >= 1
+    )
+
+
+def _heavy_v3_retryable_cli_phases_are_clean(
+    value: Any,
+    *,
+    owned_root: Path,
+) -> bool:
+    if not isinstance(value, list) or not value:
+        return False
+    roles: list[str] = []
+    phase_keys = {
+        "evidence",
+        "stdout_sha256",
+        "stderr_sha256",
+        "log_overflow",
+        "ready_version",
+    }
+    evidence_keys = {
+        "role",
+        "argv",
+        "cwd",
+        "shell",
+        "started",
+        "ready",
+        "process_exited",
+        "residual_pids",
+        "shutdown_error",
+        "open_project_path",
+        "returncode",
+        "natural_exit_before_shutdown",
+        "runner_shutdown_requested",
+    }
+    for phase in value:
+        if not isinstance(phase, Mapping) or set(phase) != phase_keys:
+            return False
+        evidence = phase.get("evidence")
+        if not isinstance(evidence, Mapping) or set(evidence) != evidence_keys:
+            return False
+        role = evidence.get("role")
+        if role not in {"setup", "business"} or role in roles:
+            return False
+        roles.append(str(role))
+        argv = evidence.get("argv")
+        cwd = evidence.get("cwd")
+        open_project = evidence.get("open_project_path")
+        returncode = evidence.get("returncode")
+        if (
+            not isinstance(argv, list)
+            or not argv
+            or any(not isinstance(item, str) or not item for item in argv)
+            or not isinstance(cwd, str)
+            or not isinstance(open_project, str)
+            or (returncode is not None and type(returncode) is not int)
+            or evidence.get("shell") is not False
+            or evidence.get("started") is not True
+            or evidence.get("ready") is not True
+            or evidence.get("process_exited") is not True
+            or evidence.get("residual_pids") != []
+            or evidence.get("shutdown_error") is not None
+            or type(evidence.get("natural_exit_before_shutdown")) is not bool
+            or type(evidence.get("runner_shutdown_requested")) is not bool
+            or phase.get("log_overflow") is not False
+            or phase.get("ready_version") != "2022.1"
+            or not isinstance(phase.get("stdout_sha256"), str)
+            or _SHA256_RE.fullmatch(str(phase.get("stdout_sha256"))) is None
+            or not isinstance(phase.get("stderr_sha256"), str)
+            or _SHA256_RE.fullmatch(str(phase.get("stderr_sha256"))) is None
+        ):
+            return False
+        project = Path(open_project)
+        working_directory = Path(cwd)
+        if (
+            not project.is_absolute()
+            or project.is_symlink()
+            or not project.is_file()
+            or not _path_is_within(project, owned_root)
+            or not working_directory.is_absolute()
+            or working_directory.is_symlink()
+            or not working_directory.is_dir()
+            or not _path_is_within(working_directory, owned_root)
+            or working_directory != project.parent
+            or open_project not in argv
+        ):
+            return False
+    return roles[-1] == "business" and roles.count("business") == 1
+
+
+def _validate_heavy_v3_retryable_project_start(
+    outcome: Mapping[str, Any],
+    *,
+    lifecycle: Mapping[str, Any],
+    scenario_root: Path,
+    owned_root: Path,
+) -> None:
+    start = load_strict_regular_json(scenario_root / "evidence" / "start.json")
+    if not isinstance(start, Mapping) or set(start) != {
+        "contract",
+        "scenario_id",
+        "version",
+        "started_at",
+        "source_hash_before",
+        "source_mtime_before_ns",
+        "sandbox_project",
+        "endpoint",
+        "isolated_launch_environment",
+    }:
+        raise CampaignEvidenceError(
+            "retryable heavy project start evidence has an invalid shape"
+        )
+    sandbox_project_value = start.get("sandbox_project")
+    endpoint = start.get("endpoint")
+    isolated_environment = start.get("isolated_launch_environment")
+    if not isinstance(sandbox_project_value, str):
+        raise CampaignEvidenceError(
+            "retryable heavy project start sandbox path is malformed"
+        )
+    sandbox_project = Path(sandbox_project_value)
+    if (
+        start.get("contract") != HEAVY_V3_PROJECT_LIFECYCLE_CONTRACT
+        or start.get("scenario_id") != outcome.get("scenario_id")
+        or start.get("version") != outcome.get("version")
+        or not _valid_heavy_utc_timestamp(start.get("started_at"))
+        or start.get("source_hash_before") != lifecycle.get("source_hash_before")
+        or start.get("source_mtime_before_ns")
+        != lifecycle.get("source_mtime_before_ns")
+        or not sandbox_project.is_absolute()
+        or sandbox_project.is_symlink()
+        or not sandbox_project.is_file()
+        or not _path_is_within(sandbox_project, owned_root)
+        or not isinstance(endpoint, Mapping)
+        or set(endpoint) != {"host", "port"}
+        or endpoint.get("host") not in {"127.0.0.1", "localhost", "::1"}
+        or type(endpoint.get("port")) is not int
+        or not 1 <= endpoint.get("port", 0) <= 65535
+        or not isinstance(isolated_environment, Mapping)
+        or any(
+            not isinstance(key, str) or not isinstance(value, str)
+            for key, value in isolated_environment.items()
+        )
+    ):
+        raise CampaignEvidenceError(
+            "retryable heavy project start evidence is not bound to its lifecycle"
+        )
+
+
+def _validate_heavy_v3_pass_outcome(
+    outcome: Mapping[str, Any],
+    *,
+    expected_unit: Any,
+    expected_row: Mapping[str, Any],
+    scenario_root: Path,
+    options: CampaignOptions,
+) -> None:
+    if outcome.get("reason") != "":
+        raise CampaignEvidenceError("passing heavy outcome must have an empty reason")
+    task_root_value = outcome.get("task_root")
+    thread_id = outcome.get("thread_id")
+    if not isinstance(task_root_value, str) or not task_root_value:
+        raise CampaignEvidenceError("passing heavy outcome has no task root")
+    if not isinstance(thread_id, str) or not thread_id:
+        raise CampaignEvidenceError("passing heavy outcome has no thread identity")
+    task_root = Path(task_root_value)
+    expected_task_root = scenario_root / "evidence" / "codex-task"
+    if (
+        not task_root.is_absolute()
+        or task_root.resolve(strict=True) != expected_task_root.resolve(strict=True)
+        or task_root.is_symlink()
+        or not task_root.is_dir()
+    ):
+        raise CampaignEvidenceError(
+            "passing heavy task root is not the exact real scenario evidence directory"
+        )
+
+    checks = outcome.get("checks")
+    lifecycle = outcome.get("lifecycle")
+    if not isinstance(checks, Mapping) or not isinstance(lifecycle, Mapping):
+        raise CampaignEvidenceError(
+            "passing heavy outcome lacks checks or lifecycle evidence"
+        )
+    prompt_evidence = _validate_heavy_v3_task_result(
+        task_root,
+        expected_unit=expected_unit,
+        expected_thread_id=thread_id,
+        scenario_root=scenario_root,
+        options=options,
+    )
+    primary_count = _heavy_v3_primary_dispatch_count(expected_unit)
+    _validate_heavy_v3_pass_checks(
+        checks,
+        expected_unit=expected_unit,
+        expected_row=expected_row,
+        expected_thread_id=thread_id,
+        primary_count=primary_count,
+        task_root=task_root,
+        prompt_evidence=prompt_evidence,
+    )
+    _validate_heavy_v3_pass_lifecycle(
+        lifecycle,
+        checks=checks,
+        expected_row=expected_row,
+        scenario_root=scenario_root,
+        task_root=task_root,
+    )
+
+
+def _heavy_v3_primary_dispatch_count(expected_unit: Any) -> int:
+    scenario = getattr(expected_unit, "scenario", None)
+    dispatch = getattr(scenario, "primary_dispatch", None)
+    count = getattr(dispatch, "count", None)
+    if type(count) is not int or count < 0:
+        raise CampaignEvidenceError(
+            "heavy scenario has no closed primary-dispatch count"
+        )
+    return count
+
+
+def _heavy_v3_topic_publisher_request_count(
+    prompt_evidence: HeavyV3PromptEvidence,
+) -> int:
+    """Return the sealed publisher-call count, not the resulting event count."""
+
+    sections = prompt_evidence.typed_sections
+    topic = (
+        sections.live_binding.get("topic")
+        if isinstance(sections, SoundBankBusinessPlanSections)
+        else None
+    )
+    requests = topic.get("publisher_requests") if isinstance(topic, Mapping) else None
+    if (
+        not isinstance(requests, list)
+        or not requests
+        or any(not isinstance(request, Mapping) for request in requests)
+    ):
+        raise CampaignEvidenceError(
+            "heavy topic plan has no closed runner-owned publisher request list"
+        )
+    return len(requests)
+
+
+def _heavy_v3_required_reference(expected_unit: Any) -> str:
+    scenario = getattr(expected_unit, "scenario", None)
+    api = getattr(scenario, "api", None)
+    item_type = getattr(scenario, "item_type", None)
+    if api in {
+        "ak.wwise.core.object.get",
+        "ak.wwise.core.mediaPool.get",
+    } or item_type == "topic":
+        return "references/waapi-query.md"
+    if isinstance(api, str) and api:
+        return "references/waapi-operate.md"
+    raise CampaignEvidenceError("heavy scenario has no exact Skill reference lane")
+
+
+def _validate_heavy_v3_prompt_materialization(
+    task_root: Path,
+    *,
+    scenario_root: Path,
+    expected_unit: Any,
+    expected_sha256: str,
+) -> HeavyV3PromptEvidence:
+    """Validate provenance -> receipt -> archived turn binding."""
+
+    if _SHA256_RE.fullmatch(expected_sha256) is None:
+        raise CampaignEvidenceError(
+            "heavy prompt materialization digest is malformed"
+        )
+    receipt_path = task_root / HEAVY_V3_PROMPT_MATERIALIZATION_FILE
+    raw = _load_strict_regular_text(receipt_path)
+    if hashlib.sha256(raw.encode("utf-8")).hexdigest() != expected_sha256:
+        raise CampaignEvidenceError(
+            "heavy prompt materialization archive digest is invalid"
+        )
+    value = load_strict_regular_json(receipt_path)
+    required_keys = {
+        "contract",
+        "scenario_id",
+        "version",
+        "provenance_path",
+        "provenance_sha256",
+        "protocol_sha256",
+        "business_oracle_plan_path",
+        "business_oracle_plan_sha256",
+        "expected_turn_count",
+        "turns",
+    }
+    scenario = getattr(expected_unit, "scenario", None)
+    planned_turns = tuple(getattr(expected_unit, "turns", ()))
+    expected_turn_count = getattr(expected_unit, "user_turn_count", None)
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != required_keys
+        or value.get("contract") != HEAVY_V3_PROMPT_MATERIALIZATION_CONTRACT
+        or value.get("scenario_id") != getattr(expected_unit, "unit_id", None)
+        or value.get("version") != getattr(expected_unit, "version", None)
+        or type(expected_turn_count) is not int
+        or expected_turn_count < 1
+        or value.get("expected_turn_count") != expected_turn_count
+        or len(planned_turns) != expected_turn_count
+    ):
+        raise CampaignEvidenceError(
+            "heavy prompt materialization identity or turn topology is invalid"
+        )
+    provenance_path = scenario_root / "evidence" / HEAVY_V3_PROMPT_PROVENANCE_FILE
+    if value.get("provenance_path") != str(provenance_path):
+        raise CampaignEvidenceError("heavy prompt receipt points outside fixed provenance")
+    business_oracle_plan_path = (
+        scenario_root / "evidence" / BUSINESS_ORACLE_PLAN_FILE
+    )
+    if value.get("business_oracle_plan_path") != str(business_oracle_plan_path):
+        raise CampaignEvidenceError(
+            "heavy prompt receipt points outside fixed business-oracle plan"
+        )
+    try:
+        provenance = read_prompt_provenance(
+            provenance_path,
+            scenario=scenario,
+            version=str(getattr(expected_unit, "version", "")),
+            scenario_root=scenario_root,
+            require_paths=False,
+        )
+    except Exception as exc:
+        raise CampaignEvidenceError(
+            f"heavy prompt provenance is invalid: {exc}"
+        ) from exc
+    if (
+        value.get("provenance_sha256") != provenance.sha256
+        or value.get("protocol_sha256")
+        != provenance.payload["protocol"]["sha256"]
+    ):
+        raise CampaignEvidenceError(
+            "heavy prompt receipt is not bound to its provenance/protocol"
+        )
+    try:
+        plan_value = load_strict_regular_json(business_oracle_plan_path)
+        fixture_spec = _heavy_v3_business_plan_fixture_spec(
+            plan_value,
+            expected_unit=expected_unit,
+        )
+        api = str(getattr(scenario, "api", ""))
+        family = business_family_for_api(api)
+        runner = "cli" if family == "cli" else "project"
+        business_oracle_plan = read_business_oracle_plan_envelope(
+            business_oracle_plan_path,
+            scenario_id=str(getattr(expected_unit, "unit_id", "")),
+            version=str(getattr(expected_unit, "version", "")),
+            api=api,
+            runner=runner,
+            family=family,
+            scenario_root=scenario_root,
+            fixture_spec=fixture_spec,
+            protocol_sha256=str(provenance.payload["protocol"]["sha256"]),
+            provenance_sha256=provenance.sha256,
+            primary_dispatch_count=_heavy_v3_primary_dispatch_count(expected_unit),
+        )
+        typed_sections = _validate_heavy_v3_typed_business_plan(
+            plan_value,
+            expected_unit=expected_unit,
+            provenance=provenance,
+        )
+    except (
+        AudioMediaBusinessPlanError,
+        BusinessOraclePlanError,
+        CampaignEvidenceError,
+        CliBusinessPlanError,
+        ImportBusinessPlanError,
+        ObjectBusinessPlanError,
+        ObjectHeavyRecipeError,
+        SoundBankBusinessPlanError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        raise CampaignEvidenceError(
+            f"heavy business-oracle plan is invalid: {exc}"
+        ) from exc
+    if value.get("business_oracle_plan_sha256") != business_oracle_plan.sha256:
+        raise CampaignEvidenceError(
+            "heavy prompt receipt is not bound to its business-oracle plan"
+        )
+    expected_rows: list[dict[str, Any]] = []
+    for index, turn in enumerate(planned_turns, start=1):
+        if getattr(turn, "index", None) != index:
+            raise CampaignEvidenceError(
+                "heavy reviewed turn plan has non-contiguous indices"
+            )
+        kind = getattr(turn, "kind", None)
+        expected_kind = "request" if index == 1 else "confirmation"
+        if kind != expected_kind:
+            raise CampaignEvidenceError(
+                "heavy reviewed turn plan has an invalid request/confirmation order"
+            )
+        prompt = provenance.prompts[index - 1]
+        reviewed_prompt = (
+            provenance.prompts[0]
+            if index == 1
+            else getattr(turn, "prompt", None)
+        )
+        if prompt != reviewed_prompt:
+            raise CampaignEvidenceError(
+                "heavy provenance prompt differs from the reviewed turn plan"
+            )
+        if not isinstance(prompt, str) or not prompt:
+            raise CampaignEvidenceError("heavy reviewed turn has no exact prompt")
+        expected_rows.append(
+            {
+                "index": index,
+                "kind": expected_kind,
+                "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+            }
+        )
+    if value.get("turns") != expected_rows:
+        raise CampaignEvidenceError(
+            "heavy prompt materialization turns differ from the reviewed turn plan"
+        )
+    return HeavyV3PromptEvidence(
+        prompts=provenance.prompts,
+        provenance=provenance,
+        business_oracle_plan=business_oracle_plan,
+        typed_sections=typed_sections,
+    )
+
+
+def _validate_heavy_v3_task_result(
+    task_root: Path,
+    *,
+    expected_unit: Any,
+    expected_thread_id: str,
+    scenario_root: Path,
+    options: CampaignOptions,
+) -> HeavyV3PromptEvidence:
+    value = load_strict_regular_json(task_root / "task-result.json")
+    required_keys = {
+        "contract",
+        "scenario_id",
+        "version",
+        "thread_id",
+        "turn_count",
+        "passed",
+        "prompt_materialization_sha256",
+        "broker",
+        "turn_grades",
+    }
+    expected_turn_count = getattr(expected_unit, "user_turn_count", None)
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != required_keys
+        or value.get("contract") != HEAVY_V3_TASK_RESULT_CONTRACT
+        or value.get("scenario_id") != getattr(expected_unit, "unit_id", None)
+        or value.get("version") != getattr(expected_unit, "version", None)
+        or value.get("thread_id") != expected_thread_id
+        or type(expected_turn_count) is not int
+        or expected_turn_count < 1
+        or value.get("turn_count") != expected_turn_count
+        or value.get("passed") is not True
+        or not isinstance(value.get("prompt_materialization_sha256"), str)
+        or _SHA256_RE.fullmatch(
+            str(value.get("prompt_materialization_sha256"))
+        )
+        is None
+    ):
+        raise CampaignEvidenceError("passing heavy task-result contract is invalid")
+
+    prompt_evidence = _validate_heavy_v3_prompt_materialization(
+        task_root,
+        scenario_root=scenario_root,
+        expected_unit=expected_unit,
+        expected_sha256=str(value["prompt_materialization_sha256"]),
+    )
+    turn_grades = value.get("turn_grades")
+    if not isinstance(turn_grades, list) or len(turn_grades) != expected_turn_count:
+        raise CampaignEvidenceError("passing heavy task has invalid turn grades")
+    turns_root = task_root / "turns"
+    expected_names = {f"turn-{index:02d}" for index in range(1, expected_turn_count + 1)}
+    actual_names = _strict_real_subdirectory_names(turns_root)
+    if actual_names != expected_names:
+        raise CampaignEvidenceError(
+            "passing heavy task turn directories do not match its turn count"
+        )
+    gateway_records: list[Mapping[str, Any]] = []
+    previous_prefix = 0
+    protocol = prompt_evidence.provenance.protocol
+    required_reference = _heavy_v3_required_reference(expected_unit)
+    for index, grade in enumerate(turn_grades, start=1):
+        turn_root = turns_root / f"turn-{index:02d}"
+        expected_prefix = protocol.turn_prefix_counts[index - 1]
+        turn_gateway_records = _validate_heavy_v3_turn_grade(
+            grade,
+            index=index,
+            turn_root=turn_root,
+            expected_thread_id=expected_thread_id,
+            expected_prompt=prompt_evidence.prompts[index - 1],
+            task_root=task_root,
+            options=options,
+            previous_broker_prefix=previous_prefix,
+            expected_broker_prefix=expected_prefix,
+            expected_steps=protocol.steps[previous_prefix:expected_prefix],
+            version=str(getattr(expected_unit, "version", "")),
+            required_reference=required_reference,
+        )
+        gateway_records.extend(turn_gateway_records)
+        if len(gateway_records) != expected_prefix:
+            raise CampaignEvidenceError(
+                "passing heavy turn command allocation differs from its broker prefix"
+            )
+        previous_prefix = expected_prefix
+    _validate_heavy_v3_broker_result(
+        value.get("broker"),
+        task_root=task_root,
+        protocol=prompt_evidence.provenance.protocol,
+        command_records=tuple(gateway_records),
+        options=options,
+        version=str(getattr(expected_unit, "version", "")),
+    )
+    return prompt_evidence
+
+
+def _validate_heavy_v3_broker_result(
+    value: Any,
+    *,
+    task_root: Path,
+    protocol: Any,
+    command_records: Sequence[Mapping[str, Any]],
+    options: CampaignOptions,
+    version: str,
+) -> None:
+    top_keys = {
+        "expected_step_names",
+        "consumed_step_names",
+        "records",
+        "state_directory",
+        "evidence_directory",
+        "runner_path",
+        "terminal_state",
+        "complete",
+        "passed",
+    }
+    if not isinstance(value, Mapping) or set(value) != top_keys:
+        raise CampaignEvidenceError("passing heavy task broker evidence is malformed")
+    expected_names = [step.name for step in protocol.steps]
+    consumed_names = value.get("consumed_step_names")
+    records = value.get("records")
+    if (
+        value.get("passed") is not True
+        or value.get("complete") is not True
+        or value.get("terminal_state") != "COMPLETE"
+        or not expected_names
+        or value.get("expected_step_names") != expected_names
+        or consumed_names != expected_names
+        or len(expected_names) != len(set(expected_names))
+        or not isinstance(records, list)
+        or len(records) != len(expected_names)
+        or len(command_records) != len(expected_names)
+    ):
+        raise CampaignEvidenceError(
+            "passing heavy task broker did not consume one exact successful protocol"
+        )
+    expected_runner = Path(
+        os.path.abspath(os.fspath(options.skill_source / "scripts" / "run.py"))
+    )
+    if value.get("runner_path") != str(expected_runner):
+        raise CampaignEvidenceError("passing heavy broker runner path is misbound")
+    _validate_heavy_v3_broker_records(
+        records,
+        task_root=task_root,
+        steps=protocol.steps,
+        command_records=command_records,
+        options=options,
+        version=version,
+        label="passing heavy",
+    )
+    for key in ("state_directory", "evidence_directory"):
+        raw = value.get(key)
+        if not isinstance(raw, str) or not raw:
+            raise CampaignEvidenceError(f"passing heavy broker lacks {key}")
+        expected = task_root / "broker" / (
+            "state" if key == "state_directory" else "evidence"
+        )
+        if raw != str(expected) or expected.is_symlink() or not expected.is_dir():
+            raise CampaignEvidenceError(
+                f"passing heavy broker {key} is outside its task evidence"
+            )
+
+
+def _codex_command_exit_status_aligns(
+    command_record: Mapping[str, Any],
+    *,
+    broker_exit_code: Any,
+) -> bool:
+    """Bind Codex's terminal command status to the broker-sealed exit code.
+
+    Codex records a zero-exit shell command as ``completed`` and a non-zero
+    shell command as ``failed``.  A reviewed gateway exit 2 is still a failed
+    shell command even when its exact structured rejection is an expected
+    protocol outcome.  Protocol admissibility is proved separately by the
+    broker record and payload checks; this helper only rejects missing,
+    unfinished, or exit/status-inconsistent Codex facts.
+    """
+
+    command_exit_code = command_record.get("exit_code")
+    if (
+        type(command_exit_code) is not int
+        or type(broker_exit_code) is not int
+        or command_exit_code != broker_exit_code
+    ):
+        return False
+    expected_status = "completed" if broker_exit_code == 0 else "failed"
+    return command_record.get("status") == expected_status
+
+
+def _validate_heavy_v3_broker_records(
+    records: Sequence[Any],
+    *,
+    task_root: Path,
+    steps: Sequence[Any],
+    command_records: Sequence[Mapping[str, Any]],
+    options: CampaignOptions,
+    version: str,
+    label: str,
+) -> None:
+    """Replay one exact broker prefix and bind it to Codex JSONL commands."""
+
+    if len(records) != len(steps) or len(command_records) != len(steps):
+        raise CampaignEvidenceError(
+            f"{label} broker record/command count differs from protocol"
+        )
+    # A first-turn infrastructure failure has a valid, cryptographically
+    # sealed empty prior prefix.  There is nothing to replay in that case and
+    # CodexGatewayBroker intentionally rejects an empty full protocol.
+    if not steps:
+        return
+    expected_runner = Path(
+        os.path.abspath(os.fspath(options.skill_source / "scripts" / "run.py"))
+    )
+    replay = CodexGatewayBroker(
+        skill_source=options.skill_source,
+        expected_steps=steps,
+        expected_wwise_version=version,
+        runner_environment={},
+    )
+    record_keys = {
+        "sequence",
+        "step_name",
+        "authenticated",
+        "accepted",
+        "rejection",
+        "model_argv",
+        "normalized_model_argv",
+        "gateway_arguments",
+        "raw_argv_sha256",
+        "argv_sha256",
+        "semantic_argv_sha256",
+        "started_at_unix",
+        "finished_at_unix",
+        "duration_seconds",
+        "exit_code",
+        "runner_exit_code",
+        "payload",
+        "payload_sha256",
+        "payload_error",
+        "runner_command_sha256",
+        "allowed_exit_codes",
+        "started_at_unix_ns",
+        "finished_at_unix_ns",
+        "subscription_ack",
+        "succeeded",
+    }
+    for index, (record, command_record, step) in enumerate(
+        zip(records, command_records, steps, strict=True),
+        start=1,
+    ):
+        if (
+            not isinstance(record, Mapping)
+            or set(record) != record_keys
+            or record.get("sequence") != index
+            or record.get("step_name") != step.name
+            or record.get("authenticated") is not True
+            or record.get("accepted") is not True
+            or record.get("succeeded") is not True
+            or record.get("rejection") != ""
+            or record.get("payload_error") != ""
+            or not isinstance(record.get("payload"), Mapping)
+        ):
+            raise CampaignEvidenceError(
+                f"{label} task contains a malformed broker record"
+            )
+        model_argv = record.get("model_argv")
+        if not isinstance(model_argv, list) or any(
+            not isinstance(item, str) for item in model_argv
+        ):
+            raise CampaignEvidenceError(f"{label} broker model argv is malformed")
+        try:
+            resolved = resolve_gateway_invocation(
+                model_argv,
+                skill_source=options.skill_source,
+                shim_directory=task_root / "broker" / "bin",
+            )
+            semantic_sha, execution_arguments = replay._validate_step(  # noqa: SLF001
+                step,
+                resolved.gateway_arguments,
+            )
+        except Exception as exc:
+            raise CampaignEvidenceError(
+                f"{label} broker argv cannot replay protocol step {step.name}: {exc}"
+            ) from exc
+        payload = record["payload"]
+        _validate_heavy_v3_gateway_payload(
+            payload,
+            step=step,
+            runner_exit_code=record.get("runner_exit_code"),
+        )
+        if step.subcommand == "transaction-show":
+            try:
+                validate_transaction_show_confirmation_against_store(
+                    payload,
+                    task_root / "broker" / "state",
+                )
+            except TransactionSealError as exc:
+                raise CampaignEvidenceError(
+                    "heavy transaction-show confirmation is not bound to the "
+                    f"archived durable transaction: {exc}"
+                ) from exc
+        expected_runner_command = [
+            os.path.abspath(sys.executable),
+            str(expected_runner.resolve(strict=True)),
+            "gateway.py",
+            *execution_arguments,
+        ]
+        started = record.get("started_at_unix")
+        finished = record.get("finished_at_unix")
+        started_ns = record.get("started_at_unix_ns")
+        finished_ns = record.get("finished_at_unix_ns")
+        duration = record.get("duration_seconds")
+        if (
+            record.get("normalized_model_argv")
+            != list(resolved.normalized_model_argv)
+            or record.get("gateway_arguments") != list(resolved.gateway_arguments)
+            or record.get("raw_argv_sha256") != _canonical_sha256(model_argv)
+            or record.get("argv_sha256")
+            != _canonical_sha256(list(resolved.normalized_model_argv))
+            or record.get("semantic_argv_sha256") != semantic_sha
+            or record.get("payload_sha256") != _canonical_sha256(payload)
+            or record.get("runner_command_sha256")
+            != _canonical_sha256(expected_runner_command)
+            or record.get("allowed_exit_codes") != list(step.allowed_exit_codes)
+            or record.get("exit_code") != record.get("runner_exit_code")
+            or record.get("runner_exit_code") not in step.allowed_exit_codes
+            or not isinstance(started, (int, float))
+            or isinstance(started, bool)
+            or not math.isfinite(float(started))
+            or not isinstance(finished, (int, float))
+            or isinstance(finished, bool)
+            or not math.isfinite(float(finished))
+            or finished < started
+            or type(started_ns) is not int
+            or started_ns <= 0
+            or type(finished_ns) is not int
+            or finished_ns < started_ns
+            or abs(float(started) - started_ns / 1_000_000_000) > 1e-6
+            or abs(float(finished) - finished_ns / 1_000_000_000) > 1e-6
+            or not isinstance(duration, (int, float))
+            or isinstance(duration, bool)
+            or not math.isfinite(float(duration))
+            or duration < 0
+        ):
+            raise CampaignEvidenceError(
+                f"{label} broker hashes, exits, or timing are inconsistent"
+            )
+        expected_topic_ack = (
+            step.name == "soundbank.generated.wait"
+            and step.subcommand == "wait-topic"
+            and bool(step.arguments)
+            and step.arguments[0] == SOUNDBANK_TOPIC
+        )
+        if expected_topic_ack:
+            _validate_heavy_v3_broker_subscription_ack_record(
+                record.get("subscription_ack"),
+                record=record,
+                task_root=task_root,
+                label=f"{label} broker subscription ACK",
+            )
+        elif record.get("subscription_ack") is not None:
+            raise CampaignEvidenceError(
+                f"{label} non-topic broker record unexpectedly carries subscription ACK evidence"
+            )
+        if (
+            not _codex_command_exit_status_aligns(
+                command_record,
+                broker_exit_code=record.get("exit_code"),
+            )
+            or command_record.get("has_shell_operators") is not False
+            or command_record.get("parse_error") != ""
+        ):
+            raise CampaignEvidenceError(
+                f"{label} broker record is not uniquely aligned to Codex facts"
+            )
+        command_argv = command_record.get("argv")
+        if not isinstance(command_argv, list) or any(
+            not isinstance(item, str) for item in command_argv
+        ):
+            raise CampaignEvidenceError(
+                f"{label} Codex facts gateway argv is malformed"
+            )
+        try:
+            command_resolved = resolve_gateway_invocation(
+                command_argv,
+                skill_source=options.skill_source,
+                shim_directory=task_root / "broker" / "bin",
+            )
+        except GatewayInvocationError as exc:
+            raise CampaignEvidenceError(
+                f"{label} Codex facts gateway argv cannot resolve: {exc}"
+            ) from exc
+        if (
+            command_resolved.normalized_model_argv
+            != resolved.normalized_model_argv
+            or command_resolved.argv_sha256 != resolved.argv_sha256
+        ):
+            raise CampaignEvidenceError(
+                f"{label} broker record is not uniquely aligned to Codex facts"
+            )
+        try:
+            observed_payload = json.loads(
+                str(command_record.get("aggregated_output", "")).strip()
+            )
+        except json.JSONDecodeError as exc:
+            raise CampaignEvidenceError(
+                f"{label} Codex command output is not the broker JSON payload"
+            ) from exc
+        if observed_payload != payload:
+            raise CampaignEvidenceError(
+                f"{label} Codex command output differs from broker payload"
+            )
+        replay._payloads_by_step[step.name] = payload  # noqa: SLF001
+
+
+def _validate_heavy_v3_broker_subscription_ack_record(
+    value: Any,
+    *,
+    record: Mapping[str, Any],
+    task_root: Path,
+    label: str,
+) -> Mapping[str, Any]:
+    """Validate the broker-owned ACK facts independently of runner checks."""
+
+    keys = {
+        "contract",
+        "ack_contract",
+        "step_name",
+        "topic",
+        "ack_path",
+        "ack_file_sha256",
+        "nonce_sha256",
+        "runner_parent_process_id",
+        "gateway_process_id",
+        "subscribed_at_unix_ns",
+        "subscribed_at_monotonic_ns",
+        "step_started_at_unix_ns",
+        "validated_at_unix_ns",
+        "step_finished_at_unix_ns",
+    }
+    if not isinstance(value, Mapping) or set(value) != keys:
+        raise CampaignEvidenceError(f"{label} has an invalid closed shape")
+    ack_path = value.get("ack_path")
+    expected_directory = task_root / "broker" / "evidence"
+    parent_process_id = value.get("runner_parent_process_id")
+    child_process_id = value.get("gateway_process_id")
+    subscribed = value.get("subscribed_at_unix_ns")
+    subscribed_monotonic = value.get("subscribed_at_monotonic_ns")
+    started = value.get("step_started_at_unix_ns")
+    validated = value.get("validated_at_unix_ns")
+    finished = value.get("step_finished_at_unix_ns")
+    if (
+        value.get("contract") != VALIDATED_SUBSCRIPTION_ACK_CONTRACT
+        or value.get("ack_contract") != TOPIC_ACK_CONTRACT
+        or value.get("step_name") != "soundbank.generated.wait"
+        or value.get("topic") != SOUNDBANK_TOPIC
+        or not isinstance(ack_path, str)
+        or Path(ack_path).parent != expected_directory
+        or not Path(ack_path).name.startswith("subscription-ack-")
+        or not Path(ack_path).name.endswith(".json")
+        or not _sha256_text_value(value.get("ack_file_sha256"))
+        or not _sha256_text_value(value.get("nonce_sha256"))
+        or type(parent_process_id) is not int
+        or parent_process_id <= 0
+        or type(child_process_id) is not int
+        or child_process_id <= 0
+        or child_process_id == parent_process_id
+        or type(subscribed) is not int
+        or subscribed <= 0
+        or type(subscribed_monotonic) is not int
+        or subscribed_monotonic <= 0
+        or type(started) is not int
+        or type(validated) is not int
+        or type(finished) is not int
+        or started != record.get("started_at_unix_ns")
+        or finished != record.get("finished_at_unix_ns")
+        or not started <= subscribed <= validated <= finished
+    ):
+        raise CampaignEvidenceError(
+            f"{label} hash, PID, path, or exact wall-clock join is invalid"
+        )
+    return value
+
+
+def _canonical_sha256(value: Any) -> str:
+    return hashlib.sha256(canonical_json_bytes(value)).hexdigest()
+
+
+def _validate_heavy_v3_gateway_payload(
+    payload: Mapping[str, Any],
+    *,
+    step: Any,
+    runner_exit_code: Any,
+) -> None:
+    if payload.get("contract") != "waapi-skill.gateway-result/v1":
+        raise CampaignEvidenceError("heavy broker payload contract is invalid")
+    if step.subcommand == "transaction-show":
+        try:
+            validate_transaction_show_confirmation_payload(payload)
+        except GatewayInvocationError as exc:
+            raise CampaignEvidenceError(
+                f"heavy transaction-show confirmation binding is invalid: {exc}"
+            ) from exc
+    if step.terminal_execute:
+        if payload.get("command") != "execute" or payload.get("automatic_retry") is not False:
+            raise CampaignEvidenceError("terminal execute payload is invalid")
+        if payload.get("ok") is True:
+            valid = (
+                payload.get("status") == "executed_unverified"
+                and payload.get("state") == "executed_unverified"
+                and payload.get("executed") is True
+                and payload.get("verified") is False
+                and runner_exit_code in {0, 2}
+            )
+        else:
+            valid = (
+                payload.get("ok") is False
+                and payload.get("status") == "indeterminate"
+                and payload.get("state") == "indeterminate"
+                and runner_exit_code == 2
+            )
+        if not valid:
+            raise CampaignEvidenceError("terminal execute payload state is invalid")
+        return
+    if step.allowed_exit_codes == (0, 2):
+        successful = (
+            runner_exit_code == 0
+            and payload.get("ok") is True
+            and payload.get("command") == "execute"
+        )
+        indeterminate = (
+            runner_exit_code == 2
+            and payload.get("ok") is False
+            and payload.get("command") == "execute"
+            and payload.get("status") == "indeterminate"
+            and payload.get("state") == "indeterminate"
+            and payload.get("automatic_retry") is False
+        )
+        if not (successful or indeterminate):
+            raise CampaignEvidenceError(
+                "branching execute payload state is invalid"
+            )
+        return
+    if step.allowed_exit_codes == (0,):
+        if payload.get("ok") is not True or payload.get("command") != step.subcommand:
+            raise CampaignEvidenceError("successful gateway payload is invalid")
+        return
+    if (
+        step.allowed_exit_codes != (2,)
+        or payload.get("ok") is not False
+        or payload.get("error_code") != step.expected_error_code
+        or payload.get("command") != step.expected_result_command
+    ):
+        raise CampaignEvidenceError("structured-error gateway payload is invalid")
+
+
+def _validate_heavy_v3_turn_grade(
+    value: Any,
+    *,
+    index: int,
+    turn_root: Path,
+    expected_thread_id: str,
+    expected_prompt: str,
+    task_root: Path,
+    options: CampaignOptions,
+    previous_broker_prefix: int,
+    expected_broker_prefix: int,
+    expected_steps: Sequence[Any],
+    version: str,
+    required_reference: str,
+) -> tuple[Mapping[str, Any], ...]:
+    if not isinstance(value, Mapping) or set(value) != {
+        "index",
+        "prompt_sha256",
+        "broker_prefix_count",
+        "reconciliation",
+        "common_gates",
+        "errors",
+        "passed",
+    }:
+        raise CampaignEvidenceError("passing heavy turn grade is malformed")
+    common_gates = value.get("common_gates")
+    errors = value.get("errors")
+    reconciliation = value.get("reconciliation")
+    prompt_sha256 = value.get("prompt_sha256")
+    if (
+        value.get("index") != index
+        or value.get("passed") is not True
+        or not isinstance(prompt_sha256, str)
+        or _SHA256_RE.fullmatch(prompt_sha256) is None
+        or not isinstance(common_gates, Mapping)
+        or not _HEAVY_V3_REQUIRED_COMMON_GATES.issubset(common_gates)
+        or any(common_gates.get(key) is not True for key in common_gates)
+        or errors != []
+        or not isinstance(reconciliation, Mapping)
+        or reconciliation.get("passed") is not True
+        or reconciliation.get("errors") != []
+        or value.get("broker_prefix_count") != expected_broker_prefix
+        or set(reconciliation)
+        != {"passed", "observed_command_count", "accepted_record_count", "errors"}
+        or reconciliation.get("observed_command_count") != expected_broker_prefix
+        or reconciliation.get("accepted_record_count") != expected_broker_prefix
+    ):
+        raise CampaignEvidenceError(
+            "passing heavy turn lacks complete no-memory/no-bypass gates"
+        )
+    archived_grade = load_strict_regular_json(turn_root / "turn-grade.json")
+    if archived_grade != value:
+        raise CampaignEvidenceError(
+            "passing heavy task-result turn grade differs from its archived grade"
+        )
+    prompt = _load_strict_regular_text(turn_root / "prompt.txt")
+    if not prompt.endswith("\n") or not prompt[:-1]:
+        raise CampaignEvidenceError("passing heavy turn prompt archive is malformed")
+    if prompt[:-1] != expected_prompt:
+        raise CampaignEvidenceError(
+            "passing heavy turn prompt differs from its reviewed materialization"
+        )
+    if hashlib.sha256(prompt[:-1].encode("utf-8")).hexdigest() != prompt_sha256:
+        raise CampaignEvidenceError("passing heavy turn prompt digest is invalid")
+    final_response = _load_strict_regular_text(turn_root / "final.txt")
+    if not final_response.strip():
+        raise CampaignEvidenceError("passing heavy turn has an empty final response")
+    _load_strict_regular_text(turn_root / "events.jsonl")
+    _load_strict_regular_text(turn_root / "stderr.txt")
+    facts = load_strict_regular_json(turn_root / "codex-facts.json")
+    if (
+        not isinstance(facts, Mapping)
+        or final_response != str(facts.get("final_response", "")) + "\n"
+    ):
+        raise CampaignEvidenceError(
+            "passing heavy final response differs from Codex facts"
+        )
+    gateway_records = _validate_heavy_v3_codex_facts(
+        facts,
+        expected_thread_id=expected_thread_id,
+        expected_prompt=expected_prompt,
+        turn_index=index,
+        turn_root=turn_root,
+        task_root=task_root,
+        options=options,
+        expected_steps=expected_steps,
+        version=version,
+        required_reference=required_reference,
+        archived_common_gates=common_gates,
+    )
+    expected_delta = expected_broker_prefix - previous_broker_prefix
+    if expected_delta < 0 or len(gateway_records) != expected_delta:
+        raise CampaignEvidenceError(
+            "passing heavy turn gateway command count differs from its sealed prefix delta"
+        )
+    return gateway_records
+
+
+def _validate_heavy_v3_codex_facts(
+    value: Any,
+    *,
+    expected_thread_id: str,
+    expected_prompt: str,
+    turn_index: int,
+    turn_root: Path,
+    task_root: Path,
+    options: CampaignOptions,
+    expected_steps: Sequence[Any],
+    version: str,
+    required_reference: str,
+    archived_common_gates: Mapping[str, Any],
+) -> tuple[Mapping[str, Any], ...]:
+    required_keys = {
+        "command",
+        "exit_status",
+        "duration_seconds",
+        "timed_out",
+        "thread_id",
+        "final_response",
+        "usage",
+        "event_count",
+        "collab_call_count",
+        "file_change_count",
+        "prompt_audit",
+        "isolation_audit",
+        "session_audit",
+        "command_facts",
+        "created_files",
+        "modified_files",
+        "deleted_files",
+        "created_source_files",
+        "modified_source_files",
+        "deleted_source_files",
+        "skill_tree_sha256_before",
+        "skill_tree_sha256_after",
+        "skill_tree_unchanged",
+    }
+    if not isinstance(value, Mapping) or set(value) != required_keys:
+        raise CampaignEvidenceError("passing heavy turn facts are malformed")
+    command_records = _validate_heavy_v3_events_against_facts(
+        turn_root / "events.jsonl",
+        value,
+        label="passing heavy turn",
+    )
+    prompt_audit = value.get("prompt_audit")
+    isolation_audit = value.get("isolation_audit")
+    session_audit = value.get("session_audit")
+    command_facts = value.get("command_facts")
+    if (
+        value.get("exit_status") != 0
+        or value.get("timed_out") is not False
+        or value.get("thread_id") != expected_thread_id
+        or value.get("collab_call_count") != 0
+        or value.get("file_change_count") != 0
+        or value.get("skill_tree_unchanged") is not True
+        or value.get("skill_tree_sha256_before")
+        != value.get("skill_tree_sha256_after")
+        or not isinstance(prompt_audit, Mapping)
+        or prompt_audit.get("passed") is not True
+        or prompt_audit.get("has_memory") is not False
+        # This digest covers Codex's serialized prompt-input payload, not the
+        # raw user prompt archived above.  Keep both hash gates independent:
+        # the grade is bound to prompt.txt, while this value must itself be a
+        # well-formed SHA-256 digest from the prompt isolation audit.
+        or not isinstance(prompt_audit.get("prompt_sha256"), str)
+        or _SHA256_RE.fullmatch(str(prompt_audit.get("prompt_sha256"))) is None
+        or not isinstance(isolation_audit, Mapping)
+        or isolation_audit.get("passed") is not True
+        or not isinstance(session_audit, Mapping)
+        or session_audit.get("passed") is not True
+        or not isinstance(command_facts, Mapping)
+    ):
+        raise CampaignEvidenceError(
+            "passing heavy turn facts do not prove a clean memory-isolated task"
+        )
+    config = CodexHarnessConfig(
+        workspace=task_root / "agent-workspace",
+        skill_source=options.skill_source,
+        codex_binary=options.codex_binary,
+        auth_json=options.auth_json,
+        model=options.model,
+        reasoning_effort=options.reasoning_effort,
+        service_tier=options.service_tier,
+        timeout_seconds=options.timeout_seconds,
+        sandbox_mode="workspace-write",
+        allow_output_write=False,
+        network_access=True,
+    )
+    expected_command = (
+        build_task_exec_command(
+            config,
+            prompt=expected_prompt,
+            writable_dir=turn_root,
+        )
+        if turn_index == 1
+        else build_task_resume_command(
+            config,
+            thread_id=expected_thread_id,
+            prompt=expected_prompt,
+            writable_dir=turn_root,
+        )
+    )
+    if value.get("command") != expected_command:
+        raise CampaignEvidenceError(
+            "heavy Codex command differs from exact no-memory initial/resume argv"
+        )
+    for key in (
+        "created_files",
+        "modified_files",
+        "deleted_files",
+        "created_source_files",
+        "modified_source_files",
+        "deleted_source_files",
+    ):
+        if value.get(key) != []:
+            raise CampaignEvidenceError(
+                f"passing heavy turn unexpectedly records {key}"
+            )
+    expected_command_fact_keys = {
+        "commands",
+        "inline_python_commands",
+        "direct_waapi_client_commands",
+        "write_like_commands",
+        "gateway_commands",
+        "discovery_commands",
+        "skill_read",
+        "gateway_before_discovery",
+        "command_records",
+        "gateway_attempt_commands",
+        "gateway_subcommands",
+        "gateway_results",
+        "gateway_evidence_apis",
+        "allowed_read_commands",
+        "skill_read_files",
+        "unexpected_commands",
+        "non_gateway_unexpected_commands",
+    }
+    if set(command_facts) != expected_command_fact_keys:
+        raise CampaignEvidenceError("heavy command-facts schema is not closed")
+    expected_gateway_errors = tuple(
+        CodexGatewayErrorExpectation(
+            command=step.expected_result_command,
+            error_code=step.expected_error_code,
+        )
+        for step in expected_steps
+        if step.allowed_exit_codes == (2,)
+    )
+    classified = classify_commands(
+        command_records,
+        skill_source=options.skill_source,
+        expected_gateway_subcommands=tuple(
+            dict.fromkeys(step.subcommand for step in expected_steps)
+        ),
+        expected_gateway_errors=expected_gateway_errors,
+        expected_wwise_version=version,
+    )
+    expected_command_facts = _json_canonical_value(asdict(classified))
+    if command_facts != expected_command_facts:
+        raise CampaignEvidenceError(
+            "heavy command facts differ from the classification of events.jsonl"
+        )
+
+    records = classified.command_records
+    allowed_reads = tuple(classified.allowed_read_commands)
+    read_files = tuple(classified.skill_read_files)
+    expected_reads = (
+        ("SKILL.md", required_reference) if turn_index == 1 else ()
+    )
+    gateway_attempt_records = tuple(
+        record
+        for record in records
+        if record.command in classified.gateway_attempt_commands
+    )
+    terminal_exit2_count = sum(
+        step.terminal_execute and record.exit_code == 2
+        for step, record in zip(
+            expected_steps,
+            gateway_attempt_records,
+            strict=False,
+        )
+    )
+    terminal_unexpected = tuple(classified.unexpected_commands)
+    expected_terminal_unexpected = (
+        len(terminal_unexpected) == terminal_exit2_count
+        and all(
+            command in classified.gateway_attempt_commands
+            for command in terminal_unexpected
+        )
+    )
+    expected_common_gates = {
+        "memory_isolated": (
+            isolation_audit.get("passed") is True
+            and prompt_audit.get("has_memory") is False
+        ),
+        "one_completed_turn": (
+            value.get("exit_status") == 0
+            and value.get("timed_out") is False
+            and session_audit.get("passed") is True
+            and value.get("file_change_count") == 0
+        ),
+        "one_target_skill": prompt_audit.get("passed") is True,
+        "no_collaboration": value.get("collab_call_count") == 0,
+        "skill_reads_exact": (
+            read_files == expected_reads and len(allowed_reads) == len(read_files)
+        ),
+        "read_prefix_exact": (
+            tuple(record.command for record in records[: len(allowed_reads)])
+            == allowed_reads
+        ),
+        "gateway_count_exact": (
+            len(classified.gateway_attempt_commands) == len(expected_steps)
+        ),
+        "no_other_commands": (
+            len(records) == len(allowed_reads) + len(expected_steps)
+        ),
+        "no_discovery": not classified.discovery_commands,
+        "no_direct_waapi": not classified.direct_waapi_client_commands,
+        "no_write_like": not classified.write_like_commands,
+        "no_unexpected_commands": (
+            expected_terminal_unexpected
+            and not classified.non_gateway_unexpected_commands
+        ),
+        "no_files_changed": (
+            not value.get("created_files")
+            and not value.get("modified_files")
+            and not value.get("deleted_files")
+            and not value.get("created_source_files")
+            and not value.get("modified_source_files")
+            and not value.get("deleted_source_files")
+            and value.get("skill_tree_unchanged") is True
+        ),
+    }
+    if (
+        set(expected_common_gates) != _HEAVY_V3_REQUIRED_COMMON_GATES
+        or archived_common_gates != expected_common_gates
+        or not all(expected_common_gates.values())
+    ):
+        raise CampaignEvidenceError(
+            "passing heavy turn common gates cannot be recomputed from raw evidence"
+        )
+    return tuple(
+        _json_canonical_value(asdict(record))
+        for record in records
+        if record.command in classified.gateway_attempt_commands
+    )
+
+
+def _validate_heavy_v3_events_against_facts(
+    events_path: Path,
+    facts: Mapping[str, Any],
+    *,
+    label: str,
+) -> tuple[Any, ...]:
+    """Rebuild stable Codex facts from archived JSONL instead of trusting child JSON."""
+
+    text = _load_strict_regular_text(events_path)
+    invalid_count = count_invalid_jsonl_lines(text)
+    events = parse_jsonl_events(text)
+    started_command_ids: list[str] = []
+    completed_command_ids: list[str] = []
+    for event in events:
+        item = event.get("item")
+        if not isinstance(item, Mapping) or item.get("type") != "command_execution":
+            continue
+        event_type = event.get("type")
+        if event_type not in {"item.started", "item.completed"}:
+            continue
+        item_id = item.get("id")
+        if not isinstance(item_id, str) or not item_id:
+            raise CampaignEvidenceError(
+                f"{label} command event has no stable item id"
+            )
+        if event_type == "item.started":
+            started_command_ids.append(item_id)
+        else:
+            completed_command_ids.append(item_id)
+    if (
+        len(started_command_ids) != len(set(started_command_ids))
+        or len(completed_command_ids) != len(set(completed_command_ids))
+        or started_command_ids != completed_command_ids
+    ):
+        raise CampaignEvidenceError(
+            f"{label} command event item ids are duplicated or mispaired"
+        )
+    session = audit_session_events(
+        events,
+        invalid_json_line_count=invalid_count,
+    )
+    expected_session = asdict(session)
+    expected_session["passed"] = session.passed
+    expected_records = [asdict(item) for item in completed_command_records(events)]
+    command_facts = facts.get("command_facts")
+    expected_thread_id = session.thread_ids[0] if len(session.thread_ids) == 1 else ""
+    if (
+        invalid_count != 0
+        or facts.get("event_count") != len(events)
+        or facts.get("session_audit") != _json_canonical_value(expected_session)
+        or not isinstance(command_facts, Mapping)
+        or command_facts.get("command_records")
+        != _json_canonical_value(expected_records)
+        or command_facts.get("commands")
+        != [item.command for item in completed_command_records(events)]
+        or facts.get("final_response") != final_agent_message(events)
+        or facts.get("usage") != turn_usage(events)
+        or facts.get("thread_id") != expected_thread_id
+        or facts.get("collab_call_count") != session.collab_call_count
+        or facts.get("file_change_count") != session.file_change_count
+    ):
+        raise CampaignEvidenceError(
+            f"{label} Codex facts cannot be reconstructed from events.jsonl"
+        )
+    return completed_command_records(events)
+
+
+def _json_canonical_value(value: Any) -> Any:
+    return json.loads(canonical_json_bytes(value))
+
+
+def _heavy_v3_business_plan_fixture_spec(
+    plan_value: Any,
+    *,
+    expected_unit: Any,
+) -> dict[str, str]:
+    """Recompute the plan fixture digest from runner-independent source truth."""
+
+    if not isinstance(plan_value, Mapping):
+        raise CampaignEvidenceError("heavy business-oracle plan is not an object")
+    fixture_spec = plan_value.get("fixture_spec")
+    if not isinstance(fixture_spec, Mapping) or set(fixture_spec) != {
+        "kind",
+        "sha256",
+    }:
+        raise CampaignEvidenceError(
+            "heavy business-oracle plan fixture specification is invalid"
+        )
+    kind = fixture_spec.get("kind")
+    scenario = getattr(expected_unit, "scenario", None)
+    api = getattr(scenario, "api", None)
+    typed_kinds = {
+        "ak.wwise.core.object.get": "object_materialized_v1",
+        "ak.wwise.core.object.create": "object_materialized_v1",
+        "ak.wwise.core.object.set": "object_materialized_v1",
+        "ak.wwise.core.audio.import": "import_materialized_runtime_v1",
+        "ak.wwise.core.audio.importTabDelimited": "import_materialized_runtime_v1",
+        "ak.wwise.core.audio.convert": "audio_conversion_materialized_v1",
+        "ak.wwise.core.mediaPool.get": "media_pool_materialized_v1",
+    }
+    soundbank_apis = {
+        "ak.wwise.core.soundbank.generate",
+        "ak.wwise.core.soundbank.processDefinitionFiles",
+        "ak.wwise.core.soundbank.convertExternalSources",
+        "ak.wwise.core.soundbank.setInclusions",
+        SOUNDBANK_TOPIC,
+    }
+    cli_apis = {
+        "ak.wwise.cli.generateSoundbank",
+        "ak.wwise.cli.tabDelimitedImport",
+        "ak.wwise.cli.convertExternalSource",
+        HEAVY_V3_MIGRATION_API,
+    }
+    if api in soundbank_apis:
+        count = _heavy_v3_primary_dispatch_count(expected_unit)
+        typed_kinds[api] = (
+            "soundbank_topic_materialized_v1"
+            if api == SOUNDBANK_TOPIC
+            else "soundbank_refusal_materialized_v1"
+            if count == 0
+            else "soundbank_function_materialized_v1"
+        )
+    elif api in cli_apis:
+        typed_kinds[api] = "cli_prepared_runtime_v1"
+    if api in typed_kinds:
+        digest = fixture_spec.get("sha256")
+        if kind != typed_kinds[api] or not isinstance(digest, str) or _SHA256_RE.fullmatch(digest) is None:
+            raise CampaignEvidenceError(
+                "heavy typed business-oracle fixture identity is invalid"
+            )
+        # The common envelope only establishes the immutable receipt binding.
+        # The family validator immediately below independently recomputes this
+        # digest from the closed static/live sections.
+        return {"kind": kind, "sha256": digest}
+    if kind == "object_recipe":
+        fixture_value = _heavy_v3_plan_json_value(
+            build_object_heavy_v3_recipe(
+                str(getattr(expected_unit, "unit_id", ""))
+            )
+        )
+    elif kind == "scenario_fixture":
+        fixture_value = _heavy_v3_plan_json_value(
+            getattr(scenario, "fixture", None)
+        )
+    else:
+        raise CampaignEvidenceError(
+            "heavy business-oracle plan fixture kind is unsupported"
+        )
+    return {"kind": kind, "sha256": _canonical_sha256(fixture_value)}
+
+
+def _validate_heavy_v3_typed_business_plan(
+    plan_value: Mapping[str, Any],
+    *,
+    expected_unit: Any,
+    provenance: PromptProvenanceEvidence,
+) -> (
+    ObjectBusinessPlanSections
+    | ImportBusinessPlanSections
+    | AudioMediaBusinessPlanSections
+    | SoundBankBusinessPlanSections
+    | CliBusinessPlanSections
+    | None
+):
+    """Parse and independently validate one supported family plan archive."""
+
+    scenario = getattr(expected_unit, "scenario", None)
+    api = str(getattr(scenario, "api", ""))
+    protocol = provenance.protocol
+    sections: (
+        ObjectBusinessPlanSections
+        | ImportBusinessPlanSections
+        | AudioMediaBusinessPlanSections
+        | SoundBankBusinessPlanSections
+        | CliBusinessPlanSections
+        | None
+    )
+    if api in {
+        "ak.wwise.core.object.get",
+        "ak.wwise.core.object.create",
+        "ak.wwise.core.object.set",
+    }:
+        parsed = parse_object_business_plan_sections(plan_value)
+        recipe = build_object_heavy_v3_recipe(
+            str(getattr(expected_unit, "unit_id", ""))
+        )
+        sections = validate_archived_object_business_plan(
+            plan_value,
+            scenario=scenario,
+            recipe=recipe,
+            protocol=protocol,
+            verify_files=False,
+        )
+        if parsed.writer_kwargs() != sections.writer_kwargs():
+            raise CampaignEvidenceError(
+                "heavy object typed-plan parse/archive projections differ"
+            )
+    elif api in {
+        "ak.wwise.core.audio.import",
+        "ak.wwise.core.audio.importTabDelimited",
+    }:
+        parsed = parse_import_business_plan_sections(plan_value)
+        sections = validate_import_business_plan_archive(
+            parsed,
+            scenario=scenario,
+            protocol=protocol,
+            verify_files=False,
+        )
+    elif api in {
+        "ak.wwise.core.audio.convert",
+        "ak.wwise.core.mediaPool.get",
+    }:
+        sections = parse_audio_media_business_plan_sections(plan_value)
+        validate_audio_media_business_plan_archive(
+            sections,
+            protocol,
+            scenario_id=str(getattr(expected_unit, "unit_id", "")),
+            api=api,
+            version=str(getattr(expected_unit, "version", "")),
+            reviewed_scenario_fixture=getattr(scenario, "fixture", None),
+        )
+    elif api in {
+        "ak.wwise.core.soundbank.generate",
+        "ak.wwise.core.soundbank.processDefinitionFiles",
+        "ak.wwise.core.soundbank.convertExternalSources",
+        "ak.wwise.core.soundbank.setInclusions",
+        SOUNDBANK_TOPIC,
+    }:
+        sections = parse_soundbank_business_plan_sections(plan_value)
+        validate_soundbank_business_plan_archive(
+            sections,
+            protocol,
+            scenario={
+                "scenario_id": str(getattr(expected_unit, "unit_id", "")),
+                "api": api,
+                "version": str(getattr(expected_unit, "version", "")),
+                "primary_dispatch_count": _heavy_v3_primary_dispatch_count(
+                    expected_unit
+                ),
+                "fixture": getattr(scenario, "fixture", None),
+            },
+        )
+        provenance_scenario_root = provenance.payload.get("scenario_root")
+        provenance_owned_root = provenance.payload.get("owned_root")
+        if (
+            not isinstance(provenance_scenario_root, str)
+            or not isinstance(provenance_owned_root, str)
+        ):
+            raise CampaignEvidenceError(
+                "SoundBank typed plan lacks independent scenario authority"
+            )
+        expected_owned_root = str(
+            (Path(provenance_scenario_root) / "owned").resolve(strict=False)
+        )
+        if (
+            provenance_owned_root != expected_owned_root
+            or sections.static_expectation.get("io_root") != expected_owned_root
+        ):
+            raise CampaignEvidenceError(
+                "SoundBank typed plan io_root differs from scenario-owned authority"
+            )
+    elif api in {
+        "ak.wwise.cli.generateSoundbank",
+        "ak.wwise.cli.tabDelimitedImport",
+        "ak.wwise.cli.convertExternalSource",
+        HEAVY_V3_MIGRATION_API,
+    }:
+        parsed = parse_cli_business_plan_sections(plan_value)
+        sections = validate_cli_business_plan_archive(
+            parsed,
+            scenario=scenario,
+            version=str(getattr(expected_unit, "version", "")),
+            protocol=protocol,
+            verify_files=False,
+        )
+    else:
+        return None
+
+    static = sections.static_expectation
+    expected_identity = {
+        "scenario_id": str(getattr(expected_unit, "unit_id", "")),
+        "version": str(getattr(expected_unit, "version", "")),
+        "api": api,
+    }
+    if any(static.get(key) != value for key, value in expected_identity.items()):
+        raise CampaignEvidenceError(
+            "heavy typed-plan static identity differs from its common envelope"
+        )
+    if (
+        not isinstance(sections, SoundBankBusinessPlanSections)
+        and static.get("family") != business_family_for_api(api)
+    ):
+        raise CampaignEvidenceError(
+            "heavy typed-plan family differs from its common envelope"
+        )
+    expected_count = _heavy_v3_primary_dispatch_count(expected_unit)
+    primary_steps = sections.payload_bindings.get("primary_steps")
+    if isinstance(sections, SoundBankBusinessPlanSections) and api == SOUNDBANK_TOPIC:
+        dispatch_invalid = (
+            expected_count < 1
+            or primary_steps != ["soundbank.generated.wait"]
+        )
+    else:
+        dispatch_invalid = (
+            not isinstance(primary_steps, list)
+            or (expected_count == 0 and primary_steps != [])
+            or (expected_count > 0 and len(primary_steps) != expected_count)
+        )
+    if dispatch_invalid:
+        raise CampaignEvidenceError(
+            "heavy typed-plan dispatch partition differs from expected unit"
+        )
+    return sections
+
+
+def _heavy_v3_plan_json_value(value: Any) -> Any:
+    """Mirror the runner's strict JSON projection without trusting its plan."""
+
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if is_dataclass(value) and not isinstance(value, type):
+        return {
+            item.name: _heavy_v3_plan_json_value(getattr(value, item.name))
+            for item in fields(value)
+        }
+    if isinstance(value, Mapping):
+        return {
+            str(key): _heavy_v3_plan_json_value(nested)
+            for key, nested in value.items()
+        }
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [_heavy_v3_plan_json_value(nested) for nested in value]
+    if isinstance(value, Path):
+        return str(value)
+    return repr(value)
+
+
+def _validate_heavy_v3_pass_checks(
+    checks: Mapping[str, Any],
+    *,
+    expected_unit: Any,
+    expected_row: Mapping[str, Any],
+    expected_thread_id: str,
+    primary_count: int,
+    task_root: Path,
+    prompt_evidence: HeavyV3PromptEvidence,
+) -> None:
+    api = str(expected_row["api"])
+    runner = str(expected_row["runner"])
+    scenario = getattr(expected_unit, "scenario", None)
+    item_type = getattr(scenario, "item_type", None)
+    primary = checks.get("primary_dispatch")
+    if checks.get("task_passed") is not True or not isinstance(primary, Mapping):
+        raise CampaignEvidenceError(
+            "passing heavy checks lack task and primary-dispatch proof"
+        )
+    if runner == "cli":
+        if (
+            set(primary)
+            != {"api", "count", "connection_lost", "connection_lost_after_dispatch"}
+            or primary.get("api") != api
+            or primary.get("count") != primary_count
+            or not isinstance(primary.get("connection_lost"), bool)
+            or not isinstance(primary.get("connection_lost_after_dispatch"), bool)
+        ):
+            raise CampaignEvidenceError("passing CLI primary-dispatch proof is invalid")
+        connection_lost = bool(primary.get("connection_lost"))
+        connection_lost_after_dispatch = bool(
+            primary.get("connection_lost_after_dispatch")
+        )
+        # A migration may either complete before the runner shuts its control
+        # server down or naturally close that server after dispatch.  Both are
+        # proven runtime outcomes; only a pre-dispatch/mixed disconnect is
+        # ambiguous.  Other reviewed CLI operations must stay connected.
+        if (
+            connection_lost != connection_lost_after_dispatch
+            or (api != HEAVY_V3_MIGRATION_API and connection_lost)
+            or checks.get("thread_id") != expected_thread_id
+            or checks.get("first_use_intro") is not True
+            or checks.get("source_template_unchanged") is not True
+        ):
+            raise CampaignEvidenceError(
+                "passing CLI checks lack thread, intro, source, or disconnect proof"
+            )
+        turn_count = getattr(expected_unit, "user_turn_count", 0)
+        if any(
+            checks.get(f"turn_{index:02d}_response_nonempty") is not True
+            for index in range(1, turn_count + 1)
+        ):
+            raise CampaignEvidenceError("passing CLI checks lack non-empty responses")
+        _validate_heavy_v3_archived_verification(
+            checks.get("business_verification"),
+            api=api,
+            scenario_id=str(getattr(expected_unit, "unit_id", "")),
+            version=str(expected_row["version"]),
+            runner=runner,
+            primary_count=primary_count,
+            task_root=task_root,
+            prompt_evidence=prompt_evidence,
+            scenario_fixture=getattr(scenario, "fixture", {}),
+            label="CLI business oracle",
+        )
+        return
+
+    if checks.get("direct_client_closed") is not True:
+        raise CampaignEvidenceError("passing project runner did not close its direct client")
+    if checks.get("first_use_intro") is not True or checks.get(
+        "final_response_nonempty"
+    ) is not True:
+        raise CampaignEvidenceError(
+            "passing project checks lack intro or final-response proof"
+        )
+    if item_type == "topic":
+        publisher_count = _heavy_v3_topic_publisher_request_count(prompt_evidence)
+        if (
+            set(primary) != {"api", "gateway_dispatch_calls", "event_count"}
+            or primary.get("api") != api
+            or primary.get("gateway_dispatch_calls") != 1
+            or primary.get("event_count") != primary_count
+            or checks.get("topic_publisher_call_count") != publisher_count
+            or type(checks.get("topic_publisher_direct_call_count")) is not int
+            or checks.get("topic_publisher_direct_call_count", 0) < publisher_count
+            or checks.get("topic_publisher_client_opened") is not True
+            or checks.get("topic_publisher_client_closed") is not True
+        ):
+            raise CampaignEvidenceError("passing topic publisher/dispatch proof is invalid")
+        ack_proof = checks.get("topic_subscription_ack")
+        _validate_heavy_v3_topic_subscription_ack(
+            ack_proof,
+            api=api,
+            publisher_count=publisher_count,
+            task_root=task_root,
+            prompt_evidence=prompt_evidence,
+        )
+        _validate_heavy_v3_topic_publisher_process(
+            checks.get("topic_publisher_diagnostics"),
+            api=api,
+            publisher_count=publisher_count,
+            ack_proof=ack_proof,
+            prompt_evidence=prompt_evidence,
+        )
+        _validate_heavy_v3_archived_verification(
+            checks.get("topic_verification"),
+            api=api,
+            scenario_id=str(getattr(expected_unit, "unit_id", "")),
+            version=str(expected_row["version"]),
+            runner=runner,
+            primary_count=primary_count,
+            task_root=task_root,
+            prompt_evidence=prompt_evidence,
+            scenario_fixture=getattr(scenario, "fixture", {}),
+            label="topic oracle",
+        )
+        return
+    if (
+        set(primary) != {"api", "dispatch_count"}
+        or primary.get("api") != api
+        or primary.get("dispatch_count") != primary_count
+    ):
+        raise CampaignEvidenceError("passing project primary-dispatch proof is invalid")
+    if primary_count == 0:
+        refusal_values = [
+            value for key, value in checks.items() if str(key).endswith(".refusal")
+        ]
+        if len(refusal_values) != 1:
+            raise CampaignEvidenceError(
+                "passing zero-dispatch case lacks one exact refusal oracle"
+            )
+        _validate_heavy_v3_archived_verification(
+            refusal_values[0],
+            api=api,
+            scenario_id=str(getattr(expected_unit, "unit_id", "")),
+            version=str(expected_row["version"]),
+            runner=runner,
+            primary_count=primary_count,
+            task_root=task_root,
+            prompt_evidence=prompt_evidence,
+            scenario_fixture=getattr(scenario, "fixture", {}),
+            label="zero-dispatch refusal oracle",
+        )
+        return
+    _validate_heavy_v3_archived_verification(
+        checks.get("business_verification"),
+        api=api,
+        scenario_id=str(getattr(expected_unit, "unit_id", "")),
+        version=str(expected_row["version"]),
+        runner=runner,
+        primary_count=primary_count,
+        task_root=task_root,
+        prompt_evidence=prompt_evidence,
+        scenario_fixture=getattr(scenario, "fixture", {}),
+        label="project business oracle",
+    )
+
+
+def _validate_heavy_v3_archived_verification(
+    value: Any,
+    *,
+    api: str,
+    scenario_id: str,
+    version: str,
+    runner: str,
+    primary_count: int,
+    task_root: Path,
+    prompt_evidence: HeavyV3PromptEvidence,
+    scenario_fixture: Any,
+    label: str,
+) -> None:
+    """Dispatch a closed archive schema for every reviewed heavy API family."""
+
+    envelope = _closed_oracle_mapping(
+        value,
+        {
+            "contract",
+            "scenario_id",
+            "version",
+            "api",
+            "runner",
+            "business_oracle_plan_sha256",
+            "verification",
+        },
+        label=label,
+    )
+    if (
+        envelope.get("contract") != HEAVY_V3_ORACLE_CONTRACT
+        or envelope.get("scenario_id") != scenario_id
+        or envelope.get("version") != version
+        or envelope.get("api") != api
+        or envelope.get("runner") != runner
+        or envelope.get("business_oracle_plan_sha256")
+        != prompt_evidence.business_oracle_plan.sha256
+        or runner not in {"project", "cli"}
+        or (api.startswith("ak.wwise.cli.") != (runner == "cli"))
+    ):
+        raise CampaignEvidenceError(f"{label} envelope identity is misbound")
+    verification = envelope.get("verification")
+    _validate_heavy_v3_typed_archived_verification(
+        prompt_evidence.typed_sections,
+        verification,
+        api=api,
+        primary_count=primary_count,
+        task_root=task_root,
+        label=label,
+    )
+
+    if api in {
+        "ak.wwise.core.object.get",
+        "ak.wwise.core.object.create",
+        "ak.wwise.core.object.set",
+    }:
+        _validate_heavy_v3_object_oracle(
+            verification,
+            api=api,
+            scenario_id=scenario_id,
+            expected_final_response_sha256=_heavy_v3_final_response_sha256(task_root),
+            final_response=_heavy_v3_final_response(task_root),
+            gateway_payload=(
+                _heavy_v3_broker_step_payload(task_root, step_name="query-object")
+                if api == "ak.wwise.core.object.get"
+                else None
+            ),
+            label=label,
+        )
+        return
+    if api in {
+        "ak.wwise.core.audio.import",
+        "ak.wwise.core.audio.importTabDelimited",
+    }:
+        _validate_heavy_v3_import_oracle(
+            verification,
+            scenario_id=scenario_id,
+            zero_dispatch=primary_count == 0,
+            label=label,
+        )
+        return
+    if api == "ak.wwise.core.audio.convert":
+        operation_request = _heavy_v3_protocol_operation_request(prompt_evidence)
+        _validate_heavy_v3_completed_transaction_protocol(
+            prompt_evidence,
+            expected_operation_request=operation_request,
+        )
+        _validate_heavy_v3_audio_conversion_oracle(
+            verification,
+            expected_operation_request=operation_request,
+            expected_byte_change_paths=_heavy_v3_audio_byte_change_paths(
+                scenario_fixture
+            ),
+            expected_verify_payload_sha256=(
+                _heavy_v3_broker_step_payload_sha256(
+                    task_root,
+                    step_name="tx01.verify",
+                )
+            ),
+            label=label,
+        )
+        return
+    if api == "ak.wwise.core.mediaPool.get":
+        _validate_heavy_v3_media_pool_oracle(
+            verification,
+            scenario_id=scenario_id,
+            task_root=task_root,
+            expected_final_response_sha256=_heavy_v3_final_response_sha256(task_root),
+            final_response=_heavy_v3_final_response(task_root),
+            expected_request=_heavy_v3_protocol_call_request(
+                prompt_evidence,
+                api="ak.wwise.core.mediaPool.get",
+            ),
+            label=label,
+        )
+        return
+    if api == "ak.wwise.core.soundbank.generated":
+        _validate_heavy_v3_soundbank_topic_oracle(
+            verification,
+            scenario_id=scenario_id,
+            label=label,
+        )
+        return
+    if api in {
+        "ak.wwise.core.soundbank.generate",
+        "ak.wwise.core.soundbank.processDefinitionFiles",
+        "ak.wwise.core.soundbank.convertExternalSources",
+        "ak.wwise.core.soundbank.setInclusions",
+    }:
+        _validate_heavy_v3_soundbank_oracle(
+            verification,
+            api=api,
+            scenario_id=scenario_id,
+            expected_phase="zero_dispatch" if primary_count == 0 else "after_execution",
+            label=label,
+        )
+        return
+    if api in {
+        "ak.wwise.cli.generateSoundbank",
+        "ak.wwise.cli.tabDelimitedImport",
+        "ak.wwise.cli.convertExternalSource",
+        "ak.wwise.cli.migrate",
+    }:
+        _validate_heavy_v3_cli_oracle(
+            verification,
+            api=api,
+            scenario_id=scenario_id,
+            label=label,
+        )
+        return
+    raise CampaignEvidenceError(f"{label} has no closed validator for {api}")
+
+
+def _validate_heavy_v3_typed_archived_verification(
+    sections: (
+        ObjectBusinessPlanSections
+        | ImportBusinessPlanSections
+        | AudioMediaBusinessPlanSections
+        | SoundBankBusinessPlanSections
+        | CliBusinessPlanSections
+        | None
+    ),
+    verification: Any,
+    *,
+    api: str,
+    primary_count: int,
+    task_root: Path,
+    label: str,
+) -> None:
+    """Join post-run evidence to the immutable typed plan before legacy checks."""
+
+    try:
+        if isinstance(sections, ObjectBusinessPlanSections):
+            validate_object_archived_verification(sections, verification)
+            return
+        if isinstance(sections, ImportBusinessPlanSections):
+            refusal_error_code = (
+                _heavy_v3_broker_refusal_error_code(
+                    task_root,
+                    step_name="tx01.preview",
+                )
+                if primary_count == 0
+                else None
+            )
+            validate_import_archived_verification(
+                sections,
+                verification,
+                refusal_error_code=refusal_error_code,
+            )
+            return
+        if isinstance(sections, AudioMediaBusinessPlanSections):
+            if api == "ak.wwise.core.audio.convert":
+                validate_audio_archived_verification(sections, verification)
+                return
+            if api == "ak.wwise.core.mediaPool.get":
+                validate_media_archived_verification(sections, verification)
+                return
+            raise CampaignEvidenceError(
+                f"{label} audio/media typed plan is cross-bound to {api}"
+            )
+        if isinstance(sections, SoundBankBusinessPlanSections):
+            if sections.static_expectation.get("api") != api:
+                raise CampaignEvidenceError(
+                    f"{label} SoundBank typed plan is cross-bound to {api}"
+                )
+            refusal_error_code = sections.static_expectation.get(
+                "zero_dispatch_error_code"
+            )
+            if refusal_error_code is not None:
+                broker_error_code = _heavy_v3_broker_refusal_error_code(
+                    task_root,
+                    step_name="tx01.preview",
+                )
+                if (
+                    refusal_error_code != PROCESS_REFUSAL_ERROR_CODE
+                    or broker_error_code != refusal_error_code
+                ):
+                    raise CampaignEvidenceError(
+                        f"{label} SoundBank refusal is not bound to the broker error"
+                    )
+            validate_soundbank_archived_verification(sections, verification)
+            return
+        if isinstance(sections, CliBusinessPlanSections):
+            if sections.static_expectation.get("api") != api:
+                raise CampaignEvidenceError(
+                    f"{label} CLI typed plan is cross-bound to {api}"
+                )
+            validate_cli_archived_verification(sections, verification)
+            return
+        if api in {
+            "ak.wwise.core.object.get",
+            "ak.wwise.core.object.create",
+            "ak.wwise.core.object.set",
+            "ak.wwise.core.audio.import",
+            "ak.wwise.core.audio.importTabDelimited",
+            "ak.wwise.core.audio.convert",
+            "ak.wwise.core.mediaPool.get",
+            "ak.wwise.core.soundbank.generate",
+            "ak.wwise.core.soundbank.processDefinitionFiles",
+            "ak.wwise.core.soundbank.convertExternalSources",
+            "ak.wwise.core.soundbank.setInclusions",
+            SOUNDBANK_TOPIC,
+            "ak.wwise.cli.generateSoundbank",
+            "ak.wwise.cli.tabDelimitedImport",
+            "ak.wwise.cli.convertExternalSource",
+            HEAVY_V3_MIGRATION_API,
+        }:
+            raise CampaignEvidenceError(
+                f"{label} lacks required typed business-plan sections"
+            )
+    except (
+        AudioMediaBusinessPlanError,
+        CliBusinessPlanError,
+        ImportBusinessPlanError,
+        ObjectBusinessPlanError,
+        SoundBankBusinessPlanError,
+    ) as exc:
+        raise CampaignEvidenceError(
+            f"{label} typed plan/evidence binding is invalid: {exc}"
+        ) from exc
+
+
+def _heavy_v3_broker_refusal_error_code(
+    task_root: Path,
+    *,
+    step_name: str,
+) -> str:
+    """Extract one already protocol-replayed structured refusal from the broker."""
+
+    task_result = load_strict_regular_json(task_root / "task-result.json")
+    broker = task_result.get("broker") if isinstance(task_result, Mapping) else None
+    records = broker.get("records") if isinstance(broker, Mapping) else None
+    matches = [
+        record
+        for record in records
+        if isinstance(record, Mapping) and record.get("step_name") == step_name
+    ] if isinstance(records, list) else []
+    if len(matches) != 1:
+        raise CampaignEvidenceError(
+            f"heavy broker lacks one exact refusal record for {step_name}"
+        )
+    record = matches[0]
+    payload = record.get("payload")
+    if (
+        record.get("authenticated") is not True
+        or record.get("accepted") is not True
+        or record.get("succeeded") is not True
+        or record.get("runner_exit_code") != 2
+        or not isinstance(payload, Mapping)
+        or payload.get("contract") != "waapi-skill.gateway-result/v1"
+        or payload.get("ok") is not False
+        or payload.get("command") != "preview"
+        or not isinstance(payload.get("error_code"), str)
+        or not payload["error_code"]
+    ):
+        raise CampaignEvidenceError(
+            f"heavy broker refusal record is invalid for {step_name}"
+        )
+    return str(payload["error_code"])
+
+
+def _closed_oracle_mapping(
+    value: Any,
+    keys: set[str],
+    *,
+    label: str,
+) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping) or set(value) != keys:
+        raise CampaignEvidenceError(f"{label} schema is not closed")
+    return value
+
+
+def _require_passing_oracle(value: Mapping[str, Any], *, label: str) -> None:
+    if value.get("passed") is not True or value.get("failures") != []:
+        raise CampaignEvidenceError(f"{label} is not an explicit failure-free pass")
+
+
+def _nonempty_text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value)
+
+
+def _optional_text(value: Any) -> bool:
+    return value is None or isinstance(value, str)
+
+
+def _plain_int(value: Any, *, minimum: int = 0) -> bool:
+    return type(value) is int and value >= minimum
+
+
+def _sha256_text_value(value: Any) -> bool:
+    return isinstance(value, str) and _SHA256_RE.fullmatch(value) is not None
+
+
+def _json_scalar(value: Any) -> bool:
+    return (
+        value is None
+        or isinstance(value, (str, bool))
+        or (
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and math.isfinite(float(value))
+        )
+    )
+
+
+def _json_archive_value(value: Any) -> bool:
+    if _json_scalar(value):
+        return True
+    if isinstance(value, list):
+        return all(_json_archive_value(item) for item in value)
+    if isinstance(value, Mapping):
+        return all(
+            isinstance(key, str) and _json_archive_value(item)
+            for key, item in value.items()
+        )
+    return False
+
+
+def _heavy_v3_final_response_sha256(task_root: Path) -> str:
+    value = _heavy_v3_final_response(task_root)
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _heavy_v3_final_response(task_root: Path) -> str:
+    turns_root = task_root / "turns"
+    names = sorted(_strict_real_subdirectory_names(turns_root))
+    if not names:
+        raise CampaignEvidenceError("heavy task has no final turn response")
+    value = _load_strict_regular_text(turns_root / names[-1] / "final.txt")
+    if not value.endswith("\n") or not value[:-1]:
+        raise CampaignEvidenceError("heavy final response archive is malformed")
+    return value[:-1]
+
+
+def _heavy_v3_protocol_operation_request(
+    evidence: HeavyV3PromptEvidence,
+) -> Mapping[str, Any]:
+    steps = serialize_protocol(evidence.provenance.protocol)["steps"]
+    values: list[Mapping[str, Any]] = []
+    for step in steps:
+        arguments = step.get("arguments")
+        if (
+            step.get("subcommand") == "preview"
+            and isinstance(arguments, list)
+            and len(arguments) == 2
+            and arguments[0] == {"kind": "literal", "value": "--request-json"}
+            and isinstance(arguments[1], Mapping)
+            and arguments[1].get("kind") in {
+                "semantic_json",
+                "semantic_json_object_operation_v1",
+            }
+            and isinstance(arguments[1].get("value"), Mapping)
+        ):
+            values.append(arguments[1]["value"])
+    if len(values) != 1:
+        raise CampaignEvidenceError(
+            "heavy protocol does not contain one exact operation request"
+        )
+    return values[0]
+
+
+def _validate_heavy_v3_completed_transaction_protocol(
+    evidence: HeavyV3PromptEvidence,
+    *,
+    expected_operation_request: Mapping[str, Any],
+) -> None:
+    """Require the closed preview/confirm/execute/verify transaction topology."""
+
+    protocol = evidence.provenance.protocol
+    steps = protocol.steps
+    operation = expected_operation_request.get("operation")
+    preview_transaction_id = ResponseBinding(
+        "tx01.preview",
+        "/transaction_id",
+    )
+    shown_transaction_id = ResponseBinding(
+        "tx01.transaction-show",
+        "/transaction_id",
+    )
+    confirmation_token = ResponseBinding(
+        "tx01.transaction-show",
+        "/confirmation/token",
+    )
+    confirmed_transaction_id = ResponseBinding(
+        "tx01.confirm",
+        "/transaction_id",
+    )
+    executed_transaction_id = ResponseBinding(
+        "tx01.execute",
+        "/transaction_id",
+    )
+    if (
+        protocol.turn_prefix_counts != (2, 6)
+        or len(steps) != 6
+        or tuple(step.name for step in steps)
+        != (
+            "tx01.operation-schema",
+            "tx01.preview",
+            "tx01.transaction-show",
+            "tx01.confirm",
+            "tx01.execute",
+            "tx01.verify",
+        )
+        or tuple(step.subcommand for step in steps)
+        != (
+            "operation-schema",
+            "preview",
+            "transaction-show",
+            "confirm",
+            "execute",
+            "verify",
+        )
+        or not _nonempty_text(operation)
+        or steps[0].arguments != (operation,)
+        or len(steps[1].arguments) != 2
+        or steps[1].arguments[0] != "--request-json"
+        or not isinstance(steps[1].arguments[1], SemanticJsonArgument)
+        or steps[1].arguments[1].expected != expected_operation_request
+        or steps[1].arguments[1].equivalence
+        != (
+            "object_operation_v1"
+            if operation in {"object.create", "object.set"}
+            else "wire_exact"
+        )
+        or steps[2].arguments != (preview_transaction_id, "--summary-only")
+        or steps[3].arguments
+        != (
+            shown_transaction_id,
+            "--confirmation-token",
+            confirmation_token,
+        )
+        or steps[4].arguments != (confirmed_transaction_id,)
+        or steps[5].arguments != (executed_transaction_id,)
+        or any(
+            step.allowed_exit_codes != ((0, 2) if index == 4 else (0,))
+            for index, step in enumerate(steps)
+        )
+        or any(step.gateway_global_arguments for step in steps)
+        or any(step.expected_error_code for step in steps)
+        or any(step.expected_result_command for step in steps)
+        or any(step.terminal_execute for step in steps)
+    ):
+        raise CampaignEvidenceError(
+            "heavy audio transaction lacks exact preview/confirm/execute/verify binding"
+        )
+
+
+def _heavy_v3_broker_step_payload_sha256(
+    task_root: Path,
+    *,
+    step_name: str,
+) -> str:
+    return _canonical_sha256(
+        _heavy_v3_broker_step_payload(task_root, step_name=step_name)
+    )
+
+
+def _heavy_v3_broker_step_payload(
+    task_root: Path,
+    *,
+    step_name: str,
+) -> Mapping[str, Any]:
+    task_result = load_strict_regular_json(task_root / "task-result.json")
+    broker = task_result.get("broker") if isinstance(task_result, Mapping) else None
+    records = broker.get("records") if isinstance(broker, Mapping) else None
+    matches = [
+        record.get("payload")
+        for record in records
+        if isinstance(record, Mapping) and record.get("step_name") == step_name
+    ] if isinstance(records, list) else []
+    if len(matches) != 1 or not isinstance(matches[0], Mapping):
+        raise CampaignEvidenceError(
+            f"heavy broker lacks one exact payload for {step_name}"
+        )
+    return matches[0]
+
+
+def _heavy_v3_protocol_call_request(
+    evidence: HeavyV3PromptEvidence,
+    *,
+    api: str,
+) -> Mapping[str, Any]:
+    steps = serialize_protocol(evidence.provenance.protocol)["steps"]
+    values: list[dict[str, Any]] = []
+    for step in steps:
+        arguments = step.get("arguments")
+        has_post_filter = (
+            isinstance(arguments, list)
+            and len(arguments) == 7
+            and arguments[5]
+            == {"kind": "literal", "value": "--post-filter-json"}
+            and isinstance(arguments[6], Mapping)
+            and arguments[6].get("kind") == "semantic_json"
+        )
+        if (
+            step.get("subcommand") == "call"
+            and isinstance(arguments, list)
+            and len(arguments) in {5, 7}
+            and arguments[0] == {"kind": "literal", "value": api}
+            and arguments[1] == {"kind": "literal", "value": "--args-json"}
+            and isinstance(arguments[2], Mapping)
+            and arguments[2].get("kind") == "semantic_json"
+            and arguments[3] == {"kind": "literal", "value": "--options-json"}
+            and isinstance(arguments[4], Mapping)
+            and arguments[4].get("kind") == "semantic_json"
+            and (len(arguments) == 5 or has_post_filter)
+        ):
+            values.append(
+                {
+                    "args": arguments[2].get("value"),
+                    "options": arguments[4].get("value"),
+                    "post_filter": (
+                        arguments[6].get("value") if has_post_filter else None
+                    ),
+                }
+            )
+    if len(values) != 1 or not all(
+        isinstance(values[0].get(key), Mapping) for key in ("args", "options")
+    ):
+        raise CampaignEvidenceError(
+            f"heavy protocol does not contain one exact call request for {api}"
+        )
+    return values[0]
+
+
+def _heavy_v3_audio_byte_change_paths(fixture: Any) -> tuple[str, ...]:
+    """Derive the byte-change subset from the reviewed scenario, not child evidence."""
+
+    asset_spec = fixture.get("asset_spec") if isinstance(fixture, Mapping) else None
+    delta_plan = asset_spec.get("delta_plan", []) if isinstance(asset_spec, Mapping) else []
+    if not isinstance(delta_plan, list):
+        raise CampaignEvidenceError("audio conversion delta plan is malformed")
+    paths: list[str] = []
+    for item in delta_plan:
+        if not isinstance(item, Mapping):
+            raise CampaignEvidenceError("audio conversion delta row is malformed")
+        kind = item.get("kind")
+        path = item.get("path")
+        if kind in {"replace_source_bytes", "replace_effective_settings"}:
+            if not _nonempty_text(path):
+                raise CampaignEvidenceError("audio conversion replacement path is invalid")
+            paths.append(str(path))
+    if len(paths) != len(set(paths)):
+        raise CampaignEvidenceError("audio conversion replacement paths are duplicated")
+    return tuple(sorted(paths))
+
+
+def _validate_heavy_v3_object_oracle(
+    value: Any,
+    *,
+    api: str,
+    scenario_id: str,
+    expected_final_response_sha256: str,
+    final_response: str,
+    gateway_payload: Mapping[str, Any] | None,
+    label: str,
+) -> None:
+    row = _closed_oracle_mapping(
+        value,
+        {"phase", "passed", "failures", "evidence"},
+        label=label,
+    )
+    _require_passing_oracle(row, label=label)
+    evidence = row.get("evidence")
+    if api == "ak.wwise.core.object.get":
+        if row.get("phase") != "query":
+            raise CampaignEvidenceError(f"{label} object.get phase is invalid")
+        proof = _closed_oracle_mapping(
+            evidence,
+            {
+                "before",
+                "after",
+                "observed_keys",
+                "expected_payload_keys",
+                "primary_row_policy",
+                "raw_row_count",
+                "query_bound",
+                "bound_reached",
+                "derived_row_policy",
+                "derived_rows",
+                "required_keys",
+                "excluded_keys",
+                "final_answer_policy",
+                "required_identity_tokens",
+                "excluded_identity_tokens",
+                "paired_rows",
+                "deduplicated_parent_rows",
+                "coverage_summary",
+                "observed_answer_order",
+                "final_response_sha256",
+            },
+            label=f"{label} evidence",
+        )
+        _validate_object_snapshot(proof.get("before"), label=f"{label} before")
+        _validate_object_snapshot(proof.get("after"), label=f"{label} after")
+        observed = proof.get("observed_keys")
+        expected = proof.get("expected_payload_keys")
+        required = proof.get("required_keys")
+        excluded = proof.get("excluded_keys")
+        primary_policy = proof.get("primary_row_policy")
+        raw_row_count = proof.get("raw_row_count")
+        query_bound = proof.get("query_bound")
+        bound_reached = proof.get("bound_reached")
+        if (
+            not isinstance(observed, list)
+            or not isinstance(expected, list)
+            or not isinstance(required, list)
+            or not isinstance(excluded, list)
+            or not expected
+            or any(
+                not _nonempty_text(item)
+                for item in (*observed, *expected, *required, *excluded)
+            )
+            or len(expected) != len(set(expected))
+            or len(required) != len(set(required))
+            or len(excluded) != len(set(excluded))
+            or primary_policy
+            not in {
+                "unique_identity_rows",
+                "ancestor_identity_rows",
+                "parent_projection_per_source_row",
+            }
+            or type(raw_row_count) is not int
+            or raw_row_count < 0
+            or not isinstance(query_bound, Mapping)
+            or set(query_bound) != {"mode", "value"}
+            or query_bound.get("mode") != "take"
+            or type(query_bound.get("value")) is not int
+            or bound_reached is not (raw_row_count == query_bound.get("value"))
+            or not set(required).issubset(set(expected))
+            or set(required) & set(excluded)
+            or proof.get("before") != proof.get("after")
+            or proof.get("final_response_sha256")
+            != expected_final_response_sha256
+        ):
+            raise CampaignEvidenceError(f"{label} object.get identities are invalid")
+        if primary_policy == "unique_identity_rows":
+            if (
+                len(observed) != len(expected)
+                or len(observed) != len(set(observed))
+                or set(observed) != set(expected)
+            ):
+                raise CampaignEvidenceError(
+                    f"{label} object.get unique primary identities are invalid"
+                )
+        elif primary_policy == "ancestor_identity_rows":
+            if (
+                len(observed) != len(expected)
+                or len(observed) != len(set(observed))
+                or set(observed) != set(expected)
+                or raw_row_count != len(expected)
+                or bound_reached is not False
+            ):
+                raise CampaignEvidenceError(
+                    f"{label} object.get ordered ancestor identities are invalid"
+                )
+        elif (
+            set(observed) != set(expected)
+            or len(observed) == len(set(observed))
+            or len(observed) != query_bound.get("value")
+            or raw_row_count != query_bound.get("value")
+            or bound_reached is not True
+        ):
+            raise CampaignEvidenceError(
+                f"{label} object.get parent-projection identities are invalid"
+            )
+        if gateway_payload is None:
+            raise CampaignEvidenceError(f"{label} object.get broker payload is missing")
+        _validate_object_query_gateway_payload(
+            proof,
+            gateway_payload=gateway_payload,
+            label=label,
+        )
+        derived_policy = proof.get("derived_row_policy")
+        derived_rows = proof.get("derived_rows")
+        if derived_policy not in {"none", "active_audio_sources_for_sound_rows"} or not isinstance(
+            derived_rows, list
+        ):
+            raise CampaignEvidenceError(f"{label} object.get derived policy is invalid")
+        if derived_policy == "none" and derived_rows:
+            raise CampaignEvidenceError(f"{label} object.get has unapproved derived rows")
+        source_ids: list[str] = []
+        source_parents: list[str] = []
+        for item in derived_rows:
+            source = _closed_oracle_mapping(
+                item,
+                {
+                    "sound_key",
+                    "sound_id",
+                    "id",
+                    "name",
+                    "type",
+                    "path",
+                    "parent_id",
+                    "language",
+                },
+                label=f"{label} activeSource row",
+            )
+            if (
+                derived_policy != "active_audio_sources_for_sound_rows"
+                or any(
+                    not _nonempty_text(source.get(field))
+                    for field in (
+                        "sound_key",
+                        "sound_id",
+                        "id",
+                        "name",
+                        "path",
+                        "parent_id",
+                        "language",
+                    )
+                )
+                or source.get("type") != "AudioFileSource"
+                or source.get("sound_id") != source.get("parent_id")
+                or not str(source.get("path")).endswith(
+                    f"\\{source.get('name')}"
+                )
+            ):
+                raise CampaignEvidenceError(f"{label} activeSource row is malformed")
+            source_ids.append(str(source["id"]))
+            source_parents.append(str(source["parent_id"]))
+        if len(source_ids) != len(set(source_ids)) or len(source_parents) != len(
+            set(source_parents)
+        ):
+            raise CampaignEvidenceError(f"{label} activeSource rows are duplicated")
+        if raw_row_count != len(observed) + len(derived_rows):
+            raise CampaignEvidenceError(
+                f"{label} object.get raw count differs from primary/derived rows"
+            )
+        required_tokens = proof.get("required_identity_tokens")
+        excluded_tokens = proof.get("excluded_identity_tokens")
+        if (
+            not isinstance(required_tokens, list)
+            or not isinstance(excluded_tokens, list)
+            or [item.get("key") for item in required_tokens if isinstance(item, Mapping)]
+            != required
+            or [item.get("key") for item in excluded_tokens if isinstance(item, Mapping)]
+            != excluded
+        ):
+            raise CampaignEvidenceError(f"{label} object.get final token proof is invalid")
+        answer_policy = proof.get("final_answer_policy")
+        if answer_policy in {
+            "name_and_id",
+            "deduplicated_parent_summary",
+            "ordered_ancestor_summary",
+        }:
+            if proof.get("paired_rows") != []:
+                raise CampaignEvidenceError(f"{label} name/GUID answer has paired evidence")
+            for item in required_tokens:
+                token = _closed_oracle_mapping(
+                    item,
+                    {"key", "name", "id", "name_present", "id_present"},
+                    label=f"{label} required identity token",
+                )
+                if (
+                    not _nonempty_text(token.get("key"))
+                    or not _nonempty_text(token.get("name"))
+                    or not _nonempty_text(token.get("id"))
+                    or token.get("name_present")
+                    is not (str(token.get("name")).casefold() in final_response.casefold())
+                    or token.get("id_present")
+                    is not (str(token.get("id")).casefold() in final_response.casefold())
+                    or token.get("name_present") is not True
+                    or token.get("id_present") is not True
+                ):
+                    raise CampaignEvidenceError(f"{label} required identity token is invalid")
+            for item in excluded_tokens:
+                token = _closed_oracle_mapping(
+                    item,
+                    {"key", "id", "id_present"},
+                    label=f"{label} excluded identity token",
+                )
+                if (
+                    not _nonempty_text(token.get("key"))
+                    or not _nonempty_text(token.get("id"))
+                    or token.get("id_present")
+                    is not (str(token.get("id")).casefold() in final_response.casefold())
+                    or token.get("id_present") is not False
+                ):
+                    raise CampaignEvidenceError(f"{label} excluded identity token is invalid")
+            if answer_policy == "name_and_id":
+                if (
+                    proof.get("deduplicated_parent_rows") != []
+                    or proof.get("coverage_summary") is not None
+                    or proof.get("observed_answer_order") != []
+                ):
+                    raise CampaignEvidenceError(
+                        f"{label} name/GUID answer has parent-summary evidence"
+                    )
+            elif answer_policy == "deduplicated_parent_summary":
+                if primary_policy != "parent_projection_per_source_row":
+                    raise CampaignEvidenceError(
+                        f"{label} parent summary lacks duplicate primary policy"
+                    )
+                _validate_archived_deduplicated_parent_answer(
+                    proof,
+                    final_response=final_response,
+                    label=label,
+                )
+            else:
+                if primary_policy != "ancestor_identity_rows":
+                    raise CampaignEvidenceError(
+                        f"{label} ancestor summary lacks ancestor primary policy"
+                    )
+                _validate_archived_ordered_ancestor_answer(
+                    proof,
+                    final_response=final_response,
+                    label=label,
+                )
+        elif answer_policy == "paired_path_rows":
+            if (
+                proof.get("deduplicated_parent_rows") != []
+                or proof.get("coverage_summary") is not None
+            ):
+                raise CampaignEvidenceError(
+                    f"{label} paired answer has parent-summary evidence"
+                )
+            _validate_archived_paired_path_answer(
+                proof,
+                final_response=final_response,
+                label=label,
+            )
+        else:
+            raise CampaignEvidenceError(f"{label} object.get answer policy is invalid")
+        return
+    if row.get("phase") != "after":
+        raise CampaignEvidenceError(f"{label} object mutation phase is invalid")
+    mutation_evidence_keys = {
+        "before",
+        "after",
+        "resolved",
+        "expected_resolved_keys",
+        "removed_keys",
+        "removed_readback",
+        "protected_keys",
+        "protected_before",
+        "protected_after",
+    }
+    if isinstance(evidence, Mapping) and "protected_comparisons" in evidence:
+        mutation_evidence_keys.add("protected_comparisons")
+    proof = _closed_oracle_mapping(
+        evidence,
+        mutation_evidence_keys,
+        label=f"{label} evidence",
+    )
+    _validate_object_snapshot(proof.get("before"), label=f"{label} before")
+    _validate_object_snapshot(proof.get("after"), label=f"{label} after")
+    resolved = proof.get("resolved")
+    expected_keys = proof.get("expected_resolved_keys")
+    removed_keys = proof.get("removed_keys")
+    removed_readback = proof.get("removed_readback")
+    protected_keys = proof.get("protected_keys")
+    protected_before = proof.get("protected_before")
+    protected_after = proof.get("protected_after")
+    if (
+        not isinstance(resolved, Mapping)
+        or not resolved
+        or not isinstance(expected_keys, list)
+        or not expected_keys
+        or set(resolved) != set(expected_keys)
+        or len(expected_keys) != len(set(expected_keys))
+        or not isinstance(removed_keys, list)
+        or len(removed_keys) != len(set(removed_keys))
+        or not isinstance(removed_readback, Mapping)
+        or set(removed_readback) != set(removed_keys)
+        or any(value != [] for value in removed_readback.values())
+        or not isinstance(protected_keys, list)
+        or len(protected_keys) != len(set(protected_keys))
+        or not isinstance(protected_before, Mapping)
+        or not isinstance(protected_after, Mapping)
+        or set(protected_before) != set(protected_keys)
+        or set(protected_after) != set(protected_keys)
+        or proof.get("before") == proof.get("after")
+    ):
+        raise CampaignEvidenceError(f"{label} object mutation business delta is invalid")
+    comparisons = proof.get("protected_comparisons")
+    if comparisons is None:
+        if protected_before != protected_after:
+            raise CampaignEvidenceError(
+                f"{label} legacy protected object snapshot changed"
+            )
+    else:
+        _validate_campaign_object_protected_comparisons(
+            protected_before,
+            protected_after,
+            comparisons,
+            scenario_id=scenario_id,
+            before_snapshot=proof["before"],
+            after_snapshot=proof["after"],
+            resolved=resolved,
+            label=label,
+        )
+    for key, item in resolved.items():
+        if not _nonempty_text(key):
+            raise CampaignEvidenceError(f"{label} resolved object key is invalid")
+        materialized = _closed_oracle_mapping(
+            item,
+            {
+                "key",
+                "id",
+                "name",
+                "type",
+                "path",
+                "parent_id",
+                "notes",
+                "properties",
+                "references",
+                "source_language",
+                "is_included",
+                "children_count",
+                "active_source_id",
+                "active_source_name",
+                "active_source_path",
+            },
+            label=f"{label} resolved object",
+        )
+        properties = materialized.get("properties")
+        references = materialized.get("references")
+        if (
+            materialized.get("key") != key
+            or any(
+                not _nonempty_text(materialized.get(field))
+                for field in ("id", "name", "type", "path")
+            )
+            or not _optional_text(materialized.get("parent_id"))
+            or not _optional_text(materialized.get("notes"))
+            or not _optional_text(materialized.get("source_language"))
+            or materialized.get("is_included") not in {None, True, False}
+            or not _plain_int(materialized.get("children_count"))
+            or not isinstance(properties, list)
+            or not isinstance(references, list)
+        ):
+            raise CampaignEvidenceError(f"{label} materialized object is malformed")
+        for property_row in properties:
+            prop = _closed_oracle_mapping(
+                property_row,
+                {"name", "value"},
+                label=f"{label} object property",
+            )
+            if not _nonempty_text(prop.get("name")) or not _json_scalar(prop.get("value")):
+                raise CampaignEvidenceError(f"{label} object property is malformed")
+        for reference_row in references:
+            reference = _closed_oracle_mapping(
+                reference_row,
+                {"name", "target_id"},
+                label=f"{label} object reference",
+            )
+            if not _nonempty_text(reference.get("name")) or not _nonempty_text(
+                reference.get("target_id")
+            ):
+                raise CampaignEvidenceError(f"{label} object reference is malformed")
+        _validate_campaign_active_source_fields(
+            materialized,
+            label=f"{label} resolved object",
+            require_for_language=False,
+        )
+    for collection in (protected_before, protected_after):
+        for key, item in collection.items():
+            _validate_materialized_object(item, expected_key=str(key), label=f"{label} protected object")
+
+
+def _validate_campaign_object_protected_comparisons(
+    protected_before: Mapping[str, Any],
+    protected_after: Mapping[str, Any],
+    comparisons: Any,
+    *,
+    scenario_id: str,
+    before_snapshot: Mapping[str, Any],
+    after_snapshot: Mapping[str, Any],
+    resolved: Mapping[str, Any],
+    label: str,
+) -> None:
+    if (
+        not isinstance(comparisons, Mapping)
+        or set(comparisons) != set(protected_before)
+    ):
+        raise CampaignEvidenceError(
+            f"{label} protected intrinsic comparison keys are invalid"
+        )
+    before_overrides = _campaign_object_override_output_map(
+        before_snapshot,
+        required_keys=set(protected_before),
+        label=f"{label} before",
+    )
+    after_overrides = _campaign_object_override_output_map(
+        after_snapshot,
+        required_keys=set(protected_before),
+        label=f"{label} after",
+    )
+    comparison_keys = {
+        "override_output_before",
+        "override_output_after",
+        "ignored_derived_fields",
+        "before_projection",
+        "after_projection",
+        "passed",
+    }
+    override_types = {"ActorMixer", "RandomSequenceContainer", "Sound"}
+    for key, before in protected_before.items():
+        after = protected_after[key]
+        comparison = comparisons[key]
+        if not isinstance(comparison, Mapping) or set(comparison) != comparison_keys:
+            raise CampaignEvidenceError(
+                f"{label} protected intrinsic comparison schema is invalid"
+            )
+        before_override = comparison.get("override_output_before")
+        after_override = comparison.get("override_output_after")
+        if (
+            before_overrides.get(key) != before_override
+            or after_overrides.get(key) != after_override
+        ):
+            raise CampaignEvidenceError(
+                f"{label} protected OverrideOutput differs from snapshots"
+            )
+        override_required = before.get("type") in override_types
+        if override_required and (
+            type(before_override) is not bool or type(after_override) is not bool
+        ):
+            raise CampaignEvidenceError(
+                f"{label} protected OverrideOutput is not explicit"
+            )
+        if before_override != after_override:
+            raise CampaignEvidenceError(
+                f"{label} protected OverrideOutput changed"
+            )
+        ignored = list(
+            _campaign_object_inherited_effective_fields(
+                key,
+                scenario_id=scenario_id,
+                before=before,
+                after=after,
+                before_snapshot=before_snapshot,
+                resolved=resolved,
+                before_override=before_override,
+                after_override=after_override,
+            )
+        )
+        if comparison.get("ignored_derived_fields") != ignored:
+            raise CampaignEvidenceError(
+                f"{label} protected ignored fields are not exact inherited values"
+            )
+        before_projection = _campaign_object_intrinsic_projection(
+            before,
+            ignored_derived_fields=ignored,
+        )
+        after_projection = _campaign_object_intrinsic_projection(
+            after,
+            ignored_derived_fields=ignored,
+        )
+        if (
+            comparison.get("before_projection") != before_projection
+            or comparison.get("after_projection") != after_projection
+            or comparison.get("passed") is not True
+            or before_projection != after_projection
+        ):
+            raise CampaignEvidenceError(
+                f"{label} protected intrinsic projection is invalid"
+            )
+
+
+def _campaign_object_override_output_map(
+    snapshot: Mapping[str, Any],
+    *,
+    required_keys: set[str],
+    label: str,
+) -> dict[str, bool | None]:
+    rows = snapshot.get("override_output_rows")
+    if not isinstance(rows, list):
+        raise CampaignEvidenceError(f"{label} OverrideOutput rows are missing")
+    result: dict[str, bool | None] = {}
+    for row in rows:
+        if (
+            not isinstance(row, list)
+            or len(row) != 2
+            or not isinstance(row[0], str)
+            or row[0] in result
+            or (row[1] is not None and type(row[1]) is not bool)
+        ):
+            raise CampaignEvidenceError(f"{label} OverrideOutput row is invalid")
+        result[row[0]] = row[1]
+    if not required_keys.issubset(result):
+        raise CampaignEvidenceError(f"{label} OverrideOutput keys are incomplete")
+    return result
+
+
+def _campaign_object_intrinsic_projection(
+    value: Mapping[str, Any],
+    *,
+    ignored_derived_fields: Sequence[str],
+) -> dict[str, Any]:
+    result = _heavy_v3_plan_json_value(value)
+    if not isinstance(result, dict):
+        raise CampaignEvidenceError("protected object projection source is invalid")
+    ignored = set(ignored_derived_fields)
+    if ignored.intersection({"@Volume", "@Pitch"}):
+        properties = result.get("properties")
+        if not isinstance(properties, list):
+            raise CampaignEvidenceError("protected object properties are invalid")
+        result["properties"] = [
+            row
+            for row in properties
+            if isinstance(row, Mapping)
+            and f"@{row.get('name')}" not in ignored
+        ]
+    if "OutputBus" in ignored:
+        references = result.get("references")
+        if not isinstance(references, list):
+            raise CampaignEvidenceError("protected object references are invalid")
+        result["references"] = [
+            row
+            for row in references
+            if isinstance(row, Mapping) and row.get("name") != "OutputBus"
+        ]
+    return result
+
+
+def _campaign_object_inherited_effective_fields(
+    key: str,
+    *,
+    scenario_id: str,
+    before: Mapping[str, Any],
+    after: Mapping[str, Any],
+    before_snapshot: Mapping[str, Any],
+    resolved: Mapping[str, Any],
+    before_override: bool | None,
+    after_override: bool | None,
+) -> tuple[str, ...]:
+    """Recompute the narrow effective-value exception from archived rows.
+
+    The typed object business plan separately proves that these fields have no
+    local fixture override.  This campaign layer independently requires the
+    protected row to remain under the same reviewed parent and to equal that
+    parent's exact before/after values.
+    """
+
+    if (
+        scenario_id != "OBJ22-F-SET-03"
+        or before.get("key") != key
+        or after.get("key") != key
+    ):
+        return ()
+    before_objects = before_snapshot.get("objects")
+    if not isinstance(before_objects, list):
+        raise CampaignEvidenceError("protected before object graph is invalid")
+    before_by_key = {
+        str(row.get("key")): row
+        for row in before_objects
+        if isinstance(row, Mapping) and isinstance(row.get("key"), str)
+    }
+    parent = next(
+        (
+            row
+            for row in resolved.values()
+            if isinstance(row, Mapping)
+            and row.get("id") == after.get("parent_id")
+        ),
+        None,
+    )
+    if parent is None or before.get("parent_id") != parent.get("id"):
+        return ()
+    before_parent = before_by_key.get(str(parent.get("key")))
+    if before_parent is None or before_parent.get("id") != parent.get("id"):
+        return ()
+
+    ignored: list[str] = []
+    for field in ("@Volume", "@Pitch"):
+        before_value = _campaign_object_field(before, field)
+        after_value = _campaign_object_field(after, field)
+        if (
+            before_value is not None
+            and after_value is not None
+            and before_value == _campaign_object_field(before_parent, field)
+            and after_value == _campaign_object_field(parent, field)
+        ):
+            ignored.append(field)
+    before_bus = _campaign_object_field(before, "OutputBus")
+    after_bus = _campaign_object_field(after, "OutputBus")
+    # The typed plan has already proved that this protected child has no local
+    # fixture OutputBus.  Accept either stable explicit boolean representation
+    # emitted by Wwise, while independently binding both bus identities to the
+    # exact before/after parent rows.
+    if (
+        type(before_override) is bool
+        and after_override == before_override
+        and isinstance(before_bus, str)
+        and isinstance(after_bus, str)
+        and before_bus == _campaign_object_field(before_parent, "OutputBus")
+        and after_bus == _campaign_object_field(parent, "OutputBus")
+    ):
+        ignored.append("OutputBus")
+    return tuple(ignored)
+
+
+def _campaign_object_field(value: Mapping[str, Any], name: str) -> Any:
+    if name.startswith("@"):
+        return {
+            row.get("name"): row.get("value")
+            for row in value.get("properties", [])
+            if isinstance(row, Mapping)
+        }.get(name[1:])
+    return {
+        row.get("name"): row.get("target_id")
+        for row in value.get("references", [])
+        if isinstance(row, Mapping)
+    }.get(name)
+
+
+def _validate_file_proof(
+    value: Any,
+    *,
+    label: str,
+    relative_optional: bool,
+    has_mtime: bool,
+) -> None:
+    keys = {"path", "relative_path", "size", "sha256"}
+    if has_mtime:
+        keys.add("mtime_ns")
+    row = _closed_oracle_mapping(value, keys, label=label)
+    relative = row.get("relative_path")
+    if (
+        not _nonempty_text(row.get("path"))
+        or not (relative is None if relative_optional and relative is None else _nonempty_text(relative))
+        or not _plain_int(row.get("size"))
+        or not _sha256_text_value(row.get("sha256"))
+        or (has_mtime and not _plain_int(row.get("mtime_ns"), minimum=1))
+    ):
+        raise CampaignEvidenceError(f"{label} file proof is malformed")
+
+
+def _validate_materialized_object(
+    value: Any,
+    *,
+    expected_key: str,
+    label: str,
+) -> None:
+    row = _closed_oracle_mapping(
+        value,
+        {
+            "key",
+            "id",
+            "name",
+            "type",
+            "path",
+            "parent_id",
+            "notes",
+            "properties",
+            "references",
+            "source_language",
+            "is_included",
+            "children_count",
+            "active_source_id",
+            "active_source_name",
+            "active_source_path",
+        },
+        label=label,
+    )
+    if (
+        row.get("key") != expected_key
+        or any(not _nonempty_text(row.get(field)) for field in ("id", "name", "type", "path"))
+        or not _optional_text(row.get("parent_id"))
+        or not _optional_text(row.get("notes"))
+        or not _optional_text(row.get("source_language"))
+        or row.get("is_included") not in {None, True, False}
+        or not _plain_int(row.get("children_count"))
+        or not isinstance(row.get("properties"), list)
+        or not isinstance(row.get("references"), list)
+    ):
+        raise CampaignEvidenceError(f"{label} materialized object is malformed")
+    for item in row["properties"]:
+        prop = _closed_oracle_mapping(item, {"name", "value"}, label=f"{label} property")
+        if not _nonempty_text(prop.get("name")) or not _json_scalar(prop.get("value")):
+            raise CampaignEvidenceError(f"{label} property is malformed")
+    for item in row["references"]:
+        reference = _closed_oracle_mapping(
+            item,
+            {"name", "target_id"},
+            label=f"{label} reference",
+        )
+        if not _nonempty_text(reference.get("name")) or not _nonempty_text(reference.get("target_id")):
+            raise CampaignEvidenceError(f"{label} reference is malformed")
+    _validate_campaign_active_source_fields(
+        row,
+        label=label,
+        require_for_language=row.get("source_language") is not None,
+    )
+
+
+def _validate_campaign_active_source_fields(
+    row: Mapping[str, Any],
+    *,
+    label: str,
+    require_for_language: bool,
+) -> None:
+    source_id = row.get("active_source_id")
+    source_name = row.get("active_source_name")
+    source_path = row.get("active_source_path")
+    present = tuple(value is not None for value in (source_id, source_name, source_path))
+    if (
+        (any(present) and not all(present))
+        or (require_for_language and not all(present))
+        or (
+            all(present)
+            and (
+                not _nonempty_text(source_id)
+                or not _nonempty_text(source_name)
+                or not _nonempty_text(source_path)
+                or source_path != f"{row.get('path')}\\{source_name}"
+                or row.get("type") != "Sound"
+                or not _nonempty_text(row.get("source_language"))
+            )
+        )
+    ):
+        raise CampaignEvidenceError(f"{label} activeSource binding is malformed")
+
+
+def _validate_object_snapshot(value: Any, *, label: str) -> None:
+    snapshot_keys = {"objects", "absent_paths", "sibling_prefix_rows", "digest"}
+    if isinstance(value, Mapping) and "override_output_rows" in value:
+        snapshot_keys.add("override_output_rows")
+    row = _closed_oracle_mapping(
+        value,
+        snapshot_keys,
+        label=label,
+    )
+    objects = row.get("objects")
+    absent = row.get("absent_paths")
+    prefixes = row.get("sibling_prefix_rows")
+    if (
+        not isinstance(objects, list)
+        or not isinstance(absent, list)
+        or any(not _nonempty_text(item) for item in absent)
+        or not isinstance(prefixes, list)
+        or not _sha256_text_value(row.get("digest"))
+    ):
+        raise CampaignEvidenceError(f"{label} object snapshot is malformed")
+    keys: list[str] = []
+    for item in objects:
+        key = item.get("key") if isinstance(item, Mapping) else None
+        if not _nonempty_text(key):
+            raise CampaignEvidenceError(f"{label} object snapshot key is invalid")
+        keys.append(str(key))
+        _validate_materialized_object(item, expected_key=str(key), label=f"{label} object")
+    if len(keys) != len(set(keys)):
+        raise CampaignEvidenceError(f"{label} object snapshot keys are duplicated")
+    override_rows = row.get("override_output_rows")
+    if override_rows is not None:
+        overrides = _campaign_object_override_output_map(
+            row,
+            required_keys=set(keys),
+            label=label,
+        )
+        if set(overrides) != set(keys):
+            raise CampaignEvidenceError(
+                f"{label} OverrideOutput keys differ from object keys"
+            )
+    for item in prefixes:
+        if (
+            not isinstance(item, list)
+            or len(item) != 2
+            or not _nonempty_text(item[0])
+            or not isinstance(item[1], list)
+            or any(
+                not isinstance(child, list)
+                or len(child) != 3
+                or any(not _nonempty_text(field) for field in child)
+                for child in item[1]
+            )
+        ):
+            raise CampaignEvidenceError(f"{label} sibling-prefix proof is malformed")
+    digest_payload = {
+        "objects": objects,
+        "absent_paths": absent,
+        "sibling_prefix_rows": prefixes,
+    }
+    if override_rows is not None:
+        digest_payload["override_output_rows"] = override_rows
+    expected_digest = _canonical_sha256(digest_payload)
+    if row.get("digest") != expected_digest:
+        raise CampaignEvidenceError(f"{label} object snapshot digest is invalid")
+
+
+def _validate_import_snapshot(
+    value: Any,
+    *,
+    scenario_id: str,
+    label: str,
+) -> None:
+    row = _closed_oracle_mapping(
+        value,
+        {
+            "scenario_id",
+            "rows",
+            "events",
+            "project_xml_files",
+            "originals_files",
+            "input_files",
+            "xml_identities",
+        },
+        label=label,
+    )
+    if row.get("scenario_id") != scenario_id:
+        raise CampaignEvidenceError(f"{label} scenario identity is invalid")
+    for collection in (
+        "rows",
+        "events",
+        "project_xml_files",
+        "originals_files",
+        "input_files",
+        "xml_identities",
+    ):
+        if not isinstance(row.get(collection), list):
+            raise CampaignEvidenceError(f"{label} {collection} is not an array")
+    for item in row["rows"]:
+        state = _closed_oracle_mapping(
+            item,
+            {"row_key", "target_path", "language", "object"},
+            label=f"{label} import row",
+        )
+        if any(
+            not _nonempty_text(state.get(field))
+            for field in ("row_key", "target_path", "language")
+        ):
+            raise CampaignEvidenceError(f"{label} import row identity is malformed")
+        object_value = state.get("object")
+        if object_value is None:
+            continue
+        object_row = _closed_oracle_mapping(
+            object_value,
+            {"id", "name", "type", "path", "parent_id", "notes", "audio_source"},
+            label=f"{label} imported object",
+        )
+        if (
+            any(not _nonempty_text(object_row.get(field)) for field in ("id", "name", "type", "path"))
+            or not _optional_text(object_row.get("parent_id"))
+            or not _optional_text(object_row.get("notes"))
+        ):
+            raise CampaignEvidenceError(f"{label} imported object is malformed")
+        source = object_row.get("audio_source")
+        if source is not None:
+            source_row = _closed_oracle_mapping(
+                source,
+                {"id", "language", "notes", "original_file", "original_relative_path"},
+                label=f"{label} audio source",
+            )
+            if (
+                not _nonempty_text(source_row.get("id"))
+                or not _nonempty_text(source_row.get("language"))
+                or not _optional_text(source_row.get("notes"))
+                or not _nonempty_text(source_row.get("original_relative_path"))
+            ):
+                raise CampaignEvidenceError(f"{label} audio source is malformed")
+            _validate_file_proof(
+                source_row.get("original_file"),
+                label=f"{label} Original file",
+                relative_optional=True,
+                has_mtime=False,
+            )
+            _validate_import_original_path_binding(
+                source_row.get("original_file"),
+                original_relative_path=source_row.get("original_relative_path"),
+                originals_files=row["originals_files"],
+                label=f"{label} Original file",
+            )
+    for item in row["events"]:
+        event = _closed_oracle_mapping(
+            item,
+            {"path", "id", "action_id", "action_type", "target", "child_count"},
+            label=f"{label} event",
+        )
+        if (
+            not _nonempty_text(event.get("path"))
+            or not _optional_text(event.get("id"))
+            or not _optional_text(event.get("action_id"))
+            or not (
+                event.get("action_type") is None
+                or type(event.get("action_type")) is int
+            )
+            or not _json_archive_value(event.get("target"))
+            or not _plain_int(event.get("child_count"))
+        ):
+            raise CampaignEvidenceError(f"{label} event is malformed")
+    for collection in ("project_xml_files", "originals_files"):
+        for item in row[collection]:
+            _validate_file_proof(
+                item,
+                label=f"{label} {collection}",
+                relative_optional=True,
+                has_mtime=False,
+            )
+    for item in row["input_files"]:
+        if (
+            not isinstance(item, list)
+            or len(item) != 4
+            or not _nonempty_text(item[0])
+            or type(item[1]) is not bool
+            or not (item[2] is None or _plain_int(item[2]))
+            or not _optional_text(item[3])
+        ):
+            raise CampaignEvidenceError(f"{label} input file state is malformed")
+    for item in row["xml_identities"]:
+        identity = _closed_oracle_mapping(
+            item,
+            {"guid", "relative_file", "element_tag", "name"},
+            label=f"{label} XML identity",
+        )
+        if (
+            not _nonempty_text(identity.get("guid"))
+            or not _nonempty_text(identity.get("relative_file"))
+            or not _nonempty_text(identity.get("element_tag"))
+            or not _optional_text(identity.get("name"))
+        ):
+            raise CampaignEvidenceError(f"{label} XML identity is malformed")
+
+
+def _validate_import_original_path_binding(
+    proof: Any,
+    *,
+    original_relative_path: Any,
+    originals_files: Any,
+    label: str,
+) -> None:
+    if (
+        not isinstance(original_relative_path, str)
+        or not original_relative_path
+        or original_relative_path.startswith(("/", "\\"))
+        or "\\" in original_relative_path
+        or "\x00" in original_relative_path
+    ):
+        raise CampaignEvidenceError(
+            f"{label} relative path is not canonical"
+        )
+    relative_parts = tuple(original_relative_path.split("/"))
+    if any(part in {"", ".", ".."} or ":" in part for part in relative_parts):
+        raise CampaignEvidenceError(
+            f"{label} relative path is not canonical"
+        )
+    if not isinstance(proof, Mapping):
+        raise CampaignEvidenceError(f"{label} proof is not an object")
+    proof_relative = proof.get("relative_path")
+    expected_relative = "Originals/" + original_relative_path
+    if proof_relative != expected_relative:
+        raise CampaignEvidenceError(
+            f"{label} project-relative path is inconsistent"
+        )
+    absolute_path = proof.get("path")
+    absolute_parts = tuple(
+        part for part in re.split(r"[\\/]+", str(absolute_path or "")) if part
+    )
+    expected_parts = ("Originals", *relative_parts)
+    if len(absolute_parts) < len(expected_parts) or tuple(
+        absolute_parts[-len(expected_parts) :]
+    ) != expected_parts:
+        raise CampaignEvidenceError(
+            f"{label} absolute/relative paths are inconsistent"
+        )
+    if not isinstance(originals_files, list) or not any(
+        isinstance(item, Mapping) and dict(item) == dict(proof)
+        for item in originals_files
+    ):
+        raise CampaignEvidenceError(
+            f"{label} is absent from the sealed Originals tree"
+        )
+
+
+_OBJECT_ANSWER_NUMBER_RE = re.compile(
+    r"(?<![\w.])[-+]?\d+(?:\.\d+)?(?![\w.])"
+)
+_OBJECT_ANSWER_CLAUSE_SPLIT_RE = re.compile(
+    r"[，,、；;。.!！？?：:（）()\[\]\n]+|但(?:是)?|不过|然而|\bbut\b|\bhowever\b",
+    re.IGNORECASE,
+)
+_OBJECT_ANSWER_GUID_RE = re.compile(
+    r"\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\}",
+    re.IGNORECASE,
+)
+
+
+def _validate_object_query_gateway_payload(
+    proof: Mapping[str, Any],
+    *,
+    gateway_payload: Mapping[str, Any],
+    label: str,
+) -> None:
+    raw_rows = gateway_payload.get("objects")
+    if (
+        gateway_payload.get("contract") != "waapi-skill.gateway-result/v1"
+        or gateway_payload.get("command") != "query-object"
+        or not isinstance(raw_rows, list)
+        or any(not isinstance(row, Mapping) for row in raw_rows)
+        or gateway_payload.get("count") != len(raw_rows)
+        or gateway_payload.get("count") != proof.get("raw_row_count")
+        or gateway_payload.get("query_bound") != proof.get("query_bound")
+    ):
+        raise CampaignEvidenceError(f"{label} object.get broker rows are malformed")
+    before = proof.get("before")
+    before_rows = before.get("objects") if isinstance(before, Mapping) else None
+    if not isinstance(before_rows, list):
+        raise CampaignEvidenceError(f"{label} object.get before rows are unavailable")
+    before_by_id = {
+        str(row["id"]): str(row["key"])
+        for row in before_rows
+        if isinstance(row, Mapping) and _nonempty_text(row.get("id"))
+    }
+    before_by_key = {
+        str(row["key"]): row
+        for row in before_rows
+        if isinstance(row, Mapping) and _nonempty_text(row.get("key"))
+    }
+    primary: list[str] = []
+    derived: list[Mapping[str, Any]] = []
+    raw_ids: list[str] = []
+    for row in raw_rows:
+        object_id = row.get("id")
+        if not _nonempty_text(object_id):
+            raise CampaignEvidenceError(f"{label} object.get broker row lacks identity")
+        source_id = str(object_id)
+        raw_ids.append(source_id)
+        key = before_by_id.get(source_id)
+        if key is None:
+            derived.append(row)
+        else:
+            primary.append(key)
+    observed_primary = proof.get("observed_keys")
+    primary_policy = proof.get("primary_row_policy")
+    if (
+        not isinstance(observed_primary, list)
+        or len(primary) != len(observed_primary)
+        or primary != observed_primary
+        or (
+            primary_policy in {"unique_identity_rows", "ancestor_identity_rows"}
+            and len(raw_ids) != len(set(raw_ids))
+        )
+        or primary_policy
+        not in {
+            "unique_identity_rows",
+            "ancestor_identity_rows",
+            "parent_projection_per_source_row",
+        }
+    ):
+        raise CampaignEvidenceError(
+            f"{label} object.get broker primary identities differ from oracle"
+        )
+    if primary_policy == "ancestor_identity_rows":
+        expected_keys = proof.get("expected_payload_keys")
+        primary_rows = [
+            item
+            for item in raw_rows
+            if before_by_id.get(str(item.get("id"))) is not None
+        ]
+        if (
+            not isinstance(expected_keys, list)
+            or len(primary) != len(expected_keys)
+            or set(primary) != set(expected_keys)
+            or len(primary_rows) != len(expected_keys)
+        ):
+            raise CampaignEvidenceError(
+                f"{label} object.get broker ancestor identity set differs from oracle"
+            )
+        for row, key in zip(primary_rows, primary, strict=True):
+            sealed = before_by_key.get(str(key))
+            if (
+                sealed is None
+                or row.get("id") != sealed.get("id")
+                or row.get("name") != sealed.get("name")
+                or row.get("type") != sealed.get("type")
+                or row.get("path") != sealed.get("path")
+                or row.get("childrenCount") != sealed.get("children_count")
+                or row.get("notes") != sealed.get("notes")
+            ):
+                raise CampaignEvidenceError(
+                    f"{label} object.get broker ancestor row differs from sealed fields"
+                )
+    elif primary_policy == "parent_projection_per_source_row":
+        counts = Counter(primary)
+        expected_keys = proof.get("expected_payload_keys")
+        if not isinstance(expected_keys, list):
+            raise CampaignEvidenceError(
+                f"{label} object.get parent-projection keys are unavailable"
+            )
+        capacities = {
+            key: sum(
+                isinstance(row, Mapping)
+                and row.get("type") == "Sound"
+                and row.get("parent_id") == before_by_key[key].get("id")
+                for row in before_rows
+            )
+            for key in expected_keys
+        }
+        if (
+            set(primary) != set(expected_keys)
+            or len(primary) == len(set(primary))
+            or any(not 1 <= counts[key] <= capacities[key] for key in expected_keys)
+            or sum(capacities.values()) != 12
+        ):
+            raise CampaignEvidenceError(
+                f"{label} object.get broker parent multiplicities are invalid"
+            )
+        for row, key in zip(
+            (item for item in raw_rows if before_by_id.get(str(item.get("id"))) is not None),
+            primary,
+            strict=True,
+        ):
+            sealed = before_by_key[key]
+            references = sealed.get("references")
+            bus_ids = [
+                item.get("target_id")
+                for item in references
+                if isinstance(item, Mapping) and item.get("name") == "OutputBus"
+            ] if isinstance(references, list) else []
+            output_bus = row.get("OutputBus")
+            output_bus_id = (
+                str(output_bus.get("id"))
+                if isinstance(output_bus, Mapping)
+                and _nonempty_text(output_bus.get("id"))
+                else str(output_bus)
+                if _nonempty_text(output_bus)
+                else None
+            )
+            if (
+                len(bus_ids) != 1
+                or row.get("id") != sealed.get("id")
+                or row.get("name") != sealed.get("name")
+                or row.get("type") != sealed.get("type")
+                or row.get("path") != sealed.get("path")
+                or row.get("childrenCount") != sealed.get("children_count")
+                or row.get("notes") != sealed.get("notes")
+                or output_bus_id != bus_ids[0]
+            ):
+                raise CampaignEvidenceError(
+                    f"{label} object.get broker duplicate parent row differs from sealed fields"
+                )
+    expected_derived = proof.get("derived_rows")
+    if not isinstance(expected_derived, list) or len(derived) != len(expected_derived):
+        raise CampaignEvidenceError(
+            f"{label} object.get broker derived count differs from oracle"
+        )
+    expected_by_id = {
+        str(row["id"]): row
+        for row in expected_derived
+        if isinstance(row, Mapping) and _nonempty_text(row.get("id"))
+    }
+    normalized: dict[str, dict[str, Any]] = {}
+    for row in derived:
+        source_id = str(row["id"])
+        expected = expected_by_id.get(source_id)
+        if expected is None:
+            raise CampaignEvidenceError(
+                f"{label} object.get broker has an unknown derived identity"
+            )
+        language = _campaign_language_name(row.get("audioSource:language"))
+        parent = row.get("parent")
+        parent_id = (
+            str(parent.get("id"))
+            if isinstance(parent, Mapping) and _nonempty_text(parent.get("id"))
+            else str(parent)
+            if _nonempty_text(parent)
+            else None
+        )
+        normalized[source_id] = {
+            "sound_key": expected.get("sound_key"),
+            "sound_id": expected.get("sound_id"),
+            "id": source_id,
+            "name": row.get("name"),
+            "type": row.get("type"),
+            "path": row.get("path"),
+            "parent_id": parent_id,
+            "language": language,
+        }
+    if [normalized.get(str(row["id"])) for row in expected_derived] != expected_derived:
+        raise CampaignEvidenceError(
+            f"{label} object.get broker derived rows differ from sealed oracle"
+        )
+
+
+def _campaign_language_name(value: Any) -> str | None:
+    if isinstance(value, str) and value:
+        return value
+    if not isinstance(value, Mapping):
+        return None
+    candidates = [
+        value[key]
+        for key in ("name", "displayName", "shortName")
+        if key in value
+    ]
+    if (
+        not candidates
+        or any(not isinstance(item, str) or not item for item in candidates)
+        or len(set(candidates)) != 1
+    ):
+        return None
+    return str(candidates[0])
+
+
+def _validate_archived_deduplicated_parent_answer(
+    proof: Mapping[str, Any],
+    *,
+    final_response: str,
+    label: str,
+) -> None:
+    before = proof.get("before")
+    before_rows = before.get("objects") if isinstance(before, Mapping) else None
+    required_keys = proof.get("required_keys")
+    excluded_keys = proof.get("excluded_keys")
+    parent_rows = proof.get("deduplicated_parent_rows")
+    coverage = proof.get("coverage_summary")
+    order = proof.get("observed_answer_order")
+    if (
+        not isinstance(before_rows, list)
+        or not isinstance(required_keys, list)
+        or not isinstance(excluded_keys, list)
+        or not isinstance(parent_rows, list)
+        or not isinstance(order, list)
+        or not isinstance(coverage, Mapping)
+    ):
+        raise CampaignEvidenceError(f"{label} parent-summary arrays are invalid")
+    before_by_key = {
+        str(row["key"]): row
+        for row in before_rows
+        if isinstance(row, Mapping) and _nonempty_text(row.get("key"))
+    }
+    before_by_id = {
+        str(row["id"]): row
+        for row in before_rows
+        if isinstance(row, Mapping) and _nonempty_text(row.get("id"))
+    }
+    if (
+        len(required_keys) != 3
+        or [row.get("key") for row in parent_rows if isinstance(row, Mapping)]
+        != required_keys
+        or order != required_keys
+    ):
+        raise CampaignEvidenceError(f"{label} parent-summary identity order is invalid")
+
+    lines = final_response.splitlines()
+    previous_line = -1
+    expected_direct_child_count = 0
+    row_keys = {
+        "key",
+        "name",
+        "id",
+        "path",
+        "children_count",
+        "notes",
+        "output_bus_id",
+        "output_bus_name",
+        "line_index",
+        "line_sha256",
+    }
+    for archived, key in zip(parent_rows, required_keys, strict=True):
+        row = _closed_oracle_mapping(
+            archived,
+            row_keys,
+            label=f"{label} deduplicated parent row",
+        )
+        sealed = before_by_key.get(str(key))
+        if sealed is None:
+            raise CampaignEvidenceError(f"{label} parent-summary key is not sealed")
+        references = sealed.get("references")
+        bus_ids = [
+            item.get("target_id")
+            for item in references
+            if isinstance(item, Mapping) and item.get("name") == "OutputBus"
+        ] if isinstance(references, list) else []
+        bus = before_by_id.get(str(bus_ids[0])) if len(bus_ids) == 1 else None
+        path = str(sealed.get("path") or "")
+        matches = [
+            (index, offset)
+            for index, line in enumerate(lines)
+            for offset in _campaign_path_token_offsets(line, path)
+        ]
+        line_index = matches[0][0] if len(matches) == 1 else None
+        line = lines[line_index] if line_index is not None else ""
+        children_count = sealed.get("children_count")
+        notes = sealed.get("notes")
+        numeric_source = line
+        for token in (
+            str(sealed.get("id") or ""),
+            path,
+            str(bus.get("id") or "") if bus is not None else "",
+            str(bus.get("name") or "") if bus is not None else "",
+        ):
+            if token:
+                numeric_source = numeric_source.replace(token, "")
+        numbers = [
+            float(value)
+            for value in _OBJECT_ANSWER_NUMBER_RE.findall(numeric_source)
+        ]
+        if (
+            bus is None
+            or type(children_count) is not int
+            or len(matches) != 1
+            or line_index is None
+            or line_index <= previous_line
+            or row.get("key") != key
+            or row.get("name") != sealed.get("name")
+            or row.get("id") != sealed.get("id")
+            or row.get("path") != path
+            or row.get("children_count") != children_count
+            or row.get("notes") != notes
+            or row.get("output_bus_id") != bus.get("id")
+            or row.get("output_bus_name") != bus.get("name")
+            or row.get("line_index") != line_index
+            or row.get("line_sha256")
+            != hashlib.sha256(line.encode("utf-8")).hexdigest()
+            or str(sealed.get("id")).casefold() not in line.casefold()
+            or str(sealed.get("name")).casefold() not in line.casefold()
+            or not isinstance(notes, str)
+            or notes.casefold() not in line.casefold()
+            or str(bus.get("name")).casefold() not in line.casefold()
+            or numbers != [float(children_count)]
+        ):
+            raise CampaignEvidenceError(
+                f"{label} parent-summary row differs from final/sealed fields"
+            )
+        previous_line = line_index
+        expected_direct_child_count += children_count
+
+    for key in excluded_keys:
+        sealed = before_by_key.get(str(key))
+        if sealed is None:
+            raise CampaignEvidenceError(f"{label} excluded parent key is not sealed")
+        if any(
+            _campaign_path_token_offsets(line, str(sealed.get("path") or ""))
+            for line in lines
+        ):
+            raise CampaignEvidenceError(
+                f"{label} parent summary contains an excluded path"
+            )
+
+    summary_line_index: int | None = None
+    for index, line in enumerate(lines):
+        lowered = line.casefold()
+        numbers = {
+            int(float(value)) for value in _OBJECT_ANSWER_NUMBER_RE.findall(line)
+        }
+        if (
+            ("父" in line or "container" in lowered)
+            and "sound" in lowered
+            and len(required_keys) in numbers
+            and proof.get("raw_row_count") in numbers
+        ):
+            summary_line_index = index
+            break
+    raw_row_count = proof.get("raw_row_count")
+    bound_disclosed, incomplete_disclosed = bounded_result_disclosure(
+        final_response,
+        take=raw_row_count if type(raw_row_count) is int else 0,
+    )
+    claims_twelve_sounds = _campaign_claims_twelve_confirmed_sounds(
+        final_response
+    )
+    expected_coverage = {
+        "unique_parent_count": len(required_keys),
+        "confirmed_sound_count": proof.get("raw_row_count"),
+        "direct_child_object_count": expected_direct_child_count,
+        "summary_line_index": summary_line_index,
+        "bound_disclosed": bound_disclosed,
+        "incomplete_disclosed": incomplete_disclosed,
+        "claims_twelve_sounds": claims_twelve_sounds,
+    }
+    if (
+        proof.get("raw_row_count") != 10
+        or expected_direct_child_count != 12
+        or coverage != expected_coverage
+        or summary_line_index is None
+        or not bound_disclosed
+        or not incomplete_disclosed
+        or claims_twelve_sounds
+    ):
+        raise CampaignEvidenceError(
+            f"{label} parent coverage summary differs from final/sealed counts"
+        )
+
+
+def _campaign_claims_twelve_confirmed_sounds(value: str) -> bool:
+    """Independently reject positive 12-Sound coverage claims by clause."""
+
+    negated_confirmation = (
+        "不等同于已确认",
+        "不等于已确认",
+        "不代表已确认",
+        "不是已确认",
+        "并非已确认",
+        "不能视为已确认",
+        "不能算作已确认",
+        "not confirmed",
+        "does not mean confirmed",
+        "doesn't mean confirmed",
+        "does not represent confirmed",
+        "is not confirmed",
+    )
+    for clause in _OBJECT_ANSWER_CLAUSE_SPLIT_RE.split(value):
+        folded = clause.casefold().strip()
+        if not folded:
+            continue
+        numbers = {
+            int(float(token))
+            for token in _OBJECT_ANSWER_NUMBER_RE.findall(clause)
+        }
+        if (
+            12 not in numbers
+            or "sound" not in folded
+            or not any(
+                token in folded
+                for token in ("覆盖", "确认", "cover", "confirm")
+            )
+        ):
+            continue
+        if any(token in folded for token in negated_confirmation):
+            continue
+        return True
+    return False
+
+
+def _validate_archived_ordered_ancestor_answer(
+    proof: Mapping[str, Any],
+    *,
+    final_response: str,
+    label: str,
+) -> None:
+    """Rebuild GET-05's answer oracle from sealed rows and final.txt."""
+
+    before = proof.get("before")
+    before_rows = before.get("objects") if isinstance(before, Mapping) else None
+    required_keys = proof.get("required_keys")
+    excluded_keys = proof.get("excluded_keys")
+    observed_keys = proof.get("observed_keys")
+    expected_keys = proof.get("expected_payload_keys")
+    ancestor_rows = proof.get("deduplicated_parent_rows")
+    coverage = proof.get("coverage_summary")
+    answer_order = proof.get("observed_answer_order")
+    query_bound = proof.get("query_bound")
+    if (
+        not isinstance(before_rows, list)
+        or not isinstance(required_keys, list)
+        or not isinstance(excluded_keys, list)
+        or not isinstance(observed_keys, list)
+        or not isinstance(expected_keys, list)
+        or not isinstance(ancestor_rows, list)
+        or len(ancestor_rows) != len(required_keys)
+        or not isinstance(coverage, Mapping)
+        or not isinstance(answer_order, list)
+        or len(required_keys) != 5
+        or len(observed_keys) != len(expected_keys)
+        or len(observed_keys) != len(set(observed_keys))
+        or set(observed_keys) != set(expected_keys)
+        or required_keys != expected_keys
+        or answer_order != required_keys
+        or proof.get("raw_row_count") != 5
+        or query_bound != {"mode": "take", "value": 8}
+        or proof.get("bound_reached") is not False
+    ):
+        raise CampaignEvidenceError(
+            f"{label} ordered ancestor cardinality/order boundary is invalid"
+        )
+    before_by_key = {
+        str(row["key"]): row
+        for row in before_rows
+        if isinstance(row, Mapping) and _nonempty_text(row.get("key"))
+    }
+    if any(key not in before_by_key for key in (*required_keys, *excluded_keys)):
+        raise CampaignEvidenceError(
+            f"{label} ordered ancestor proof references an unsealed key"
+        )
+    chain = [before_by_key[key] for key in required_keys]
+    target = before_by_key.get("q5_target")
+    if (
+        target is None
+        or not chain
+        or target.get("parent_id") != chain[0].get("id")
+        or any(
+            child.get("parent_id") != parent.get("id")
+            for child, parent in zip(chain, chain[1:])
+        )
+        or any(row.get("type") == "Project" for row in chain)
+    ):
+        raise CampaignEvidenceError(
+            f"{label} sealed ancestors are not the target's near-to-far parent chain"
+        )
+
+    sealed_counts = {
+        "random_sequence_container_count": sum(
+            before_by_key[key].get("type") == "RandomSequenceContainer"
+            for key in required_keys
+        ),
+        "actor_mixer_count": sum(
+            before_by_key[key].get("type") == "ActorMixer"
+            for key in required_keys
+        ),
+        "work_unit_count": sum(
+            before_by_key[key].get("type") == "WorkUnit"
+            for key in required_keys
+        ),
+        "default_work_unit_count": sum(
+            before_by_key[key].get("name") == "Default Work Unit"
+            for key in required_keys
+        ),
+    }
+    if sealed_counts != {
+        "random_sequence_container_count": 1,
+        "actor_mixer_count": 2,
+        "work_unit_count": 2,
+        "default_work_unit_count": 1,
+    }:
+        raise CampaignEvidenceError(
+            f"{label} sealed ordered ancestor type distribution is invalid"
+        )
+
+    lines = final_response.splitlines()
+    row_keys = {
+        "key",
+        "name",
+        "id",
+        "type",
+        "path",
+        "children_count",
+        "notes",
+        "notes_present",
+        "ordinal",
+        "ordinal_present",
+        "numeric_values",
+        "line_index",
+        "line_sha256",
+    }
+    recomputed_rows: list[dict[str, Any]] = []
+    row_line_indexes: list[int] = []
+    for ordinal, (archived, key) in enumerate(
+        zip(ancestor_rows, required_keys, strict=True),
+        start=1,
+    ):
+        row = _closed_oracle_mapping(
+            archived,
+            row_keys,
+            label=f"{label} ordered ancestor row",
+        )
+        sealed = before_by_key[key]
+        path = sealed.get("path")
+        if not _nonempty_text(path):
+            raise CampaignEvidenceError(
+                f"{label} sealed ordered ancestor path is invalid"
+            )
+        matches = [
+            (index, offset)
+            for index, line in enumerate(lines)
+            for offset in _campaign_path_token_offsets(line, str(path))
+        ]
+        line_index = matches[0][0] if len(matches) == 1 else None
+        line = lines[line_index] if line_index is not None else ""
+        numbers = _campaign_ancestor_numeric_values(line, sealed)
+        ordinal_present = numbers == [
+            float(ordinal),
+            float(sealed.get("children_count")),
+        ]
+        notes_present = _campaign_ancestor_notes_present(
+            line, sealed.get("notes")
+        )
+        recomputed = {
+            "key": key,
+            "name": sealed.get("name"),
+            "id": sealed.get("id"),
+            "type": sealed.get("type"),
+            "path": path,
+            "children_count": sealed.get("children_count"),
+            "notes": sealed.get("notes"),
+            "notes_present": notes_present,
+            "ordinal": ordinal,
+            "ordinal_present": ordinal_present,
+            "numeric_values": numbers,
+            "line_index": line_index,
+            "line_sha256": (
+                hashlib.sha256(line.encode("utf-8")).hexdigest()
+                if line_index is not None
+                else None
+            ),
+        }
+        if (
+            len(matches) != 1
+            or row != recomputed
+            or not _nonempty_text(sealed.get("name"))
+            or not _nonempty_text(sealed.get("id"))
+            or not _nonempty_text(sealed.get("type"))
+            or str(sealed["name"]).casefold() not in line.casefold()
+            or str(sealed["id"]).casefold() not in line.casefold()
+            or str(sealed["type"]).casefold() not in line.casefold()
+            or type(sealed.get("children_count")) is not int
+            or numbers
+            not in (
+                [float(sealed["children_count"])],
+                [float(ordinal), float(sealed["children_count"])],
+            )
+            or not notes_present
+        ):
+            raise CampaignEvidenceError(
+                f"{label} ordered ancestor row differs from final/sealed fields"
+            )
+        recomputed_rows.append(recomputed)
+        row_line_indexes.append(int(line_index))
+    if (
+        len(ancestor_rows) != len(required_keys)
+        or row_line_indexes != sorted(row_line_indexes)
+        or len(row_line_indexes) != len(set(row_line_indexes))
+    ):
+        raise CampaignEvidenceError(
+            f"{label} ordered ancestor rows are not near-to-far"
+        )
+
+    folded = final_response.casefold()
+    for key in excluded_keys:
+        sealed = before_by_key[key]
+        if (
+            str(sealed.get("id") or "").casefold() in folded
+            or any(
+                _campaign_path_token_offsets(line, str(sealed.get("path") or ""))
+                for line in lines
+            )
+        ):
+            raise CampaignEvidenceError(
+                f"{label} ordered ancestor answer contains a decoy identity"
+            )
+    row_line_set = set(row_line_indexes)
+    if any(
+        index not in row_line_set
+        and "project" in line.casefold()
+        and (
+            _OBJECT_ANSWER_GUID_RE.search(line) is not None
+            or (line.count("|") >= 3 and "\\" in line)
+        )
+        for index, line in enumerate(lines)
+    ):
+        raise CampaignEvidenceError(
+            f"{label} ordered ancestor answer contains a Project row"
+        )
+
+    type_summary_lines: set[int] = set()
+    for type_name, expected_count in (
+        ("RandomSequenceContainer", 1),
+        ("ActorMixer", 2),
+        ("WorkUnit", 2),
+    ):
+        indexes = _campaign_exact_summary_count_lines(
+            lines,
+            type_name,
+            expected_count,
+            excluded_line_indexes=row_line_set,
+        )
+        if not indexes:
+            raise CampaignEvidenceError(
+                f"{label} ordered ancestor type summary differs for {type_name}"
+            )
+        type_summary_lines.update(indexes)
+    truncation_claimed = _campaign_claims_ancestor_truncation(final_response)
+    expected_coverage = {
+        **sealed_counts,
+        "raw_row_count": 5,
+        "take": 8,
+        "bound_reached": False,
+        "summary_line_indexes": sorted(type_summary_lines),
+        "truncation_claimed": truncation_claimed,
+    }
+    if coverage != expected_coverage or truncation_claimed:
+        raise CampaignEvidenceError(
+            f"{label} ordered ancestor summary differs from final/sealed chain"
+        )
+
+
+def _campaign_ancestor_notes_present(line: str, notes: Any) -> bool:
+    cells = _campaign_markdown_row_cells(line)
+    if cells is not None:
+        note_cell = cells[-1].strip().strip("`").casefold()
+        if isinstance(notes, str) and notes:
+            return notes.casefold() in note_cell
+        return note_cell in {
+            "",
+            "-",
+            "—",
+            "无",
+            "无备注",
+            "未设置",
+            "none",
+            "empty",
+            "n/a",
+            "null",
+        }
+    if isinstance(notes, str) and notes:
+        return notes.casefold() in line.casefold()
+    return re.search(
+        r"(?:备注|notes?)\s*[:：]?\s*(?:无|无备注|未设置|none|empty|n/a|null|[-—])(?:\s|$)",
+        line,
+        re.IGNORECASE,
+    ) is not None
+
+
+def _campaign_markdown_row_cells(line: str) -> tuple[str, ...] | None:
+    stripped = line.strip()
+    if "|" not in stripped:
+        return None
+    cells = tuple(cell.strip() for cell in stripped.strip("|").split("|"))
+    return cells if len(cells) >= 2 else None
+
+
+def _campaign_ancestor_numeric_values(
+    line: str,
+    sealed: Mapping[str, Any],
+) -> list[float]:
+    numeric_source = line
+    for token in (
+        str(sealed.get("id") or ""),
+        str(sealed.get("path") or ""),
+        str(sealed.get("name") or ""),
+        str(sealed.get("type") or ""),
+        str(sealed.get("notes") or ""),
+    ):
+        if token:
+            numeric_source = numeric_source.replace(token, "")
+    return [
+        float(value)
+        for value in _OBJECT_ANSWER_NUMBER_RE.findall(numeric_source)
+    ]
+
+
+def _campaign_exact_summary_count_lines(
+    lines: Sequence[str],
+    type_name: str,
+    expected_count: int,
+    *,
+    excluded_line_indexes: set[int],
+) -> tuple[int, ...]:
+    indexes: list[int] = []
+    aliases = {
+        "RandomSequenceContainer": (
+            "randomsequencecontainer",
+            "random container",
+        ),
+        "ActorMixer": ("actormixer", "actor mixer"),
+        "WorkUnit": ("workunit", "work unit"),
+    }.get(type_name, (type_name.casefold(),))
+    for index, line in enumerate(lines):
+        if index in excluded_line_indexes:
+            continue
+        matched = False
+        for clause in _OBJECT_ANSWER_CLAUSE_SPLIT_RE.split(line):
+            folded_clause = clause.casefold()
+            if type_name == "WorkUnit" and "default work unit" in folded_clause:
+                continue
+            if not any(alias in folded_clause for alias in aliases):
+                continue
+            numbers = {
+                int(float(value))
+                for value in _OBJECT_ANSWER_NUMBER_RE.findall(clause)
+            }
+            if numbers and numbers != {expected_count}:
+                return ()
+            if numbers == {expected_count}:
+                matched = True
+        if matched:
+            indexes.append(index)
+    return tuple(indexes)
+
+
+def _campaign_claims_ancestor_truncation(value: str) -> bool:
+    negative = (
+        "未截断",
+        "没有截断",
+        "并未截断",
+        "未达到",
+        "没有达到",
+        "未触及",
+        "not truncated",
+        "did not reach",
+        "not reach",
+    )
+    positive = (
+        "截断",
+        "触及上限",
+        "达到上限",
+        "上限已触及",
+        "结果不完整",
+        "truncated",
+        "reached the limit",
+        "incomplete",
+    )
+    for clause in _OBJECT_ANSWER_CLAUSE_SPLIT_RE.split(value):
+        folded = clause.casefold()
+        if any(token in folded for token in negative):
+            continue
+        if any(token in folded for token in positive):
+            return True
+    return False
+
+
+def _validate_archived_paired_path_answer(
+    proof: Mapping[str, Any],
+    *,
+    final_response: str,
+    label: str,
+) -> None:
+    lines = final_response.splitlines()
+    before = proof.get("before")
+    before_rows = before.get("objects") if isinstance(before, Mapping) else None
+    if not isinstance(before_rows, list):
+        raise CampaignEvidenceError(f"{label} paired answer lacks sealed before rows")
+    all_languages = {
+        str(row["source_language"])
+        for row in before_rows
+        if isinstance(row, Mapping) and _nonempty_text(row.get("source_language"))
+    }
+    all_notes = {
+        str(row["notes"]).casefold()
+        for row in before_rows
+        if (
+            isinstance(row, Mapping)
+            and row.get("type") == "Sound"
+            and _nonempty_text(row.get("notes"))
+        )
+    }
+    required = proof.get("required_identity_tokens")
+    excluded = proof.get("excluded_identity_tokens")
+    paired = proof.get("paired_rows")
+    order = proof.get("observed_answer_order")
+    if not all(isinstance(value, list) for value in (required, excluded, paired, order)):
+        raise CampaignEvidenceError(f"{label} paired answer arrays are invalid")
+    for item in required:
+        token = _closed_oracle_mapping(
+            item,
+            {"key", "path", "occurrence_count", "first_line"},
+            label=f"{label} required path token",
+        )
+        path = token.get("path")
+        if not _nonempty_text(path):
+            raise CampaignEvidenceError(f"{label} required path is invalid")
+        matches = [
+            (index, offset)
+            for index, line in enumerate(lines)
+            for offset in _campaign_path_token_offsets(line, str(path))
+        ]
+        if (
+            token.get("occurrence_count") != len(matches)
+            or token.get("first_line") != (matches[0][0] if matches else None)
+            or not matches
+        ):
+            raise CampaignEvidenceError(
+                f"{label} required standalone path proof differs from final.txt"
+            )
+    for item in excluded:
+        token = _closed_oracle_mapping(
+            item,
+            {"key", "path", "occurrence_count"},
+            label=f"{label} excluded path token",
+        )
+        path = token.get("path")
+        if not _nonempty_text(path):
+            raise CampaignEvidenceError(f"{label} excluded path is invalid")
+        matches = [
+            offset
+            for line in lines
+            for offset in _campaign_path_token_offsets(line, str(path))
+        ]
+        if token.get("occurrence_count") != len(matches) or matches:
+            raise CampaignEvidenceError(
+                f"{label} excluded standalone path proof differs from final.txt"
+            )
+    pair_keys = {
+        "child_key",
+        "parent_key",
+        "parent_path",
+        "child_path",
+        "language",
+        "volume",
+        "notes",
+        "line_index",
+        "line_sha256",
+        "parent_path_count",
+        "child_path_count",
+        "language_present",
+        "volume_values",
+        "notes_present",
+        "unexpected_languages",
+        "unexpected_notes",
+    }
+    observed_order: list[tuple[int, str]] = []
+    for item in paired:
+        row = _closed_oracle_mapping(
+            item,
+            pair_keys,
+            label=f"{label} paired path row",
+        )
+        if any(
+            not _nonempty_text(row.get(field))
+            for field in (
+                "child_key",
+                "parent_key",
+                "parent_path",
+                "child_path",
+                "language",
+                "notes",
+            )
+        ) or isinstance(row.get("volume"), bool) or not isinstance(
+            row.get("volume"), (int, float)
+        ):
+            raise CampaignEvidenceError(f"{label} paired path row values are invalid")
+        child_matches = [
+            (index, offset)
+            for index, line in enumerate(lines)
+            for offset in _campaign_path_token_offsets(line, str(row["child_path"]))
+        ]
+        line_index = child_matches[0][0] if child_matches else None
+        line = lines[line_index] if line_index is not None else ""
+        numeric_values = [
+            float(value) for value in _OBJECT_ANSWER_NUMBER_RE.findall(line)
+        ]
+        recomputed = {
+            "line_index": line_index,
+            "line_sha256": (
+                hashlib.sha256(line.encode("utf-8")).hexdigest()
+                if line_index is not None
+                else None
+            ),
+            "parent_path_count": len(
+                _campaign_path_token_offsets(line, str(row["parent_path"]))
+            ),
+            "child_path_count": len(
+                _campaign_path_token_offsets(line, str(row["child_path"]))
+            ),
+            "language_present": str(row["language"]).casefold()
+            in line.casefold(),
+            "volume_values": numeric_values,
+            "notes_present": str(row["notes"]).casefold() in line.casefold(),
+            "unexpected_languages": sorted(
+                language
+                for language in all_languages
+                if language != row["language"]
+                and language.casefold() in line.casefold()
+            ),
+            "unexpected_notes": sorted(
+                notes
+                for notes in all_notes
+                if notes != str(row["notes"]).casefold()
+                and notes in line.casefold()
+            ),
+        }
+        if (
+            len(child_matches) != 1
+            or any(row.get(key) != value for key, value in recomputed.items())
+            or row.get("parent_path_count") != 1
+            or row.get("child_path_count") != 1
+            or row.get("language_present") is not True
+            or row.get("volume_values") != [float(row["volume"])]
+            or row.get("notes_present") is not True
+            or row.get("unexpected_languages") != []
+            or row.get("unexpected_notes") != []
+        ):
+            raise CampaignEvidenceError(
+                f"{label} paired path proof differs from final.txt"
+            )
+        observed_order.append((int(line_index), str(row["child_key"])))
+    if [key for _, key in sorted(observed_order)] != order:
+        raise CampaignEvidenceError(f"{label} paired path order differs from final.txt")
+
+
+def _campaign_path_token_offsets(value: str, path: str) -> tuple[int, ...]:
+    offsets: list[int] = []
+    start = 0
+    while True:
+        index = value.find(path, start)
+        if index < 0:
+            break
+        end = index + len(path)
+        before = value[index - 1] if index else ""
+        after = value[end] if end < len(value) else ""
+        if before != "\\" and after != "\\":
+            offsets.append(index)
+        start = index + 1
+    return tuple(offsets)
+
+
+def _validate_heavy_v3_import_oracle(
+    value: Any,
+    *,
+    scenario_id: str,
+    zero_dispatch: bool,
+    label: str,
+) -> None:
+    row = _closed_oracle_mapping(
+        value,
+        {"scenario_id", "phase", "passed", "failures", "before", "after"},
+        label=label,
+    )
+    _require_passing_oracle(row, label=label)
+    expected_phase = "zero_dispatch" if zero_dispatch else "after_execution"
+    if row.get("scenario_id") != scenario_id or row.get("phase") != expected_phase:
+        raise CampaignEvidenceError(f"{label} import identity/phase is invalid")
+    _validate_import_snapshot(row.get("before"), scenario_id=scenario_id, label=f"{label} before")
+    _validate_import_snapshot(row.get("after"), scenario_id=scenario_id, label=f"{label} after")
+    if zero_dispatch and row.get("before") != row.get("after"):
+        raise CampaignEvidenceError(f"{label} zero-dispatch import state changed")
+    if not zero_dispatch:
+        before = row["before"]
+        after = row["after"]
+        before_row_keys = [item["row_key"] for item in before["rows"]]
+        after_row_keys = [item["row_key"] for item in after["rows"]]
+        if (
+            before["input_files"] != after["input_files"]
+            or before_row_keys != after_row_keys
+            or not after["rows"]
+            or any(item.get("object") is None for item in after["rows"])
+            or not after["project_xml_files"]
+            or not after["originals_files"]
+            or before["project_xml_files"] == after["project_xml_files"]
+            or before["originals_files"] == after["originals_files"]
+            or before == after
+        ):
+            raise CampaignEvidenceError(f"{label} import business delta is invalid")
+        if after["events"] and any(
+            item.get("id") is None
+            or item.get("action_id") is None
+            or item.get("child_count", 0) < 1
+            for item in after["events"]
+        ):
+            raise CampaignEvidenceError(f"{label} import Event/Action proof is invalid")
+
+
+def _validate_heavy_v3_audio_conversion_oracle(
+    value: Any,
+    *,
+    expected_operation_request: Mapping[str, Any],
+    expected_byte_change_paths: tuple[str, ...],
+    expected_verify_payload_sha256: str,
+    label: str,
+) -> None:
+    row = _closed_oracle_mapping(
+        value,
+        {"phase", "passed", "failures", "evidence"},
+        label=label,
+    )
+    _require_passing_oracle(row, label=label)
+    evidence = _closed_oracle_mapping(
+        row.get("evidence"),
+        {
+            "before",
+            "after",
+            "target_slots",
+            "observed_target_paths",
+            "after_digest",
+            "volatile_cache_files_before",
+            "volatile_cache_files_after",
+            "volatile_cache_changed_paths",
+            "byte_change_required_paths",
+            "operation_request",
+            "operation_request_sha256",
+            "verify_request_sha256",
+            "verify_payload_sha256",
+        },
+        label=f"{label} evidence",
+    )
+    _validate_audio_conversion_snapshot(
+        evidence.get("before"), label=f"{label} before"
+    )
+    _validate_audio_conversion_snapshot(
+        evidence.get("after"), label=f"{label} after"
+    )
+    paths = evidence.get("observed_target_paths")
+    byte_change_paths = evidence.get("byte_change_required_paths")
+    slots = evidence.get("target_slots")
+    operation_request = evidence.get("operation_request")
+    if (
+        row.get("phase") != "after"
+        or not _plain_int(slots, minimum=1)
+        or not isinstance(paths, list)
+        or not paths
+        or len(paths) > slots
+        or len(paths) != len(set(paths))
+        or any(not _nonempty_text(item) for item in paths)
+        or not isinstance(byte_change_paths, list)
+        or tuple(byte_change_paths) != expected_byte_change_paths
+        or not _sha256_text_value(evidence.get("after_digest"))
+        or evidence.get("after_digest")
+        != evidence.get("after", {}).get("digest")
+        or not isinstance(operation_request, Mapping)
+        or operation_request != expected_operation_request
+        or evidence.get("operation_request_sha256")
+        != _canonical_sha256(operation_request)
+        or evidence.get("verify_request_sha256")
+        != evidence.get("operation_request_sha256")
+        or evidence.get("verify_payload_sha256")
+        != expected_verify_payload_sha256
+    ):
+        raise CampaignEvidenceError(f"{label} audio conversion evidence is invalid")
+    before = evidence["before"]
+    after = evidence["after"]
+    arguments = operation_request.get("arguments")
+    request_args = arguments.get("args") if isinstance(arguments, Mapping) else None
+    objects = request_args.get("objects") if isinstance(request_args, Mapping) else None
+    platforms = request_args.get("platforms") if isinstance(request_args, Mapping) else None
+    languages = request_args.get("languages") if isinstance(request_args, Mapping) else None
+    io_root = arguments.get("io_root") if isinstance(arguments, Mapping) else None
+    if (
+        operation_request.get("operation") != "waapi.call"
+        or not isinstance(arguments, Mapping)
+        or arguments.get("api") != "ak.wwise.core.audio.convert"
+        or arguments.get("options") != {}
+        or not isinstance(objects, list)
+        or not isinstance(platforms, list)
+        or not isinstance(languages, list)
+        or not all(objects) or not all(platforms) or not all(languages)
+        or any(not _nonempty_text(item) for item in (*objects, *platforms, *languages))
+        or not _nonempty_text(io_root)
+        or before["input_files"] != after["input_files"]
+        or before["originals_files"] != after["originals_files"]
+        or before["authoring_files"] != after["authoring_files"]
+        or before["conversion_xml"] != after["conversion_xml"]
+        or before["baseline_artifact_paths"]
+        != after["baseline_artifact_paths"]
+    ):
+        raise CampaignEvidenceError(f"{label} audio conversion request/control proof is invalid")
+    baseline_paths = before["baseline_artifact_paths"]
+    if (
+        len(baseline_paths) > len(before["artifacts"])
+        or any(
+            not Path(path).is_absolute()
+            or not _path_is_within(Path(path), Path(str(io_root)))
+            for path in baseline_paths
+        )
+        or not {
+            item["path"] for item in before["output_tree"]
+        } <= set(baseline_paths)
+    ):
+        raise CampaignEvidenceError(
+            f"{label} pre-preview stable output is not bound to baseline artifacts"
+        )
+    try:
+        allowed_volatile_paths = audio_conversion_volatile_cache_paths(str(io_root))
+    except AudioConversionRuntimeError as exc:
+        raise CampaignEvidenceError(
+            f"{label} audio conversion volatile cache allowlist is invalid"
+        ) from exc
+    before_volatile = before["volatile_cache_files"]
+    after_volatile = after["volatile_cache_files"]
+    changed_volatile_paths = [
+        current["path"]
+        for previous, current in zip(
+            before_volatile,
+            after_volatile,
+            strict=True,
+        )
+        if previous != current
+    ]
+    if (
+        tuple(item["path"] for item in before_volatile) != allowed_volatile_paths
+        or tuple(item["path"] for item in after_volatile) != allowed_volatile_paths
+        or evidence.get("volatile_cache_files_before") != before_volatile
+        or evidence.get("volatile_cache_files_after") != after_volatile
+        or evidence.get("volatile_cache_changed_paths") != changed_volatile_paths
+    ):
+        raise CampaignEvidenceError(
+            f"{label} audio conversion volatile cache proof is invalid"
+        )
+    expected_slots = {
+        (str(object_path), str(platform), str(language))
+        for object_path in objects
+        for platform in platforms
+        for language in languages
+    }
+    if not set(byte_change_paths).issubset(set(objects)):
+        raise CampaignEvidenceError(
+            f"{label} byte-change paths escape the target object set"
+        )
+    before_slots = {
+        (item["object_path"], item["platform"], item["language"]): item
+        for item in before["artifacts"]
+    }
+    after_slots = {
+        (item["object_path"], item["platform"], item["language"]): item
+        for item in after["artifacts"]
+    }
+    if (
+        len(expected_slots) != slots
+        or set(before_slots) != set(after_slots)
+        or not expected_slots.issubset(after_slots)
+    ):
+        raise CampaignEvidenceError(f"{label} audio conversion slot matrix is invalid")
+    for slot, current in after_slots.items():
+        previous = before_slots[slot]
+        if slot not in expected_slots:
+            if current != previous:
+                raise CampaignEvidenceError(f"{label} changed a non-target conversion slot")
+            continue
+        if (
+            (current["object_id"], current["source_id"], current["source_key"])
+            != (
+                previous["object_id"],
+                previous["source_id"],
+                previous["source_key"],
+            )
+            or current["original_path"] != previous["original_path"]
+            or current["original_file"] != previous["original_file"]
+            or current["converted_path"] not in paths
+            or current["file"].get("path") != current["converted_path"]
+            or not Path(str(current["converted_path"])).is_absolute()
+            or not _path_is_within(Path(str(current["converted_path"])), Path(str(io_root)))
+            or current["file"].get("present") is not True
+            or not _plain_int(current["file"].get("size"), minimum=1)
+            or not _sha256_text_value(current["file"].get("sha256"))
+            or not _plain_int(current["file"].get("mtime_ns"), minimum=1)
+        ):
+            raise CampaignEvidenceError(f"{label} target conversion artifact is invalid")
+        previous_file = previous["file"]
+        if previous_file.get("present") is True:
+            if current["file"].get("mtime_ns", 0) <= (
+                previous_file.get("mtime_ns") or 0
+            ):
+                raise CampaignEvidenceError(
+                    f"{label} target conversion artifact is stale"
+                )
+            if (
+                slot[0] in byte_change_paths
+                and current["file"].get("sha256")
+                == previous_file.get("sha256")
+            ):
+                raise CampaignEvidenceError(
+                    f"{label} target conversion bytes were not replaced"
+                )
+    observed_after_target_paths = {
+        item["converted_path"]
+        for slot, item in after_slots.items()
+        if slot in expected_slots
+    }
+    if observed_after_target_paths != set(paths):
+        raise CampaignEvidenceError(
+            f"{label} observed target path evidence is misbound"
+        )
+    before_target_paths = {
+        item["converted_path"]
+        for slot, item in before_slots.items()
+        if slot in expected_slots
+    }
+    after_target_paths = observed_after_target_paths
+    before_non_target_paths = {
+        item["path"]
+        for item in before["output_tree"]
+        if item["path"] not in before_target_paths
+    }
+    if (after_target_paths - before_target_paths) & before_non_target_paths:
+        raise CampaignEvidenceError(
+            f"{label} target path collides with pre-existing non-target output"
+        )
+    target_paths = before_target_paths | after_target_paths
+    before_controls = {
+        item["path"]: item
+        for item in before["output_tree"]
+        if item["path"] not in target_paths
+    }
+    after_controls = {
+        item["path"]: item
+        for item in after["output_tree"]
+        if item["path"] not in target_paths
+    }
+    if before_controls != after_controls:
+        raise CampaignEvidenceError(f"{label} changed non-target conversion output")
+
+
+def _validate_audio_file_state(value: Any, *, label: str) -> None:
+    row = _closed_oracle_mapping(
+        value,
+        {"path", "present", "size", "sha256", "mtime_ns"},
+        label=label,
+    )
+    present = row.get("present")
+    if (
+        not _nonempty_text(row.get("path"))
+        or type(present) is not bool
+        or not (row.get("size") is None or _plain_int(row.get("size")))
+        or not (row.get("sha256") is None or _sha256_text_value(row.get("sha256")))
+        or not (row.get("mtime_ns") is None or _plain_int(row.get("mtime_ns"), minimum=1))
+        or (
+            present
+            and (
+                not _plain_int(row.get("size"), minimum=1)
+                or not _sha256_text_value(row.get("sha256"))
+                or not _plain_int(row.get("mtime_ns"), minimum=1)
+            )
+        )
+    ):
+        raise CampaignEvidenceError(f"{label} audio file state is malformed")
+
+
+def _validate_audio_conversion_snapshot(value: Any, *, label: str) -> None:
+    row = _closed_oracle_mapping(
+        value,
+        {
+            "artifacts",
+            "baseline_artifacts",
+            "input_files",
+            "originals_files",
+            "authoring_files",
+            "conversion_xml",
+            "output_tree",
+            "baseline_artifact_paths",
+            "volatile_cache_files",
+            "digest",
+        },
+        label=label,
+    )
+    for collection in (
+        "artifacts",
+        "baseline_artifacts",
+        "input_files",
+        "originals_files",
+        "authoring_files",
+        "output_tree",
+        "volatile_cache_files",
+    ):
+        if not isinstance(row.get(collection), list):
+            raise CampaignEvidenceError(f"{label} {collection} is not an array")
+    for collection in (
+        "input_files",
+        "originals_files",
+        "authoring_files",
+        "output_tree",
+    ):
+        for item in row[collection]:
+            _validate_audio_file_state(item, label=f"{label} {collection}")
+    for item in row["volatile_cache_files"]:
+        volatile = _closed_oracle_mapping(
+            item,
+            {"path", "present", "size"},
+            label=f"{label} volatile cache file",
+        )
+        present = volatile.get("present")
+        size = volatile.get("size")
+        if (
+            not _nonempty_text(volatile.get("path"))
+            or type(present) is not bool
+            or (
+                present
+                and (
+                    not _plain_int(size)
+                    or int(size) > 16 * 1024 * 1024 * 1024
+                )
+            )
+            or (not present and size is not None)
+        ):
+            raise CampaignEvidenceError(
+                f"{label} volatile cache metadata is malformed or unbounded"
+            )
+    baseline_paths = row.get("baseline_artifact_paths")
+    if (
+        not isinstance(baseline_paths, list)
+        or not baseline_paths
+        or baseline_paths != sorted(set(baseline_paths))
+        or any(not _nonempty_text(path) for path in baseline_paths)
+    ):
+        raise CampaignEvidenceError(
+            f"{label} baseline artifact path seal is invalid"
+        )
+    _validate_audio_file_state(row.get("conversion_xml"), label=f"{label} conversion XML")
+    slot_matrices: dict[str, list[tuple[str, str, str]]] = {}
+    for collection in ("artifacts", "baseline_artifacts"):
+        slots: list[tuple[str, str, str]] = []
+        for item in row[collection]:
+            artifact = _closed_oracle_mapping(
+                item,
+                {
+                    "object_path",
+                    "object_id",
+                    "source_id",
+                    "source_key",
+                    "platform",
+                    "language",
+                    "conversion_id",
+                    "conversion_name",
+                    "original_path",
+                    "original_file",
+                    "converted_path",
+                    "file",
+                    "codec",
+                    "sample_rate",
+                },
+                label=f"{label} {collection} converted artifact",
+            )
+            if (
+                any(
+                    not _nonempty_text(artifact.get(field))
+                    for field in (
+                        "object_path",
+                        "object_id",
+                        "source_id",
+                        "source_key",
+                        "platform",
+                        "language",
+                        "conversion_id",
+                        "conversion_name",
+                        "original_path",
+                        "converted_path",
+                    )
+                )
+                or not _optional_text(artifact.get("codec"))
+                or not (
+                    artifact.get("sample_rate") is None
+                    or _plain_int(artifact.get("sample_rate"), minimum=1)
+                )
+            ):
+                raise CampaignEvidenceError(
+                    f"{label} {collection} converted artifact is malformed"
+                )
+            _validate_audio_file_state(
+                artifact.get("original_file"), label=f"{label} {collection} original"
+            )
+            _validate_audio_file_state(
+                artifact.get("file"), label=f"{label} {collection} converted file"
+            )
+            if collection == "baseline_artifacts" and (
+                artifact["file"].get("present") is not True
+                or artifact["file"].get("path") != artifact["converted_path"]
+                or not _nonempty_text(artifact.get("codec"))
+                or not _plain_int(artifact.get("sample_rate"), minimum=1)
+            ):
+                raise CampaignEvidenceError(
+                    f"{label} sealed baseline artifact is incomplete"
+                )
+            slots.append(
+                (
+                    str(artifact["object_path"]),
+                    str(artifact["platform"]),
+                    str(artifact["language"]),
+                )
+            )
+        if len(slots) != len(set(slots)):
+            raise CampaignEvidenceError(
+                f"{label} {collection} conversion slots are duplicated"
+            )
+        slot_matrices[collection] = slots
+    if set(slot_matrices["artifacts"]) != set(slot_matrices["baseline_artifacts"]):
+        raise CampaignEvidenceError(f"{label} baseline conversion slot matrix drifted")
+    expected_digest = _canonical_sha256(
+        {
+            "artifacts": row["artifacts"],
+            "baseline_artifacts": row["baseline_artifacts"],
+            "inputs": row["input_files"],
+            "originals": row["originals_files"],
+            "authoring_files": row["authoring_files"],
+            "conversion_xml": row["conversion_xml"],
+            "output_tree": row["output_tree"],
+            "baseline_artifact_paths": row["baseline_artifact_paths"],
+        }
+    )
+    if row.get("digest") != expected_digest:
+        raise CampaignEvidenceError(f"{label} conversion snapshot digest is invalid")
+
+
+def _validate_heavy_v3_media_pool_oracle(
+    value: Any,
+    *,
+    scenario_id: str,
+    task_root: Path,
+    expected_final_response_sha256: str,
+    final_response: str,
+    expected_request: Mapping[str, Any],
+    label: str,
+) -> None:
+    row = _closed_oracle_mapping(
+        value,
+        {"passed", "failures", "evidence"},
+        label=label,
+    )
+    _require_passing_oracle(row, label=label)
+    evidence = _closed_oracle_mapping(
+        row.get("evidence"),
+        {
+            "sealed_oracle",
+            "source_fingerprint_after",
+            "staged_assets_after",
+            "model_get_fields",
+            "model_media_result",
+            "model_reference_result",
+            "reference_baseline",
+            "project_digest_before",
+            "project_digest_after",
+            "supporting_association_read",
+            "custom_baseline_ids",
+            "custom_created_ids",
+            "final_response_sha256",
+            "cleanup_evidence_path",
+        },
+        label=f"{label} evidence",
+    )
+    oracle = _validate_media_pool_sealed_oracle(
+        evidence.get("sealed_oracle"),
+        scenario_id=scenario_id,
+        label=f"{label} sealed oracle",
+    )
+    supporting = evidence.get("supporting_association_read")
+    cleanup_path = task_root.parent / "media-pool-cleanup.json"
+    _validate_media_tree_fingerprint(
+        evidence.get("source_fingerprint_after"),
+        label=f"{label} source after",
+    )
+    staged_assets = evidence.get("staged_assets_after")
+    if (
+        not isinstance(evidence.get("model_get_fields"), Mapping)
+        or not isinstance(evidence.get("model_media_result"), Mapping)
+        or type(supporting) is not bool
+        or (supporting != (evidence.get("reference_baseline") is not None))
+        or (supporting != (evidence.get("model_reference_result") is not None))
+        or not _sha256_text_value(evidence.get("project_digest_before"))
+        or evidence.get("project_digest_before")
+        != evidence.get("project_digest_after")
+        or evidence.get("final_response_sha256")
+        != expected_final_response_sha256
+        or evidence.get("cleanup_evidence_path") != str(cleanup_path)
+        or evidence.get("source_fingerprint_after")
+        != oracle.get("source_fingerprint")
+        or not isinstance(staged_assets, list)
+        or not isinstance(evidence.get("custom_baseline_ids"), list)
+        or not isinstance(evidence.get("custom_created_ids"), Mapping)
+        or any(
+            not _nonempty_text(item)
+            for item in evidence.get("custom_baseline_ids", [])
+        )
+        or any(
+            not _nonempty_text(key) or not _nonempty_text(item)
+            for key, item in evidence.get("custom_created_ids", {}).items()
+        )
+    ):
+        raise CampaignEvidenceError(f"{label} Media Pool evidence is invalid")
+    sealed_rows = {
+        item["key"]: item
+        for item in oracle.get("rows", [])
+        if isinstance(item, Mapping) and _nonempty_text(item.get("key"))
+    }
+    observed_staged: dict[str, Mapping[str, Any]] = {}
+    for item in staged_assets:
+        state = _closed_oracle_mapping(
+            item,
+            {"key", "path", "size", "sha256"},
+            label=f"{label} staged asset",
+        )
+        if (
+            not _nonempty_text(state.get("key"))
+            or not _nonempty_text(state.get("path"))
+            or not _plain_int(state.get("size"), minimum=1)
+            or not _sha256_text_value(state.get("sha256"))
+            or state.get("key") in observed_staged
+        ):
+            raise CampaignEvidenceError(f"{label} staged asset is malformed")
+        observed_staged[str(state["key"])] = state
+    if set(observed_staged) != set(sealed_rows) or any(
+        observed_staged[key]["path"] != sealed_rows[key]["host_path"]
+        for key in observed_staged
+    ):
+        raise CampaignEvidenceError(f"{label} staged assets differ from sealed rows")
+    expected_keys = oracle.get("expected_keys")
+    sealed_request = oracle.get("request")
+    if (
+        not expected_keys
+        or not isinstance(sealed_request, Mapping)
+        or sealed_request.get("args") != expected_request.get("args")
+        or sealed_request.get("options") != expected_request.get("options")
+        or sealed_request.get("post_filter")
+        != expected_request.get("post_filter")
+    ):
+        raise CampaignEvidenceError(f"{label} Media Pool oracle has no expected keys")
+    binding = sealed_request.get("binding")
+    available_fields = binding.get("available_fields") if isinstance(binding, Mapping) else None
+    model_get_fields = evidence.get("model_get_fields")
+    if (
+        not isinstance(model_get_fields, Mapping)
+        or model_get_fields.get("return") != available_fields
+    ):
+        raise CampaignEvidenceError(f"{label} getFields differs from sealed inventory")
+    requested_fields = sealed_request.get("options", {}).get("return")
+    model_result = evidence.get("model_media_result")
+    raw_rows = model_result.get("return") if isinstance(model_result, Mapping) else None
+    expected_by_id = {
+        item["file_id"]: item
+        for item in oracle.get("rows", [])
+        if item.get("key") in expected_keys
+    }
+    actual_by_id: dict[str, Mapping[str, Any]] = {}
+    if not isinstance(requested_fields, list) or not isinstance(raw_rows, list):
+        raise CampaignEvidenceError(f"{label} Media Pool result is malformed")
+    for item in raw_rows:
+        if not isinstance(item, Mapping) or not _nonempty_text(item.get("FileId")):
+            raise CampaignEvidenceError(f"{label} Media Pool result row is malformed")
+        file_id = str(item["FileId"])
+        if file_id in actual_by_id:
+            raise CampaignEvidenceError(f"{label} Media Pool result duplicates FileId")
+        actual_by_id[file_id] = item
+    if set(actual_by_id) != set(expected_by_id):
+        raise CampaignEvidenceError(f"{label} Media Pool FileId set is invalid")
+    for file_id, item in actual_by_id.items():
+        expected_row = expected_by_id[file_id]
+        if set(item) != set(requested_fields) or any(
+            not _same_media_value_v3(
+                item.get(field), expected_row.get("values", {}).get(field)
+            )
+            for field in requested_fields
+        ):
+            raise CampaignEvidenceError(f"{label} Media Pool return fields/values drifted")
+    if supporting:
+        _validate_compact_media_reference_archive(
+            evidence.get("model_reference_result"),
+            reference_baseline=evidence.get("reference_baseline"),
+            oracle=oracle,
+            label=f"{label} Media Pool association proof",
+        )
+    _validate_media_final_response(
+        final_response,
+        oracle=oracle,
+        label=label,
+    )
+    cleanup = load_strict_regular_json(cleanup_path)
+    cleanup_row = _closed_oracle_mapping(
+        cleanup,
+        {
+            "contract",
+            "scenario_id",
+            "baseline_user_database_ids",
+            "created_database_ids",
+            "final_user_database_ids",
+            "global_user_state_before",
+            "global_user_state_after",
+            "wwise_process_stopped",
+            "verification",
+            "passed",
+        },
+        label=f"{label} cleanup",
+    )
+    if (
+        cleanup_row.get("contract")
+        != "waapi-skill.media-pool-cleanup-evidence/v1"
+        or cleanup_row.get("scenario_id") != scenario_id
+        or cleanup_row.get("passed") is not True
+        or cleanup_row.get("wwise_process_stopped") is not True
+        or cleanup_row.get("baseline_user_database_ids")
+        != evidence.get("custom_baseline_ids")
+        or cleanup_row.get("created_database_ids")
+        != evidence.get("custom_created_ids")
+        or cleanup_row.get("final_user_database_ids")
+        != evidence.get("custom_baseline_ids")
+    ):
+        raise CampaignEvidenceError(f"{label} cleanup identities are invalid")
+    verification = _closed_oracle_mapping(
+        cleanup_row.get("verification"),
+        {"ok", "code", "details"},
+        label=f"{label} cleanup verification",
+    )
+    if (
+        verification.get("ok") is not True
+        or not _nonempty_text(verification.get("code"))
+        or not isinstance(verification.get("details"), Mapping)
+    ):
+        raise CampaignEvidenceError(f"{label} cleanup verification failed")
+    if evidence.get("custom_created_ids"):
+        _validate_media_tree_fingerprint(
+            cleanup_row.get("global_user_state_before"),
+            label=f"{label} global before",
+        )
+        _validate_media_tree_fingerprint(
+            cleanup_row.get("global_user_state_after"),
+            label=f"{label} global after",
+        )
+        if cleanup_row.get("global_user_state_before") != cleanup_row.get(
+            "global_user_state_after"
+        ):
+            raise CampaignEvidenceError(f"{label} changed global user state")
+    elif (
+        cleanup_row.get("global_user_state_before") is not None
+        or cleanup_row.get("global_user_state_after") is not None
+    ):
+        raise CampaignEvidenceError(f"{label} unexpected global state proof")
+
+
+def _validate_compact_media_reference_archive(
+    value: Any,
+    *,
+    reference_baseline: Any,
+    oracle: Mapping[str, Any],
+    label: str,
+) -> None:
+    """Join compact model evidence to the sealed paths and trusted full scan."""
+
+    result = _closed_oracle_mapping(
+        value,
+        {
+            "contract",
+            "candidates",
+            "scanned_audio_source_count",
+            "scan_limit",
+            "scan_complete",
+        },
+        label=label,
+    )
+    baseline = _closed_oracle_mapping(
+        reference_baseline,
+        {"return"},
+        label=f"{label} trusted baseline",
+    )
+    baseline_rows = baseline.get("return")
+    scanned_count = result.get("scanned_audio_source_count")
+    if (
+        result.get("contract") != REFERENCE_MATCH_RESULT_CONTRACT
+        or result.get("scan_limit") != REFERENCE_MATCH_SCAN_LIMIT
+        or result.get("scan_complete") is not True
+        or not isinstance(scanned_count, int)
+        or isinstance(scanned_count, bool)
+        or scanned_count < 0
+        or scanned_count >= REFERENCE_MATCH_SCAN_LIMIT
+        or not isinstance(baseline_rows, list)
+        or scanned_count != len(baseline_rows)
+    ):
+        raise CampaignEvidenceError(f"{label} scan contract is invalid")
+
+    expected_keys = oracle.get("expected_keys")
+    oracle_rows = oracle.get("rows")
+    answer = oracle.get("semantic_answer")
+    if (
+        not isinstance(expected_keys, list)
+        or not isinstance(oracle_rows, list)
+        or not isinstance(answer, Mapping)
+    ):
+        raise CampaignEvidenceError(f"{label} sealed oracle is malformed")
+    row_by_key = {
+        row.get("key"): row
+        for row in oracle_rows
+        if isinstance(row, Mapping) and _nonempty_text(row.get("key"))
+    }
+    expected_rows: list[Mapping[str, Any]] = []
+    host_name_to_key: dict[str, str] = {}
+    path_to_key: dict[str, str] = {}
+    for key in expected_keys:
+        row = row_by_key.get(key)
+        if not isinstance(key, str) or not isinstance(row, Mapping):
+            raise CampaignEvidenceError(f"{label} sealed candidate is missing")
+        path = row.get("path")
+        host_path = row.get("host_path")
+        if not _nonempty_text(path) or not _nonempty_text(host_path):
+            raise CampaignEvidenceError(f"{label} sealed candidate path is invalid")
+        host_name = Path(str(host_path)).name.casefold()
+        if not host_name or host_name in host_name_to_key or str(path) in path_to_key:
+            raise CampaignEvidenceError(
+                f"{label} sealed candidate paths are not uniquely matchable"
+            )
+        host_name_to_key[host_name] = key
+        path_to_key[str(path)] = key
+        expected_rows.append(row)
+
+    referenced = answer.get("referenced_keys")
+    unreferenced = answer.get("unreferenced_keys")
+    if (
+        not isinstance(referenced, list)
+        or not isinstance(unreferenced, list)
+        or set(referenced) & set(unreferenced)
+        or set(referenced) | set(unreferenced) != set(expected_keys)
+    ):
+        raise CampaignEvidenceError(
+            f"{label} sealed reference classification is invalid"
+        )
+    referenced_keys = set(referenced)
+
+    trusted_by_key: dict[str, list[tuple[str, str]]] = {
+        key: [] for key in expected_keys
+    }
+    trusted_ids: set[str] = set()
+    for raw_row in baseline_rows:
+        if not isinstance(raw_row, Mapping):
+            raise CampaignEvidenceError(f"{label} trusted baseline row is malformed")
+        original = raw_row.get("originalFilePath")
+        if not isinstance(original, str) or not original:
+            continue
+        key = host_name_to_key.get(
+            Path(original.replace("\\", "/")).name.casefold()
+        )
+        if key is None:
+            continue
+        source_id = raw_row.get("id")
+        object_path = raw_row.get("path")
+        if (
+            not _nonempty_text(source_id)
+            or _OBJECT_ANSWER_GUID_RE.fullmatch(str(source_id)) is None
+            or not _nonempty_text(object_path)
+            or str(source_id).upper() in trusted_ids
+        ):
+            raise CampaignEvidenceError(
+                f"{label} trusted candidate identity is malformed"
+            )
+        trusted_ids.add(str(source_id).upper())
+        trusted_by_key[key].append((str(source_id), str(object_path)))
+
+    candidates = result.get("candidates")
+    expected_paths = tuple(sorted(path_to_key))
+    if not isinstance(candidates, list) or len(candidates) != len(expected_paths):
+        raise CampaignEvidenceError(f"{label} candidate set is invalid")
+    observed_paths = tuple(
+        candidate.get("originalFilePath")
+        if isinstance(candidate, Mapping)
+        else None
+        for candidate in candidates
+    )
+    if observed_paths != expected_paths:
+        raise CampaignEvidenceError(
+            f"{label} candidates differ from sorted sealed paths"
+        )
+
+    observed_ids: set[str] = set()
+    returned_reference_count = 0
+    for candidate in candidates:
+        row = _closed_oracle_mapping(
+            candidate,
+            {
+                "originalFilePath",
+                "classification",
+                "reference_count",
+                "references",
+                "references_truncated",
+            },
+            label=f"{label} candidate",
+        )
+        original_path = str(row["originalFilePath"])
+        key = path_to_key[original_path]
+        trusted = tuple(sorted(trusted_by_key[key]))
+        expected_classification = (
+            "referenced" if key in referenced_keys else "unreferenced"
+        )
+        references = row.get("references")
+        reference_count = row.get("reference_count")
+        if (
+            row.get("classification") != expected_classification
+            or bool(trusted) != (key in referenced_keys)
+            or not isinstance(references, list)
+            or not isinstance(reference_count, int)
+            or isinstance(reference_count, bool)
+            or reference_count != len(references)
+            or reference_count != len(trusted)
+            or row.get("references_truncated") is not False
+        ):
+            raise CampaignEvidenceError(
+                f"{label} candidate classification/count is invalid"
+            )
+        observed_references: list[tuple[str, str]] = []
+        for reference in references:
+            identity = _closed_oracle_mapping(
+                reference,
+                {"id", "path"},
+                label=f"{label} candidate reference",
+            )
+            source_id = identity.get("id")
+            object_path = identity.get("path")
+            if (
+                not _nonempty_text(source_id)
+                or _OBJECT_ANSWER_GUID_RE.fullmatch(str(source_id)) is None
+                or not _nonempty_text(object_path)
+                or str(source_id).upper() in observed_ids
+            ):
+                raise CampaignEvidenceError(
+                    f"{label} candidate reference identity is malformed"
+                )
+            observed_ids.add(str(source_id).upper())
+            observed_references.append((str(source_id), str(object_path)))
+        if tuple(sorted(observed_references)) != trusted:
+            raise CampaignEvidenceError(
+                f"{label} candidate references differ from trusted baseline"
+            )
+        returned_reference_count += reference_count
+    if returned_reference_count > scanned_count:
+        raise CampaignEvidenceError(
+            f"{label} returned references exceed the trusted full scan"
+        )
+
+
+def _same_media_value_v3(actual: Any, expected: Any) -> bool:
+    """Match the runtime Media Pool numeric tolerance exactly."""
+
+    if isinstance(expected, float):
+        return (
+            isinstance(actual, (int, float))
+            and not isinstance(actual, bool)
+            and math.isfinite(float(actual))
+            and abs(float(actual) - expected) <= 1e-6
+        )
+    return actual == expected
+
+
+def _validate_media_final_response(
+    value: str,
+    *,
+    oracle: Mapping[str, Any],
+    label: str,
+) -> None:
+    folded = value.casefold()
+    rows = {item["key"]: item for item in oracle["rows"]}
+    answer = oracle["semantic_answer"]
+    positions: dict[str, int] = {}
+    for key in oracle["expected_keys"]:
+        filenames = _serialized_media_response_filenames(
+            oracle,
+            rows[key],
+            label=label,
+        )
+        filename = filenames[-1]
+        position = _first_serialized_media_filename_position(folded, filenames)
+        if position < 0:
+            raise CampaignEvidenceError(f"{label} final response omits {filename}")
+        positions[key] = position
+    if (
+        media_answer_requires_order(str(oracle.get("scenario_id")))
+        and tuple(sorted(positions, key=positions.__getitem__))
+        != tuple(answer["ordered_keys"])
+    ):
+        raise CampaignEvidenceError(f"{label} final response order is invalid")
+    if oracle.get("scenario_id") == MEDIA_POOL_CLOSED_GROUP_REPORT_CASE_ID:
+        report_rows: dict[str, MediaReportRowExpectation] = {}
+        for key, row in rows.items():
+            db = row.get("db")
+            database = db.get("name") if isinstance(db, Mapping) else None
+            path = row.get("path")
+            if not _nonempty_text(database) or not _nonempty_text(path):
+                raise CampaignEvidenceError(
+                    f"{label} Media Pool row {key} lacks database/path identity"
+                )
+            report_rows[key] = MediaReportRowExpectation(
+                key=key,
+                filenames=_serialized_media_response_filenames(
+                    oracle,
+                    row,
+                    label=label,
+                ),
+                database=str(database),
+                path=str(path),
+            )
+        grouped_failures = media_grouped_report_failures(
+            value,
+            expected_groups=answer["expected_groups"],
+            rows=report_rows,
+            excluded_keys=answer["excluded_keys"],
+        )
+        if grouped_failures:
+            raise CampaignEvidenceError(f"{label} {grouped_failures[0]}")
+    else:
+        for key in answer["excluded_keys"]:
+            filenames = _serialized_media_response_filenames(
+                oracle,
+                rows[key],
+                label=label,
+            )
+            filename = filenames[-1]
+            if _first_serialized_media_filename_position(folded, filenames) >= 0:
+                raise CampaignEvidenceError(
+                    f"{label} final response includes excluded {filename}"
+                )
+        for group, keys in answer["expected_groups"].items():
+            if str(group).casefold() not in folded:
+                raise CampaignEvidenceError(
+                    f"{label} final response omits group {group}"
+                )
+            for key in keys:
+                filenames = _serialized_media_response_filenames(
+                    oracle,
+                    rows[key],
+                    label=label,
+                )
+                filename = filenames[-1]
+                if _first_serialized_media_filename_position(
+                    folded,
+                    filenames,
+                ) < 0:
+                    raise CampaignEvidenceError(
+                        f"{label} group {group} omits {filename}"
+                    )
+    for key in answer["referenced_keys"]:
+        filenames = _serialized_media_response_filenames(
+            oracle,
+            rows[key],
+            label=label,
+        )
+        filename = filenames[-1]
+        if not _media_near_classification(folded, filenames, referenced=True):
+            raise CampaignEvidenceError(f"{label} does not classify {filename} as referenced")
+    for key in answer["unreferenced_keys"]:
+        filenames = _serialized_media_response_filenames(
+            oracle,
+            rows[key],
+            label=label,
+        )
+        filename = filenames[-1]
+        if not _media_near_classification(folded, filenames, referenced=False):
+            raise CampaignEvidenceError(f"{label} does not classify {filename} as unreferenced")
+
+
+def _serialized_media_response_filenames(
+    oracle: Mapping[str, Any],
+    row: Mapping[str, Any],
+    *,
+    label: str,
+) -> tuple[str, ...]:
+    request = oracle.get("request")
+    binding = request.get("binding") if isinstance(request, Mapping) else None
+    by_concept = (
+        binding.get("by_concept") if isinstance(binding, Mapping) else None
+    )
+    filename_field = (
+        by_concept.get("name") if isinstance(by_concept, Mapping) else None
+    )
+    values = row.get("values")
+    live_filename = (
+        values.get(filename_field)
+        if isinstance(values, Mapping) and isinstance(filename_field, str)
+        else None
+    )
+    host_path = row.get("host_path")
+    if (
+        not isinstance(live_filename, str)
+        or not live_filename
+        or not isinstance(host_path, str)
+        or not host_path
+    ):
+        raise CampaignEvidenceError(
+            f"{label} Media Pool row lacks bound Filename/host_path identity"
+        )
+    full_filename = Path(host_path).name
+    if not full_filename:
+        raise CampaignEvidenceError(
+            f"{label} Media Pool row host_path has no basename"
+        )
+    return tuple(
+        dict.fromkeys((live_filename.casefold(), full_filename.casefold()))
+    )
+
+
+def _first_serialized_media_filename_position(
+    text: str,
+    filenames: Sequence[str],
+) -> int:
+    positions = tuple(
+        position
+        for filename in filenames
+        if (position := text.find(filename)) >= 0
+    )
+    return min(positions, default=-1)
+
+
+def _media_near_classification(
+    text: str,
+    filenames: Sequence[str],
+    *,
+    referenced: bool,
+) -> bool:
+    return media_near_classification(
+        text,
+        filenames,
+        referenced=referenced,
+    )
+
+
+def _validate_media_tree_fingerprint(value: Any, *, label: str) -> None:
+    row = _closed_oracle_mapping(
+        value,
+        {"root", "exists", "sha256", "file_count", "byte_count"},
+        label=label,
+    )
+    if (
+        not _nonempty_text(row.get("root"))
+        or type(row.get("exists")) is not bool
+        or not _sha256_text_value(row.get("sha256"))
+        or not _plain_int(row.get("file_count"))
+        or not _plain_int(row.get("byte_count"))
+    ):
+        raise CampaignEvidenceError(f"{label} fingerprint is malformed")
+
+
+def _validate_media_pool_sealed_oracle(
+    value: Any,
+    *,
+    scenario_id: str,
+    label: str,
+) -> Mapping[str, Any]:
+    row = _closed_oracle_mapping(
+        value,
+        {
+            "scenario_id",
+            "request",
+            "rows",
+            "candidate_keys",
+            "expected_keys",
+            "semantic_answer",
+            "source_fingerprint",
+            "staged_fingerprint",
+        },
+        label=label,
+    )
+    if row.get("scenario_id") != scenario_id:
+        raise CampaignEvidenceError(f"{label} scenario identity is invalid")
+    request = _closed_oracle_mapping(
+        row.get("request"),
+        {"scenario_id", "args", "options", "binding", "post_filter"},
+        label=f"{label} request",
+    )
+    binding = _closed_oracle_mapping(
+        request.get("binding"),
+        {"available_fields", "by_concept"},
+        label=f"{label} binding",
+    )
+    if (
+        request.get("scenario_id") != scenario_id
+        or not isinstance(request.get("args"), Mapping)
+        or not isinstance(request.get("options"), Mapping)
+        or not isinstance(binding.get("available_fields"), list)
+        or not isinstance(binding.get("by_concept"), Mapping)
+        or any(not _nonempty_text(item) for item in binding.get("available_fields", []))
+        or any(
+            not _nonempty_text(key) or not _nonempty_text(item)
+            for key, item in binding.get("by_concept", {}).items()
+        )
+    ):
+        raise CampaignEvidenceError(f"{label} request is malformed")
+    post_filter = request.get("post_filter")
+    if post_filter is not None:
+        post_filter = _closed_oracle_mapping(
+            post_filter,
+            {"field", "operator", "value", "limit"},
+            label=f"{label} post filter",
+        )
+        requested_fields = request.get("options", {}).get("return")
+        request_args = request.get("args")
+        server_filters = (
+            request_args.get("filters")
+            if isinstance(request_args, Mapping)
+            else None
+        )
+        matching_candidate_filters = [
+            item
+            for item in server_filters or []
+            if isinstance(item, Mapping)
+            and item.get("type") == "field"
+            and item.get("field") == post_filter.get("field")
+            and item.get("operator") == "contains"
+            and item.get("value") == post_filter.get("value")
+        ]
+        if (
+            post_filter.get("field") != "Filename"
+            or post_filter.get("operator") != "containsCaseSensitive"
+            or not _nonempty_text(post_filter.get("value"))
+            or not _plain_int(post_filter.get("limit"), minimum=1)
+            or not isinstance(requested_fields, list)
+            or post_filter.get("field") not in requested_fields
+            or not isinstance(server_filters, list)
+            or len(matching_candidate_filters) != 1
+            or request_args.get("maxResults") != 200
+            or int(post_filter.get("limit") or 0) > 200
+        ):
+            raise CampaignEvidenceError(f"{label} post filter is malformed")
+    rows = row.get("rows")
+    candidate_keys = row.get("candidate_keys")
+    expected_keys = row.get("expected_keys")
+    if (
+        not isinstance(rows, list)
+        or not isinstance(candidate_keys, list)
+        or len(candidate_keys) != len(set(candidate_keys))
+        or any(not _nonempty_text(item) for item in candidate_keys)
+        or not isinstance(expected_keys, list)
+        or len(expected_keys) != len(set(expected_keys))
+        or any(not _nonempty_text(item) for item in expected_keys)
+    ):
+        raise CampaignEvidenceError(f"{label} rows/keys are malformed")
+    row_keys: list[str] = []
+    for item in rows:
+        media = _closed_oracle_mapping(
+            item,
+            {"key", "path", "host_path", "file_id", "db", "values"},
+            label=f"{label} row",
+        )
+        if (
+            any(not _nonempty_text(media.get(field)) for field in ("key", "path", "host_path", "file_id"))
+            or not isinstance(media.get("db"), Mapping)
+            or not isinstance(media.get("values"), Mapping)
+            or any(
+                not _nonempty_text(key) or not _nonempty_text(item)
+                for key, item in media.get("db", {}).items()
+            )
+            or not _json_archive_value(media.get("values"))
+        ):
+            raise CampaignEvidenceError(f"{label} row is malformed")
+        row_keys.append(str(media["key"]))
+    if (
+        len(row_keys) != len(set(row_keys))
+        or not set(candidate_keys).issubset(row_keys)
+        or not set(expected_keys).issubset(candidate_keys)
+        or (post_filter is None and candidate_keys != expected_keys)
+    ):
+        raise CampaignEvidenceError(f"{label} row identities are invalid")
+    answer = _closed_oracle_mapping(
+        row.get("semantic_answer"),
+        {
+            "ordered_keys",
+            "expected_groups",
+            "referenced_keys",
+            "unreferenced_keys",
+            "excluded_keys",
+            "max_results",
+        },
+        label=f"{label} semantic answer",
+    )
+    for field in ("ordered_keys", "referenced_keys", "unreferenced_keys", "excluded_keys"):
+        if not isinstance(answer.get(field), list) or any(
+            not _nonempty_text(item) for item in answer.get(field, [])
+        ):
+            raise CampaignEvidenceError(f"{label} semantic answer {field} is invalid")
+    ordered_keys = answer.get("ordered_keys", [])
+    excluded_keys = answer.get("excluded_keys", [])
+    referenced_keys = answer.get("referenced_keys", [])
+    unreferenced_keys = answer.get("unreferenced_keys", [])
+    groups = answer.get("expected_groups")
+    grouped_keys = [
+        item
+        for items in groups.values()
+        for item in items
+    ] if isinstance(groups, Mapping) else []
+    max_results = answer.get("max_results")
+    if (
+        len(ordered_keys) != len(set(ordered_keys))
+        or set(ordered_keys) != set(expected_keys)
+        or len(excluded_keys) != len(set(excluded_keys))
+        or set(excluded_keys) != set(row_keys) - set(expected_keys)
+        or len(referenced_keys) != len(set(referenced_keys))
+        or len(unreferenced_keys) != len(set(unreferenced_keys))
+        or set(referenced_keys) & set(unreferenced_keys)
+        or not (set(referenced_keys) | set(unreferenced_keys)).issubset(
+            expected_keys
+        )
+        or (
+            (referenced_keys or unreferenced_keys)
+            and set(referenced_keys) | set(unreferenced_keys)
+            != set(expected_keys)
+        )
+        or not isinstance(groups, Mapping)
+        or any(
+            not _nonempty_text(key)
+            or not isinstance(items, list)
+            or any(not _nonempty_text(item) for item in items)
+            or len(items) != len(set(items))
+            for key, items in (groups or {}).items()
+        )
+        or len(grouped_keys) != len(set(grouped_keys))
+        or not set(grouped_keys).issubset(expected_keys)
+        or (grouped_keys and set(grouped_keys) != set(expected_keys))
+        or not _plain_int(max_results, minimum=1)
+        or max_results
+        != (
+            post_filter.get("limit")
+            if isinstance(post_filter, Mapping)
+            else request.get("args", {}).get("maxResults")
+        )
+        or len(expected_keys) > int(max_results or 0)
+    ):
+        raise CampaignEvidenceError(f"{label} semantic answer is malformed")
+    _validate_media_tree_fingerprint(row.get("source_fingerprint"), label=f"{label} source")
+    _validate_media_tree_fingerprint(row.get("staged_fingerprint"), label=f"{label} staged")
+    return row
+
+
+def _validate_soundbank_tree_entry(value: Any, *, label: str) -> None:
+    row = _closed_oracle_mapping(
+        value,
+        {"relative_path", "size", "sha256", "mtime_ns"},
+        label=label,
+    )
+    if (
+        not _nonempty_text(row.get("relative_path"))
+        or not _plain_int(row.get("size"))
+        or not _sha256_text_value(row.get("sha256"))
+        or not _plain_int(row.get("mtime_ns"), minimum=1)
+    ):
+        raise CampaignEvidenceError(f"{label} tree entry is malformed")
+
+
+def _validate_soundbank_snapshot(
+    value: Any,
+    *,
+    scenario_id: str,
+    label: str,
+) -> None:
+    row = _closed_oracle_mapping(
+        value,
+        {"scenario_id", "objects", "banks", "project_files", "input_files", "output_files"},
+        label=label,
+    )
+    if row.get("scenario_id") != scenario_id:
+        raise CampaignEvidenceError(f"{label} scenario identity is invalid")
+    for collection in ("objects", "banks", "project_files", "input_files", "output_files"):
+        if not isinstance(row.get(collection), list):
+            raise CampaignEvidenceError(f"{label} {collection} is not an array")
+    object_keys: list[str] = []
+    for item in row["objects"]:
+        object_row = _closed_oracle_mapping(
+            item,
+            {"key", "id", "path", "object_type"},
+            label=f"{label} object",
+        )
+        if (
+            not _nonempty_text(object_row.get("key"))
+            or not _nonempty_text(object_row.get("path"))
+            or not _optional_text(object_row.get("id"))
+            or not _optional_text(object_row.get("object_type"))
+        ):
+            raise CampaignEvidenceError(f"{label} object is malformed")
+        object_keys.append(str(object_row["key"]))
+    if len(object_keys) != len(set(object_keys)):
+        raise CampaignEvidenceError(f"{label} object keys are duplicated")
+    bank_names: list[str] = []
+    for item in row["banks"]:
+        bank = _closed_oracle_mapping(
+            item,
+            {"name", "id", "inclusions"},
+            label=f"{label} bank",
+        )
+        inclusions = bank.get("inclusions")
+        if (
+            not _nonempty_text(bank.get("name"))
+            or not _optional_text(bank.get("id"))
+            or not isinstance(inclusions, list)
+            or any(
+                not isinstance(inclusion, list)
+                or len(inclusion) != 2
+                or not _nonempty_text(inclusion[0])
+                or not isinstance(inclusion[1], list)
+                or any(not _nonempty_text(item) for item in inclusion[1])
+                for inclusion in inclusions
+            )
+        ):
+            raise CampaignEvidenceError(f"{label} bank is malformed")
+        bank_names.append(str(bank["name"]))
+    if len(bank_names) != len(set(bank_names)):
+        raise CampaignEvidenceError(f"{label} bank names are duplicated")
+    for item in row["project_files"]:
+        _validate_soundbank_tree_entry(item, label=f"{label} project file")
+    for item in row["output_files"]:
+        _validate_soundbank_tree_entry(item, label=f"{label} output file")
+    for item in row["input_files"]:
+        _validate_file_proof(
+            item,
+            label=f"{label} input file",
+            relative_optional=False,
+            has_mtime=True,
+        )
+
+
+def _validate_heavy_v3_soundbank_oracle(
+    value: Any,
+    *,
+    api: str,
+    scenario_id: str,
+    expected_phase: str,
+    label: str,
+) -> None:
+    row = _closed_oracle_mapping(
+        value,
+        {"scenario_id", "phase", "passed", "failures", "before", "after"},
+        label=label,
+    )
+    _require_passing_oracle(row, label=label)
+    if row.get("scenario_id") != scenario_id or row.get("phase") != expected_phase:
+        raise CampaignEvidenceError(f"{label} SoundBank identity/phase is invalid")
+    _validate_soundbank_snapshot(row.get("before"), scenario_id=scenario_id, label=f"{label} before")
+    _validate_soundbank_snapshot(row.get("after"), scenario_id=scenario_id, label=f"{label} after")
+    if expected_phase == "zero_dispatch" and row.get("before") != row.get("after"):
+        raise CampaignEvidenceError(f"{label} zero-dispatch SoundBank state changed")
+    if expected_phase != "zero_dispatch":
+        before = row["before"]
+        after = row["after"]
+        if before["input_files"] != after["input_files"] or before == after:
+            raise CampaignEvidenceError(f"{label} SoundBank immutable input/delta proof is invalid")
+        if api in {
+            "ak.wwise.core.soundbank.generate",
+            "ak.wwise.core.soundbank.convertExternalSources",
+            "ak.wwise.core.soundbank.generated",
+        }:
+            if (
+                before["project_files"] != after["project_files"]
+                or before["output_files"] == after["output_files"]
+            ):
+                raise CampaignEvidenceError(f"{label} SoundBank output delta is invalid")
+        elif api == "ak.wwise.core.soundbank.processDefinitionFiles":
+            if (
+                before["banks"] == after["banks"]
+                and before["project_files"] == after["project_files"]
+            ):
+                raise CampaignEvidenceError(f"{label} definition processing delta is absent")
+        elif api == "ak.wwise.core.soundbank.setInclusions":
+            if (
+                before["banks"] == after["banks"]
+                and before["project_files"] == after["project_files"]
+            ) or before["output_files"] != after["output_files"]:
+                raise CampaignEvidenceError(f"{label} inclusion delta/control proof is invalid")
+
+
+def _validate_heavy_v3_soundbank_topic_oracle(
+    value: Any,
+    *,
+    scenario_id: str,
+    label: str,
+) -> None:
+    row = _closed_oracle_mapping(value, {"topic", "artifacts"}, label=label)
+    topic = _closed_oracle_mapping(
+        row.get("topic"),
+        {"scenario_id", "passed", "failures", "observed_keys", "expected_keys"},
+        label=f"{label} topic",
+    )
+    _require_passing_oracle(topic, label=f"{label} topic")
+    observed = topic.get("observed_keys")
+    expected = topic.get("expected_keys")
+    if (
+        topic.get("scenario_id") != scenario_id
+        or not isinstance(observed, list)
+        or not isinstance(expected, list)
+        or not expected
+        or any(
+            not isinstance(key, list)
+            or len(key) != 3
+            or not _nonempty_text(key[0])
+            or not _nonempty_text(key[1])
+            or not _optional_text(key[2])
+            for key in [*expected, *observed]
+        )
+    ):
+        raise CampaignEvidenceError(f"{label} topic identities are invalid")
+    if Counter(tuple(key) for key in observed) != Counter(
+        tuple(key) for key in expected
+    ):
+        raise CampaignEvidenceError(f"{label} topic identities are invalid")
+    _validate_heavy_v3_soundbank_oracle(
+        row.get("artifacts"),
+        api="ak.wwise.core.soundbank.generated",
+        scenario_id=scenario_id,
+        expected_phase="topic_artifacts",
+        label=f"{label} artifacts",
+    )
+
+
+def _validate_heavy_v3_topic_publisher_process(
+    value: Any,
+    *,
+    api: str,
+    publisher_count: int,
+    ack_proof: Any,
+    prompt_evidence: HeavyV3PromptEvidence,
+) -> None:
+    """Require the passing publisher to be one closed, reaped spawn child."""
+
+    diagnostics = _closed_oracle_mapping(
+        value,
+        {
+            "contract",
+            "diagnostic_only",
+            "abort_requested",
+            "execution_mode",
+            "ack",
+            "publisher_started_at_monotonic_ns",
+            "publisher_finished_at_monotonic_ns",
+            "publisher_call_evidence",
+            "result_count",
+            "direct_call_count",
+            "client_opened",
+            "client_closed",
+            "child_process",
+            "error",
+        },
+        label="topic publisher process",
+    )
+    proof = _closed_oracle_mapping(
+        ack_proof,
+        {
+            "contract",
+            "business_oracle_plan_sha256",
+            "requirement",
+            "ack_path",
+            "ack_file_sha256",
+            "ack_payload",
+            "ack_observed_at_monotonic_ns",
+            "publisher_started_at_monotonic_ns",
+            "publisher_call_started_at_monotonic_ns",
+            "ack_before_publish",
+        },
+        label="topic publisher ACK join",
+    )
+    ack_payload = proof.get("ack_payload")
+    if not isinstance(ack_payload, Mapping):
+        raise CampaignEvidenceError("topic publisher process lacks its ACK payload join")
+    ack = _closed_oracle_mapping(
+        diagnostics.get("ack"),
+        {
+            "contract",
+            "step_name",
+            "topic",
+            "path",
+            "nonce_sha256",
+            "observed",
+            "file_sha256",
+            "observed_at_monotonic_ns",
+            "payload",
+        },
+        label="topic publisher diagnostic ACK",
+    )
+    child = _closed_oracle_mapping(
+        diagnostics.get("child_process"),
+        {
+            "start_method",
+            "coordinator_process_id",
+            "pid",
+            "parent_pid",
+            "exit_code",
+            "reaped",
+            "terminate_requested",
+            "kill_requested",
+            "canonical_result_received",
+            "child_started_at_monotonic_ns",
+            "child_finished_at_monotonic_ns",
+            "cleanup_error",
+        },
+        label="topic publisher child process",
+    )
+    started = diagnostics.get("publisher_started_at_monotonic_ns")
+    finished = diagnostics.get("publisher_finished_at_monotonic_ns")
+    call_rows = diagnostics.get("publisher_call_evidence")
+    call_times = proof.get("publisher_call_started_at_monotonic_ns")
+    expected_requests = (
+        prompt_evidence.typed_sections.live_binding.get("topic", {}).get(
+            "publisher_requests"
+        )
+        if isinstance(prompt_evidence.typed_sections, SoundBankBusinessPlanSections)
+        else None
+    )
+    if (
+        diagnostics.get("contract")
+        != HEAVY_V3_TOPIC_PUBLISHER_DIAGNOSTICS_CONTRACT
+        or diagnostics.get("diagnostic_only") is not True
+        or diagnostics.get("abort_requested") is not False
+        or diagnostics.get("execution_mode") != "spawn_process"
+        or diagnostics.get("error") is not None
+        or type(started) is not int
+        or type(finished) is not int
+        or started <= 0
+        or finished < started
+        or diagnostics.get("result_count") != publisher_count
+        or type(diagnostics.get("direct_call_count")) is not int
+        or diagnostics.get("direct_call_count", 0) < publisher_count
+        or diagnostics.get("client_opened") is not True
+        or diagnostics.get("client_closed") is not True
+        or not isinstance(call_rows, list)
+        or len(call_rows) != publisher_count
+        or not isinstance(call_times, list)
+        or len(call_times) != publisher_count
+        or not isinstance(expected_requests, list)
+        or len(expected_requests) != publisher_count
+    ):
+        raise CampaignEvidenceError(
+            "passing topic publisher diagnostics are not one complete spawn execution"
+        )
+
+    nonce = ack_payload.get("nonce")
+    diagnostic_ack_payload = {
+        key: nested for key, nested in ack_payload.items() if key != "nonce"
+    }
+    if (
+        api != SOUNDBANK_TOPIC
+        or ack.get("contract") != TOPIC_ACK_CONTRACT
+        or ack.get("step_name") != "soundbank.generated.wait"
+        or ack.get("topic") != api
+        or ack.get("path") != proof.get("ack_path")
+        or ack.get("file_sha256") != proof.get("ack_file_sha256")
+        or not isinstance(nonce, str)
+        or ack.get("nonce_sha256")
+        != hashlib.sha256(nonce.encode("utf-8")).hexdigest()
+        or ack.get("observed") is not True
+        or ack.get("observed_at_monotonic_ns")
+        != proof.get("ack_observed_at_monotonic_ns")
+        or ack.get("payload") != diagnostic_ack_payload
+        or started != proof.get("publisher_started_at_monotonic_ns")
+    ):
+        raise CampaignEvidenceError(
+            "topic publisher diagnostics do not join the sealed ACK proof"
+        )
+
+    child_pid = child.get("pid")
+    parent_pid = child.get("parent_pid")
+    coordinator_pid = child.get("coordinator_process_id")
+    child_started = child.get("child_started_at_monotonic_ns")
+    child_finished = child.get("child_finished_at_monotonic_ns")
+    if (
+        child.get("start_method") != "spawn"
+        or type(child_pid) is not int
+        or child_pid <= 0
+        or type(parent_pid) is not int
+        or parent_pid <= 0
+        or type(coordinator_pid) is not int
+        or coordinator_pid <= 0
+        or child_pid == parent_pid
+        or parent_pid != coordinator_pid
+        or coordinator_pid == ack_payload.get("runner_parent_process_id")
+        or coordinator_pid == ack_payload.get("gateway_process_id")
+        or child_pid == ack_payload.get("gateway_process_id")
+        or child.get("exit_code") != 0
+        or child.get("reaped") is not True
+        or child.get("terminate_requested") is not False
+        or child.get("kill_requested") is not False
+        or child.get("canonical_result_received") is not True
+        or type(child_started) is not int
+        or type(child_finished) is not int
+        or not started <= child_started <= child_finished <= finished
+        or child.get("cleanup_error") is not None
+    ):
+        raise CampaignEvidenceError(
+            "passing topic publisher lacks a clean, ACK-bound spawned child process"
+        )
+
+    expected_call_keys = {
+        "index",
+        "request_sha256",
+        "status",
+        "uri",
+        "args_sha256",
+        "options_sha256",
+        "started_at_monotonic_ns",
+        "finished_at_monotonic_ns",
+        "result",
+    }
+    for index, (row_value, request_value, call_time) in enumerate(
+        zip(call_rows, expected_requests, call_times, strict=True),
+        start=1,
+    ):
+        row = _closed_oracle_mapping(
+            row_value,
+            expected_call_keys,
+            label=f"topic publisher call {index}",
+        )
+        result_evidence = _closed_oracle_mapping(
+            row.get("result"),
+            {"sha256", "size_bytes", "included", "value"},
+            label=f"topic publisher call {index} result",
+        )
+        try:
+            result_bytes = canonical_json_bytes(result_evidence.get("value"))
+        except CampaignEvidenceError:
+            result_bytes = b""
+        expected_request_sha256 = hashlib.sha256(
+            canonical_json_bytes(request_value)
+        ).hexdigest()
+        call_started = row.get("started_at_monotonic_ns")
+        call_finished = row.get("finished_at_monotonic_ns")
+        if (
+            row.get("index") != index
+            or row.get("request_sha256") != expected_request_sha256
+            or row.get("status") != "succeeded"
+            or row.get("uri") != "ak.wwise.core.soundbank.generate"
+            or not _sha256_text_value(row.get("args_sha256"))
+            or not _sha256_text_value(row.get("options_sha256"))
+            or type(call_started) is not int
+            or type(call_finished) is not int
+            or call_started != call_time
+            or not child_started <= call_started <= call_finished <= child_finished
+            or result_evidence.get("included") is not True
+            or type(result_evidence.get("size_bytes")) is not int
+            or result_evidence.get("size_bytes") != len(result_bytes)
+            or not _sha256_text_value(result_evidence.get("sha256"))
+            or result_evidence.get("sha256")
+            != hashlib.sha256(result_bytes).hexdigest()
+        ):
+            raise CampaignEvidenceError(
+                "topic publisher call evidence is not bound to its reviewed request"
+            )
+
+
+def _validate_heavy_v3_topic_subscription_ack(
+    value: Any,
+    *,
+    api: str,
+    publisher_count: int,
+    task_root: Path,
+    prompt_evidence: HeavyV3PromptEvidence,
+) -> None:
+    """Join the sealed topic plan to one exclusive ACK-before-publish proof."""
+
+    keys = {
+        "contract",
+        "business_oracle_plan_sha256",
+        "requirement",
+        "ack_path",
+        "ack_file_sha256",
+        "ack_payload",
+        "ack_observed_at_monotonic_ns",
+        "publisher_started_at_monotonic_ns",
+        "publisher_call_started_at_monotonic_ns",
+        "ack_before_publish",
+    }
+    proof = _closed_oracle_mapping(value, keys, label="topic subscription ACK")
+    sections = prompt_evidence.typed_sections
+    topic_binding = (
+        sections.live_binding.get("topic")
+        if isinstance(sections, SoundBankBusinessPlanSections)
+        else None
+    )
+    planned_requirement = (
+        topic_binding.get("subscription_ack_requirement")
+        if isinstance(topic_binding, Mapping)
+        else None
+    )
+    expected_requirement = {
+        "contract": TOPIC_ACK_REQUIREMENT_CONTRACT,
+        "ack_contract": TOPIC_ACK_CONTRACT,
+        "step_name": "soundbank.generated.wait",
+        "topic": api,
+        "fresh_exclusive_path_required": True,
+        "publisher_requires_valid_ack": True,
+    }
+    if (
+        api != SOUNDBANK_TOPIC
+        or planned_requirement != expected_requirement
+        or proof.get("requirement") != expected_requirement
+        or proof.get("contract") != TOPIC_ACK_PROOF_CONTRACT
+        or proof.get("business_oracle_plan_sha256")
+        != prompt_evidence.business_oracle_plan.sha256
+        or proof.get("ack_before_publish") is not True
+    ):
+        raise CampaignEvidenceError(
+            "topic subscription ACK proof is not bound to its typed business plan"
+        )
+
+    try:
+        task_result = load_strict_regular_json(task_root / "task-result.json")
+    except Exception as exc:
+        raise CampaignEvidenceError(
+            f"topic subscription ACK lacks sealed broker record evidence: {exc}"
+        ) from exc
+    broker = task_result.get("broker") if isinstance(task_result, Mapping) else None
+    records = broker.get("records") if isinstance(broker, Mapping) else None
+    matching_records = (
+        [
+            record
+            for record in records
+            if isinstance(record, Mapping)
+            and record.get("step_name") == "soundbank.generated.wait"
+        ]
+        if isinstance(records, list)
+        else []
+    )
+    if (
+        len(matching_records) != 1
+        or matching_records[0].get("authenticated") is not True
+        or matching_records[0].get("accepted") is not True
+        or matching_records[0].get("succeeded") is not True
+        or matching_records[0].get("payload_error") != ""
+    ):
+        raise CampaignEvidenceError(
+            "topic subscription ACK has no exact successful broker step record"
+        )
+    broker_record = matching_records[0]
+    broker_ack = _validate_heavy_v3_broker_subscription_ack_record(
+        broker_record.get("subscription_ack"),
+        record=broker_record,
+        task_root=task_root,
+        label="topic subscription ACK broker record",
+    )
+
+    ack_path_value = proof.get("ack_path")
+    if not isinstance(ack_path_value, str) or not ack_path_value:
+        raise CampaignEvidenceError("topic subscription ACK path is invalid")
+    ack_path = Path(ack_path_value)
+    evidence_directory = task_root / "broker" / "evidence"
+    try:
+        metadata = ack_path.lstat()
+        real_parent = ack_path.parent.resolve(strict=True)
+        real_evidence = evidence_directory.resolve(strict=True)
+    except OSError as exc:
+        raise CampaignEvidenceError(
+            f"topic subscription ACK artifact is unavailable: {exc}"
+        ) from exc
+    if (
+        not ack_path.is_absolute()
+        or ack_path.is_symlink()
+        or ack_path.parent != evidence_directory
+        or real_parent != real_evidence
+        or not ack_path.name.startswith("subscription-ack-")
+        or not ack_path.name.endswith(".json")
+        or not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or metadata.st_size <= 0
+        or metadata.st_size > 4096
+        or stat.S_IMODE(metadata.st_mode) & 0o077
+    ):
+        raise CampaignEvidenceError(
+            "topic subscription ACK is not one private exclusive broker artifact"
+        )
+    raw = ack_path.read_bytes()
+    if (
+        hashlib.sha256(raw).hexdigest() != proof.get("ack_file_sha256")
+        or metadata.st_size != len(raw)
+    ):
+        raise CampaignEvidenceError("topic subscription ACK file proof drifted")
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CampaignEvidenceError(
+            f"topic subscription ACK is not strict UTF-8 JSON: {exc}"
+        ) from exc
+    payload_keys = {
+        "contract",
+        "step_name",
+        "topic",
+        "nonce",
+        "runner_parent_process_id",
+        "gateway_process_id",
+        "subscribed_at_unix_ns",
+        "subscribed_at_monotonic_ns",
+    }
+    nonce = payload.get("nonce") if isinstance(payload, Mapping) else None
+    nonce_sha256 = (
+        hashlib.sha256(nonce.encode("utf-8")).hexdigest()
+        if isinstance(nonce, str)
+        else ""
+    )
+    ack_file_sha256 = hashlib.sha256(raw).hexdigest()
+    if (
+        not isinstance(payload, Mapping)
+        or set(payload) != payload_keys
+        or proof.get("ack_payload") != payload
+        or payload.get("contract") != TOPIC_ACK_CONTRACT
+        or payload.get("step_name") != expected_requirement["step_name"]
+        or payload.get("topic") != api
+        or not isinstance(nonce, str)
+        or re.fullmatch(r"[A-Za-z0-9_-]{32,128}", nonce) is None
+        or type(payload.get("runner_parent_process_id")) is not int
+        or payload.get("runner_parent_process_id", 0) <= 0
+        or type(payload.get("gateway_process_id")) is not int
+        or payload.get("gateway_process_id", 0) <= 0
+        or payload.get("gateway_process_id")
+        == payload.get("runner_parent_process_id")
+        or type(payload.get("subscribed_at_unix_ns")) is not int
+        or type(payload.get("subscribed_at_monotonic_ns")) is not int
+        or payload.get("subscribed_at_monotonic_ns", 0) <= 0
+        or raw != canonical_json_bytes(payload) + b"\n"
+    ):
+        raise CampaignEvidenceError(
+            "topic subscription ACK payload identity or canonical form is invalid"
+        )
+    if (
+        broker_ack.get("ack_path") != str(ack_path)
+        or broker_ack.get("ack_file_sha256") != ack_file_sha256
+        or proof.get("ack_file_sha256") != ack_file_sha256
+        or broker_ack.get("nonce_sha256") != nonce_sha256
+        or broker_ack.get("runner_parent_process_id")
+        != payload.get("runner_parent_process_id")
+        or broker_ack.get("gateway_process_id")
+        != payload.get("gateway_process_id")
+        or broker_ack.get("subscribed_at_unix_ns")
+        != payload.get("subscribed_at_unix_ns")
+        or broker_ack.get("subscribed_at_monotonic_ns")
+        != payload.get("subscribed_at_monotonic_ns")
+    ):
+        raise CampaignEvidenceError(
+            "topic subscription ACK proof does not join its validated broker hash, PID, and time"
+        )
+    observed = proof.get("ack_observed_at_monotonic_ns")
+    started = proof.get("publisher_started_at_monotonic_ns")
+    call_times = proof.get("publisher_call_started_at_monotonic_ns")
+    if (
+        type(observed) is not int
+        or type(started) is not int
+        or not isinstance(call_times, list)
+        or len(call_times) != publisher_count
+        or any(type(item) is not int or item <= 0 for item in call_times)
+        or not int(payload["subscribed_at_monotonic_ns"])
+        <= observed
+        <= started
+        <= min(call_times)
+    ):
+        raise CampaignEvidenceError(
+            "topic publisher timeline does not prove ACK before every publish"
+        )
+
+
+def _validate_cli_file_proof(value: Any, *, label: str) -> None:
+    _validate_file_proof(
+        value,
+        label=label,
+        relative_optional=False,
+        has_mtime=True,
+    )
+
+
+def _validate_cli_tree_proof(value: Any, *, label: str) -> None:
+    row = _closed_oracle_mapping(value, {"root", "files", "sha256"}, label=label)
+    files = row.get("files")
+    if (
+        not _nonempty_text(row.get("root"))
+        or not isinstance(files, list)
+        or not _sha256_text_value(row.get("sha256"))
+    ):
+        raise CampaignEvidenceError(f"{label} tree proof is malformed")
+    digest = hashlib.sha256()
+    relatives: list[str] = []
+    for item in files:
+        _validate_cli_file_proof(item, label=f"{label} file")
+        relative = str(item["relative_path"])
+        relatives.append(relative)
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(str(item["size"]).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(str(item["sha256"]).encode("ascii"))
+        digest.update(b"\0")
+    if relatives != sorted(relatives) or len(relatives) != len(set(relatives)):
+        raise CampaignEvidenceError(f"{label} file order/identity is invalid")
+    if row.get("sha256") != digest.hexdigest():
+        raise CampaignEvidenceError(f"{label} tree digest is invalid")
+
+
+def _validate_cli_snapshot(value: Any, *, label: str) -> None:
+    row = _closed_oracle_mapping(
+        value,
+        {
+            "project_tree",
+            "source_template_tree",
+            "asset_tree",
+            "output_tree",
+            "objects",
+            "events",
+            "migration_inventory",
+            "project_version",
+        },
+        label=label,
+    )
+    for field in ("project_tree", "source_template_tree", "asset_tree", "output_tree"):
+        _validate_cli_tree_proof(row.get(field), label=f"{label} {field}")
+    for collection in ("objects", "events", "migration_inventory"):
+        if not isinstance(row.get(collection), list):
+            raise CampaignEvidenceError(f"{label} {collection} is not an array")
+    object_paths: list[str] = []
+    for item in row["objects"]:
+        object_row = _closed_oracle_mapping(
+            item,
+            {
+                "path",
+                "object_id",
+                "object_type",
+                "name",
+                "parent_id",
+                "language",
+                "source_path",
+                "source_sha256",
+                "notes",
+                "short_id",
+            },
+            label=f"{label} object",
+        )
+        if (
+            any(not _nonempty_text(object_row.get(field)) for field in ("path", "object_id", "object_type", "name"))
+            or not _optional_text(object_row.get("parent_id"))
+            or not _optional_text(object_row.get("language"))
+            or not _optional_text(object_row.get("source_path"))
+            or not (
+                object_row.get("source_sha256") is None
+                or _sha256_text_value(object_row.get("source_sha256"))
+            )
+            or not _optional_text(object_row.get("notes"))
+            or not (
+                object_row.get("short_id") is None
+                or _plain_int(object_row.get("short_id"))
+            )
+        ):
+            raise CampaignEvidenceError(f"{label} object is malformed")
+        object_paths.append(str(object_row["path"]))
+    if len(object_paths) != len(set(object_paths)):
+        raise CampaignEvidenceError(f"{label} object paths are duplicated")
+    event_paths: list[str] = []
+    for item in row["events"]:
+        event = _closed_oracle_mapping(
+            item,
+            {"path", "object_id", "action_ids", "target_ids", "action_types"},
+            label=f"{label} event",
+        )
+        if (
+            not _nonempty_text(event.get("path"))
+            or not _nonempty_text(event.get("object_id"))
+            or any(
+                not isinstance(event.get(field), list)
+                for field in ("action_ids", "target_ids", "action_types")
+            )
+            or any(not _nonempty_text(item) for item in event.get("action_ids", []))
+            or any(not _nonempty_text(item) for item in event.get("target_ids", []))
+            or any(type(item) is not int for item in event.get("action_types", []))
+        ):
+            raise CampaignEvidenceError(f"{label} event is malformed")
+        event_paths.append(str(event["path"]))
+    if len(event_paths) != len(set(event_paths)):
+        raise CampaignEvidenceError(f"{label} event paths are duplicated")
+    inventory_keys: list[str] = []
+    for item in row["migration_inventory"]:
+        inventory = _closed_oracle_mapping(
+            item,
+            {"key", "identity", "semantic_rows", "reference_rows"},
+            label=f"{label} migration inventory",
+        )
+        identity = inventory.get("identity")
+        if (
+            not _nonempty_text(inventory.get("key"))
+            or not isinstance(identity, list)
+            or len(identity) != 4
+            or any(not _nonempty_text(field) for field in identity[:3])
+            or not (
+                identity[3] is None
+                or (
+                    isinstance(identity[3], list)
+                    and len(identity[3]) == 3
+                    and _nonempty_text(identity[3][0])
+                    and all(isinstance(field, str) for field in identity[3][1:])
+                )
+            )
+            or not isinstance(inventory.get("semantic_rows"), list)
+            or not isinstance(inventory.get("reference_rows"), list)
+            or any(not isinstance(value, list) or not _json_archive_value(value) for value in inventory.get("semantic_rows", []))
+            or any(not isinstance(value, list) or not _json_archive_value(value) for value in inventory.get("reference_rows", []))
+        ):
+            raise CampaignEvidenceError(f"{label} migration inventory is malformed")
+        inventory_keys.append(str(inventory["key"]))
+    if len(inventory_keys) != len(set(inventory_keys)):
+        raise CampaignEvidenceError(f"{label} migration inventory keys are duplicated")
+    if not _optional_text(row.get("project_version")):
+        raise CampaignEvidenceError(f"{label} project version is malformed")
+
+
+def _validate_heavy_v3_cli_oracle(
+    value: Any,
+    *,
+    api: str,
+    scenario_id: str,
+    label: str,
+) -> None:
+    row = _closed_oracle_mapping(
+        value,
+        {"scenario_id", "phase", "passed", "failures", "before", "after"},
+        label=label,
+    )
+    _require_passing_oracle(row, label=label)
+    if row.get("scenario_id") != scenario_id or row.get("phase") != "after":
+        raise CampaignEvidenceError(f"{label} CLI identity/phase is invalid")
+    _validate_cli_snapshot(row.get("before"), label=f"{label} before")
+    _validate_cli_snapshot(row.get("after"), label=f"{label} after")
+    before = row["before"]
+    after = row["after"]
+    if before["source_template_tree"] != after["source_template_tree"]:
+        raise CampaignEvidenceError(f"{label} immutable CLI source/template changed")
+    if api == "ak.wwise.cli.convertExternalSource":
+        try:
+            validate_cli_convert_archived_side_effects(before, after)
+        except CliBusinessPlanError as exc:
+            raise CampaignEvidenceError(
+                f"{label} CLI convert side effects are invalid: {exc}"
+            ) from exc
+        if before["output_tree"] == after["output_tree"]:
+            raise CampaignEvidenceError(f"{label} CLI output/project delta is invalid")
+    elif api == "ak.wwise.cli.generateSoundbank":
+        if before["asset_tree"] != after["asset_tree"]:
+            raise CampaignEvidenceError(f"{label} immutable CLI input assets changed")
+        if (
+            authored_project_archive_projection(before["project_tree"])
+            != authored_project_archive_projection(after["project_tree"])
+            or before["output_tree"] == after["output_tree"]
+        ):
+            raise CampaignEvidenceError(f"{label} CLI output/project delta is invalid")
+    elif api == "ak.wwise.cli.tabDelimitedImport":
+        if before["asset_tree"] != after["asset_tree"]:
+            raise CampaignEvidenceError(f"{label} immutable CLI input assets changed")
+        if before["project_tree"] == after["project_tree"]:
+            raise CampaignEvidenceError(f"{label} tab import did not change project proof")
+    elif api == "ak.wwise.cli.migrate":
+        if before["asset_tree"] != after["asset_tree"]:
+            raise CampaignEvidenceError(f"{label} immutable CLI input assets changed")
+        if (
+            before["project_tree"] == after["project_tree"]
+            or before["migration_inventory"] != after["migration_inventory"]
+            or not str(after.get("project_version") or "").startswith("v2022.1")
+        ):
+            raise CampaignEvidenceError(f"{label} migration proof is invalid")
+
+
+def _validate_heavy_v3_pass_lifecycle(
+    lifecycle: Mapping[str, Any],
+    *,
+    checks: Mapping[str, Any],
+    expected_row: Mapping[str, Any],
+    scenario_root: Path,
+    task_root: Path,
+) -> None:
+    runner = str(expected_row["runner"])
+    scenario_id = str(expected_row["scenario_id"])
+    version = str(expected_row["version"])
+    lifecycle_path = task_root.parent / "lifecycle.json"
+    archived = load_strict_regular_json(lifecycle_path)
+    if archived != lifecycle:
+        raise CampaignEvidenceError(
+            "passing heavy outcome lifecycle differs from lifecycle.json"
+        )
+    owned_root = scenario_root / "owned"
+    if owned_root.exists() or owned_root.is_symlink():
+        raise CampaignEvidenceError("passing heavy scenario retained owned state")
+
+    if runner == "project":
+        required = {
+            "contract",
+            "scenario_id",
+            "version",
+            "requested_status",
+            "final_status",
+            "sandbox_retained",
+            "source_hash_before",
+            "source_hash_after",
+            "source_mtime_before_ns",
+            "source_mtime_after_ns",
+            "errors",
+            "quarantine_path",
+        }
+        if (
+            set(lifecycle) != required
+            or lifecycle.get("contract") != HEAVY_V3_PROJECT_LIFECYCLE_CONTRACT
+            or lifecycle.get("scenario_id") != scenario_id
+            or lifecycle.get("version") != version
+            or lifecycle.get("requested_status") != "PASS"
+            or lifecycle.get("final_status") != "PASS"
+            or lifecycle.get("sandbox_retained") is not False
+            or lifecycle.get("errors") != []
+            or lifecycle.get("quarantine_path") is not None
+            or not isinstance(lifecycle.get("source_hash_before"), Mapping)
+            or lifecycle.get("source_hash_before") != lifecycle.get("source_hash_after")
+            or type(lifecycle.get("source_mtime_before_ns")) is not int
+            or lifecycle.get("source_mtime_before_ns")
+            != lifecycle.get("source_mtime_after_ns")
+        ):
+            raise CampaignEvidenceError("passing project lifecycle proof is invalid")
+        start = load_strict_regular_json(task_root.parent / "start.json")
+        if (
+            not isinstance(start, Mapping)
+            or start.get("contract") != HEAVY_V3_PROJECT_LIFECYCLE_CONTRACT
+            or start.get("scenario_id") != scenario_id
+            or start.get("version") != version
+            or start.get("source_hash_before") != lifecycle.get("source_hash_before")
+            or start.get("source_mtime_before_ns")
+            != lifecycle.get("source_mtime_before_ns")
+            or not isinstance(start.get("endpoint"), Mapping)
+            or start["endpoint"].get("host") not in {"127.0.0.1", "localhost", "::1"}
+            or type(start["endpoint"].get("port")) is not int
+            or not _path_is_within(
+                Path(str(start.get("sandbox_project"))),
+                scenario_root / "owned",
+            )
+        ):
+            raise CampaignEvidenceError("passing project start proof is invalid")
+        return
+
+    required = {
+        "contract",
+        "requested_status",
+        "final_status",
+        "owned_state_retained",
+        "quarantine_path",
+        "source_hash_before",
+        "source_hash_after",
+        "source_mtime_before_ns",
+        "source_mtime_after_ns",
+        "phases",
+        "errors",
+    }
+    phases = lifecycle.get("phases")
+    if (
+        set(lifecycle) != required
+        or lifecycle.get("contract") != HEAVY_V3_CLI_LIFECYCLE_CONTRACT
+        or lifecycle.get("requested_status") != "PASS"
+        or lifecycle.get("final_status") != "PASS"
+        or lifecycle.get("owned_state_retained") is not False
+        or lifecycle.get("quarantine_path") is not None
+        or lifecycle.get("errors") != []
+        or not isinstance(lifecycle.get("source_hash_before"), Mapping)
+        or lifecycle.get("source_hash_before") != lifecycle.get("source_hash_after")
+        or type(lifecycle.get("source_mtime_before_ns")) is not int
+        or lifecycle.get("source_mtime_before_ns")
+        != lifecycle.get("source_mtime_after_ns")
+        or not isinstance(phases, list)
+        or not phases
+    ):
+        raise CampaignEvidenceError("passing CLI lifecycle proof is invalid")
+    phase_order = checks.get("phase_order")
+    if not isinstance(phase_order, list) or len(phase_order) != len(phases):
+        raise CampaignEvidenceError("passing CLI phase-order proof is invalid")
+    observed_roles: list[str] = []
+    for phase in phases:
+        if not isinstance(phase, Mapping):
+            raise CampaignEvidenceError("passing CLI phase proof is malformed")
+        evidence = phase.get("evidence")
+        role = evidence.get("role") if isinstance(evidence, Mapping) else None
+        if (
+            not isinstance(role, str)
+            or not role
+            or not isinstance(evidence, Mapping)
+            or evidence.get("shell") is not False
+            or evidence.get("started") is not True
+            or evidence.get("ready") is not True
+            or evidence.get("process_exited") is not True
+            or evidence.get("residual_pids") != []
+            or evidence.get("shutdown_error") is not None
+            or phase.get("log_overflow") is not False
+            or phase.get("ready_version") != version
+            or _SHA256_RE.fullmatch(str(phase.get("stdout_sha256"))) is None
+            or _SHA256_RE.fullmatch(str(phase.get("stderr_sha256"))) is None
+        ):
+            raise CampaignEvidenceError("passing CLI process phase is not clean")
+        cwd = evidence.get("cwd")
+        if cwd is not None and not _path_is_within(Path(str(cwd)), scenario_root):
+            raise CampaignEvidenceError("passing CLI process cwd escapes its scenario")
+        opened = evidence.get("open_project_path")
+        if opened is not None and not _path_is_within(
+            Path(str(opened)), scenario_root / "owned"
+        ):
+            raise CampaignEvidenceError(
+                "passing CLI phase opened a project outside owned state"
+            )
+        observed_roles.append(role)
+    if observed_roles != phase_order or len(observed_roles) != len(set(observed_roles)):
+        raise CampaignEvidenceError("passing CLI lifecycle phase order drifted")
+
+
+def _strict_real_subdirectory_names(root: Path) -> set[str]:
+    directory = Path(root)
+    if directory.is_symlink() or not directory.is_dir():
+        raise CampaignEvidenceError(f"evidence directory is not real: {directory}")
+    names: set[str] = set()
+    for entry in os.scandir(directory):
+        info = entry.stat(follow_symlinks=False)
+        if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode):
+            raise CampaignEvidenceError(
+                f"evidence directory contains a non-directory entry: {entry.path}"
+            )
+        names.add(entry.name)
+    return names
+
+
+def _load_strict_regular_text(path: Path, *, limit_bytes: int = 8 * 1024 * 1024) -> str:
+    source = Path(path)
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(source, flags)
+    except OSError as exc:
+        raise CampaignEvidenceError(f"cannot open child text {source}: {exc}") from exc
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > limit_bytes:
+            raise CampaignEvidenceError(
+                f"child text is not a bounded regular file: {source}"
+            )
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = os.read(descriptor, min(1024 * 1024, limit_bytes + 1 - total))
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > limit_bytes:
+                raise CampaignEvidenceError(f"child text exceeds limit: {source}")
+            chunks.append(chunk)
+    finally:
+        os.close(descriptor)
+    try:
+        return b"".join(chunks).decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise CampaignEvidenceError(f"child text is not UTF-8: {source}") from exc
+
+
+def _heavy_v3_outcome_contract(runner: str) -> str:
+    if runner == "project":
+        return HEAVY_V3_PROJECT_OUTCOME_CONTRACT
+    if runner == "cli":
+        return HEAVY_V3_CLI_OUTCOME_CONTRACT
+    raise CampaignEvidenceError(f"unknown heavy runner lane: {runner}")
+
+
+def _heavy_v3_scenario_directories(root: Path) -> dict[str, Path]:
+    scenarios_root = root / "scenarios"
+    if not scenarios_root.exists():
+        return {}
+    try:
+        entries = tuple(os.scandir(scenarios_root))
+    except OSError as exc:
+        raise CampaignEvidenceError(
+            f"cannot scan heavy scenario evidence: {exc}"
+        ) from exc
+    result: dict[str, Path] = {}
+    for entry in entries:
+        info = entry.stat(follow_symlinks=False)
+        if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode):
+            raise CampaignEvidenceError(
+                f"heavy scenario evidence entry is not a real directory: {entry.path}"
+            )
+        result[entry.name] = Path(entry.path).resolve(strict=True)
+    return result
+
+
+def _valid_heavy_timestamp(value: Any) -> bool:
+    return isinstance(value, str) and bool(value) and value.endswith("Z")
+
+
+def _valid_heavy_utc_timestamp(value: Any) -> bool:
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    offset = parsed.utcoffset()
+    return offset is not None and offset.total_seconds() == 0
+
+
+def _path_is_within(path: Path, root: Path) -> bool:
+    try:
+        path.resolve(strict=False).relative_to(root.resolve(strict=False))
+    except ValueError:
+        return False
+    return True
 
 
 def current_candidate_sha256(skill_source: Path, *, effective: Mapping[str, Any]) -> str:
@@ -837,8 +10090,12 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     parser.add_argument("--campaign-root", required=True)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--verify-only", action="store_true")
-    parser.add_argument("--profile", choices=PROFILE_IDS, default="screening")
-    parser.add_argument("--suite", default=str(matrix.DEFAULT_SUITE))
+    parser.add_argument(
+        "--profile",
+        choices=(*PROFILE_IDS, HEAVY_V3_PROFILE_ID),
+        default="screening",
+    )
+    parser.add_argument("--suite")
     parser.add_argument("--skill-source", default=str(matrix.SKILL_ROOT))
     parser.add_argument("--codex-binary", default=str(matrix.DEFAULT_CODEX_BINARY))
     parser.add_argument("--auth-json", default=str(matrix.DEFAULT_AUTH_JSON))
@@ -851,13 +10108,14 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     )
     parser.add_argument("--service-tier", default="priority")
     parser.add_argument("--timeout", type=float, default=240.0)
-    parser.add_argument("--case-id", action="append", choices=CASE_IDS, default=[])
+    parser.add_argument("--case-id", action="append", default=[])
     parser.add_argument("--version", action="append", choices=SUPPORTED_VERSIONS, default=[])
     parser.add_argument("--pair-id", action="append", default=[])
     parser.add_argument("--offline-only", action="store_true")
     parser.add_argument("--lock-timeout", type=float, default=10.0)
     parser.add_argument("--max-pre-action-retries", type=int, default=1)
     args = parser.parse_args(argv)
+    is_heavy_v3 = args.profile == HEAVY_V3_PROFILE_ID
     if args.verify_only and not args.resume:
         parser.error("--verify-only requires --resume")
     if args.timeout <= 0 or args.lock_timeout <= 0:
@@ -871,8 +10129,21 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     ):
         if len(set(values)) != len(values):
             parser.error(f"{name} values must be unique")
+    if is_heavy_v3 and args.pair_id:
+        parser.error(f"--pair-id is not supported by {HEAVY_V3_PROFILE_ID}")
+    if is_heavy_v3 and args.offline_only:
+        parser.error(f"--offline-only is not supported by {HEAVY_V3_PROFILE_ID}")
+    if not is_heavy_v3:
+        unknown_case_ids = sorted(set(args.case_id) - set(CASE_IDS))
+        if unknown_case_ids:
+            parser.error(
+                "unknown v2 --case-id values: " + ", ".join(unknown_case_ids)
+            )
+    suite = args.suite or str(
+        matrix.DEFAULT_V3_SUITE if is_heavy_v3 else matrix.DEFAULT_SUITE
+    )
     try:
-        suite_path = Path(args.suite).expanduser().resolve(strict=True)
+        suite_path = Path(suite).expanduser().resolve(strict=True)
         skill_source = Path(args.skill_source).expanduser().resolve(strict=True)
         codex_binary = Path(args.codex_binary).expanduser().resolve(strict=True)
         auth_json = Path(args.auth_json).expanduser().resolve(strict=True)
