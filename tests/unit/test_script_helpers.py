@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import importlib
 import os
+import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest  # pyright: ignore[reportMissingImports]
@@ -15,6 +17,18 @@ setup_script = importlib.import_module("scripts.setup_environment")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
+
+
+class CompletedPopen:
+    def __init__(self, returncode: int = 0) -> None:
+        self.returncode = returncode
+
+    def wait(self, timeout: float | None = None) -> int:
+        del timeout
+        return self.returncode
+
+    def poll(self) -> int:
+        return self.returncode
 
 
 def test_script_config_exports_expected_paths_and_targets() -> None:
@@ -58,17 +72,169 @@ def test_run_main_executes_existing_script_when_bootstrap_is_stubbed(monkeypatch
 
     calls: list[list[str]] = []
 
-    def fake_run(cmd, **kwargs):
+    def fake_popen(cmd, **kwargs):
+        del kwargs
         calls.append([str(part) for part in cmd])
+        return CompletedPopen()
 
-        class Result:
-            returncode = 0
-
-        return Result()
-
-    monkeypatch.setattr(run_script.subprocess, "run", fake_run)
+    monkeypatch.setattr(run_script.subprocess, "Popen", fake_popen)
     assert run_script.main(["setup_environment.py", "--check"]) == 0
     assert calls and calls[0][0].endswith(("python", "python.exe"))
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX SIGINT cleanup integration")
+def test_run_main_returns_standard_interrupt_code_without_wrapper_traceback(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    skill_root = tmp_path / "skill"
+    scripts_root = skill_root / "scripts"
+    scripts_root.mkdir(parents=True)
+    marker = tmp_path / "cleanup-marker.txt"
+    ready = tmp_path / "ready.txt"
+    (scripts_root / "gateway.py").write_text(
+        "\n".join(
+            (
+                "import signal",
+                "import sys",
+                "import time",
+                "from pathlib import Path",
+                "marker = Path(sys.argv[1])",
+                "ready = Path(sys.argv[2])",
+                "def cancel(signum, frame):",
+                "    del signum, frame",
+                "    time.sleep(0.35)",
+                "    marker.write_text('cleaned', encoding='utf-8')",
+                "    print('{\"status\":\"cancelled\"}', flush=True)",
+                "    raise SystemExit(130)",
+                "signal.signal(signal.SIGINT, cancel)",
+                "ready.write_text('ready', encoding='utf-8')",
+                "while True:",
+                "    time.sleep(0.05)",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(run_script, "SKILL_DIR", skill_root)
+    monkeypatch.setattr(run_script, "venv_python", lambda: Path(sys.executable))
+    monkeypatch.setattr(run_script, "bootstrap_if_needed", lambda: None)
+    real_popen = subprocess.Popen
+    launched: list[InterruptingPopen] = []
+
+    class InterruptingPopen:
+        def __init__(self, command: list[str]) -> None:
+            self.process = real_popen(command)
+            self.initial_wait = True
+            self.forwarded_signals: list[int] = []
+            self.terminated = False
+            self.killed = False
+
+        def wait(self, timeout: float | None = None) -> int:
+            if self.initial_wait:
+                self.initial_wait = False
+                deadline = time.monotonic() + 2.0
+                while not ready.exists() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                assert ready.exists(), "temporary gateway did not install its handler"
+                self.process.send_signal(signal.SIGINT)
+                raise KeyboardInterrupt
+            return self.process.wait(timeout=timeout)
+
+        def poll(self) -> int | None:
+            return self.process.poll()
+
+        def send_signal(self, requested_signal: int) -> None:
+            self.forwarded_signals.append(requested_signal)
+            self.process.send_signal(requested_signal)
+
+        def terminate(self) -> None:
+            self.terminated = True
+            self.process.terminate()
+
+        def kill(self) -> None:
+            self.killed = True
+            self.process.kill()
+
+    def launch(command: list[str], **kwargs) -> InterruptingPopen:
+        assert kwargs == {}
+        process = InterruptingPopen(command)
+        launched.append(process)
+        return process
+
+    monkeypatch.setattr(run_script.subprocess, "Popen", launch)
+
+    assert run_script.main(["gateway.py", str(marker), str(ready)]) == 130
+    assert marker.read_text(encoding="utf-8") == "cleaned"
+    assert launched[0].forwarded_signals == []
+    assert launched[0].terminated is False
+    assert launched[0].killed is False
+
+
+def test_run_main_escalates_and_reaps_child_that_ignores_interrupt(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(run_script, "VENV_DIR", tmp_path / ".venv")
+    run_script.VENV_DIR.mkdir(parents=True)
+    monkeypatch.setattr(run_script, "bootstrap_if_needed", lambda: None)
+    events: list[tuple[str, float | int | None]] = []
+
+    class StuckPopen:
+        def __init__(self) -> None:
+            self.initial_wait = True
+            self.killed = False
+
+        def wait(self, timeout: float | None = None) -> int:
+            if self.initial_wait:
+                self.initial_wait = False
+                raise KeyboardInterrupt
+            events.append(("wait", timeout))
+            if self.killed:
+                return -signal.SIGKILL
+            raise subprocess.TimeoutExpired(cmd=["gateway.py"], timeout=timeout)
+
+        def poll(self) -> int | None:
+            return -signal.SIGKILL if self.killed else None
+
+        def send_signal(self, requested_signal: int) -> None:
+            events.append(("signal", requested_signal))
+            raise OSError("synthetic platform SIGINT rejection")
+
+        def terminate(self) -> None:
+            events.append(("terminate", None))
+
+        def kill(self) -> None:
+            events.append(("kill", None))
+            self.killed = True
+
+    process = StuckPopen()
+    monkeypatch.setattr(run_script.subprocess, "Popen", lambda *args, **kwargs: process)
+
+    assert run_script.main(["gateway.py", "wait-topic", "ak.test", "--no-timeout"]) == 130
+    assert [event[0] for event in events] == [
+        "wait",
+        "signal",
+        "wait",
+        "terminate",
+        "wait",
+        "kill",
+    ]
+    assert events[0][1] == pytest.approx(
+        run_script.INTERRUPTED_CHILD_CLEANUP_GRACE_SECONDS,
+        abs=0.01,
+    )
+    assert events[1] == ("signal", signal.SIGINT)
+    assert events[2][1] == pytest.approx(
+        run_script.INTERRUPTED_CHILD_SIGNAL_GRACE_SECONDS,
+        abs=0.01,
+    )
+    assert events[3] == ("terminate", None)
+    assert events[4][1] == pytest.approx(
+        run_script.INTERRUPTED_CHILD_TERMINATE_GRACE_SECONDS,
+        abs=0.01,
+    )
+    assert events[5] == ("kill", None)
 
 
 @pytest.mark.parametrize(
@@ -90,15 +256,12 @@ def test_run_main_normalizes_closed_version_selector_before_gateway_target(
     monkeypatch.setattr(run_script, "bootstrap_if_needed", lambda: None)
     calls: list[list[str]] = []
 
-    def fake_run(cmd, **kwargs):
+    def fake_popen(cmd, **kwargs):
+        del kwargs
         calls.append([str(part) for part in cmd])
+        return CompletedPopen()
 
-        class Result:
-            returncode = 0
-
-        return Result()
-
-    monkeypatch.setattr(run_script.subprocess, "run", fake_run)
+    monkeypatch.setattr(run_script.subprocess, "Popen", fake_popen)
 
     assert run_script.main(
         [*runner_selector, "gateway.py", "operation-schema", "object.copy"]
@@ -135,7 +298,7 @@ def test_run_main_rejects_unclosed_runner_version_selector_forms(
 ) -> None:
     monkeypatch.setattr(
         run_script.subprocess,
-        "run",
+        "Popen",
         lambda *args, **kwargs: pytest.fail("rejected runner form must not execute"),
     )
 
@@ -152,15 +315,12 @@ def test_run_main_does_not_confuse_config_set_field_with_global_selector(
     monkeypatch.setattr(run_script, "bootstrap_if_needed", lambda: None)
     calls: list[list[str]] = []
 
-    def fake_run(cmd, **kwargs):
+    def fake_popen(cmd, **kwargs):
+        del kwargs
         calls.append([str(part) for part in cmd])
+        return CompletedPopen()
 
-        class Result:
-            returncode = 0
-
-        return Result()
-
-    monkeypatch.setattr(run_script.subprocess, "run", fake_run)
+    monkeypatch.setattr(run_script.subprocess, "Popen", fake_popen)
 
     assert run_script.main(
         [

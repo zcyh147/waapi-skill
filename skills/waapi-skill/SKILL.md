@@ -69,8 +69,9 @@ python scripts/run.py gateway.py --version <supported-version> call <bounded-rea
 python scripts/run.py gateway.py query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path
 python scripts/run.py gateway.py query-object --type Event --take 100
 python scripts/run.py gateway.py metadata types --summary-only
-python scripts/run.py gateway.py --timeout 10 wait-topic <topic-uri>
-python scripts/run.py gateway.py --timeout 10 wait-topic <topic-uri> --event-count <1..64> --match-json '<object>'
+python scripts/run.py gateway.py wait-topic <topic-uri>
+python scripts/run.py gateway.py --timeout <positive-finite-seconds> wait-topic <topic-uri> --event-count <1..64> --match-json '<object>'
+python scripts/run.py gateway.py wait-topic <topic-uri> --no-timeout
 python scripts/run.py gateway.py operations
 python scripts/run.py gateway.py operation-schema object.create
 python scripts/run.py gateway.py operation-schema object.set
@@ -97,10 +98,36 @@ Use exactly one command for the corresponding intent:
 | call a capability whose catalog route is `manifest_dispatch` | `call` with reflected args/options | recursively validated bounded live result |
 | object lookup by path, id, type, search, or query object | `query-object` | semantic query builder plus `ak.wwise.core.object.get` |
 | object type/property/reference metadata | `metadata` | fixed metadata builder and typed result parser |
-| wait for one or a fixed bounded count of topic events | `wait-topic` | 1–64 matching events, one total timeout, optional JSON payload match, guaranteed unsubscribe |
+| wait for one or a fixed bounded count of topic events | `wait-topic` | 1–64 matching events, a default 10-second wait or an explicit duration policy, optional JSON payload match, guaranteed unsubscribe |
 | inspect project-changing operation support | `operations` / `operation-schema` | offline closed request schema and explicit executable boundary |
 
 Each command prints one JSON document. Summarize its actual values in the user's language. Do not paste the whole JSON unless asked. Every result includes a bounded `session_context`; use it for the one-time conversation introduction above and do not reconstruct those settings from prose, configuration files, or assumptions.
+
+Before invoking `wait-topic`, tell the user the effective waiting policy in one
+natural sentence. When the user did not specify a duration, say that this
+invocation will use the ordinary 10-second default and that they can request a
+different duration. The gateway's omitted-duration default remains 10 seconds
+for every Topic. The Skill-level exception is
+`ak.wwise.core.soundbank.generated`: when the user omits a duration, explicitly
+pass gateway-global `--timeout 120` and report that actual 120-second wait
+before invoking it. When the user supplies a positive finite duration, preserve
+it exactly (converting units to seconds without rounding) in the gateway-global
+`--timeout <positive-finite-seconds>` position before `wait-topic`; do not clamp
+it to 10 or 120 seconds. When the user explicitly requests no time limit, use
+the `wait-topic` subcommand flag `--no-timeout` and say that monitoring
+continues until the requested 1–64 matching events have been collected or the
+user cancels it. `--no-timeout` removes only the waiting deadline: it is not an
+unlimited output stream, and the event-count and result-size bounds still
+apply. Never combine `--timeout` with `--no-timeout`, and never infer an
+unlimited wait from vague wording such as “monitor this” or “keep an eye on
+this.”
+
+For example, natural Chinese wording for an ordinary wait is: “好的，我会监听
+`<topic>`。这次使用默认的 10 秒等待时间；如果需要，你可以指定更长时间，
+或明确让我不限时等待。” For an explicit no-time-limit request, say:
+“我会不限时监听 `<topic>`，直到收齐 `<N>` 个匹配事件或你让我停止；事件
+数量和返回结果仍然有界。” Adapt the topic, count, language, and actual
+duration instead of copying placeholders.
 
 Exact reflection-call fast route: when the user explicitly asks to call `ak.wwise.waapi.getFunctions` or `ak.wwise.waapi.getTopics` with empty args and options, run exactly one matching `call` command from the table, replacing `<supported-version>` with the exact requested or connected Wwise version. Do not run `describe` or `capabilities` first, and do not read the query reference before or after the call. The reviewed route is already fixed by this Skill. If that one gateway invocation is rejected or fails, stop and report the result; never retry it with another command.
 

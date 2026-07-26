@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import queue
 import stat
 import threading
@@ -319,6 +320,91 @@ def test_wait_for_event_receives_event_and_unsubscribes_once() -> None:
     assert event.topic == "ak.wwise.core.object.created"
     assert event.payload == {"id": 1}
     assert event.kwargs == {"sequence": 2}
+    assert client.unsubscribe_calls == 1
+    assert manager.active_topics == set()
+
+
+def test_wait_for_event_accepts_unbounded_timeout_without_passing_infinity_to_queue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = FakeSubscriptionClient()
+    manager = SubscriptionManager(client)
+    queue_timeouts: list[float | None] = []
+    original_get = queue.Queue.get
+
+    def guarded_get(
+        instance: queue.Queue[Any],
+        block: bool = True,
+        timeout: float | None = None,
+    ) -> Any:
+        queue_timeouts.append(timeout)
+        assert timeout is None or math.isfinite(timeout)
+        return original_get(instance, block=block, timeout=timeout)
+
+    monkeypatch.setattr(queue.Queue, "get", guarded_get)
+
+    def publish() -> None:
+        while not client.handlers:
+            time.sleep(0.001)
+        client.handlers[0].emit({"id": 1})
+
+    publisher = threading.Thread(target=publish)
+    publisher.start()
+    event = manager.wait_for_event("ak.unbounded", timeout=math.inf)
+    publisher.join(0.5)
+
+    assert event.payload == {"id": 1}
+    assert queue_timeouts == [None]
+    assert client.unsubscribe_calls == 1
+    assert manager.active_topics == set()
+
+
+def test_unbounded_wait_keyboard_interrupt_unsubscribes_and_reraises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = FakeSubscriptionClient()
+    manager = SubscriptionManager(client)
+
+    def interrupted_get(
+        instance: queue.Queue[Any],
+        block: bool = True,
+        timeout: float | None = None,
+    ) -> Any:
+        del instance, block
+        assert timeout is None
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(queue.Queue, "get", interrupted_get)
+
+    with pytest.raises(KeyboardInterrupt):
+        manager.wait_for_event("ak.unbounded.cancelled", timeout=math.inf)
+
+    assert client.unsubscribe_calls == 1
+    assert client.handlers == []
+    assert manager.active_topics == set()
+
+
+def test_wait_for_events_accepts_unbounded_timeout_and_keeps_count_bounded() -> None:
+    client = FakeSubscriptionClient()
+    manager = SubscriptionManager(client)
+
+    def publish() -> None:
+        while not client.handlers:
+            time.sleep(0.001)
+        handler = client.handlers[0]
+        handler.emit({"sequence": 1})
+        handler.emit({"sequence": 2})
+
+    publisher = threading.Thread(target=publish)
+    publisher.start()
+    events = manager.wait_for_events(
+        "ak.unbounded.multi",
+        event_count=2,
+        timeout=math.inf,
+    )
+    publisher.join(0.5)
+
+    assert [event.payload["sequence"] for event in events] == [1, 2]
     assert client.unsubscribe_calls == 1
     assert manager.active_topics == set()
 

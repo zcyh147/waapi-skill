@@ -113,6 +113,12 @@ user's approval.
 - All live results and structured failures must stay bounded. Cleanup failures,
   timeouts, ambiguous mutation outcomes, and result-schema-only verification must
   remain distinguishable.
+- A Topic execution contract's `timeout_seconds` is its packaged default or
+  recommendation, not a caller maximum. `wait-topic` defaults to 10 seconds,
+  honors an explicit positive finite `--timeout`, and accepts `--no-timeout`
+  only as an explicit event-count-bounded wait. Even without a time limit,
+  event count, result size, terminal JSON output, cancellation cleanup, and
+  Authoring-host boundaries remain enforced.
 - A new reflected API row needs an explicit public route or exclusion, versioned
   schema validation, safety classification, and program coverage. Same-count URI
   substitutions must fail the inventory digest checks.

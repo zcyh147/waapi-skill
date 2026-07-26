@@ -410,6 +410,16 @@ run_program() {
     tests/unit/test_debug_lua_gateway_full_chain.py
     tests/unit/test_public_route_negative_contracts.py
     tests/unit/test_subscriptions.py
+    tests/unit/test_dispatcher.py::test_topic_dispatch_accepts_unbounded_timeout
+    tests/unit/test_dispatcher.py::test_topic_dispatch_rejects_other_non_finite_timeouts
+    tests/unit/test_dispatcher.py::test_topic_cleanup_failure_does_not_swallow_keyboard_interrupt
+    tests/unit/test_waapi_gateway.py::test_ordinary_wait_topic_honors_explicit_long_timeout_without_contract_cap
+    tests/unit/test_waapi_gateway.py::test_ordinary_wait_topic_reports_default_ten_second_budget
+    tests/unit/test_waapi_gateway.py::test_wait_topic_no_timeout_returns_strict_bounded_json
+    tests/unit/test_waapi_gateway.py::test_wait_topic_rejects_ambiguous_or_implicit_unbounded_timeout_before_connecting
+    tests/unit/test_waapi_gateway.py::test_wait_topic_keyboard_interrupt_closes_transport_subscription
+    tests/unit/test_waapi_gateway.py::test_wait_topic_no_timeout_keeps_transport_connect_finitely_bounded
+    tests/unit/test_script_helpers.py::test_run_main_returns_standard_interrupt_code_without_wrapper_traceback
     tests/unit/test_io_policy.py
     tests/unit/test_transaction_locality.py
     tests/unit/test_platform_paths.py

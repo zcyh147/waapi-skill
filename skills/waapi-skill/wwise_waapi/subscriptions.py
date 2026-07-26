@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import queue
 import re
@@ -65,7 +66,7 @@ class SubscriptionCleanupError(SubscriptionError):
         self,
         message: str,
         *,
-        primary_error: Exception | None = None,
+        primary_error: BaseException | None = None,
         reason: str,
     ) -> None:
         super().__init__(message)
@@ -349,8 +350,8 @@ class SubscriptionManager:
     ) -> tuple[SubscriptionEvent, ...]:
         """Internal shared implementation for single- and multi-event waits."""
 
-        if timeout < 0:
-            raise ValueError("timeout must be non-negative")
+        if math.isnan(timeout) or timeout < 0:
+            raise ValueError("timeout must be non-negative or positive infinity")
         event_queue: queue.Queue[SubscriptionEvent] = queue.Queue(maxsize=max(1, queue_size))
         matched: list[SubscriptionEvent] = []
 
@@ -359,16 +360,19 @@ class SubscriptionManager:
 
         # Subscription setup is part of the advertised timeout; starting the
         # deadline afterward could wait ``setup + timeout`` wall-clock time.
-        deadline = time.monotonic() + timeout
+        deadline = None if math.isinf(timeout) else time.monotonic() + timeout
         handle = self.subscribe(topic, callback=callback, options=options)
         if handle is None:
             raise SubscriptionUnavailable("A WAAPI client is required for bounded topic waits")
-        primary_error: Exception | None = None
+        primary_error: BaseException | None = None
         try:
             while len(matched) < event_count:
-                remaining = max(0.0, deadline - time.monotonic())
                 try:
-                    event = event_queue.get(timeout=remaining)
+                    if deadline is None:
+                        event = event_queue.get()
+                    else:
+                        remaining = max(0.0, deadline - time.monotonic())
+                        event = event_queue.get(timeout=remaining)
                 except queue.Empty as exc:
                     raise SubscriptionTimeout(
                         f"Timed out waiting {timeout:.3f}s for {event_count} matching "
@@ -376,7 +380,7 @@ class SubscriptionManager:
                     ) from exc
                 if predicate is None or predicate(event):
                     matched.append(event)
-        except Exception as exc:  # cleanup must remain independently observable
+        except BaseException as exc:  # cleanup must also run for Ctrl-C/SystemExit
             primary_error = exc
 
         try:

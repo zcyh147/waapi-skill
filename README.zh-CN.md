@@ -149,7 +149,7 @@ restart/assert/crash 会以生命周期不确定状态终止。
 
 命名操作层还为对象创建与修改、插件创建、RTPC/平台 link、音频导入、SoundBank 工作流、Lua/debug、截图，以及 Authoring UI command 的执行、注册和注销提供闭合、按版本约束的业务合同。`object.createPlugin` 只接受明确的 class ID 和闭合的 Source/Effect 描述；`2022.1` 使用固定 Effect 引用，后续版本追加 EffectSlot，并通过实时读回验证新建插件。UI command execute 只能验证反射出的空结果结构，不能声称任意 GUI 或工程效果已经验证；register/unregister 还会验证实时命令 ID 的存在状态。Wwise `2021.1` 的 SoundBank 生成只从实时 Project 的 `filePath`、`workunitIsDirty` 和受约束、带哈希、严格解析的 `.wproj` 获取工程上下文；后续版本绑定实时 `core.getProjectInfo`。这些路由把不可变 preview 绑定到之后的确认，并使用各操作能提供的最强读回，而不是只相信 WAAPI 返回成功。一旦 URI 已有实现完成的命名操作，generic `waapi.call` 会以 `DEDICATED_OPERATION_REQUIRED` 拒绝该 URI，避免原始 payload 绕过专用合同。
 
-当前固定的纯程序 gate 包含 **1901 项程序测试**，其中每一个已覆盖的默认 profile 版本/API 行都有一项已封装路由合同用例，并另外覆盖 Authoring overlay/UI command、gateway 会话提示上下文和上述命名操作的合同/验证矩阵。它验证 packaged 路由、schema、安全边界、I/O 约束、transaction 行为、fake dispatch 执行和确定性的 onboarding 信息；这不等于已经在真实 Wwise 进程中逐一运行了全部 808 行。另有一轮关闭 memory 的 `h80-release-c38` 真实 Wwise campaign，已通过全部 80 个获批重型 API 场景（2022.1 为 70 个，2024.1 和 2025.1 各 5 个）；这份证据只覆盖这些场景及其封存候选版本，不代表整个接口都做过真实语义测试。完整口径见[五版本覆盖契约](./skills/waapi-skill/references/waapi-coverage.md)。
+当前固定的纯程序 gate 包含 **1918 项程序测试**，其中每一个已覆盖的默认 profile 版本/API 行都有一项已封装路由合同用例，并另外覆盖 Authoring overlay/UI command、可配置和显式不限时的 Topic wait 生命周期、gateway 会话提示上下文和上述命名操作的合同/验证矩阵。它验证 packaged 路由、schema、安全边界、I/O 约束、transaction 行为、fake dispatch 执行和确定性的 onboarding 信息；这不等于已经在真实 Wwise 进程中逐一运行了全部 808 行。另有一轮关闭 memory 的 `h80-release-c38` 真实 Wwise campaign，已通过全部 80 个获批重型 API 场景（2022.1 为 70 个，2024.1 和 2025.1 各 5 个）；这份证据只覆盖这些场景及其封存候选版本，不代表整个接口都做过真实语义测试。完整口径见[五版本覆盖契约](./skills/waapi-skill/references/waapi-coverage.md)。
 
 ---
 
@@ -214,7 +214,7 @@ restart/assert/crash 会以生命周期不确定状态终止。
 
 ### Bounded topic handling
 
-支持 topic waits，但采用的是有边界的等待模型，而不是假设无限期 listener 生命周期。命令 timeout 是端到端预算，事件等待会从中预留一小段时间用于 unsubscribe、写 evidence 和关闭 transport。成功的 `wait-topic` 会把校验后的 WAAPI publish payload 直接放在 `event` 下，dispatcher 内部 callback envelope 不会泄漏到公开结果。不要用目标最终名称匹配 `object.created`，因为通知发生时命名尚未完成。对于 packaged ActorMixer 探针，Wwise 2021.1-2024.1 在通知时报告 `ActorMixer`，Wwise 2025.1 则报告底层 `PropertyContainer`；需要证明事件归属时，应把返回的对象 GUID 与可信 publisher 的 GUID 对账。
+所有 Topic wait 的 gateway 默认值都是 10 秒，也接受用户通过 gateway 全局 `--timeout` 指定任意正有限时长。若用户订阅 `ak.wwise.core.soundbank.generated` 时没有指定时长，Skill 会显式给同一个 gateway 传入 `--timeout 120`，并在开始前告知本次实际使用 120 秒；这是 Skill 的选择，不是另一套 gateway 默认值。用户明确要求不限时，才使用 `wait-topic --no-timeout`，持续到收齐目标事件或由用户取消。不限时只取消等待期限，并不是无限输出流：`wait-topic` 仍只收集 1–64 个事件、最终只返回一个 JSON 文档，聚合结果仍受 256 KiB 上限约束。递归 JSON 条件会逐个匹配候选事件，成功、超时或取消后都会 unsubscribe。单事件成功会把校验后的 WAAPI publish payload 放在 `event` 下，多事件则返回有序 `events` 和请求/实际数量。不要用目标最终名称匹配 `object.created`，因为通知发生时命名尚未完成。对于 packaged ActorMixer 探针，Wwise 2021.1-2024.1 在通知时报告 `ActorMixer`，Wwise 2025.1 则报告底层 `PropertyContainer`；需要证明事件归属时，应把返回的对象 GUID 与可信 publisher 的 GUID 对账。
 
 ### Unsupported boundary 明确返回
 

@@ -209,12 +209,12 @@ class WwiseDispatcher:
     def _dispatch(self, request: DispatcherRequest) -> dict[str, Any]:
         if not request.api.strip():
             return self._error_result(request.api, request.version, "INVALID_API", "api must be a non-empty WAAPI URI")
-        if not math.isfinite(request.timeout) or request.timeout < 0:
+        if math.isnan(request.timeout) or request.timeout < 0:
             return self._error_result(
                 request.api,
                 request.version,
                 "INVALID_TIMEOUT",
-                "timeout must be finite and non-negative",
+                "timeout must be non-negative; positive infinity is allowed only for topics",
             )
         if not isinstance(request.result_limit_bytes, int) or isinstance(request.result_limit_bytes, bool) or request.result_limit_bytes <= 0:
             return self._error_result(
@@ -242,6 +242,16 @@ class WwiseDispatcher:
                 request.version,
                 "API_NOT_FOUND",
                 f"WAAPI URI {request.api!r} is not present in generated manifest {request.version}",
+            )
+        if entry.item_type != "topic" and not math.isfinite(request.timeout):
+            return self._error_result(
+                request.api,
+                request.version,
+                "INVALID_TIMEOUT",
+                "timeout must be finite and non-negative for functions",
+                item_type=entry.item_type,
+                category=entry.category,
+                risk_level=entry.risk_level,
             )
         if self._unsupported_live_behavior(request, entry):
             return self._error_result(
@@ -322,6 +332,11 @@ class WwiseDispatcher:
                 }
         except SubscriptionCleanupError as exc:
             primary = exc.primary_error
+            if isinstance(primary, KeyboardInterrupt):
+                # Cancellation must remain cancellation even when the first
+                # unsubscribe attempt fails. The gateway owns the transport
+                # close/retry and the final structured cancellation result.
+                raise primary from exc
             if isinstance(primary, SubscriptionTimeout):
                 result = self._exception_result(
                     request,
@@ -393,7 +408,7 @@ class WwiseDispatcher:
             "item_type": entry.item_type,
             "category": entry.category,
             "risk_level": entry.risk_level,
-            "timeout": request.timeout,
+            "timeout": "unbounded" if math.isinf(request.timeout) else request.timeout,
             "dry_run": request.dry_run,
             "result": payload,
             "error_code": None,

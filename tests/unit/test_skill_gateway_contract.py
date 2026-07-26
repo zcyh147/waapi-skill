@@ -25,7 +25,9 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
         "python scripts/run.py gateway.py query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path",
         "python scripts/run.py gateway.py query-object --type Event --take 100",
         "python scripts/run.py gateway.py metadata types --summary-only",
-        "python scripts/run.py gateway.py --timeout 10 wait-topic <topic-uri>",
+        "python scripts/run.py gateway.py wait-topic <topic-uri>",
+        "python scripts/run.py gateway.py --timeout <positive-finite-seconds> wait-topic <topic-uri>",
+        "python scripts/run.py gateway.py wait-topic <topic-uri> --no-timeout",
         "python scripts/run.py gateway.py operations",
         "python scripts/run.py gateway.py operation-schema object.create",
         "python scripts/run.py gateway.py operation-schema waapi.call",
@@ -112,6 +114,46 @@ def test_query_reference_has_no_raw_client_fallback() -> None:
     assert "metadata types --summary-only" in query_reference
     assert "compact-serialize that object exactly" in query_reference
     assert "repeat the metadata command after success" in query_reference
+
+
+def test_topic_wait_policy_is_consistent_across_skill_reference_and_readmes() -> None:
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    query = (SKILL_ROOT / "references" / "waapi-query.md").read_text(
+        encoding="utf-8"
+    )
+    english = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    chinese = (REPO_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
+    skill_flat = " ".join(skill.split())
+    query_flat = " ".join(query.split())
+
+    assert "ordinary 10-second default" in skill_flat
+    assert "tell the user the effective waiting policy in one natural sentence" in skill_flat
+    assert "positive finite duration" in skill_flat
+    assert "`--no-timeout` removes only the waiting deadline" in skill_flat
+    assert "not an unlimited output stream" in skill_flat
+
+    assert "An ordinary omitted duration uses 10 seconds" in query_flat
+    assert "A user-supplied positive finite duration is authoritative" in query_flat
+    assert "Do not silently clamp it" in query_flat
+    assert "Do not combine the two flags" in query_flat
+    assert "collection still stops at 1–64 matching events" in query_flat
+    assert "the command still returns one terminal JSON document" in query_flat
+    assert "gateway itself keeps the ordinary 10-second omitted-duration default" in query_flat
+    assert "explicitly pass gateway-global `--timeout 120`" in query_flat
+    assert "tell the user that this subscription will use 120 seconds" in query_flat
+
+    for readme in (english, chinese):
+        assert "--timeout" in readme
+        assert "--no-timeout" in readme
+        assert "256 KiB" in readme
+    assert "gateway default for every Topic wait is 10 seconds" in english
+    assert "not an unlimited output stream" in english
+    assert "explicitly invokes the same gateway with `--timeout 120`" in english
+    assert "120 seconds is a Skill policy, not a second gateway default" in english
+    assert "所有 Topic wait 的 gateway 默认值都是 10 秒" in chinese
+    assert "并不是无限输出流" in chinese
+    assert "显式给同一个 gateway 传入 `--timeout 120`" in chinese
+    assert "这是 Skill 的选择，不是另一套 gateway 默认值" in chinese
 
 
 def test_query_reference_exposes_only_the_closed_original_file_match_surface() -> None:
@@ -223,7 +265,7 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
         assert "**656**" in readme
         assert "**152**" in readme
         assert "**6**" in readme
-        assert "1901" in readme
+        assert "1918" in readme
         assert "./skills/waapi-skill/references/waapi-coverage.md" in readme
 
     assert "198 unique routed WAAPI URIs" in english
@@ -232,4 +274,4 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
     assert "仍要求实时宿主为 Authoring" in " ".join(chinese.split())
     assert "not a claim that all 808 rows have been exercised against a real Wwise process" in english
     assert "不等于已经在真实 Wwise 进程中逐一运行了全部 808 行" in chinese
-    assert "currently contains 1901 passing tests" in coverage_contract
+    assert "currently contains 1918 passing tests" in coverage_contract

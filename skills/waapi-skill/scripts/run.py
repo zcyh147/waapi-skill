@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import argparse
 import os
+import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 try:  # pragma: no cover - import path differs between CLI and tests
@@ -27,6 +29,9 @@ except ImportError:  # pragma: no cover
 
 CODEX_GATEWAY_REQUIRED_ENV = "WAAPI_CODEX_GATEWAY_REQUIRED"
 CODEX_GATEWAY_REQUIRED_EXIT_CODE = 125
+INTERRUPTED_CHILD_CLEANUP_GRACE_SECONDS = 2.0
+INTERRUPTED_CHILD_SIGNAL_GRACE_SECONDS = 1.0
+INTERRUPTED_CHILD_TERMINATE_GRACE_SECONDS = 1.0
 SUPPORTED_WWISE_VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
 _GATEWAY_VERSION_OPTIONS = frozenset({"--version", "--wwise-version"})
 _GATEWAY_GLOBAL_OPTIONS_WITH_VALUES = frozenset(
@@ -103,6 +108,98 @@ def bootstrap_if_needed() -> None:
     subprocess.run([sys.executable, str(setup_script)], check=True)
 
 
+def _wait_for_interrupted_child(
+    process: subprocess.Popen[bytes],
+    *,
+    timeout: float,
+) -> bool:
+    """Wait a bounded interval while suppressing repeated wrapper interrupts."""
+
+    deadline = time.monotonic() + timeout
+    while True:
+        remaining = max(0.0, deadline - time.monotonic())
+        if remaining <= 0:
+            return process.poll() is not None
+        try:
+            process.wait(timeout=remaining)
+            return True
+        except subprocess.TimeoutExpired:
+            return process.poll() is not None
+        except KeyboardInterrupt:
+            # A repeated terminal interrupt must not abandon the child between
+            # cleanup stages. Continue toward the bounded escalation below.
+            continue
+
+
+def _signal_running_child(
+    process: subprocess.Popen[bytes],
+    action: str,
+) -> None:
+    """Apply one escalation action without racing a just-exited child."""
+
+    if process.poll() is not None:
+        return
+    try:
+        if action == "interrupt":
+            process.send_signal(signal.SIGINT)
+        elif action == "terminate":
+            process.terminate()
+        elif action == "kill":
+            process.kill()
+        else:  # pragma: no cover - internal closed call surface
+            raise ValueError(f"Unsupported child action: {action}")
+    except ProcessLookupError:
+        return
+    except (OSError, ValueError):
+        if action == "interrupt":
+            # Windows cannot deliver SIGINT to every child configuration.
+            # Continue through the bounded terminate/kill fallback instead of
+            # adding a wrapper traceback to an already-cancelled command.
+            return
+        raise
+
+
+def _reap_interrupted_child(process: subprocess.Popen[bytes]) -> None:
+    """Reap a force-killed child even if the wrapper receives another Ctrl-C."""
+
+    while process.poll() is None:
+        try:
+            process.wait()
+        except KeyboardInterrupt:
+            continue
+
+
+def _cleanup_interrupted_child(process: subprocess.Popen[bytes]) -> None:
+    """Give the gateway cleanup time, then escalate without orphaning it.
+
+    A terminal Ctrl-C normally reaches the wrapper and child gateway
+    synchronously because they share a process group. The first grace period
+    therefore deliberately sends no second signal: it lets the gateway emit its
+    structured cancellation result and close active WAAPI subscriptions. Only a
+    child that remains alive is interrupted again, then terminated, then killed.
+    """
+
+    if _wait_for_interrupted_child(
+        process,
+        timeout=INTERRUPTED_CHILD_CLEANUP_GRACE_SECONDS,
+    ):
+        return
+    _signal_running_child(process, "interrupt")
+    if _wait_for_interrupted_child(
+        process,
+        timeout=INTERRUPTED_CHILD_SIGNAL_GRACE_SECONDS,
+    ):
+        return
+    _signal_running_child(process, "terminate")
+    if _wait_for_interrupted_child(
+        process,
+        timeout=INTERRUPTED_CHILD_TERMINATE_GRACE_SECONDS,
+    ):
+        return
+    _signal_running_child(process, "kill")
+    _reap_interrupted_child(process)
+
+
 def main(argv: list[str] | None = None) -> int:
     if CODEX_GATEWAY_REQUIRED_ENV in os.environ:
         print(
@@ -140,8 +237,14 @@ def main(argv: list[str] | None = None) -> int:
         bootstrap_if_needed()
     except PackagedScriptError as exc:
         parser.error(str(exc))
-    result = subprocess.run([str(venv_python()), str(script_path), *script_arguments])
-    return result.returncode
+    process = subprocess.Popen(
+        [str(venv_python()), str(script_path), *script_arguments]
+    )
+    try:
+        return process.wait()
+    except KeyboardInterrupt:
+        _cleanup_interrupted_child(process)
+        return 130
 
 
 if __name__ == "__main__":

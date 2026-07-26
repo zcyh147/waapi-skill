@@ -247,15 +247,56 @@ def test_mixed_parent_child_query_keeps_both_required_types_in_candidate_set() -
         assert phrase in query_flat
 
 
-def test_soundbank_generated_uses_its_long_running_topic_default() -> None:
+def test_soundbank_generated_uses_an_explicit_skill_selected_timeout() -> None:
     command = (
         "--timeout 120 wait-topic ak.wwise.core.soundbank.generated "
         "--options-json"
     )
     assert command in QUERY
     assert "--timeout 10 wait-topic ak.wwise.core.soundbank.generated" not in QUERY
-    assert "topic-specific default overrides the general 5–10 second guidance" in QUERY
-    assert "SoundBank generation notifications use the documented 120-second default" in QUERY
+    assert "gateway itself keeps the ordinary 10-second omitted-duration default" in QUERY
+    assert "explicitly pass gateway-global `--timeout 120`" in QUERY
+    assert "an explicit Skill-selected timeout, not a different gateway default" in QUERY
+    assert "tell the user that this subscription will use 120 seconds" in QUERY
+    assert "user-supplied positive finite duration or explicit no-time-limit request still takes precedence" in QUERY
+
+
+def test_topic_wait_duration_policy_is_explicit_and_output_remains_bounded() -> None:
+    skill_flat = " ".join(SKILL.split())
+    query_flat = " ".join(QUERY.split())
+
+    for phrase in (
+        "tell the user the effective waiting policy in one natural sentence",
+        "ordinary 10-second default",
+        "converting units to seconds without rounding",
+        "`--timeout <positive-finite-seconds>` position before `wait-topic`",
+        "`wait-topic` subcommand flag `--no-timeout`",
+        "until the requested 1–64 matching events have been collected or the user cancels it",
+        "it is not an unlimited output stream",
+        "Never combine `--timeout` with `--no-timeout`",
+    ):
+        assert phrase in skill_flat
+
+    for phrase in (
+        "An ordinary omitted duration uses 10 seconds",
+        "convert its units to seconds without rounding",
+        "Do not silently clamp it",
+        "is its default or recommendation, not a maximum",
+        "add the subcommand flag `--no-timeout`",
+        "the command still returns one terminal JSON document",
+        "after success, timeout, or user cancellation",
+        "event count, result size, and terminal JSON output remain bounded",
+    ):
+        assert phrase in query_flat
+
+    assert "gateway.py wait-topic <topic-uri>" in SKILL
+    assert (
+        "gateway.py --timeout <positive-finite-seconds> wait-topic <topic-uri>"
+        in SKILL
+    )
+    assert "gateway.py wait-topic <topic-uri> --no-timeout" in SKILL
+    assert "这次使用默认的 10 秒等待时间" in SKILL
+    assert "直到收齐 `<N>` 个匹配事件或你让我停止" in SKILL
 
 
 def test_ordinary_wwise_work_forbids_agent_authored_code() -> None:

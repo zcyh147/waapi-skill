@@ -4519,6 +4519,197 @@ def test_soundbank_generated_wait_is_not_silently_capped_at_ten_seconds(
     assert 119.0 < captured["operation_timeout"] < 120.0
 
 
+def test_ordinary_wait_topic_honors_explicit_long_timeout_without_contract_cap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    topic = "ak.wwise.core.object.created"
+    captured: dict[str, float] = {}
+
+    def record_dispatch(*args: Any, **kwargs: Any) -> Mapping[str, Any]:
+        operation_timeout = float(kwargs["operation_timeout"])
+        captured["operation_timeout"] = operation_timeout
+        return {
+            "api": topic,
+            "item_type": "topic",
+            "category": None,
+            "version": "2022.1",
+            "ok": False,
+            "risk_level": "read",
+            "error_code": "TIMEOUT",
+            "message": "synthetic timeout without waiting",
+            "details": {"operation_timeout_seconds": operation_timeout},
+        }
+
+    monkeypatch.setattr(waapi_gateway, "dispatch", record_dispatch)
+    client = FakeClient({"ak.wwise.core.getInfo": live_info()})
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["--timeout", "3600", "wait-topic", topic],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert 3599.0 < captured["operation_timeout"] < 3600.0
+    assert payload["subscription_timeout"] == {
+        "mode": "finite",
+        "seconds": 3600.0,
+        "source": "explicit",
+    }
+
+
+def test_ordinary_wait_topic_reports_default_ten_second_budget(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    topic = "ak.wwise.core.object.created"
+    captured: dict[str, float] = {}
+
+    def record_dispatch(*args: Any, **kwargs: Any) -> Mapping[str, Any]:
+        operation_timeout = float(kwargs["operation_timeout"])
+        captured["operation_timeout"] = operation_timeout
+        return {
+            "api": topic,
+            "item_type": "topic",
+            "category": None,
+            "version": "2022.1",
+            "ok": False,
+            "risk_level": "read",
+            "error_code": "TIMEOUT",
+            "message": "synthetic timeout without waiting",
+            "details": {"operation_timeout_seconds": operation_timeout},
+        }
+
+    monkeypatch.setattr(waapi_gateway, "dispatch", record_dispatch)
+    client = FakeClient({"ak.wwise.core.getInfo": live_info()})
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["wait-topic", topic],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert 9.0 < captured["operation_timeout"] < 10.0
+    assert payload["subscription_timeout"] == {
+        "mode": "finite",
+        "seconds": 10.0,
+        "source": "default",
+    }
+
+
+def test_wait_topic_no_timeout_returns_strict_bounded_json(
+    tmp_path: Path,
+) -> None:
+    topic = "ak.wwise.core.object.created"
+    event = {"object": {"id": "wanted", "name": "UI"}}
+    client = FakeClient(
+        {"ak.wwise.core.getInfo": live_info()},
+        subscription_events={topic: [event]},
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["wait-topic", topic, "--no-timeout"],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0
+    assert payload["event"] == event
+    assert payload["subscription_timeout"] == {
+        "mode": "unbounded",
+        "seconds": None,
+        "source": "explicit_no_timeout",
+    }
+    assert payload["call"]["timeout"] == "unbounded"
+    assert payload["cleanup"] == "unsubscribed"
+    assert client.handlers[0].unsubscribe_calls == 1
+    json.dumps(payload, allow_nan=False)
+
+
+@pytest.mark.parametrize(
+    "argv",
+    (
+        [
+            "--timeout",
+            "60",
+            "wait-topic",
+            "ak.wwise.core.object.created",
+            "--no-timeout",
+        ],
+        ["--timeout", "inf", "wait-topic", "ak.wwise.core.object.created"],
+    ),
+)
+def test_wait_topic_rejects_ambiguous_or_implicit_unbounded_timeout_before_connecting(
+    tmp_path: Path,
+    argv: list[str],
+) -> None:
+    called = False
+
+    def client_factory(url: str) -> FakeClient:
+        nonlocal called
+        called = True
+        raise AssertionError(f"invalid timeout must not connect to {url}")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        argv,
+        env=gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert called is False
+
+
+def test_wait_topic_keyboard_interrupt_closes_transport_subscription(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    topic = "ak.wwise.core.object.created"
+
+    def interrupt_after_subscribe(
+        manager: Any,
+        subscribed_topic: str,
+        *,
+        event_count: int,
+        timeout: float,
+        options: Mapping[str, Any] | None,
+        queue_size: int,
+        predicate: Any,
+    ) -> tuple[Any, ...]:
+        del event_count, timeout, queue_size, predicate
+        handle = manager.subscribe(
+            subscribed_topic,
+            callback=lambda *args, **kwargs: None,
+            options=dict(options or {}),
+        )
+        assert handle is not None
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        dispatcher_module.SubscriptionManager,
+        "_wait_for_events",
+        interrupt_after_subscribe,
+    )
+    client = FakeClient({"ak.wwise.core.getInfo": live_info()})
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["wait-topic", topic, "--no-timeout"],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 130
+    assert payload["status"] == "cancelled"
+    assert payload["error_code"] == "CANCELLED"
+    assert payload["cleanup"] == {"status": "transport_closed"}
+    assert payload["subscription_timeout"]["mode"] == "unbounded"
+    assert client.handlers[0].unsubscribe_calls == 1
+    assert client.disconnected is True
+
+
 def test_wait_topic_collects_bounded_matching_events_in_order(tmp_path: Path) -> None:
     topic = "ak.wwise.core.object.created"
     client = FakeClient(
@@ -4902,6 +5093,48 @@ def test_transport_connect_timeout_returns_within_wall_budget_and_late_factory_c
     assert caught.value.as_dict()["details"]["cleanup_pending"] is True
 
     release_factory.set()
+    assert disconnected.wait(timeout=1)
+
+
+def test_wait_topic_no_timeout_keeps_transport_connect_finitely_bounded(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    release_factory = threading.Event()
+    disconnected = threading.Event()
+
+    class LateClient:
+        def disconnect(self) -> None:
+            disconnected.set()
+
+    def slow_factory(url: str) -> LateClient:
+        del url
+        release_factory.wait(timeout=2)
+        return LateClient()
+
+    monkeypatch.setattr(waapi_gateway, "DEFAULT_TIMEOUT", 0.03)
+    started_at = time.monotonic()
+    try:
+        exit_code, payload = waapi_gateway.execute_gateway(
+            [
+                "wait-topic",
+                "ak.wwise.core.object.created",
+                "--no-timeout",
+            ],
+            env=gateway_env(tmp_path),
+            client_factory=slow_factory,
+        )
+    finally:
+        release_factory.set()
+    elapsed = time.monotonic() - started_at
+
+    assert exit_code == 2
+    assert elapsed < 0.15
+    assert payload["error_code"] == "TIMEOUT"
+    assert payload["details"]["phase"] == "transport.connect"
+    assert payload["details"]["timeout_mode"] == "unbounded"
+    assert payload["details"]["deadline_exhausted"] is False
+    assert payload["details"]["cleanup_pending"] is True
     assert disconnected.wait(timeout=1)
 
 

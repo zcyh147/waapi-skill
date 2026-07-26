@@ -167,6 +167,7 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_TIMEOUT = 10.0
 DEFAULT_TRANSACTION_TIMEOUT = 150.0
 TRANSPORT_CLEANUP_GRACE_SECONDS = 0.05
+UNBOUNDED_TOPIC_CLEANUP_TIMEOUT_SECONDS = 1.0
 TOPIC_CLEANUP_RESERVE_MAX_SECONDS = 0.25
 TOPIC_CLEANUP_RESERVE_RATIO = 0.20
 GET_INFO_URI = "ak.wwise.core.getInfo"
@@ -383,17 +384,27 @@ class GatewayTimeoutError(TimeoutError):
         self.abort_requested = self.abort_requested or abort_requested
 
     def as_dict(self) -> dict[str, Any]:
+        unbounded = math.isinf(self.configured_timeout)
         details: dict[str, Any] = {
             "provenance": GATEWAY_DEADLINE_PROVENANCE,
             "phase": self.phase,
-            "configured_timeout_seconds": self.configured_timeout,
+            "configured_timeout_seconds": (
+                None if unbounded else self.configured_timeout
+            ),
+            "timeout_mode": "unbounded" if unbounded else "finite",
             "elapsed_seconds": self.elapsed,
-            "deadline_exhausted": self.elapsed >= self.configured_timeout,
+            "deadline_exhausted": (
+                False if unbounded else self.elapsed >= self.configured_timeout
+            ),
             "cleanup_pending": self.cleanup_pending,
             "abort_requested": self.abort_requested,
         }
         if self.operation_timeout is not None:
-            details["operation_timeout_seconds"] = self.operation_timeout
+            details["operation_timeout_seconds"] = (
+                None
+                if math.isinf(self.operation_timeout)
+                else self.operation_timeout
+            )
         return {
             "error_code": "TIMEOUT",
             "message": str(self),
@@ -416,6 +427,8 @@ class GatewayDeadline:
 
     @property
     def cleanup_expires_at(self) -> float:
+        if math.isinf(self.expires_at):
+            return time.monotonic() + UNBOUNDED_TOPIC_CLEANUP_TIMEOUT_SECONDS
         return self.expires_at + TRANSPORT_CLEANUP_GRACE_SECONDS
 
     def remaining(self, *, cleanup: bool = False) -> float:
@@ -449,6 +462,12 @@ class GatewayDeadline:
         if remaining <= 0:
             raise self.timeout_error(phase)
         return remaining
+
+
+def _blocking_timeout(seconds: float) -> float | None:
+    """Translate an internal unbounded deadline into Python's blocking API."""
+
+    return None if math.isinf(seconds) else max(0.0, seconds)
 
 
 @dataclass(frozen=True, slots=True)
@@ -523,6 +542,11 @@ class GatewayTransport:
         )
         self._thread.start()
         ready_timeout = self.deadline.remaining()
+        if math.isinf(ready_timeout):
+            # No-timeout applies only to the established Topic wait. A stuck
+            # client constructor must not turn connection setup into an
+            # unbounded phase.
+            ready_timeout = DEFAULT_TIMEOUT
         if ready_timeout <= 0:
             self._abandoned.set()
             self._closed.set()
@@ -531,7 +555,7 @@ class GatewayTransport:
             self._last_timeout = error
             raise error
         try:
-            ok, payload = self._ready.get(timeout=ready_timeout)
+            ok, payload = self._ready.get(timeout=_blocking_timeout(ready_timeout))
         except queue.Empty as exc:
             self._abandoned.set()
             self._closed.set()
@@ -581,7 +605,17 @@ class GatewayTransport:
         )
 
     def subscribe(self, uri: str, callback: Any, options: Mapping[str, Any] | None = None) -> Any:
-        return self._request("subscribe", uri, callback, options=options, phase=f"WAAPI subscribe {uri}")
+        setup_timeout = (
+            DEFAULT_TIMEOUT if math.isinf(self.deadline.timeout) else None
+        )
+        return self._request(
+            "subscribe",
+            uri,
+            callback,
+            options=options,
+            phase=f"WAAPI subscribe {uri}",
+            timeout=setup_timeout,
+        )
 
     def unsubscribe(self, subscription: Any) -> Any:
         return self._request("unsubscribe", subscription, phase="WAAPI unsubscribe", cleanup=True)
@@ -593,7 +627,9 @@ class GatewayTransport:
         request = self._close_request()
         self._requests.put(request)
         try:
-            ok, payload = request.response.get(timeout=self.deadline.remaining(cleanup=True))
+            ok, payload = request.response.get(
+                timeout=_blocking_timeout(self.deadline.remaining(cleanup=True))
+            )
         except queue.Empty as exc:
             abort_requested = self._abort_pending_client()
             error = self._last_timeout or self.deadline.timeout_error(
@@ -604,7 +640,9 @@ class GatewayTransport:
             error.mark_cleanup_pending(abort_requested=abort_requested)
             self._last_timeout = error
             raise error from exc
-        self._thread.join(timeout=self.deadline.remaining(cleanup=True))
+        self._thread.join(
+            timeout=_blocking_timeout(self.deadline.remaining(cleanup=True))
+        )
         if self._thread.is_alive():
             abort_requested = self._abort_pending_client()
             error = self._last_timeout or self.deadline.timeout_error(
@@ -657,7 +695,11 @@ class GatewayTransport:
         )
         self._requests.put(request)
         try:
-            ok, payload = response.get(timeout=max(0.0, expires_at - time.monotonic()))
+            ok, payload = response.get(
+                timeout=_blocking_timeout(
+                    max(0.0, expires_at - time.monotonic())
+                )
+            )
         except queue.Empty as exc:
             request.cancelled.set()
             abort_requested = self._abort_pending_client()
@@ -996,6 +1038,15 @@ def build_parser() -> argparse.ArgumentParser:
             f"and is capped at {MAX_WAIT_EVENT_COUNT}"
         ),
     )
+    wait_topic.add_argument(
+        "--no-timeout",
+        action="store_true",
+        help=(
+            "Wait without a Skill-imposed time limit until the requested bounded "
+            "event count arrives or the command is cancelled; cannot be combined "
+            "with global --timeout"
+        ),
+    )
 
     capabilities = subparsers.add_parser(
         "capabilities",
@@ -1237,9 +1288,14 @@ def _execute_gateway_unconstrained(
         factory = client_factory or default_client_factory
         transport = GatewayTransport(connection.url, factory, deadline=connection.deadline)
         try:
+            version_detection_timeout = connection.deadline.require_remaining(
+                "version_detection.getInfo"
+            )
+            if math.isinf(version_detection_timeout):
+                version_detection_timeout = DEFAULT_TIMEOUT
             live_info = transport.call_with_timeout(
                 GET_INFO_URI,
-                timeout=connection.deadline.require_remaining("version_detection.getInfo"),
+                timeout=version_detection_timeout,
                 phase="version_detection.getInfo",
             )
             detected_version = version_key_from_get_info(require_mapping(live_info, "getInfo response"))
@@ -1263,6 +1319,51 @@ def _execute_gateway_unconstrained(
             )
             if payload.get("ok"):
                 connection.deadline.require_remaining(f"finalize {args.command}")
+        except KeyboardInterrupt:
+            cancellation_cleanup: dict[str, Any]
+            try:
+                transport.close()
+            except BaseException as cleanup_exc:  # noqa: BLE001 - cancellation must report cleanup truthfully
+                cancellation_cleanup = {
+                    "status": "cleanup_failed",
+                    "failure": cleanup_failure_evidence(cleanup_exc),
+                }
+            else:
+                cancellation_cleanup = {"status": "transport_closed"}
+            cancelled_payload: dict[str, Any] = {
+                "contract": GATEWAY_RESULT_CONTRACT,
+                "ok": False,
+                "status": "cancelled",
+                "command": args.command,
+                "error_code": "CANCELLED",
+                "message": (
+                    "Gateway command was cancelled; transport cleanup was attempted."
+                ),
+                "cleanup": cancellation_cleanup,
+            }
+            if args.command == "wait-topic":
+                unbounded_timeout = math.isinf(connection.timeout)
+                cancelled_payload.update(
+                    {
+                        "topic": args.api,
+                        "subscription_timeout": {
+                            "mode": (
+                                "unbounded" if unbounded_timeout else "finite"
+                            ),
+                            "seconds": (
+                                None if unbounded_timeout else connection.timeout
+                            ),
+                            "source": (
+                                "explicit_no_timeout"
+                                if unbounded_timeout
+                                else "explicit"
+                                if args.timeout is not None
+                                else "default"
+                            ),
+                        },
+                    }
+                )
+            return finish(130, cancelled_payload)
         except Exception as primary_exc:
             try:
                 transport.close()
@@ -2267,6 +2368,10 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
     elif args.command == "wait-topic":
         parse_json_object(args.options_json, "--options-json")
         parse_json_object(args.match_json, "--match-json")
+        if args.no_timeout and args.timeout is not None:
+            raise GatewayInputError(
+                "wait-topic --no-timeout cannot be combined with global --timeout"
+            )
         if not 1 <= args.event_count <= MAX_WAIT_EVENT_COUNT:
             raise GatewayInputError(
                 f"wait-topic --event-count must be between 1 and {MAX_WAIT_EVENT_COUNT}"
@@ -3002,16 +3107,29 @@ def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> G
         if evidence_text
         else None
     )
+    no_topic_timeout = bool(
+        args.command == "wait-topic" and getattr(args, "no_timeout", False)
+    )
     raw_timeout = (
-        args.timeout
-        if args.timeout is not None
+        math.inf
+        if no_topic_timeout
         else (
-            DEFAULT_TRANSACTION_TIMEOUT
-            if args.command in {"preview", "execute", "verify"}
-            else DEFAULT_TIMEOUT
+            args.timeout
+            if args.timeout is not None
+            else (
+                DEFAULT_TRANSACTION_TIMEOUT
+                if args.command in {"preview", "execute", "verify"}
+                else DEFAULT_TIMEOUT
+            )
         )
     )
-    if not math.isfinite(raw_timeout) or raw_timeout <= 0:
+    if (
+        raw_timeout <= 0
+        or (
+            not math.isfinite(raw_timeout)
+            and not (no_topic_timeout and raw_timeout == math.inf)
+        )
+    ):
         raise GatewayInputError("timeout must be finite and greater than zero")
     timeout = float(raw_timeout)
     return GatewayConnection(
@@ -3688,18 +3806,27 @@ def dispatch_command(
             options=request_options,
             topic_match=match or None,
             topic_event_count=args.event_count,
-            operation_timeout=min(
-                reserved_topic_wait_timeout(connection),
-                float(capability.execution_contract["timeout_seconds"]),
-            ),
+            operation_timeout=reserved_topic_wait_timeout(connection),
             result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
         )
+        unbounded_timeout = math.isinf(connection.timeout)
         payload: dict[str, Any] = {
             "ok": bool(result.get("ok")),
             "status": "ok" if result.get("ok") else "error",
             **common,
             "topic": args.api,
             "match": match or None,
+            "subscription_timeout": {
+                "mode": "unbounded" if unbounded_timeout else "finite",
+                "seconds": None if unbounded_timeout else connection.timeout,
+                "source": (
+                    "explicit_no_timeout"
+                    if unbounded_timeout
+                    else "explicit"
+                    if args.timeout is not None
+                    else "default"
+                ),
+            },
             "call": dispatch_call_summary(result),
         }
         cleanup = topic_subscription_cleanup_status(result)
@@ -5336,11 +5463,22 @@ def dispatch(
         result = dict(result)
         details = dict(result.get("details") or {})
         elapsed = connection.deadline.elapsed()
+        unbounded = math.isinf(connection.timeout)
         details.setdefault("phase", f"dispatch {api}")
-        details.setdefault("configured_timeout_seconds", connection.timeout)
-        details.setdefault("operation_timeout_seconds", dispatch_timeout)
+        details.setdefault(
+            "configured_timeout_seconds",
+            None if unbounded else connection.timeout,
+        )
+        details.setdefault("timeout_mode", "unbounded" if unbounded else "finite")
+        details.setdefault(
+            "operation_timeout_seconds",
+            None if math.isinf(dispatch_timeout) else dispatch_timeout,
+        )
         details.setdefault("elapsed_seconds", elapsed)
-        details.setdefault("deadline_exhausted", elapsed >= connection.timeout)
+        details.setdefault(
+            "deadline_exhausted",
+            False if unbounded else elapsed >= connection.timeout,
+        )
         details.setdefault("cleanup_pending", False)
         details.setdefault("abort_requested", False)
         result["details"] = details

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import queue
 import threading
 import time
 from pathlib import Path
@@ -244,6 +245,44 @@ def test_topic_dispatch_uses_subscription_manager_without_reimplementing_subscri
     assert manager.waits == [("ak.wwise.core.object.created", 0.25, {"filter": "fixture"})]
 
 
+def test_topic_dispatch_accepts_unbounded_timeout() -> None:
+    manager = FakeSubscriptionManager()
+    dispatcher = WwiseDispatcher(
+        manifest_store=manifest_store(),
+        subscription_manager=manager,  # type: ignore[arg-type]
+    )
+
+    result = dispatcher.dispatch(
+        "ak.wwise.core.object.created",
+        timeout=float("inf"),
+    )
+
+    assert result["ok"] is True
+    assert result["timeout"] == "unbounded"
+    assert result["details"]["subscription_cleanup"] == {"status": "unsubscribed"}
+    assert manager.waits == [
+        ("ak.wwise.core.object.created", float("inf"), {})
+    ]
+
+
+@pytest.mark.parametrize("timeout", (float("nan"), float("-inf")))
+def test_topic_dispatch_rejects_other_non_finite_timeouts(timeout: float) -> None:
+    manager = FakeSubscriptionManager()
+    dispatcher = WwiseDispatcher(
+        manifest_store=manifest_store(),
+        subscription_manager=manager,  # type: ignore[arg-type]
+    )
+
+    result = dispatcher.dispatch(
+        "ak.wwise.core.object.created",
+        timeout=timeout,
+    )
+
+    assert result["ok"] is False
+    assert result["error_code"] == "INVALID_TIMEOUT"
+    assert manager.waits == []
+
+
 def test_topic_cleanup_false_preserves_timeout_and_marks_cleanup_failure() -> None:
     class FailedCleanupManager:
         def wait_for_event(self, *args: Any, **kwargs: Any) -> SubscriptionEvent:
@@ -268,6 +307,58 @@ def test_topic_cleanup_false_preserves_timeout_and_marks_cleanup_failure() -> No
         "status": "unsubscribe_failed",
         "reason": "unsubscribe_returned_false",
     }
+
+
+@pytest.mark.parametrize("cleanup_mode", ("false", "raise"))
+def test_topic_cleanup_failure_does_not_swallow_keyboard_interrupt(
+    cleanup_mode: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class InterruptCleanupHandler:
+        def __init__(self) -> None:
+            self.unsubscribe_calls = 0
+
+        def unsubscribe(self) -> bool:
+            self.unsubscribe_calls += 1
+            if cleanup_mode == "raise":
+                raise RuntimeError("synthetic unsubscribe failure")
+            return False
+
+    class InterruptCleanupClient:
+        def __init__(self) -> None:
+            self.handler = InterruptCleanupHandler()
+
+        def subscribe(
+            self,
+            topic: str,
+            callback: Any,
+            options: Mapping[str, Any] | None = None,
+        ) -> InterruptCleanupHandler:
+            del topic, callback, options
+            return self.handler
+
+    cancellation = KeyboardInterrupt("synthetic user cancellation")
+
+    def interrupted_get(
+        instance: queue.Queue[Any],
+        block: bool = True,
+        timeout: float | None = None,
+    ) -> Any:
+        del instance, block, timeout
+        raise cancellation
+
+    monkeypatch.setattr(queue.Queue, "get", interrupted_get)
+    client = InterruptCleanupClient()
+    dispatcher = WwiseDispatcher(
+        client=client,  # type: ignore[arg-type]
+        manifest_store=manifest_store(),
+    )
+
+    with pytest.raises(KeyboardInterrupt) as caught:
+        dispatcher.dispatch("ak.wwise.core.object.created", timeout=float("inf"))
+
+    assert caught.value is cancellation
+    assert client.handler.unsubscribe_calls == 1
 
 
 def test_topic_dispatch_supports_a_recursive_payload_match() -> None:
@@ -339,7 +430,10 @@ def test_dispatcher_rejects_non_finite_timeout_without_calling_client(timeout: f
 
     assert result["ok"] is False
     assert result["error_code"] == "INVALID_TIMEOUT"
-    assert result["message"] == "timeout must be finite and non-negative"
+    assert result["message"] in {
+        "timeout must be non-negative; positive infinity is allowed only for topics",
+        "timeout must be finite and non-negative for functions",
+    }
     assert client.calls == []
 
 
