@@ -439,11 +439,11 @@ def _preview_target_identity(target_identities: Mapping[str, Any]) -> dict[str, 
     roles = {str(role): dict(identity) for role, identity in target_identities.items() if isinstance(identity, Mapping)}
     return {
         "roles": roles,
-        "confirmed_execution": {
+        "authorized_execution": {
             "required": True,
             "abort_on_mismatch": True,
             "mismatch_status": "repreview_required",
-            "reason": "confirmed execution must reuse the preview-resolved target identity",
+            "reason": "authorized execution must reuse the preview-resolved target identity",
         },
     }
 
@@ -631,8 +631,8 @@ def _preview_metadata(
     return metadata
 
 
-def confirm_preview_target_identity(preview: SemanticPreview, execution_target_identity: Mapping[str, Any]) -> dict[str, Any]:
-    """Compare confirmed execution targets with preview metadata and fail closed."""
+def validate_preview_target_identity(preview: SemanticPreview, execution_target_identity: Mapping[str, Any]) -> dict[str, Any]:
+    """Compare authorized execution targets with preview metadata and fail closed."""
 
     preview_target_identity = preview.envelope.metadata.get("preview_target_identity")
     if not isinstance(preview_target_identity, Mapping):
@@ -665,12 +665,12 @@ def confirm_preview_target_identity(preview: SemanticPreview, execution_target_i
             "repreview_required": True,
             "executed": False,
             "verified": False,
-            "reason": "confirmed execution target identity differs from preview target identity",
+            "reason": "authorized execution target identity differs from preview target identity",
             "expected_target_identity": expected_keys,
             "provided_target_identity": provided_keys,
         }
     return {
-        "status": "target_identity_confirmed",
+        "status": "target_identity_validated",
         "repreview_required": False,
         "executed": False,
         "verified": False,

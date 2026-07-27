@@ -26,9 +26,13 @@ for Wwise Authoring. Read this file before changing the Skill or running tests.
 - Prefer deterministic code and structured results over prompt-only knowledge.
   When a capability is unavailable through the packaged interface, return a
   clear boundary instead of teaching the model how to synthesize a workaround.
-- Read-only work should be direct and bounded. Project changes use immutable
-  preview, later explicit confirmation, one execution, and verification. Never
-  turn an imperative user request into same-turn preview plus execution.
+- Read-only work should be direct and bounded. Every project change uses an
+  immutable preview, at most one execution, and verification. `read_only`
+  blocks changes but still permits catalog-proven read transactions;
+  `ask_before_changes` presents the expected result and waits for a later
+  explicit confirmation; `allow_changes` gives notice and may continue from a
+  distinct durable policy authorization in the same user turn. A
+  design-only or ambiguous request never receives direct policy authorization.
 - The first Skill-backed reply uses gateway-owned `session_context` for the
   natural one-time introduction. Do not add a separate live call only to produce
   that introduction, and do not reconstruct its facts from memory or prose.
@@ -130,8 +134,8 @@ user's approval.
   collector beyond live `getInfo`, the five fixed schemas, and `getCommands`
   without a new review.
 - A new mutation route needs a closed request schema, immutable preview artifact,
-  confirmation binding, drift checks, non-retry semantics, and an appropriate
-  verifier or an explicit weaker boundary.
+  confirmation or policy-authorization binding, drift checks, non-retry
+  semantics, and an appropriate verifier or an explicit weaker boundary.
 - Update README coverage numbers and `tests/TEST_INVENTORY.md` only from an actual
   completed run; never estimate a passing count.
 - Fresh Codex campaign and matrix runners are the only agent-semantic test lane.

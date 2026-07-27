@@ -58,7 +58,11 @@ inherited from the canonical Console manifest.
   unsubscribe.
 - `transaction`, `managed_transaction`, or `isolated_transaction`: the
   manifest-registered `waapi.call` operation through immutable
-  preview -> explicit confirmation -> execute once -> result verification.
+  preview -> accepted authorization -> execute once -> result verification.
+  For project changes, `ask_before_changes` presents the expected result and
+  waits for a later explicit confirmation, while `allow_changes` gives notice
+  and may continue from durable policy authorization in the same user turn;
+  `read_only` blocks the change.
 - `compound_transaction_member`: one Undo member row that remains executable
   only inside the closed `waapi.undoGroup` same-connection composite; it is
   rejected from independent `waapi.call` execution.
@@ -160,11 +164,11 @@ closed until the packaged contract is reviewed and updated.
 
 ## Verification scope
 
-The focused program gate currently contains 1918 passing tests and exercises
+The focused program gate currently contains 1932 passing tests and exercises
 all 808 packaged route-contract version/API rows with
 in-process fake clients. It validates exact URI dispatch, reflected request and
-result/event schemas, timeout/result ceilings, transaction preparation and
-verification, same-connection Undo execution, lifecycle cleanup binding,
+result/event schemas, timeout/result ceilings, all three modification-policy
+branches, transaction preparation and verification, same-connection Undo execution, lifecycle cleanup binding,
 isolated path confinement, and topic
 subscribe/event/unsubscribe behavior. Separate negative tests cover exclusions,
 route bypass attempts, model-authored external command hooks, malformed nested
@@ -180,6 +184,17 @@ sealed evidence. That result applies only to the exact heavy-suite candidate;
 the later reflected-identical 2025.1 `audio.convert` mapping and the wider 808
 row interface remain “program-tested packaged coverage,” not individually
 live-semantic-verified.
+
+For the current modification-policy candidate, the sealed, memory-off
+`campaign-modification-policy-9-c7` Codex Terra campaign passed all nine
+Wwise 2022.1 tasks and all 15 user turns. It ran three isolated repetitions
+each of `read_only`, question-style `ask_before_changes`, and same-turn
+`allow_changes`. The three read-only cases performed no primary mutation
+dispatch. Each of the six authorized write cases performed exactly one primary
+dispatch and verified seven created objects with 46 passing business
+assertions. All source-project hashes remained unchanged and all nine
+sandboxes were cleaned. This is focused policy behavior evidence, not
+per-API or cross-version semantic coverage.
 
 The five Authoring UI resources were collected from the matching installed
 builds with exactly 35 read-only calls in total: per version, one `getInfo`,

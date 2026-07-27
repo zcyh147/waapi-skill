@@ -62,7 +62,7 @@ OPENERS = (
 
 def _contract(api: str, *companions: str) -> dict[str, object]:
     return {
-        "contract": "waapi-skill.public-execution-contract/v1",
+        "contract": "waapi-skill.public-execution-contract/v2",
         "uri": api,
         "route": "managed_transaction",
         "companion_uris": list(companions),
@@ -326,6 +326,9 @@ def test_missing_request_binding_and_invalid_phase_are_structured_errors() -> No
             ),
         )
     assert missing.value.error_code == "CLEANUP_BINDING_MISSING"
+    assert str(missing.value) == (
+        "The authorized immutable request lacks the argument required by its cleanup companion."
+    )
 
     spec = build_transaction_cleanup_spec(
         "ak.wwise.core.remote.connect",

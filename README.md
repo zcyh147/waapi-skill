@@ -70,8 +70,8 @@ Project-changing operations are not treated as casual follow-ups.
 The skill supports:
 
 - read-only first paths for ordinary inspection
-- preview-then-confirm mutation flow
-- gateway-issued confirmation tokens bound to immutable transaction previews
+- three clear modification modes: `read_only`, `ask_before_changes`, and `allow_changes`
+- immutable previews bound either to a gateway-issued confirmation token or a distinct durable policy authorization
 - bounded destructive opt-in
 - post-action verification and readback
 
@@ -145,7 +145,7 @@ Inspect either packaged profile offline with
 cannot override the profile detected from a live host.
 
 Both profiles route APIs through fixed commands, bounded direct calls, bounded
-topic waits, confirmed transactions, isolated I/O transactions, or the
+topic waits, policy-gated transactions, isolated I/O transactions, or the
 same-connection Undo Group composite. Lua file routes accept only an existing
 `.lua` file whose path, size, and hash are rebound, while Wwise 2025.1 also has
 an exact inline-source route; `source_authority` is a caller assertion, not
@@ -154,9 +154,9 @@ repairs, or wraps Lua. Private debug APIs use bounded reads/topics or explicit
 non-retry transactions, with restart/assert/crash terminating in an
 indeterminate lifecycle result.
 
-The named operation layer also provides closed, version-aware business contracts for object creation and mutation, plug-in creation, RTPC/platform-link editing, audio import, SoundBank workflows, Lua/debug operations, screenshots, and Authoring UI command execution/registration/unregistration. `object.createPlugin` accepts only an exact class ID and a closed Source/Effect descriptor, uses fixed Effect references in `2022.1` or an appended EffectSlot in later versions, and verifies the created plug-in through live readback. UI command execution verifies only the reflected empty result—not the arbitrary GUI or project effect—while registration and unregistration additionally verify live command-ID membership. For `soundbank.generate`, Wwise `2021.1` derives its project and output context from the live Project object's `filePath` and `workunitIsDirty` accessors plus a contained, hashed, strictly parsed `.wproj`; no caller-authored project layout is accepted. Later versions bind the reflected `core.getProjectInfo` result. These routes bind an immutable preview to the later confirmation and use the strongest available operation-specific readback instead of trusting only a successful WAAPI response. Once a URI has an implemented dedicated operation, the generic `waapi.call` fallback is rejected with `DEDICATED_OPERATION_REQUIRED` so raw payloads cannot bypass that contract.
+The named operation layer also provides closed, version-aware business contracts for object creation and mutation, plug-in creation, RTPC/platform-link editing, audio import, SoundBank workflows, Lua/debug operations, screenshots, and Authoring UI command execution/registration/unregistration. `object.createPlugin` accepts only an exact class ID and a closed Source/Effect descriptor, uses fixed Effect references in `2022.1` or an appended EffectSlot in later versions, and verifies the created plug-in through live readback. UI command execution verifies only the reflected empty result—not the arbitrary GUI or project effect—while registration and unregistration additionally verify live command-ID membership. For `soundbank.generate`, Wwise `2021.1` derives its project and output context from the live Project object's `filePath` and `workunitIsDirty` accessors plus a contained, hashed, strictly parsed `.wproj`; no caller-authored project layout is accepted. Later versions bind the reflected `core.getProjectInfo` result. These routes bind an immutable preview to explicit confirmation or durable `allow_changes` authority and use the strongest available operation-specific readback instead of trusting only a successful WAAPI response. Once a URI has an implemented dedicated operation, the generic `waapi.call` fallback is rejected with `DEDICATED_OPERATION_REQUIRED` so raw payloads cannot bypass that contract.
 
-The focused code-only gate currently runs **1918 program tests**, including one packaged-route-contract case for every covered default-profile version/API row, the separate Authoring overlay/UI-command contracts, the configurable and explicitly unbounded topic-wait lifecycle, the gateway-owned conversation-context contract, and the named-operation contract/verifier matrices above. This proves packaged routing, schema handling, safety boundaries, I/O confinement, transaction behavior, fake-dispatch execution, and deterministic onboarding facts; it is not a claim that all 808 rows have been exercised against a real Wwise process. The completed memory-off `h80-release-c38` campaign separately passed all 80 approved real-Wwise heavy-API scenarios (70 on 2022.1, five on 2024.1, and five on 2025.1); that evidence applies to those scenarios and their sealed candidate, not the whole interface. See [the detailed five-version coverage contract](./skills/waapi-skill/references/waapi-coverage.md).
+The focused code-only gate currently runs **1932 program tests**, including one packaged-route-contract case for every covered default-profile version/API row, the separate Authoring overlay/UI-command contracts, the configurable and explicitly unbounded topic-wait lifecycle, the three modification-policy branches (including catalog-proven read transactions under `read_only`), the gateway-owned conversation-context contract, and the named-operation contract/verifier matrices above. This proves packaged routing, schema handling, safety boundaries, I/O confinement, transaction behavior, fake-dispatch execution, and deterministic onboarding facts; it is not a claim that all 808 rows have been exercised against a real Wwise process. For the current policy candidate, the memory-off `modification_policy_9-c7` campaign passed all nine Wwise 2022.1 tasks: three isolated repetitions each of `read_only`, question-style `ask_before_changes`, and same-turn `allow_changes`. Its six authorized write tasks each created and verified seven objects through 46 business assertions, while all source-project hashes remained unchanged and every sandbox was cleaned. The earlier memory-off `h80-release-c38` campaign separately passed all 80 approved real-Wwise heavy-API scenarios (70 on 2022.1, five on 2024.1, and five on 2025.1); that historical evidence applies to those scenarios and its sealed candidate, not the whole interface or this later policy candidate. See [the detailed five-version coverage contract](./skills/waapi-skill/references/waapi-coverage.md).
 
 ---
 
@@ -169,7 +169,7 @@ This skill and a Wwise MCP server solve overlapping problems, but they are not t
 - **On-demand resource loading** instead of broad always-on context
 - **Version-scoped runtime assets** for `2021.1` through `2025.1`
 - **Skill-local Python workflow** with no separate server process required
-- **Preview-oriented authoring flow** with confirmation semantics
+- **Preview-oriented authoring flow** with three explicit modification policies
 - **Extensive repo-native testing**, including sandbox and semantic validation
 
 ### Where a Wwise MCP server may be stronger
@@ -208,7 +208,7 @@ The normal flow is:
 1. detect or select the Wwise version
 2. choose the fixed packaged gateway route for that intent
 3. run a direct read-only command or create an immutable mutation preview
-4. confirm and execute only through the closed transaction route
+4. apply `read_only`, `ask_before_changes`, or `allow_changes` through the closed transaction route
 5. verify the result
 
 ### Read-first behavior for safe inspection
@@ -267,6 +267,17 @@ Public persisted fields are intentionally small:
 - `waapi_port`
 - `project_modification_policy`
 
+The three canonical modes are:
+
+- `read_only`: project changes are blocked; reads remain available, including
+  packaged explicit-confirmation-only read transactions.
+- `ask_before_changes` (default): show what will change and the expected result, then ask before executing.
+- `allow_changes`: show a notice, then execute and verify the immutable preview without a second confirmation message.
+
+Legacy config values `never`, `preview_then_confirm`, and `allow_with_notice`
+remain accepted as migration aliases, but all new output and saves use the
+canonical names above.
+
 ### 3. Run read-only work through the gateway
 
 Check the live version/project and query objects without composing WAAPI code:
@@ -280,31 +291,36 @@ python scripts/run.py gateway.py query-object \
 
 ### 4. Use the closed transaction lane for project changes
 
-Inspect the packaged request contract first. `preview` returns an immutable
-transaction id and full artifact hash for review. After the user confirms that
-preview in a later message, `transaction-show --summary-only` reopens the stored
-transaction and returns its short, state-bound `confirmation.token` plus the
-exact next command. Use that token for the normal confirmation flow:
+Inspect the packaged request contract first. For an actual change,
+`preview --apply` returns an immutable transaction id and full artifact hash.
+Under `ask_before_changes`, it stops at `awaiting_confirmation`; explain the
+expected result and ask the user. A later `transaction-show --summary-only`
+returns the state-bound confirmation token. Under `allow_changes`, the preview
+instead returns `policy_authorized` and an exact `execute` continuation, so the
+agent gives notice and continues in the same user turn. `read_only` blocks
+`--apply`.
 
 ```bash
 python scripts/run.py gateway.py operation-schema object.setNotes
-python scripts/run.py gateway.py preview \
-  --request-json '{"contract":"waapi-skill.operation-request/v1","operation":"object.setNotes","arguments":{"object":{"kind":"path","value":"\\Events\\Default Work Unit\\Target"},"value":"Reviewed"}}'
+python scripts/run.py gateway.py preview --apply \
+  --request-json '{"contract":"waapi-skill.operation-request/v1","version":"2022.1","operation":"object.setNotes","arguments":{"object":{"kind":"path","value":"\\Events\\Default Work Unit\\Target"},"value":"Reviewed"}}'
 python scripts/run.py gateway.py transaction-show <transaction-id> --summary-only
 python scripts/run.py gateway.py confirm <transaction-id> --confirmation-token <confirmation-token>
 python scripts/run.py gateway.py execute <transaction-id>
 python scripts/run.py gateway.py verify <transaction-id>
 ```
 
-Run each phase separately and use the complete returned
-`next_command.shell_command` rather than rebuilding it. The alternative
+Run each returned phase separately and use the complete
+`next_command.shell_command` rather than rebuilding it. The `transaction-show`
+and `confirm` commands apply to `ask_before_changes`; `allow_changes` moves from
+`policy_authorized` directly to `execute`. The alternative
 `confirm <transaction-id> --artifact-hash <full-artifact-hash>` spelling remains
 available only for legacy transactions and programmatic compatibility; new
 agent workflows should use the token returned by `transaction-show`.
 
 The gateway is the public interface. Do not import internal runtime modules, construct a `WaapiClient`, create a one-off helper script, or use inline Python to complete a Wwise task. If the gateway reports no packaged route, return that unsupported boundary instead of synthesizing code.
 
-Manifest reflection is discovery, not permission. The generic `call` route exposes only an immutable reviewed set of recursively validated, result-bounded reads; the two zero-input reflection inventories are merely fast paths within that set. Wwise 2025.1 Media Pool queries first discover exact field names through `mediaPool.getFields`, then call `mediaPool.get` with enforced limits of 200 results, 16 filters, 8 databases, and 32 unique return fields. Broader reads require a confirmed transaction, while fixed commands and topic waits remain exact allowlists. New or unreviewed functions and topics fail closed regardless of names such as `get`, `verify`, or `dump`; `--dry-run` cannot bypass a fixed, transaction, topic, or unsupported route boundary.
+Manifest reflection is discovery, not permission. The generic `call` route exposes only an immutable reviewed set of recursively validated, result-bounded reads; the two zero-input reflection inventories are merely fast paths within that set. Wwise 2025.1 Media Pool queries first discover exact field names through `mediaPool.getFields`, then call `mediaPool.get` with enforced limits of 200 results, 16 filters, 8 databases, and 32 unique return fields. Broader reads require an authorized transaction, while fixed commands and topic waits remain exact allowlists. New or unreviewed functions and topics fail closed regardless of names such as `get`, `verify`, or `dump`; `--dry-run` cannot bypass a fixed, transaction, topic, or unsupported route boundary.
 
 ---
 
@@ -312,7 +328,7 @@ Manifest reflection is discovery, not permission. The generic `call` route expos
 
 - destructive operations are blocked by default
 - project-changing steps should be previewed before execution
-- confirmation must match the active immutable preview artifact
+- confirmation or policy authorization must match the active immutable preview artifact
 - unsupported runtime boundaries should fail clearly, not pretend to execute
 - reflected functions and topics require an explicit reviewed public route
 - evidence, runtime data, and local auth state should stay local unless explicitly promoted

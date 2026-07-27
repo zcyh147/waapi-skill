@@ -80,6 +80,17 @@ suite. A partial, quota-blocked, prerequisite-blocked, or interrupted campaign
 is incomplete even if its selected profile is named `formal_98` or
 `full_cross_version_168`.
 
+The focused current-candidate `modification_policy_9` campaign is separate
+from those historical v2 totals. Its sealed
+`campaign-modification-policy-9-c7` run passed 9/9 Wwise 2022.1 tasks and all
+15 turns using nine unique memory-isolated Codex Terra threads. It covered
+three repetitions each of `read_only`, question-style `ask_before_changes`,
+and same-turn `allow_changes`; all source-project hashes remained unchanged
+and every sandbox was cleaned. The six authorized writes each verified seven
+created objects through 46 passing business assertions. Preserve this exact
+scope: it is policy-interaction evidence, not broad API or cross-version
+semantic coverage.
+
 The review-oriented v3 bundle is rooted at
 `skills/waapi-skill/evals/suite-v3.json` and deliberately separates:
 

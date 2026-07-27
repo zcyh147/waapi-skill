@@ -27,6 +27,7 @@ import time
 from dataclasses import asdict, dataclass, fields, is_dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Mapping, Sequence
 
 
@@ -202,6 +203,8 @@ EXIT_BLOCKED = 3
 EXIT_PENDING = 75
 EXIT_INTERRUPTED = 130
 HEAVY_V3_PROFILE_ID = matrix.HEAVY_V3_PROFILE_ID
+MODIFICATION_POLICY_V3_PROFILE_ID = matrix.MODIFICATION_POLICY_V3_PROFILE_ID
+EXECUTABLE_V3_PROFILE_IDS = matrix.EXECUTABLE_V3_PROFILE_IDS
 HEAVY_V3_EFFECTIVE_CONTRACT = "waapi-skill.codex-semantic-campaign-effective/v3"
 HEAVY_V3_PHASE = "scenario"
 HEAVY_V3_GROUP_ID = "heavy-v3"
@@ -414,7 +417,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def run_campaign(options: CampaignOptions) -> int:
-    if options.profile == HEAVY_V3_PROFILE_ID:
+    if options.profile in EXECUTABLE_V3_PROFILE_IDS:
         return run_heavy_v3_campaign(options)
     try:
         suite = load_eval_suite(options.suite_path)
@@ -648,6 +651,14 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
         raise CampaignConfigError("heavy V3 campaigns do not accept pair filters")
     if options.offline_only:
         raise CampaignConfigError("heavy V3 campaigns require real Wwise execution")
+    if (
+        options.profile == MODIFICATION_POLICY_V3_PROFILE_ID
+        and (options.case_ids or options.versions)
+    ):
+        raise CampaignConfigError(
+            "modification_policy_9 is one fixed nine-task campaign; "
+            "case/version filters are reserved for its internal resume child"
+        )
     try:
         units = load_heavy_v3_campaign_units(options)
     except (SystemExit, ValueError) as exc:
@@ -690,6 +701,11 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
             write_campaign_marker(root, campaign_id=str(config["campaign_id"]))
 
         manifests = load_verified_attempts(root)
+        if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID:
+            _validate_modification_policy_identity_history(
+                root,
+                manifests=manifests,
+            )
         consolidated = consolidate_units(required_units, manifests)
         write_consolidated(root, consolidated)
         terminal = heavy_v3_consolidated_exit(consolidated)
@@ -813,6 +829,12 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
                         options=options,
                         returncode=completed.returncode,
                     )
+                    if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID:
+                        _validate_modification_policy_identity_history(
+                            root,
+                            manifests=manifests,
+                            current_attempt_root=attempt_root,
+                        )
                     assert_heavy_v3_effective_inputs_frozen(
                         options,
                         effective=effective,
@@ -872,6 +894,11 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
                     f"sealed attempt failed immediate verification: {attempt_id}"
                 )
             manifests.append(verified)
+            if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID:
+                _validate_modification_policy_identity_history(
+                    root,
+                    manifests=manifests,
+                )
             consolidated = consolidate_units(required_units, manifests)
             write_consolidated(root, consolidated)
             print_status(consolidated)
@@ -883,7 +910,7 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
 
 def load_heavy_v3_campaign_units(options: CampaignOptions) -> tuple[Any, ...]:
     matrix_options = matrix.RunnerOptions(
-        profile=HEAVY_V3_PROFILE_ID,
+        profile=options.profile,
         iteration_root=options.campaign_root / ".selection-only",
         suite_path=options.suite_path,
         skill_source=options.skill_source,
@@ -915,7 +942,7 @@ def build_heavy_v3_child_argv(
         sys.executable,
         str(REPO_ROOT / "tests" / "semantic" / "run_codex_skill_matrix.py"),
         "--profile",
-        HEAVY_V3_PROFILE_ID,
+        options.profile,
         "--suite",
         str(options.suite_path),
         "--iteration-root",
@@ -953,11 +980,14 @@ def heavy_v3_child_request(
         "group_id": HEAVY_V3_GROUP_ID,
         "scenario_ids": [str(unit.unit_id) for unit in units],
         "units": [
-            heavy_v3_unit_row(unit, sequence=index)
+            {
+                **heavy_v3_unit_row(unit, sequence=index),
+                **_policy_unit_metadata(unit),
+            }
             for index, unit in enumerate(units, start=1)
         ],
         "request": {
-            "profile": HEAVY_V3_PROFILE_ID,
+            "profile": options.profile,
             "suite_path": str(options.suite_path),
             "skill_source": str(options.skill_source),
             "codex_binary": str(options.codex_binary),
@@ -968,6 +998,11 @@ def heavy_v3_child_request(
             "service_tier": options.service_tier,
             "timeout_seconds": options.timeout_seconds,
             "memory": "disabled",
+            **(
+                {"approval_policy": "never"}
+                if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID
+                else {}
+            ),
             "sequential": True,
         },
         "argv": list(argv),
@@ -1210,6 +1245,7 @@ def build_heavy_v3_effective_config(
             "prompt_sha256": str(unit.scenario.prompt_sha256),
             "user_turn_count": int(unit.user_turn_count),
             "transaction_count": int(unit.transaction_count),
+            **_policy_unit_metadata(unit),
         }
         for index, unit in enumerate(units, start=1)
     ]
@@ -1220,7 +1256,7 @@ def build_heavy_v3_effective_config(
     return {
         "contract": HEAVY_V3_EFFECTIVE_CONTRACT,
         "selection": {
-            "profile": HEAVY_V3_PROFILE_ID,
+            "profile": options.profile,
             "case_ids": list(options.case_ids),
             "versions": list(options.versions),
             "pair_ids": [],
@@ -1241,6 +1277,21 @@ def build_heavy_v3_effective_config(
         "suite": {
             "path": str(options.suite_path),
             "sha256": sha256_file(options.suite_path),
+            **(
+                {
+                    "dependency_root": str(options.suite_path.parent),
+                    "dependency_tree_sha256": stable_tree_sha256(
+                        options.suite_path.parent,
+                        exclude_names=(
+                            "__pycache__",
+                            ".pytest_cache",
+                            ".DS_Store",
+                        ),
+                    ),
+                }
+                if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID
+                else {}
+            ),
         },
         "runner": {
             "campaign_path": str(campaign_runner),
@@ -1274,6 +1325,11 @@ def build_heavy_v3_effective_config(
             "timeout_seconds": options.timeout_seconds,
             "memory": "disabled",
             "fresh_process_thread_and_task_per_scenario": True,
+            **(
+                {"approval_policy": "never"}
+                if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID
+                else {}
+            ),
         },
         "auth": {
             "mode": "ephemeral-codex-home-auth-link",
@@ -1466,12 +1522,63 @@ def heavy_v3_unit_row(unit: Any, *, sequence: int) -> dict[str, Any]:
         or not api
     ):
         raise CampaignEvidenceError("heavy unit has an invalid identity")
-    return {
+    row = {
         "sequence": sequence,
         "scenario_id": scenario_id,
         "version": version,
         "api": api,
         "runner": "cli" if api.startswith("ak.wwise.cli.") else "project",
+    }
+    policy_metadata = _policy_unit_metadata(unit)
+    for key in (
+        "base_scenario_id",
+        "policy_mode",
+        "project_modification_policy",
+        "repetition",
+        "expected_primary_dispatch_count",
+    ):
+        if key in policy_metadata:
+            row[key] = policy_metadata[key]
+    return row
+
+
+def _policy_unit_metadata(unit: Any) -> dict[str, Any]:
+    policy = getattr(unit, "project_modification_policy", None)
+    if policy is None:
+        return {}
+    base_scenario_id = getattr(unit, "base_scenario_id", None)
+    repetition = getattr(unit, "repetition", None)
+    expected_dispatch = getattr(unit, "expected_primary_dispatch_count", None)
+    turns = tuple(getattr(unit, "turns", ()))
+    if (
+        policy not in {"read_only", "ask_before_changes", "allow_changes"}
+        or not isinstance(base_scenario_id, str)
+        or not base_scenario_id
+        or type(repetition) is not int
+        or repetition not in {1, 2, 3}
+        or type(expected_dispatch) is not int
+        or expected_dispatch not in {0, 1}
+        or not turns
+    ):
+        raise CampaignEvidenceError(
+            "modification-policy unit metadata is incomplete"
+        )
+    return {
+        "base_scenario_id": base_scenario_id,
+        "policy_mode": policy,
+        "project_modification_policy": policy,
+        "repetition": repetition,
+        "expected_primary_dispatch_count": expected_dispatch,
+        "turns": [
+            {
+                "index": int(turn.index),
+                "kind": str(turn.kind),
+                "prompt_sha256": hashlib.sha256(
+                    str(turn.prompt).encode("utf-8")
+                ).hexdigest(),
+            }
+            for turn in turns
+        ],
     }
 
 
@@ -1481,6 +1588,25 @@ def assert_heavy_v3_effective_inputs_frozen(
     effective: Mapping[str, Any],
 ) -> None:
     assert_effective_inputs_frozen(options, effective=effective)
+    if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID:
+        suite = effective.get("suite")
+        dependency_root = options.suite_path.parent
+        if (
+            not isinstance(suite, Mapping)
+            or suite.get("dependency_root") != str(dependency_root)
+            or suite.get("dependency_tree_sha256")
+            != stable_tree_sha256(
+                dependency_root,
+                exclude_names=(
+                    "__pycache__",
+                    ".pytest_cache",
+                    ".DS_Store",
+                ),
+            )
+        ):
+            raise CampaignEvidenceError(
+                "modification-policy transitive suite inputs drifted"
+            )
     runner = effective.get("runner")
     if not isinstance(runner, Mapping):
         raise CampaignEvidenceError("heavy campaign runner fingerprint is malformed")
@@ -1546,6 +1672,8 @@ def validate_heavy_v3_child_run(
         summary,
         expected_ids=expected_ids,
         returncode=returncode,
+        expected_profile=options.profile,
+        expected_rows=expected_rows,
     )
     _validate_heavy_v3_live_preflight(root, summary=summary)
     _validate_heavy_v3_progress(run_config["progress"], summary=summary)
@@ -1721,7 +1849,7 @@ def _validate_heavy_v3_run_config(
         raise CampaignEvidenceError("invalid heavy matrix run-config contract")
     expected_ids = [str(row["scenario_id"]) for row in expected_rows]
     expected = {
-        "profile": HEAVY_V3_PROFILE_ID,
+        "profile": options.profile,
         "expected_unit_count": len(expected_rows),
         "selected_units": [dict(row) for row in expected_rows],
         "case_ids": expected_ids,
@@ -1772,6 +1900,8 @@ def _validate_heavy_v3_summary(
     *,
     expected_ids: Sequence[str],
     returncode: int,
+    expected_profile: str = HEAVY_V3_PROFILE_ID,
+    expected_rows: Sequence[Mapping[str, Any]] | None = None,
 ) -> None:
     required_keys = {
         "contract",
@@ -1799,7 +1929,7 @@ def _validate_heavy_v3_summary(
         not isinstance(value, Mapping)
         or set(value) != required_keys
         or value.get("contract") != matrix.HEAVY_V3_SUMMARY_CONTRACT
-        or value.get("profile") != HEAVY_V3_PROFILE_ID
+        or value.get("profile") != expected_profile
     ):
         raise CampaignEvidenceError("invalid heavy matrix summary contract")
     if value.get("selected_unit_count") != len(expected_ids):
@@ -1820,7 +1950,7 @@ def _validate_heavy_v3_summary(
         raise CampaignEvidenceError("heavy matrix attempted counts disagree")
     statuses: list[str] = []
     for index, record in enumerate(case_records):
-        if not isinstance(record, Mapping) or set(record) != {
+        required_record_keys = {
             "sequence",
             "scenario_id",
             "version",
@@ -1829,10 +1959,35 @@ def _validate_heavy_v3_summary(
             "status",
             "reason",
             "scenario_root",
-        }:
+        }
+        expected_row = (
+            expected_rows[index]
+            if expected_rows is not None and index < len(expected_rows)
+            else None
+        )
+        if isinstance(expected_row, Mapping):
+            required_record_keys.update(
+                key
+                for key in (
+                    "base_scenario_id",
+                    "policy_mode",
+                    "project_modification_policy",
+                    "repetition",
+                    "expected_primary_dispatch_count",
+                )
+                if key in expected_row
+            )
+        if not isinstance(record, Mapping) or set(record) != required_record_keys:
             raise CampaignEvidenceError("heavy matrix summary case record is malformed")
         if record.get("sequence") != index + 1 or record.get("scenario_id") != attempted[index]:
             raise CampaignEvidenceError("heavy matrix summary case order drifted")
+        if isinstance(expected_row, Mapping) and any(
+            record.get(key) != value
+            for key, value in expected_row.items()
+        ):
+            raise CampaignEvidenceError(
+                "heavy matrix summary unit metadata drifted"
+            )
         status = record.get("status")
         if status not in matrix.HEAVY_V3_STATUSES:
             raise CampaignEvidenceError("heavy matrix summary has an invalid status")
@@ -2036,16 +2191,11 @@ def _validate_heavy_v3_matrix_case(
 ) -> None:
     required_keys = {
         "contract",
-        "sequence",
-        "scenario_id",
-        "version",
-        "api",
-        "runner",
         "status",
         "reason",
         "scenario_root",
         "runner_outcome",
-    }
+    } | set(expected_row)
     if (
         not isinstance(value, Mapping)
         or set(value) != required_keys
@@ -2057,18 +2207,15 @@ def _validate_heavy_v3_matrix_case(
             raise CampaignEvidenceError(f"heavy matrix-case mismatch for {key}")
     if value.get("scenario_root") != str(scenario_root):
         raise CampaignEvidenceError("heavy matrix-case scenario root is misbound")
+    expected_summary_keys = {
+        *expected_row,
+        "status",
+        "reason",
+        "scenario_root",
+    }
     expected_summary = {
         key: value.get(key)
-        for key in (
-            "sequence",
-            "scenario_id",
-            "version",
-            "api",
-            "runner",
-            "status",
-            "reason",
-            "scenario_root",
-        )
+        for key in expected_summary_keys
     }
     if dict(summary_row) != expected_summary:
         raise CampaignEvidenceError("heavy matrix-case differs from summary record")
@@ -2389,13 +2536,17 @@ def _validate_heavy_v3_retryable_task_failure(
         else None
     )
     prior_thread_id = sidecar.get("prior_thread_id") if isinstance(sidecar, Mapping) else None
+    optional_policy_protocol = (
+        getattr(expected_unit, "project_modification_policy", None)
+        == "read_only"
+    )
     if (
         not isinstance(sidecar, Mapping)
         or set(sidecar) != sidecar_keys
         or sidecar.get("contract")
         != HEAVY_V3_TASK_INFRASTRUCTURE_FAILURE_CONTRACT
-        or sidecar.get("scenario_id") != outcome.get("scenario_id")
-        or sidecar.get("scenario_id") != getattr(expected_unit, "unit_id", None)
+        or sidecar.get("scenario_id")
+        != _heavy_v3_base_scenario_id(expected_unit)
         or sidecar.get("version") != outcome.get("version")
         or sidecar.get("version") != getattr(expected_unit, "version", None)
         or type(expected_turn_count) is not int
@@ -2408,7 +2559,11 @@ def _validate_heavy_v3_retryable_task_failure(
         or type(previous_prefix) is not int
         or previous_prefix < 0
         or type(failed_prefix) is not int
-        or failed_prefix <= previous_prefix
+        or (
+            failed_prefix < previous_prefix
+            if optional_policy_protocol
+            else failed_prefix <= previous_prefix
+        )
         or sidecar.get("failure") != dict(failure)
         or not isinstance(sidecar.get("prompt_sha256"), str)
         or _SHA256_RE.fullmatch(str(sidecar.get("prompt_sha256"))) is None
@@ -2513,8 +2668,20 @@ def _validate_heavy_v3_retryable_task_failure(
         turn_root = turns_root / f"turn-{index:02d}"
         grade = load_strict_regular_json(turn_root / "turn-grade.json")
         expected_prefix = (
-            protocol.turn_prefix_counts[index - 1]
+            grade.get("broker_prefix_count")
+            if protocol.allowed_turn_prefix_counts
+            and isinstance(grade, Mapping)
+            else protocol.turn_prefix_counts[index - 1]
         )
+        if (
+            type(expected_prefix) is not int
+            or expected_prefix
+            not in protocol.allowed_prefixes_for_turn(index)
+            or expected_prefix < previous_validated_prefix
+        ):
+            raise CampaignEvidenceError(
+                "retryable heavy prior turn has an invalid optional prefix"
+            )
         turn_gateway_records = _validate_heavy_v3_turn_grade(
             grade,
             index=index,
@@ -2542,7 +2709,11 @@ def _validate_heavy_v3_retryable_task_failure(
             )
         prior_prefixes.append(prefix)
     if (
-        prior_prefixes != sorted(set(prior_prefixes))
+        (
+            prior_prefixes != sorted(prior_prefixes)
+            if protocol.allowed_turn_prefix_counts
+            else prior_prefixes != sorted(set(prior_prefixes))
+        )
         or (prior_prefixes[-1] if prior_prefixes else 0) != previous_prefix
     ):
         raise CampaignEvidenceError(
@@ -2553,7 +2724,7 @@ def _validate_heavy_v3_retryable_task_failure(
     expected_previous_prefix = (
         0
         if failed_turn_index == 1
-        else protocol.turn_prefix_counts[failed_turn_index - 2]
+        else prior_prefixes[-1]
     )
     expected_failed_prefix = protocol.turn_prefix_counts[failed_turn_index - 1]
     if (
@@ -2572,6 +2743,11 @@ def _validate_heavy_v3_retryable_task_failure(
         command_records=tuple(prior_gateway_records),
         options=options,
         version=str(getattr(expected_unit, "version", "")),
+        expected_project_modification_policy=getattr(
+            expected_unit,
+            "project_modification_policy",
+            None,
+        ),
     )
 
 
@@ -2765,6 +2941,7 @@ def _validate_heavy_v3_retryable_partial_broker(
     command_records: Sequence[Mapping[str, Any]],
     options: CampaignOptions,
     version: str,
+    expected_project_modification_policy: str | None = None,
 ) -> None:
     if not isinstance(value, Mapping) or set(value) != {
         "expected_step_names",
@@ -2783,10 +2960,16 @@ def _validate_heavy_v3_retryable_partial_broker(
     expected_names = [step.name for step in protocol.steps]
     consumed_names = value.get("consumed_step_names")
     records = value.get("records")
+    completed_before_failed_turn = (
+        bool(getattr(protocol, "allowed_turn_prefix_counts", ()))
+        and previous_prefix == len(expected_names)
+        and failed_prefix == previous_prefix
+    )
     if (
-        value.get("terminal_state") != "RUNNING"
-        or value.get("complete") is not False
-        or value.get("passed") is not False
+        value.get("terminal_state")
+        != ("COMPLETE" if completed_before_failed_turn else "RUNNING")
+        or value.get("complete") is not completed_before_failed_turn
+        or value.get("passed") is not completed_before_failed_turn
         or not expected_names
         or len(expected_names) != len(set(expected_names))
         or failed_prefix > len(expected_names)
@@ -2809,6 +2992,9 @@ def _validate_heavy_v3_retryable_partial_broker(
         options=options,
         version=version,
         label="retryable heavy partial",
+        expected_project_modification_policy=(
+            expected_project_modification_policy
+        ),
     )
     expected_directories = {
         "state_directory": task_root / "broker" / "state",
@@ -3242,6 +3428,17 @@ def _validate_heavy_v3_pass_outcome(
 
 
 def _heavy_v3_primary_dispatch_count(expected_unit: Any) -> int:
+    declared = getattr(
+        expected_unit,
+        "expected_primary_dispatch_count",
+        None,
+    )
+    if declared is not None:
+        if type(declared) is not int or declared < 0:
+            raise CampaignEvidenceError(
+                "policy unit has an invalid primary-dispatch count"
+            )
+        return declared
     scenario = getattr(expected_unit, "scenario", None)
     dispatch = getattr(scenario, "primary_dispatch", None)
     count = getattr(dispatch, "count", None)
@@ -3250,6 +3447,17 @@ def _heavy_v3_primary_dispatch_count(expected_unit: Any) -> int:
             "heavy scenario has no closed primary-dispatch count"
         )
     return count
+
+
+def _heavy_v3_base_scenario_id(expected_unit: Any) -> str:
+    value = getattr(expected_unit, "base_scenario_id", None)
+    if value is None:
+        value = getattr(expected_unit, "unit_id", None)
+    if not isinstance(value, str) or not value:
+        raise CampaignEvidenceError(
+            "heavy unit has no closed base-scenario identity"
+        )
+    return value
 
 
 def _heavy_v3_topic_publisher_request_count(
@@ -3328,7 +3536,8 @@ def _validate_heavy_v3_prompt_materialization(
         not isinstance(value, Mapping)
         or set(value) != required_keys
         or value.get("contract") != HEAVY_V3_PROMPT_MATERIALIZATION_CONTRACT
-        or value.get("scenario_id") != getattr(expected_unit, "unit_id", None)
+        or value.get("scenario_id")
+        != _heavy_v3_base_scenario_id(expected_unit)
         or value.get("version") != getattr(expected_unit, "version", None)
         or type(expected_turn_count) is not int
         or expected_turn_count < 1
@@ -3379,7 +3588,7 @@ def _validate_heavy_v3_prompt_materialization(
         runner = "cli" if family == "cli" else "project"
         business_oracle_plan = read_business_oracle_plan_envelope(
             business_oracle_plan_path,
-            scenario_id=str(getattr(expected_unit, "unit_id", "")),
+            scenario_id=_heavy_v3_base_scenario_id(expected_unit),
             version=str(getattr(expected_unit, "version", "")),
             api=api,
             runner=runner,
@@ -3478,18 +3687,37 @@ def _validate_heavy_v3_task_result(
         "broker",
         "turn_grades",
     }
+    is_optional_protocol = (
+        getattr(expected_unit, "project_modification_policy", None)
+        == "read_only"
+    )
+    if is_optional_protocol:
+        required_keys.update(
+            {
+                "protocol_terminal_passed",
+                "accepted_terminal_prefixes",
+            }
+        )
     expected_turn_count = getattr(expected_unit, "user_turn_count", None)
     if (
         not isinstance(value, Mapping)
         or set(value) != required_keys
         or value.get("contract") != HEAVY_V3_TASK_RESULT_CONTRACT
-        or value.get("scenario_id") != getattr(expected_unit, "unit_id", None)
+        or value.get("scenario_id")
+        != _heavy_v3_base_scenario_id(expected_unit)
         or value.get("version") != getattr(expected_unit, "version", None)
         or value.get("thread_id") != expected_thread_id
         or type(expected_turn_count) is not int
         or expected_turn_count < 1
         or value.get("turn_count") != expected_turn_count
         or value.get("passed") is not True
+        or (
+            is_optional_protocol
+            and (
+                value.get("protocol_terminal_passed") is not True
+                or value.get("accepted_terminal_prefixes") != [1]
+            )
+        )
         or not isinstance(value.get("prompt_materialization_sha256"), str)
         or _SHA256_RE.fullmatch(
             str(value.get("prompt_materialization_sha256"))
@@ -3520,7 +3748,21 @@ def _validate_heavy_v3_task_result(
     required_reference = _heavy_v3_required_reference(expected_unit)
     for index, grade in enumerate(turn_grades, start=1):
         turn_root = turns_root / f"turn-{index:02d}"
-        expected_prefix = protocol.turn_prefix_counts[index - 1]
+        expected_prefix = (
+            grade.get("broker_prefix_count")
+            if protocol.allowed_turn_prefix_counts
+            and isinstance(grade, Mapping)
+            else protocol.turn_prefix_counts[index - 1]
+        )
+        if (
+            type(expected_prefix) is not int
+            or expected_prefix
+            not in protocol.allowed_prefixes_for_turn(index)
+            or expected_prefix < previous_prefix
+        ):
+            raise CampaignEvidenceError(
+                "passing heavy turn selected an invalid optional broker prefix"
+            )
         turn_gateway_records = _validate_heavy_v3_turn_grade(
             grade,
             index=index,
@@ -3548,6 +3790,12 @@ def _validate_heavy_v3_task_result(
         command_records=tuple(gateway_records),
         options=options,
         version=str(getattr(expected_unit, "version", "")),
+        expected_consumed_count=previous_prefix,
+        expected_project_modification_policy=getattr(
+            expected_unit,
+            "project_modification_policy",
+            None,
+        ),
     )
     return prompt_evidence
 
@@ -3560,6 +3808,8 @@ def _validate_heavy_v3_broker_result(
     command_records: Sequence[Mapping[str, Any]],
     options: CampaignOptions,
     version: str,
+    expected_consumed_count: int | None = None,
+    expected_project_modification_policy: str | None = None,
 ) -> None:
     top_keys = {
         "expected_step_names",
@@ -3575,19 +3825,30 @@ def _validate_heavy_v3_broker_result(
     if not isinstance(value, Mapping) or set(value) != top_keys:
         raise CampaignEvidenceError("passing heavy task broker evidence is malformed")
     expected_names = [step.name for step in protocol.steps]
+    consumed_count = (
+        len(expected_names)
+        if expected_consumed_count is None
+        else expected_consumed_count
+    )
+    accepted_terminal = tuple(
+        getattr(protocol, "accepted_terminal_prefixes", (len(expected_names),))
+    )
+    complete_expected = consumed_count == len(expected_names)
     consumed_names = value.get("consumed_step_names")
     records = value.get("records")
     if (
-        value.get("passed") is not True
-        or value.get("complete") is not True
-        or value.get("terminal_state") != "COMPLETE"
+        consumed_count not in accepted_terminal
+        or value.get("passed") is not complete_expected
+        or value.get("complete") is not complete_expected
+        or value.get("terminal_state")
+        != ("COMPLETE" if complete_expected else "RUNNING")
         or not expected_names
         or value.get("expected_step_names") != expected_names
-        or consumed_names != expected_names
+        or consumed_names != expected_names[:consumed_count]
         or len(expected_names) != len(set(expected_names))
         or not isinstance(records, list)
-        or len(records) != len(expected_names)
-        or len(command_records) != len(expected_names)
+        or len(records) != consumed_count
+        or len(command_records) != consumed_count
     ):
         raise CampaignEvidenceError(
             "passing heavy task broker did not consume one exact successful protocol"
@@ -3600,11 +3861,14 @@ def _validate_heavy_v3_broker_result(
     _validate_heavy_v3_broker_records(
         records,
         task_root=task_root,
-        steps=protocol.steps,
+        steps=protocol.steps[:consumed_count],
         command_records=command_records,
         options=options,
         version=version,
         label="passing heavy",
+        expected_project_modification_policy=(
+            expected_project_modification_policy
+        ),
     )
     for key in ("state_directory", "evidence_directory"):
         raw = value.get(key)
@@ -3654,6 +3918,7 @@ def _validate_heavy_v3_broker_records(
     options: CampaignOptions,
     version: str,
     label: str,
+    expected_project_modification_policy: str | None = None,
 ) -> None:
     """Replay one exact broker prefix and bind it to Codex JSONL commands."""
 
@@ -3673,6 +3938,9 @@ def _validate_heavy_v3_broker_records(
         skill_source=options.skill_source,
         expected_steps=steps,
         expected_wwise_version=version,
+        project_modification_policy=(
+            expected_project_modification_policy or "ask_before_changes"
+        ),
         runner_environment={},
     )
     record_keys = {
@@ -3745,6 +4013,9 @@ def _validate_heavy_v3_broker_records(
             payload,
             step=step,
             runner_exit_code=record.get("runner_exit_code"),
+            expected_project_modification_policy=(
+                expected_project_modification_policy
+            ),
         )
         if step.subcommand == "transaction-show":
             try:
@@ -3949,9 +4220,36 @@ def _validate_heavy_v3_gateway_payload(
     *,
     step: Any,
     runner_exit_code: Any,
+    expected_project_modification_policy: str | None = None,
 ) -> None:
     if payload.get("contract") != "waapi-skill.gateway-result/v1":
         raise CampaignEvidenceError("heavy broker payload contract is invalid")
+    context = payload.get("session_context")
+    introduction = (
+        context.get("one_time_introduction")
+        if isinstance(context, Mapping)
+        else None
+    )
+    facts = (
+        introduction.get("facts")
+        if isinstance(introduction, Mapping)
+        else None
+    )
+    if expected_project_modification_policy is not None and (
+        not isinstance(context, Mapping)
+        or context.get("project_modification_policy")
+        != expected_project_modification_policy
+        or context.get("available_project_modification_policies")
+        != ["read_only", "ask_before_changes", "allow_changes"]
+        or not isinstance(facts, Mapping)
+        or facts.get("project_modification_policy")
+        != expected_project_modification_policy
+        or facts.get("available_project_modification_policies")
+        != ["read_only", "ask_before_changes", "allow_changes"]
+    ):
+        raise CampaignEvidenceError(
+            "heavy broker payload session policy is misbound"
+        )
     if step.subcommand == "transaction-show":
         try:
             validate_transaction_show_confirmation_payload(payload)
@@ -4496,7 +4794,7 @@ def _heavy_v3_business_plan_fixture_spec(
     if kind == "object_recipe":
         fixture_value = _heavy_v3_plan_json_value(
             build_object_heavy_v3_recipe(
-                str(getattr(expected_unit, "unit_id", ""))
+                _heavy_v3_base_scenario_id(expected_unit)
             )
         )
     elif kind == "scenario_fixture":
@@ -4543,7 +4841,7 @@ def _validate_heavy_v3_typed_business_plan(
     }:
         parsed = parse_object_business_plan_sections(plan_value)
         recipe = build_object_heavy_v3_recipe(
-            str(getattr(expected_unit, "unit_id", ""))
+            _heavy_v3_base_scenario_id(expected_unit)
         )
         sections = validate_archived_object_business_plan(
             plan_value,
@@ -4575,7 +4873,7 @@ def _validate_heavy_v3_typed_business_plan(
         validate_audio_media_business_plan_archive(
             sections,
             protocol,
-            scenario_id=str(getattr(expected_unit, "unit_id", "")),
+            scenario_id=_heavy_v3_base_scenario_id(expected_unit),
             api=api,
             version=str(getattr(expected_unit, "version", "")),
             reviewed_scenario_fixture=getattr(scenario, "fixture", None),
@@ -4592,7 +4890,7 @@ def _validate_heavy_v3_typed_business_plan(
             sections,
             protocol,
             scenario={
-                "scenario_id": str(getattr(expected_unit, "unit_id", "")),
+                "scenario_id": _heavy_v3_base_scenario_id(expected_unit),
                 "api": api,
                 "version": str(getattr(expected_unit, "version", "")),
                 "primary_dispatch_count": _heavy_v3_primary_dispatch_count(
@@ -4639,7 +4937,7 @@ def _validate_heavy_v3_typed_business_plan(
 
     static = sections.static_expectation
     expected_identity = {
-        "scenario_id": str(getattr(expected_unit, "unit_id", "")),
+        "scenario_id": _heavy_v3_base_scenario_id(expected_unit),
         "version": str(getattr(expected_unit, "version", "")),
         "api": api,
     }
@@ -4694,6 +4992,79 @@ def _heavy_v3_plan_json_value(value: Any) -> Any:
     if isinstance(value, Path):
         return str(value)
     return repr(value)
+
+
+def _revalidate_modification_policy_natural_behavior(
+    *,
+    expected_unit: Any,
+    policy_mode: str,
+    task_root: Path,
+) -> None:
+    """Recompute policy reply/notice gates from the sealed turn archives."""
+
+    from tests.semantic.support import codex_heavy_project_runner_v3 as project_runner
+
+    if policy_mode not in {"read_only", "ask_before_changes", "allow_changes"}:
+        raise CampaignEvidenceError("passing policy case has an invalid mode")
+    scenario = getattr(expected_unit, "scenario", None)
+    try:
+        expected_terms = project_runner._policy_notice_change_terms(scenario)
+    except Exception as exc:
+        raise CampaignEvidenceError(
+            f"passing policy case has no concrete notice terms: {exc}"
+        ) from exc
+    response_turns = (
+        range(1, 3)
+        if policy_mode == "read_only"
+        else (1,)
+        if policy_mode == "ask_before_changes"
+        else ()
+    )
+    for turn_index in response_turns:
+        final = _load_strict_regular_text(
+            task_root / "turns" / f"turn-{turn_index:02d}" / "final.txt"
+        )
+        try:
+            project_runner._require_policy_turn_response(
+                SimpleNamespace(final_response=final.rstrip("\n")),
+                policy=policy_mode,
+                turn_index=turn_index,
+                expected_change_terms=expected_terms,
+            )
+        except Exception as exc:
+            raise CampaignEvidenceError(
+                f"passing {policy_mode} turn {turn_index} natural response is invalid: {exc}"
+            ) from exc
+    if policy_mode != "allow_changes":
+        return
+    turn_root = task_root / "turns" / "turn-01"
+    facts = load_strict_regular_json(turn_root / "codex-facts.json")
+    command_facts = (
+        facts.get("command_facts") if isinstance(facts, Mapping) else None
+    )
+    if not isinstance(command_facts, Mapping):
+        raise CampaignEvidenceError(
+            "passing allow_changes turn lacks archived command facts"
+        )
+    result = SimpleNamespace(
+        stdout=_load_strict_regular_text(turn_root / "events.jsonl"),
+        command_facts=SimpleNamespace(
+            gateway_attempt_commands=tuple(
+                command_facts.get("gateway_attempt_commands", ())
+            ),
+            gateway_subcommands=tuple(
+                command_facts.get("gateway_subcommands", ())
+            ),
+        ),
+    )
+    if not project_runner._policy_notice_precedes_execute(
+        result,
+        expected_change_terms=expected_terms,
+    ):
+        raise CampaignEvidenceError(
+            "passing allow_changes archive lacks a concrete notice after preview "
+            "and before execute"
+        )
 
 
 def _validate_heavy_v3_pass_checks(
@@ -4752,7 +5123,7 @@ def _validate_heavy_v3_pass_checks(
         _validate_heavy_v3_archived_verification(
             checks.get("business_verification"),
             api=api,
-            scenario_id=str(getattr(expected_unit, "unit_id", "")),
+            scenario_id=_heavy_v3_base_scenario_id(expected_unit),
             version=str(expected_row["version"]),
             runner=runner,
             primary_count=primary_count,
@@ -4770,6 +5141,34 @@ def _validate_heavy_v3_pass_checks(
     ) is not True:
         raise CampaignEvidenceError(
             "passing project checks lack intro or final-response proof"
+        )
+    policy_mode = getattr(
+        expected_unit,
+        "project_modification_policy",
+        None,
+    )
+    if policy_mode is not None:
+        _revalidate_modification_policy_natural_behavior(
+            expected_unit=expected_unit,
+            policy_mode=policy_mode,
+            task_root=task_root,
+        )
+    if (
+        policy_mode == "ask_before_changes"
+        and (
+            checks.get("policy_turn_01_project_unchanged") is not True
+            or checks.get("policy_turn_01_response") is not True
+        )
+    ):
+        raise CampaignEvidenceError(
+            "passing ask_before_changes case lacks first-turn unchanged/response proof"
+        )
+    if (
+        policy_mode == "allow_changes"
+        and checks.get("allow_changes_notice_before_execute") is not True
+    ):
+        raise CampaignEvidenceError(
+            "passing allow_changes case lacks pre-execute notice proof"
         )
     if item_type == "topic":
         publisher_count = _heavy_v3_topic_publisher_request_count(prompt_evidence)
@@ -4803,7 +5202,7 @@ def _validate_heavy_v3_pass_checks(
         _validate_heavy_v3_archived_verification(
             checks.get("topic_verification"),
             api=api,
-            scenario_id=str(getattr(expected_unit, "unit_id", "")),
+            scenario_id=_heavy_v3_base_scenario_id(expected_unit),
             version=str(expected_row["version"]),
             runner=runner,
             primary_count=primary_count,
@@ -4820,6 +5219,46 @@ def _validate_heavy_v3_pass_checks(
     ):
         raise CampaignEvidenceError("passing project primary-dispatch proof is invalid")
     if primary_count == 0:
+        if (
+            getattr(
+                expected_unit,
+                "project_modification_policy",
+                None,
+            )
+            == "read_only"
+        ):
+            turn_count = int(getattr(expected_unit, "user_turn_count", 0))
+            if (
+                turn_count != 2
+                or any(
+                    checks.get(
+                        f"policy_turn_{index:02d}_project_unchanged"
+                    )
+                    is not True
+                    for index in range(1, turn_count + 1)
+                )
+                or any(
+                    checks.get(f"policy_turn_{index:02d}_response")
+                    is not True
+                    for index in range(1, turn_count + 1)
+                )
+            ):
+                raise CampaignEvidenceError(
+                    "passing read_only policy case lacks per-turn unchanged/response proof"
+                )
+            _validate_heavy_v3_archived_verification(
+                checks.get("policy_read_only_unchanged"),
+                api=api,
+                scenario_id=_heavy_v3_base_scenario_id(expected_unit),
+                version=str(expected_row["version"]),
+                runner=runner,
+                primary_count=primary_count,
+                task_root=task_root,
+                prompt_evidence=prompt_evidence,
+                scenario_fixture=getattr(scenario, "fixture", {}),
+                label="read_only policy oracle",
+            )
+            return
         refusal_values = [
             value for key, value in checks.items() if str(key).endswith(".refusal")
         ]
@@ -4830,7 +5269,7 @@ def _validate_heavy_v3_pass_checks(
         _validate_heavy_v3_archived_verification(
             refusal_values[0],
             api=api,
-            scenario_id=str(getattr(expected_unit, "unit_id", "")),
+            scenario_id=_heavy_v3_base_scenario_id(expected_unit),
             version=str(expected_row["version"]),
             runner=runner,
             primary_count=primary_count,
@@ -4843,7 +5282,7 @@ def _validate_heavy_v3_pass_checks(
     _validate_heavy_v3_archived_verification(
         checks.get("business_verification"),
         api=api,
-        scenario_id=str(getattr(expected_unit, "unit_id", "")),
+        scenario_id=_heavy_v3_base_scenario_id(expected_unit),
         version=str(expected_row["version"]),
         runner=runner,
         primary_count=primary_count,
@@ -4913,6 +5352,7 @@ def _validate_heavy_v3_archived_verification(
             verification,
             api=api,
             scenario_id=scenario_id,
+            primary_count=primary_count,
             expected_final_response_sha256=_heavy_v3_final_response_sha256(task_root),
             final_response=_heavy_v3_final_response(task_root),
             gateway_payload=(
@@ -5237,16 +5677,17 @@ def _heavy_v3_protocol_operation_request(
         if (
             step.get("subcommand") == "preview"
             and isinstance(arguments, list)
-            and len(arguments) == 2
-            and arguments[0] == {"kind": "literal", "value": "--request-json"}
-            and isinstance(arguments[1], Mapping)
-            and arguments[1].get("kind") in {
+            and len(arguments) == 3
+            and arguments[0] == {"kind": "literal", "value": "--apply"}
+            and arguments[1] == {"kind": "literal", "value": "--request-json"}
+            and isinstance(arguments[2], Mapping)
+            and arguments[2].get("kind") in {
                 "semantic_json",
                 "semantic_json_object_operation_v1",
             }
-            and isinstance(arguments[1].get("value"), Mapping)
+            and isinstance(arguments[2].get("value"), Mapping)
         ):
-            values.append(arguments[1]["value"])
+            values.append(arguments[2]["value"])
     if len(values) != 1:
         raise CampaignEvidenceError(
             "heavy protocol does not contain one exact operation request"
@@ -5307,11 +5748,11 @@ def _validate_heavy_v3_completed_transaction_protocol(
         )
         or not _nonempty_text(operation)
         or steps[0].arguments != (operation,)
-        or len(steps[1].arguments) != 2
-        or steps[1].arguments[0] != "--request-json"
-        or not isinstance(steps[1].arguments[1], SemanticJsonArgument)
-        or steps[1].arguments[1].expected != expected_operation_request
-        or steps[1].arguments[1].equivalence
+        or len(steps[1].arguments) != 3
+        or steps[1].arguments[:2] != ("--apply", "--request-json")
+        or not isinstance(steps[1].arguments[2], SemanticJsonArgument)
+        or steps[1].arguments[2].expected != expected_operation_request
+        or steps[1].arguments[2].equivalence
         != (
             "object_operation_v1"
             if operation in {"object.create", "object.set"}
@@ -5445,6 +5886,7 @@ def _validate_heavy_v3_object_oracle(
     *,
     api: str,
     scenario_id: str,
+    primary_count: int,
     expected_final_response_sha256: str,
     final_response: str,
     gateway_payload: Mapping[str, Any] | None,
@@ -5457,6 +5899,26 @@ def _validate_heavy_v3_object_oracle(
     )
     _require_passing_oracle(row, label=label)
     evidence = row.get("evidence")
+    if primary_count == 0 and api in {
+        "ak.wwise.core.object.create",
+        "ak.wwise.core.object.set",
+    }:
+        if row.get("phase") != "policy_read_only":
+            raise CampaignEvidenceError(
+                f"{label} object read-only phase is invalid"
+            )
+        proof = _closed_oracle_mapping(
+            evidence,
+            {"before", "after"},
+            label=f"{label} read-only evidence",
+        )
+        _validate_object_snapshot(proof.get("before"), label=f"{label} before")
+        _validate_object_snapshot(proof.get("after"), label=f"{label} after")
+        if proof.get("before") != proof.get("after"):
+            raise CampaignEvidenceError(
+                f"{label} read-only object snapshot changed"
+            )
+        return
     if api == "ak.wwise.core.object.get":
         if row.get("phase") != "query":
             raise CampaignEvidenceError(f"{label} object.get phase is invalid")
@@ -10026,6 +10488,218 @@ def load_verified_attempts(root: Path) -> list[dict[str, Any]]:
     return manifests
 
 
+def _validate_modification_policy_identity_history(
+    campaign_root: Path,
+    *,
+    manifests: Sequence[Mapping[str, Any]],
+    current_attempt_root: Path | None = None,
+) -> None:
+    """Require a fresh Codex task and thread for every policy attempt.
+
+    A failed invocation may legitimately stop before Codex returns a thread
+    identity.  Non-empty identities are nevertheless campaign-global: a retry
+    must create a new task instead of resuming evidence from an earlier
+    attempt.
+    """
+
+    root = Path(campaign_root).resolve(strict=True)
+    attempts_root = root / "attempts"
+    attempt_roots: list[tuple[str, Path]] = []
+    seen_attempt_ids: set[str] = set()
+    for manifest in manifests:
+        attempt_id = manifest.get("attempt_id")
+        if (
+            not isinstance(attempt_id, str)
+            or not attempt_id
+            or attempt_id in seen_attempt_ids
+        ):
+            raise CampaignEvidenceError(
+                "modification-policy identity audit received invalid attempts"
+            )
+        seen_attempt_ids.add(attempt_id)
+        attempt_roots.append(
+            (attempt_id, (attempts_root / attempt_id).resolve(strict=True))
+        )
+    if current_attempt_root is not None:
+        current = Path(current_attempt_root).resolve(strict=True)
+        if current.parent != attempts_root.resolve(strict=True):
+            raise CampaignEvidenceError(
+                "current modification-policy attempt escapes the campaign"
+            )
+        if current.name in seen_attempt_ids:
+            raise CampaignEvidenceError(
+                "current modification-policy attempt is already sealed"
+            )
+        attempt_roots.append((current.name, current))
+
+    seen_threads: dict[str, str] = {}
+    for attempt_id, attempt_root in attempt_roots:
+        matrix_root = attempt_root / "runs" / HEAVY_V3_GROUP_ID / "matrix"
+        if not matrix_root.exists():
+            continue
+        if matrix_root.is_symlink() or not matrix_root.is_dir():
+            raise CampaignEvidenceError(
+                f"{attempt_id} modification-policy matrix root is not real"
+            )
+        for scenario_name, scenario_root in sorted(
+            _heavy_v3_scenario_directories(matrix_root).items()
+        ):
+            label = f"{attempt_id}/{scenario_name}"
+            outcome_path = scenario_root / "outcome.json"
+            outcome: Mapping[str, Any] | None = None
+            if outcome_path.exists():
+                loaded_outcome = load_strict_regular_json(outcome_path)
+                if not isinstance(loaded_outcome, Mapping):
+                    raise CampaignEvidenceError(
+                        f"{label} policy outcome is malformed"
+                    )
+                outcome = loaded_outcome
+
+            task_root = scenario_root / "evidence" / "codex-task"
+            if not task_root.exists():
+                if outcome is not None and (
+                    outcome.get("thread_id") is not None
+                    or outcome.get("task_root") is not None
+                ):
+                    raise CampaignEvidenceError(
+                        f"{label} outcome claims an absent policy task"
+                    )
+                continue
+            if task_root.is_symlink() or not task_root.is_dir():
+                raise CampaignEvidenceError(
+                    f"{label} policy task root is not real"
+                )
+            if outcome is None or outcome.get("task_root") != str(task_root):
+                raise CampaignEvidenceError(
+                    f"{label} outcome is not bound to its raw policy task"
+                )
+
+            turns_root = task_root / "turns"
+            if not turns_root.exists():
+                if outcome.get("thread_id") is not None:
+                    raise CampaignEvidenceError(
+                        f"{label} claims a thread without raw turn evidence"
+                    )
+                continue
+            thread_ids: list[str] = []
+            for turn_name in sorted(_strict_real_subdirectory_names(turns_root)):
+                if re.fullmatch(r"turn-\d{2}", turn_name) is None:
+                    raise CampaignEvidenceError(
+                        f"{label} has an invalid policy turn directory"
+                    )
+                events_text = _load_strict_regular_text(
+                    turns_root / turn_name / "events.jsonl"
+                )
+                if count_invalid_jsonl_lines(events_text):
+                    raise CampaignEvidenceError(
+                        f"{label}/{turn_name} has invalid raw Codex events"
+                    )
+                for event in parse_jsonl_events(events_text):
+                    if event.get("type") != "thread.started":
+                        continue
+                    thread_id = event.get("thread_id")
+                    if not isinstance(thread_id, str) or not thread_id:
+                        raise CampaignEvidenceError(
+                            f"{label}/{turn_name} has a malformed raw thread identity"
+                        )
+                    thread_ids.append(thread_id)
+
+            distinct_thread_ids = tuple(dict.fromkeys(thread_ids))
+            if len(distinct_thread_ids) > 1:
+                raise CampaignEvidenceError(
+                    f"{label} raw turns disagree on policy thread identity"
+                )
+            raw_thread_id = (
+                distinct_thread_ids[0] if distinct_thread_ids else None
+            )
+            outcome_thread_id = outcome.get("thread_id")
+            retryable_missing_outcome_thread = (
+                outcome_thread_id is None
+                and raw_thread_id is not None
+                and _policy_retryable_failure_binds_raw_thread(
+                    outcome,
+                    task_root=task_root,
+                    raw_thread_id=raw_thread_id,
+                )
+            )
+            if (
+                outcome_thread_id != raw_thread_id
+                and not retryable_missing_outcome_thread
+            ):
+                raise CampaignEvidenceError(
+                    f"{label} outcome thread identity differs from raw events"
+                )
+            if raw_thread_id is None:
+                continue
+            previous = seen_threads.get(raw_thread_id)
+            if previous is not None:
+                raise CampaignEvidenceError(
+                    f"{label} reused policy thread identity from {previous}"
+                )
+            seen_threads[raw_thread_id] = label
+
+
+def _policy_retryable_failure_binds_raw_thread(
+    outcome: Mapping[str, Any],
+    *,
+    task_root: Path,
+    raw_thread_id: str,
+) -> bool:
+    """Recognize a pre-agent failed turn whose outcome cannot expose a task."""
+
+    checks = outcome.get("checks")
+    failure = (
+        checks.get("codex_infrastructure_failure")
+        if isinstance(checks, Mapping)
+        else None
+    )
+    sidecar_path = task_root / "infrastructure-failure.json"
+    if (
+        outcome.get("status") != "BLOCKED"
+        or not isinstance(checks, Mapping)
+        or checks.get("failure_classification") != "BLOCKED"
+        or not isinstance(failure, Mapping)
+        or not sidecar_path.exists()
+    ):
+        return False
+    sidecar = load_strict_regular_json(sidecar_path)
+    required_keys = {
+        "contract",
+        "scenario_id",
+        "version",
+        "failed_turn_index",
+        "expected_turn_count",
+        "prior_completed_turn_count",
+        "previous_broker_prefix",
+        "expected_failed_turn_prefix",
+        "prior_thread_id",
+        "prompt_sha256",
+        "failure",
+        "artifact_sha256",
+    }
+    if (
+        not isinstance(sidecar, Mapping)
+        or set(sidecar) != required_keys
+        or sidecar.get("contract")
+        != HEAVY_V3_TASK_INFRASTRUCTURE_FAILURE_CONTRACT
+        or sidecar.get("failure") != dict(failure)
+        or sidecar.get("version") != outcome.get("version")
+        or type(sidecar.get("failed_turn_index")) is not int
+        or type(sidecar.get("prior_completed_turn_count")) is not int
+        or sidecar.get("failed_turn_index")
+        != sidecar.get("prior_completed_turn_count") + 1
+        or not isinstance(sidecar.get("prompt_sha256"), str)
+        or _SHA256_RE.fullmatch(str(sidecar.get("prompt_sha256"))) is None
+        or not isinstance(sidecar.get("artifact_sha256"), Mapping)
+    ):
+        return False
+    prior_thread_id = sidecar.get("prior_thread_id")
+    prior_completed_turn_count = sidecar["prior_completed_turn_count"]
+    if prior_completed_turn_count > 0:
+        return prior_thread_id == raw_thread_id
+    return prior_thread_id is None
+
+
 def write_campaign_marker(root: Path, *, campaign_id: str) -> None:
     atomic_write_json_with_digest(
         root / CAMPAIGN_MARKER_FILE,
@@ -10092,7 +10766,7 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     parser.add_argument("--verify-only", action="store_true")
     parser.add_argument(
         "--profile",
-        choices=(*PROFILE_IDS, HEAVY_V3_PROFILE_ID),
+        choices=(*PROFILE_IDS, *sorted(EXECUTABLE_V3_PROFILE_IDS)),
         default="screening",
     )
     parser.add_argument("--suite")
@@ -10100,13 +10774,13 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     parser.add_argument("--codex-binary", default=str(matrix.DEFAULT_CODEX_BINARY))
     parser.add_argument("--auth-json", default=str(matrix.DEFAULT_AUTH_JSON))
     parser.add_argument("--live-config", default=str(matrix.DEFAULT_LIVE_CONFIG))
-    parser.add_argument("--model", default="gpt-5.6-sol")
+    parser.add_argument("--model")
     parser.add_argument(
         "--reasoning-effort",
         choices=("minimal", "low", "medium", "high", "xhigh", "ultra"),
         default="medium",
     )
-    parser.add_argument("--service-tier", default="priority")
+    parser.add_argument("--service-tier")
     parser.add_argument("--timeout", type=float, default=240.0)
     parser.add_argument("--case-id", action="append", default=[])
     parser.add_argument("--version", action="append", choices=SUPPORTED_VERSIONS, default=[])
@@ -10115,7 +10789,8 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     parser.add_argument("--lock-timeout", type=float, default=10.0)
     parser.add_argument("--max-pre-action-retries", type=int, default=1)
     args = parser.parse_args(argv)
-    is_heavy_v3 = args.profile == HEAVY_V3_PROFILE_ID
+    is_executable_v3 = args.profile in EXECUTABLE_V3_PROFILE_IDS
+    is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
     if args.verify_only and not args.resume:
         parser.error("--verify-only requires --resume")
     if args.timeout <= 0 or args.lock_timeout <= 0:
@@ -10129,18 +10804,35 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     ):
         if len(set(values)) != len(values):
             parser.error(f"{name} values must be unique")
-    if is_heavy_v3 and args.pair_id:
-        parser.error(f"--pair-id is not supported by {HEAVY_V3_PROFILE_ID}")
-    if is_heavy_v3 and args.offline_only:
-        parser.error(f"--offline-only is not supported by {HEAVY_V3_PROFILE_ID}")
-    if not is_heavy_v3:
+    if is_executable_v3 and args.pair_id:
+        parser.error(f"--pair-id is not supported by {args.profile}")
+    if is_executable_v3 and args.offline_only:
+        parser.error(f"--offline-only is not supported by {args.profile}")
+    if not is_executable_v3:
         unknown_case_ids = sorted(set(args.case_id) - set(CASE_IDS))
         if unknown_case_ids:
             parser.error(
                 "unknown v2 --case-id values: " + ", ".join(unknown_case_ids)
             )
+    model = args.model or (
+        "gpt-5.6-terra" if is_policy_v3 else "gpt-5.6-sol"
+    )
+    service_tier = args.service_tier or (
+        "default" if is_policy_v3 else "priority"
+    )
+    if is_policy_v3 and (
+        model != "gpt-5.6-terra"
+        or args.reasoning_effort != "medium"
+        or service_tier != "default"
+    ):
+        parser.error(
+            f"{MODIFICATION_POLICY_V3_PROFILE_ID} requires "
+            "gpt-5.6-terra / medium / default"
+        )
     suite = args.suite or str(
-        matrix.DEFAULT_V3_SUITE if is_heavy_v3 else matrix.DEFAULT_SUITE
+        matrix.DEFAULT_MODIFICATION_POLICY_V3_SUITE
+        if is_policy_v3
+        else (matrix.DEFAULT_V3_SUITE if is_executable_v3 else matrix.DEFAULT_SUITE)
     )
     try:
         suite_path = Path(suite).expanduser().resolve(strict=True)
@@ -10160,9 +10852,9 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         codex_binary=codex_binary,
         auth_json=auth_json,
         live_config=live_config,
-        model=str(args.model),
+        model=str(model),
         reasoning_effort=str(args.reasoning_effort),
-        service_tier=str(args.service_tier),
+        service_tier=str(service_tier),
         timeout_seconds=float(args.timeout),
         case_ids=tuple(str(value) for value in args.case_id),
         versions=tuple(str(value) for value in args.version),

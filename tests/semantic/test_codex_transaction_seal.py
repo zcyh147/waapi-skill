@@ -84,7 +84,12 @@ def _artifact(*, omit: str | None = None) -> dict[str, Any]:
         "created_at": CREATED_AT,
         "expires_at": EXPIRES_AT,
         "execution_policy": {
-            "confirmation_required": True,
+            "requires_authorization": True,
+            "accepted_authorization_modes": [
+                "explicit_confirmation",
+                "policy_authorization",
+            ],
+            "authorization_selected_at_preview": True,
             "automatic_retry_allowed": False,
             "revalidate_project_guard": True,
             "revalidate_runtime_guard": True,
@@ -211,7 +216,10 @@ def test_confirm_and_verified_state_progression_preserves_phase_a_preview(tmp_pa
         seal,
         allowed_states={TransactionState.CONFIRMED},
     )
-    store.begin_execution("tx-sealed")
+    store.begin_execution(
+        "tx-sealed",
+        expected_authorization=TransactionState.CONFIRMED,
+    )
     executing = verify_preview_seal(
         tmp_path,
         "tx-sealed",

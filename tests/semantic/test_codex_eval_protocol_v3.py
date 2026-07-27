@@ -61,7 +61,8 @@ def test_single_transaction_spans_two_turn_prefixes_with_response_bindings() -> 
     assert protocol.steps[5].arguments == (
         ResponseBinding("tx01.execute", "/transaction_id"),
     )
-    request_argument = protocol.steps[1].arguments[1]
+    assert protocol.steps[1].arguments[:2] == ("--apply", "--request-json")
+    request_argument = protocol.steps[1].arguments[2]
     assert isinstance(request_argument, SemanticJsonArgument)
     assert request_argument.equivalence == "object_operation_v1"
 
@@ -75,7 +76,8 @@ def test_non_object_transaction_request_keeps_wire_exact_json() -> None:
 
     protocol = build_transaction_protocol([request])
 
-    request_argument = protocol.steps[1].arguments[1]
+    assert protocol.steps[1].arguments[:2] == ("--apply", "--request-json")
+    request_argument = protocol.steps[1].arguments[2]
     assert isinstance(request_argument, SemanticJsonArgument)
     assert request_argument.equivalence == "wire_exact"
 
@@ -350,7 +352,8 @@ def test_wait_topic_and_operation_requests_deeply_normalize_frozen_json() -> Non
         }
     )
     protocol = build_transaction_protocol((request,))
-    preview_request = protocol.steps[1].arguments[1]
+    assert protocol.steps[1].arguments[:2] == ("--apply", "--request-json")
+    preview_request = protocol.steps[1].arguments[2]
     assert isinstance(preview_request, SemanticJsonArgument)
     assert type(preview_request.expected) is dict
     assert type(preview_request.expected["arguments"]) is dict

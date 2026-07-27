@@ -1084,11 +1084,11 @@ def _audit_coverage(
                 confirmed_versions = [
                     version
                     for version in scenario.versions
-                    if bool(
-                        dispatch_records[version].execution_contract.get(
-                            "requires_confirmation"
+                        if bool(
+                            dispatch_records[version].execution_contract.get(
+                                "requires_authorization"
+                            )
                         )
-                    )
                 ]
                 if confirmed_versions:
                     _validate_compound_supporting_dispatch(
@@ -1097,7 +1097,11 @@ def _audit_coverage(
                         confirmed_versions=confirmed_versions,
                     )
         expected_protocols = {
-            "preview_confirm" if record.execution_contract.get("requires_confirmation") else "single"
+            (
+                "preview_confirm"
+                if record.execution_contract.get("requires_authorization")
+                else "single"
+            )
             for record in selected_records
         }
         if expected_protocols != {scenario.protocol}:

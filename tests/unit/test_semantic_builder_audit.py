@@ -97,7 +97,7 @@ def test_skill_docs_route_builders_through_packaged_transaction_runtime_only() -
     assert "Do not import builders or planners from inline Python" in text
     assert "SemanticPlanner" not in text
     assert "XML editing" not in text
-    assert "preview --request-json" in text
+    assert "preview --apply --request-json" in text
     assert "execute <transaction-id>" in text
     assert "verify <transaction-id>" in text
     assert "Packaged semantic builder source-note families" not in text

@@ -592,6 +592,23 @@ class PreparedObjectRuntime:
         failures = () if after.digest == before.digest else ("object fixture changed before confirmation",)
         return ObjectRuntimeVerification("preview", not failures, failures, {"before": before.digest, "after": after.digest})
 
+    def verify_policy_read_only_unchanged(self) -> ObjectRuntimeVerification:
+        """Prove the complete object fixture stayed equal to its sealed baseline."""
+
+        before = self._before()
+        after = self.snapshot()
+        failures = (
+            ()
+            if after == before
+            else ("read_only policy task changed the object fixture",)
+        )
+        return ObjectRuntimeVerification(
+            "policy_read_only",
+            not failures,
+            failures,
+            {"before": asdict(before), "after": asdict(after)},
+        )
+
     def verify_after_execution(self) -> ObjectRuntimeVerification:
         before = self._before()
         before_by_key = before.by_key()

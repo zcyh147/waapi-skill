@@ -17,7 +17,7 @@ Inspect and change saved config only through the offline gateway:
 
 ```bash
 python scripts/run.py gateway.py config-show
-python scripts/run.py gateway.py config-set --wwise-version 2022.1 --waapi-host 127.0.0.1 --waapi-port 8080 --project-modification-policy preview_then_confirm
+python scripts/run.py gateway.py config-set --wwise-version 2022.1 --waapi-host 127.0.0.1 --waapi-port 8080 --project-modification-policy ask_before_changes
 python scripts/run.py gateway.py config-set --clear-wwise-version --clear-waapi-port
 python scripts/run.py gateway.py config-set --reset
 ```
@@ -33,7 +33,22 @@ The saved public config fields are exactly:
 - `waapi_port`
 - `project_modification_policy`
 
-External config fails closed on unknown fields or invalid values. `wwise_version` may be cleared and otherwise must be one of the five supported year-major versions; `waapi_port` may be cleared and otherwise must be in `1..65535`. `project_modification_policy=never` is re-read at both confirmation and execution, so changing policy after confirmation still blocks execution.
+External config fails closed on unknown fields or invalid values. `wwise_version` may be cleared and otherwise must be one of the five supported year-major versions; `waapi_port` may be cleared and otherwise must be in `1..65535`.
+
+The canonical project modification modes are:
+
+- `read_only`: block actual project changes while continuing to allow reads,
+  including packaged explicit-confirmation-only read transactions.
+- `ask_before_changes`: show the immutable preview and expected result, then wait for a later explicit confirmation.
+- `allow_changes`: show a notice, policy-authorize the immutable preview, and continue to one execution plus verification in the same user turn.
+
+The Gateway re-reads this policy before mutation. A policy-authorized
+transaction can execute only while the current value is still
+`allow_changes`; a downgrade fails closed before dispatch. Existing config
+files using `never`, `preview_then_confirm`, or `allow_with_notice` are accepted
+as read-only migration aliases and normalized respectively to `read_only`,
+`ask_before_changes`, and `allow_changes`. New output and saves use only the
+canonical names.
 
 If `config-show` or a normal `config-set` reports that the external JSON is unreadable or invalid, use `config-set --reset`. It replaces that external file with validated defaults, optionally followed by fields supplied in the same command. This is the only recovery route; do not hand-edit or delete the config file. A reset never reads from or writes to the legacy checkout-local config.
 

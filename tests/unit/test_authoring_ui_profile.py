@@ -47,7 +47,7 @@ def test_authoring_profile_has_fixed_five_version_counts_and_digests() -> None:
     summary = validate_packaged_authoring_ui_execution_contracts(registry)
 
     assert summary == {
-        "contract": "waapi-skill.public-execution-contract/v1",
+        "contract": "waapi-skill.public-execution-contract/v2",
         "execution_profile": AUTHORING_UI_EXECUTION_PROFILE,
         "manifest_rows": 824,
         "executable_rows": 824,
@@ -138,7 +138,7 @@ def test_authoring_profile_assigns_exact_ui_command_routes(
         record = records[uri]
         assert record.route == "managed_transaction"
         assert record.effect == "runtime_mutation"
-        assert record.requires_confirmation is True
+        assert record.requires_authorization is True
         assert record.gateway_commands == (
             "preview",
             "confirm",
@@ -252,13 +252,13 @@ def test_authoring_capabilities_expose_correct_safety_route_and_evidence(
         assert record.transaction_operations == (operation,)
         assert record.safety.read_only is False
         assert record.safety.requires_destructive_gate is True
-        assert record.safety.requires_confirmation is True
+        assert record.safety.requires_authorization is True
         assert record.safety.interface_status == "available_via_transaction"
     read = records["ak.wwise.ui.commands.getCommands"]
     assert read.preferred_route == "manifest_dispatch"
     assert read.gateway_commands == ("call",)
     assert read.safety.read_only is True
-    assert read.safety.requires_confirmation is False
+    assert read.safety.requires_authorization is False
     topic = records["ak.wwise.ui.commands.executed"]
     assert topic.preferred_route == "bounded_topic_wait"
     assert topic.gateway_commands == ("wait-topic",)

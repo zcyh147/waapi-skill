@@ -122,7 +122,7 @@ def gateway_env(tmp_path: Path) -> dict[str, str]:
                     "wwise_version": None,
                     "waapi_host": "127.0.0.1",
                     "waapi_port": None,
-                    "project_modification_policy": "preview_then_confirm",
+                    "project_modification_policy": "ask_before_changes",
                 }
             ),
             encoding="utf-8",
@@ -889,7 +889,7 @@ def test_config_show_returns_defaults_offline_without_connecting(
     assert called is False
     assert payload == {
         "contract": waapi_gateway.GATEWAY_RESULT_CONTRACT,
-        "config_contract": "waapi-skill.config/v1",
+        "config_contract": "waapi-skill.config/v2",
         "ok": True,
         "status": "ok",
         "command": "config-show",
@@ -898,25 +898,25 @@ def test_config_show_returns_defaults_offline_without_connecting(
             "wwise_version": None,
             "waapi_host": "127.0.0.1",
             "waapi_port": None,
-            "project_modification_policy": "preview_then_confirm",
+            "project_modification_policy": "ask_before_changes",
         },
         "source": "defaults",
         "external_path": str(external_path),
         "legacy_fallback_used": False,
         "session_context": {
-            "contract": "waapi-skill.session-context/v1",
+            "contract": "waapi-skill.session-context/v2",
             "available": False,
             "endpoint": {"host": "127.0.0.1", "port": None, "url": None},
             "adapter_version": None,
             "adapter_version_source": "unavailable",
-            "project_modification_policy": "preview_then_confirm",
+            "project_modification_policy": "ask_before_changes",
             "available_project_modification_policies": [
-                "never",
-                "preview_then_confirm",
-                "allow_with_notice",
+                "read_only",
+                "ask_before_changes",
+                "allow_changes",
             ],
             "one_time_introduction": {
-                "contract": "waapi-skill.session-introduction/v1",
+                "contract": "waapi-skill.session-introduction/v2",
                 "emit_condition": "visible_conversation_intro_absent",
                 "emit_timing": "first_agent_message_after_gateway_result",
                 "atomic": True,
@@ -925,11 +925,11 @@ def test_config_show_returns_defaults_offline_without_connecting(
                     "skill_name": "waapi-skill",
                     "endpoint_url": None,
                     "adapter_version": None,
-                    "project_modification_policy": "preview_then_confirm",
+                    "project_modification_policy": "ask_before_changes",
                     "available_project_modification_policies": [
-                        "never",
-                        "preview_then_confirm",
-                        "allow_with_notice",
+                        "read_only",
+                        "ask_before_changes",
+                        "allow_changes",
                     ],
                 },
                 "machine_readable_result_policy": "separate_progress_message",
@@ -953,7 +953,7 @@ def test_config_set_roundtrips_atomically_outside_checkout(tmp_path: Path) -> No
             "--waapi-port",
             "31337",
             "--project-modification-policy",
-            "allow_with_notice",
+            "allow_changes",
         ],
         env=env,
         client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
@@ -987,9 +987,19 @@ def test_config_set_roundtrips_atomically_outside_checkout(tmp_path: Path) -> No
     assert cleared["effective"]["waapi_host"] == "localhost"
 
 
-def test_config_legacy_read_and_external_migration_never_rewrites_legacy(
+@pytest.mark.parametrize(
+    ("legacy_policy", "canonical_policy"),
+    (
+        ("never", "read_only"),
+        ("preview_then_confirm", "ask_before_changes"),
+        ("allow_with_notice", "allow_changes"),
+    ),
+)
+def test_config_legacy_read_normalizes_policy_alias_and_never_rewrites_legacy(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    legacy_policy: str,
+    canonical_policy: str,
 ) -> None:
     skill_root = tmp_path / "skill"
     legacy_path = skill_root / "data" / "config.json"
@@ -999,7 +1009,7 @@ def test_config_legacy_read_and_external_migration_never_rewrites_legacy(
         "wwise_version": "2023.1",
         "waapi_host": "legacy-host",
         "waapi_port": 8123,
-        "project_modification_policy": "preview_then_confirm",
+        "project_modification_policy": legacy_policy,
         "use_current_selection_for_ambiguous_queries": False,
     }
     legacy_text = json.dumps(legacy_payload, indent=2, sort_keys=True) + "\n"
@@ -1012,6 +1022,13 @@ def test_config_legacy_read_and_external_migration_never_rewrites_legacy(
     assert shown["source"] == "legacy"
     assert shown["legacy_fallback_used"] is True
     assert shown["effective"]["waapi_host"] == "legacy-host"
+    assert shown["effective"]["project_modification_policy"] == canonical_policy
+    assert (
+        shown["session_context"]["one_time_introduction"]["facts"][
+            "project_modification_policy"
+        ]
+        == canonical_policy
+    )
 
     set_code, saved = waapi_gateway.execute_gateway(
         ["config-set", "--waapi-host", "external-host"],
@@ -1024,9 +1041,52 @@ def test_config_legacy_read_and_external_migration_never_rewrites_legacy(
         "wwise_version": "2023.1",
         "waapi_host": "external-host",
         "waapi_port": 8123,
-        "project_modification_policy": "preview_then_confirm",
+        "project_modification_policy": canonical_policy,
     }
     assert legacy_path.read_text(encoding="utf-8") == legacy_text
+
+
+@pytest.mark.parametrize(
+    ("legacy_policy", "canonical_policy"),
+    (
+        ("never", "read_only"),
+        ("preview_then_confirm", "ask_before_changes"),
+        ("allow_with_notice", "allow_changes"),
+    ),
+)
+def test_config_set_normalizes_legacy_policy_alias_before_saving(
+    tmp_path: Path,
+    legacy_policy: str,
+    canonical_policy: str,
+) -> None:
+    external_path = tmp_path / "external" / "config.json"
+    env = {"WAAPI_SKILL_CONFIG_PATH": str(external_path)}
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "config-set",
+            "--project-modification-policy",
+            legacy_policy,
+        ],
+        env=env,
+        client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
+    )
+
+    assert exit_code == 0
+    assert payload["config_contract"] == "waapi-skill.config/v2"
+    assert payload["effective"]["project_modification_policy"] == canonical_policy
+    assert (
+        json.loads(external_path.read_text(encoding="utf-8"))[
+            "project_modification_policy"
+        ]
+        == canonical_policy
+    )
+    assert (
+        payload["session_context"]["one_time_introduction"]["facts"][
+            "available_project_modification_policies"
+        ]
+        == ["read_only", "ask_before_changes", "allow_changes"]
+    )
 
 
 @pytest.mark.parametrize(
@@ -1081,7 +1141,7 @@ def test_external_config_rejects_unknown_public_fields(tmp_path: Path) -> None:
                 "wwise_version": "2022.1",
                 "waapi_host": "127.0.0.1",
                 "waapi_port": 8080,
-                "project_modification_policy": "preview_then_confirm",
+                "project_modification_policy": "ask_before_changes",
                 "internal_escape_hatch": True,
             }
         ),
@@ -1111,7 +1171,7 @@ def test_config_reset_recovers_invalid_external_config_without_reading_legacy(
                 "wwise_version": "2025.1",
                 "waapi_host": "legacy-host",
                 "waapi_port": 9000,
-                "project_modification_policy": "never",
+                "project_modification_policy": "read_only",
             }
         ),
         encoding="utf-8",
@@ -1154,7 +1214,7 @@ def test_config_reset_recovers_invalid_external_config_without_reading_legacy(
         "wwise_version": None,
         "waapi_host": "127.0.0.1",
         "waapi_port": 31337,
-        "project_modification_policy": "preview_then_confirm",
+        "project_modification_policy": "ask_before_changes",
     }
     assert json.loads(external_path.read_text(encoding="utf-8")) == reset["effective"]
     assert json.loads(legacy_path.read_text(encoding="utf-8"))["waapi_host"] == "legacy-host"
@@ -1178,7 +1238,7 @@ def test_config_reset_alone_writes_validated_defaults(tmp_path: Path) -> None:
         "wwise_version": None,
         "waapi_host": "127.0.0.1",
         "waapi_port": None,
-        "project_modification_policy": "preview_then_confirm",
+        "project_modification_policy": "ask_before_changes",
     }
 
 
@@ -1190,7 +1250,7 @@ def test_saved_version_hint_mismatch_fails_closed(tmp_path: Path) -> None:
                 "wwise_version": "2024.1",
                 "waapi_host": "127.0.0.1",
                 "waapi_port": 31337,
-                "project_modification_policy": "preview_then_confirm",
+                "project_modification_policy": "ask_before_changes",
             }
         ),
         encoding="utf-8",
@@ -1217,7 +1277,7 @@ def test_connection_cli_then_env_then_saved_config_precedence(tmp_path: Path) ->
                 "wwise_version": "2023.1",
                 "waapi_host": "saved-host",
                 "waapi_port": 1111,
-                "project_modification_policy": "preview_then_confirm",
+                "project_modification_policy": "ask_before_changes",
             }
         ),
         encoding="utf-8",
@@ -1347,7 +1407,9 @@ def test_transaction_state_directory_inside_skill_checkout_is_rejected_without_w
     assert not state_dir.exists()
 
 
-def test_external_never_policy_blocks_confirm_without_connecting(tmp_path: Path) -> None:
+def test_legacy_never_policy_normalizes_to_read_only_and_blocks_confirm_without_connecting(
+    tmp_path: Path,
+) -> None:
     external_path = tmp_path / "config.json"
     external_path.write_text(
         json.dumps(
@@ -1375,7 +1437,9 @@ def test_external_never_policy_blocks_confirm_without_connecting(tmp_path: Path)
     )
 
     assert exit_code == 2
-    assert payload["message"] == "project_modification_policy=never blocks transaction confirmation"
+    assert payload["message"] == (
+        "project_modification_policy=read_only blocks transaction confirmation"
+    )
 
 
 def test_capability_matrix_is_available_offline_without_config_or_client(tmp_path: Path) -> None:
@@ -1462,7 +1526,7 @@ def test_capabilities_detail_is_explicit_and_compact_rows_keep_transaction_bound
     compact = compact_payload["capabilities"][0]
     assert set(compact) == CAPABILITY_COMPACT_KEYS
     assert compact["transaction_boundaries"][0]["operation"] == "object.copy"
-    assert compact["execution_contract"]["contract"] == "waapi-skill.public-execution-contract/v1"
+    assert compact["execution_contract"]["contract"] == "waapi-skill.public-execution-contract/v2"
     assert compact["execution_contract"]["route"] == "transaction"
     assert compact["execution_contract"]["executable"] is True
 

@@ -152,7 +152,7 @@ def gateway_env(
                     "wwise_version": None,
                     "waapi_host": "127.0.0.1",
                     "waapi_port": None,
-                    "project_modification_policy": "preview_then_confirm",
+                    "project_modification_policy": "ask_before_changes",
                 }
             ),
             encoding="utf-8",

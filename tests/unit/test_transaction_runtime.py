@@ -92,6 +92,15 @@ def test_transaction_artifact_binds_closed_preview_runtime_guard_and_expiry() ->
     }
     assert artifact["runtime_guard"]["version"] == "2022.1"
     assert len(artifact["runtime_guard"]["files"]) >= 18
+    assert artifact["execution_policy"]["requires_authorization"] is True
+    assert artifact["execution_policy"]["accepted_authorization_modes"] == [
+        "explicit_confirmation",
+        "policy_authorization",
+    ]
+    assert (
+        artifact["execution_policy"]["authorization_selected_at_preview"]
+        is True
+    )
     assert artifact["execution_policy"]["automatic_retry_allowed"] is False
     assert artifact["expires_at"] == "2026-07-14T06:10:00.000000Z"
 

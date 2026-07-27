@@ -11,6 +11,10 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Mapping
 
+from .authorization import (
+    AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,
+    accepted_authorization_modes_for_uri,
+)
 from .execution_contracts import (
     APPROVED_EXCLUSIONS,
     BOUNDED_DIRECT_CALL_URIS,
@@ -57,15 +61,22 @@ class ApiSafety:
 
     read_only: bool
     requires_destructive_gate: bool
-    requires_confirmation: bool
+    accepted_authorization_modes: tuple[str, ...]
     interface_status: str
     reason: str
+
+    @property
+    def requires_authorization(self) -> bool:
+        return bool(self.accepted_authorization_modes)
 
     def as_dict(self) -> dict[str, object]:
         return {
             "read_only": self.read_only,
             "requires_destructive_gate": self.requires_destructive_gate,
-            "requires_confirmation": self.requires_confirmation,
+            "requires_authorization": self.requires_authorization,
+            "accepted_authorization_modes": list(
+                self.accepted_authorization_modes
+            ),
             "interface_status": self.interface_status,
             "reason": self.reason,
         }
@@ -80,7 +91,7 @@ def classify_api_safety(uri: str, item_type: str, category: str) -> ApiSafety:
         return ApiSafety(
             read_only=False,
             requires_destructive_gate=True,
-            requires_confirmation=True,
+            accepted_authorization_modes=(),
             interface_status="unsupported_by_skill_interface",
             reason=excluded,
         )
@@ -89,14 +100,14 @@ def classify_api_safety(uri: str, item_type: str, category: str) -> ApiSafety:
             return ApiSafety(
                 read_only=False,
                 requires_destructive_gate=True,
-                requires_confirmation=True,
+                accepted_authorization_modes=(),
                 interface_status="unsupported_by_skill_interface",
                 reason="This topic is not present in the reviewed five-version execution contract.",
             )
         return ApiSafety(
             read_only=True,
             requires_destructive_gate=False,
-            requires_confirmation=False,
+            accepted_authorization_modes=(),
             interface_status="available",
             reason="This reviewed topic is exposed only through one bounded wait with guaranteed unsubscribe.",
         )
@@ -106,18 +117,28 @@ def classify_api_safety(uri: str, item_type: str, category: str) -> ApiSafety:
         return ApiSafety(
             read_only=True,
             requires_destructive_gate=False,
-            requires_confirmation=False,
+            accepted_authorization_modes=(),
             interface_status="available",
             reason="This function has a reviewed fixed or bounded-call execution contract.",
         )
     effect = classify_function_effect(uri)
+    authorization_modes = (
+        (AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,)
+        if effect == "read"
+        else accepted_authorization_modes_for_uri(uri)
+    )
+    authorization_label = (
+        "explicit-confirmation-only"
+        if authorization_modes == ("explicit_confirmation",)
+        else "project-policy-gated"
+    )
     return ApiSafety(
         read_only=effect == "read",
         requires_destructive_gate=True,
-        requires_confirmation=True,
+        accepted_authorization_modes=authorization_modes,
         interface_status="available_via_transaction",
         reason=(
-            f"This function is packaged as a confirmed {effect} transaction with schema validation, "
+            f"This function is packaged as an {authorization_label} {effect} transaction with schema validation, "
             "immutable preview binding, bounded execution, and result verification."
         ),
     )

@@ -68,7 +68,7 @@ def test_catalog_separates_route_safety_and_evidence_without_overclaiming() -> N
     assert closed_mutation.safety.interface_status == "available_via_transaction"
     assert mutation.semantic_family == "soundbank"
     assert mutation.safety.requires_destructive_gate is True
-    assert mutation.safety.requires_confirmation is True
+    assert mutation.safety.requires_authorization is True
     assert mutation.preferred_route == "transaction_operation"
     assert mutation.transaction_operations == ("soundbank.generate",)
     assert mutation.safety.interface_status == "available_via_transaction"
@@ -91,7 +91,7 @@ def test_2025_media_pool_reads_use_the_bounded_direct_route() -> None:
         assert capability.preferred_route == "manifest_dispatch"
         assert capability.gateway_commands == ("call",)
         assert capability.safety.read_only is True
-        assert capability.safety.requires_confirmation is False
+        assert capability.safety.requires_authorization is False
 
 
 def test_catalog_keeps_specific_builder_boundaries_and_hides_generic_bypass() -> None:
@@ -123,7 +123,7 @@ def test_catalog_keeps_specific_builder_boundaries_and_hides_generic_bypass() ->
         assert generic.preferred_route == "transaction_operation"
         assert generic.gateway_commands == ("preview", "confirm", "execute", "verify")
         assert generic.safety.interface_status == "available_via_transaction"
-        assert generic.safety.requires_confirmation is True
+        assert generic.safety.requires_authorization is True
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
@@ -221,7 +221,7 @@ def test_all_semantic_read_records_resolve_to_public_gateway_routes() -> None:
     assert inclusions.preferred_route == "transaction_operation"
     assert inclusions.transaction_operations == ("waapi.call",)
     assert inclusions.safety.read_only is True
-    assert inclusions.safety.requires_confirmation is True
+    assert inclusions.safety.requires_authorization is True
 
     public = object_get.as_dict(detail=True)["interface"]
     assert "semantic_builder_ref" not in public
@@ -384,19 +384,23 @@ def test_compact_capability_representation_is_stable_and_keeps_boundaries_visibl
     assert compact["transaction_operations"] == ["waapi.call"]
     assert compact["transaction_boundaries"][0]["operation"] == "object.copy"
     assert "returned copy GUID" in compact["transaction_boundaries"][0]["boundary"]
-    assert compact["execution_contract"]["contract"] == "waapi-skill.public-execution-contract/v1"
+    assert compact["execution_contract"]["contract"] == "waapi-skill.public-execution-contract/v2"
     assert compact["execution_contract"]["route"] == "transaction"
     assert compact["execution_contract"]["executable"] is True
-    assert compact["execution_contract"]["requires_confirmation"] is True
+    assert compact["execution_contract"]["requires_authorization"] is True
+    assert compact["execution_contract"]["accepted_authorization_modes"] == [
+        "explicit_confirmation",
+        "policy_authorization",
+    ]
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
-def test_dump_objects_external_file_write_is_an_isolated_confirmed_transaction(version: str) -> None:
+def test_dump_objects_external_file_write_is_an_isolated_authorized_transaction(version: str) -> None:
     record = CapabilityCatalog().describe(version, "ak.wwise.cli.dumpObjects")
 
     assert record.safety.read_only is False
     assert record.safety.interface_status == "available_via_transaction"
-    assert record.safety.requires_confirmation is True
+    assert record.safety.requires_authorization is True
     assert record.preferred_route == "transaction_operation"
     assert record.execution_mode == "isolated_transaction"
     assert record.gateway_commands == ("preview", "confirm", "execute", "verify")

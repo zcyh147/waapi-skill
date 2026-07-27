@@ -2082,6 +2082,7 @@ def validated_skill_read(
         "references/waapi-setup.md",
         "references/waapi-query.md",
         "references/waapi-operate.md",
+        "references/waapi-coverage.md",
     }
     if relative not in allowed:
         return None

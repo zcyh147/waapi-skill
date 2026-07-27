@@ -523,11 +523,11 @@ def _preview_target_identity(target_identities: Mapping[str, Any]) -> dict[str, 
     roles = {str(role): dict(identity) for role, identity in target_identities.items() if isinstance(identity, Mapping)}
     return {
         "roles": roles,
-        "confirmed_execution": {
+        "authorized_execution": {
             "required": True,
             "abort_on_mismatch": True,
             "mismatch_status": "repreview_required",
-            "reason": "confirmed execution must reuse the preview-resolved target identity",
+            "reason": "authorized execution must reuse the preview-resolved target identity",
         },
     }
 

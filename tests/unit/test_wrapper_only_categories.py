@@ -86,7 +86,7 @@ def test_formerly_blocked_categories_are_executable_except_named_exclusions() ->
 
 
 @pytest.mark.parametrize(
-    ("uri", "expected_route", "expected_commands", "requires_confirmation"),
+    ("uri", "expected_route", "expected_commands", "requires_authorization"),
     (
         (
             "ak.wwise.cli.dumpObjects",
@@ -114,13 +114,13 @@ def test_2022_former_wrapper_only_examples_have_concrete_public_routes(
     uri: str,
     expected_route: str,
     expected_commands: tuple[str, ...],
-    requires_confirmation: bool,
+    requires_authorization: bool,
 ) -> None:
     contract = ExecutionContractRegistry().describe("2022.1", uri)
 
     assert contract.route == expected_route
     assert contract.gateway_commands == expected_commands
-    assert contract.requires_confirmation is requires_confirmation
+    assert contract.requires_authorization is requires_authorization
     assert contract.executable is True
     assert contract.excluded_reason is None
 
@@ -132,7 +132,7 @@ def test_safe_debug_file_api_uses_isolated_transaction_in_supported_versions() -
         contract = registry.describe(version, "ak.wwise.debug.generateToneWAV")
         assert contract.route == "isolated_transaction"
         assert contract.effect == "external"
-        assert contract.requires_confirmation is True
+        assert contract.requires_authorization is True
         assert contract.executable is True
 
 
@@ -159,7 +159,8 @@ def test_only_the_two_named_uris_fail_closed_before_connect() -> None:
             safety = classify_api_safety(contract.uri, contract.item_type, "ignored")
             assert safety.interface_status == "unsupported_by_skill_interface"
             assert safety.requires_destructive_gate is True
-            assert safety.requires_confirmation is True
+            assert safety.requires_authorization is False
+            assert safety.accepted_authorization_modes == ()
             assert safety.reason == contract.excluded_reason
 
     assert observed == EXPECTED_EXCLUSION_URIS

@@ -70,6 +70,10 @@ _CODEX_INFRASTRUCTURE_CATEGORIES = frozenset(
 class V3TaskRunnerError(RuntimeError):
     """The fresh task failed a harness/broker invariant."""
 
+    def __init__(self, message: str, *, thread_id: str | None = None) -> None:
+        super().__init__(message)
+        self.thread_id = thread_id
+
 
 class V3CommandLifecycleError(CodexHarnessError):
     """Codex ended a turn while one or more command items were incomplete."""
@@ -103,10 +107,14 @@ class V3TaskRun:
     turns: tuple[CodexRunResult, ...]
     turn_grades: tuple[V3TurnGrade, ...]
     broker_evidence: GatewayBrokerEvidence
+    broker_protocol_passed: bool = False
 
     @property
     def passed(self) -> bool:
-        return self.broker_evidence.passed and all(item.passed for item in self.turn_grades)
+        return (
+            (self.broker_evidence.passed or self.broker_protocol_passed)
+            and all(item.passed for item in self.turn_grades)
+        )
 
     @property
     def terminal_indeterminate(self) -> bool:
@@ -147,6 +155,8 @@ def run_v3_codex_task(
     trusted_step_pre_observer: TrustedStepPreObserver | None = None,
     trusted_step_observer: TrustedStepObserver | None = None,
     turn_observer: TurnObserver | None = None,
+    project_modification_policy: str = "ask_before_changes",
+    expected_primary_dispatch_count: int | None = None,
 ) -> V3TaskRun:
     """Run every natural turn in one exact, memory-isolated Codex thread."""
 
@@ -186,7 +196,12 @@ def run_v3_codex_task(
     expected_family = business_family_for_api(str(scenario.api))
     expected_runner = "cli" if expected_family == "cli" else "project"
     primary_dispatch = getattr(scenario, "primary_dispatch", None)
-    expected_primary_count = getattr(primary_dispatch, "count", None)
+    scenario_primary_count = getattr(primary_dispatch, "count", None)
+    expected_primary_count = (
+        scenario_primary_count
+        if expected_primary_dispatch_count is None
+        else expected_primary_dispatch_count
+    )
     if (
         business_oracle_plan.path != root.parent / BUSINESS_ORACLE_PLAN_FILE
         or plan_payload.get("scenario_id") != scenario_id
@@ -199,6 +214,7 @@ def run_v3_codex_task(
         != provenance.payload["protocol"]["sha256"]
         or plan_payload.get("provenance_sha256") != provenance.sha256
         or type(expected_primary_count) is not int
+        or expected_primary_count < 0
         or plan_payload.get("primary_dispatch_count") != expected_primary_count
     ):
         raise V3TaskRunnerError(
@@ -274,6 +290,7 @@ def run_v3_codex_task(
         skill_source=skill_source,
         expected_steps=protocol.steps,
         expected_wwise_version=version,
+        project_modification_policy=project_modification_policy,
         runner_environment=runner_environment,
         working_root=broker_root,
         transport="tcp",
@@ -312,6 +329,11 @@ def run_v3_codex_task(
                                 step.name for step in protocol.steps
                             ),
                             previous_broker_prefix=previous_prefix,
+                            allow_complete_prefix_failure=(
+                                bool(protocol.allowed_turn_prefix_counts)
+                                and previous_prefix == len(protocol.steps)
+                                and expected_prefix == previous_prefix
+                            ),
                         )
                         _archive_infrastructure_failure(
                             root,
@@ -343,15 +365,60 @@ def run_v3_codex_task(
                     terminal_indeterminate = bool(
                         getattr(broker_evidence, "terminal_indeterminate", False)
                     )
+                    actual_prefix = len(broker_evidence.consumed_step_names)
+                    allowed_prefixes = protocol.allowed_prefixes_for_turn(
+                        turn_index
+                    )
                     effective_prefix = (
-                        len(broker_evidence.consumed_step_names)
+                        actual_prefix
                         if terminal_indeterminate
+                        or protocol.allowed_turn_prefix_counts
                         else expected_prefix
                     )
-                    reconciliation = broker.reconcile_prefix(
-                        cumulative_gateway_argvs,
-                        expected_step_count=effective_prefix,
-                    )
+                    prefix_errors: list[str] = []
+                    if (
+                        not terminal_indeterminate
+                        and effective_prefix not in allowed_prefixes
+                    ):
+                        prefix_errors.append(
+                            "broker prefix is outside the allowed turn choices: "
+                            f"observed={effective_prefix} allowed={allowed_prefixes!r}"
+                        )
+                    if effective_prefix < previous_prefix:
+                        prefix_errors.append(
+                            "broker prefix moved backwards across Codex turns"
+                        )
+                    if effective_prefix < 1:
+                        reconciliation = GatewayBrokerReconciliation(
+                            passed=False,
+                            observed_command_count=len(cumulative_gateway_argvs),
+                            accepted_record_count=len(
+                                broker_evidence.accepted_records
+                            ),
+                            errors=tuple(
+                                prefix_errors
+                                or ("broker consumed no expected gateway step",)
+                            ),
+                        )
+                    else:
+                        raw_reconciliation = broker.reconcile_prefix(
+                            cumulative_gateway_argvs,
+                            expected_step_count=effective_prefix,
+                        )
+                        reconciliation = GatewayBrokerReconciliation(
+                            passed=raw_reconciliation.passed
+                            and not prefix_errors,
+                            observed_command_count=(
+                                raw_reconciliation.observed_command_count
+                            ),
+                            accepted_record_count=(
+                                raw_reconciliation.accepted_record_count
+                            ),
+                            errors=(
+                                *raw_reconciliation.errors,
+                                *prefix_errors,
+                            ),
+                        )
                     terminal_execute_exit2_count = _terminal_execute_exit2_count(
                         protocol,
                         broker_evidence,
@@ -402,7 +469,8 @@ def run_v3_codex_task(
                         raise V3TaskRunnerError(
                             f"{scenario_id} turn {turn_index} failed task gates: "
                             f"common={common_failures}; "
-                            f"reconciliation={grade.reconciliation.errors}"
+                            f"reconciliation={grade.reconciliation.errors}",
+                            thread_id=result.thread_id,
                         )
                     if turn_observer is not None:
                         turn_observer(turn_index, result, broker_evidence)
@@ -427,10 +495,12 @@ def run_v3_codex_task(
         turns=tuple(results),
         turn_grades=tuple(grades),
         broker_evidence=broker_evidence,
+        broker_protocol_passed=_broker_terminal_protocol_passed(
+            protocol,
+            broker_evidence,
+        ),
     )
-    _write_json(
-        root / "task-result.json",
-        {
+    task_result = {
             "contract": TASK_RESULT_CONTRACT,
             "scenario_id": scenario_id,
             "version": version,
@@ -448,9 +518,44 @@ def run_v3_codex_task(
                 }
                 for item in run.turn_grades
             ],
-        },
-    )
+        }
+    if protocol.allowed_turn_prefix_counts:
+        task_result["protocol_terminal_passed"] = run.broker_protocol_passed
+        task_result["accepted_terminal_prefixes"] = list(
+            protocol.accepted_terminal_prefixes
+        )
+    _write_json(root / "task-result.json", task_result)
     return run
+
+
+def _broker_terminal_protocol_passed(
+    protocol: V3GatewayProtocol,
+    evidence: GatewayBrokerEvidence,
+) -> bool:
+    """Accept only one sealed complete protocol or declared optional prefix."""
+
+    consumed_count = len(evidence.consumed_step_names)
+    if consumed_count not in protocol.accepted_terminal_prefixes:
+        return False
+    expected_names = tuple(
+        step.name for step in protocol.steps[:consumed_count]
+    )
+    if (
+        evidence.consumed_step_names != expected_names
+        or len(evidence.records) != consumed_count
+        or tuple(record.step_name for record in evidence.records)
+        != expected_names
+        or evidence.rejected_records
+        or not all(record.succeeded for record in evidence.records)
+    ):
+        return False
+    if consumed_count == len(protocol.steps):
+        return evidence.passed
+    return (
+        protocol.allowed_turn_prefix_counts
+        and not evidence.complete
+        and evidence.terminal_state == "RUNNING"
+    )
 
 
 def _grade_common_turn(
@@ -792,6 +897,7 @@ def _validate_infrastructure_failure(
     broker_evidence: GatewayBrokerEvidence,
     expected_step_names: tuple[str, ...],
     previous_broker_prefix: int,
+    allow_complete_prefix_failure: bool = False,
 ) -> None:
     """Prove the infrastructure failure preceded every model-side action."""
 
@@ -868,14 +974,28 @@ def _validate_infrastructure_failure(
             broker_evidence.expected_step_names == expected_step_names
         ),
         "broker_prefix_exact": (
-            0 <= previous_broker_prefix < len(expected_step_names)
+            0 <= previous_broker_prefix <= len(expected_step_names)
             and broker_evidence.consumed_step_names == expected_prefix_names
             and len(broker_records) == previous_broker_prefix
             and tuple(record.step_name for record in broker_records)
             == expected_prefix_names
             and all(record.succeeded for record in broker_records)
-            and not broker_evidence.complete
-            and broker_evidence.terminal_state == "RUNNING"
+            and (
+                (
+                    allow_complete_prefix_failure
+                    and previous_broker_prefix == len(expected_step_names)
+                    and broker_evidence.complete
+                    and broker_evidence.passed
+                    and broker_evidence.terminal_state == "COMPLETE"
+                )
+                or (
+                    not allow_complete_prefix_failure
+                    and previous_broker_prefix < len(expected_step_names)
+                    and not broker_evidence.complete
+                    and not broker_evidence.passed
+                    and broker_evidence.terminal_state == "RUNNING"
+                )
+            )
         ),
     }
     failures = tuple(name for name, passed in gates.items() if not passed)

@@ -15,7 +15,7 @@ raw WAAPI payload, shell command string, or script source.  Instead it:
 * exposes a separately acknowledged, likewise non-reversible unregister
   boundary for pre-existing command IDs supplied without definitions.
 
-The module performs no WAAPI calls.  Callers own preview/confirmation binding,
+The module performs no WAAPI calls.  Callers own preview/authorization binding,
 the immediately-before/after live checks, and the single non-retried dispatch.
 
 For any program or Lua handler, the caller must also attest
@@ -38,11 +38,12 @@ import subprocess
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from .authorization import DEFAULT_TRANSACTION_AUTHORIZATION_MODES
 from .canonical import canonical_json_bytes, canonical_sha256
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 
 
-UI_COMMAND_PLAN_CONTRACT = "waapi-skill.ui-command-operation-plan/v1"
+UI_COMMAND_PLAN_CONTRACT = "waapi-skill.ui-command-operation-plan/v2"
 UI_COMMAND_FILE_PROOF_CONTRACT = "waapi-skill.ui-command-path-proof/v1"
 UI_COMMAND_INVENTORY_EVIDENCE_CONTRACT = (
     "waapi-skill.ui-command-inventory-evidence/v1"
@@ -2351,8 +2352,11 @@ def _safety_metadata() -> dict[str, Any]:
         "automatic_retry": False,
         "model_generated_code_allowed": False,
         "raw_shell_string_allowed": False,
-        "requires_preview_confirmation": True,
-        "same_turn_execution_allowed": False,
+        "requires_preview_authorization": True,
+        "accepted_authorization_modes": list(
+            DEFAULT_TRANSACTION_AUTHORIZATION_MODES
+        ),
+        "same_turn_execution_allowed_by_policy": True,
         "structured_argument_tokens_required": True,
     }
 

@@ -1473,7 +1473,11 @@ def _synthetic_protocol(
         step = ExpectedGatewayStep(
             name="audio.preview",
             subcommand="preview",
-            arguments=("--request-json", SemanticJsonArgument(request)),
+            arguments=(
+                "--apply",
+                "--request-json",
+                SemanticJsonArgument(request),
+            ),
         )
         return V3GatewayProtocol((step,), (1,))
     steps = tuple(
@@ -1670,7 +1674,10 @@ def _synthetic_gateway_records(
             )
         elif step.subcommand == "execute":
             assert transaction_store is not None
-            transaction_store.begin_execution(transaction_id)
+            transaction_store.begin_execution(
+                transaction_id,
+                expected_authorization=TransactionState.CONFIRMED,
+            )
             executed = transaction_store.mark_executed_unverified(transaction_id)
             payload.update(
                 {
@@ -3157,6 +3164,7 @@ def test_campaign_object_archive_accepts_strict_set03_intrinsic_projection(
         verification,
         api="ak.wwise.core.object.set",
         scenario_id="OBJ22-F-SET-03",
+        primary_count=1,
         expected_final_response_sha256="0" * 64,
         final_response="",
         gateway_payload=None,
@@ -3175,6 +3183,7 @@ def test_campaign_object_archive_accepts_strict_set03_intrinsic_projection(
             verification,
             api="ak.wwise.core.object.set",
             scenario_id="OBJ22-F-SET-01",
+            primary_count=1,
             expected_final_response_sha256="0" * 64,
             final_response="",
             gateway_payload=None,
@@ -3221,9 +3230,10 @@ def test_campaign_object_archive_keeps_legacy_exact_protected_evidence(
     validate_object_archived_verification(sections, verification)
     campaign._validate_heavy_v3_object_oracle(
         verification,
-        api="ak.wwise.core.object.set",
-        scenario_id=case_id,
-        expected_final_response_sha256="0" * 64,
+            api="ak.wwise.core.object.set",
+            scenario_id=case_id,
+            primary_count=1,
+            expected_final_response_sha256="0" * 64,
         final_response="",
         gateway_payload=None,
         label="synthetic legacy SET01",

@@ -4,6 +4,11 @@ import math
 from collections import Counter
 from typing import Mapping
 
+from wwise_waapi.authorization import (
+    DEFAULT_TRANSACTION_AUTHORIZATION_MODES,
+    EXPLICIT_CONFIRMATION_ONLY_URIS,
+    AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,
+)
 from wwise_waapi.capabilities import CapabilityCatalog
 from wwise_waapi.execution_contracts import (
     LIFECYCLE_COMPANIONS,
@@ -57,7 +62,8 @@ def test_every_registry_row_has_one_complete_route_contract() -> None:
             assert row.timeout_seconds == 0
             assert row.result_limit_bytes == 0
             assert row.excluded_reason
-            assert row.requires_confirmation is False
+            assert row.requires_authorization is False
+            assert row.accepted_authorization_modes == ()
             continue
 
         assert row.route in EXECUTABLE_ROUTES
@@ -66,7 +72,36 @@ def test_every_registry_row_has_one_complete_route_contract() -> None:
         assert 0 < row.result_limit_bytes <= 1024 * 1024
         assert row.verification_strategy != "none"
         assert row.program_case
-        assert row.requires_confirmation is (row.route in TRANSACTION_ROUTES)
+        assert row.requires_authorization is (row.route in TRANSACTION_ROUTES)
+        if row.route not in TRANSACTION_ROUTES:
+            assert row.accepted_authorization_modes == ()
+        elif row.effect == "read" or row.uri in EXPLICIT_CONFIRMATION_ONLY_URIS:
+            assert row.accepted_authorization_modes == (
+                AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,
+            )
+        else:
+            assert (
+                row.accepted_authorization_modes
+                == DEFAULT_TRANSACTION_AUTHORIZATION_MODES
+            )
+
+
+def test_all_transaction_reads_are_explicit_confirmation_only() -> None:
+    registry = ExecutionContractRegistry()
+    rows = [
+        entry
+        for version in SUPPORTED_WWISE_VERSION_KEYS
+        for entry in registry.entries(version)
+        if entry.route in TRANSACTION_ROUTES and entry.effect == "read"
+    ]
+
+    assert len(rows) == 59
+    assert len({row.uri for row in rows}) == 15
+    assert all(
+        row.accepted_authorization_modes
+        == (AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,)
+        for row in rows
+    )
 
 
 def test_all_six_project_transition_apis_have_explicit_versioned_guard_modes() -> None:
@@ -154,7 +189,7 @@ def test_route_families_have_explicit_program_cleanup_or_confirmation_contracts(
         entry.gateway_commands == ("preview", "confirm", "execute", "verify")
         for entry in transactions
     )
-    assert all(entry.requires_confirmation for entry in transactions)
+    assert all(entry.requires_authorization for entry in transactions)
 
 
 def test_all_undo_member_rows_route_only_to_same_connection_composite() -> None:

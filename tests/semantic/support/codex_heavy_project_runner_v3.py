@@ -17,6 +17,7 @@ import math
 import multiprocessing
 import os
 import queue
+import re
 import secrets
 import stat
 import threading
@@ -44,6 +45,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
     V3GatewayProtocol,
     build_direct_protocol,
+    build_modification_policy_protocol,
     build_transaction_protocol,
     call_step,
     query_object_step,
@@ -60,6 +62,7 @@ from tests.semantic.support.codex_harness import (
     CodexInfrastructureError,
     CodexRunResult,
     first_gateway_backed_agent_message,
+    parse_jsonl_events,
 )
 from tests.semantic.support.codex_import_assets_v3 import (
     CANONICAL_WWISE_LANGUAGE,
@@ -133,7 +136,10 @@ from tests.semantic.support.codex_media_pool_runtime_v3 import (
     verify_reference_associations,
     verify_reference_match_result,
 )
-from tests.semantic.support.codex_object_heavy_v3 import build_object_heavy_v3_recipe
+from tests.semantic.support.codex_object_heavy_v3 import (
+    OperationRequestSpec,
+    build_object_heavy_v3_recipe,
+)
 from tests.semantic.support.codex_object_business_plan_v3 import (
     ObjectBusinessPlanSections,
     compile_object_business_plan,
@@ -170,7 +176,11 @@ from tests.semantic.support.codex_soundbank_runtime_v3 import (
     PreparedSoundBankRuntime,
     prepare_soundbank_runtime,
 )
-from tests.semantic.support.codex_task_runner_v3 import V3TaskRun, run_v3_codex_task
+from tests.semantic.support.codex_task_runner_v3 import (
+    V3TaskRun,
+    V3TaskRunnerError,
+    run_v3_codex_task,
+)
 from tests.semantic.support.codex_prompt_provenance_v3 import write_prompt_provenance
 from tests.semantic.support.codex_transaction_seal import (
     validate_transaction_show_confirmation_against_store,
@@ -722,6 +732,7 @@ class _PreparedCase:
     prompt_sources: Mapping[str, Any] = field(default_factory=dict)
     verify_preview: Callable[[Mapping[str, Any]], Any] | None = None
     verify_refusal: Callable[[Mapping[str, Any]], Any] | None = None
+    verify_policy_read_only: Callable[[], Any] | None = None
     cleanup_success: Callable[[], Any] | None = None
     # This hook is reserved for case-owned state that must be restored even
     # when the Codex task or its semantic grade fails.  It runs exactly once
@@ -776,6 +787,7 @@ def run_heavy_project_unit(
     observer: _CaseObservers | None = None
     observer_finished = False
     direct_close_deferred = False
+    failed_task_thread_id: str | None = None
     cancelled: BaseException | None = None
     checks: dict[str, Any] = {}
     requested_status = "BLOCKED"
@@ -787,11 +799,13 @@ def run_heavy_project_unit(
                 "scenario lifecycle returned another scenario/version identity"
             )
         direct = OwnedDirectWaapiCall(host=runtime.host, port=runtime.port)
+        policy_mode = _unit_project_modification_policy(unit)
         prepared = _prepare_case(
             unit.scenario,
             runtime=runtime,
             direct=direct,
             media_holder=media_holder,
+            project_modification_policy=policy_mode,
         )
         prompts = (prepared.prompt, *(turn.prompt for turn in unit.turns[1:]))
         task_root = runtime.evidence_root / "codex-task"
@@ -812,6 +826,7 @@ def run_heavy_project_unit(
             provenance=provenance,
             runner="project",
             typed_sections=prepared.typed_sections,
+            primary_dispatch_count=_unit_primary_dispatch_count(unit),
         )
         observer = _CaseObservers(
             scenario=unit.scenario,
@@ -820,7 +835,22 @@ def run_heavy_project_unit(
             endpoint=f"{runtime.host}:{runtime.port}",
             version=unit.version,
             business_oracle_plan_sha256=business_oracle_plan.sha256,
+            project_modification_policy=(
+                policy_mode or "ask_before_changes"
+            ),
+            enforce_policy_turn_oracles=policy_mode is not None,
         )
+
+        def observe_turn(
+            turn_index: int,
+            result: CodexRunResult,
+            broker_evidence: Any,
+        ) -> None:
+            nonlocal failed_task_thread_id
+            if isinstance(result.thread_id, str) and result.thread_id:
+                failed_task_thread_id = result.thread_id
+            observer.after_turn(turn_index, result, broker_evidence)
+
         trusted_subscription_ack = (
             TrustedSubscriptionAckSpec(
                 step_name=prepared.topic_payload_step,
@@ -830,7 +860,7 @@ def run_heavy_project_unit(
             else None
         )
         task = run_v3_codex_task(
-            scenario_id=unit.unit_id,
+            scenario_id=unit.scenario.id,
             version=unit.version,
             scenario=unit.scenario,
             prompts=prompts,
@@ -854,7 +884,11 @@ def run_heavy_project_unit(
             ),
             trusted_step_pre_observer=observer.before_gateway_step,
             trusted_step_observer=observer.after_gateway_step,
-            turn_observer=observer.after_turn,
+            turn_observer=observe_turn,
+            project_modification_policy=(
+                policy_mode or "ask_before_changes"
+            ),
+            expected_primary_dispatch_count=_unit_primary_dispatch_count(unit),
         )
         checks["task_passed"] = bool(task.passed)
         _validate_task_run(
@@ -872,11 +906,39 @@ def run_heavy_project_unit(
         observer.finish()
         observer_finished = True
         checks.update(observer.checks)
+        if policy_mode == "read_only":
+            if prepared.verify_policy_read_only is None:
+                raise _HeavyProjectInfrastructureError(
+                    "read_only policy case has no unchanged-state verifier"
+                )
+            verification = prepared.verify_policy_read_only()
+            _assert_verification(
+                verification,
+                context="read_only policy business oracle",
+            )
+            checks["policy_read_only_unchanged"] = _oracle_evidence(
+                scenario=unit.scenario,
+                version=unit.version,
+                runner="project",
+                business_oracle_plan_sha256=business_oracle_plan.sha256,
+                verification=verification,
+            )
+        if policy_mode == "allow_changes":
+            if not _policy_notice_precedes_execute(
+                task.turns[0],
+                expected_change_terms=_policy_notice_change_terms(unit.scenario),
+            ):
+                raise _HeavyProjectSemanticError(
+                    "allow_changes did not emit a user-visible policy notice "
+                    "describing the concrete change between preview and execute"
+                )
+            checks["allow_changes_notice_before_execute"] = True
         checks["primary_dispatch"] = _audit_primary_dispatch(
             unit.scenario,
             task=task,
             topic_payload=observer.topic_payload,
             topic_subscription_ack=observer.checks.get("topic_subscription_ack"),
+            expected_count=_unit_primary_dispatch_count(unit),
         )
         if prepared.cleanup_success is not None:
             try:
@@ -893,6 +955,13 @@ def run_heavy_project_unit(
             exc,
             runtime=runtime,
         )
+        if (
+            task is None
+            and isinstance(exc, V3TaskRunnerError)
+            and isinstance(exc.thread_id, str)
+            and exc.thread_id
+        ):
+            failed_task_thread_id = exc.thread_id
         checks["exception"] = reason
         checks["failure_classification"] = requested_status
         if isinstance(exc, CodexInfrastructureError):
@@ -1063,7 +1132,11 @@ def run_heavy_project_unit(
             and (runtime.evidence_root / "codex-task").is_dir()
             else None
         ),
-        thread_id=task.thread_id if task is not None else None,
+        thread_id=(
+            task.thread_id
+            if task is not None
+            else failed_task_thread_id
+        ),
         checks=MappingProxyType(dict(checks)),
         lifecycle=lifecycle_result.as_dict() if lifecycle_result is not None else None,
     )
@@ -1098,6 +1171,8 @@ class _CaseObservers:
         endpoint: str,
         version: str,
         business_oracle_plan_sha256: str,
+        project_modification_policy: str = "ask_before_changes",
+        enforce_policy_turn_oracles: bool = False,
         publisher_client_factory: Callable[[], OwnedDirectWaapiCall] | None = None,
         publisher_process_target: Callable[..., None] | None = None,
     ) -> None:
@@ -1107,6 +1182,14 @@ class _CaseObservers:
         self.endpoint = endpoint
         self.version = version
         self.business_oracle_plan_sha256 = business_oracle_plan_sha256
+        self.project_modification_policy = project_modification_policy
+        self.policy_baseline = (
+            prepared.snapshot()
+            if enforce_policy_turn_oracles
+            and project_modification_policy
+            in {"read_only", "ask_before_changes", "allow_changes"}
+            else None
+        )
         # An explicit factory keeps the cheap in-process fake lane available to
         # unit tests.  Production leaves it unset and always uses spawn.
         self._publisher_client_factory = publisher_client_factory
@@ -1290,8 +1373,35 @@ class _CaseObservers:
                 intro_response,
                 endpoint=self.endpoint,
                 version=self.version,
+                policy=self.project_modification_policy,
             )
             self.checks["first_use_intro"] = True
+        if self.policy_baseline is not None and (
+            self.project_modification_policy == "read_only"
+            or (
+                self.project_modification_policy == "ask_before_changes"
+                and turn_index == 1
+            )
+        ):
+            if self.policy_baseline is None or (
+                self.prepared.snapshot() != self.policy_baseline
+            ):
+                raise HeavyProjectRunnerError(
+                    f"{self.project_modification_policy} changed the project "
+                    f"during turn {turn_index}"
+                )
+            self.checks[
+                f"policy_turn_{turn_index:02d}_project_unchanged"
+            ] = True
+            _require_policy_turn_response(
+                result,
+                policy=self.project_modification_policy,
+                turn_index=turn_index,
+                expected_change_terms=_policy_notice_change_terms(self.scenario),
+            )
+            self.checks[
+                f"policy_turn_{turn_index:02d}_response"
+            ] = True
         if turn_index == len(self.prepared.protocol.turn_prefix_counts):
             if self.scenario.protocol == "single" and self.prepared.topic_payload_step is None:
                 payload = self.payloads[self.prepared.protocol.steps[-1].name]
@@ -3196,6 +3306,7 @@ def _prepare_case(
     runtime: ScenarioRuntime,
     direct: OwnedDirectWaapiCall,
     media_holder: Mapping[str, Any],
+    project_modification_policy: str | None = None,
 ) -> _PreparedCase:
     if scenario.api in OBJECT_APIS:
         recipe = build_object_heavy_v3_recipe(scenario.id)
@@ -3211,6 +3322,11 @@ def _prepare_case(
                 "object runtime did not retain its sealed before snapshot"
             )
         protocol = object_runtime.gateway_protocol()
+        if project_modification_policy is not None:
+            protocol = build_modification_policy_protocol(
+                protocol,
+                policy=project_modification_policy,
+            )
         object_input_files = {
             item.key: (
                 runtime.asset_root / "object-query-audio" / f"{item.key}.wav"
@@ -3256,6 +3372,11 @@ def _prepare_case(
             ),
             snapshot=object_runtime.snapshot,
             verify_final=verify,
+            verify_policy_read_only=(
+                object_runtime.verify_policy_read_only_unchanged
+                if project_modification_policy == "read_only"
+                else None
+            ),
             typed_sections=typed_sections,
             visible_values=MappingProxyType({}),
         )
@@ -3793,7 +3914,7 @@ def _validate_task_run(
     task_root: Path,
     expected_turn_count: int,
 ) -> None:
-    if task.scenario_id != unit.unit_id or task.version != unit.version:
+    if task.scenario_id != unit.scenario.id or task.version != unit.version:
         raise _HeavyProjectInfrastructureError(
             "fresh task returned another scenario/version identity"
         )
@@ -3828,6 +3949,362 @@ def _validate_task_run(
         raise _HeavyProjectSemanticError(
             "fresh task returned a non-passing broker/turn grade"
         )
+
+
+def _unit_project_modification_policy(unit: Any) -> str | None:
+    value = getattr(unit, "project_modification_policy", None)
+    if value is None:
+        return None
+    if value not in {"read_only", "ask_before_changes", "allow_changes"}:
+        raise _HeavyProjectInfrastructureError(
+            f"unit has invalid project modification policy {value!r}"
+        )
+    return str(value)
+
+
+def _unit_primary_dispatch_count(unit: Any) -> int:
+    declared = getattr(unit, "expected_primary_dispatch_count", None)
+    if declared is None:
+        declared = getattr(
+            getattr(unit.scenario, "primary_dispatch", None),
+            "count",
+            None,
+        )
+    if type(declared) is not int or declared < 0:
+        raise _HeavyProjectInfrastructureError(
+            "unit has no closed expected primary-dispatch count"
+        )
+    return declared
+
+
+def _policy_notice_change_terms(
+    scenario: OnlineScenario,
+) -> tuple[str, ...]:
+    """Derive concrete object names the allow-changes notice must mention."""
+
+    recipe = build_object_heavy_v3_recipe(scenario.id)
+    request = recipe.request
+    if not isinstance(request, OperationRequestSpec):
+        raise _HeavyProjectInfrastructureError(
+            "modification-policy notice requires an object operation recipe"
+        )
+    arguments = request.arguments
+    root_name = arguments.get("name")
+    children = arguments.get("children", ())
+    child_names = tuple(
+        child.get("name")
+        for child in children
+        if isinstance(child, Mapping) and isinstance(child.get("name"), str)
+    )
+    if (
+        not isinstance(root_name, str)
+        or not root_name
+        or len(child_names) < 2
+    ):
+        raise _HeavyProjectInfrastructureError(
+            "modification-policy notice terms are unavailable"
+        )
+    return (root_name, *child_names[:2])
+
+
+def _policy_notice_precedes_execute(
+    result: CodexRunResult,
+    *,
+    expected_change_terms: Sequence[str],
+) -> bool:
+    """Require a concrete allow-changes notice after preview, before execute."""
+
+    facts = result.command_facts
+    commands = tuple(facts.gateway_attempt_commands)
+    subcommands = tuple(facts.gateway_subcommands)
+    if len(commands) != len(subcommands):
+        return False
+    preview_commands = {
+        command
+        for command, subcommand in zip(commands, subcommands, strict=True)
+        if subcommand == "preview"
+    }
+    execute_commands = {
+        command
+        for command, subcommand in zip(commands, subcommands, strict=True)
+        if subcommand == "execute"
+    }
+    if len(preview_commands) != 1 or len(execute_commands) != 1:
+        return False
+    terms = tuple(
+        str(value).casefold()
+        for value in expected_change_terms
+        if isinstance(value, str) and value
+    )
+    if not terms:
+        return False
+    preview_completed = False
+    notice_seen = False
+    for event in parse_jsonl_events(result.stdout):
+        item = event.get("item")
+        if not isinstance(item, Mapping):
+            continue
+        if (
+            event.get("type") == "item.completed"
+            and item.get("type") == "command_execution"
+            and item.get("command") in preview_commands
+        ):
+            preview_completed = True
+            continue
+        if (
+            preview_completed
+            and event.get("type") == "item.completed"
+            and item.get("type") == "agent_message"
+            and isinstance(item.get("text"), str)
+        ):
+            folded = item["text"].casefold()
+            mode_notice = (
+                "allow_changes" in folded
+                or (
+                    any(
+                        marker in item["text"]
+                        for marker in ("当前模式", "修改策略", "当前策略")
+                    )
+                    and any(
+                        marker in item["text"]
+                        for marker in (
+                            "允许",
+                            "可以直接",
+                            "授权",
+                            "按当前策略执行",
+                        )
+                    )
+                )
+            )
+            affirmative_action = bool(
+                re.search(
+                    r"(?:将|会|接下来|现在|随后).{0,24}"
+                    r"(?:创建|新建|建出|执行)",
+                    item["text"],
+                )
+                or re.search(
+                    r"(?:will|going to|proceed|now|next).{0,32}"
+                    r"(?:create|build|execute)",
+                    folded,
+                )
+            )
+            negated_action = bool(
+                re.search(
+                    r"(?:不|不会|不能|不可|不要|暂不|先不|无法).{0,12}"
+                    r"(?:创建|新建|建出|执行)",
+                    item["text"],
+                )
+                or re.search(
+                    r"(?:not|cannot|can't|won't|do not|unable to).{0,24}"
+                    r"(?:create|execute|proceed)",
+                    folded,
+                )
+            )
+            concrete_change = (
+                affirmative_action
+                and all(term in folded for term in terms)
+                and not negated_action
+            )
+            notice_seen = notice_seen or (mode_notice and concrete_change)
+            continue
+        if (
+            item.get("type") == "command_execution"
+            and item.get("command") in execute_commands
+        ):
+            return preview_completed and notice_seen
+    return False
+
+
+def _require_policy_turn_response(
+    result: CodexRunResult,
+    *,
+    policy: str,
+    turn_index: int,
+    expected_change_terms: Sequence[str],
+) -> None:
+    """Require the user-facing response to explain the policy outcome."""
+
+    text = result.final_response.strip()
+    folded = text.casefold()
+    root_term = (
+        str(expected_change_terms[0]).casefold()
+        if expected_change_terms
+        else ""
+    )
+    unchanged = any(
+        marker in folded
+        for marker in (
+            "没有修改",
+            "没有改动",
+            "未修改",
+                "未改动",
+                "未执行",
+                "未写入",
+                "尚未写入",
+                "未发生任何更改",
+                "保持原样",
+                "不会创建",
+            "no change",
+            "not changed",
+            "not executed",
+        )
+    ) or bool(
+        re.search(
+                r"(?:尚未|还未|未).{0,8}"
+                r"(?:执行|创建|新建|修改|改动|更改|变更|变化|应用|写入)",
+                text,
+            )
+        or re.search(
+            r"(?:未发生(?:任何)?|没有(?:发生)?(?:任何)?).{0,8}"
+            r"(?:修改|改动|更改|变更|变化)",
+            text,
+        )
+    )
+    completion_text = re.sub(
+        r"预览(?:已经|已)?(?:生成|准备完成|创建完成|完成)"
+        r"(?!了?(?:层级|对象|项目))",
+        "PREVIEW_READY",
+        text,
+    )
+    completion_text = re.sub(
+        r"(?:已经|已)(?:生成|准备好|创建完成|完成).{0,8}预览",
+        "PREVIEW_READY",
+        completion_text,
+    )
+    completion_folded = re.sub(
+        r"preview.{0,12}(?:(?:has been|is|was)\s+)?"
+        r"(?:created|completed|prepared|ready)",
+        "preview ready",
+        completion_text.casefold(),
+    )
+    contradictory_completion = bool(
+        re.search(
+            r"(?:已经|已)(?!确认)(?:成功地?|完成)?(?:为你)?"
+            r"(?:创建|新建|建好|建出)",
+            completion_text,
+        )
+        or re.search(
+            r"(?<!确认)(?:操作|创建|新建|建好|建出).{0,8}"
+            r"(?:完成|好了)(?!后|时|再)",
+            completion_text,
+        )
+        or re.search(
+            r"(?:already|has been).{0,24}(?:created|built|completed)",
+            completion_folded,
+        )
+        or any(
+            marker in completion_folded
+            for marker in ("created successfully", "operation completed")
+        )
+    )
+    if policy == "read_only":
+        policy_explained = (
+            "read_only" in folded
+            or "只读" in text
+            or (turn_index > 1 and unchanged)
+        )
+        request_explained = (
+            (bool(root_term) and root_term in folded)
+            or turn_index > 1
+            or any(
+                marker in folded
+                for marker in (
+                    "创建",
+                    "对象",
+                    "修改",
+                    "改动",
+                    "create",
+                    "object",
+                    "change",
+                )
+            )
+        )
+        if (
+            not text
+            or not unchanged
+            or contradictory_completion
+            or not policy_explained
+            or not request_explained
+        ):
+            raise HeavyProjectRunnerError(
+                "read_only response did not explain that the requested project "
+                "change was blocked and the project remained unchanged"
+            )
+        return
+    if policy == "ask_before_changes" and turn_index == 1:
+        preview_negated = bool(
+            re.search(
+                r"预览.{0,8}(?:尚未|还未|未|无法|不能).{0,8}"
+                r"(?:完成|生成|准备|就绪)",
+                text,
+            )
+            or re.search(
+                r"preview.{0,16}(?:not|isn't|cannot|can't|unable).{0,16}"
+                r"(?:ready|complete|generated|prepared)",
+                folded,
+            )
+        )
+        preview = not preview_negated and bool(
+            re.search(
+                r"预览.{0,16}(?:已|已经)?"
+                r"(?:生成|准备完成|准备好|就绪|创建完成|完成)",
+                text,
+            )
+            or re.search(
+                r"(?:已|已经)(?:生成|准备好|创建完成|完成).{0,16}预览",
+                text,
+            )
+            or re.search(
+                r"preview.{0,16}(?:ready|complete|generated|prepared)",
+                folded,
+            )
+        )
+        confirmation_requested = any(
+            marker in folded
+            for marker in (
+                "请确认",
+                "是否继续",
+                "要我执行吗",
+                "等待你的确认",
+                "等你确认",
+                "please confirm",
+                "would you like me to proceed",
+            )
+            ) or bool(
+                re.search(
+                    r"(?:请|可以)?(?:明确)?回复.{0,12}(?:确认|同意)",
+                    text,
+                )
+                or re.search(
+                    r"(?:确认|是否|要(?:不要|我)?|可以|需要我|你希望我).{0,12}"
+                    r"(?:执行|创建|继续|进行).{0,6}(?:吗|么|？|\?)",
+                    text,
+                )
+                or re.search(
+                    r"(?:please\s+)?reply.{0,24}(?:confirm|yes|proceed)",
+                    folded,
+            )
+        )
+        concrete_terms = tuple(
+            str(term).casefold()
+            for term in expected_change_terms
+            if isinstance(term, str) and term
+        )
+        target_explained = bool(concrete_terms) and all(
+            term in folded for term in concrete_terms
+        )
+        if (
+            not text
+            or not preview
+            or not confirmation_requested
+            or not unchanged
+            or contradictory_completion
+            or not target_explained
+        ):
+            raise HeavyProjectRunnerError(
+                "ask_before_changes first response did not explain the concrete "
+                "preview, unchanged state, and later-confirmation requirement"
+            )
 
 
 def _failure_status(
@@ -3868,6 +4345,7 @@ def _audit_primary_dispatch(
     task: V3TaskRun,
     topic_payload: Mapping[str, Any] | None,
     topic_subscription_ack: Mapping[str, Any] | None = None,
+    expected_count: int | None = None,
 ) -> Mapping[str, Any]:
     try:
         evidence_root = Path(task.broker_evidence.evidence_directory).resolve(
@@ -3901,10 +4379,15 @@ def _audit_primary_dispatch(
                 "event_count": observed_events,
             }
         )
-    if observed_calls != scenario.primary_dispatch.count:
+    primary_count = (
+        scenario.primary_dispatch.count
+        if expected_count is None
+        else expected_count
+    )
+    if observed_calls != primary_count:
         raise HeavyProjectRunnerError(
             f"primary dispatch count differs for {scenario.api}: "
-            f"expected={scenario.primary_dispatch.count} observed={observed_calls}"
+            f"expected={primary_count} observed={observed_calls}"
         )
     return MappingProxyType(
         {
@@ -4042,15 +4525,22 @@ def _assert_verification(value: Any, *, context: str) -> None:
         )
 
 
-def _require_natural_intro(text: str, *, endpoint: str, version: str) -> None:
+def _require_natural_intro(
+    text: str,
+    *,
+    endpoint: str,
+    version: str,
+    policy: str,
+) -> None:
     folded = text.casefold()
     required = {
         "skill": "waapi-skill" in folded,
         "endpoint": endpoint.casefold() in folded,
         "version": version.casefold() in folded,
-        "policy": "preview_then_confirm" in folded,
-        "mode_never": "never" in folded,
-        "mode_notice": "allow_with_notice" in folded,
+        "policy": policy.casefold() in folded,
+        "mode_read_only": "read_only" in folded,
+        "mode_ask": "ask_before_changes" in folded,
+        "mode_allow": "allow_changes" in folded,
     }
     missing = [key for key, ok in required.items() if not ok]
     if missing:
@@ -4252,6 +4742,7 @@ def _write_common_business_oracle_plan(
         | SoundBankBusinessPlanSections
         | None
     ),
+    primary_dispatch_count: int | None = None,
 ) -> BusinessOraclePlanEvidence:
     """Seal the common envelope with runner-compiled family sections.
 
@@ -4272,7 +4763,11 @@ def _write_common_business_oracle_plan(
         scenario_root=scenario_root,
         protocol_sha256=provenance.payload["protocol"]["sha256"],
         provenance_sha256=provenance.sha256,
-        primary_dispatch_count=scenario.primary_dispatch.count,
+        primary_dispatch_count=(
+            scenario.primary_dispatch.count
+            if primary_dispatch_count is None
+            else primary_dispatch_count
+        ),
         **family_kwargs,
     )
 

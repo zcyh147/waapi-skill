@@ -790,7 +790,7 @@ def test_single_platform_convert_provenance_binds_visible_root_to_pair_value(
     assert binding["pointer"] == ""
     assert binding["origin_kind"] == "owned_path"
     assert binding["origin_pointer"] == (
-        "/steps/1/arguments/1/value/arguments/args/output/1"
+        "/steps/1/arguments/2/value/arguments/args/output/1"
     )
     assert binding["path_kind"] == "directory"
     assert binding["owned_relative_path"].endswith("/cli-io/output")

@@ -25,6 +25,7 @@ from .authoring_ui_commands_manifest import (
     AuthoringUiCommandsSupplementError,
     AuthoringUiCommandsSupplementMissingError,
 )
+from .authorization import DEFAULT_TRANSACTION_AUTHORIZATION_MODES
 from .builders.source_notes import load_semantic_source_notes
 from .category_policy import category_policy
 from .deferred_registry import ApiClassifier
@@ -594,7 +595,7 @@ def _safety_for_profile(
         return ApiSafety(
             read_only=True,
             requires_destructive_gate=False,
-            requires_confirmation=False,
+            accepted_authorization_modes=(),
             interface_status="available",
             reason=(
                 "This Authoring-only UI command inventory/event surface is "
@@ -604,11 +605,11 @@ def _safety_for_profile(
     return ApiSafety(
         read_only=False,
         requires_destructive_gate=True,
-        requires_confirmation=True,
+        accepted_authorization_modes=DEFAULT_TRANSACTION_AUTHORIZATION_MODES,
         interface_status="available_via_transaction",
         reason=(
             "This Authoring-only UI command mutation is exposed through its "
-            "closed dedicated operation, immutable preview confirmation, and "
+            "closed dedicated operation, immutable preview authorization, and "
             "live command-inventory verification."
         ),
     )
@@ -791,7 +792,8 @@ def _compact_execution_contract(contract: Mapping[str, Any]) -> dict[str, Any]:
         "timeout_seconds",
         "result_limit_bytes",
         "verification_strategy",
-        "requires_confirmation",
+        "requires_authorization",
+        "accepted_authorization_modes",
         "lifecycle_strategy",
         "companion_uris",
         "executable",

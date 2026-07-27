@@ -3,9 +3,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from wwise_waapi import SkillConfig  # pyright: ignore[reportMissingImports]
 from wwise_waapi.config import (  # pyright: ignore[reportMissingImports]
+    DEFAULT_PROJECT_MODIFICATION_POLICY,
+    LEGACY_PROJECT_MODIFICATION_POLICY_ALIASES,
     MAX_CONFIG_BYTES,
+    PROJECT_MODIFICATION_POLICIES,
     resolve_external_config_path,
 )
 
@@ -67,7 +72,8 @@ def test_load_defaults_when_config_is_missing(tmp_path) -> None:
     assert config.wwise_version is None
     assert config.waapi_host == "127.0.0.1"
     assert config.waapi_port is None
-    assert config.project_modification_policy == "preview_then_confirm"
+    assert config.project_modification_policy == "ask_before_changes"
+    assert config.project_modification_policy == DEFAULT_PROJECT_MODIFICATION_POLICY
 
 
 def test_save_and_load_roundtrip(tmp_path) -> None:
@@ -76,7 +82,7 @@ def test_save_and_load_roundtrip(tmp_path) -> None:
     config.wwise_version = "2024.1"
     config.waapi_host = "localhost"
     config.waapi_port = 8080
-    config.project_modification_policy = "allow_with_notice"
+    config.project_modification_policy = "allow_changes"
 
     config.save(config_path)
 
@@ -84,7 +90,7 @@ def test_save_and_load_roundtrip(tmp_path) -> None:
     assert payload == {
         "waapi_host": "localhost",
         "waapi_port": 8080,
-        "project_modification_policy": "allow_with_notice",
+        "project_modification_policy": "allow_changes",
         "wwise_version": "2024.1",
     }
 
@@ -92,7 +98,7 @@ def test_save_and_load_roundtrip(tmp_path) -> None:
     assert loaded.wwise_version == "2024.1"
     assert loaded.waapi_host == "localhost"
     assert loaded.waapi_port == 8080
-    assert loaded.project_modification_policy == "allow_with_notice"
+    assert loaded.project_modification_policy == "allow_changes"
 
 
 def test_update_persists_specific_fields(tmp_path) -> None:
@@ -108,14 +114,125 @@ def test_update_persists_specific_fields(tmp_path) -> None:
     loaded = SkillConfig.load(tmp_path, config_path)
     assert loaded.wwise_version == "2025.1"
     assert loaded.waapi_port == 1234
-    assert loaded.project_modification_policy == "never"
+    assert loaded.project_modification_policy == "read_only"
+    assert json.loads(config_path.read_text(encoding="utf-8"))[
+        "project_modification_policy"
+    ] == "read_only"
 
 
-def test_invalid_project_modification_policy_fails_closed(tmp_path) -> None:
+@pytest.mark.parametrize(
+    ("value", "canonical"),
+    (
+        ("read_only", "read_only"),
+        ("ask_before_changes", "ask_before_changes"),
+        ("allow_changes", "allow_changes"),
+        ("never", "read_only"),
+        ("preview_then_confirm", "ask_before_changes"),
+        ("allow_with_notice", "allow_changes"),
+    ),
+)
+def test_update_accepts_canonical_and_legacy_policy_values_but_saves_canonical(
+    tmp_path: Path,
+    value: str,
+    canonical: str,
+) -> None:
+    config_path = tmp_path / value / "config.json"
+
+    config = SkillConfig(tmp_path).update(
+        path=config_path,
+        project_modification_policy=value,
+    )
+
+    assert config.project_modification_policy == canonical
+    assert config.as_dict()["project_modification_policy"] == canonical
+    assert json.loads(config_path.read_text(encoding="utf-8"))[
+        "project_modification_policy"
+    ] == canonical
+    assert (
+        SkillConfig.load(tmp_path, config_path).project_modification_policy
+        == canonical
+    )
+
+
+@pytest.mark.parametrize(
+    ("legacy", "canonical"),
+    tuple(LEGACY_PROJECT_MODIFICATION_POLICY_ALIASES.items()),
+)
+def test_save_canonicalizes_legacy_policy_assigned_by_config_set_style_caller(
+    tmp_path: Path,
+    legacy: str,
+    canonical: str,
+) -> None:
+    config_path = tmp_path / legacy / "config.json"
+    config = SkillConfig(tmp_path)
+    config.project_modification_policy = legacy
+
+    config.save(config_path)
+
+    assert json.loads(config_path.read_text(encoding="utf-8"))[
+        "project_modification_policy"
+    ] == canonical
+
+
+@pytest.mark.parametrize(
+    ("legacy", "canonical"),
+    tuple(LEGACY_PROJECT_MODIFICATION_POLICY_ALIASES.items()),
+)
+def test_load_legacy_policy_normalizes_in_memory_without_rewriting_then_update_migrates(
+    tmp_path: Path,
+    legacy: str,
+    canonical: str,
+) -> None:
+    config_path = tmp_path / legacy / "config.json"
+    config_path.parent.mkdir(parents=True)
+    original = (
+        json.dumps(
+            {
+                "wwise_version": "2022.1",
+                "waapi_host": "127.0.0.1",
+                "waapi_port": 8080,
+                "project_modification_policy": legacy,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )
+    config_path.write_text(original, encoding="utf-8")
+
+    loaded = SkillConfig.load(tmp_path, config_path, strict_fields=True)
+
+    assert loaded.project_modification_policy == canonical
+    assert loaded.as_dict()["project_modification_policy"] == canonical
+    assert config_path.read_text(encoding="utf-8") == original
+
+    loaded.update(path=config_path, waapi_host="localhost")
+
+    migrated = json.loads(config_path.read_text(encoding="utf-8"))
+    assert migrated["waapi_host"] == "localhost"
+    assert migrated["project_modification_policy"] == canonical
+
+
+def test_public_policy_inventory_contains_only_canonical_values() -> None:
+    assert PROJECT_MODIFICATION_POLICIES == (
+        "read_only",
+        "ask_before_changes",
+        "allow_changes",
+    )
+    assert set(PROJECT_MODIFICATION_POLICIES).isdisjoint(
+        LEGACY_PROJECT_MODIFICATION_POLICY_ALIASES
+    )
+
+
+@pytest.mark.parametrize("invalid", ("mutating", "", " read_only", None, True))
+def test_invalid_project_modification_policy_fails_closed(
+    tmp_path: Path,
+    invalid: object,
+) -> None:
     config_path = tmp_path / "data" / "config.json"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
-        '{"project_modification_policy": "mutating"}',
+        json.dumps({"project_modification_policy": invalid}),
         encoding="utf-8",
     )
 
@@ -127,11 +244,15 @@ def test_invalid_project_modification_policy_fails_closed(tmp_path) -> None:
         raise AssertionError("Expected invalid policy to raise ValueError")
 
 
-def test_update_rejects_invalid_project_modification_policy(tmp_path) -> None:
+@pytest.mark.parametrize("invalid", ("mutating", "", "allow_changes ", None, False))
+def test_update_rejects_invalid_project_modification_policy(
+    tmp_path: Path,
+    invalid: object,
+) -> None:
     config = SkillConfig(tmp_path)
 
     try:
-        config.update(project_modification_policy="mutating")
+        config.update(project_modification_policy=invalid)
     except ValueError as exc:
         assert "project_modification_policy must be one of" in str(exc)
     else:

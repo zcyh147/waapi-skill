@@ -10,6 +10,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from .authorization import (
+    AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,
+    AUTHORIZATION_MODE_POLICY,
+    accepted_authorization_modes_for_operation,
+)
 from .canonical import canonical_sha256, sha256_hex
 from .execution_contracts import (
     CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS,
@@ -31,7 +36,7 @@ from .operation_registry import (
 )
 
 
-TRANSACTION_PREVIEW_CONTRACT = "waapi-skill.transaction-preview/v1"
+TRANSACTION_PREVIEW_CONTRACT = "waapi-skill.transaction-preview/v2"
 PROJECT_GUARD_CONTRACT = "waapi-skill.project-guard/v1"
 RUNTIME_GUARD_CONTRACT = "waapi-skill.runtime-guard/v1"
 DEFAULT_PREVIEW_TTL_SECONDS = 30 * 60
@@ -68,6 +73,10 @@ class TransactionArtifact:
     expires_at: str
 
     def as_dict(self) -> dict[str, Any]:
+        authorization_modes = _artifact_authorization_modes(
+            self.request,
+            self.prepared_operation,
+        )
         return {
             "contract": TRANSACTION_PREVIEW_CONTRACT,
             "request": self.request.as_dict(),
@@ -77,7 +86,9 @@ class TransactionArtifact:
             "created_at": self.created_at,
             "expires_at": self.expires_at,
             "execution_policy": {
-                "confirmation_required": True,
+                "requires_authorization": True,
+                "accepted_authorization_modes": list(authorization_modes),
+                "authorization_selected_at_preview": True,
                 "automatic_retry_allowed": False,
                 # Historical v1 key: this is the pre-execution project guard
                 # revalidation. The URI-specific post-execution policy is
@@ -88,6 +99,36 @@ class TransactionArtifact:
                 "post_execution_verification_required": True,
             },
         }
+
+
+def _artifact_authorization_modes(
+    request: OperationRequest,
+    prepared_operation: PreparedOperation,
+) -> tuple[str, ...]:
+    """Bind the exact accepted durable authority set into one preview."""
+
+    sealed_contract = prepared_operation.pre_state.get("execution_contract")
+    if isinstance(sealed_contract, Mapping):
+        raw_modes = sealed_contract.get("accepted_authorization_modes")
+        if isinstance(raw_modes, (list, tuple)):
+            modes = tuple(raw_modes)
+            if (
+                modes
+                and len(modes) == len(set(modes))
+                and all(
+                    mode
+                    in {
+                        AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,
+                        AUTHORIZATION_MODE_POLICY,
+                    }
+                    for mode in modes
+                )
+            ):
+                return modes
+            raise ValueError(
+                "sealed execution contract has invalid accepted authorization modes"
+            )
+    return accepted_authorization_modes_for_operation(request.operation)
 
 
 def build_project_guard(

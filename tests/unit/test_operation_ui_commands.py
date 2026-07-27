@@ -47,6 +47,19 @@ def test_execute_plan_is_closed_versioned_and_live_inventory_bound(
     )
 
     assert validate_ui_command_plan(plan) == plan
+    assert plan["safety"] == {
+        "arbitrary_waapi_payload_allowed": False,
+        "automatic_retry": False,
+        "model_generated_code_allowed": False,
+        "raw_shell_string_allowed": False,
+        "requires_preview_authorization": True,
+        "accepted_authorization_modes": [
+            "explicit_confirmation",
+            "policy_authorization",
+        ],
+        "same_turn_execution_allowed_by_policy": True,
+        "structured_argument_tokens_required": True,
+    }
     assert plan["dispatch"] == {
         "arguments": {
             "command": "ShowPropertyEditor(Deprecated)1",

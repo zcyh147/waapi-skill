@@ -917,7 +917,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "api must resolve to transaction, managed_transaction, or isolated_transaction",
             "args/options must pass the packaged reflected schema",
             "isolated transactions audit absolute paths and confine explicit writes under io_root",
-            "execution is bound to immutable preview confirmation",
+            "execution is bound to immutable preview authorization",
         ),
     ),
     "audio.import": OperationSpec(
@@ -1152,7 +1152,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         constraints=(
             "pre-state and post-state are read with ak.wwise.core.object.isLinked",
             "the platform is explicit and the linked value must be a JSON boolean",
-            "the same object/property/platform tuple is rebound at confirmation",
+            "the same object/property/platform tuple is rebound before execution",
         ),
         supported_versions=("2023.1", "2024.1", "2025.1"),
     ),
@@ -1386,7 +1386,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "debug.setAsserts",
         DEBUG_ENABLE_ASSERTS_URI,
         "debug-runtime",
-        "Apply one explicitly confirmed process-wide debug-assert ref-count change.",
+        "Apply one policy-gated process-wide debug-assert ref-count change.",
         ("enable",),
         argument_contract=_object_contract(
             ("enable",),
@@ -1401,7 +1401,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "debug.setAutomationMode",
         DEBUG_ENABLE_AUTOMATION_MODE_URI,
         "debug-runtime",
-        "Enable or disable Wwise automation mode after an explicit immutable preview.",
+        "Enable or disable Wwise automation mode through an immutable policy-gated preview.",
         ("enable",),
         argument_contract=_object_contract(
             ("enable",),
@@ -1728,7 +1728,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "the user SoundBank, platform, and language scope is explicit; Init is an automatic by-product and cannot be requested",
             "Event and AuxBus descriptors resolve live to one GUID before preview",
             "Wwise 2021.1 derives project paths from the live Project filePath plus a hashed strict WPROJ parse; later versions use live core.getProjectInfo",
-            "confirmation replays project/file/artifact guards; verification requires each requested Bank artifact to be created or changed and non-empty",
+            "execution replays project/file/artifact guards; verification requires each requested Bank artifact to be created or changed and non-empty",
         ),
     ),
     "soundbank.convertExternalSources": OperationSpec(
@@ -1759,7 +1759,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         constraints=(
             "every .wsources document and WAV source is parsed and hashed before preview",
             "different platforms cannot share an output root and every derived .wem remains inside io_root",
-            "confirmation rejects input, project, or output-tree drift; verification requires every exact WEM output and rejects partial success",
+            "execution rejects input, project, or output-tree drift; verification requires every exact WEM output and rejects partial success",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
     ),
@@ -1779,7 +1779,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         constraints=(
             "SoundBank names and inclusion rows are derived only from hashed UTF-8 tab-delimited files",
             "unsupported directives, duplicate rows, unknown objects, and ambiguous names fail before dispatch",
-            "confirmation replays file/project and SoundBank inclusion snapshots; verification checks exact target inclusions and one unrelated control Bank",
+            "execution replays file/project and SoundBank inclusion snapshots; verification checks exact target inclusions and one unrelated control Bank",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
     ),

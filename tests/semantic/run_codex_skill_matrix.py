@@ -105,9 +105,15 @@ from wwise_waapi.transactions import TransactionState  # noqa: E402  # pyright: 
 
 DEFAULT_SUITE = SKILL_ROOT / "evals" / "evals-v2.json"
 DEFAULT_V3_SUITE = SKILL_ROOT / "evals" / "suite-v3.json"
+DEFAULT_MODIFICATION_POLICY_V3_SUITE = (
+    SKILL_ROOT / "evals" / "modification-policy-9.json"
+)
 DEFAULT_ITERATION_ROOT = SKILL_ROOT.parent / "waapi-skill-workspace" / "iteration-9-v2-matrix"
 DEFAULT_HEAVY_V3_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "heavy-cross-version-80"
+)
+DEFAULT_MODIFICATION_POLICY_V3_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "modification-policy-9"
 )
 DEFAULT_CODEX_BINARY = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
 DEFAULT_AUTH_JSON = Path.home() / ".codex" / "auth.json"
@@ -139,6 +145,10 @@ QUERY_OBJECT_KEYS = frozenset({"id", "name", "type", "path"})
 MISSING_QUERY_RESULT_KEYS = frozenset({"count", "objects", "not_found"})
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 HEAVY_V3_PROFILE_ID = "heavy_cross_version_80"
+MODIFICATION_POLICY_V3_PROFILE_ID = "modification_policy_9"
+EXECUTABLE_V3_PROFILE_IDS = frozenset(
+    {HEAVY_V3_PROFILE_ID, MODIFICATION_POLICY_V3_PROFILE_ID}
+)
 HEAVY_V3_RUN_CONFIG_CONTRACT = "waapi-skill.codex-heavy-matrix-config/v3"
 HEAVY_V3_SUMMARY_CONTRACT = "waapi-skill.codex-heavy-matrix-summary/v3"
 HEAVY_V3_CASE_RECORD_CONTRACT = "waapi-skill.codex-heavy-matrix-case/v3"
@@ -277,6 +287,20 @@ HeavyV3DependencyPreflight = Callable[[], Mapping[str, Any]]
 def load_heavy_v3_units(options: RunnerOptions) -> tuple[Any, ...]:
     """Load and filter the reviewed V3 bundle without importing live runners."""
 
+    if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID:
+        policy_module = importlib.import_module(
+            "tests.semantic.support.codex_modification_policy_v3"
+        )
+        profile = policy_module.load_modification_policy_profile(
+            options.suite_path,
+            unit_ids=options.case_ids,
+            versions=options.versions,
+        )
+        return tuple(profile.units)
+    if options.profile != HEAVY_V3_PROFILE_ID:
+        raise HeavyV3MatrixError(
+            f"unsupported executable V3 profile {options.profile!r}"
+        )
     bundle_module = importlib.import_module(
         "tests.semantic.support.codex_eval_bundle_v3"
     )
@@ -327,9 +351,10 @@ def run_heavy_v3_matrix(
     evaluated Codex task.
     """
 
-    if options.profile != HEAVY_V3_PROFILE_ID:
+    if options.profile not in EXECUTABLE_V3_PROFILE_IDS:
         raise HeavyV3MatrixError(
-            f"V3 heavy runner requires profile {HEAVY_V3_PROFILE_ID!r}"
+            "V3 executable runner requires one of "
+            f"{tuple(sorted(EXECUTABLE_V3_PROFILE_IDS))!r}"
         )
     if options.pair_ids:
         raise HeavyV3MatrixError("V3 heavy execution does not accept pair filters")
@@ -356,6 +381,7 @@ def run_heavy_v3_matrix(
     run_errors: list[str] = []
     stop_reason = ""
     preflight_state = "pending"
+    policy_thread_ids: set[str] = set()
 
     def persist(*, terminal: bool) -> None:
         completed_at = utc_now() if terminal else None
@@ -375,6 +401,7 @@ def run_heavy_v3_matrix(
         write_json(
             options.iteration_root / "summary.json",
             _heavy_v3_summary(
+                profile=options.profile,
                 unit_rows=unit_rows,
                 records=records,
                 run_errors=run_errors,
@@ -430,6 +457,21 @@ def run_heavy_v3_matrix(
                 scenario_root=scenario_root,
                 options=options,
             )
+            if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID:
+                thread_id = getattr(outcome, "thread_id", None)
+                outcome_status = getattr(outcome, "status", None)
+                if outcome_status == "PASS" and (
+                    not isinstance(thread_id, str) or not thread_id
+                ):
+                    raise HeavyV3MatrixError(
+                        f"{scenario_id} policy outcome has no fresh thread identity"
+                    )
+                if isinstance(thread_id, str) and thread_id in policy_thread_ids:
+                    raise HeavyV3MatrixError(
+                        f"{scenario_id} reused a prior policy task thread identity"
+                    )
+                if isinstance(thread_id, str) and thread_id:
+                    policy_thread_ids.add(thread_id)
             record = _heavy_v3_case_record(
                 unit_row,
                 scenario_root=scenario_root,
@@ -609,13 +651,44 @@ def _heavy_v3_unit_row(unit: Any, *, sequence: int) -> dict[str, Any]:
         raise HeavyV3MatrixError(
             f"V3 heavy scenario id is not path-safe: {scenario_id!r}"
         )
-    return {
+    row = {
         "sequence": sequence,
         "scenario_id": scenario_id,
         "version": version,
         "api": api,
         "runner": "cli" if api.startswith("ak.wwise.cli.") else "project",
     }
+    policy = getattr(unit, "project_modification_policy", None)
+    if policy is not None:
+        base_scenario_id = getattr(unit, "base_scenario_id", None)
+        repetition = getattr(unit, "repetition", None)
+        expected_dispatch = getattr(
+            unit,
+            "expected_primary_dispatch_count",
+            None,
+        )
+        if (
+            policy not in {"read_only", "ask_before_changes", "allow_changes"}
+            or not isinstance(base_scenario_id, str)
+            or not base_scenario_id
+            or type(repetition) is not int
+            or repetition not in {1, 2, 3}
+            or type(expected_dispatch) is not int
+            or expected_dispatch not in {0, 1}
+        ):
+            raise HeavyV3MatrixError(
+                "V3 modification-policy unit metadata is invalid"
+            )
+        row.update(
+            {
+                "base_scenario_id": base_scenario_id,
+                "policy_mode": policy,
+                "project_modification_policy": policy,
+                "repetition": repetition,
+                "expected_primary_dispatch_count": expected_dispatch,
+            }
+        )
+    return row
 
 
 def _heavy_v3_case_record(
@@ -733,6 +806,7 @@ def _heavy_v3_summary(
     preflight_state: str,
     started_at: str,
     completed_at: str | None,
+    profile: str = HEAVY_V3_PROFILE_ID,
 ) -> dict[str, Any]:
     attempted_ids = [str(record["scenario_id"]) for record in records]
     attempted_set = frozenset(attempted_ids)
@@ -755,7 +829,7 @@ def _heavy_v3_summary(
         "started_at": started_at,
         "updated_at": utc_now(),
         "completed_at": completed_at,
-        "profile": HEAVY_V3_PROFILE_ID,
+        "profile": profile,
         "preflight": preflight_state,
         "selected_unit_count": len(unit_rows),
         "attempted_unit_count": len(records),
@@ -795,10 +869,16 @@ def _heavy_v3_summary(
                     "version",
                     "api",
                     "runner",
+                    "base_scenario_id",
+                    "policy_mode",
+                    "project_modification_policy",
+                    "repetition",
+                    "expected_primary_dispatch_count",
                     "status",
                     "reason",
                     "scenario_root",
                 )
+                if key in record
             }
             for record in records
         ],
@@ -820,7 +900,7 @@ def _append_heavy_reason(current: str, extra: str) -> str:
 
 def main(argv: Sequence[str] | None = None) -> int:
     options = parse_args(argv)
-    if options.profile == HEAVY_V3_PROFILE_ID:
+    if options.profile in EXECUTABLE_V3_PROFILE_IDS:
         return run_heavy_v3_matrix(options)
     suite = load_eval_suite(options.suite_path)
     sessions = select_sessions(
@@ -3063,7 +3143,7 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--profile",
-        choices=(*PROFILE_IDS, HEAVY_V3_PROFILE_ID),
+        choices=(*PROFILE_IDS, *sorted(EXECUTABLE_V3_PROFILE_IDS)),
         default="screening",
     )
     parser.add_argument("--suite")
@@ -3072,13 +3152,13 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     parser.add_argument("--codex-binary", default=str(DEFAULT_CODEX_BINARY))
     parser.add_argument("--auth-json", default=str(DEFAULT_AUTH_JSON))
     parser.add_argument("--live-config", default=str(DEFAULT_LIVE_CONFIG))
-    parser.add_argument("--model", default="gpt-5.6-sol")
+    parser.add_argument("--model")
     parser.add_argument(
         "--reasoning-effort",
         choices=("minimal", "low", "medium", "high", "xhigh", "ultra"),
         default="medium",
     )
-    parser.add_argument("--service-tier", default="priority")
+    parser.add_argument("--service-tier")
     parser.add_argument("--timeout", type=float, default=240.0)
     parser.add_argument("--case-id", action="append", default=[])
     parser.add_argument("--version", action="append", choices=SUPPORTED_VERSIONS, default=[])
@@ -3086,26 +3166,56 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     parser.add_argument("--offline-only", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args(argv)
-    is_heavy_v3 = args.profile == HEAVY_V3_PROFILE_ID
+    is_executable_v3 = args.profile in EXECUTABLE_V3_PROFILE_IDS
+    is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
     if args.timeout <= 0:
         parser.error("--timeout must be greater than zero")
     if len(set(args.version)) != len(args.version):
         parser.error("--version values must be unique")
     if len(set(args.pair_id)) != len(args.pair_id):
         parser.error("--pair-id values must be unique")
-    if is_heavy_v3 and args.pair_id:
-        parser.error(f"--pair-id is not supported by {HEAVY_V3_PROFILE_ID}")
-    if is_heavy_v3 and args.offline_only:
-        parser.error(f"--offline-only is not supported by {HEAVY_V3_PROFILE_ID}")
-    if not is_heavy_v3:
+    if is_executable_v3 and args.pair_id:
+        parser.error(f"--pair-id is not supported by {args.profile}")
+    if is_executable_v3 and args.offline_only:
+        parser.error(f"--offline-only is not supported by {args.profile}")
+    if not is_executable_v3:
         unknown_case_ids = sorted(set(args.case_id) - set(CASE_IDS))
         if unknown_case_ids:
             parser.error(
                 "unknown v2 --case-id values: " + ", ".join(unknown_case_ids)
             )
-    suite = args.suite or str(DEFAULT_V3_SUITE if is_heavy_v3 else DEFAULT_SUITE)
+    if is_policy_v3 and args.version and args.version != ["2022.1"]:
+        parser.error(
+            f"{MODIFICATION_POLICY_V3_PROFILE_ID} supports only --version 2022.1"
+        )
+    model = args.model or (
+        "gpt-5.6-terra" if is_policy_v3 else "gpt-5.6-sol"
+    )
+    service_tier = args.service_tier or (
+        "default" if is_policy_v3 else "priority"
+    )
+    if is_policy_v3 and (
+        model != "gpt-5.6-terra"
+        or args.reasoning_effort != "medium"
+        or service_tier != "default"
+    ):
+        parser.error(
+            f"{MODIFICATION_POLICY_V3_PROFILE_ID} requires "
+            "gpt-5.6-terra / medium / default"
+        )
+    suite = args.suite or str(
+        DEFAULT_MODIFICATION_POLICY_V3_SUITE
+        if is_policy_v3
+        else (DEFAULT_V3_SUITE if is_executable_v3 else DEFAULT_SUITE)
+    )
     iteration_root = args.iteration_root or str(
-        DEFAULT_HEAVY_V3_ITERATION_ROOT if is_heavy_v3 else DEFAULT_ITERATION_ROOT
+        DEFAULT_MODIFICATION_POLICY_V3_ITERATION_ROOT
+        if is_policy_v3
+        else (
+            DEFAULT_HEAVY_V3_ITERATION_ROOT
+            if is_executable_v3
+            else DEFAULT_ITERATION_ROOT
+        )
     )
     return RunnerOptions(
         profile=str(args.profile),
@@ -3115,9 +3225,9 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         codex_binary=Path(args.codex_binary).expanduser().resolve(strict=True),
         auth_json=Path(args.auth_json).expanduser().resolve(strict=True),
         live_config=Path(args.live_config).expanduser().resolve(strict=True),
-        model=str(args.model),
+        model=str(model),
         reasoning_effort=str(args.reasoning_effort),
-        service_tier=str(args.service_tier),
+        service_tier=str(service_tier),
         timeout_seconds=float(args.timeout),
         case_ids=tuple(str(value) for value in args.case_id),
         versions=tuple(str(value) for value in args.version),

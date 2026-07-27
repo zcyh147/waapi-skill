@@ -361,8 +361,8 @@ class _FakeWorld:
                 "已加载 waapi-skill。当前连接的 WAAPI 地址为 "
                 f"{kwargs['runner_environment']['WWISE_WAAPI_HOST']}:"
                 f"{kwargs['runner_environment']['WWISE_WAAPI_PORT']}，"
-                "WAAPI 适配层版本为 2022.1，修改策略为 preview_then_confirm。"
-                "若有需要，可按需切换模式：never / preview_then_confirm / allow_with_notice。"
+                "WAAPI 适配层版本为 2022.1，修改策略为 ask_before_changes。"
+                "若有需要，可按需切换模式：read_only / ask_before_changes / allow_changes。"
             )
             response = "已按确认执行并完成检查。"
             agent_messages = (
@@ -553,7 +553,10 @@ class _FakeWorld:
                 0,
             )
         if step.subcommand == "execute":
-            store.begin_execution(transaction_id)
+            store.begin_execution(
+                transaction_id,
+                expected_authorization=TransactionState.CONFIRMED,
+            )
             if self.migration_indeterminate or self.ordinary_indeterminate:
                 indeterminate = store.mark_execution_indeterminate(
                     transaction_id,

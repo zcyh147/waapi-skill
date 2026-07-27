@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Mapping, Sequence
 
 from tests.semantic.support.codex_gateway_broker import (
@@ -30,6 +30,8 @@ class V3ProtocolError(ValueError):
 class V3GatewayProtocol:
     steps: tuple[ExpectedGatewayStep, ...]
     turn_prefix_counts: tuple[int, ...]
+    allowed_turn_prefix_counts: tuple[tuple[int, ...], ...] = ()
+    terminal_prefix_counts: tuple[int, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.steps:
@@ -38,13 +40,72 @@ class V3GatewayProtocol:
             raise ValueError("V3GatewayProtocol.turn_prefix_counts must be non-empty")
         if tuple(sorted(self.turn_prefix_counts)) != self.turn_prefix_counts:
             raise ValueError("turn prefix counts must be ordered")
-        if len(set(self.turn_prefix_counts)) != len(self.turn_prefix_counts):
+        if (
+            not self.allowed_turn_prefix_counts
+            and len(set(self.turn_prefix_counts)) != len(self.turn_prefix_counts)
+        ):
             raise ValueError("turn prefix counts must be unique")
         if self.turn_prefix_counts[-1] != len(self.steps):
             raise ValueError("final turn prefix must consume the complete protocol")
+        if self.allowed_turn_prefix_counts:
+            if len(self.allowed_turn_prefix_counts) != len(self.turn_prefix_counts):
+                raise ValueError(
+                    "allowed turn prefixes must match the turn-boundary count"
+                )
+            for index, (maximum, allowed) in enumerate(
+                zip(
+                    self.turn_prefix_counts,
+                    self.allowed_turn_prefix_counts,
+                    strict=True,
+                ),
+                start=1,
+            ):
+                if (
+                    not allowed
+                    or tuple(sorted(set(allowed))) != allowed
+                    or any(
+                        isinstance(value, bool)
+                        or not isinstance(value, int)
+                        or not 1 <= value <= maximum
+                        for value in allowed
+                    )
+                    or maximum not in allowed
+                ):
+                    raise ValueError(
+                        f"allowed prefix choices for turn {index} are invalid"
+                    )
+            terminal = self.terminal_prefix_counts
+            if (
+                not terminal
+                or tuple(sorted(set(terminal))) != terminal
+                or any(
+                    value not in self.allowed_turn_prefix_counts[-1]
+                    for value in terminal
+                )
+            ):
+                raise ValueError(
+                    "terminal prefixes must be unique final-turn allowed choices"
+                )
+        elif self.terminal_prefix_counts:
+            raise ValueError(
+                "terminal prefixes require explicit allowed turn prefixes"
+            )
         names = tuple(step.name for step in self.steps)
         if len(names) != len(set(names)):
             raise ValueError("V3 gateway step names must be unique")
+
+    def allowed_prefixes_for_turn(self, index: int) -> tuple[int, ...]:
+        if not 1 <= index <= len(self.turn_prefix_counts):
+            raise IndexError("turn index is outside the protocol")
+        if self.allowed_turn_prefix_counts:
+            return self.allowed_turn_prefix_counts[index - 1]
+        return (self.turn_prefix_counts[index - 1],)
+
+    @property
+    def accepted_terminal_prefixes(self) -> tuple[int, ...]:
+        if self.terminal_prefix_counts:
+            return self.terminal_prefix_counts
+        return (len(self.steps),)
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,6 +170,7 @@ def build_transaction_protocol(
                 name=preview_name,
                 subcommand="preview",
                 arguments=(
+                    "--apply",
                     "--request-json",
                     SemanticJsonArgument(
                         request,
@@ -210,6 +272,80 @@ def build_direct_protocol(
     if not values:
         raise V3ProtocolError("direct protocol requires at least one gateway step")
     return V3GatewayProtocol(values, (len(values),))
+
+
+def build_modification_policy_protocol(
+    base: V3GatewayProtocol,
+    *,
+    policy: str,
+) -> V3GatewayProtocol:
+    """Derive one closed mutation protocol for a canonical project policy.
+
+    The input is the already materialized, independently reviewed one-request
+    ask-before-changes transaction protocol.  This function changes only the
+    policy mechanics: read-only stops after schema without attempting an executable preview,
+    ask-before-changes retains the later confirmation turn, and allow-changes
+    executes directly from the policy-authorized preview in the same turn.
+    """
+
+    if policy not in {"read_only", "ask_before_changes", "allow_changes"}:
+        raise V3ProtocolError(
+            "modification policy must be read_only, ask_before_changes, or allow_changes"
+        )
+    if base.turn_prefix_counts != (2, 6) or len(base.steps) != 6:
+        raise V3ProtocolError(
+            "modification-policy evaluation requires one ordinary transaction"
+        )
+    (
+        operation_schema,
+        preview,
+        transaction_show,
+        confirm,
+        execute,
+        verify,
+    ) = base.steps
+    if (
+        operation_schema.subcommand != "operation-schema"
+        or preview.subcommand != "preview"
+        or transaction_show.subcommand != "transaction-show"
+        or confirm.subcommand != "confirm"
+        or execute.subcommand != "execute"
+        or verify.subcommand != "verify"
+        or preview.allowed_exit_codes != (0,)
+        or len(preview.arguments) != 3
+        or preview.arguments[:2] != ("--apply", "--request-json")
+        or not isinstance(preview.arguments[2], SemanticJsonArgument)
+    ):
+        raise V3ProtocolError(
+            "base transaction protocol differs from the reviewed six-step shape"
+        )
+    if policy == "read_only":
+        return V3GatewayProtocol(
+            steps=(operation_schema,),
+            turn_prefix_counts=(1, 1),
+            allowed_turn_prefix_counts=((1,), (1,)),
+            terminal_prefix_counts=(1,),
+        )
+    if policy == "ask_before_changes":
+        return base
+
+    direct_execute = replace(
+        execute,
+        arguments=(ResponseBinding(preview.name, "/transaction_id"),),
+    )
+    direct_verify = replace(
+        verify,
+        arguments=(ResponseBinding(direct_execute.name, "/transaction_id"),),
+    )
+    return V3GatewayProtocol(
+        steps=(
+            operation_schema,
+            preview,
+            direct_execute,
+            direct_verify,
+        ),
+        turn_prefix_counts=(4,),
+    )
 
 
 def call_step(
@@ -422,6 +558,7 @@ __all__ = [
     "V3GatewayProtocol",
     "V3ProtocolError",
     "build_direct_protocol",
+    "build_modification_policy_protocol",
     "build_transaction_protocol",
     "call_step",
     "query_object_step",

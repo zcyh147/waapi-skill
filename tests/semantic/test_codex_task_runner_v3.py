@@ -805,6 +805,32 @@ def test_contradictory_infrastructure_failure_is_not_archived_as_retryable(
         assert (task_root / "turns" / "turn-01" / "turn-grade.json").is_file()
 
 
+def test_task_gate_failure_preserves_the_completed_raw_thread_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_task_fakes(monkeypatch, failure_turn=2)
+    monkeypatch.setattr(
+        task_runner,
+        "_grade_common_turn",
+        lambda *_args, **_kwargs: (
+            ("skill_reads_exact",),
+            {"skill_reads_exact": False},
+        ),
+    )
+
+    with pytest.raises(
+        task_runner.V3TaskRunnerError,
+        match="failed task gates",
+    ) as caught:
+        _run_infrastructure_task(
+            tmp_path,
+            prompts=("first natural prompt", "second natural prompt"),
+        )
+
+    assert caught.value.thread_id == "thread-prior"
+
+
 def test_incomplete_codex_command_lifecycle_is_archived_as_non_retryable_blocked(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

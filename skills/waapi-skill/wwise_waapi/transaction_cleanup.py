@@ -319,7 +319,7 @@ def _build_opener_binding(
         if source_field is None or target_field is None or source_field not in args:
             raise TransactionCleanupError(
                 "CLEANUP_BINDING_MISSING",
-                "The confirmed request lacks the argument required by its cleanup companion.",
+                "The authorized immutable request lacks the argument required by its cleanup companion.",
                 details={"api": api, "required_argument": source_field},
             )
         value = _strict_json_copy(args[source_field], path=f"args.{source_field}")

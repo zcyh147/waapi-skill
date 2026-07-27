@@ -78,6 +78,11 @@ from wwise_waapi.builders.schema import (  # noqa: E402  # pyright: ignore[repor
     validate_semantic_payload,
     validate_semantic_result,
 )
+from wwise_waapi.authorization import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,
+    AUTHORIZATION_MODE_POLICY,
+    EXPLICIT_CONFIRMATION_ONLY_OPERATIONS,
+)
 from wwise_waapi.config import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     PROJECT_MODIFICATION_POLICIES,
     ResolvedSkillConfig,
@@ -137,6 +142,7 @@ from wwise_waapi.transaction_locality import (  # noqa: E402  # pyright: ignore[
 from wwise_waapi.transaction_runtime import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     DEFAULT_PREVIEW_TTL_SECONDS,
     PROJECT_GUARD_PHASE_POST_VERIFICATION,
+    TRANSACTION_PREVIEW_CONTRACT,
     TransactionGuardError,
     build_project_guard,
     build_transaction_artifact,
@@ -153,6 +159,7 @@ from wwise_waapi.transactions import (  # noqa: E402  # pyright: ignore[reportMi
     CONFIRMATION_TOKEN_MATERIAL_CONTRACT,
     STATE_DIRECTORY_ENV,
     InvalidTransition,
+    TransactionNotFound,
     TransactionState,
     TransactionStore,
     new_transaction_id,
@@ -193,9 +200,9 @@ OFFLINE_COMMANDS = frozenset(
     }
 )
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
-GATEWAY_CONFIG_CONTRACT = "waapi-skill.config/v1"
-GATEWAY_SESSION_CONTEXT_CONTRACT = "waapi-skill.session-context/v1"
-GATEWAY_SESSION_INTRODUCTION_CONTRACT = "waapi-skill.session-introduction/v1"
+GATEWAY_CONFIG_CONTRACT = "waapi-skill.config/v2"
+GATEWAY_SESSION_CONTEXT_CONTRACT = "waapi-skill.session-context/v2"
+GATEWAY_SESSION_INTRODUCTION_CONTRACT = "waapi-skill.session-introduction/v2"
 GATEWAY_OPERATION_SCHEMA_DIRECT_FAST_ROUTE_CONTRACT = (
     "waapi-skill.operation-schema-direct-fast-route/v1"
 )
@@ -1179,14 +1186,30 @@ def build_parser() -> argparse.ArgumentParser:
 
     preview = subparsers.add_parser(
         "preview",
-        help="Live-resolve a closed operation, persist an immutable preview, and await confirmation",
+        help=(
+            "Live-resolve a closed operation and persist an immutable preview; "
+            "--apply marks an explicit request to carry out the change under "
+            "the configured project modification policy"
+        ),
+    )
+    preview.add_argument(
+        "--apply",
+        action="store_true",
+        help=(
+            "Mark this as an explicit change request. read_only blocks it, "
+            "ask_before_changes waits for later confirmation, and allow_changes "
+            "policy-authorizes the immutable preview for same-turn execution."
+        ),
     )
     preview.add_argument("--request-json", required=True)
     preview.add_argument("--ttl", type=int, default=DEFAULT_PREVIEW_TTL_SECONDS)
 
     execute = subparsers.add_parser(
         "execute",
-        help="Execute exactly one confirmed immutable transaction after guard and role revalidation",
+        help=(
+            "Execute exactly one explicitly confirmed or policy-authorized "
+            "immutable transaction after guard and role revalidation"
+        ),
     )
     execute.add_argument("transaction_id")
 
@@ -1260,7 +1283,12 @@ def _execute_gateway_unconstrained(
     post_result_cleanup_failed = False
     try:
         if args.command == "execute":
-            require_project_modification_policy(env=source_env, action="execution")
+            require_transaction_preconnection_policy(args, env=source_env)
+        elif args.command == "preview" and args.apply:
+            require_project_modification_policy(
+                env=source_env,
+                action="requested project change",
+            )
         route_boundary = preflight_public_route(args, env=source_env)
         if route_boundary is not None:
             return finish(2, route_boundary)
@@ -1763,7 +1791,7 @@ def transaction_required_payload(
         "api": api,
         "error_code": "TRANSACTION_REQUIRED",
         "message": (
-            "This URI is available only through the packaged preview, confirmation, execution, "
+            "This URI is available only through the packaged preview, authorization, execution, "
             "and verification transaction interface; generic call and --dry-run cannot bypass it."
         ),
         "executed": False,
@@ -2680,9 +2708,31 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     ],
                     requires_explicit_user_confirmation=True,
                 )
+            elif record.state is TransactionState.POLICY_AUTHORIZED:
+                authorization = transaction_authorization(
+                    record=record,
+                    events=events,
+                )
+                current_policy = load_gateway_config(env).config.project_modification_policy
+                payload["authorization"] = {
+                    **authorization,
+                    "current_policy": current_policy,
+                }
+                if current_policy == "allow_changes":
+                    payload["next_command"] = transaction_next_command(
+                        "execute",
+                        ["execute", transaction_id],
+                    )
+                else:
+                    payload["policy_execution_blocked"] = True
+                    payload["repreview_required"] = True
             return payload
         if args.command == "confirm":
-            require_project_modification_policy(env=env, action="confirmation")
+            require_transaction_confirmation_policy(
+                store=store,
+                transaction_id=transaction_id,
+                env=env,
+            )
             record = store.confirm(
                 transaction_id,
                 confirmation_token=args.confirmation_token,
@@ -2873,14 +2923,256 @@ def build_gateway_session_context(
     }
 
 
-def require_project_modification_policy(*, env: Mapping[str, str], action: str) -> None:
-    """Re-read the external policy at both confirmation and execution boundaries."""
+def require_project_modification_policy(
+    *,
+    env: Mapping[str, str],
+    action: str,
+) -> str:
+    """Re-read and return the canonical policy at each mutation boundary."""
 
     policy = load_gateway_config(env).config.project_modification_policy
-    if policy == "never":
+    if policy == "read_only":
         raise GatewayInputError(
-            f"project_modification_policy=never blocks transaction {action}"
+            f"project_modification_policy=read_only blocks transaction {action}"
         )
+    return policy
+
+
+POLICY_AUTHORIZATION_AUTHORITY = "caller_asserted_current_user_change_request"
+
+
+def sealed_read_transaction_contract(
+    artifact: Mapping[str, Any],
+) -> Mapping[str, Any] | None:
+    """Return a current, immutable read-transaction contract or fail closed.
+
+    A handful of reflected read functions use the transaction lane for bounded
+    schema validation and result verification.  ``read_only`` must permit those
+    reads without permitting a model to relabel a mutation.  Classification is
+    therefore restricted to a hash-checked ``waapi.call`` artifact whose
+    request, dispatch, sealed contract, and current packaged catalog all agree.
+    """
+
+    if artifact.get("contract") != TRANSACTION_PREVIEW_CONTRACT:
+        return None
+    request = artifact.get("request")
+    prepared = artifact.get("prepared_operation")
+    if not isinstance(request, Mapping) or not isinstance(prepared, Mapping):
+        return None
+    if request.get("operation") != "waapi.call" or prepared.get("request") != request:
+        return None
+    version = request.get("version")
+    arguments = request.get("arguments")
+    dispatch_payload = prepared.get("dispatch")
+    pre_state = prepared.get("pre_state")
+    if (
+        not isinstance(version, str)
+        or not isinstance(arguments, Mapping)
+        or not isinstance(dispatch_payload, Mapping)
+        or not isinstance(pre_state, Mapping)
+    ):
+        return None
+    api = arguments.get("api")
+    call_args = arguments.get("args", {})
+    call_options = arguments.get("options", {})
+    if (
+        not isinstance(api, str)
+        or not isinstance(call_args, Mapping)
+        or not isinstance(call_options, Mapping)
+        or dict(dispatch_payload)
+        != {
+            "uri": api,
+            "args": dict(call_args),
+            "options": dict(call_options),
+        }
+    ):
+        return None
+    sealed_contract = pre_state.get("execution_contract")
+    if not isinstance(sealed_contract, Mapping):
+        return None
+    try:
+        capability = CapabilityCatalog().describe(version, api)
+    except (CapabilityNotFoundError, ValueError):
+        return None
+    current_contract = capability.execution_contract
+    try:
+        request_validation = validate_semantic_payload(
+            api,
+            call_args,
+            call_options,
+            version=version,
+        )
+    except (SemanticValidationError, TypeError, ValueError):
+        return None
+    expected_sealed_contract = {
+        **dict(current_contract),
+        "request_validation": request_validation.as_dict(),
+        "request_validation_strength": (
+            "partial_reflected_schema"
+            if request_validation.unresolved_refs
+            else "complete_reflected_schema"
+        ),
+        "io_audit": None,
+    }
+    if (
+        capability.preferred_route != "transaction_operation"
+        or "waapi.call" not in capability.transaction_operations
+        or current_contract.get("effect") != "read"
+        or tuple(current_contract.get("accepted_authorization_modes", ()))
+        != (AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,)
+        or dict(sealed_contract) != expected_sealed_contract
+    ):
+        return None
+    execution_policy = artifact.get("execution_policy")
+    if (
+        not isinstance(execution_policy, Mapping)
+        or execution_policy.get("requires_authorization") is not True
+        or tuple(execution_policy.get("accepted_authorization_modes", ()))
+        != (AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,)
+    ):
+        return None
+    return current_contract
+
+
+def require_transaction_preconnection_policy(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> str:
+    """Block read-only policy violations before opening a WAAPI connection."""
+
+    policy = load_gateway_config(env).config.project_modification_policy
+    if policy != "read_only":
+        return policy
+    store = resolve_transaction_store(args, env=env)
+    try:
+        artifact = store.load_preview(args.transaction_id).artifact
+    except TransactionNotFound as exc:
+        raise GatewayInputError(
+            "project_modification_policy=read_only blocks transaction execution"
+        ) from exc
+    if not isinstance(artifact, Mapping) or sealed_read_transaction_contract(artifact) is None:
+        raise GatewayInputError(
+            "project_modification_policy=read_only blocks transaction execution"
+        )
+    return policy
+
+
+def require_transaction_confirmation_policy(
+    *,
+    store: TransactionStore,
+    transaction_id: str,
+    env: Mapping[str, str],
+) -> str:
+    """Permit explicit confirmation in read-only mode only for sealed reads."""
+
+    policy = load_gateway_config(env).config.project_modification_policy
+    if policy != "read_only":
+        return policy
+    try:
+        artifact = store.load_preview(transaction_id).artifact
+    except TransactionNotFound as exc:
+        raise GatewayInputError(
+            "project_modification_policy=read_only blocks transaction confirmation"
+        ) from exc
+    if not isinstance(artifact, Mapping) or sealed_read_transaction_contract(artifact) is None:
+        raise GatewayInputError(
+            "project_modification_policy=read_only blocks transaction confirmation"
+        )
+    return policy
+
+
+def transaction_authorization(
+    *,
+    record: Any,
+    events: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Project the durable execution authority without conflating policy and consent."""
+
+    if record.state is TransactionState.CONFIRMED:
+        if not any(event.get("event_type") == "confirmed" for event in events):
+            raise GatewayInputError(
+                "confirmed transaction is missing its durable confirmation event"
+            )
+        return {
+            "mode": AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,
+            "explicit_confirmation": True,
+            "notice_required": False,
+        }
+    if record.state is TransactionState.POLICY_AUTHORIZED:
+        event = next(
+            (
+                candidate
+                for candidate in reversed(events)
+                if candidate.get("event_type") == "policy_authorized"
+            ),
+            None,
+        )
+        details = event.get("details") if isinstance(event, Mapping) else None
+        if not isinstance(details, Mapping):
+            raise GatewayInputError(
+                "policy-authorized transaction is missing its durable authorization event"
+            )
+        if (
+            details.get("policy") != "allow_changes"
+            or details.get("authority") != POLICY_AUTHORIZATION_AUTHORITY
+            or details.get("explicit_confirmation") is not False
+        ):
+            raise GatewayInputError(
+                "policy-authorized transaction has invalid durable authorization evidence"
+            )
+        return {
+            "mode": AUTHORIZATION_MODE_POLICY,
+            "policy": "allow_changes",
+            "authority": POLICY_AUTHORIZATION_AUTHORITY,
+            "explicit_confirmation": False,
+            "notice_required": True,
+        }
+    raise InvalidTransition(
+        f"Transaction {record.transaction_id!r} is not authorized for execution; "
+        f"current state is {record.state.value!r}."
+    )
+
+
+def require_transaction_execution_authorization(
+    *,
+    record: Any,
+    events: Sequence[Mapping[str, Any]],
+    env: Mapping[str, str],
+    read_only_transaction: bool = False,
+) -> dict[str, Any]:
+    """Revalidate durable authority and the current external policy before dispatch."""
+
+    authorization = transaction_authorization(record=record, events=events)
+    current_policy = load_gateway_config(env).config.project_modification_policy
+    if read_only_transaction:
+        if (
+            record.state is not TransactionState.CONFIRMED
+            or authorization.get("mode")
+            != AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION
+        ):
+            raise GatewayInputError(
+                "Read transactions require durable explicit confirmation."
+            )
+        return {
+            **authorization,
+            "current_policy": current_policy,
+            "read_only_transaction": True,
+        }
+    if current_policy == "read_only":
+        raise GatewayInputError(
+            "project_modification_policy=read_only blocks transaction execution"
+        )
+    if (
+        record.state is TransactionState.POLICY_AUTHORIZED
+        and current_policy != "allow_changes"
+    ):
+        raise GatewayInputError(
+            "A policy-authorized transaction can execute only while "
+            "project_modification_policy=allow_changes; create a new preview "
+            "under the current policy."
+        )
+    return {**authorization, "current_policy": current_policy}
 
 
 def parse_config_set_changes(args: argparse.Namespace) -> dict[str, Any]:
@@ -4058,7 +4350,7 @@ def prepared_wire_path_io_audit(
     if not isinstance(pre_state, Mapping):
         raise WwiseWirePathError(
             "WIRE_PATH_AUDIT_MISSING",
-            "The confirmed preview lacks sealed execution state for path adaptation.",
+            "The authorized preview lacks sealed execution state for path adaptation.",
         )
     if operation == "waapi.call" and call_uri.startswith("ak.wwise.cli."):
         execution_contract = pre_state.get("execution_contract")
@@ -4094,7 +4386,7 @@ def prepared_wire_path_io_audit(
     if not isinstance(io_audit, Mapping):
         raise WwiseWirePathError(
             "WIRE_PATH_AUDIT_MISSING",
-            f"The confirmed {context} preview lacks its sealed isolated-I/O audit.",
+            f"The authorized {context} preview lacks its sealed isolated-I/O audit.",
         )
     if io_audit.get("uri") != call_uri:
         raise WwiseWirePathError(
@@ -4173,10 +4465,74 @@ def dispatch_transaction_command(
             skill_root=SKILL_ROOT,
             ttl_seconds=args.ttl,
         ).as_dict()
+        prepared = require_mapping(
+            artifact.get("prepared_operation"),
+            "prepared operation",
+        )
+        pre_state = require_mapping(
+            prepared.get("pre_state"),
+            "prepared pre-state",
+        )
+        sealed_contract = pre_state.get("execution_contract")
+        if (
+            isinstance(sealed_contract, Mapping)
+            and sealed_contract.get("effect") == "read"
+        ):
+            if sealed_read_transaction_contract(artifact) is None:
+                raise GatewayInputError(
+                    "Read transaction preview did not match its current packaged "
+                    "execution contract."
+                )
+            if args.apply:
+                raise GatewayInputError(
+                    "preview --apply is reserved for project or process changes; "
+                    "omit --apply for this read transaction."
+                )
         transaction_id = new_transaction_id()
+        current_policy = load_gateway_config(env).config.project_modification_policy
+        if args.apply and current_policy == "read_only":
+            raise GatewayInputError(
+                "project_modification_policy=read_only blocks transaction "
+                "requested project change"
+            )
         created = store.create_preview(transaction_id, artifact)
-        awaiting = store.submit_for_confirmation(transaction_id)
-        prepared = artifact["prepared_operation"]
+        operation = request_payload.get("operation")
+        confirmation_only = operation in EXPLICIT_CONFIRMATION_ONLY_OPERATIONS
+        if args.apply and current_policy == "allow_changes" and not confirmation_only:
+            transaction = store.authorize_by_policy(
+                transaction_id,
+                policy="allow_changes",
+                authority=POLICY_AUTHORIZATION_AUTHORITY,
+            )
+            authorization = {
+                "mode": AUTHORIZATION_MODE_POLICY,
+                "policy": "allow_changes",
+                "authority": POLICY_AUTHORIZATION_AUTHORITY,
+                "explicit_confirmation": False,
+                "notice_required": True,
+            }
+            next_command = transaction_next_command(
+                "execute",
+                ["execute", transaction_id],
+            )
+            status = TransactionState.POLICY_AUTHORIZED.value
+        else:
+            transaction = store.submit_for_confirmation(transaction_id)
+            authorization = {
+                "mode": AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,
+                "policy": current_policy,
+                "explicit_confirmation": False,
+                "notice_required": True,
+                "requires_later_user_message": True,
+            }
+            if confirmation_only:
+                authorization["reason"] = "dangerous_host_control_requires_confirmation"
+            next_command = transaction_next_command(
+                "transaction-show",
+                ["transaction-show", transaction_id, "--summary-only"],
+                requires_later_user_message=True,
+            )
+            status = TransactionState.AWAITING_CONFIRMATION.value
         cleanup = transaction_cleanup_payload(prepared, phase="preview")
         try:
             review = transaction_show_summary(
@@ -4187,7 +4543,7 @@ def dispatch_transaction_command(
             exc.details.update(
                 {
                     "transaction_id": transaction_id,
-                    "state": awaiting.state.value,
+                    "state": transaction.state.value,
                     "artifact_hash": created.artifact_hash,
                 }
             )
@@ -4197,31 +4553,29 @@ def dispatch_transaction_command(
             if isinstance(project_call, Mapping)
             else None
         )
-        next_command = transaction_next_command(
-            "transaction-show",
-            ["transaction-show", transaction_id, "--summary-only"],
-            requires_later_user_message=True,
-        )
         agent_result = transaction_agent_result(
             request=require_mapping(artifact.get("request"), "transaction request"),
             transaction_id=transaction_id,
             artifact_hash=created.artifact_hash,
-            state=awaiting.state.value,
+            state=transaction.state.value,
             executed=False,
+            authorization=authorization,
             cleanup=cleanup,
             next_command=next_command,
         )
         return {
             "ok": True,
-            "status": "awaiting_confirmation",
+            "status": status,
             **common,
             "transaction_id": transaction_id,
-            "state": awaiting.state.value,
+            "state": transaction.state.value,
             "artifact_hash": created.artifact_hash,
             **review,
             "project_call": project_call_summary,
             "executed": False,
             "verified": False,
+            "change_requested": bool(args.apply),
+            "authorization": authorization,
             "cleanup": cleanup,
             "next_command": next_command,
             "agent_result": agent_result,
@@ -4272,10 +4626,54 @@ def dispatch_transaction_command(
         }
 
     if args.command == "execute":
-        if record.state is not TransactionState.CONFIRMED:
+        if record.state not in {
+            TransactionState.CONFIRMED,
+            TransactionState.POLICY_AUTHORIZED,
+        }:
             raise InvalidTransition(
-                f"Transaction {transaction_id!r} must be confirmed before execution; current state is {record.state.value!r}."
+                f"Transaction {transaction_id!r} must be explicitly confirmed or "
+                "policy-authorized before execution; "
+                f"current state is {record.state.value!r}."
             )
+        authorization_events = store.read_events(transaction_id)
+        authorization = transaction_authorization(
+            record=record,
+            events=authorization_events,
+        )
+        current_policy = load_gateway_config(env).config.project_modification_policy
+        if (
+            record.state is TransactionState.POLICY_AUTHORIZED
+            and current_policy != "allow_changes"
+        ):
+            repreview = store.require_repreview(
+                transaction_id,
+                expected_authorization=record.state,
+                details={
+                    "error_code": "PROJECT_MODIFICATION_POLICY_CHANGED",
+                    "authorized_policy": "allow_changes",
+                    "current_policy": current_policy,
+                    "executed": False,
+                },
+            )
+            return {
+                "ok": False,
+                "status": "repreview_required",
+                **common,
+                "transaction_id": transaction_id,
+                "state": repreview.state.value,
+                "error_code": "PROJECT_MODIFICATION_POLICY_CHANGED",
+                "message": (
+                    "The transaction was authorized by allow_changes, but the "
+                    f"current policy is {current_policy}; create a new preview."
+                ),
+                "authorization": {
+                    **authorization,
+                    "current_policy": current_policy,
+                },
+                "executed": False,
+                "verified": False,
+                "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
+            }
         request_payload = require_mapping(artifact.get("request"), "transaction request")
         project_guard_mode, target_project_path = transaction_project_guard_spec(
             request_payload,
@@ -4302,7 +4700,11 @@ def dispatch_transaction_command(
                 skill_root=SKILL_ROOT,
             )
         except TransactionGuardError as exc:
-            repreview = store.require_repreview(transaction_id, details=exc.as_dict())
+            repreview = store.require_repreview(
+                transaction_id,
+                expected_authorization=record.state,
+                details=exc.as_dict(),
+            )
             return {
                 "ok": False,
                 "status": "repreview_required",
@@ -4321,6 +4723,7 @@ def dispatch_transaction_command(
         if role_validation.get("ok") is not True:
             repreview = store.require_repreview(
                 transaction_id,
+                expected_authorization=record.state,
                 details={"error_code": "ROLE_GUARD_MISMATCH", "role_validation": role_validation},
             )
             return {
@@ -4355,6 +4758,20 @@ def dispatch_transaction_command(
             call_uri,
             live_info=live_info,
         )
+        read_transaction_contract = sealed_read_transaction_contract(artifact)
+        if (
+            capability.execution_contract.get("effect") == "read"
+            and read_transaction_contract is None
+        ):
+            raise OperationContractError(
+                "PREVIEW_DISPATCH_MISMATCH",
+                "Immutable read transaction no longer matches its sealed and "
+                "current packaged execution contract.",
+                details={
+                    "operation": operation,
+                    "uri": call_uri,
+                },
+            )
         if operation == "waapi.call" and capability.preferred_route != "transaction_operation":
             raise OperationContractError(
                 "PREVIEW_DISPATCH_MISMATCH",
@@ -4384,8 +4801,16 @@ def dispatch_transaction_command(
                     "Immutable waapi.undoGroup execution plan no longer matches its request.",
                 )
             role_validation_output = undo_group_role_validation_summary(role_validation)
-            require_project_modification_policy(env=env, action="execution")
-            store.begin_execution(transaction_id)
+            authorization = require_transaction_execution_authorization(
+                record=record,
+                events=authorization_events,
+                env=env,
+                read_only_transaction=False,
+            )
+            store.begin_execution(
+                transaction_id,
+                expected_authorization=record.state,
+            )
             try:
                 compound = dispatch_undo_group_execution_plan(
                     dispatcher,
@@ -4567,7 +4992,7 @@ def dispatch_transaction_command(
                 if not isinstance(sealed_project_guard, Mapping):
                     raise WwiseWirePathError(
                         "WIRE_PATH_CONTEXT_UNAVAILABLE",
-                        "The confirmed path-bearing preview lacks its sealed project guard.",
+                        "The authorized path-bearing preview lacks its sealed project guard.",
                     )
                 adapted_dispatch = adapt_cli_dispatch_paths(
                     uri=call_uri,
@@ -4581,6 +5006,7 @@ def dispatch_transaction_command(
                 adaptation_error = exc.as_dict()
                 repreview = store.require_repreview(
                     transaction_id,
+                    expected_authorization=record.state,
                     details={
                         "error_code": exc.error_code,
                         "wire_path_adaptation": adaptation_error,
@@ -4616,8 +5042,16 @@ def dispatch_transaction_command(
         )
         # Re-read at the final mutation boundary as well as before connecting.
         # A policy change during live guard validation must still stop execution.
-        require_project_modification_policy(env=env, action="execution")
-        store.begin_execution(transaction_id)
+        authorization = require_transaction_execution_authorization(
+            record=record,
+            events=authorization_events,
+            env=env,
+            read_only_transaction=read_transaction_contract is not None,
+        )
+        store.begin_execution(
+            transaction_id,
+            expected_authorization=record.state,
+        )
         try:
             result = dispatch(
                 dispatcher,
@@ -4985,8 +5419,22 @@ def dispatch_host_control_transaction(
             "INVALID_PREVIEW",
             "Host-control verification lacks its expected disconnect and process lifecycle.",
         )
-    require_project_modification_policy(env=env, action="execution")
-    store.begin_execution(transaction_id)
+    authorization_record = store.load(transaction_id)
+    if authorization_record.state is not TransactionState.CONFIRMED:
+        raise InvalidTransition(
+            "Dangerous host-control transactions require durable explicit "
+            "confirmation and cannot execute from policy authorization."
+        )
+    authorization = require_transaction_execution_authorization(
+        record=authorization_record,
+        events=store.read_events(transaction_id),
+        env=env,
+        read_only_transaction=False,
+    )
+    store.begin_execution(
+        transaction_id,
+        expected_authorization=authorization_record.state,
+    )
     result: Mapping[str, Any] | None = None
     exception_evidence: Mapping[str, Any] | None = None
     try:
@@ -7047,6 +7495,7 @@ def transaction_agent_result(
     state: str,
     executed: bool,
     verified: bool | None = None,
+    authorization: Mapping[str, Any] | None = None,
     cleanup: Mapping[str, Any] | None = None,
     next_command: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -7071,6 +7520,8 @@ def transaction_agent_result(
     }
     if verified is not None:
         result["verified"] = verified
+    if authorization is not None:
+        result["authorization"] = dict(authorization)
     if cleanup is not None:
         result["cleanup"] = dict(cleanup)
     if next_command is not None:
@@ -7147,7 +7598,7 @@ def transaction_show_summary(
     """Return a bounded review projection of one immutable transaction preview.
 
     The exact request remains visible because it is the object the user reviews
-    before confirmation.  The committed summary shape is returned unchanged
+    before authorization.  The committed summary shape is returned unchanged
     whenever its fixed (non-request) portion fits the public budget.  Only an
     oversized artifact switches to explicitly labelled digest projections so a
     large object graph is not printed two or three times.  Nothing is
@@ -7889,7 +8340,7 @@ def transaction_read_call(
             args=args,
             options=options,
             # These exact URIs are operation-owned readbacks.  Some are routed
-            # as confirmed transactions for public use, so the generic
+            # as policy-gated transactions for public use, so the generic
             # dispatcher gate must be bypassed internally without broadening
             # the public direct-call surface.
             allow_destructive=True,

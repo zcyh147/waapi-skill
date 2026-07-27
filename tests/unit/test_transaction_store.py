@@ -43,6 +43,30 @@ def _race_transition(state_dir: str, transaction_id: str, target: str, ready: An
         results.put(("committed", record.state.value))
 
 
+def _race_draft_authorization(
+    state_dir: str,
+    transaction_id: str,
+    mode: str,
+    ready: Any,
+    results: Any,
+) -> None:
+    store = TransactionStore(Path(state_dir))
+    ready.wait(timeout=5)
+    try:
+        if mode == "policy":
+            record = store.authorize_by_policy(
+                transaction_id,
+                policy="allow_changes",
+                authority="caller_asserted_current_user_imperative",
+            )
+        else:
+            record = store.submit_for_confirmation(transaction_id)
+    except (InvalidTransition, StateConflict):
+        results.put(("rejected", mode))
+    else:
+        results.put(("committed", record.state.value))
+
+
 def _preview_path(state_dir: Path, transaction_id: str) -> Path:
     return state_dir / "transactions" / transaction_id / "preview.json"
 
@@ -300,7 +324,13 @@ def test_full_confirm_execute_verify_state_machine(tmp_path) -> None:
 
     assert store.submit_for_confirmation("tx-verified").state is TransactionState.AWAITING_CONFIRMATION
     assert store.confirm("tx-verified", artifact_hash=created.artifact_hash).state is TransactionState.CONFIRMED
-    assert store.begin_execution("tx-verified").state is TransactionState.EXECUTING
+    assert (
+        store.begin_execution(
+            "tx-verified",
+            expected_authorization=TransactionState.CONFIRMED,
+        ).state
+        is TransactionState.EXECUTING
+    )
     assert store.mark_executed_unverified("tx-verified").state is TransactionState.EXECUTED_UNVERIFIED
     final = store.record_verification(
         "tx-verified", "verified", details={"readback": {"name": "NewName"}}
@@ -320,12 +350,167 @@ def test_full_confirm_execute_verify_state_machine(tmp_path) -> None:
     assert events[-1]["details"] == {"readback": {"name": "NewName"}}
 
 
+def test_policy_authorized_execute_verify_state_machine_and_journal(tmp_path) -> None:
+    store = TransactionStore(tmp_path)
+    created = store.create_preview(
+        "tx-policy-authorized",
+        {"operation": "object.setNotes"},
+    )
+
+    authorized = store.authorize_by_policy(
+        "tx-policy-authorized",
+        policy="allow_changes",
+        authority="caller_asserted_current_user_imperative",
+    )
+    snapshot = store.load_snapshot("tx-policy-authorized")
+
+    assert authorized.state is TransactionState.POLICY_AUTHORIZED
+    assert snapshot.confirmation_token is None
+    authorization_event = snapshot.events[-1]
+    assert authorization_event["event_type"] == "policy_authorized"
+    assert authorization_event["from_state"] == "draft"
+    assert authorization_event["to_state"] == "policy_authorized"
+    assert authorization_event["artifact_hash"] == created.artifact_hash
+    assert authorization_event["previous_event_hash"] == snapshot.events[0]["event_hash"]
+    assert authorization_event["event_hash"] == authorized.last_event_hash
+    assert authorization_event["details"] == {
+        "authority": "caller_asserted_current_user_imperative",
+        "explicit_confirmation": False,
+        "policy": "allow_changes",
+    }
+
+    executing = store.begin_execution(
+        "tx-policy-authorized",
+        expected_authorization=TransactionState.POLICY_AUTHORIZED,
+    )
+    assert executing.state is TransactionState.EXECUTING
+    assert store.mark_executed_unverified(
+        "tx-policy-authorized"
+    ).state is TransactionState.EXECUTED_UNVERIFIED
+    final = store.record_verification("tx-policy-authorized", "verified")
+
+    assert final.state is TransactionState.VERIFIED
+    events = store.read_events("tx-policy-authorized")
+    assert [event["to_state"] for event in events] == [
+        "draft",
+        "policy_authorized",
+        "executing",
+        "executed_unverified",
+        "verified",
+    ]
+    assert events[2]["from_state"] == "policy_authorized"
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "error_type"),
+    [
+        ("policy", None, TypeError),
+        ("policy", "", ValueError),
+        ("policy", "   ", ValueError),
+        ("authority", 7, TypeError),
+        ("authority", "", ValueError),
+        ("authority", "\t", ValueError),
+    ],
+)
+def test_policy_authorization_requires_non_empty_string_evidence(
+    tmp_path,
+    field,
+    value,
+    error_type,
+) -> None:
+    store = TransactionStore(tmp_path)
+    store.create_preview("tx-policy-input", {"operation": "object.setNotes"})
+    arguments = {
+        "policy": "allow_changes",
+        "authority": "caller_asserted_current_user_imperative",
+    }
+    arguments[field] = value
+
+    with pytest.raises(error_type, match=field):
+        store.authorize_by_policy("tx-policy-input", **arguments)
+
+    assert store.load("tx-policy-input").state is TransactionState.DRAFT
+    assert len(store.read_events("tx-policy-input")) == 1
+
+
+def test_execution_requires_one_explicit_matching_authorization_state(tmp_path) -> None:
+    store = TransactionStore(tmp_path)
+    confirmed = store.create_preview("tx-confirmed-auth", {"mode": "confirm"})
+    store.submit_for_confirmation("tx-confirmed-auth")
+    store.confirm("tx-confirmed-auth", artifact_hash=confirmed.artifact_hash)
+
+    with pytest.raises(TypeError, match="expected_authorization"):
+        store.begin_execution("tx-confirmed-auth")  # type: ignore[call-arg]
+    with pytest.raises(InvalidTransition, match="confirmed.*policy_authorized"):
+        store.begin_execution(
+            "tx-confirmed-auth",
+            expected_authorization=TransactionState.DRAFT,
+        )
+    with pytest.raises(StateConflict, match="caller expected 'policy_authorized'"):
+        store.begin_execution(
+            "tx-confirmed-auth",
+            expected_authorization=TransactionState.POLICY_AUTHORIZED,
+        )
+    assert (
+        store.begin_execution(
+            "tx-confirmed-auth",
+            expected_authorization=TransactionState.CONFIRMED,
+        ).state
+        is TransactionState.EXECUTING
+    )
+
+    policy = store.create_preview("tx-policy-auth", {"mode": "policy"})
+    store.authorize_by_policy(
+        "tx-policy-auth",
+        policy="allow_changes",
+        authority="caller_asserted_current_user_imperative",
+    )
+    with pytest.raises(StateConflict, match="caller expected 'confirmed'"):
+        store.begin_execution(
+            "tx-policy-auth",
+            expected_authorization=TransactionState.CONFIRMED,
+        )
+    with pytest.raises(StateConflict, match="caller expected 'awaiting_confirmation'"):
+        store.confirm("tx-policy-auth", artifact_hash=policy.artifact_hash)
+    assert (
+        store.begin_execution(
+            "tx-policy-auth",
+            expected_authorization=TransactionState.POLICY_AUTHORIZED,
+        ).state
+        is TransactionState.EXECUTING
+    )
+
+
+def test_policy_authorized_transaction_can_require_repreview(tmp_path) -> None:
+    store = TransactionStore(tmp_path)
+    store.create_preview("tx-policy-repreview", {"operation": "object.create"})
+    store.authorize_by_policy(
+        "tx-policy-repreview",
+        policy="allow_changes",
+        authority="caller_asserted_current_user_imperative",
+    )
+
+    record = store.require_repreview(
+        "tx-policy-repreview",
+        expected_authorization=TransactionState.POLICY_AUTHORIZED,
+        details={"reason": "policy changed before dispatch"},
+    )
+
+    assert record.state is TransactionState.REPREVIEW_REQUIRED
+    assert store.read_events("tx-policy-repreview")[-1]["details"] == {
+        "reason": "policy changed before dispatch"
+    }
+
+
 def test_execution_result_can_be_recovered_from_hash_chained_journal(tmp_path) -> None:
     store = TransactionStore(tmp_path)
     created = store.create_preview("tx-result", {"operation": "object.create"})
     store.submit_for_confirmation("tx-result")
     store.confirm("tx-result", artifact_hash=created.artifact_hash)
-    store.begin_execution("tx-result")
+    store.begin_execution(
+        "tx-result",
+        expected_authorization=TransactionState.CONFIRMED,
+    )
     store.mark_executed_unverified(
         "tx-result",
         details={"dispatch_result": {"id": "{created-guid}"}, "attempt": 1},
@@ -345,7 +530,10 @@ def test_result_schema_checked_is_a_distinct_terminal_success_state(tmp_path) ->
     created = store.create_preview("tx-schema", {"operation": "waapi.call"})
     store.submit_for_confirmation("tx-schema")
     store.confirm("tx-schema", artifact_hash=created.artifact_hash)
-    store.begin_execution("tx-schema")
+    store.begin_execution(
+        "tx-schema",
+        expected_authorization=TransactionState.CONFIRMED,
+    )
     store.mark_executed_unverified("tx-schema")
 
     final = store.record_verification(
@@ -365,7 +553,10 @@ def test_execution_cancelled_is_a_truthful_terminal_non_verification_state(tmp_p
     created = store.create_preview("tx-cancelled", {"operation": "waapi.undoGroup"})
     store.submit_for_confirmation("tx-cancelled")
     store.confirm("tx-cancelled", artifact_hash=created.artifact_hash)
-    store.begin_execution("tx-cancelled")
+    store.begin_execution(
+        "tx-cancelled",
+        expected_authorization=TransactionState.CONFIRMED,
+    )
 
     final = store.mark_execution_cancelled(
         "tx-cancelled",
@@ -394,7 +585,10 @@ def test_post_execution_verification_branches_are_closed(tmp_path, outcome) -> N
     created = store.create_preview(transaction_id, {"outcome": outcome.value})
     store.submit_for_confirmation(transaction_id)
     store.confirm(transaction_id, artifact_hash=created.artifact_hash)
-    store.begin_execution(transaction_id)
+    store.begin_execution(
+        transaction_id,
+        expected_authorization=TransactionState.CONFIRMED,
+    )
     store.mark_executed_unverified(transaction_id)
 
     assert store.record_verification(transaction_id, outcome).state is outcome
@@ -412,7 +606,10 @@ def test_rejected_indeterminate_and_repreview_paths(tmp_path) -> None:
     created = store.create_preview("tx-indeterminate", {"x": 2})
     store.submit_for_confirmation("tx-indeterminate")
     store.confirm("tx-indeterminate", artifact_hash=created.artifact_hash)
-    store.begin_execution("tx-indeterminate")
+    store.begin_execution(
+        "tx-indeterminate",
+        expected_authorization=TransactionState.CONFIRMED,
+    )
     assert store.mark_execution_indeterminate("tx-indeterminate").state is TransactionState.INDETERMINATE
 
     created = store.create_preview("tx-repreview", {"x": 3})
@@ -541,6 +738,34 @@ def test_event_journal_tampering_is_detected(tmp_path) -> None:
         store.load("tx-event-tampered")
 
 
+def test_policy_authorization_evidence_is_bound_by_the_event_hash(tmp_path) -> None:
+    store = TransactionStore(tmp_path)
+    store.create_preview("tx-policy-event-tampered", {"safe": True})
+    store.authorize_by_policy(
+        "tx-policy-event-tampered",
+        policy="allow_changes",
+        authority="caller_asserted_current_user_imperative",
+    )
+    events_path = (
+        tmp_path
+        / "transactions"
+        / "tx-policy-event-tampered"
+        / "events.jsonl"
+    )
+    events = [
+        json.loads(line)
+        for line in events_path.read_text(encoding="utf-8").splitlines()
+    ]
+    events[-1]["details"]["authority"] = "injected"
+    events_path.write_text(
+        "\n".join(json.dumps(event) for event in events) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(StateCorruptionError, match="Event hash mismatch"):
+        store.load("tx-policy-event-tampered")
+
+
 @pytest.mark.parametrize(
     ("raw_events", "message"),
     [("\n", "Blank event"), ("{\n", "Invalid event JSON"), ("[]\n", "Event must be an object")],
@@ -611,6 +836,48 @@ def test_fcntl_lock_serializes_cross_process_state_race(tmp_path) -> None:
     assert sorted(result[0] for result in outcomes) == ["committed", "rejected"]
     assert store.load("tx-race").state.value in {"confirmed", "rejected"}
     assert len(store.read_events("tx-race")) == 3
+
+
+@pytest.mark.skipif(os.name == "nt", reason="fcntl race test is POSIX-only")
+def test_fcntl_lock_serializes_competing_draft_authorization_paths(tmp_path) -> None:
+    store = TransactionStore(tmp_path)
+    store.create_preview("tx-authorization-race", {"race": True})
+    context = multiprocessing.get_context("fork")
+    ready = context.Event()
+    results = context.Queue()
+    processes = [
+        context.Process(
+            target=_race_draft_authorization,
+            args=(
+                str(tmp_path),
+                "tx-authorization-race",
+                mode,
+                ready,
+                results,
+            ),
+        )
+        for mode in ("confirmation", "policy")
+    ]
+    for process in processes:
+        process.start()
+    ready.set()
+    outcomes = [results.get(timeout=10) for _ in processes]
+    for process in processes:
+        process.join(timeout=10)
+        assert process.exitcode == 0
+
+    assert sorted(result[0] for result in outcomes) == ["committed", "rejected"]
+    record = store.load("tx-authorization-race")
+    assert record.state in {
+        TransactionState.AWAITING_CONFIRMATION,
+        TransactionState.POLICY_AUTHORIZED,
+    }
+    events = store.read_events("tx-authorization-race")
+    assert len(events) == 2
+    assert events[-1]["event_type"] in {
+        "confirmation_requested",
+        "policy_authorized",
+    }
 
 
 def test_missing_fcntl_fails_closed_with_windows_boundary_message(tmp_path, monkeypatch) -> None:

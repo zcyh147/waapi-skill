@@ -105,6 +105,11 @@ def test_initial_skill_bootstrap_is_the_only_combined_read_exception() -> None:
     assert "Never combine a reference read, gateway invocation, or any other commands" in SKILL
 
 
+def test_skill_entry_fits_the_fresh_codex_bootstrap_window() -> None:
+    assert len(SKILL.splitlines()) <= 230
+    assert len(SKILL.encode("utf-8")) <= 35_000
+
+
 def test_exact_identity_query_is_complete_in_entry_file() -> None:
     command = (
         "query-object --path '<exact-object-path>' --return-field id "
@@ -311,7 +316,7 @@ def test_ordinary_wwise_work_forbids_agent_authored_code() -> None:
 def test_operate_lane_uses_real_transaction_cli_in_order() -> None:
     new_transaction_sequence = (
         "gateway.py operation-schema <operation-name>",
-        "preview --request-json",
+        "preview --apply --request-json",
     )
     continuation_sequence = (
         "transaction-show <transaction-id>",
@@ -390,15 +395,8 @@ def test_complex_query_projection_documents_derived_field_first_mention_order() 
 def test_reviewed_raw_transaction_fast_routes_skip_catalog_discovery() -> None:
     assert "except for the reviewed direct `waapi.call` fast routes named below" in SKILL
     assert "or a reviewed direct `waapi.call` fast route named in the operate lane below" in SKILL
-    assert "the four deterministic `ak.wwise.cli` transaction rows" in SKILL
-    assert "route's first gateway command is `operation-schema waapi.call`" in SKILL
-    assert "do not run `describe` or `capabilities` first" in SKILL
-    assert "When the configured/runtime Wwise version is `2022.1`" in SKILL
-    assert "If the version is not visible before that first gateway call" in SKILL
-    assert "read its returned `session_context`" in SKILL
-    assert "If it reports another version, do not preview" in SKILL
-    assert "For every other known Wwise version" in SKILL
-    assert "never reuse the 2022.1 field mapping" in SKILL
+    assert "version-specific direct `waapi.call` fast routes and request mappings" in SKILL
+    assert "Follow that reference literally after its one complete read" in SKILL
 
     assert "except for the reviewed direct `waapi.call` fast routes below" in OPERATE
     assert "Deterministic Wwise `2022.1` `ak.wwise.cli` request mapping" in OPERATE
@@ -474,15 +472,15 @@ def test_audio_convert_fast_route_closes_prompt_mapping_and_rereads() -> None:
 
 
 def test_audio_convert_uses_gateway_owned_schema_contract() -> None:
-    flattened = " ".join(SKILL.split())
+    flattened = " ".join(OPERATE.split())
 
-    assert (
-        "returned Gateway-owned `direct_fast_route_contract.canonical_request_template`"
-        in flattened
-    )
-    assert "never omit `args.languages`" in flattened
-    assert 'literal `languages:["SFX"]`' in flattened
-    assert "does not apply to any other `waapi.call` URI" in flattened
+    assert "`direct_fast_route_contract.canonical_request_template`" in flattened
+    assert "Copy the complete version-specific envelope returned by" in flattened
+    assert "`args.languages`" in flattened
+    assert 'maps to `languages:["SFX"]`' in flattened
+    assert "The two reviewed versions differ only in the exact version" in flattened
+    assert "applies only to `ak.wwise.core.audio.convert`" in flattened
+    assert "never to another `waapi.call` URI" in flattened
 
 
 def test_2022_cli_json_cardinality_shapes_match_the_runtime_compiler() -> None:
@@ -641,7 +639,7 @@ def test_2022_cli_mapping_is_single_and_precedes_the_audio_convert_fast_route() 
     )
     assert "After one complete terminal `verify` result, stop all tool use" in OPERATE[:2_000]
     assert (
-        "For `ak.wwise.cli.migrate`, its one complete `execute` result is that "
+        "For `ak.wwise.cli.migrate`, its one complete `execute` result is the "
         "terminal boundary instead"
     ) in OPERATE[:2_000]
     assert "do not inspect the filesystem or repository for extra business proof" in OPERATE[:2_000]
@@ -657,7 +655,7 @@ def test_operate_state_directory_is_caller_owned_and_never_probed() -> None:
 
     assert "gateway.py --state-dir /absolute/state/dir" not in OPERATE
     for command in (
-        "gateway.py preview --request-json",
+        "gateway.py preview --apply --request-json",
         "gateway.py transaction-show <transaction-id> --summary-only",
         "gateway.py confirm <transaction-id> --confirmation-token <gateway-token>",
         "gateway.py execute <transaction-id>",
@@ -694,7 +692,7 @@ def test_confirmed_preview_risks_are_reported_but_do_not_become_a_second_veto() 
 def test_transaction_show_is_a_visible_json_safety_gate() -> None:
     assert "do not reread either file in the same visible conversation/task" in SKILL
     assert "proceeding directly from the already-visible instructions" in SKILL
-    assert "if `confirm` does not return complete visible JSON" in SKILL
+    assert "If `confirm` does not return complete visible JSON" in SKILL
     assert "stop before `execute` or `verify`" in SKILL
     assert "`transaction-show` is the continuation safety gate" in SKILL
     assert "even with exit code `0` or a transaction id/hash" in SKILL
@@ -713,7 +711,7 @@ def test_transaction_show_is_a_visible_json_safety_gate() -> None:
 def test_preview_rejection_is_a_same_turn_stop_and_replace_boundary_is_unambiguous() -> None:
     assert "A rejected `preview`, invalid JSON/shell invocation" in SKILL
     assert "do not fix and retry the command in the same turn" in SKILL
-    assert "A `preview` result is also a hard same-turn boundary" in OPERATE
+    assert "A rejected or incomplete `preview` result is a hard same-turn boundary" in OPERATE
     assert "Do not repair a bracket" in OPERATE
     assert "authorization boundary, not the object being replaced" in OPERATE
     assert "normally set both `parent` and `replace_owned_root` to `P`" in OPERATE
@@ -742,16 +740,27 @@ def test_verify_payload_is_terminal_and_must_not_be_double_checked() -> None:
     assert "then stop without an extra query" in OPERATE
 
 
-def test_closed_multi_transaction_workflow_previews_only_the_next_item() -> None:
+def test_closed_multi_transaction_workflow_applies_each_policy_independently() -> None:
     assert "original request that already closed and ordered multiple independent transactions" in SKILL
-    assert "run only the next transaction's `operation-schema` and immutable `preview`" in SKILL
-    assert "never execute that next preview in the same turn" in SKILL
+    assert "apply the same configured policy independently to each item" in SKILL
+    assert "never infer, reorder, or add a transaction" in SKILL
+    assert "ask as a natural direct question whether to proceed and end the turn" in SKILL
+    assert "then in the same user turn execute" in SKILL
 
-    assert "original user request that already closed and ordered multiple independent transactions" in OPERATE
-    assert "successful non-final `verify` may be followed only by the next transaction's `operation-schema`" in OPERATE
-    assert "It never authorizes the next `confirm` or `execute`" in OPERATE
-    assert "The final transaction's `verify` remains the terminal command" in OPERATE
-    assert "This exception never permits same-turn preview plus execution" in OPERATE
+    assert "original request itself contains a closed ordered sequence of" in OPERATE
+    assert "apply the configured policy independently to each" in OPERATE
+    assert "after the prior item reaches its terminal verification result" in OPERATE
+    assert "Never infer," in OPERATE
+    assert "add, or reorder an item" in OPERATE
+    assert "proceed, and end the turn" in " ".join(OPERATE.split())
+    assert "Then, in the same user turn" in OPERATE
+
+
+def test_allow_changes_notice_is_post_preview_and_concrete() -> None:
+    flattened = " ".join(OPERATE.split())
+    assert "after the preview completes and before `execute`" in flattened
+    assert "an earlier introduction does not count" in flattened
+    assert "generic object count is not enough" in flattened
 
 
 def test_migration_execute_is_terminal_and_defers_to_the_reopened_oracle() -> None:
@@ -865,9 +874,7 @@ def test_tab_delimited_import_documents_wwise_physical_separator_boundary() -> N
 
 
 def test_soundbank_workflows_have_direct_named_routes_and_closed_preflight() -> None:
-    section = SKILL.split("Fast route from this entry file:", 1)[1].split(
-        "Conditional read for a closed transaction:", 1
-    )[0]
+    section = OPERATE
     section_flat = " ".join(section.split())
 
     for workflow, operation in (
@@ -876,16 +883,28 @@ def test_soundbank_workflows_have_direct_named_routes_and_closed_preflight() -> 
         ("Definition `.tsv` processing", "soundbank.processDefinitionFiles"),
     ):
         assert f"{workflow} uses `{operation}`" in section_flat
-    assert "the first gateway command after the operate-reference read is the matching named `operation-schema`" in section_flat
-    assert "do not run `describe`, `query-object`, or `operation-schema waapi.call` first" in section_flat
+    assert "Without that explicit CLI wording" in section_flat
+    assert "the first gateway command after this reference read is the matching named `operation-schema`" in section_flat
+    assert "generation begins with exactly `operation-schema soundbank.generate`" in section_flat
+    assert "Do not run `describe`, `query-object`, or `operation-schema waapi.call` first" in section_flat
     assert "Do not inspect a supplied `.wsources` or `.tsv` with `cat`, `sed`" in section_flat
     assert "the named operation's `preview` owns strict file parsing, input proofs" in section_flat
-    assert "After its successful `execute` reports `executed_unverified`, run `verify` before answering" in section_flat
-    assert "These are the `ak.wwise.core.soundbank.*` routes" in section_flat
-    assert "Only a request that explicitly asks for WwiseConsole, CLI, command-line, or 命令行 execution" in section_flat
-    assert "a `.wproj` path, JSON `project` field, project-copy description" in section_flat
-    assert "input data, not CLI intent" in section_flat
-    assert "generation begins with exactly `operation-schema soundbank.generate`" in section_flat
+    assert "After a successful `execute` reports `executed_unverified`" in section_flat
+    assert "run its returned `verify` before answering" in section_flat
+
+
+def test_operate_reference_owns_ui_routing_and_local_host_boundaries() -> None:
+    flattened = " ".join(OPERATE.split())
+
+    assert "do not begin a modifying request with the default Console-profile `describe`" in flattened
+    assert "Begin directly with `operation-schema ui.commands.execute`" in flattened
+    assert "bounded live `call ak.wwise.ui.commands.getCommands`" in flattened
+    assert "bounded `wait-topic ak.wwise.ui.commands.executed`" in flattened
+    assert "accepts no caller-controlled Authoring override" in flattened
+    assert "WwiseConsole returns `AUTHORING_HOST_REQUIRED` before business dispatch" in flattened
+    assert "Never create a wrapper to evade this boundary" in flattened
+    assert "On `LOCAL_WAAPI_HOST_REQUIRED`, report the boundary and stop" in flattened
+    assert "Never reinterpret a local hash, directory proof, or isolated-I/O policy" in flattened
 
 
 def test_cli_and_connected_authoring_names_are_not_interchangeable() -> None:
@@ -894,8 +913,8 @@ def test_cli_and_connected_authoring_names_are_not_interchangeable() -> None:
     assert "a `.wproj` path, a JSON `project` field, a project-copy description" in OPERATE
     assert "alone never establish CLI intent" in OPERATE
     assert "Without that explicit CLI wording" in OPERATE
-    assert "connected SoundBank generation must begin with `operation-schema soundbank.generate`" in OPERATE
-    assert "never `operation-schema waapi.call`" in OPERATE
+    assert "generation begins with exactly `operation-schema soundbank.generate`" in OPERATE
+    assert "Do not run `describe`, `query-object`, or `operation-schema waapi.call` first" in OPERATE
     for distinction in (
         "`ak.wwise.cli.convertExternalSource` (singular) is not `ak.wwise.core.soundbank.convertExternalSources` (plural)",
         "`ak.wwise.cli.generateSoundbank` is not `ak.wwise.core.soundbank.generate`",

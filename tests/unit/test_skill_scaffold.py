@@ -28,5 +28,5 @@ def test_config_targets_are_documented() -> None:
     assert config.wwise_version is None
     assert config.waapi_host == "127.0.0.1"
     assert config.waapi_port is None
-    assert config.project_modification_policy == "preview_then_confirm"
+    assert config.project_modification_policy == "ask_before_changes"
     assert config.config_path.as_posix().endswith("data/config.json")

@@ -547,6 +547,8 @@ def test_external_sources_parser_hashes_inputs_and_derives_destinations(tmp_path
     ]
     assert plan["requests"][0]["managed_side_effects"] == ["Wwise.dat"]
     assert plan["artifact_plan"]["all_outputs_explicit"] is True
+    assert plan["oracle"]["source_files_must_be_reverified_before_execution"] is True
+    assert "source_files_must_be_reverified_at_confirmation" not in plan["oracle"]
     _assert_seal(plan, "plan_sha256")
 
     verify_file_proof(parsed["entries"][0]["source"], field="line_a")

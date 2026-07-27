@@ -179,7 +179,7 @@ def import_operation_policy(import_operation: str) -> dict[str, Any]:
         "import_operation": operation,
         "one_global_operation_per_call": True,
         "pre_state_required": True,
-        "confirmation_time_drift_check_required": True,
+        "pre_execution_drift_check_required": True,
         "verify_every_derived_target": True,
         "partial_success_is_failure": True,
         "automatic_retry": False,

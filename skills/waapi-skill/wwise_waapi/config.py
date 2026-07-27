@@ -7,6 +7,7 @@ import os
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Mapping
 
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
@@ -16,7 +17,19 @@ DEFAULT_WWISE_CONSOLE_MACOS = Path(
     "/Applications/Audiokinetic/Wwise2022.1.19.8584/Wwise.app/Contents/Tools/WwiseConsole.sh"
 )
 WINDOWS_WWISE_CONSOLE_RELATIVE = Path("Authoring") / "x64" / "Release" / "bin" / "WwiseConsole.exe"
-PROJECT_MODIFICATION_POLICIES = ("never", "preview_then_confirm", "allow_with_notice")
+PROJECT_MODIFICATION_POLICIES = (
+    "read_only",
+    "ask_before_changes",
+    "allow_changes",
+)
+LEGACY_PROJECT_MODIFICATION_POLICY_ALIASES: Mapping[str, str] = MappingProxyType(
+    {
+        "never": "read_only",
+        "preview_then_confirm": "ask_before_changes",
+        "allow_with_notice": "allow_changes",
+    }
+)
+DEFAULT_PROJECT_MODIFICATION_POLICY = "ask_before_changes"
 PUBLIC_CONFIG_FIELDS = frozenset(
     {"wwise_version", "waapi_host", "waapi_port", "project_modification_policy"}
 )
@@ -57,7 +70,7 @@ class SkillConfig:
     wwise_version: str | None = None
     waapi_host: str = "127.0.0.1"
     waapi_port: int | None = None
-    project_modification_policy: str = "preview_then_confirm"
+    project_modification_policy: str = DEFAULT_PROJECT_MODIFICATION_POLICY
     paths: SkillPaths = field(init=False)
 
     def __post_init__(self) -> None:
@@ -341,6 +354,7 @@ def _load_project_modification_policy(payload: dict[str, Any], key: str, default
 def _validate_project_modification_policy(value: Any, key: str = "project_modification_policy") -> str:
     if not isinstance(value, str):
         raise ValueError(f"{key} must be one of: {', '.join(PROJECT_MODIFICATION_POLICIES)}")
-    if value not in PROJECT_MODIFICATION_POLICIES:
+    canonical = LEGACY_PROJECT_MODIFICATION_POLICY_ALIASES.get(value, value)
+    if canonical not in PROJECT_MODIFICATION_POLICIES:
         raise ValueError(f"{key} must be one of: {', '.join(PROJECT_MODIFICATION_POLICIES)}")
-    return value
+    return canonical

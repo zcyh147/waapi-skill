@@ -64,7 +64,7 @@ def _env(tmp_path: Path, version: str = "2022.1") -> dict[str, str]:
                 "wwise_version": version,
                 "waapi_host": "127.0.0.1",
                 "waapi_port": 31337,
-                "project_modification_policy": "preview_then_confirm",
+                "project_modification_policy": "ask_before_changes",
             }
         ),
         encoding="utf-8",

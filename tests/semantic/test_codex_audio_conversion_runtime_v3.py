@@ -117,7 +117,8 @@ def test_all_five_cases_build_closed_waapi_call_protocols(tmp_path: Path) -> Non
             "execute",
             "verify",
         ]
-        preview_request = protocol.steps[1].arguments[1]
+        assert protocol.steps[1].arguments[:2] == ("--apply", "--request-json")
+        preview_request = protocol.steps[1].arguments[2]
         assert isinstance(preview_request, SemanticJsonArgument)
         assert preview_request.expected == plan.operation_request
         assert runtime.render_prompt() == _scenario(plan.scenario_id).render_prompt(

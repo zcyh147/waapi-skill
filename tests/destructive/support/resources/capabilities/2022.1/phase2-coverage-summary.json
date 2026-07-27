@@ -773,7 +773,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.addNewPlatform",
-      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
+      "user_approved_rationale": "CLI functions are executable only through a policy-gated, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -806,7 +806,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.convertExternalSource",
-      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
+      "user_approved_rationale": "CLI functions are executable only through a policy-gated, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -839,7 +839,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.createNewProject",
-      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
+      "user_approved_rationale": "CLI functions are executable only through a policy-gated, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -872,7 +872,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.dumpObjects",
-      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
+      "user_approved_rationale": "CLI functions are executable only through a policy-gated, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -905,7 +905,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.generateSoundbank",
-      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
+      "user_approved_rationale": "CLI functions are executable only through a policy-gated, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -938,7 +938,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.migrate",
-      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
+      "user_approved_rationale": "CLI functions are executable only through a policy-gated, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -971,7 +971,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.moveMediaIdsToSingleFile",
-      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
+      "user_approved_rationale": "CLI functions are executable only through a policy-gated, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -1004,7 +1004,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.moveMediaIdsToWorkUnits",
-      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
+      "user_approved_rationale": "CLI functions are executable only through a policy-gated, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -1037,7 +1037,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.tabDelimitedImport",
-      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
+      "user_approved_rationale": "CLI functions are executable only through a policy-gated, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -1070,7 +1070,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.updateMediaIdsInSingleFile",
-      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
+      "user_approved_rationale": "CLI functions are executable only through a policy-gated, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -1103,7 +1103,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.verify",
-      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
+      "user_approved_rationale": "CLI functions are executable only through a policy-gated, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -1136,7 +1136,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.cli.waapiServer",
-      "user_approved_rationale": "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction.",
+      "user_approved_rationale": "CLI functions are executable only through a policy-gated, schema-validated, timeout-bounded transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -3139,7 +3139,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.core.remote.connect",
-      "user_approved_rationale": "Remote-console calls are part of the high-coverage contract but require a confirmed managed-session transaction.",
+      "user_approved_rationale": "Remote-console calls are part of the high-coverage contract but require a policy-gated managed-session transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -3172,7 +3172,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.core.remote.disconnect",
-      "user_approved_rationale": "Remote-console calls are part of the high-coverage contract but require a confirmed managed-session transaction.",
+      "user_approved_rationale": "Remote-console calls are part of the high-coverage contract but require a policy-gated managed-session transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -3205,7 +3205,7 @@
       "status_transition": "phase1-fake-route-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.core.remote.getAvailableConsoles",
-      "user_approved_rationale": "Remote-console calls are part of the high-coverage contract but require a confirmed managed-session transaction.",
+      "user_approved_rationale": "Remote-console calls are part of the high-coverage contract but require a policy-gated managed-session transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -3238,7 +3238,7 @@
       "status_transition": "phase1-fake-route-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.core.remote.getConnectionStatus",
-      "user_approved_rationale": "Remote-console calls are part of the high-coverage contract but require a confirmed managed-session transaction.",
+      "user_approved_rationale": "Remote-console calls are part of the high-coverage contract but require a policy-gated managed-session transaction.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -4053,7 +4053,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.debug.assertFailed",
-      "user_approved_rationale": "Debug reads, process-wide modes, and deliberate host controls are exposed only through separate fixed or confirmed routes with explicit lifecycle evidence.",
+      "user_approved_rationale": "Debug reads, process-wide modes, and deliberate host controls are exposed only through separate fixed or policy-gated routes with explicit lifecycle evidence; restart, test-assert, and test-crash remain explicit-confirmation-only.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -4086,7 +4086,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.debug.enableAsserts",
-      "user_approved_rationale": "Debug reads, process-wide modes, and deliberate host controls are exposed only through separate fixed or confirmed routes with explicit lifecycle evidence.",
+      "user_approved_rationale": "Debug reads, process-wide modes, and deliberate host controls are exposed only through separate fixed or policy-gated routes with explicit lifecycle evidence; restart, test-assert, and test-crash remain explicit-confirmation-only.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -4119,7 +4119,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.debug.enableAutomationMode",
-      "user_approved_rationale": "Debug reads, process-wide modes, and deliberate host controls are exposed only through separate fixed or confirmed routes with explicit lifecycle evidence.",
+      "user_approved_rationale": "Debug reads, process-wide modes, and deliberate host controls are exposed only through separate fixed or policy-gated routes with explicit lifecycle evidence; restart, test-assert, and test-crash remain explicit-confirmation-only.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -4152,7 +4152,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.debug.testAssert",
-      "user_approved_rationale": "Debug reads, process-wide modes, and deliberate host controls are exposed only through separate fixed or confirmed routes with explicit lifecycle evidence.",
+      "user_approved_rationale": "Debug reads, process-wide modes, and deliberate host controls are exposed only through separate fixed or policy-gated routes with explicit lifecycle evidence; restart, test-assert, and test-crash remain explicit-confirmation-only.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -4185,7 +4185,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.debug.testCrash",
-      "user_approved_rationale": "Debug reads, process-wide modes, and deliberate host controls are exposed only through separate fixed or confirmed routes with explicit lifecycle evidence.",
+      "user_approved_rationale": "Debug reads, process-wide modes, and deliberate host controls are exposed only through separate fixed or policy-gated routes with explicit lifecycle evidence; restart, test-assert, and test-crash remain explicit-confirmation-only.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -4218,7 +4218,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.bringToForeground",
-      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or policy-gated transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -4251,7 +4251,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.captureScreen",
-      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or policy-gated transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -4284,7 +4284,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.commands.execute",
-      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or policy-gated transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -4317,7 +4317,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.commands.executed",
-      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or policy-gated transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -4350,7 +4350,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.commands.getCommands",
-      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or policy-gated transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -4383,7 +4383,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.commands.register",
-      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or policy-gated transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -4416,7 +4416,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.commands.unregister",
-      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or policy-gated transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -4449,7 +4449,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.getSelectedObjects",
-      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or policy-gated transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -4482,7 +4482,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.project.close",
-      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or policy-gated transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -4515,7 +4515,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.project.open",
-      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or policy-gated transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },
@@ -4548,7 +4548,7 @@
       "status_transition": "phase1-deferred-execution-policy",
       "substitute_test": "",
       "uri": "ak.wwise.ui.selectionChanged",
-      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or confirmed transactions instead of ad-hoc automation code.",
+      "user_approved_rationale": "UI functions are part of the reviewed high-coverage contract and execute through bounded reads or policy-gated transactions instead of ad-hoc automation code.",
       "version": "2022.1",
       "windows_validation": "pending"
     },

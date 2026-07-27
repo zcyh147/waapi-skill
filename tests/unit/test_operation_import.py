@@ -643,6 +643,8 @@ def test_replace_existing_truthfully_requires_disposable_project() -> None:
     use = import_operation_policy("useExisting")
 
     assert replace["disposable_project_required"] is True
+    assert replace["pre_execution_drift_check_required"] is True
+    assert "confirmation_time_drift_check_required" not in replace
     assert replace["owned_project_copy_required_for_clean_test"] is True
     assert replace["in_place_restore_supported"] is False
     assert replace["existing_target_postcondition"] == "old_guid_absent_and_new_guid_distinct"

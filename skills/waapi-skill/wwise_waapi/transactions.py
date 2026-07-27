@@ -1,9 +1,10 @@
 """Durable, WAAPI-independent transaction preview artifacts.
 
-The store implements the local half of a preview -> confirm -> execute ->
-verify protocol.  It never imports a WAAPI client and never performs a Wwise
-operation.  A preview is immutable and confirmation is bound to its canonical
-SHA-256 hash.
+The store implements the local half of a preview -> authorize/confirm ->
+execute -> verify protocol.  It never imports a WAAPI client and never performs
+a Wwise operation.  A preview is immutable and explicit confirmation is bound
+to its canonical SHA-256 hash; policy authorization is recorded as a distinct
+durable state and journal event.
 
 Concurrency support intentionally has a clear platform boundary: the locking
 backend uses ``fcntl.flock`` and therefore supports macOS and Linux.  Windows
@@ -108,6 +109,7 @@ class TransactionState(str, Enum):
 
     DRAFT = "draft"
     AWAITING_CONFIRMATION = "awaiting_confirmation"
+    POLICY_AUTHORIZED = "policy_authorized"
     CONFIRMED = "confirmed"
     REJECTED = "rejected"
     EXECUTING = "executing"
@@ -121,9 +123,17 @@ class TransactionState(str, Enum):
 
 
 ALLOWED_TRANSITIONS: Mapping[TransactionState, frozenset[TransactionState]] = {
-    TransactionState.DRAFT: frozenset({TransactionState.AWAITING_CONFIRMATION}),
+    TransactionState.DRAFT: frozenset(
+        {
+            TransactionState.AWAITING_CONFIRMATION,
+            TransactionState.POLICY_AUTHORIZED,
+        }
+    ),
     TransactionState.AWAITING_CONFIRMATION: frozenset(
         {TransactionState.CONFIRMED, TransactionState.REJECTED}
+    ),
+    TransactionState.POLICY_AUTHORIZED: frozenset(
+        {TransactionState.EXECUTING, TransactionState.REPREVIEW_REQUIRED}
     ),
     TransactionState.CONFIRMED: frozenset(
         {TransactionState.EXECUTING, TransactionState.REPREVIEW_REQUIRED}
@@ -574,6 +584,29 @@ class TransactionStore:
             event_type="confirmation_requested",
         )
 
+    def authorize_by_policy(
+        self,
+        transaction_id: str,
+        *,
+        policy: str,
+        authority: str,
+    ) -> TransactionRecord:
+        """Record a policy grant without misrepresenting it as confirmation."""
+
+        policy = _validate_non_empty_string(policy, field="policy")
+        authority = _validate_non_empty_string(authority, field="authority")
+        return self.transition(
+            transaction_id,
+            TransactionState.POLICY_AUTHORIZED,
+            expected_state=TransactionState.DRAFT,
+            event_type="policy_authorized",
+            details={
+                "policy": policy,
+                "authority": authority,
+                "explicit_confirmation": False,
+            },
+        )
+
     def confirm(
         self,
         transaction_id: str,
@@ -611,11 +644,19 @@ class TransactionStore:
             details=details,
         )
 
-    def begin_execution(self, transaction_id: str) -> TransactionRecord:
+    def begin_execution(
+        self,
+        transaction_id: str,
+        *,
+        expected_authorization: TransactionState | str,
+    ) -> TransactionRecord:
+        """Atomically execute from one explicitly declared authorization state."""
+
+        expected = _coerce_authorization_state(expected_authorization)
         return self.transition(
             transaction_id,
             TransactionState.EXECUTING,
-            expected_state=TransactionState.CONFIRMED,
+            expected_state=expected,
             event_type="execution_started",
         )
 
@@ -683,12 +724,17 @@ class TransactionStore:
         )
 
     def require_repreview(
-        self, transaction_id: str, *, details: Mapping[str, Any] | None = None
+        self,
+        transaction_id: str,
+        *,
+        expected_authorization: TransactionState | str = TransactionState.CONFIRMED,
+        details: Mapping[str, Any] | None = None,
     ) -> TransactionRecord:
+        expected = _coerce_authorization_state(expected_authorization)
         return self.transition(
             transaction_id,
             TransactionState.REPREVIEW_REQUIRED,
-            expected_state=TransactionState.CONFIRMED,
+            expected_state=expected,
             event_type="repreview_required",
             details=details,
         )
@@ -991,6 +1037,28 @@ def _coerce_state(value: TransactionState | str | Any, *, field: str) -> Transac
         return value if isinstance(value, TransactionState) else TransactionState(value)
     except (TypeError, ValueError) as error:
         raise InvalidTransition(f"{field} is not a recognized transaction state: {value!r}") from error
+
+
+def _coerce_authorization_state(
+    value: TransactionState | str | Any,
+) -> TransactionState:
+    state = _coerce_state(value, field="expected_authorization")
+    if state not in {
+        TransactionState.CONFIRMED,
+        TransactionState.POLICY_AUTHORIZED,
+    }:
+        raise InvalidTransition(
+            "expected_authorization must be 'confirmed' or 'policy_authorized'"
+        )
+    return state
+
+
+def _validate_non_empty_string(value: Any, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"{field} must be a string")
+    if not value.strip():
+        raise ValueError(f"{field} must be a non-empty string")
+    return value
 
 
 def _read_json_object(path: Path, transaction_id: str) -> dict[str, Any]:

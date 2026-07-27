@@ -12,7 +12,7 @@ from wwise_waapi.builders.identity import ObjectIdentity  # pyright: ignore[repo
 from wwise_waapi.builders.imports import ImportBuilder, ImportItem, tab_delimited_plan  # pyright: ignore[reportMissingImports]
 from wwise_waapi.builders.object_mutation import (  # pyright: ignore[reportMissingImports]
     ObjectMutationBuilder,
-    confirm_preview_target_identity,
+    validate_preview_target_identity,
 )
 
 
@@ -32,13 +32,19 @@ def test_object_mutation_preview_identity_handoff_reports_repreview_required_on_
     target_metadata = preview.envelope.metadata["preview_target_identity"]
     assert target_metadata["roles"]["parent"]["target_key"] == [parent_path]
     assert target_metadata["roles"]["parent"]["container_suitability"]["reason"] == "writable-default-work-unit-target"
-    assert target_metadata["confirmed_execution"]["mismatch_status"] == "repreview_required"
+    assert target_metadata["authorized_execution"] == {
+        "required": True,
+        "abort_on_mismatch": True,
+        "mismatch_status": "repreview_required",
+        "reason": "authorized execution must reuse the preview-resolved target identity",
+    }
+    assert "confirmed_execution" not in target_metadata
 
-    confirmed = confirm_preview_target_identity(preview, {"parent": {"target_key": [parent_path]}})
-    assert confirmed["status"] == "target_identity_confirmed"
-    assert confirmed["repreview_required"] is False
+    validated = validate_preview_target_identity(preview, {"parent": {"target_key": [parent_path]}})
+    assert validated["status"] == "target_identity_validated"
+    assert validated["repreview_required"] is False
 
-    mismatch = confirm_preview_target_identity(preview, {"parent": {"target_key": [r"\Actor-Mixer Hierarchy\Other Work Unit"]}})
+    mismatch = validate_preview_target_identity(preview, {"parent": {"target_key": [r"\Actor-Mixer Hierarchy\Other Work Unit"]}})
     assert mismatch["status"] == "repreview_required"
     assert mismatch["repreview_required"] is True
     assert mismatch["executed"] is False
@@ -57,14 +63,20 @@ def test_import_preview_identity_handoff_uses_same_mismatch_guard() -> None:
     target_metadata = preview.envelope.metadata["preview_target_identity"]
     assert target_metadata["roles"][role]["target_key"] == [object_path]
     assert target_metadata["roles"][role]["container_suitability"]["reason"] == "writable-default-work-unit-target"
-    assert target_metadata["confirmed_execution"]["mismatch_status"] == "repreview_required"
+    assert target_metadata["authorized_execution"] == {
+        "required": True,
+        "abort_on_mismatch": True,
+        "mismatch_status": "repreview_required",
+        "reason": "authorized execution must reuse the preview-resolved target identity",
+    }
+    assert "confirmed_execution" not in target_metadata
 
-    confirmed = confirm_preview_target_identity(preview, {"roles": {role: {"target_key": [object_path]}}})
-    assert confirmed["status"] == "target_identity_confirmed"
+    validated = validate_preview_target_identity(preview, {"roles": {role: {"target_key": [object_path]}}})
+    assert validated["status"] == "target_identity_validated"
 
-    mismatch = confirm_preview_target_identity(preview, {"roles": {role: {"target_key": [r"\Actor-Mixer Hierarchy\Default Work Unit\<Sound>Other"]}}})
+    mismatch = validate_preview_target_identity(preview, {"roles": {role: {"target_key": [r"\Actor-Mixer Hierarchy\Default Work Unit\<Sound>Other"]}}})
     assert mismatch["status"] == "repreview_required"
-    assert mismatch["reason"] == "confirmed execution target identity differs from preview target identity"
+    assert mismatch["reason"] == "authorized execution target identity differs from preview target identity"
 
 
 def test_crud_and_import_invalid_root_details_share_service_semantics() -> None:

@@ -1620,6 +1620,63 @@ def test_task_exception_classification_requires_archived_real_turn_evidence(
     assert "codex_infrastructure_failure" not in outcome.checks
 
 
+def test_task_gate_failure_publishes_its_raw_thread_identity(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _install_orchestration_fakes(monkeypatch, prepared=_prepared())
+
+    def fail(**kwargs):
+        _fake_task(kwargs["task_root"], archive_turn=True)
+        raise runner.V3TaskRunnerError(
+            "synthetic task gate failure",
+            thread_id="thread-gate-failure",
+        )
+
+    monkeypatch.setattr(runner, "run_v3_codex_task", fail)
+    outcome = runner.run_heavy_project_unit(
+        _unit(),
+        scenario_root=tmp_path / "case",
+        options=_options(tmp_path),
+    )
+
+    assert outcome.status == "FAIL"
+    assert outcome.thread_id == "thread-gate-failure"
+
+
+def test_turn_observer_failure_publishes_its_raw_thread_identity(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _install_orchestration_fakes(monkeypatch, prepared=_prepared())
+    monkeypatch.setattr(
+        runner._CaseObservers,
+        "after_turn",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            runner.HeavyProjectRunnerError("synthetic natural-response failure")
+        ),
+    )
+
+    def fail(**kwargs):
+        _fake_task(kwargs["task_root"], archive_turn=True)
+        kwargs["turn_observer"](
+            1,
+            SimpleNamespace(thread_id="thread-observer-failure"),
+            SimpleNamespace(),
+        )
+        raise AssertionError("observer failure did not propagate")
+
+    monkeypatch.setattr(runner, "run_v3_codex_task", fail)
+    outcome = runner.run_heavy_project_unit(
+        _unit(),
+        scenario_root=tmp_path / "case",
+        options=_options(tmp_path),
+    )
+
+    assert outcome.status == "FAIL"
+    assert outcome.thread_id == "thread-observer-failure"
+
+
 @pytest.mark.parametrize(
     ("category", "turn_failed", "timed_out"),
     [
@@ -1825,8 +1882,8 @@ def test_direct_turn_requires_natural_intro_and_runs_final_business_oracle() -> 
     result = _first_turn_result(
         after_gateway=(
             "已加载 waapi-skill，当前 WAAPI 地址是 127.0.0.1:49152，"
-            "适配层版本 2022.1，修改策略 preview_then_confirm。"
-            "如有需要可切换 never / preview_then_confirm / allow_with_notice。",
+            "适配层版本 2022.1，修改策略 ask_before_changes。"
+            "如有需要可切换 read_only / ask_before_changes / allow_changes。",
             "已生成不可变预览，尚未执行任何改动。请确认事务 ID。",
         ),
     )
@@ -1851,8 +1908,8 @@ def test_first_use_intro_rejects_later_agent_message_after_gateway() -> None:
         after_gateway=(
             "正在生成不可变预览。",
             "已加载 waapi-skill，当前 WAAPI 地址是 127.0.0.1:49152，"
-            "适配层版本 2022.1，修改策略 preview_then_confirm。"
-            "如有需要可切换 never / preview_then_confirm / allow_with_notice。",
+            "适配层版本 2022.1，修改策略 ask_before_changes。"
+            "如有需要可切换 read_only / ask_before_changes / allow_changes。",
         ),
     )
 
@@ -1878,8 +1935,8 @@ def test_first_use_intro_rejects_skill_name_split_before_gateway() -> None:
         before_gateway="我已加载 waapi-skill，接下来会读取当前连接信息。",
         after_gateway=(
             "当前 WAAPI 地址是 127.0.0.1:49152，适配层版本 2022.1，"
-            "修改策略 preview_then_confirm。如有需要可切换 "
-            "never / preview_then_confirm / allow_with_notice。",
+            "修改策略 ask_before_changes。如有需要可切换 "
+            "read_only / ask_before_changes / allow_changes。",
             "已生成不可变预览，尚未执行任何改动。请确认事务 ID。",
         ),
     )

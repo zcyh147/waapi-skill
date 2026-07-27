@@ -23,6 +23,7 @@ from typing import Any, Mapping, Sequence
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     build_direct_protocol,
+    build_modification_policy_protocol,
     build_transaction_protocol,
     query_object_step,
 )
@@ -143,7 +144,7 @@ def compile_object_business_plan(
     static = _static_expectation(recipe, protocol)
     live = _live_binding(before_value, file_rows)
     rules = _delta_rules(recipe, before_value)
-    primary_steps, verification_steps = _step_partition(recipe)
+    primary_steps, verification_steps = _step_partition(recipe, protocol)
     return _build_sections(
         recipe=recipe,
         static=static,
@@ -281,7 +282,7 @@ def validate_archived_object_business_plan(
     expected_rules = _delta_rules(recipe, before_value)
     if tuple(_json_value(item) for item in sections.delta_rules) != expected_rules:
         raise ObjectBusinessPlanError("object delta rules differ from reviewed oracle")
-    primary_steps, verification_steps = _step_partition(recipe)
+    primary_steps, verification_steps = _step_partition(recipe, protocol)
     expected = _build_sections(
         recipe=recipe,
         static=static,
@@ -323,6 +324,20 @@ def validate_object_archived_verification(
             "object oracle before snapshot differs from the pre-Codex plan"
         )
     api = sections.static_expectation["api"]
+    if verification.get("phase") == "policy_read_only":
+        if (
+            api not in {
+                "ak.wwise.core.object.create",
+                "ak.wwise.core.object.set",
+            }
+            or sections.payload_bindings.get("primary_steps") != []
+            or set(evidence) != {"before", "after"}
+            or evidence.get("after") != before
+        ):
+            raise ObjectBusinessPlanError(
+                "object read-only policy oracle differs from its sealed baseline"
+            )
+        return
     if api == "ak.wwise.core.object.get":
         if verification.get("phase") != "query" or len(sections.delta_rules) != 1:
             raise ObjectBusinessPlanError("object.get verification phase/rules are invalid")
@@ -1502,14 +1517,29 @@ def _validate_protocol(recipe: ObjectHeavyRecipe, protocol: V3GatewayProtocol) -
         raise ObjectBusinessPlanError("object protocol must be V3GatewayProtocol")
     request = recipe.request
     if isinstance(request, OperationRequestSpec):
-        expected = build_transaction_protocol([request.as_dict()])
+        base = build_transaction_protocol([request.as_dict()])
+        expected_protocols = (
+            base,
+            *(
+                build_modification_policy_protocol(base, policy=policy)
+                for policy in (
+                    "read_only",
+                    "ask_before_changes",
+                    "allow_changes",
+                )
+            ),
+        )
     elif isinstance(request, QueryObjectRequestSpec):
-        expected = build_direct_protocol(
-            [query_object_step("query-object", request.argv[3:])]
+        expected_protocols = (
+            build_direct_protocol(
+                [query_object_step("query-object", request.argv[3:])]
+            ),
         )
     else:  # pragma: no cover - recipe union is closed
         raise ObjectBusinessPlanError("object recipe request type is unsupported")
-    if serialize_protocol(protocol) != serialize_protocol(expected):
+    if serialize_protocol(protocol) not in tuple(
+        serialize_protocol(expected) for expected in expected_protocols
+    ):
         raise ObjectBusinessPlanError(
             "object protocol differs from the exact reviewed request"
         )
@@ -1917,19 +1947,19 @@ def _delta_rules(
     )
 
 
-def _step_partition(recipe: ObjectHeavyRecipe) -> tuple[tuple[str, ...], tuple[str, ...]]:
+def _step_partition(
+    recipe: ObjectHeavyRecipe,
+    protocol: V3GatewayProtocol,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
     if isinstance(recipe.request, QueryObjectRequestSpec):
         return ("query-object",), ()
-    return (
-        ("tx01.execute",),
-        (
-            "tx01.operation-schema",
-            "tx01.preview",
-            "tx01.transaction-show",
-            "tx01.confirm",
-            "tx01.verify",
-        ),
+    execute_steps = tuple(
+        step.name for step in protocol.steps if step.subcommand == "execute"
     )
+    verification_steps = tuple(
+        step.name for step in protocol.steps if step.subcommand != "execute"
+    )
+    return execute_steps, verification_steps
 
 
 def _assertion_ids(recipe: ObjectHeavyRecipe) -> tuple[str, ...]:

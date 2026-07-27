@@ -23,6 +23,10 @@ from tests.semantic.support.codex_business_oracle_plan_v3 import (
 )
 from tests.semantic.support.codex_eval_bundle_v3 import OnlineScenario
 from tests.semantic.support.codex_eval_protocol_v3 import V3GatewayProtocol
+from tests.semantic.support.codex_eval_protocol_v3 import (
+    build_modification_policy_protocol,
+    build_transaction_protocol,
+)
 from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
     ResponseBinding,
@@ -112,7 +116,12 @@ def write_prompt_provenance(
             f"prompt provenance is closed to the heavy API set: {scenario.api}"
         )
     values = _visible_values(scenario, visible_values)
-    prompt_values = _expected_prompts(scenario, values, prompts)
+    prompt_values = _expected_prompts(
+        scenario,
+        values,
+        prompts,
+        protocol=protocol,
+    )
     protocol_value = serialize_protocol(protocol)
     if len(prompt_values) != len(protocol.turn_prefix_counts):
         raise PromptProvenanceError(
@@ -286,7 +295,12 @@ def read_prompt_provenance(
         raise PromptProvenanceError("rendered request is not reproducible")
 
     turns = value.get("turns")
-    expected = _expected_prompts(scenario, visible_values, expected_prompts)
+    expected = _expected_prompts(
+        scenario,
+        visible_values,
+        expected_prompts,
+        protocol=protocol,
+    )
     expected_turns = [
         {
             "index": index,
@@ -357,14 +371,29 @@ def prompt_materialization_receipt(
 
 
 def serialize_protocol(protocol: V3GatewayProtocol) -> dict[str, Any]:
-    return {
+    value = {
         "turn_prefix_counts": list(protocol.turn_prefix_counts),
         "steps": [_serialize_step(step) for step in protocol.steps],
     }
+    if protocol.allowed_turn_prefix_counts:
+        value["allowed_turn_prefix_counts"] = [
+            list(item) for item in protocol.allowed_turn_prefix_counts
+        ]
+        value["terminal_prefix_counts"] = list(protocol.terminal_prefix_counts)
+    return value
 
 
 def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
-    if set(value) != {"turn_prefix_counts", "steps"}:
+    keys = set(value)
+    if keys not in (
+        {"turn_prefix_counts", "steps"},
+        {
+            "turn_prefix_counts",
+            "steps",
+            "allowed_turn_prefix_counts",
+            "terminal_prefix_counts",
+        },
+    ):
         raise PromptProvenanceError("protocol manifest schema is invalid")
     prefixes = value.get("turn_prefix_counts")
     steps = value.get("steps")
@@ -374,9 +403,31 @@ def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
         or not isinstance(steps, list)
     ):
         raise PromptProvenanceError("protocol manifest topology is invalid")
+    allowed: tuple[tuple[int, ...], ...] = ()
+    terminal: tuple[int, ...] = ()
+    if "allowed_turn_prefix_counts" in value:
+        raw_allowed = value.get("allowed_turn_prefix_counts")
+        raw_terminal = value.get("terminal_prefix_counts")
+        if (
+            not isinstance(raw_allowed, list)
+            or any(
+                not isinstance(row, list)
+                or any(type(item) is not int for item in row)
+                for row in raw_allowed
+            )
+            or not isinstance(raw_terminal, list)
+            or any(type(item) is not int for item in raw_terminal)
+        ):
+            raise PromptProvenanceError(
+                "optional protocol prefix topology is invalid"
+            )
+        allowed = tuple(tuple(row) for row in raw_allowed)
+        terminal = tuple(raw_terminal)
     return V3GatewayProtocol(
         tuple(_deserialize_step(item) for item in steps),
         tuple(prefixes),
+        allowed,
+        terminal,
     )
 
 
@@ -1006,11 +1057,24 @@ def _protocol_requests(
         if not isinstance(step, Mapping) or step.get("subcommand") != "preview":
             continue
         arguments = step.get("arguments")
-        if not isinstance(arguments, list) or len(arguments) != 2:
+        if not isinstance(arguments, list):
             raise PromptProvenanceError("preview request argument topology drifted")
-        if arguments[0] != {"kind": "literal", "value": "--request-json"}:
+        if (
+            len(arguments) == 3
+            and arguments[0] == {"kind": "literal", "value": "--apply"}
+            and arguments[1]
+            == {"kind": "literal", "value": "--request-json"}
+        ):
+            semantic_index = 2
+        elif (
+            len(arguments) == 2
+            and arguments[0]
+            == {"kind": "literal", "value": "--request-json"}
+        ):
+            semantic_index = 1
+        else:
             raise PromptProvenanceError("preview request flag drifted")
-        semantic = arguments[1]
+        semantic = arguments[semantic_index]
         if (
             not isinstance(semantic, Mapping)
             or semantic.get("kind") not in {
@@ -1037,7 +1101,7 @@ def _protocol_requests(
             )
         result.append(
             (
-                f"/steps/{step_index}/arguments/1/value",
+                f"/steps/{step_index}/arguments/{semantic_index}/value",
                 request,
             )
         )
@@ -1549,19 +1613,74 @@ def _expected_prompts(
     scenario: OnlineScenario,
     values: Mapping[str, str],
     supplied: Sequence[str] | None,
+    *,
+    protocol: V3GatewayProtocol,
 ) -> tuple[str, ...]:
     request = scenario.render_prompt(values)
-    count = 1 + scenario.confirmation_turn_count
-    if count == 1:
+    policy = _modification_policy_for_protocol(protocol)
+    if policy == "read_only":
+        from tests.semantic.support.codex_modification_policy_v3 import (
+            READ_ONLY_FOLLOW_UP_PROMPT,
+        )
+
+        expected = (request, READ_ONLY_FOLLOW_UP_PROMPT)
+    elif policy == "allow_changes":
         expected = (request,)
     else:
-        confirmation = scenario.confirmation_prompt
-        if not isinstance(confirmation, str) or not confirmation:
-            raise PromptProvenanceError("confirmation prompt is missing")
-        expected = (request, *((confirmation,) * (count - 1)))
+        count = 1 + scenario.confirmation_turn_count
+        if count == 1:
+            expected = (request,)
+        else:
+            confirmation = scenario.confirmation_prompt
+            if not isinstance(confirmation, str) or not confirmation:
+                raise PromptProvenanceError("confirmation prompt is missing")
+            expected = (request, *((confirmation,) * (count - 1)))
     if supplied is not None and tuple(str(item) for item in supplied) != expected:
         raise PromptProvenanceError("in-memory prompts differ from the frozen scenario")
     return expected
+
+
+def _modification_policy_for_protocol(
+    protocol: V3GatewayProtocol,
+) -> str | None:
+    previews = tuple(
+        step for step in protocol.steps if step.subcommand == "preview"
+    )
+    if not previews:
+        if (
+            protocol.turn_prefix_counts == (1, 1)
+            and protocol.allowed_turn_prefix_counts == ((1,), (1,))
+            and protocol.terminal_prefix_counts == (1,)
+            and len(protocol.steps) == 1
+            and protocol.steps[0].subcommand == "operation-schema"
+        ):
+            return "read_only"
+        return None
+    if len(previews) != 1 or previews[0].arguments[:1] != ("--apply",):
+        return None
+    preview = previews[0]
+    if (
+        len(preview.arguments) != 3
+        or preview.arguments[1] != "--request-json"
+        or not isinstance(preview.arguments[2], SemanticJsonArgument)
+        or not isinstance(preview.arguments[2].expected, Mapping)
+    ):
+        raise PromptProvenanceError(
+            "modification-policy preview request topology is invalid"
+        )
+    try:
+        base = build_transaction_protocol([preview.arguments[2].expected])
+        matches = tuple(
+            policy
+            for policy in ("ask_before_changes", "allow_changes")
+            if protocol
+            == build_modification_policy_protocol(base, policy=policy)
+        )
+    except (TypeError, ValueError) as exc:
+        raise PromptProvenanceError(
+            f"modification-policy protocol cannot be rederived: {exc}"
+        ) from exc
+    return matches[0] if len(matches) == 1 else None
 
 
 def _scenario_root(path: Path, *, require_exists: bool) -> Path:

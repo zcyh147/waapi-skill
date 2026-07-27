@@ -1514,7 +1514,7 @@ def build_external_sources_operation_plan(
             "result_schema_required": True,
             "result_schema_is_business_state_proof": False,
             "all_source_files_hashed_before_dispatch": True,
-            "source_files_must_be_reverified_at_confirmation": True,
+            "source_files_must_be_reverified_before_execution": True,
             "explicit_conversion_names_require_live_resolution": sorted(requested_conversions),
             "project_default_conversion": default_conversion,
             "no_retry_after_dispatch": True,

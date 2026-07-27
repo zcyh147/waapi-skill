@@ -1287,6 +1287,7 @@ class CodexGatewayBroker:
         expected_steps: Sequence[ExpectedGatewayStep],
         gateway_global_arguments: Sequence[str] = (),
         expected_wwise_version: str = "",
+        project_modification_policy: str = "ask_before_changes",
         runner_environment: Mapping[str, str] | None = None,
         trusted_python: Path | None = None,
         runner_cwd: Path | None = None,
@@ -1305,6 +1306,7 @@ class CodexGatewayBroker:
         self.expected_steps = tuple(expected_steps)
         self.gateway_global_arguments = tuple(str(value) for value in gateway_global_arguments)
         self.expected_wwise_version = str(expected_wwise_version)
+        self.project_modification_policy = str(project_modification_policy)
         self.trusted_python = _absolute_lexical(trusted_python or Path(sys.executable))
         self.runner_cwd = _absolute_lexical(runner_cwd or self.skill_source)
         self._requested_working_root = _absolute_lexical(working_root) if working_root else None
@@ -1332,6 +1334,15 @@ class CodexGatewayBroker:
             raise ValueError(
                 "expected_wwise_version must be empty or one of "
                 f"{tuple(sorted(_SUPPORTED_WWISE_VERSIONS))!r}"
+            )
+        if self.project_modification_policy not in {
+            "read_only",
+            "ask_before_changes",
+            "allow_changes",
+        }:
+            raise ValueError(
+                "project_modification_policy must be read_only, "
+                "ask_before_changes, or allow_changes"
             )
         if self.required_contract != GATEWAY_RESULT_CONTRACT:
             raise ValueError(
@@ -1576,7 +1587,7 @@ class CodexGatewayBroker:
                         "wwise_version": None,
                         "waapi_host": "127.0.0.1",
                         "waapi_port": None,
-                        "project_modification_policy": "preview_then_confirm",
+                        "project_modification_policy": self.project_modification_policy,
                     },
                     ensure_ascii=False,
                     indent=2,

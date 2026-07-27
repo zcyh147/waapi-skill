@@ -1718,9 +1718,9 @@ def _require_natural_intro(text: str, *, endpoint: str, version: str) -> None:
         "skill": "waapi-skill" in folded,
         "endpoint": endpoint.casefold() in folded,
         "version": version.casefold() in folded,
-        "policy": "preview_then_confirm" in folded,
-        "mode_never": "never" in folded,
-        "mode_notice": "allow_with_notice" in folded,
+        "policy": "ask_before_changes" in folded,
+        "mode_read_only": "read_only" in folded,
+        "mode_allow_changes": "allow_changes" in folded,
     }
     missing = [key for key, passed in required.items() if not passed]
     if missing:

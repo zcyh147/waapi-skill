@@ -22,6 +22,11 @@ from .authoring_ui_commands_manifest import (
     AuthoringUiCommandsSupplementError,
     AuthoringUiCommandsSupplementMissingError,
 )
+from .authorization import (
+    AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,
+    DEFAULT_TRANSACTION_AUTHORIZATION_MODES,
+    accepted_authorization_modes_for_uri,
+)
 from .manifest import ManifestStore
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 
@@ -29,7 +34,7 @@ from .versions import SUPPORTED_WWISE_VERSION_KEYS
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_ROOT = SKILL_ROOT / "resources" / "manifest"
 
-PUBLIC_EXECUTION_CONTRACT = "waapi-skill.public-execution-contract/v1"
+PUBLIC_EXECUTION_CONTRACT = "waapi-skill.public-execution-contract/v2"
 PACKAGED_INVENTORY_SHA256 = "4644c792fdf55fe498e7dd9fc7de1475831801d1b363be8488fb13cbdfa826fa"
 CONSOLE_EXECUTION_PROFILE = "wwise-console"
 AUTHORING_UI_EXECUTION_PROFILE = "wwise-authoring-ui"
@@ -361,7 +366,7 @@ class ExecutionContract:
     timeout_seconds: float
     result_limit_bytes: int
     verification_strategy: str
-    requires_confirmation: bool
+    accepted_authorization_modes: tuple[str, ...]
     program_case: str
     lifecycle_strategy: str = "none"
     companion_uris: tuple[str, ...] = ()
@@ -377,6 +382,10 @@ class ExecutionContract:
     def read_only(self) -> bool:
         return self.effect in {"read", "observation"}
 
+    @property
+    def requires_authorization(self) -> bool:
+        return bool(self.accepted_authorization_modes)
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "contract": PUBLIC_EXECUTION_CONTRACT,
@@ -389,7 +398,10 @@ class ExecutionContract:
             "timeout_seconds": self.timeout_seconds,
             "result_limit_bytes": self.result_limit_bytes,
             "verification_strategy": self.verification_strategy,
-            "requires_confirmation": self.requires_confirmation,
+            "requires_authorization": self.requires_authorization,
+            "accepted_authorization_modes": list(
+                self.accepted_authorization_modes
+            ),
             "program_case": self.program_case,
             "lifecycle_strategy": self.lifecycle_strategy,
             "companion_uris": list(self.companion_uris),
@@ -599,7 +611,7 @@ class ExecutionContractRegistry:
                 timeout_seconds=0.0,
                 result_limit_bytes=0,
                 verification_strategy="none",
-                requires_confirmation=False,
+                accepted_authorization_modes=(),
                 program_case="excluded-before-connect",
                 excluded_reason=excluded_reason,
             )
@@ -616,7 +628,7 @@ class ExecutionContractRegistry:
                 ),
                 result_limit_bytes=256 * 1024,
                 verification_strategy="topic_event_schema",
-                requires_confirmation=False,
+                accepted_authorization_modes=(),
                 program_case="subscribe-event-unsubscribe",
             )
         if item_type != "function":
@@ -633,7 +645,7 @@ class ExecutionContractRegistry:
                 timeout_seconds=10.0,
                 result_limit_bytes=256 * 1024,
                 verification_strategy="fixed_result_contract",
-                requires_confirmation=False,
+                accepted_authorization_modes=(),
                 program_case="fixed-command-dispatch",
             )
         if uri in BOUNDED_DIRECT_CALL_URIS:
@@ -647,7 +659,7 @@ class ExecutionContractRegistry:
                 timeout_seconds=10.0,
                 result_limit_bytes=256 * 1024,
                 verification_strategy="result_schema",
-                requires_confirmation=False,
+                accepted_authorization_modes=(),
                 program_case="call-result-schema",
             )
 
@@ -687,7 +699,11 @@ class ExecutionContractRegistry:
                 if project_guard_mode != PROJECT_GUARD_INVARIANT
                 else "result_schema"
             ),
-            requires_confirmation=True,
+            accepted_authorization_modes=(
+                (AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,)
+                if effect == "read"
+                else accepted_authorization_modes_for_uri(uri)
+            ),
             program_case=f"{route}-result-schema",
             lifecycle_strategy=lifecycle_strategy,
             companion_uris=companions,
@@ -729,7 +745,7 @@ def _build_authoring_ui_execution_contract(
             timeout_seconds=DEFAULT_TOPIC_TIMEOUT_SECONDS,
             result_limit_bytes=256 * 1024,
             verification_strategy="topic_event_schema",
-            requires_confirmation=False,
+            accepted_authorization_modes=(),
             program_case="authoring-ui-command-subscribe-event-unsubscribe",
         )
     if uri == "ak.wwise.ui.commands.getCommands":
@@ -743,7 +759,7 @@ def _build_authoring_ui_execution_contract(
             timeout_seconds=10.0,
             result_limit_bytes=256 * 1024,
             verification_strategy="result_schema",
-            requires_confirmation=False,
+            accepted_authorization_modes=(),
             program_case="authoring-ui-command-live-inventory-bounded-read",
         )
     operation = AUTHORING_UI_DEDICATED_OPERATIONS.get(uri)
@@ -775,7 +791,7 @@ def _build_authoring_ui_execution_contract(
         timeout_seconds=30.0,
         result_limit_bytes=1024 * 1024,
         verification_strategy=verification_strategy,
-        requires_confirmation=True,
+        accepted_authorization_modes=DEFAULT_TRANSACTION_AUTHORIZATION_MODES,
         program_case=f"authoring-{operation}-dedicated-transaction",
         lifecycle_strategy=lifecycle_strategy,
         companion_uris=companion_uris,
@@ -950,7 +966,7 @@ def validate_packaged_authoring_ui_execution_contracts(
             != "bounded_topic_wait"
             or any(
                 ui_rows[uri].route != "managed_transaction"
-                or not ui_rows[uri].requires_confirmation
+                or not ui_rows[uri].requires_authorization
                 for uri in AUTHORING_UI_DEDICATED_OPERATIONS
             )
         ):

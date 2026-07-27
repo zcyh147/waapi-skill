@@ -94,7 +94,12 @@ _PROJECT_GUARD_FIELDS = frozenset(
 )
 _RUNTIME_GUARD_FIELDS = frozenset({"contract", "version", "files", "fingerprint"})
 _EXECUTION_POLICY = {
-    "confirmation_required": True,
+    "requires_authorization": True,
+    "accepted_authorization_modes": [
+        "explicit_confirmation",
+        "policy_authorization",
+    ],
+    "authorization_selected_at_preview": True,
     "automatic_retry_allowed": False,
     "revalidate_project_guard": True,
     "revalidate_runtime_guard": True,

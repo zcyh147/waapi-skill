@@ -132,7 +132,7 @@ def gateway_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterato
                     "wwise_version": version,
                     "waapi_host": lifecycle.host,
                     "waapi_port": lifecycle.port,
-                    "project_modification_policy": "preview_then_confirm",
+                    "project_modification_policy": "ask_before_changes",
                 }
             ),
             encoding="utf-8",

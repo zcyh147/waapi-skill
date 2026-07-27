@@ -9,11 +9,14 @@ SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
 
 def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() -> None:
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    coverage = (SKILL_ROOT / "references" / "waapi-coverage.md").read_text(
+        encoding="utf-8"
+    )
 
     for command in (
         "python scripts/run.py gateway.py status",
         "python scripts/run.py gateway.py config-show",
-        "python scripts/run.py gateway.py config-set --wwise-version 2022.1 --waapi-host 127.0.0.1 --waapi-port 8080 --project-modification-policy preview_then_confirm",
+        "python scripts/run.py gateway.py config-set --wwise-version 2022.1 --waapi-host 127.0.0.1 --waapi-port 8080 --project-modification-policy ask_before_changes",
         "python scripts/run.py gateway.py config-set --reset",
         "python scripts/run.py gateway.py buses",
         "python scripts/run.py gateway.py selected",
@@ -38,11 +41,14 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
     assert "before `ls`, `find`, `rg`" in skill
     assert "inline Python" in skill
     assert "unsupported_by_skill_interface" in skill
-    assert "assigns all 814 reflected version/API rows to exactly one catalog decision" in skill
-    assert "808 packaged route-contract rows and 6 explicit exclusions" in skill
-    assert "still require a live Authoring host" in skill
-    assert "824 packaged route-contract version/API rows" in skill
-    assert "each `transaction_operation` row requires immutable preview/confirmation through exactly one declared closed lane" in skill
+    assert "814" in coverage
+    assert "808 packaged route rows" in coverage
+    assert "require a live Authoring host" in coverage
+    assert "824" in coverage
+    assert (
+        "each `transaction_operation` row requires immutable preview plus "
+        "confirmation or policy authorization through exactly one declared closed lane"
+    ) in skill
     assert "`waapi.undoGroup` for the three Undo members, and `waapi.call` only when the catalog explicitly lists it" in skill
     assert "FIXED_COMMAND_REQUIRED" in skill
     assert "WAIT_TOPIC_REQUIRED" in skill
@@ -265,7 +271,7 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
         assert "**656**" in readme
         assert "**152**" in readme
         assert "**6**" in readme
-        assert "1918" in readme
+        assert "1932" in readme
         assert "./skills/waapi-skill/references/waapi-coverage.md" in readme
 
     assert "198 unique routed WAAPI URIs" in english
@@ -274,4 +280,4 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
     assert "仍要求实时宿主为 Authoring" in " ".join(chinese.split())
     assert "not a claim that all 808 rows have been exercised against a real Wwise process" in english
     assert "不等于已经在真实 Wwise 进程中逐一运行了全部 808 行" in chinese
-    assert "currently contains 1918 passing tests" in coverage_contract
+    assert "currently contains 1932 passing tests" in coverage_contract

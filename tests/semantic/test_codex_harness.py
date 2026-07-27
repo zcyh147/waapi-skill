@@ -39,6 +39,7 @@ from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     snapshot_workspace,
     turn_usage,
     workspace_changes,
+    validated_skill_read,
 )
 from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImports]
     BASH_ENV_NAME,
@@ -1037,7 +1038,7 @@ def test_command_classifier_accepts_offline_gateway_config_commands(tmp_path: Pa
             gateway_command(
                 skill,
                 "config-set --wwise-version 2022.1 --waapi-host 127.0.0.1 "
-                "--waapi-port 8080 --project-modification-policy preview_then_confirm",
+                "--waapi-port 8080 --project-modification-policy ask_before_changes",
             ),
             {
                 "contract": "waapi-skill.gateway-result/v1",
@@ -1199,6 +1200,21 @@ def test_command_classifier_allows_only_exact_initial_skill_bootstrap_read(tmp_p
     assert facts.skill_read_files == ("SKILL.md",)
     assert facts.write_like_commands == ()
     assert facts.unexpected_commands == ()
+
+
+def test_validated_skill_read_accepts_complete_coverage_reference(tmp_path: Path) -> None:
+    skill = tmp_path / "waapi-skill"
+    references = skill / "references"
+    references.mkdir(parents=True)
+    coverage = references / "waapi-coverage.md"
+    content = "# coverage\n"
+    coverage.write_text(content, encoding="utf-8")
+
+    assert validated_skill_read(
+        str(coverage),
+        content,
+        skill_source=skill,
+    ) == ("references/waapi-coverage.md", content)
 
 
 def test_command_classifier_accepts_codex_full_range_sed_only_for_exact_skill_read(

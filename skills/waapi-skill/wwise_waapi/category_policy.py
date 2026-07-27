@@ -31,11 +31,11 @@ def category_policy(category: str) -> CategoryPolicy | None:
             target_status="guarded-execution",
             user_approved_rationale=(
                 "UI functions are part of the reviewed high-coverage contract and execute through bounded reads "
-                "or confirmed transactions instead of ad-hoc automation code."
+                "or policy-gated transactions instead of ad-hoc automation code."
             ),
             risk_explanation=(
                 "UI calls depend on focus, selection, command registration, project windows, or foreground Authoring state, so "
-                "mutating UI routes require an immutable preview and explicit confirmation."
+                "mutating UI routes require an immutable preview and configured transaction authorization."
             ),
             future_review_trigger=(
                 "Revisit when a version changes a UI schema or the deterministic program contract no longer matches."
@@ -46,7 +46,7 @@ def category_policy(category: str) -> CategoryPolicy | None:
             category=category,
             target_status="isolated-transaction",
             user_approved_rationale=(
-                "CLI functions are executable only through a confirmed, schema-validated, timeout-bounded transaction."
+                "CLI functions are executable only through a policy-gated, schema-validated, timeout-bounded transaction."
             ),
             risk_explanation=(
                 "CLI migration, project creation, platform, and SoundBank generation commands can create or rewrite project artifacts "
@@ -61,7 +61,7 @@ def category_policy(category: str) -> CategoryPolicy | None:
             category=category,
             target_status="managed-transaction",
             user_approved_rationale=(
-                "Remote-console calls are part of the high-coverage contract but require a confirmed managed-session transaction."
+                "Remote-console calls are part of the high-coverage contract but require a policy-gated managed-session transaction."
             ),
             risk_explanation=(
                 "Remote connect/disconnect behavior depends on external consoles and network/session state not provided by the local sandbox."
@@ -76,7 +76,8 @@ def category_policy(category: str) -> CategoryPolicy | None:
             target_status="guarded-execution",
             user_approved_rationale=(
                 "Debug reads, process-wide modes, and deliberate host controls are exposed only through "
-                "separate fixed or confirmed routes with explicit lifecycle evidence."
+                "separate fixed or policy-gated routes with explicit lifecycle evidence; "
+                "restart, test-assert, and test-crash remain explicit-confirmation-only."
             ),
             risk_explanation=(
                 "Debug assert/crash APIs intentionally fail or terminate the host, while automation/assert "

@@ -106,7 +106,7 @@ python tests/semantic/render_v3_review.py --api ak.wwise.core.object.copy
 python tests/semantic/render_v3_review.py --case-id OBJ22-F-COPY-01
 ```
 
-The approved executable V3 scope is `heavy_cross_version_80`: five scenarios
+The approved broad executable V3 scope is `heavy_cross_version_80`: five scenarios
 for each of 16 APIs, for 80 fresh tasks and 145 user turns. It covers
 `object.get/create/set`, `audio.import/importTabDelimited/convert`,
 `mediaPool.get`, five SoundBank APIs (`generate`, `generated`,
@@ -114,6 +114,26 @@ for each of 16 APIs, for 80 fresh tasks and 145 user turns. It covers
 four reviewed `ak.wwise.cli` APIs. Its representative distribution is 70 cases
 on 2022.1, five on 2024.1, and five on 2025.1. Each case receives a fresh
 project/process/task and the matrix runs them sequentially.
+
+The focused `modification_policy_9` profile reuses the existing
+`OBJ22-F-CREATE-01` fixture, runner, broker, lifecycle, and business oracle. It
+runs `read_only`, `ask_before_changes`, and `allow_changes` three times each:
+nine fresh tasks and 15 user turns, all on Wwise 2022.1. `read_only` permits
+only the operation-schema read and proves both turns leave the project
+unchanged; `ask_before_changes` proves the first turn only previews and asks
+for a later confirmation; `allow_changes` requires a concrete user-visible
+notice after the authorized preview and before execute. The profile is fixed
+to `gpt-5.6-terra`, medium reasoning, the default service tier, CLI approval
+policy `never`, disabled memory, and sequential one-shot project sandboxes.
+
+The sealed current-candidate run at
+`skills/waapi-skill-workspace/campaign-modification-policy-9-c7` passed all
+nine tasks and 15 turns on Wwise 2022.1. It used nine unique memory-isolated
+Codex Terra threads. All three `read_only` cases made zero primary mutation
+dispatches; all six `ask_before_changes`/`allow_changes` cases made exactly one
+and verified seven created objects with 46 passing business assertions. Source
+project hashes remained unchanged, every sandbox was cleaned, and a later
+`--resume --verify-only` check passed without starting Codex or Wwise.
 
 The reviewed 2022.1 CLI contract keeps conversion and migration mappings
 closed. `convertExternalSource` uses explicit platform/path pairs; a shared
@@ -162,6 +182,7 @@ The separately approved V3 executable profile is:
 | Profile | Fresh tasks | User turns | Intended use |
 | --- | ---: | ---: | --- |
 | `heavy_cross_version_80` | 80 | 145 | Real sandboxed business-oracle coverage for the 16 implemented heavy APIs |
+| `modification_policy_9` | 9 | 15 | Three isolated repetitions of each canonical project-modification policy on one reviewed object.create business case |
 
 From the repository root, run each profile into a distinct campaign directory.
 Use the Skill-local Python so the runner-owned live fixture has the same pinned
@@ -179,7 +200,13 @@ settings, or start with one pilot case:
 ```bash
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile heavy_cross_version_80 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-heavy-v3-terra
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile heavy_cross_version_80 --case-id OBJ22-F-GET-01 --version 2022.1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-heavy-v3-pilot-object-get
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile modification_policy_9 --campaign-root skills/waapi-skill-workspace/campaign-modification-policy-9
 ```
+
+`modification_policy_9` is one closed nine-task campaign; its public campaign
+entrypoint rejects case and version filters. The matrix receives internal unit
+IDs only when the same sealed campaign resumes pending or proven-retryable
+work.
 
 Resume with the same profile, filters, candidate, model, reasoning, service
 tier, timeout, and retry policy plus `--resume`. Use `--resume --verify-only` to

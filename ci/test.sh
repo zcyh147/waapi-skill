@@ -444,6 +444,16 @@ run_program() {
     tests/unit/test_object_set_merge.py
     tests/unit/test_operation_soundbank_version_matrix.py
     tests/unit/test_skill_contract_protocol.py
+    tests/unit/test_transaction_gateway.py::test_preview_apply_read_only_blocks_before_connection_or_state_write
+    tests/unit/test_transaction_gateway.py::test_preview_apply_rejects_transaction_read_without_persisting_a_transaction
+    tests/unit/test_transaction_gateway.py::test_read_only_allows_explicitly_confirmed_sealed_read_transaction
+    tests/unit/test_transaction_gateway.py::test_preview_apply_ask_before_changes_still_requires_show_token_and_confirm
+    tests/unit/test_transaction_gateway.py::test_preview_apply_allow_changes_records_policy_authority_without_confirmation
+    tests/unit/test_transaction_gateway.py::test_policy_authorized_allow_changes_executes_once_and_can_verify
+    tests/unit/test_transaction_gateway.py::test_policy_authorized_allow_to_ask_drift_requires_repreview_without_business_dispatch
+    tests/unit/test_transaction_gateway.py::test_policy_authorized_allow_to_read_only_drift_blocks_before_connection
+    tests/unit/test_transaction_gateway.py::test_preview_without_apply_stays_review_only_under_allow_changes
+    tests/unit/test_transaction_gateway.py::test_allow_changes_keeps_dangerous_host_control_on_confirmation_path
     tests/unit/test_transaction_gateway.py::test_operation_schema_owns_exact_audio_convert_fast_route_contract
     tests/unit/test_transaction_gateway.py::test_generic_manifest_call_runs_full_preview_confirm_execute_verify_chain
     tests/unit/test_transaction_gateway.py::test_object_create_plugin_runs_full_preview_confirm_execute_verify_chain

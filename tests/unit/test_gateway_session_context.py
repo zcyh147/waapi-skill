@@ -18,7 +18,7 @@ SPEC.loader.exec_module(waapi_gateway)
 
 
 PROJECT_GUID = "{11111111-1111-1111-1111-111111111111}"
-POLICIES = ["never", "preview_then_confirm", "allow_with_notice"]
+POLICIES = ["read_only", "ask_before_changes", "allow_changes"]
 
 
 def expected_introduction(
@@ -28,7 +28,7 @@ def expected_introduction(
     policy: str | None,
 ) -> dict[str, Any]:
     return {
-        "contract": "waapi-skill.session-introduction/v1",
+        "contract": "waapi-skill.session-introduction/v2",
         "emit_condition": "visible_conversation_intro_absent",
         "emit_timing": "first_agent_message_after_gateway_result",
         "atomic": True,
@@ -68,7 +68,7 @@ def configured_env(
     version: str | None = "2022.1",
     host: str = "127.0.0.1",
     port: int | None = 8080,
-    policy: str = "preview_then_confirm",
+    policy: str = "ask_before_changes",
 ) -> dict[str, str]:
     config_path = tmp_path / "config" / "config.json"
     config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -91,12 +91,12 @@ def expected_context(
     version: str = "2022.1",
     host: str = "127.0.0.1",
     port: int = 8080,
-    policy: str = "preview_then_confirm",
+    policy: str = "ask_before_changes",
     source: str = "configured",
     available: bool = True,
 ) -> dict[str, Any]:
     return {
-        "contract": "waapi-skill.session-context/v1",
+        "contract": "waapi-skill.session-context/v2",
         "available": available,
         "endpoint": {
             "host": host,
@@ -156,17 +156,17 @@ def test_incomplete_config_marks_session_context_unavailable_without_guessing(tm
 
     assert exit_code == 0
     assert payload["session_context"] == {
-        "contract": "waapi-skill.session-context/v1",
+        "contract": "waapi-skill.session-context/v2",
         "available": False,
         "endpoint": {"host": "127.0.0.1", "port": None, "url": None},
         "adapter_version": None,
         "adapter_version_source": "unavailable",
-        "project_modification_policy": "preview_then_confirm",
+        "project_modification_policy": "ask_before_changes",
         "available_project_modification_policies": POLICIES,
         "one_time_introduction": expected_introduction(
             endpoint_url=None,
             version=None,
-            policy="preview_then_confirm",
+            policy="ask_before_changes",
         ),
     }
 
@@ -319,7 +319,7 @@ def test_config_set_session_context_reflects_the_new_saved_values(tmp_path: Path
             "--waapi-port",
             "32025",
             "--project-modification-policy",
-            "allow_with_notice",
+            "allow_changes",
         ],
         env={"WAAPI_SKILL_CONFIG_PATH": str(config_path)},
         client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
@@ -330,7 +330,7 @@ def test_config_set_session_context_reflects_the_new_saved_values(tmp_path: Path
         version="2025.1",
         host="localhost",
         port=32025,
-        policy="allow_with_notice",
+        policy="allow_changes",
     )
 
 
@@ -346,7 +346,7 @@ def test_invalid_config_error_has_bounded_unavailable_session_context(tmp_path: 
     assert exit_code == 2
     assert payload["error_code"] == "GatewayInputError"
     assert payload["session_context"] == {
-        "contract": "waapi-skill.session-context/v1",
+        "contract": "waapi-skill.session-context/v2",
         "available": False,
         "endpoint": {"host": None, "port": None, "url": None},
         "adapter_version": None,

@@ -291,6 +291,19 @@ def generic_manifest_call_request() -> dict[str, Any]:
     }
 
 
+def generic_read_transaction_call_request() -> dict[str, Any]:
+    return {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2022.1",
+        "operation": "waapi.call",
+        "arguments": {
+            "api": "ak.wwise.core.remote.getAvailableConsoles",
+            "args": {},
+            "options": {},
+        },
+    }
+
+
 def generic_public_call_request(
     api: str,
     args: Mapping[str, Any],
@@ -507,6 +520,7 @@ def gateway_env(
     state_dir: Path | None = None,
     version: str = "2022.1",
     port: int = 31337,
+    policy: str = "ask_before_changes",
 ) -> dict[str, str]:
     config_path = tmp_path / "config" / "config.json"
     if not config_path.exists():
@@ -517,7 +531,7 @@ def gateway_env(
                     "wwise_version": None,
                     "waapi_host": "127.0.0.1",
                     "waapi_port": None,
-                    "project_modification_policy": "preview_then_confirm",
+                    "project_modification_policy": policy,
                 }
             ),
             encoding="utf-8",
@@ -534,6 +548,13 @@ def gateway_env(
     return result
 
 
+def write_gateway_policy(tmp_path: Path, policy: str) -> None:
+    config_path = Path(gateway_env(tmp_path)["WAAPI_SKILL_CONFIG_PATH"])
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["project_modification_policy"] = policy
+    config_path.write_text(json.dumps(payload), encoding="utf-8")
+
+
 def execute(
     argv: Sequence[str],
     *,
@@ -543,6 +564,7 @@ def execute(
     client: FakeClient | None = None,
     version: str = "2022.1",
     port: int = 31337,
+    policy: str = "ask_before_changes",
 ) -> tuple[int, dict[str, Any]]:
     arguments = list(argv)
     if state_dir is not None and not env_state_dir:
@@ -552,6 +574,7 @@ def execute(
         state_dir=state_dir if env_state_dir else None,
         version=version,
         port=port,
+        policy=policy,
     )
 
     def factory(url: str) -> FakeClient:
@@ -569,26 +592,48 @@ def preview(
     state_dir: Path,
     client: FakeClient,
     ttl: int = 300,
+    apply: bool = False,
+    policy: str = "ask_before_changes",
 ) -> dict[str, Any]:
+    arguments = ["preview"]
+    if apply:
+        arguments.append("--apply")
+    arguments.extend(
+        ["--request-json", json.dumps(request), "--ttl", str(ttl)]
+    )
     exit_code, payload = execute(
-        ["preview", "--request-json", json.dumps(request), "--ttl", str(ttl)],
+        arguments,
         tmp_path=tmp_path,
         state_dir=state_dir,
         client=client,
         version=str(request.get("version", "2022.1")),
+        policy=policy,
     )
     assert exit_code == 0, payload
     assert payload["ok"] is True
-    assert payload["state"] == TransactionState.AWAITING_CONFIRMATION.value
+    policy_authorized = apply and policy == "allow_changes"
+    expected_state = (
+        TransactionState.POLICY_AUTHORIZED
+        if policy_authorized
+        else TransactionState.AWAITING_CONFIRMATION
+    )
+    assert payload["state"] == expected_state.value
+    assert payload["change_requested"] is apply
     assert isinstance(payload["transaction_id"], str) and payload["transaction_id"]
     assert COMPACT_TRANSACTION_ID_RE.fullmatch(payload["transaction_id"])
     assert isinstance(payload["artifact_hash"], str) and len(payload["artifact_hash"]) == 64
     assert isinstance(payload["preview_summary"], Mapping)
-    assert payload["next_command"] == expected_transaction_next_command(
-        "transaction-show",
-        ["transaction-show", payload["transaction_id"], "--summary-only"],
-        requires_later_user_message=True,
-    )
+    if policy_authorized:
+        assert payload["next_command"] == expected_transaction_next_command(
+            "execute",
+            ["execute", payload["transaction_id"]],
+        )
+    else:
+        assert payload["next_command"] == expected_transaction_next_command(
+            "transaction-show",
+            ["transaction-show", payload["transaction_id"], "--summary-only"],
+            requires_later_user_message=True,
+        )
     assert list(payload).index("session_context") < list(payload).index("next_command")
     assert list(payload).index("next_command") < list(payload).index("agent_result")
     assert payload["agent_result"]["next_command"] == payload["next_command"]
@@ -680,6 +725,62 @@ def test_debug_test_crash_is_confirmed_dispatched_once_and_terminal_indeterminat
     assert [call[0] for call in client.calls].count(
         "ak.wwise.debug.testCrash"
     ) == 1
+
+
+def test_allow_changes_keeps_dangerous_host_control_on_confirmation_path(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2022.1",
+        "operation": "debug.testCrash",
+        "arguments": {"acknowledge": "crash_wwise_process"},
+    }
+
+    exit_code, payload = execute(
+        [
+            "preview",
+            "--apply",
+            "--request-json",
+            json.dumps(request),
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info()],
+                "ak.wwise.core.getProjectInfo": [project()],
+            }
+        ),
+        policy="allow_changes",
+    )
+
+    assert exit_code == 0, payload
+    assert payload["state"] == TransactionState.AWAITING_CONFIRMATION.value
+    assert payload["authorization"] == {
+        "mode": "explicit_confirmation",
+        "policy": "allow_changes",
+        "explicit_confirmation": False,
+        "notice_required": True,
+        "requires_later_user_message": True,
+        "reason": "dangerous_host_control_requires_confirmation",
+    }
+    assert payload["next_command"] == expected_transaction_next_command(
+        "transaction-show",
+        [
+            "transaction-show",
+            payload["transaction_id"],
+            "--summary-only",
+        ],
+        requires_later_user_message=True,
+    )
+    assert [
+        event["event_type"]
+        for event in TransactionStore(state_dir).read_events(
+            payload["transaction_id"]
+        )
+    ] == ["preview_created", "confirmation_requested"]
 
 
 def preview_and_confirm_public_call(
@@ -1298,7 +1399,7 @@ def test_transaction_show_summary_omits_raw_artifact_bulk_but_keeps_review_evide
     state_dir = tmp_path / "state"
     store = TransactionStore(state_dir)
     artifact = {
-        "contract": "waapi-skill.transaction-preview/v1",
+        "contract": "waapi-skill.transaction-preview/v2",
         "request": {"operation": "object.setNotes"},
         "prepared_operation": {
             "dispatch": {"uri": "ak.wwise.core.object.setNotes"},
@@ -1456,7 +1557,7 @@ def test_transaction_show_summary_compacts_large_graph_without_losing_exact_requ
     }
     cleanup = {"kind": "none", "automatic_cleanup": False, "warnings": []}
     artifact = {
-        "contract": "waapi-skill.transaction-preview/v1",
+        "contract": "waapi-skill.transaction-preview/v2",
         "request": request,
         "prepared_operation": {
             "dispatch": dispatch,
@@ -1599,7 +1700,7 @@ def test_preview_uses_bounded_review_for_set04_scale_artifact_without_losing_sta
         for index in range(96)
     ]
     artifact = {
-        "contract": "waapi-skill.transaction-preview/v1",
+        "contract": "waapi-skill.transaction-preview/v2",
         "request": request,
         "prepared_operation": {
             "contract": "waapi-skill.prepared-operation/v1",
@@ -1698,6 +1799,7 @@ def test_preview_uses_bounded_review_for_set04_scale_artifact_without_losing_sta
         "state": TransactionState.AWAITING_CONFIRMATION.value,
         "executed": False,
         "request": request,
+        "authorization": payload["authorization"],
         "cleanup": payload["cleanup"],
         "next_command": payload["next_command"],
     }
@@ -1786,7 +1888,7 @@ def test_transaction_show_digest_size_is_independent_of_role_and_pre_state_key_c
         for index in range(500)
     }
     artifact = {
-        "contract": "waapi-skill.transaction-preview/v1",
+        "contract": "waapi-skill.transaction-preview/v2",
         "request": {
             "contract": "waapi-skill.operation-request/v1",
             "operation": "object.setNotes",
@@ -1854,14 +1956,14 @@ def test_transaction_show_long_migrate_review_is_materially_smaller_than_legacy_
         "spec_sha256": "a" * 64,
     }
     artifact = {
-        "contract": "waapi-skill.transaction-preview/v1",
+        "contract": "waapi-skill.transaction-preview/v2",
         "request": request,
         "prepared_operation": {
             "dispatch": dispatch,
             "resolved_roles": {},
             "pre_state": {
                 "execution_contract": {
-                    "contract": "waapi-skill.public-execution-contract/v1",
+                    "contract": "waapi-skill.public-execution-contract/v2",
                     "effect": "external",
                     "gateway_commands": ["preview", "confirm", "execute", "verify"],
                     "io_audit": {
@@ -1877,7 +1979,11 @@ def test_transaction_show_long_migrate_review_is_materially_smaller_than_legacy_
                         ],
                     },
                     "request_validation_strength": "partial_reflected_schema",
-                    "requires_confirmation": True,
+                    "requires_authorization": True,
+                    "accepted_authorization_modes": [
+                        "explicit_confirmation",
+                        "policy_authorization",
+                    ],
                     "route": "isolated_transaction",
                     "timeout_seconds": 120.0,
                     "uri": "ak.wwise.cli.migrate",
@@ -1953,7 +2059,7 @@ def test_transaction_show_summary_budget_failure_is_structured_and_never_truncat
     state_dir = tmp_path / "state"
     store = TransactionStore(state_dir)
     artifact = {
-        "contract": "waapi-skill.transaction-preview/v1",
+        "contract": "waapi-skill.transaction-preview/v2",
         "request": {"operation": "object.setNotes"},
         "prepared_operation": {
             "dispatch": {"uri": "ak.wwise.core.object.setNotes", "args": {}, "options": {}},
@@ -2145,8 +2251,514 @@ def test_execute_rechecks_external_never_policy_after_prior_confirmation(tmp_pat
     )
 
     assert exit_code == 2
-    assert payload["message"] == "project_modification_policy=never blocks transaction execution"
+    assert payload["message"] == (
+        "project_modification_policy=read_only blocks transaction execution"
+    )
     assert store.load("tx-policy-drift").state is TransactionState.CONFIRMED
+
+
+def test_preview_apply_read_only_blocks_before_connection_or_state_write(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+
+    exit_code, payload = execute(
+        [
+            "preview",
+            "--apply",
+            "--request-json",
+            json.dumps(create_request()),
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        policy="read_only",
+    )
+
+    assert exit_code == 2
+    assert payload["ok"] is False
+    assert payload["message"] == (
+        "project_modification_policy=read_only blocks transaction "
+        "requested project change"
+    )
+    assert payload["session_context"]["project_modification_policy"] == "read_only"
+    assert not state_dir.exists()
+
+
+def test_preview_apply_rejects_transaction_read_without_persisting_a_transaction(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info()],
+            "ak.wwise.core.getProjectInfo": [project()],
+        }
+    )
+
+    exit_code, payload = execute(
+        [
+            "preview",
+            "--apply",
+            "--request-json",
+            json.dumps(generic_read_transaction_call_request()),
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=client,
+        policy="allow_changes",
+    )
+
+    assert exit_code == 2
+    assert payload["ok"] is False
+    assert payload["message"] == (
+        "preview --apply is reserved for project or process changes; "
+        "omit --apply for this read transaction."
+    )
+    assert [call[0] for call in client.calls] == [
+        "ak.wwise.core.getInfo",
+        "ak.wwise.core.getProjectInfo",
+    ]
+    assert list((state_dir / "transactions").iterdir()) == []
+
+
+def test_read_only_allows_explicitly_confirmed_sealed_read_transaction(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "read-state"
+    transaction = preview(
+        generic_read_transaction_call_request(),
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info()],
+                "ak.wwise.core.getProjectInfo": [project()],
+            }
+        ),
+        policy="read_only",
+    )
+    assert transaction["authorization"] == {
+        "mode": "explicit_confirmation",
+        "policy": "read_only",
+        "explicit_confirmation": False,
+        "notice_required": True,
+        "requires_later_user_message": True,
+    }
+    artifact = TransactionStore(state_dir).load_preview(
+        transaction["transaction_id"]
+    ).artifact
+    assert artifact["execution_policy"]["accepted_authorization_modes"] == [
+        "explicit_confirmation"
+    ]
+
+    confirm(
+        transaction["transaction_id"],
+        transaction["artifact_hash"],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+    execute_client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info()],
+            "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.remote.getAvailableConsoles": [{"consoles": []}],
+        }
+    )
+    execute_exit, executed = execute(
+        ["execute", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=execute_client,
+        policy="read_only",
+    )
+
+    assert execute_exit == 0, executed
+    assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value
+    assert [
+        call[0] for call in execute_client.calls
+    ].count("ak.wwise.core.remote.getAvailableConsoles") == 1
+
+    verify_exit, verified = execute(
+        ["verify", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info()],
+                "ak.wwise.core.getProjectInfo": [project()],
+            }
+        ),
+        policy="read_only",
+    )
+    assert verify_exit == 0, verified
+    assert verified["state"] == TransactionState.RESULT_SCHEMA_CHECKED.value
+    assert verified["result_schema_checked"] is True
+
+
+def test_preview_apply_ask_before_changes_still_requires_show_token_and_confirm(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    transaction = preview(
+        create_request(),
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info()],
+                "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.object.get": create_preview_object_reads(),
+                "ak.wwise.core.object.getTypes": [create_type_catalog()],
+            }
+        ),
+        apply=True,
+        policy="ask_before_changes",
+    )
+
+    transaction_id = transaction["transaction_id"]
+    store = TransactionStore(state_dir)
+    awaiting = store.load_snapshot(transaction_id)
+    assert awaiting.record.state is TransactionState.AWAITING_CONFIRMATION
+    assert transaction["authorization"] == {
+        "mode": "explicit_confirmation",
+        "policy": "ask_before_changes",
+        "explicit_confirmation": False,
+        "notice_required": True,
+        "requires_later_user_message": True,
+    }
+    assert [event["event_type"] for event in awaiting.events] == [
+        "preview_created",
+        "confirmation_requested",
+    ]
+
+    show_exit, shown = execute(
+        ["transaction-show", transaction_id, "--summary-only"],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        policy="ask_before_changes",
+    )
+    assert show_exit == 0, shown
+    token = assert_confirmation_binding(
+        shown,
+        transaction_id=transaction_id,
+        artifact_hash=transaction["artifact_hash"],
+        event_sequence=awaiting.record.event_sequence,
+        last_event_hash=awaiting.record.last_event_hash,
+    )
+    assert shown["next_command"] == expected_transaction_next_command(
+        "confirm",
+        ["confirm", transaction_id, "--confirmation-token", token],
+        requires_explicit_user_confirmation=True,
+    )
+
+    confirm_exit, confirmed = execute(
+        ["confirm", transaction_id, "--confirmation-token", token],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        policy="ask_before_changes",
+    )
+    assert confirm_exit == 0, confirmed
+    assert confirmed["state"] == TransactionState.CONFIRMED.value
+    assert confirmed["next_command"] == expected_transaction_next_command(
+        "execute",
+        ["execute", transaction_id],
+    )
+
+
+def test_preview_apply_allow_changes_records_policy_authority_without_confirmation(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    preview_client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info()],
+            "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": create_preview_object_reads(),
+            "ak.wwise.core.object.getTypes": [create_type_catalog()],
+        }
+    )
+    transaction = preview(
+        create_request(),
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=preview_client,
+        apply=True,
+        policy="allow_changes",
+    )
+
+    transaction_id = transaction["transaction_id"]
+    expected_authorization = {
+        "mode": "policy_authorization",
+        "policy": "allow_changes",
+        "authority": waapi_gateway.POLICY_AUTHORIZATION_AUTHORITY,
+        "explicit_confirmation": False,
+        "notice_required": True,
+    }
+    assert transaction["status"] == TransactionState.POLICY_AUTHORIZED.value
+    assert transaction["authorization"] == expected_authorization
+    assert transaction["agent_result"]["authorization"] == expected_authorization
+    assert "confirmation" not in transaction
+    assert "requires_later_user_message" not in transaction["next_command"]
+    assert transaction["next_command"] == expected_transaction_next_command(
+        "execute",
+        ["execute", transaction_id],
+    )
+
+    store = TransactionStore(state_dir)
+    snapshot = store.load_snapshot(transaction_id)
+    assert snapshot.record.state is TransactionState.POLICY_AUTHORIZED
+    assert snapshot.confirmation_token is None
+    assert [event["event_type"] for event in snapshot.events] == [
+        "preview_created",
+        "policy_authorized",
+    ]
+    assert snapshot.events[-1]["details"] == {
+        "policy": "allow_changes",
+        "authority": waapi_gateway.POLICY_AUTHORIZATION_AUTHORITY,
+        "explicit_confirmation": False,
+    }
+
+    show_exit, shown = execute(
+        ["transaction-show", transaction_id, "--summary-only"],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        policy="allow_changes",
+    )
+    assert show_exit == 0, shown
+    assert "confirmation" not in shown
+    assert shown["authorization"] == {
+        **expected_authorization,
+        "current_policy": "allow_changes",
+    }
+    assert shown["next_command"] == expected_transaction_next_command(
+        "execute",
+        ["execute", transaction_id],
+    )
+    assert "requires_later_user_message" not in shown["next_command"]
+    assert not any(
+        call[0] == "ak.wwise.core.object.create" for call in preview_client.calls
+    )
+
+
+def test_policy_authorized_allow_changes_executes_once_and_can_verify(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    transaction = preview(
+        create_request(),
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info()],
+                "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.object.get": create_preview_object_reads(),
+                "ak.wwise.core.object.getTypes": [create_type_catalog()],
+            }
+        ),
+        apply=True,
+        policy="allow_changes",
+    )
+    execute_client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info()],
+            "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [
+                {"return": [parent_row()]},
+                {"return": []},
+                {"return": []},
+            ],
+            "ak.wwise.core.object.create": [
+                {"id": CREATED_GUID, "name": "CreatedByGateway"}
+            ],
+        }
+    )
+
+    execute_exit, executed = execute(
+        ["execute", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=execute_client,
+        policy="allow_changes",
+    )
+
+    assert execute_exit == 0, executed
+    assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value
+    assert executed["executed"] is True
+    assert [
+        call[0] for call in execute_client.calls
+    ].count("ak.wwise.core.object.create") == 1
+    assert executed["next_command"] == expected_transaction_next_command(
+        "verify",
+        ["verify", transaction["transaction_id"]],
+    )
+
+    verify_client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info()],
+            "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [created_row()]}],
+        }
+    )
+    verify_exit, verified = execute(
+        ["verify", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=verify_client,
+        policy="allow_changes",
+    )
+
+    assert verify_exit == 0, verified
+    assert verified["state"] == TransactionState.VERIFIED.value
+    assert verified["verified"] is True
+    assert not any(
+        call[0] == "ak.wwise.core.object.create" for call in verify_client.calls
+    )
+    events = TransactionStore(state_dir).read_events(transaction["transaction_id"])
+    assert [event["event_type"] for event in events] == [
+        "preview_created",
+        "policy_authorized",
+        "execution_started",
+        "execution_completed",
+        "verification_recorded",
+    ]
+
+
+def test_policy_authorized_allow_to_ask_drift_requires_repreview_without_business_dispatch(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    transaction = preview(
+        create_request(),
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info()],
+                "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.object.get": create_preview_object_reads(),
+                "ak.wwise.core.object.getTypes": [create_type_catalog()],
+            }
+        ),
+        apply=True,
+        policy="allow_changes",
+    )
+    write_gateway_policy(tmp_path, "ask_before_changes")
+    execute_client = FakeClient(
+        {"ak.wwise.core.getInfo": [live_info()]}
+    )
+
+    exit_code, payload = execute(
+        ["execute", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=execute_client,
+        policy="ask_before_changes",
+    )
+
+    assert exit_code == 2
+    assert payload["ok"] is False
+    assert payload["status"] == "repreview_required"
+    assert payload["state"] == TransactionState.REPREVIEW_REQUIRED.value
+    assert payload["error_code"] == "PROJECT_MODIFICATION_POLICY_CHANGED"
+    assert payload["executed"] is False
+    assert payload["authorization"]["current_policy"] == "ask_before_changes"
+    assert [call[0] for call in execute_client.calls] == [
+        "ak.wwise.core.getInfo"
+    ]
+    assert TransactionStore(state_dir).load(
+        transaction["transaction_id"]
+    ).state is TransactionState.REPREVIEW_REQUIRED
+
+
+def test_policy_authorized_allow_to_read_only_drift_blocks_before_connection(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    transaction = preview(
+        create_request(),
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info()],
+                "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.object.get": create_preview_object_reads(),
+                "ak.wwise.core.object.getTypes": [create_type_catalog()],
+            }
+        ),
+        apply=True,
+        policy="allow_changes",
+    )
+    write_gateway_policy(tmp_path, "read_only")
+    store = TransactionStore(state_dir)
+    events_before = store.read_events(transaction["transaction_id"])
+
+    exit_code, payload = execute(
+        ["execute", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        policy="read_only",
+    )
+
+    assert exit_code == 2
+    assert payload["ok"] is False
+    assert payload["message"] == (
+        "project_modification_policy=read_only blocks transaction execution"
+    )
+    assert payload["session_context"]["project_modification_policy"] == "read_only"
+    assert store.load(
+        transaction["transaction_id"]
+    ).state is TransactionState.POLICY_AUTHORIZED
+    assert store.read_events(transaction["transaction_id"]) == events_before
+
+
+def test_preview_without_apply_stays_review_only_under_allow_changes(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    transaction = preview(
+        create_request(),
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info()],
+                "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.object.get": create_preview_object_reads(),
+                "ak.wwise.core.object.getTypes": [create_type_catalog()],
+            }
+        ),
+        policy="allow_changes",
+    )
+
+    assert transaction["status"] == TransactionState.AWAITING_CONFIRMATION.value
+    assert transaction["change_requested"] is False
+    assert transaction["authorization"] == {
+        "mode": "explicit_confirmation",
+        "policy": "allow_changes",
+        "explicit_confirmation": False,
+        "notice_required": True,
+        "requires_later_user_message": True,
+    }
+    assert transaction["next_command"] == expected_transaction_next_command(
+        "transaction-show",
+        [
+            "transaction-show",
+            transaction["transaction_id"],
+            "--summary-only",
+        ],
+        requires_later_user_message=True,
+    )
+    snapshot = TransactionStore(state_dir).load_snapshot(
+        transaction["transaction_id"]
+    )
+    assert snapshot.record.state is TransactionState.AWAITING_CONFIRMATION
+    assert snapshot.confirmation_token is not None
+    assert [event["event_type"] for event in snapshot.events] == [
+        "preview_created",
+        "confirmation_requested",
+    ]
 
 
 def test_confirm_rejects_tampered_hash_and_preserves_awaiting_state(tmp_path: Path) -> None:
@@ -2214,6 +2826,7 @@ def test_preview_live_resolves_and_persists_immutable_awaiting_artifact_with_ttl
         "state": TransactionState.AWAITING_CONFIRMATION.value,
         "executed": False,
         "request": stored.artifact["request"],
+        "authorization": payload["authorization"],
         "cleanup": payload["cleanup"],
         "next_command": payload["next_command"],
     }
@@ -2256,6 +2869,7 @@ def test_preview_agent_result_preserves_quotes_backslashes_and_unicode_from_arti
         "state": TransactionState.AWAITING_CONFIRMATION.value,
         "executed": False,
         "request": stored_request,
+        "authorization": payload["authorization"],
         "cleanup": payload["cleanup"],
         "next_command": payload["next_command"],
     }
@@ -4419,7 +5033,7 @@ def test_confirmed_named_soundbank_transaction_stays_confirmed_on_remote_execute
         },
     }
     artifact = {
-        "contract": "waapi-skill.transaction-preview/v1",
+        "contract": "waapi-skill.transaction-preview/v2",
         "request": request,
         "prepared_operation": {
             "contract": "waapi-skill.prepared-operation/v1",

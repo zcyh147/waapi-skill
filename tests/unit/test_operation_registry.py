@@ -177,7 +177,7 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
             },
         },
     }
-    assert "execution is bound to immutable preview confirmation" in specs["waapi.call"]["constraints"]
+    assert "execution is bound to immutable preview authorization" in specs["waapi.call"]["constraints"]
     assert specs["object.create"]["implemented"] is True
     object_create_type = specs["object.create"]["argument_contract"]["properties"]["type"]
     child_type = specs["object.create"]["argument_contract"]["properties"]["children"]["items"]["properties"]["type"]

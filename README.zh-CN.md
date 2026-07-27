@@ -70,8 +70,8 @@
 这里支持的是：
 
 - 普通 inspection 请求优先走 read-only 路径
-- preview-then-confirm 的 mutation 流程
-- 由 Gateway 签发、绑定不可变 transaction preview 的确认 token
+- 三种直观的修改模式：`read_only`、`ask_before_changes`、`allow_changes`
+- 不可变 preview 会绑定 Gateway 确认 token，或独立、可审计的策略授权
 - bounded destructive opt-in
 - 执行后 verification / readback
 
@@ -140,16 +140,16 @@ fake client，不是新增的真实业务修改证据。
 这个 catalog 选项不能覆盖实时宿主探测得到的 profile。
 
 两套 profile 都通过 fixed command、bounded direct call、bounded topic
-wait、确认式 transaction、隔离 I/O transaction 或同连接 Undo Group
+wait、策略约束 transaction、隔离 I/O transaction 或同连接 Undo Group
 执行。Lua 文件路由只接受已经存在并重新绑定路径、大小和哈希的 `.lua`
 文件；Wwise 2025.1 另有精确 inline source 路由。`source_authority`
 只是调用方声明，不是运行时对对话来源的证明；Skill 不会生成、修复或包装
 Lua。Private debug API 使用有界读取/订阅或明确的不可重试 transaction，
 restart/assert/crash 会以生命周期不确定状态终止。
 
-命名操作层还为对象创建与修改、插件创建、RTPC/平台 link、音频导入、SoundBank 工作流、Lua/debug、截图，以及 Authoring UI command 的执行、注册和注销提供闭合、按版本约束的业务合同。`object.createPlugin` 只接受明确的 class ID 和闭合的 Source/Effect 描述；`2022.1` 使用固定 Effect 引用，后续版本追加 EffectSlot，并通过实时读回验证新建插件。UI command execute 只能验证反射出的空结果结构，不能声称任意 GUI 或工程效果已经验证；register/unregister 还会验证实时命令 ID 的存在状态。Wwise `2021.1` 的 SoundBank 生成只从实时 Project 的 `filePath`、`workunitIsDirty` 和受约束、带哈希、严格解析的 `.wproj` 获取工程上下文；后续版本绑定实时 `core.getProjectInfo`。这些路由把不可变 preview 绑定到之后的确认，并使用各操作能提供的最强读回，而不是只相信 WAAPI 返回成功。一旦 URI 已有实现完成的命名操作，generic `waapi.call` 会以 `DEDICATED_OPERATION_REQUIRED` 拒绝该 URI，避免原始 payload 绕过专用合同。
+命名操作层还为对象创建与修改、插件创建、RTPC/平台 link、音频导入、SoundBank 工作流、Lua/debug、截图，以及 Authoring UI command 的执行、注册和注销提供闭合、按版本约束的业务合同。`object.createPlugin` 只接受明确的 class ID 和闭合的 Source/Effect 描述；`2022.1` 使用固定 Effect 引用，后续版本追加 EffectSlot，并通过实时读回验证新建插件。UI command execute 只能验证反射出的空结果结构，不能声称任意 GUI 或工程效果已经验证；register/unregister 还会验证实时命令 ID 的存在状态。Wwise `2021.1` 的 SoundBank 生成只从实时 Project 的 `filePath`、`workunitIsDirty` 和受约束、带哈希、严格解析的 `.wproj` 获取工程上下文；后续版本绑定实时 `core.getProjectInfo`。这些路由把不可变 preview 绑定到显式确认或持久化的 `allow_changes` 策略授权，并使用各操作能提供的最强读回，而不是只相信 WAAPI 返回成功。一旦 URI 已有实现完成的命名操作，generic `waapi.call` 会以 `DEDICATED_OPERATION_REQUIRED` 拒绝该 URI，避免原始 payload 绕过专用合同。
 
-当前固定的纯程序 gate 包含 **1918 项程序测试**，其中每一个已覆盖的默认 profile 版本/API 行都有一项已封装路由合同用例，并另外覆盖 Authoring overlay/UI command、可配置和显式不限时的 Topic wait 生命周期、gateway 会话提示上下文和上述命名操作的合同/验证矩阵。它验证 packaged 路由、schema、安全边界、I/O 约束、transaction 行为、fake dispatch 执行和确定性的 onboarding 信息；这不等于已经在真实 Wwise 进程中逐一运行了全部 808 行。另有一轮关闭 memory 的 `h80-release-c38` 真实 Wwise campaign，已通过全部 80 个获批重型 API 场景（2022.1 为 70 个，2024.1 和 2025.1 各 5 个）；这份证据只覆盖这些场景及其封存候选版本，不代表整个接口都做过真实语义测试。完整口径见[五版本覆盖契约](./skills/waapi-skill/references/waapi-coverage.md)。
+当前固定的纯程序 gate 包含 **1932 项程序测试**，其中每一个已覆盖的默认 profile 版本/API 行都有一项已封装路由合同用例，并另外覆盖 Authoring overlay/UI command、可配置和显式不限时的 Topic wait 生命周期、三种修改策略分支（包括 `read_only` 下由目录合同证明的只读 transaction）、gateway 会话提示上下文和上述命名操作的合同/验证矩阵。它验证 packaged 路由、schema、安全边界、I/O 约束、transaction 行为、fake dispatch 执行和确定性的 onboarding 信息；这不等于已经在真实 Wwise 进程中逐一运行了全部 808 行。对于当前修改策略候选版本，关闭 memory 的 `modification_policy_9-c7` campaign 已通过全部 9 个 Wwise 2022.1 任务：`read_only`、提问式 `ask_before_changes` 和同回合执行的 `allow_changes` 各独立重复 3 次。6 个获准写入的任务都创建并验证了 7 个对象和 46 项业务断言，所有源工程哈希保持不变，sandbox 也全部清理。更早的 `h80-release-c38` 真实 Wwise campaign 另行通过了全部 80 个获批重型 API 场景（2022.1 为 70 个，2024.1 和 2025.1 各 5 个）；这份历史证据只覆盖那些场景及其封存候选版本，不代表整个接口或当前修改策略候选版本都做过真实语义测试。完整口径见[五版本覆盖契约](./skills/waapi-skill/references/waapi-coverage.md)。
 
 ---
 
@@ -162,7 +162,7 @@ restart/assert/crash 会以生命周期不确定状态终止。
 - **按需加载资源**，而不是默认把大范围内容长期挂在上下文里
 - **版本化运行资源**，覆盖 `2021.1` 到 `2025.1`
 - **skill-local 的 Python 工作流**，不需要单独起 server
-- **更明确的 preview / confirm authoring 流程**
+- **更明确的三模式 preview / authoring 流程**
 - **仓库内测试体系更完整**，包括 sandbox 和 semantic validation
 
 ### MCP server 可能更适合的地方
@@ -205,7 +205,7 @@ restart/assert/crash 会以生命周期不确定状态终止。
 1. 检测或选择 Wwise 版本
 2. 为意图选择固定的 packaged gateway 路由
 3. 执行直接 read-only 命令，或生成不可变 mutation preview
-4. 只通过闭合 transaction 路由确认和执行
+4. 通过闭合 transaction 路由应用 `read_only`、`ask_before_changes` 或 `allow_changes`
 5. 对结果做 verification
 
 ### 优先支持 read-first 的安全 inspection
@@ -262,6 +262,15 @@ $HOME/.config/waapi-skill/config.json
 - `waapi_port`
 - `project_modification_policy`
 
+三种规范模式分别是：
+
+- `read_only`：禁止工程修改，但仍允许读取，包括已封装、仅接受显式确认的只读 transaction。
+- `ask_before_changes`（默认）：先说明将修改什么、预期得到什么，再询问用户是否执行。
+- `allow_changes`：先告知用户，然后无需第二条确认消息，直接执行不可变 preview 并验证。
+
+旧配置值 `never`、`preview_then_confirm`、`allow_with_notice` 仍可作为迁移
+别名读取，但新的输出和保存只使用上述规范名称。
+
 ### 3. 所有 read-only 工作都走 gateway
 
 无需拼装 WAAPI 代码即可检查实时版本/工程并查询对象：
@@ -275,28 +284,32 @@ python scripts/run.py gateway.py query-object \
 
 ### 4. 工程修改必须走 closed transaction lane
 
-先查询 packaged request contract。`preview` 会返回不可变 transaction id 和供审核的完整
-artifact hash。用户在后续消息中确认该 preview 后，先用
-`transaction-show --summary-only` 重新读取已保存的 transaction；其结果会提供一个与当前状态绑定的短
-`confirmation.token` 和准确的下一条命令。正常确认流程使用这个 token：
+先查询 packaged request contract。实际修改使用 `preview --apply`，它会返回
+不可变 transaction id 和完整 artifact hash。`ask_before_changes` 会停在
+`awaiting_confirmation`，Agent 先说明预期结果并询问用户；后续的
+`transaction-show --summary-only` 会返回与当前状态绑定的确认 token。
+`allow_changes` 则返回 `policy_authorized` 和准确的 `execute` 命令，Agent 告知
+后可在同一轮继续。`read_only` 会阻止 `--apply`。
 
 ```bash
 python scripts/run.py gateway.py operation-schema object.setNotes
-python scripts/run.py gateway.py preview \
-  --request-json '{"contract":"waapi-skill.operation-request/v1","operation":"object.setNotes","arguments":{"object":{"kind":"path","value":"\\Events\\Default Work Unit\\Target"},"value":"Reviewed"}}'
+python scripts/run.py gateway.py preview --apply \
+  --request-json '{"contract":"waapi-skill.operation-request/v1","version":"2022.1","operation":"object.setNotes","arguments":{"object":{"kind":"path","value":"\\Events\\Default Work Unit\\Target"},"value":"Reviewed"}}'
 python scripts/run.py gateway.py transaction-show <transaction-id> --summary-only
 python scripts/run.py gateway.py confirm <transaction-id> --confirmation-token <confirmation-token>
 python scripts/run.py gateway.py execute <transaction-id>
 python scripts/run.py gateway.py verify <transaction-id>
 ```
 
-每个阶段应分开执行，并直接使用完整返回的 `next_command.shell_command`，不要自行重建命令。
+每个返回阶段应分开执行，并直接使用完整的 `next_command.shell_command`，不要自行重建命令。
+`transaction-show` 和 `confirm` 属于 `ask_before_changes`；`allow_changes`
+从 `policy_authorized` 直接进入 `execute`。
 `confirm <transaction-id> --artifact-hash <full-artifact-hash>` 只作为旧 transaction 和程序兼容入口保留；
 新的 agent 工作流应使用 `transaction-show` 返回的 token。
 
 Gateway 是唯一公开接口。完成普通 Wwise 任务时，不要 import 内部 runtime module、构造 `WaapiClient`、创建一次性 helper script，也不要使用 inline Python。如果 gateway 返回没有 packaged route，就直接报告 unsupported boundary，不要自行合成代码。
 
-Manifest 反射只用于发现能力，不等于授权执行。generic `call` 只开放经过 immutable review、递归校验且结果有界的读取集合；两个零输入反射列表只是其中的快速路径。Wwise `2025.1` 的 Media Pool 查询会先通过 `mediaPool.getFields` 发现精确字段名，再调用 `mediaPool.get`，并强制限制最多 200 个结果、16 个过滤器、8 个数据库和 32 个唯一返回字段。更广的读取必须进入确认式 transaction，fixed command 和 bounded topic wait 仍只开放精确 allowlist。新的或尚未 review 的 function/topic 即使名字以 `get`、`verify`、`dump` 开头也会 fail closed；`--dry-run` 不能绕过 fixed、transaction、topic 或 unsupported 路由边界。
+Manifest 反射只用于发现能力，不等于授权执行。generic `call` 只开放经过 immutable review、递归校验且结果有界的读取集合；两个零输入反射列表只是其中的快速路径。Wwise `2025.1` 的 Media Pool 查询会先通过 `mediaPool.getFields` 发现精确字段名，再调用 `mediaPool.get`，并强制限制最多 200 个结果、16 个过滤器、8 个数据库和 32 个唯一返回字段。更广的读取必须进入已授权 transaction，fixed command 和 bounded topic wait 仍只开放精确 allowlist。新的或尚未 review 的 function/topic 即使名字以 `get`、`verify`、`dump` 开头也会 fail closed；`--dry-run` 不能绕过 fixed、transaction、topic 或 unsupported 路由边界。
 
 ---
 
@@ -304,7 +317,7 @@ Manifest 反射只用于发现能力，不等于授权执行。generic `call` �
 
 - destructive operations 默认阻止
 - project-changing steps 应先 preview 再执行
-- confirmation 必须匹配当前不可变 preview artifact
+- confirmation 或策略授权必须匹配当前不可变 preview artifact
 - unsupported runtime boundary 要清楚失败，而不是假装支持
 - reflected function/topic 必须先有显式 reviewed public route
 - evidence、runtime data、local auth state 默认保持本地
