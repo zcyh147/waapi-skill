@@ -393,6 +393,25 @@ def test_operate_lane_uses_real_transaction_cli_in_order() -> None:
     assert "Gateway-owned short token" in OPERATE
     assert "Do not generate, shorten, validate from spelling, reconstruct, or substitute the token" in OPERATE
     assert "contract `waapi-skill.confirmation-binding/v1`" in OPERATE
+    assert (
+        "Hide transaction ids, hashes, tokens, state labels, and commands from "
+        "normal prose"
+    ) in SKILL
+    flattened_operate = " ".join(OPERATE.split())
+    assert (
+        "transaction ids, artifact hashes, confirmation tokens, internal state "
+        "labels, and returned commands out of ordinary user prose"
+    ) in flattened_operate
+    assert "raw, machine-readable, or diagnostic transaction data" in flattened_operate
+    assert "summarize the transaction id, full artifact hash" not in OPERATE
+    assert "with the transaction id, full artifact hash" not in OPERATE
+    assert "report the transaction id" not in OPERATE
+    assert "do not ask a normal user to provide an internal transaction id" in OPERATE
+    assert "The labels below are internal routing, not normal user-facing copy" in OPERATE
+    assert "Do not hide the cleanup obligation or uncertainty" in OPERATE
+    assert (
+        "action may have reached Wwise and its outcome cannot currently be confirmed"
+    ) in OPERATE
 
 
 def test_operation_schema_owns_the_complete_versioned_request_envelope() -> None:
@@ -1097,7 +1116,7 @@ def test_lua_source_authority_is_explicitly_a_caller_assertion_not_proof() -> No
 
 def test_transaction_runtime_invariants_prevent_confirmation_target_and_retry_drift() -> None:
     for phrase in (
-        "full SHA-256 remains visible for human review",
+        "full SHA-256 remains in the structured Gateway result",
         "exact short token returned by `transaction-show`",
         "token binds the stored artifact and transaction state",
         "does not accept replacement JSON",
