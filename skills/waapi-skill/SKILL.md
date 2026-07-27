@@ -57,6 +57,8 @@ python scripts/run.py gateway.py metadata types --summary-only
 python scripts/run.py gateway.py wait-topic <topic-uri>
 python scripts/run.py gateway.py --timeout <positive-finite-seconds> wait-topic <topic-uri> --event-count <1..64> --match-json '<object>'
 python scripts/run.py gateway.py wait-topic <topic-uri> --no-timeout
+python scripts/run.py gateway.py stream-topic <topic-uri> --options-json '<object>' --match-json '<object>'
+python scripts/run.py gateway.py --timeout <positive-finite-seconds> stream-topic <topic-uri> --match-json '<object>'
 python scripts/run.py gateway.py operations
 python scripts/run.py gateway.py operation-schema object.create
 python scripts/run.py gateway.py operation-schema object.set
@@ -84,35 +86,35 @@ Use exactly one command for the corresponding intent:
 | object lookup by path, id, type, search, or query object | `query-object` |
 | object type/property/reference metadata | `metadata` |
 | wait for one or a fixed bounded count of topic events | `wait-topic` |
+| explicitly stream topic events continuously | `stream-topic` |
 | inspect project-changing operation support | `operations` / `operation-schema` |
 
-Each command prints one JSON document. Summarize its actual values in the user's language. Do not paste the whole JSON unless asked. Every result includes a bounded `session_context`; use it for the one-time conversation introduction above and do not reconstruct those settings from prose, configuration files, or assumptions.
+Every command except `stream-topic` prints one JSON document; streaming prints compact flushed NDJSON event records and one terminal record. Summarize actual values; show full JSON only if asked. Every result includes bounded `session_context`; use it for the one-time introduction and never reconstruct it.
 
-Before invoking `wait-topic`, tell the user the effective waiting policy in one
-natural sentence. When the user did not specify a duration, say that this
-invocation will use the ordinary 10-second default and that they can request a
-different duration. The gateway's omitted-duration default remains 10 seconds
-for every Topic. The Skill-level exception is
-`ak.wwise.core.soundbank.generated`: when the user omits a duration, explicitly
-pass gateway-global `--timeout 120` and report that actual 120-second wait
-before invoking it. When the user supplies a positive finite duration, preserve
-it exactly (converting units to seconds without rounding) in the gateway-global
-`--timeout <positive-finite-seconds>` position before `wait-topic`; do not clamp
-it to 10 or 120 seconds. When the user explicitly requests no time limit, use
-the `wait-topic` subcommand flag `--no-timeout` and say that monitoring
-continues until the requested 1–64 matching events have been collected or the
-user cancels it. `--no-timeout` removes only the waiting deadline: it is not an
-unlimited output stream, and the event-count and result-size bounds still
-apply. Never combine `--timeout` with `--no-timeout`, and never infer an
-unlimited wait from vague wording such as “monitor this” or “keep an eye on
-this.”
+Route ordinary vague “subscribe”, “listen”, or “monitor” wording to
+`wait-topic`, not streaming. Before invoking it, tell the user the effective
+policy naturally. Its ordinary omitted-duration default is 10 seconds; the
+Skill exception for `ak.wwise.core.soundbank.generated` explicitly passes and
+reports `--timeout 120`. Preserve a user-supplied positive finite duration
+exactly (converting units to seconds without rounding) in the gateway-global
+`--timeout <positive-finite-seconds>` position before `wait-topic`. Only an
+explicit no-time-limit bounded-wait request selects the `wait-topic` subcommand
+flag `--no-timeout`; it waits until 1–64 requested matches or cancellation but
+is not an unlimited output stream. Never combine those flags.
 
-For example, natural Chinese wording for an ordinary wait is: “好的，我会监听
-`<topic>`。这次使用默认的 10 秒等待时间；如果需要，你可以指定更长时间，
-或明确让我不限时等待。” For an explicit no-time-limit request, say:
-“我会不限时监听 `<topic>`，直到收齐 `<N>` 个匹配事件或你让我停止；事件
-数量和返回结果仍然有界。” Adapt the topic, count, language, and actual
-duration instead of copying placeholders.
+Select `stream-topic` only for explicit streaming or persistent intent such as
+“stream”, “continuous”, “persistent”, “实时逐条”, “流式”, “持续”, “一直监听”,
+or “不要收到后退出”. It creates one persistent subscription, emits each matched
+event immediately as a compact flushed JSON record, and by default runs until
+cancellation; a gateway-global `--timeout <positive-finite-seconds>` gives it a
+finite duration. Pass reviewed `--options-json` and recursive `--match-json`
+when needed. Each event is publish-schema and size validated; a bounded buffer
+fails closed on overflow, cleanup always attempts unsubscribe, and a terminal
+record reports why the stream ended.
+
+For example: “好的，我会监听 `<topic>`。这次使用默认的 10 秒等待时间；你也
+可以指定时长。” For explicit streaming: “我会持续流式监听 `<topic>`，逐条
+报告事件，直到你让我停止。”
 
 Exact reflection-call fast route: when the user explicitly asks to call `ak.wwise.waapi.getFunctions` or `ak.wwise.waapi.getTopics` with empty args and options, run exactly one matching `call` command from the table, replacing `<supported-version>` with the exact requested or connected Wwise version. Do not run `describe` or `capabilities` first, and do not read the query reference before or after the call. The reviewed route is already fixed by this Skill. If that one gateway invocation is rejected or fails, stop and report the result; never retry it with another command.
 
@@ -134,7 +136,7 @@ Read: `references/waapi-setup.md`
 
 ### Query lane
 
-Use query for read-only inspection: selection, object lookup, hierarchy browsing, property reads, WAQL-shaped discovery, project facts, bounded topic waits, and other non-mutating inspection.
+Use query for read-only inspection: selection, object lookup, hierarchy browsing, property reads, WAQL-shaped discovery, project facts, topic waits/streams, and other non-mutating inspection.
 
 Classify the requested action, not background wording. A request to listen for, wait for, or report a SoundBank generation notification is a query-only topic task even when it says that a Bank is being generated or rebuilt and even when an old output file already exists. It never authorizes `soundbank.generate`, an operation-schema lookup, or another mutation.
 
@@ -174,7 +176,7 @@ For a new change request with no existing transaction, use the named semantic op
 
 Except for `ak.wwise.cli.migrate`'s terminal `execute`, `verify` is the terminal authority for the selected contract: dedicated operations return their live readback, while generic `waapi.call` returns reflected result-schema evidence. After `verify` returns `verified` or another terminal verification state, stop the gateway sequence and report exactly that evidence. Do not add `query-object`, `call`, or another gateway command to double-check the same mutation. For an original request that already closed and ordered multiple independent transactions, apply the same configured policy independently to each item; never infer, reorder, or add a transaction.
 
-In ordinary agent use, omit `--state-dir` and let the caller or broker inject the transaction store implicitly. Never run `env`, `printenv`, shell expansion, or another environment-inspection command to discover `WAAPI_SKILL_STATE_DIR`, and never guess or search for a state directory. Pass `--state-dir` only when the user or trusted caller explicitly supplied a trusted absolute path. If the gateway returns a structured state-directory error or boundary, report it and stop instead of probing the environment or filesystem.
+In ordinary agent use, omit `--state-dir`: the Gateway owns a deterministic external transaction-store default. Never run `env`, `printenv`, shell expansion, or another probe to discover `WAAPI_SKILL_STATE_DIR`; never ask a normal user for this implementation path. Pass `--state-dir` only when the user or trusted caller explicitly supplied a trusted absolute override, and reuse it unchanged.
 
 Fast route from this entry file:
 
@@ -193,7 +195,7 @@ The runtime loads `resources/manifest/<version>/`, `resources/semantic/<version>
 - Do not invent fixed API maps in the prompt when the runtime resources can resolve the correct URI.
 - Never write disposable business logic for a user Wwise task. No heredoc script, inline Python, new `.py`/`.js`/`.sh` helper, or direct client construction.
 - `scripts/run.py` and the environment helper accept only their immutable packaged script allowlist. Never attempt another runner target or temporary script path.
-- The generic `call` path accepts only catalog rows whose preferred route is `manifest_dispatch`. Fixed functions require their packaged command, reviewed topics require `wait-topic`, and each `transaction_operation` row requires immutable preview plus confirmation or policy authorization through exactly one declared closed lane: a dedicated named operation when present, `waapi.undoGroup` for the three Undo members, and `waapi.call` only when the catalog explicitly lists it. `--dry-run`, `--allow-destructive`, and `WWISE_DESTRUCTIVE=1` do not bypass those route decisions.
+- The generic `call` path accepts only catalog rows whose preferred route is `manifest_dispatch`. Fixed functions require their packaged command, reviewed topics require `wait-topic` or `stream-topic`, and each `transaction_operation` row requires immutable preview plus confirmation or policy authorization through exactly one declared closed lane: a dedicated named operation when present, `waapi.undoGroup` for the three Undo members, and `waapi.call` only when the catalog explicitly lists it. `--dry-run`, `--allow-destructive`, and `WWISE_DESTRUCTIVE=1` do not bypass those route decisions.
 - Lua is available only through its dedicated policy-gated operations: an existing non-symlink `.lua` file canonically inside `io_root`, or an exact inline string explicitly supplied by the user in Wwise 2025.1. `source_authority` is a caller assertion in the request protocol, not provenance the runtime can independently prove; set it only when the current user message actually supplies the complete code or exact file path. Never generate, repair, wrap, augment, or hide Lua for the user. Loader paths/modules and CLI project/migration switches remain closed, source size/hash is rebound before execution, side effects are not inferred or rolled back, and no Lua operation is retried.
 - Private debug reads use only `debug-wal-tree`, `debug-validate-call`, or bounded `wait-topic ak.wwise.debug.assertFailed`. Process-wide mode changes require their dedicated policy-gated operations. `debug.restartWaapiServers`, `debug.testAssert`, and `debug.testCrash` require exact dangerous-action acknowledgement plus later confirmation even under `allow_changes`; execution is once-only and terminal indeterminate with explicit disconnect/process expectations, no retry, reconnect, or generic verification.
 - Raw or unrestricted UI-command registration/execution and model-supplied CLI custom command hooks remain blocked. Only the closed Authoring-host routes above are available. A current live `getCommands` result—not the packaged observed inventory—is the command-ID authority. Program/Lua registration paths and content are rebound, but the `user_supplied_verbatim` value remains a caller assertion that the runtime cannot independently prove. Isolated transactions audit absolute inputs and confine every explicit write path below `io_root`; any implicit Wwise-managed write is disclosed as unproven, never misreported as confined.
@@ -204,6 +206,6 @@ The runtime loads `resources/manifest/<version>/`, `resources/semantic/<version>
 ## Detailed references
 
 - `references/waapi-setup.md` — connection, version, config, and status troubleshooting
-- `references/waapi-query.md` — read-only inspection, selection/object lookup, bounded topic waits, and no-code failure rules
+- `references/waapi-query.md` — read-only inspection, selection/object lookup, topic waits/streams, and no-code failure rules
 - `references/waapi-operate.md` — closed operation JSON, durable policy-aware preview/authorize/execute/verify flow, retry rules, and explicit boundaries
 - `references/waapi-coverage.md` — exact five-version counts, exclusions, route meanings, and program-test scope

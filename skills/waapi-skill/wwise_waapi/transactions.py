@@ -740,7 +740,7 @@ class TransactionStore:
         )
 
     def _ensure_store_directories(self) -> None:
-        self.state_dir.mkdir(parents=True, exist_ok=True)
+        self.state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         for directory in (self.transactions_dir, self.locks_dir):
             if directory.is_symlink():
                 raise StateCorruptionError(f"Store directory cannot be a symlink: {directory}")

@@ -150,7 +150,7 @@ After the one complete read of this reference, do not reread any line range with
 
 Derive the absolute Skill directory from the injected absolute `SKILL.md` locator and invoke its absolute `scripts/run.py` path in every actual tool call. The snippets below retain `scripts/run.py` only as readable shorthand; never execute that relative spelling in an automated agent run.
 
-In ordinary agent use, omit `--state-dir` on every gateway command and let the caller or broker inject the transaction store implicitly. Never run `env`, `printenv`, shell expansion, or another environment-inspection command to discover `WAAPI_SKILL_STATE_DIR`; do not read, guess, or search for its value. Pass `--state-dir` only when the user or trusted caller explicitly supplied a trusted absolute path, and then reuse that exact path unchanged. If no implicit store is available, let the gateway return its structured state-directory error or boundary, report it, and stop without probing the environment or filesystem.
+In ordinary agent use, omit `--state-dir` on every gateway command: the Gateway owns a deterministic external transaction-store default. Never run `env`, `printenv`, shell expansion, or another environment-inspection command to discover `WAAPI_SKILL_STATE_DIR`; do not read, guess, or search for its value, and never ask a normal user to provide this implementation path. Pass `--state-dir` only when the user or trusted caller explicitly supplied a trusted absolute override, then reuse that exact path unchanged. Explicit caller flags retain priority over the Gateway-owned default.
 
 For an actual, unambiguous change request:
 

@@ -448,6 +448,7 @@ run_program() {
     tests/unit/test_transaction_gateway.py::test_preview_apply_rejects_transaction_read_without_persisting_a_transaction
     tests/unit/test_transaction_gateway.py::test_read_only_allows_explicitly_confirmed_sealed_read_transaction
     tests/unit/test_transaction_gateway.py::test_preview_apply_ask_before_changes_still_requires_show_token_and_confirm
+    tests/unit/test_transaction_gateway.py::test_ask_before_changes_uses_same_home_state_store_without_broker_injection
     tests/unit/test_transaction_gateway.py::test_preview_apply_allow_changes_records_policy_authority_without_confirmation
     tests/unit/test_transaction_gateway.py::test_policy_authorized_allow_changes_executes_once_and_can_verify
     tests/unit/test_transaction_gateway.py::test_policy_authorized_allow_to_ask_drift_requires_repreview_without_business_dispatch

@@ -134,7 +134,12 @@ from wwise_waapi.safety import (  # noqa: E402  # pyright: ignore[reportMissingI
     EXPLICIT_UNSUPPORTED_TOPIC_URIS,
     REVIEWED_TOPIC_URIS,
 )
-from wwise_waapi.subscriptions import MAX_WAIT_EVENT_COUNT  # noqa: E402  # pyright: ignore[reportMissingImports]
+from wwise_waapi.subscriptions import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    DEFAULT_LISTENER_QUEUE_SIZE,
+    MAX_WAIT_EVENT_COUNT,
+    SubscriptionManager,
+    payload_matches,
+)
 from wwise_waapi.transaction_locality import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     is_loopback_waapi_host,
     local_filesystem_path_roles,
@@ -200,6 +205,7 @@ OFFLINE_COMMANDS = frozenset(
     }
 )
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
+TOPIC_STREAM_RECORD_CONTRACT = "waapi-skill.topic-stream/v1"
 GATEWAY_CONFIG_CONTRACT = "waapi-skill.config/v2"
 GATEWAY_SESSION_CONTEXT_CONTRACT = "waapi-skill.session-context/v2"
 GATEWAY_SESSION_INTRODUCTION_CONTRACT = "waapi-skill.session-introduction/v2"
@@ -225,6 +231,8 @@ NAMED_OPERATION_WIRE_PATH_URIS: Mapping[str, str] = {
 PROJECT_IDENTITY_FIELDS = ("id", "name", "path")
 EXPANDING_QUERY_SELECTS = frozenset({"descendants", "ancestors", "referencesTo", "children"})
 MAX_GATEWAY_RESULT_JSON_BYTES = 1024 * 1024
+TOPIC_STREAM_POLL_SECONDS = 0.05
+TOPIC_STREAM_HEALTH_INTERVAL_SECONDS = 5.0
 MAX_GATEWAY_JSON_INPUT_BYTES = 256 * 1024
 MAX_GATEWAY_JSON_DEPTH = 32
 MAX_GATEWAY_JSON_NODES = 10_000
@@ -869,7 +877,10 @@ def _unsubscribe_event_handler(client: Any, handler: Any) -> Any:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="gateway.py",
-        description="Call the manifest-backed WAAPI Skill gateway and print one JSON result.",
+        description=(
+            "Call the manifest-backed WAAPI Skill gateway and print one JSON result, "
+            "or flushed JSON records for stream-topic."
+        ),
     )
     parser.add_argument("--host", help=f"WAAPI host; defaults to ${ENV_HOST}, then saved config")
     parser.add_argument("--port", type=int, help=f"WAAPI port; defaults to ${ENV_PORT}, then saved config")
@@ -884,12 +895,19 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         help=(
-            f"Whole-command deadline in seconds; defaults to {DEFAULT_TIMEOUT:g} for reads/topics "
-            f"and {DEFAULT_TRANSACTION_TIMEOUT:g} for preview/execute/verify transactions"
+            f"Whole-command deadline in seconds; defaults to {DEFAULT_TIMEOUT:g} for reads/bounded topics, "
+            f"{DEFAULT_TRANSACTION_TIMEOUT:g} for preview/execute/verify transactions, "
+            "and no time limit for stream-topic"
         ),
     )
     parser.add_argument("--evidence-dir", help=f"Dispatcher evidence directory; defaults to ${ENV_EVIDENCE_DIR}")
-    parser.add_argument("--state-dir", help=f"Transaction state directory; defaults to ${STATE_DIRECTORY_ENV}")
+    parser.add_argument(
+        "--state-dir",
+        help=(
+            f"Transaction state directory; defaults to ${STATE_DIRECTORY_ENV}, "
+            "then $XDG_STATE_HOME/waapi-skill or $HOME/.local/state/waapi-skill"
+        ),
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("status", help="Return live Wwise version and current project information")
@@ -1054,6 +1072,17 @@ def build_parser() -> argparse.ArgumentParser:
             "with global --timeout"
         ),
     )
+
+    stream_topic = subparsers.add_parser(
+        "stream-topic",
+        help=(
+            "Keep one manifest topic subscription open and emit each matching "
+            "event immediately as a flushed JSON record"
+        ),
+    )
+    stream_topic.add_argument("api")
+    stream_topic.add_argument("--options-json", default="{}")
+    stream_topic.add_argument("--match-json", default="{}")
 
     capabilities = subparsers.add_parser(
         "capabilities",
@@ -1245,11 +1274,13 @@ def execute_gateway(
     *,
     env: Mapping[str, str] | None = None,
     client_factory: ClientFactory | None = None,
+    stream_sink: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> tuple[int, dict[str, Any]]:
     exit_code, payload = _execute_gateway_unconstrained(
         argv,
         env=env,
         client_factory=client_factory,
+        stream_sink=stream_sink,
     )
     if payload.get("command") in OFFLINE_COMMANDS:
         return exit_code, payload
@@ -1261,6 +1292,7 @@ def _execute_gateway_unconstrained(
     *,
     env: Mapping[str, str] | None = None,
     client_factory: ClientFactory | None = None,
+    stream_sink: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> tuple[int, dict[str, Any]]:
     args = build_parser().parse_args(argv)
     source_env = dict(os.environ if env is None else env)
@@ -1269,6 +1301,15 @@ def _execute_gateway_unconstrained(
 
     def finish(exit_code: int, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         enriched = dict(payload)
+        if args.command == "stream-topic":
+            gateway_contract = enriched.get("contract")
+            enriched["contract"] = TOPIC_STREAM_RECORD_CONTRACT
+            enriched["record_type"] = "terminal"
+            if (
+                isinstance(gateway_contract, str)
+                and gateway_contract != TOPIC_STREAM_RECORD_CONTRACT
+            ):
+                enriched["gateway_result_contract"] = gateway_contract
         if runtime_endpoint is not None and "endpoint" not in enriched:
             enriched["endpoint"] = dict(runtime_endpoint)
         if runtime_detected_version is not None and "detected_version" not in enriched:
@@ -1282,6 +1323,11 @@ def _execute_gateway_unconstrained(
     cleanup_failure: BaseException | None = None
     post_result_cleanup_failed = False
     try:
+        if args.command == "stream-topic" and stream_sink is None:
+            raise GatewayInputError(
+                "stream-topic requires a live record sink; use the gateway CLI "
+                "entry point so every streamed record remains observable."
+            )
         if args.command == "execute":
             require_transaction_preconnection_policy(args, env=source_env)
         elif args.command == "preview" and args.apply:
@@ -1344,6 +1390,7 @@ def _execute_gateway_unconstrained(
                 detected_version=detected_version,
                 live_info=require_mapping(live_info, "getInfo response"),
                 dispatcher=dispatcher,
+                stream_sink=stream_sink,
             )
             if payload.get("ok"):
                 connection.deadline.require_remaining(f"finalize {args.command}")
@@ -1369,7 +1416,7 @@ def _execute_gateway_unconstrained(
                 ),
                 "cleanup": cancellation_cleanup,
             }
-            if args.command == "wait-topic":
+            if args.command in {"wait-topic", "stream-topic"}:
                 unbounded_timeout = math.isinf(connection.timeout)
                 cancelled_payload.update(
                     {
@@ -1382,7 +1429,10 @@ def _execute_gateway_unconstrained(
                                 None if unbounded_timeout else connection.timeout
                             ),
                             "source": (
-                                "explicit_no_timeout"
+                                "default_continuous"
+                                if args.command == "stream-topic"
+                                and args.timeout is None
+                                else "explicit_no_timeout"
                                 if unbounded_timeout
                                 else "explicit"
                                 if args.timeout is not None
@@ -1812,23 +1862,23 @@ def catalog_route_boundary_payload(
 ) -> dict[str, Any] | None:
     """Translate the catalog's one public route into a gateway boundary payload."""
 
-    if command == "wait-topic":
+    if command in {"wait-topic", "stream-topic"}:
         if capability.item_type != "topic":
             raise GatewayInputError(
-                f"wait-topic requires a reflected topic URI, got {capability.item_type}: {capability.uri}"
+                f"{command} requires a reflected topic URI, got {capability.item_type}: {capability.uri}"
             )
         if capability.safety.interface_status == "unsupported_by_skill_interface":
             return unsupported_interface_payload(
                 capability.uri,
                 capability.safety.reason,
-                command="wait-topic",
+                command=command,
                 common=common,
             )
         if capability.preferred_route != "bounded_topic_wait":
             return unsupported_interface_payload(
                 capability.uri,
-                "This topic has no reviewed bounded wait route in the packaged Skill interface.",
-                command="wait-topic",
+                "This topic has no reviewed subscription route in the packaged Skill interface.",
+                command=command,
                 common=common,
             )
         return None
@@ -2064,7 +2114,7 @@ def preflight_public_route(
 ) -> dict[str, Any] | None:
     """Fail closed before connecting when the requested public route is already known."""
 
-    if args.command not in {"call", "wait-topic"}:
+    if args.command not in {"call", "wait-topic", "stream-topic"}:
         return None
     api = args.api
 
@@ -2096,7 +2146,7 @@ def preflight_public_route(
                     or BOUNDED_CALL_CANDIDATES.get(api)
                     or EXPLICIT_UNSUPPORTED_TOPIC_URIS.get(api)
                 )
-            elif args.command == "wait-topic":
+            elif args.command in {"wait-topic", "stream-topic"}:
                 safety_context = EXPLICIT_UNSUPPORTED_TOPIC_URIS.get(api)
             return unreflected_interface_payload(
                 api,
@@ -2146,7 +2196,7 @@ def preflight_public_route(
             return unsupported_interface_payload(
                 api,
                 explicit_topic_boundary,
-                command="wait-topic",
+                command=args.command,
             )
     return None
 
@@ -2393,14 +2443,21 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
                 request_options=request_options,
                 dry_run=args.dry_run,
             )
-    elif args.command == "wait-topic":
+    elif args.command in {"wait-topic", "stream-topic"}:
         parse_json_object(args.options_json, "--options-json")
         parse_json_object(args.match_json, "--match-json")
-        if args.no_timeout and args.timeout is not None:
+        if (
+            args.command == "wait-topic"
+            and args.no_timeout
+            and args.timeout is not None
+        ):
             raise GatewayInputError(
                 "wait-topic --no-timeout cannot be combined with global --timeout"
             )
-        if not 1 <= args.event_count <= MAX_WAIT_EVENT_COUNT:
+        if (
+            args.command == "wait-topic"
+            and not 1 <= args.event_count <= MAX_WAIT_EVENT_COUNT
+        ):
             raise GatewayInputError(
                 f"wait-topic --event-count must be between 1 and {MAX_WAIT_EVENT_COUNT}"
             )
@@ -3402,9 +3459,12 @@ def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> G
     no_topic_timeout = bool(
         args.command == "wait-topic" and getattr(args, "no_timeout", False)
     )
+    continuous_topic_timeout = bool(
+        args.command == "stream-topic" and args.timeout is None
+    )
     raw_timeout = (
         math.inf
-        if no_topic_timeout
+        if no_topic_timeout or continuous_topic_timeout
         else (
             args.timeout
             if args.timeout is not None
@@ -3419,7 +3479,10 @@ def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> G
         raw_timeout <= 0
         or (
             not math.isfinite(raw_timeout)
-            and not (no_topic_timeout and raw_timeout == math.inf)
+            and not (
+                (no_topic_timeout or continuous_topic_timeout)
+                and raw_timeout == math.inf
+            )
         )
     ):
         raise GatewayInputError("timeout must be finite and greater than zero")
@@ -3442,6 +3505,7 @@ def dispatch_command(
     detected_version: str,
     live_info: Mapping[str, Any],
     dispatcher: WwiseDispatcher,
+    stream_sink: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     common = {
         "contract": GATEWAY_RESULT_CONTRACT,
@@ -4059,6 +4123,17 @@ def dispatch_command(
             return payload
         payload["normalized"] = normalized
         return payload
+    if args.command == "stream-topic":
+        return dispatch_topic_stream(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+            stream_sink=stream_sink,
+        )
     if args.command == "wait-topic":
         request_options = parse_json_object(args.options_json, "--options-json")
         match = parse_json_object(args.match_json, "--match-json")
@@ -4336,6 +4411,326 @@ def dispatch_command(
         payload["agent_result"] = filtered_result
         return payload
     raise GatewayInputError(f"unsupported command: {args.command}")
+
+
+def dispatch_topic_stream(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+    stream_sink: Callable[[Mapping[str, Any]], None] | None,
+) -> dict[str, Any]:
+    """Keep one reviewed topic subscription open and publish events immediately."""
+
+    request_options = parse_json_object(args.options_json, "--options-json")
+    match = parse_json_object(args.match_json, "--match-json")
+    authoring_boundary = live_authoring_api_boundary(
+        args.api,
+        command="stream-topic",
+        live_info=live_info,
+        common=common,
+    )
+    if authoring_boundary is not None:
+        return authoring_boundary
+    try:
+        capability = live_capability(
+            detected_version,
+            args.api,
+            live_info=live_info,
+        )
+    except CapabilityNotFoundError:
+        return unreflected_interface_payload(
+            args.api,
+            detected_version,
+            command="stream-topic",
+            common=common,
+        )
+    route_boundary = catalog_route_boundary_payload(
+        capability,
+        command="stream-topic",
+        common=common,
+    )
+    if route_boundary is not None:
+        return route_boundary
+
+    result_limit_bytes = int(
+        capability.execution_contract["result_limit_bytes"]
+    )
+    manager = SubscriptionManager(dispatcher.client)  # type: ignore[arg-type]
+    event_stream = manager.open_stream(
+        args.api,
+        options=request_options,
+        queue_size=DEFAULT_LISTENER_QUEUE_SIZE,
+        max_event_bytes=result_limit_bytes,
+    )
+    stream_started_at = time.monotonic()
+    unbounded_timeout = math.isinf(connection.timeout)
+    timeout_policy = {
+        "mode": "unbounded" if unbounded_timeout else "finite",
+        "seconds": None if unbounded_timeout else connection.timeout,
+        "source": (
+            "default_continuous"
+            if args.timeout is None
+            else "explicit"
+        ),
+    }
+    stream_common = {
+        **dict(common),
+        "contract": TOPIC_STREAM_RECORD_CONTRACT,
+        "command": "stream-topic",
+        "topic": args.api,
+        "match": match or None,
+        "subscription_timeout": timeout_policy,
+    }
+    started_record = attach_gateway_session_context(
+        {
+            **stream_common,
+            "record_type": "started",
+            "ok": True,
+            "status": "streaming",
+            "buffer_limit_events": DEFAULT_LISTENER_QUEUE_SIZE,
+            "event_result_limit_bytes": result_limit_bytes,
+        },
+        args=args,
+        env=env,
+    )
+
+    event_count = 0
+    primary_error: Exception | None = None
+    cleanup_status = "unknown"
+    cleanup_failure: dict[str, Any] | None = None
+    try:
+        emit_topic_stream_record(
+            started_record,
+            sink=stream_sink,
+            limit_bytes=MAX_GATEWAY_RESULT_JSON_BYTES,
+        )
+        collection_timeout = (
+            math.inf
+            if unbounded_timeout
+            else reserved_topic_wait_timeout(connection)
+        )
+        collection_expires_at = (
+            math.inf
+            if math.isinf(collection_timeout)
+            else time.monotonic() + collection_timeout
+        )
+        next_health_at = (
+            time.monotonic() + TOPIC_STREAM_HEALTH_INTERVAL_SECONDS
+        )
+        while True:
+            now = time.monotonic()
+            remaining = collection_expires_at - now
+            if remaining <= 0:
+                break
+            if now >= next_health_at:
+                require_topic_stream_health(
+                    dispatcher,
+                    expected_version=detected_version,
+                )
+                next_health_at = (
+                    time.monotonic() + TOPIC_STREAM_HEALTH_INTERVAL_SECONDS
+                )
+                continue
+            event = event_stream.poll(
+                min(
+                    TOPIC_STREAM_POLL_SECONDS,
+                    max(0.0, next_health_at - now),
+                    remaining,
+                )
+            )
+            if event is None:
+                continue
+            if match and not payload_matches(event.payload, match):
+                continue
+            payload_probe = probe_gateway_json_document_size(
+                event.payload,
+                result_limit_bytes,
+            )
+            if payload_probe != "ok":
+                raise GatewayResultShapeError(
+                    "stream-topic event exceeded its reflected JSON result boundary.",
+                    details={
+                        "topic": args.api,
+                        "limit_bytes": result_limit_bytes,
+                        "reason": payload_probe,
+                    },
+                    error_code=(
+                        "RESULT_TOO_LARGE"
+                        if payload_probe == "too_large"
+                        else "RESULT_NOT_JSON"
+                    ),
+                )
+            validation = validate_semantic_event(
+                args.api,
+                event.payload,
+                version=detected_version,
+                authoring_ui_profile=live_info.get("isCommandLine") is False,
+            )
+            sequence = event_count + 1
+            emit_topic_stream_record(
+                {
+                    "contract": TOPIC_STREAM_RECORD_CONTRACT,
+                    "record_type": "event",
+                    "sequence": sequence,
+                    "topic": args.api,
+                    "event": event.payload,
+                    "event_validation": validation.as_dict(),
+                },
+                sink=stream_sink,
+                limit_bytes=result_limit_bytes,
+            )
+            event_count = sequence
+    except KeyboardInterrupt:
+        try:
+            event_stream.close()
+        except BaseException:
+            pass
+        raise
+    except Exception as exc:  # noqa: BLE001 - terminal record preserves the structured error
+        primary_error = exc
+
+    try:
+        cleanup_succeeded = event_stream.close()
+    except Exception as exc:  # noqa: BLE001 - cleanup is reported separately
+        cleanup_status = SUBSCRIPTION_CLEANUP_FAILED
+        cleanup_failure = cleanup_failure_evidence(exc)
+    else:
+        cleanup_status = (
+            SUBSCRIPTION_CLEANUP_UNSUBSCRIBED
+            if cleanup_succeeded
+            else SUBSCRIPTION_CLEANUP_FAILED
+        )
+        if not cleanup_succeeded:
+            cleanup_failure = {
+                "error_code": "SUBSCRIPTION_CLEANUP_FAILED",
+                "message": "Subscription cleanup returned false and remains active",
+                "details": {"reason": "unsubscribe_returned_false"},
+            }
+
+    terminal: dict[str, Any] = {
+        **stream_common,
+        "record_type": "terminal",
+        "event_count": event_count,
+        "elapsed_seconds": max(0.0, time.monotonic() - stream_started_at),
+        "cleanup": cleanup_status,
+    }
+    if primary_error is not None:
+        normalized = normalize_gateway_exception(primary_error)
+        terminal.update(
+            {
+                "ok": False,
+                "status": "error",
+                "error_code": normalized["error_code"],
+                "message": normalized["message"],
+                "details": normalized.get("details"),
+            }
+        )
+        if cleanup_failure is not None:
+            details = (
+                dict(terminal["details"])
+                if isinstance(terminal.get("details"), Mapping)
+                else {}
+            )
+            details["cleanup_failure"] = cleanup_failure
+            terminal["details"] = details
+        return terminal
+    if cleanup_failure is not None:
+        terminal.update(
+            {
+                "ok": False,
+                "status": "error",
+                "error_code": "SUBSCRIPTION_CLEANUP_FAILED",
+                "message": "Persistent topic stream ended but cleanup did not explicitly succeed.",
+                "details": {"cleanup_failure": cleanup_failure},
+            }
+        )
+        return terminal
+    terminal.update(
+        {
+            "ok": True,
+            "status": "completed",
+            "completion_reason": "duration_elapsed",
+        }
+    )
+    return terminal
+
+
+def require_topic_stream_health(
+    dispatcher: WwiseDispatcher,
+    *,
+    expected_version: str,
+) -> None:
+    """Boundedly detect a lost or replaced WAAPI connection during a long stream."""
+
+    call_with_timeout = getattr(dispatcher.client, "call_with_timeout", None)
+    if not callable(call_with_timeout):
+        raise GatewayInputError(
+            "stream-topic transport does not expose the required bounded health check."
+        )
+    response = call_with_timeout(
+        GET_INFO_URI,
+        timeout=DEFAULT_TIMEOUT,
+        phase="stream-topic health check",
+    )
+    actual_version = version_key_from_get_info(
+        require_mapping(response, "stream-topic health getInfo response")
+    )
+    if actual_version != expected_version:
+        raise GatewayInputError(
+            "The WAAPI host version changed during stream-topic: "
+            f"expected {expected_version}, got {actual_version}."
+        )
+
+
+def topic_stream_stdout_json_encoder() -> json.JSONEncoder:
+    """Build the compact strict encoder used for each flushed stream record."""
+
+    return json.JSONEncoder(
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=False,
+        allow_nan=False,
+        check_circular=True,
+    )
+
+
+def emit_topic_stream_record(
+    record: Mapping[str, Any],
+    *,
+    sink: Callable[[Mapping[str, Any]], None] | None,
+    limit_bytes: int,
+) -> None:
+    """Validate one compact stream record's size before exposing it."""
+
+    encoder = topic_stream_stdout_json_encoder()
+    observed = 1  # stdout adds one newline
+    try:
+        for chunk in encoder.iterencode(record):
+            observed += len(chunk.encode("utf-8"))
+            if observed > limit_bytes:
+                raise GatewayResultShapeError(
+                    "stream-topic record exceeded its JSON output boundary.",
+                    details={
+                        "limit_bytes": limit_bytes,
+                        "observed_at_least_bytes": limit_bytes + 1,
+                    },
+                    error_code="RESULT_TOO_LARGE",
+                )
+    except GatewayResultShapeError:
+        raise
+    except (RecursionError, TypeError, UnicodeEncodeError, ValueError) as exc:
+        raise GatewayResultShapeError(
+            "stream-topic record is not a strict JSON document.",
+            details={"record_type": record.get("record_type")},
+            error_code="RESULT_NOT_JSON",
+        ) from exc
+    if sink is not None:
+        sink(record)
 
 
 def prepared_wire_path_io_audit(
@@ -7379,14 +7774,29 @@ def resolve_transaction_state_directory(
     *,
     env: Mapping[str, str],
 ) -> Path:
-    configured = args.state_dir or env.get(STATE_DIRECTORY_ENV)
-    if not configured:
-        raise GatewayInputError(
-            f"Transaction commands require --state-dir or ${STATE_DIRECTORY_ENV}; state is never written into the Skill checkout implicitly."
-        )
+    if args.state_dir is not None:
+        configured = args.state_dir
+        label = "--state-dir"
+    elif STATE_DIRECTORY_ENV in env:
+        configured = env[STATE_DIRECTORY_ENV]
+        label = f"${STATE_DIRECTORY_ENV}"
+    else:
+        xdg_state_home = env.get("XDG_STATE_HOME")
+        home = env.get("HOME")
+        if xdg_state_home:
+            configured = str(Path(xdg_state_home) / "waapi-skill")
+            label = "$XDG_STATE_HOME/waapi-skill"
+        elif home:
+            configured = str(Path(home) / ".local" / "state" / "waapi-skill")
+            label = "$HOME/.local/state/waapi-skill"
+        else:
+            raise GatewayInputError(
+                "Transaction state directory could not be resolved because neither "
+                f"${STATE_DIRECTORY_ENV}, $XDG_STATE_HOME, nor $HOME is available."
+            )
     return resolve_external_runtime_directory(
         str(configured),
-        label="--state-dir" if args.state_dir else f"${STATE_DIRECTORY_ENV}",
+        label=label,
     )
 
 
@@ -9132,8 +9542,21 @@ def require_mapping(value: Any, label: str) -> Mapping[str, Any]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    exit_code, payload = execute_gateway(argv)
-    print(gateway_stdout_json_encoder().encode(payload))
+    def stream_stdout_sink(record: Mapping[str, Any]) -> None:
+        print(topic_stream_stdout_json_encoder().encode(record), flush=True)
+
+    command_line = tuple(sys.argv[1:] if argv is None else argv)
+    if "stream-topic" in command_line:
+        exit_code, payload = execute_gateway(
+            argv,
+            stream_sink=stream_stdout_sink,
+        )
+    else:
+        exit_code, payload = execute_gateway(argv)
+    if payload.get("contract") == TOPIC_STREAM_RECORD_CONTRACT:
+        print(topic_stream_stdout_json_encoder().encode(payload), flush=True)
+    else:
+        print(gateway_stdout_json_encoder().encode(payload))
     return exit_code
 
 

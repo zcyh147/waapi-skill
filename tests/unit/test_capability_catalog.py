@@ -136,7 +136,10 @@ def test_all_topics_expose_a_bounded_wait_route(version: str) -> None:
     assert {entry.execution_mode for entry in topics} == {"bounded_topic_wait"}
     assert reviewed
     assert all(entry.preferred_route == "bounded_topic_wait" for entry in reviewed)
-    assert all(entry.gateway_commands == ("wait-topic",) for entry in reviewed)
+    assert all(
+        entry.gateway_commands == ("wait-topic", "stream-topic")
+        for entry in reviewed
+    )
     assert all(entry.safety.read_only for entry in reviewed)
     assert all(not entry.safety.requires_destructive_gate for entry in reviewed)
     assert unsupported == []
@@ -216,7 +219,7 @@ def test_all_semantic_read_records_resolve_to_public_gateway_routes() -> None:
     inclusions = catalog.describe("2022.1", "ak.wwise.core.soundbank.getInclusions")
     assert object_get.gateway_commands == ("query-object", "buses")
     assert property_info.gateway_commands == ("metadata property-info",)
-    assert imported.gateway_commands == ("wait-topic",)
+    assert imported.gateway_commands == ("wait-topic", "stream-topic")
     assert inclusions.gateway_commands == ("preview", "confirm", "execute", "verify")
     assert inclusions.preferred_route == "transaction_operation"
     assert inclusions.transaction_operations == ("waapi.call",)

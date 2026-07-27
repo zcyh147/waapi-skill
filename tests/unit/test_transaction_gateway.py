@@ -2465,6 +2465,70 @@ def test_preview_apply_ask_before_changes_still_requires_show_token_and_confirm(
     )
 
 
+def test_ask_before_changes_uses_same_home_state_store_without_broker_injection(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    state_dir = home / ".local" / "state" / "waapi-skill"
+    env = gateway_env(tmp_path, policy="ask_before_changes")
+    env["HOME"] = str(home)
+    preview_client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info()],
+            "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": create_preview_object_reads(),
+            "ak.wwise.core.object.getTypes": [create_type_catalog()],
+        }
+    )
+
+    preview_exit, transaction = waapi_gateway.execute_gateway(
+        [
+            "preview",
+            "--apply",
+            "--request-json",
+            json.dumps(create_request()),
+        ],
+        env=env,
+        client_factory=lambda url: preview_client,
+    )
+
+    assert preview_exit == 0, transaction
+    assert transaction["state"] == TransactionState.AWAITING_CONFIRMATION.value
+    transaction_id = transaction["transaction_id"]
+    assert (state_dir / "transactions" / transaction_id).is_dir()
+
+    offline_factory = lambda url: (_ for _ in ()).throw(AssertionError(url))
+    show_exit, shown = waapi_gateway.execute_gateway(
+        ["transaction-show", transaction_id, "--summary-only"],
+        env=env,
+        client_factory=offline_factory,
+    )
+    assert show_exit == 0, shown
+    snapshot = TransactionStore(state_dir).load_snapshot(transaction_id)
+    token = assert_confirmation_binding(
+        shown,
+        transaction_id=transaction_id,
+        artifact_hash=transaction["artifact_hash"],
+        event_sequence=snapshot.record.event_sequence,
+        last_event_hash=snapshot.record.last_event_hash,
+    )
+    assert shown["next_command"] == expected_transaction_next_command(
+        "confirm",
+        ["confirm", transaction_id, "--confirmation-token", token],
+        requires_explicit_user_confirmation=True,
+    )
+
+    confirm_exit, confirmed = waapi_gateway.execute_gateway(
+        ["confirm", transaction_id, "--confirmation-token", token],
+        env=env,
+        client_factory=offline_factory,
+    )
+
+    assert confirm_exit == 0, confirmed
+    assert confirmed["state"] == TransactionState.CONFIRMED.value
+    assert TransactionStore(state_dir).load(transaction_id).state is TransactionState.CONFIRMED
+
+
 def test_preview_apply_allow_changes_records_policy_authority_without_confirmation(
     tmp_path: Path,
 ) -> None:

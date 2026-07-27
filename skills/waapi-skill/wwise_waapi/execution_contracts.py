@@ -622,7 +622,7 @@ class ExecutionContractRegistry:
                 item_type=item_type,
                 route="bounded_topic_wait",
                 effect="observation",
-                gateway_commands=("wait-topic",),
+                gateway_commands=("wait-topic", "stream-topic"),
                 timeout_seconds=TOPIC_TIMEOUT_OVERRIDES.get(
                     uri, DEFAULT_TOPIC_TIMEOUT_SECONDS
                 ),
@@ -741,7 +741,7 @@ def _build_authoring_ui_execution_contract(
             item_type=item_type,
             route="bounded_topic_wait",
             effect="observation",
-            gateway_commands=("wait-topic",),
+            gateway_commands=("wait-topic", "stream-topic"),
             timeout_seconds=DEFAULT_TOPIC_TIMEOUT_SECONDS,
             result_limit_bytes=256 * 1024,
             verification_strategy="topic_event_schema",

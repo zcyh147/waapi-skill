@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import math
 import shlex
+import stat
 import sys
 import threading
 import time
@@ -761,6 +763,43 @@ def test_main_keeps_non_transaction_output_strict_json(
     ) == "ok"
 
 
+def test_main_prints_stream_records_as_compact_json_lines(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: Any,
+) -> None:
+    started = {
+        "contract": waapi_gateway.TOPIC_STREAM_RECORD_CONTRACT,
+        "record_type": "started",
+        "topic": "ak.wwise.core.object.created",
+    }
+    terminal = {
+        "contract": waapi_gateway.TOPIC_STREAM_RECORD_CONTRACT,
+        "record_type": "terminal",
+        "command": "stream-topic",
+        "ok": True,
+        "status": "completed",
+    }
+
+    def fake_execute(
+        argv: Any,
+        *,
+        stream_sink: Any,
+    ) -> tuple[int, dict[str, Any]]:
+        stream_sink(started)
+        return 0, terminal
+
+    monkeypatch.setattr(waapi_gateway, "execute_gateway", fake_execute)
+
+    exit_code = waapi_gateway.main(
+        ["stream-topic", "ak.wwise.core.object.created"]
+    )
+    lines = capsys.readouterr().out.splitlines()
+
+    assert exit_code == 0
+    assert [json.loads(line) for line in lines] == [started, terminal]
+    assert all("\n" not in line and ": " not in line for line in lines)
+
+
 def test_main_rejects_non_strict_json_values(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         waapi_gateway,
@@ -1384,6 +1423,154 @@ def test_transaction_state_directory_requires_an_absolute_path_without_writing(
     assert exit_code == 2
     assert payload["error_code"] == "GatewayInputError"
     assert "must be an absolute path" in payload["message"]
+
+
+def test_transaction_state_directory_defaults_to_xdg_state_home(
+    tmp_path: Path,
+) -> None:
+    env = gateway_env(tmp_path)
+    state_home = tmp_path / "xdg-state"
+    env["XDG_STATE_HOME"] = str(state_home)
+    env["HOME"] = str(tmp_path / "home")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["transaction-show", "tx-missing"],
+        env=env,
+        client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "TransactionNotFound"
+    assert (state_home / "waapi-skill" / "transactions").is_dir()
+    assert not (tmp_path / "home" / ".local" / "state" / "waapi-skill").exists()
+
+
+def test_transaction_state_directory_falls_back_to_home(
+    tmp_path: Path,
+) -> None:
+    env = gateway_env(tmp_path)
+    home = tmp_path / "home"
+    env["HOME"] = str(home)
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["transaction-show", "tx-missing"],
+        env=env,
+        client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "TransactionNotFound"
+    state_dir = home / ".local" / "state" / "waapi-skill"
+    assert (state_dir / "transactions").is_dir()
+    assert stat.S_IMODE(state_dir.stat().st_mode) & 0o077 == 0
+
+
+def test_relative_xdg_state_home_fails_closed_without_writing(
+    tmp_path: Path,
+) -> None:
+    env = gateway_env(tmp_path)
+    env["XDG_STATE_HOME"] = "relative-state"
+    env["HOME"] = str(tmp_path / "home")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["transaction-show", "tx-missing"],
+        env=env,
+        client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert "$XDG_STATE_HOME/waapi-skill must be an absolute path" in payload["message"]
+    assert not (tmp_path / "home" / ".local" / "state" / "waapi-skill").exists()
+
+
+@pytest.mark.parametrize(
+    ("argv", "configured_env", "expected_label"),
+    (
+        (
+            ["--state-dir", "", "transaction-show", "tx-missing"],
+            None,
+            "--state-dir",
+        ),
+        (
+            ["transaction-show", "tx-missing"],
+            "",
+            "$WAAPI_SKILL_STATE_DIR",
+        ),
+    ),
+)
+def test_explicit_empty_transaction_state_override_fails_closed(
+    tmp_path: Path,
+    argv: list[str],
+    configured_env: str | None,
+    expected_label: str,
+) -> None:
+    env = gateway_env(tmp_path)
+    env["HOME"] = str(tmp_path / "home")
+    if configured_env is not None:
+        env["WAAPI_SKILL_STATE_DIR"] = configured_env
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        argv,
+        env=env,
+        client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert f"{expected_label} must be a non-empty absolute path" in payload["message"]
+    assert not (tmp_path / "home" / ".local" / "state" / "waapi-skill").exists()
+
+
+def test_transaction_state_directory_precedence_is_flag_env_xdg_home(
+    tmp_path: Path,
+) -> None:
+    env = gateway_env(tmp_path)
+    env.update(
+        {
+            "HOME": str(tmp_path / "home"),
+            "XDG_STATE_HOME": str(tmp_path / "xdg"),
+            "WAAPI_SKILL_STATE_DIR": str(tmp_path / "env-state"),
+        }
+    )
+    with_flag = waapi_gateway.build_parser().parse_args(
+        [
+            "--state-dir",
+            str(tmp_path / "flag-state"),
+            "transaction-show",
+            "tx-missing",
+        ]
+    )
+    without_flag = waapi_gateway.build_parser().parse_args(
+        ["transaction-show", "tx-missing"]
+    )
+
+    assert waapi_gateway.resolve_transaction_state_directory(
+        with_flag,
+        env=env,
+    ) == (tmp_path / "flag-state").resolve()
+    assert waapi_gateway.resolve_transaction_state_directory(
+        without_flag,
+        env=env,
+    ) == (tmp_path / "env-state").resolve()
+    env_without_override = {
+        key: value
+        for key, value in env.items()
+        if key != "WAAPI_SKILL_STATE_DIR"
+    }
+    assert waapi_gateway.resolve_transaction_state_directory(
+        without_flag,
+        env=env_without_override,
+    ) == (tmp_path / "xdg" / "waapi-skill").resolve()
+    env_without_xdg = {
+        key: value
+        for key, value in env_without_override.items()
+        if key != "XDG_STATE_HOME"
+    }
+    assert waapi_gateway.resolve_transaction_state_directory(
+        without_flag,
+        env=env_without_xdg,
+    ) == (tmp_path / "home" / ".local" / "state" / "waapi-skill").resolve()
 
 
 def test_transaction_state_directory_inside_skill_checkout_is_rejected_without_writing(
@@ -4435,6 +4622,201 @@ def test_wait_topic_uses_payload_match_and_unsubscribes(tmp_path: Path) -> None:
     assert client.handlers[0].unsubscribe_calls == 1
     assert client.handlers[0].unsubscribe_thread_ident == client.handlers[0].subscribe_thread_ident
     assert client.handlers[0].unsubscribe_thread_ident != threading.get_ident()
+
+
+def test_stream_topic_emits_matching_events_immediately_from_one_subscription(
+    tmp_path: Path,
+) -> None:
+    topic = "ak.wwise.core.object.created"
+    client = FakeClient(
+        {"ak.wwise.core.getInfo": live_info()},
+        subscription_events={
+            topic: [
+                {"object": {"id": "wrong", "name": "Ignore"}},
+                {"object": {"id": "wanted", "name": "UI_1"}},
+                {"object": {"id": "wanted", "name": "UI_2"}},
+            ]
+        },
+    )
+    records: list[Mapping[str, Any]] = []
+
+    exit_code, terminal = waapi_gateway.execute_gateway(
+        [
+            "--timeout",
+            "0.5",
+            "stream-topic",
+            topic,
+            "--match-json",
+            '{"object":{"id":"wanted"}}',
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+        stream_sink=records.append,
+    )
+
+    assert exit_code == 0
+    assert [record["record_type"] for record in records] == [
+        "started",
+        "event",
+        "event",
+    ]
+    assert [record["sequence"] for record in records[1:]] == [1, 2]
+    assert [record["event"]["object"]["name"] for record in records[1:]] == [
+        "UI_1",
+        "UI_2",
+    ]
+    assert records[0]["session_context"]["available"] is True
+    assert terminal["contract"] == waapi_gateway.TOPIC_STREAM_RECORD_CONTRACT
+    assert terminal["record_type"] == "terminal"
+    assert terminal["status"] == "completed"
+    assert terminal["completion_reason"] == "duration_elapsed"
+    assert terminal["event_count"] == 2
+    assert terminal["cleanup"] == "unsubscribed"
+    assert len(client.handlers) == 1
+    assert client.handlers[0].unsubscribe_calls == 1
+    assert client.disconnected is True
+
+
+def test_stream_topic_defaults_to_continuous_until_cancelled(
+    tmp_path: Path,
+) -> None:
+    args = waapi_gateway.build_parser().parse_args(
+        ["stream-topic", "ak.wwise.core.object.created"]
+    )
+
+    connection = waapi_gateway.resolve_connection(
+        args,
+        env=gateway_env(tmp_path),
+    )
+
+    assert connection.timeout == math.inf
+
+
+def test_stream_topic_without_record_sink_fails_before_connecting(
+    tmp_path: Path,
+) -> None:
+    connected = False
+
+    def client_factory(url: str) -> FakeClient:
+        nonlocal connected
+        connected = True
+        raise AssertionError(url)
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["stream-topic", "ak.wwise.core.object.created"],
+        env=gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert payload["contract"] == waapi_gateway.TOPIC_STREAM_RECORD_CONTRACT
+    assert payload["record_type"] == "terminal"
+    assert payload["error_code"] == "GatewayInputError"
+    assert "requires a live record sink" in payload["message"]
+    assert connected is False
+
+
+def test_stream_topic_queue_overflow_fails_closed_without_emitting_partial_events(
+    tmp_path: Path,
+) -> None:
+    topic = "ak.wwise.core.object.created"
+    events = [
+        {"object": {"id": f"object-{index}", "name": f"Object_{index}"}}
+        for index in range(waapi_gateway.DEFAULT_LISTENER_QUEUE_SIZE + 1)
+    ]
+    client = FakeClient(
+        {"ak.wwise.core.getInfo": live_info()},
+        subscription_events={topic: events},
+    )
+    records: list[Mapping[str, Any]] = []
+
+    exit_code, terminal = waapi_gateway.execute_gateway(
+        ["--timeout", "0.5", "stream-topic", topic],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+        stream_sink=records.append,
+    )
+
+    assert exit_code == 2
+    assert [record["record_type"] for record in records] == ["started"]
+    assert terminal["error_code"] == "SUBSCRIPTION_STREAM_OVERFLOW"
+    assert terminal["event_count"] == 0
+    assert terminal["cleanup"] == "unsubscribed"
+    assert client.handlers[0].unsubscribe_calls == 1
+
+
+def test_stream_topic_rejects_oversized_event_before_buffering(
+    tmp_path: Path,
+) -> None:
+    topic = "ak.wwise.core.object.created"
+    client = FakeClient(
+        {"ak.wwise.core.getInfo": live_info()},
+        subscription_events={
+            topic: [{"object": {"id": "wanted", "name": "x" * (300 * 1024)}}]
+        },
+    )
+    records: list[Mapping[str, Any]] = []
+
+    exit_code, terminal = waapi_gateway.execute_gateway(
+        ["--timeout", "0.5", "stream-topic", topic],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+        stream_sink=records.append,
+    )
+
+    assert exit_code == 2
+    assert [record["record_type"] for record in records] == ["started"]
+    assert terminal["error_code"] == "RESULT_TOO_LARGE"
+    assert terminal["details"]["limit_bytes"] == 256 * 1024
+    assert terminal["event_count"] == 0
+    assert terminal["cleanup"] == "unsubscribed"
+
+
+def test_stream_topic_health_check_terminates_after_connection_loss(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    topic = "ak.wwise.core.object.created"
+
+    class DisconnectingClient(FakeClient):
+        def __init__(self) -> None:
+            super().__init__({"ak.wwise.core.getInfo": live_info()})
+            self.get_info_calls = 0
+
+        def call(
+            self,
+            uri: str,
+            args: Mapping[str, Any] | None = None,
+            options: Mapping[str, Any] | None = None,
+        ) -> Any:
+            if uri == "ak.wwise.core.getInfo":
+                self.get_info_calls += 1
+                if self.get_info_calls > 1:
+                    raise ConnectionError("synthetic WAAPI disconnect")
+            return super().call(uri, args, options)
+
+    monkeypatch.setattr(
+        waapi_gateway,
+        "TOPIC_STREAM_HEALTH_INTERVAL_SECONDS",
+        0.01,
+    )
+    client = DisconnectingClient()
+    records: list[Mapping[str, Any]] = []
+
+    exit_code, terminal = waapi_gateway.execute_gateway(
+        ["--timeout", "0.5", "stream-topic", topic],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+        stream_sink=records.append,
+    )
+
+    assert exit_code == 2
+    assert [record["record_type"] for record in records] == ["started"]
+    assert terminal["error_code"] == "ConnectionError"
+    assert terminal["event_count"] == 0
+    assert terminal["cleanup"] == "unsubscribed"
+    assert client.get_info_calls == 2
+    assert client.handlers[0].unsubscribe_calls == 1
 
 
 def test_wait_topic_false_unsubscribe_is_retained_and_close_retries(

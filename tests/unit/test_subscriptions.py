@@ -19,6 +19,8 @@ from wwise_waapi.subscriptions import (  # pyright: ignore[reportMissingImports]
     SubscriptionAcknowledgementError,
     SubscriptionEvent,
     SubscriptionManager,
+    SubscriptionStreamIngressError,
+    SubscriptionStreamOverflow,
     SubscriptionTimeout,
     SubscriptionUnavailable,
     SUBSCRIPTION_ACK_CONTRACT,
@@ -27,6 +29,7 @@ from wwise_waapi.subscriptions import (  # pyright: ignore[reportMissingImports]
     SUBSCRIPTION_ACK_PATH_ENV,
     SUBSCRIPTION_ACK_STEP_ENV,
     SUBSCRIPTION_ACK_TOPIC_ENV,
+    TopicEventStream,
     _put_bounded,
     payload_matches,
 )
@@ -583,6 +586,131 @@ def test_wait_for_event_callback_only_hands_off_to_queue_not_client() -> None:
 
     assert event.payload == {"safe": True}
     assert client.call_while_in_callback == 0
+
+
+def test_persistent_stream_delivers_ordered_events_through_one_handler() -> None:
+    client = FakeSubscriptionClient()
+    manager = SubscriptionManager(client)
+
+    stream = manager.open_stream("ak.persistent", queue_size=3)
+    assert isinstance(stream, TopicEventStream)
+    assert len(client.handlers) == 1
+    handler = client.handlers[0]
+
+    handler.emit({"sequence": 1})
+    handler.emit({"sequence": 2})
+    handler.emit({"sequence": 3})
+
+    assert [
+        stream.poll(timeout=0.01).payload["sequence"],  # type: ignore[union-attr]
+        stream.poll(timeout=0.01).payload["sequence"],  # type: ignore[union-attr]
+        stream.poll(timeout=0.01).payload["sequence"],  # type: ignore[union-attr]
+    ] == [1, 2, 3]
+    assert len(client.handlers) == 1
+    assert client.call_while_in_callback == 0
+    assert stream.close() is True
+
+
+def test_persistent_stream_poll_returns_none_on_timeout() -> None:
+    client = FakeSubscriptionClient()
+    stream = SubscriptionManager(client).open_stream("ak.persistent.timeout")
+
+    assert stream.poll(timeout=0.01) is None
+    assert stream.close() is True
+
+
+def test_persistent_stream_cleanup_runs_exactly_once() -> None:
+    client = FakeSubscriptionClient()
+    manager = SubscriptionManager(client)
+    stream = manager.open_stream("ak.persistent.cleanup")
+
+    assert stream.close() is True
+    assert stream.close() is False
+    assert client.unsubscribe_calls == 1
+    assert client.handlers == []
+    assert manager.active_topics == set()
+
+
+def test_persistent_stream_overflow_fails_instead_of_dropping() -> None:
+    client = FakeSubscriptionClient()
+    stream = SubscriptionManager(client).open_stream(
+        "ak.persistent.overflow",
+        queue_size=1,
+    )
+    handler = client.handlers[0]
+
+    handler.emit({"sequence": 1})
+    handler.emit({"sequence": 2})
+
+    with pytest.raises(SubscriptionStreamOverflow) as caught:
+        stream.poll(timeout=0.01)
+
+    assert caught.value.error_code == "SUBSCRIPTION_STREAM_OVERFLOW"
+    assert caught.value.topic == "ak.persistent.overflow"
+    assert caught.value.queue_size == 1
+    assert stream.close() is True
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected_code"),
+    (
+        ({"text": "x" * 128}, "RESULT_TOO_LARGE"),
+        ({"invalid": {1, 2}}, "RESULT_NOT_JSON"),
+    ),
+)
+def test_persistent_stream_rejects_invalid_payload_before_buffering(
+    payload: Any,
+    expected_code: str,
+) -> None:
+    client = FakeSubscriptionClient()
+    stream = SubscriptionManager(client).open_stream(
+        "ak.persistent.ingress",
+        queue_size=3,
+        max_event_bytes=32,
+    )
+    handler = client.handlers[0]
+
+    handler.emit(payload)
+    handler.emit({"ignored_after_failure": True})
+
+    with pytest.raises(SubscriptionStreamIngressError) as caught:
+        stream.poll(timeout=0.01)
+
+    assert caught.value.error_code == expected_code
+    assert caught.value.topic == "ak.persistent.ingress"
+    assert caught.value.limit_bytes == 32
+    assert stream.event_queue.empty()
+    assert stream.close() is True
+
+
+@pytest.mark.parametrize("queue_size", (0, -1, True, 1.5))
+def test_persistent_stream_rejects_invalid_queue_size_before_subscribing(
+    queue_size: object,
+) -> None:
+    client = FakeSubscriptionClient()
+
+    with pytest.raises(ValueError, match="positive integer"):
+        SubscriptionManager(client).open_stream(
+            "ak.persistent.invalid",
+            queue_size=queue_size,  # type: ignore[arg-type]
+        )
+
+    assert client.handlers == []
+
+
+@pytest.mark.parametrize("max_event_bytes", (0, -1, True, 1.5))
+def test_persistent_stream_rejects_invalid_event_byte_limit_before_subscribing(
+    max_event_bytes: object,
+) -> None:
+    client = FakeSubscriptionClient()
+
+    with pytest.raises(ValueError, match="max_event_bytes must be a positive integer"):
+        SubscriptionManager(client).open_stream(
+            "ak.persistent.invalid-limit",
+            max_event_bytes=max_event_bytes,  # type: ignore[arg-type]
+        )
+
+    assert client.handlers == []
 
 
 def test_background_listener_receives_event_and_cancel_cleans_up() -> None:

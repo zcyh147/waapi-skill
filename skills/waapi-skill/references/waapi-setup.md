@@ -61,6 +61,12 @@ checkout; `~` and relative paths are rejected instead of being expanded from
 ambient process state. A transaction preview additionally rejects state inside
 the live Wwise project before creating the state store.
 
+Ordinary transaction commands omit `--state-dir`; users do not need to
+configure it. The Gateway resolves state in this order: an explicit
+`--state-dir`, `WAAPI_SKILL_STATE_DIR`, `$XDG_STATE_HOME/waapi-skill`, then
+`$HOME/.local/state/waapi-skill`. Explicit empty or relative overrides fail
+closed rather than falling through to another location.
+
 ## Version selection
 
 - Prefer an explicit user-provided Wwise version when exact API behavior matters; pass it with `--version`.

@@ -17,6 +17,8 @@ from typing import Any, Callable, Mapping, Protocol
 DEFAULT_WAIT_TIMEOUT = 5.0
 DEFAULT_QUEUE_SIZE = 1
 DEFAULT_LISTENER_QUEUE_SIZE = 64
+DEFAULT_STREAM_EVENT_BYTES = 1024 * 1024
+DEFAULT_STREAM_FAILURE_POLL_INTERVAL = 0.05
 MAX_WAIT_EVENT_COUNT = 64
 DEFAULT_CANCEL_JOIN_TIMEOUT = 1.0
 DEFAULT_LISTENER_POLL_INTERVAL = 0.05
@@ -57,6 +59,61 @@ class SubscriptionTimeout(SubscriptionError):
 
 class SubscriptionCallbackError(SubscriptionError):
     """Raised by listener checks when the user callback failed."""
+
+
+class SubscriptionStreamOverflow(SubscriptionError):
+    """Raised when a persistent stream cannot retain every received event."""
+
+    error_code = "SUBSCRIPTION_STREAM_OVERFLOW"
+
+    def __init__(self, topic: str, queue_size: int) -> None:
+        super().__init__(
+            f"Persistent WAAPI topic stream overflowed its {queue_size}-event "
+            f"queue for {topic}; event delivery is no longer complete"
+        )
+        self.topic = topic
+        self.queue_size = queue_size
+
+
+class SubscriptionStreamIngressError(SubscriptionError):
+    """A permanent strict-JSON or byte-ceiling failure at stream ingress."""
+
+    def __init__(
+        self,
+        *,
+        error_code: str,
+        topic: str,
+        limit_bytes: int,
+    ) -> None:
+        if error_code == "RESULT_TOO_LARGE":
+            message = "Persistent WAAPI topic event exceeded its JSON byte limit"
+            reason = "too_large"
+        elif error_code == "RESULT_NOT_JSON":
+            message = "Persistent WAAPI topic event is not a strict JSON value"
+            reason = "not_json"
+        else:  # pragma: no cover - construction is private and closed below
+            raise ValueError("unsupported stream ingress error code")
+        super().__init__(message)
+        self.error_code = error_code
+        self.topic = topic
+        self.limit_bytes = limit_bytes
+        self.reason = reason
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return bounded structured details for gateway normalization."""
+
+        details: dict[str, Any] = {
+            "topic": self.topic,
+            "limit_bytes": self.limit_bytes,
+            "reason": self.reason,
+        }
+        if self.error_code == "RESULT_TOO_LARGE":
+            details["observed_at_least_bytes"] = self.limit_bytes + 1
+        return {
+            "error_code": self.error_code,
+            "message": str(self),
+            "details": details,
+        }
 
 
 class SubscriptionCleanupError(SubscriptionError):
@@ -172,6 +229,93 @@ class SubscriptionHandle:
 
     def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
         self.unsubscribe()
+
+
+@dataclass(slots=True)
+class _TopicStreamIngressState:
+    """Share the callback's first permanent ingress failure with the poller."""
+
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+    _error: SubscriptionStreamIngressError | None = field(
+        default=None,
+        init=False,
+        repr=False,
+    )
+
+    def fail(self, error: SubscriptionStreamIngressError) -> None:
+        with self._lock:
+            if self._error is None:
+                self._error = error
+
+    def current_error(self) -> SubscriptionStreamIngressError | None:
+        with self._lock:
+            return self._error
+
+
+@dataclass(slots=True)
+class TopicEventStream:
+    """One persistent WAAPI subscription with fail-closed queued delivery."""
+
+    handle: SubscriptionHandle
+    event_queue: queue.Queue[SubscriptionEvent]
+    overflowed: threading.Event
+    queue_size: int
+    max_event_bytes: int
+    ingress_state: _TopicStreamIngressState
+
+    @property
+    def topic(self) -> str:
+        """Return the topic owned by the single subscription handle."""
+
+        return self.handle.topic
+
+    def poll(self, timeout: float | None = None) -> SubscriptionEvent | None:
+        """Return the next event, ``None`` on timeout, or fail on any overflow."""
+
+        if timeout is not None:
+            if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
+                raise ValueError("timeout must be a non-negative finite number or None")
+            if not math.isfinite(timeout) or timeout < 0:
+                raise ValueError("timeout must be a non-negative finite number or None")
+        deadline = None if timeout is None else time.monotonic() + timeout
+        while True:
+            self._raise_if_failed()
+            wait_seconds = DEFAULT_STREAM_FAILURE_POLL_INTERVAL
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    try:
+                        event = self.event_queue.get_nowait()
+                    except queue.Empty:
+                        self._raise_if_failed()
+                        return None
+                    self._raise_if_failed()
+                    return event
+                wait_seconds = min(wait_seconds, remaining)
+            try:
+                event = self.event_queue.get(timeout=wait_seconds)
+            except queue.Empty:
+                continue
+            self._raise_if_failed()
+            return event
+
+    def close(self) -> bool:
+        """Unsubscribe this stream; successful cleanup is idempotent."""
+
+        return self.handle.unsubscribe()
+
+    def _raise_if_failed(self) -> None:
+        ingress_error = self.ingress_state.current_error()
+        if ingress_error is not None:
+            raise ingress_error
+        if self.overflowed.is_set():
+            raise SubscriptionStreamOverflow(self.topic, self.queue_size)
+
+    def __enter__(self) -> "TopicEventStream":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        self.close()
 
 
 @dataclass(slots=True)
@@ -438,6 +582,89 @@ class SubscriptionManager:
             join_timeout=join_timeout,
         ).start()
 
+    def open_stream(
+        self,
+        topic: str,
+        options: dict[str, Any] | None = None,
+        queue_size: int = DEFAULT_LISTENER_QUEUE_SIZE,
+        max_event_bytes: int = DEFAULT_STREAM_EVENT_BYTES,
+    ) -> TopicEventStream:
+        """Open one persistent subscription whose events are polled by the caller.
+
+        Unlike the background-listener compatibility lane, this stream never
+        discards an old event to make room for a new one. Any full queue marks
+        the stream permanently incomplete, and the next poll fails closed.
+        """
+
+        if (
+            isinstance(queue_size, bool)
+            or not isinstance(queue_size, int)
+            or queue_size <= 0
+        ):
+            raise ValueError("queue_size must be a positive integer")
+        if (
+            isinstance(max_event_bytes, bool)
+            or not isinstance(max_event_bytes, int)
+            or max_event_bytes <= 0
+        ):
+            raise ValueError("max_event_bytes must be a positive integer")
+        if self.client is None:
+            raise SubscriptionUnavailable(
+                "A WAAPI client is required for persistent topic streams"
+            )
+        event_queue: queue.Queue[SubscriptionEvent] = queue.Queue(
+            maxsize=queue_size
+        )
+        overflowed = threading.Event()
+        ingress_state = _TopicStreamIngressState()
+
+        def waapi_callback(*args: Any, **kwargs: Any) -> None:
+            if (
+                overflowed.is_set()
+                or ingress_state.current_error() is not None
+            ):
+                return
+            event = SubscriptionEvent(
+                topic=topic,
+                args=args,
+                kwargs=dict(kwargs),
+            )
+            probe = _probe_strict_stream_payload(
+                event.payload,
+                max_event_bytes,
+            )
+            if probe != "ok":
+                ingress_state.fail(
+                    SubscriptionStreamIngressError(
+                        error_code=(
+                            "RESULT_TOO_LARGE"
+                            if probe == "too_large"
+                            else "RESULT_NOT_JSON"
+                        ),
+                        topic=topic,
+                        limit_bytes=max_event_bytes,
+                    )
+                )
+                return
+            try:
+                event_queue.put_nowait(event)
+            except queue.Full:
+                overflowed.set()
+
+        handle = self.subscribe(topic, callback=waapi_callback, options=options)
+        if handle is None:  # Defensive: the configured-client check above is authoritative.
+            raise SubscriptionUnavailable(
+                "A WAAPI client is required for persistent topic streams"
+            )
+        return TopicEventStream(
+            handle=handle,
+            event_queue=event_queue,
+            overflowed=overflowed,
+            queue_size=queue_size,
+            max_event_bytes=max_event_bytes,
+            ingress_state=ingress_state,
+        )
+
     def unsubscribe(self, topic: str) -> None:
         """Discard a client-less registry topic; handle objects own real cleanup."""
 
@@ -603,6 +830,166 @@ def _put_bounded(event_queue: queue.Queue[SubscriptionEvent], event: Subscriptio
         event_queue.put_nowait(event)
     except queue.Full:
         pass
+
+
+class _StreamJsonSizeExceeded(Exception):
+    """The strict stream payload crossed its configured byte ceiling."""
+
+
+class _StreamJsonEncodingRejected(Exception):
+    """The stream payload is outside the strict JSON value set."""
+
+
+class _BoundedStreamJsonSizer:
+    """Count compact strict-JSON UTF-8 bytes without materializing the document."""
+
+    def __init__(self, limit_bytes: int) -> None:
+        self.limit_bytes = limit_bytes
+        self.observed_bytes = 0
+        self._active_container_ids: set[int] = set()
+
+    def add_bytes(self, byte_count: int) -> None:
+        if byte_count > self.limit_bytes - self.observed_bytes:
+            raise _StreamJsonSizeExceeded
+        self.observed_bytes += byte_count
+
+    def measure(self, value: Any) -> None:
+        if value is None:
+            self.add_bytes(4)
+            return
+        if value is True:
+            self.add_bytes(4)
+            return
+        if value is False:
+            self.add_bytes(5)
+            return
+        if isinstance(value, str):
+            self._measure_string(value)
+            return
+        if isinstance(value, int):
+            self.add_bytes(len(int.__repr__(value)))
+            return
+        if isinstance(value, float):
+            if not math.isfinite(value):
+                raise _StreamJsonEncodingRejected
+            self.add_bytes(len(float.__repr__(value)))
+            return
+        if isinstance(value, (list, tuple)):
+            self._measure_array(value)
+            return
+        if isinstance(value, dict):
+            self._measure_object(value)
+            return
+        raise _StreamJsonEncodingRejected
+
+    def _measure_string(self, value: str) -> None:
+        self.add_bytes(2)
+        for character in value:
+            codepoint = ord(character)
+            if character in {'"', "\\"} or character in {
+                "\b",
+                "\f",
+                "\n",
+                "\r",
+                "\t",
+            }:
+                self.add_bytes(2)
+            elif codepoint <= 0x1F:
+                self.add_bytes(6)
+            elif codepoint <= 0x7F:
+                self.add_bytes(1)
+            elif codepoint <= 0x7FF:
+                self.add_bytes(2)
+            elif 0xD800 <= codepoint <= 0xDFFF:
+                raise _StreamJsonEncodingRejected
+            elif codepoint <= 0xFFFF:
+                self.add_bytes(3)
+            else:
+                self.add_bytes(4)
+
+    def _measure_array(self, value: list[Any] | tuple[Any, ...]) -> None:
+        self.add_bytes(1)
+        if not value:
+            self.add_bytes(1)
+            return
+        # One byte per smallest value, one comma between values, and ``]``.
+        if (2 * len(value)) > self.limit_bytes - self.observed_bytes:
+            raise _StreamJsonSizeExceeded
+        self._enter_container(value)
+        try:
+            for index, item in enumerate(value):
+                if index:
+                    self.add_bytes(1)
+                self.measure(item)
+            self.add_bytes(1)
+        finally:
+            self._leave_container(value)
+
+    def _measure_object(self, value: dict[Any, Any]) -> None:
+        self.add_bytes(1)
+        if not value:
+            self.add_bytes(1)
+            return
+        # Each compact member needs at least ``"":0`` plus separators/``}``.
+        if (5 * len(value)) > self.limit_bytes - self.observed_bytes:
+            raise _StreamJsonSizeExceeded
+        self._enter_container(value)
+        try:
+            for index, (key, item) in enumerate(value.items()):
+                if index:
+                    self.add_bytes(1)
+                self._measure_string(self._object_key_string(key))
+                self.add_bytes(1)
+                self.measure(item)
+            self.add_bytes(1)
+        finally:
+            self._leave_container(value)
+
+    def _object_key_string(self, key: Any) -> str:
+        if isinstance(key, str):
+            return key
+        if key is True:
+            return "true"
+        if key is False:
+            return "false"
+        if key is None:
+            return "null"
+        if isinstance(key, int):
+            return int.__repr__(key)
+        if isinstance(key, float):
+            if not math.isfinite(key):
+                raise _StreamJsonEncodingRejected
+            return float.__repr__(key)
+        raise _StreamJsonEncodingRejected
+
+    def _enter_container(self, value: Any) -> None:
+        identity = id(value)
+        if identity in self._active_container_ids:
+            raise _StreamJsonEncodingRejected
+        self._active_container_ids.add(identity)
+
+    def _leave_container(self, value: Any) -> None:
+        self._active_container_ids.remove(id(value))
+
+
+def _probe_strict_stream_payload(value: Any, limit_bytes: int) -> str:
+    """Return ``ok``, ``too_large``, or ``not_json`` using bounded work."""
+
+    sizer = _BoundedStreamJsonSizer(limit_bytes)
+    try:
+        sizer.measure(value)
+    except _StreamJsonSizeExceeded:
+        return "too_large"
+    except (
+        _StreamJsonEncodingRejected,
+        OverflowError,
+        RecursionError,
+        TypeError,
+        UnicodeError,
+        ValueError,
+    ):
+        return "not_json"
+    return "ok"
 
 
 def payload_matches(payload: Any, expected: Any) -> bool:

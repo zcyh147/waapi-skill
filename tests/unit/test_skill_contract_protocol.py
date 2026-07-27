@@ -263,7 +263,7 @@ def test_soundbank_generated_uses_an_explicit_skill_selected_timeout() -> None:
     assert "explicitly pass gateway-global `--timeout 120`" in QUERY
     assert "an explicit Skill-selected timeout, not a different gateway default" in QUERY
     assert "tell the user that this subscription will use 120 seconds" in QUERY
-    assert "user-supplied positive finite duration or explicit no-time-limit request still takes precedence" in QUERY
+    assert "user-supplied positive finite duration or explicit no-time-limit bounded wait still takes precedence" in QUERY
 
 
 def test_topic_wait_duration_policy_is_explicit_and_output_remains_bounded() -> None:
@@ -271,14 +271,14 @@ def test_topic_wait_duration_policy_is_explicit_and_output_remains_bounded() -> 
     query_flat = " ".join(QUERY.split())
 
     for phrase in (
-        "tell the user the effective waiting policy in one natural sentence",
-        "ordinary 10-second default",
+        "tell the user the effective policy naturally",
+        "ordinary omitted-duration default is 10 seconds",
         "converting units to seconds without rounding",
         "`--timeout <positive-finite-seconds>` position before `wait-topic`",
         "`wait-topic` subcommand flag `--no-timeout`",
-        "until the requested 1–64 matching events have been collected or the user cancels it",
-        "it is not an unlimited output stream",
-        "Never combine `--timeout` with `--no-timeout`",
+        "until 1–64 requested matches or cancellation",
+        "is not an unlimited output stream",
+        "Never combine those flags",
     ):
         assert phrase in skill_flat
 
@@ -290,7 +290,7 @@ def test_topic_wait_duration_policy_is_explicit_and_output_remains_bounded() -> 
         "add the subcommand flag `--no-timeout`",
         "the command still returns one terminal JSON document",
         "after success, timeout, or user cancellation",
-        "event count, result size, and terminal JSON output remain bounded",
+        "complete dispatcher collection still shares the topic execution contract's 256 KiB JSON result ceiling",
     ):
         assert phrase in query_flat
 
@@ -301,7 +301,51 @@ def test_topic_wait_duration_policy_is_explicit_and_output_remains_bounded() -> 
     )
     assert "gateway.py wait-topic <topic-uri> --no-timeout" in SKILL
     assert "这次使用默认的 10 秒等待时间" in SKILL
-    assert "直到收齐 `<N>` 个匹配事件或你让我停止" in SKILL
+
+
+def test_explicit_persistent_topic_intent_uses_one_streaming_subscription() -> None:
+    skill_flat = " ".join(SKILL.split())
+    query_flat = " ".join(QUERY.split())
+
+    for phrase in (
+        "Route ordinary vague “subscribe”, “listen”, or “monitor” wording to `wait-topic`",
+        "Select `stream-topic` only for explicit streaming or persistent intent",
+        "one persistent subscription",
+        "compact flushed JSON record",
+        "by default runs until cancellation",
+        "bounded buffer fails closed on overflow",
+        "cleanup always attempts unsubscribe",
+        "a terminal record reports why the stream ended",
+    ):
+        assert phrase in skill_flat
+    for phrase in (
+        "one compact flushed NDJSON record",
+        "by default continues until the user cancels it or a bounded low-frequency health check detects",
+        "overflow fails closed instead of silently dropping an event",
+        "always attempts to unsubscribe",
+        "one terminal NDJSON record",
+        "Every streamed event is validated",
+    ):
+        assert phrase in query_flat
+    for intent in (
+        "stream",
+        "continuous",
+        "persistent",
+        "实时逐条",
+        "流式",
+        "持续",
+        "一直监听",
+        "不要收到后退出",
+    ):
+        assert intent in SKILL
+        assert intent in QUERY
+
+    assert "gateway.py stream-topic <topic-uri>" in SKILL
+    assert (
+        "gateway.py --timeout <positive-finite-seconds> stream-topic <topic-uri>"
+        in SKILL
+    )
+    assert "Every command except `stream-topic` prints one JSON document" in skill_flat
 
 
 def test_ordinary_wwise_work_forbids_agent_authored_code() -> None:
@@ -645,13 +689,26 @@ def test_2022_cli_mapping_is_single_and_precedes_the_audio_convert_fast_route() 
     assert "do not inspect the filesystem or repository for extra business proof" in OPERATE[:2_000]
 
 
-def test_operate_state_directory_is_caller_owned_and_never_probed() -> None:
+def test_operate_state_directory_has_a_gateway_owned_default_and_is_never_probed() -> None:
     for document in (SKILL, OPERATE):
         assert "omit `--state-dir`" in document
+        assert "Gateway owns a deterministic external transaction-store default" in document
         assert "Never run `env`, `printenv`" in document
         assert "discover `WAAPI_SKILL_STATE_DIR`" in document
-        assert "trusted absolute path" in document
-        assert "structured state-directory error or boundary" in document
+        assert "never ask a normal user" in document
+        assert "trusted absolute override" in document
+
+    assert "Explicit caller flags retain priority" in OPERATE
+    setup_flat = " ".join(SETUP.split())
+    assert "users do not need to configure it" in setup_flat
+    assert (
+        "`--state-dir`, `WAAPI_SKILL_STATE_DIR`, "
+        "`$XDG_STATE_HOME/waapi-skill`, then "
+        "`$HOME/.local/state/waapi-skill`"
+    ) in setup_flat
+    assert "Explicit empty or relative overrides fail closed" in setup_flat
+    assert "structured state-directory error or boundary" not in SKILL
+    assert "structured state-directory error or boundary" not in OPERATE
 
     assert "gateway.py --state-dir /absolute/state/dir" not in OPERATE
     for command in (

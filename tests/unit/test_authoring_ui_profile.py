@@ -261,7 +261,7 @@ def test_authoring_capabilities_expose_correct_safety_route_and_evidence(
     assert read.safety.requires_authorization is False
     topic = records["ak.wwise.ui.commands.executed"]
     assert topic.preferred_route == "bounded_topic_wait"
-    assert topic.gateway_commands == ("wait-topic",)
+    assert topic.gateway_commands == ("wait-topic", "stream-topic")
     assert topic.safety.read_only is True
 
 

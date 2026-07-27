@@ -31,6 +31,8 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
         "python scripts/run.py gateway.py wait-topic <topic-uri>",
         "python scripts/run.py gateway.py --timeout <positive-finite-seconds> wait-topic <topic-uri>",
         "python scripts/run.py gateway.py wait-topic <topic-uri> --no-timeout",
+        "python scripts/run.py gateway.py stream-topic <topic-uri>",
+        "python scripts/run.py gateway.py --timeout <positive-finite-seconds> stream-topic <topic-uri>",
         "python scripts/run.py gateway.py operations",
         "python scripts/run.py gateway.py operation-schema object.create",
         "python scripts/run.py gateway.py operation-schema waapi.call",
@@ -99,6 +101,7 @@ def test_query_reference_has_no_raw_client_fallback() -> None:
     assert "not an open raw-call surface" in query_reference
     assert "gateway.py query-object" in query_reference
     assert "gateway.py wait-topic" in query_reference
+    assert "gateway.py stream-topic" in query_reference
     assert "`--query` means an existing Wwise Query Editor object" in query_reference
     assert "It never accepts raw WAQL" in query_reference
     assert "`this` and `owner` remain outside the packaged boundary" in query_reference
@@ -132,10 +135,10 @@ def test_topic_wait_policy_is_consistent_across_skill_reference_and_readmes() ->
     skill_flat = " ".join(skill.split())
     query_flat = " ".join(query.split())
 
-    assert "ordinary 10-second default" in skill_flat
-    assert "tell the user the effective waiting policy in one natural sentence" in skill_flat
+    assert "ordinary omitted-duration default is 10 seconds" in skill_flat
+    assert "tell the user the effective policy naturally" in skill_flat
     assert "positive finite duration" in skill_flat
-    assert "`--no-timeout` removes only the waiting deadline" in skill_flat
+    assert "explicit no-time-limit bounded-wait request selects" in skill_flat
     assert "not an unlimited output stream" in skill_flat
 
     assert "An ordinary omitted duration uses 10 seconds" in query_flat
@@ -147,6 +150,29 @@ def test_topic_wait_policy_is_consistent_across_skill_reference_and_readmes() ->
     assert "gateway itself keeps the ordinary 10-second omitted-duration default" in query_flat
     assert "explicitly pass gateway-global `--timeout 120`" in query_flat
     assert "tell the user that this subscription will use 120 seconds" in query_flat
+    assert "ordinary vague requests to subscribe, listen, monitor" in query_flat
+    assert "only when the user explicitly asks for a stream" in query_flat
+    assert "one persistent subscription" in query_flat
+    assert "one compact flushed NDJSON record" in query_flat
+    assert (
+        "by default continues until the user cancels it or a bounded "
+        "low-frequency health check detects"
+    ) in query_flat
+    assert "overflow fails closed instead of silently dropping an event" in query_flat
+    assert "always attempts to unsubscribe" in query_flat
+    assert "one terminal NDJSON record" in query_flat
+    assert "Every command except `stream-topic` prints one JSON document" in skill_flat
+    for intent in (
+        "stream",
+        "continuous",
+        "persistent",
+        "实时逐条",
+        "流式",
+        "持续",
+        "一直监听",
+        "不要收到后退出",
+    ):
+        assert intent in query
 
     for readme in (english, chinese):
         assert "--timeout" in readme
