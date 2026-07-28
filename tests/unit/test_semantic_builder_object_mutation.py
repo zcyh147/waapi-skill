@@ -132,6 +132,33 @@ def test_set_batch_preview_represents_partial_success_risk_without_atomicity_cla
 
 def test_delete_copy_move_diff_and_paste_properties_payloads() -> None:
     assert_mutating_preview(builder().delete(object=exact_id("{delete-me}")), OBJECT_DELETE_URI, {"object": "{delete-me}"}, {})
+    assert_mutating_preview(
+        ObjectMutationBuilder(
+            version="2023.1",
+            source_note_checker=FakeSourceNoteChecker(),
+        ).delete(object=exact_id("{delete-me}")),
+        OBJECT_DELETE_URI,
+        {
+            "object": "{delete-me}",
+            "autoCheckOutToSourceControl": False,
+        },
+        {},
+    )
+    assert_mutating_preview(
+        ObjectMutationBuilder(
+            version="2023.1",
+            source_note_checker=FakeSourceNoteChecker(),
+        ).delete(
+            object=exact_id("{delete-me}"),
+            auto_check_out_to_source_control=True,
+        ),
+        OBJECT_DELETE_URI,
+        {
+            "object": "{delete-me}",
+            "autoCheckOutToSourceControl": True,
+        },
+        {},
+    )
 
     copy_preview = builder().copy(object=exact_id("{source}"), parent=exact_id("{parent}"), on_name_conflict="rename")
     assert_mutating_preview(copy_preview, OBJECT_COPY_URI, {"object": "{source}", "parent": "{parent}", "onNameConflict": "rename"}, {})

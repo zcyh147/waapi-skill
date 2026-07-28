@@ -21,6 +21,7 @@ from wwise_waapi.safety import (
     REVIEWED_PUBLIC_CALL_URIS,
     REVIEWED_TOPIC_URIS,
 )
+from wwise_waapi.selection_guidance import CAPABILITY_SELECTION_GUIDANCE
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 
 
@@ -78,6 +79,118 @@ def test_catalog_separates_route_safety_and_evidence_without_overclaiming() -> N
     assert unsafe.transaction_operations == ("debug.testCrash",)
     assert unsafe.safety.interface_status == "available_via_transaction"
     assert read.evidence["registry_status"] in {"deferred", "not_listed_in_packaged_deferred_registry"}
+
+
+def test_describe_exposes_selection_guidance_for_ambiguous_native_routes() -> None:
+    catalog = CapabilityCatalog()
+
+    set_range = catalog.describe(
+        "2025.1",
+        "ak.wwise.core.gameParameter.setRange",
+    )
+    set_range_guidance = set_range.as_dict()["interface"]["selection_guidance"]
+    assert set_range_guidance["domain"] == "authoring_project_model"
+    assert {
+        item["target"] for item in set_range_guidance["preferred_over"]
+    } == {"object.setProperty", "object.set"}
+
+    runtime_rtpc = catalog.describe("2025.1", "ak.soundengine.setRTPCValue")
+    runtime_guidance = runtime_rtpc.as_dict()["interface"]["selection_guidance"]
+    assert runtime_guidance["domain"] == "runtime_soundengine"
+    assert runtime_guidance["choose_instead"][0]["target"] == "object.setRTPC"
+
+    transport = catalog.describe("2025.1", "ak.wwise.core.transport.create")
+    assert (
+        transport.as_dict()["interface"]["selection_guidance"]["domain"]
+        == "authoring_audition"
+    )
+
+    generated = catalog.describe(
+        "2025.1",
+        "ak.wwise.core.soundbank.generated",
+    ).as_dict()["interface"]["selection_guidance"]
+    generation_done = catalog.describe(
+        "2025.1",
+        "ak.wwise.core.soundbank.generationDone",
+    ).as_dict()["interface"]["selection_guidance"]
+    assert generated["choose_instead"][0]["target"].endswith("generationDone")
+    assert any("proof" in item for item in generation_done["avoid_when"])
+
+    source_control = catalog.describe(
+        "2025.1",
+        "ak.wwise.core.sourceControl.add",
+    ).as_dict()["interface"]["selection_guidance"]
+    assert source_control["domain"] == "authoring_source_control"
+    assert "auto_add_to_source_control" in source_control["choose_instead"][0]["target"]
+
+    set_cursor = catalog.describe(
+        "2025.1",
+        "ak.wwise.core.profiler.setCursorTime",
+    ).as_dict()["interface"]["selection_guidance"]
+    assert set_cursor["choose_instead"][0]["target"].endswith("moveCursor")
+
+    ordinary_read = catalog.describe("2025.1", "ak.wwise.core.object.get")
+    assert "selection_guidance" not in ordinary_read.as_dict()["interface"]
+    assert "selection_guidance" not in set_range.as_compact_dict()
+
+
+def test_every_reflected_soundengine_route_exposes_runtime_domain_guidance() -> None:
+    catalog = CapabilityCatalog()
+
+    for version in SUPPORTED_WWISE_VERSION_KEYS:
+        soundengine_uris = {
+            entry.uri
+            for entry in catalog.entries(version)
+            if entry.uri.startswith("ak.soundengine.")
+        }
+        assert soundengine_uris
+        for uri in soundengine_uris:
+            guidance = catalog.describe(version, uri).as_dict()["interface"][
+                "selection_guidance"
+            ]
+            assert guidance["domain"] == "runtime_soundengine", (version, uri)
+            assert guidance["use_when"], (version, uri)
+            assert guidance["avoid_when"], (version, uri)
+
+    generic = catalog.describe(
+        "2025.1",
+        "ak.soundengine.setPosition",
+    ).as_dict()["interface"]["selection_guidance"]
+    assert generic["choose_instead"][0]["target"].endswith("ak.wwise.core.* route")
+
+    exact = catalog.describe(
+        "2025.1",
+        "ak.soundengine.setRTPCValue",
+    ).as_dict()["interface"]["selection_guidance"]
+    assert exact["choose_instead"][0]["target"] == "object.setRTPC"
+
+
+def test_selection_guidance_registry_contains_only_reflected_bounded_records() -> None:
+    catalog = CapabilityCatalog()
+    reflected_uris = {
+        entry.uri
+        for version in SUPPORTED_WWISE_VERSION_KEYS
+        for entry in catalog.entries(version)
+    }
+
+    assert set(CAPABILITY_SELECTION_GUIDANCE) <= reflected_uris
+    assert len(CAPABILITY_SELECTION_GUIDANCE) >= 38
+    for uri, guidance in CAPABILITY_SELECTION_GUIDANCE.items():
+        assert set(guidance) == {
+            "principle",
+            "domain",
+            "use_when",
+            "avoid_when",
+            "preferred_over",
+            "choose_instead",
+        }
+        assert guidance["domain"]
+        assert guidance["use_when"]
+        for relation in ("preferred_over", "choose_instead"):
+            assert all(
+                set(item) == {"target", "when"}
+                for item in guidance[relation]
+            ), uri
 
 
 def test_2025_media_pool_reads_use_the_bounded_direct_route() -> None:

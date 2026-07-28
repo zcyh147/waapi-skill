@@ -60,6 +60,14 @@ for Wwise Authoring. Read this file before changing the Skill or running tests.
     `authoring-ui-command-inventory.json` resources.
 - `skills/waapi-skill/resources/deferred/<version>.json`
   - category and deferred-route classification.
+- `skills/waapi-skill/resources/metadata/<version>/object-types.json`
+  - compact, reflected object-type discovery index; live property/reference
+    metadata remains authoritative for mutation validation.
+- `skills/waapi-skill/resources/native_surface_policy.json`
+  - complete function-route partition plus detailed selector mapping for the
+    high-risk reflected request surfaces that differ from their public closed
+    operations; `normalized_equivalent` claims also require focused operation
+    tests.
 - `skills/waapi-skill/resources/semantic/<version>/` and `resources/waql/<version>/`
   - compact runtime semantic evidence and versioned query examples.
 - `skills/waapi-skill/references/waapi-*.md`

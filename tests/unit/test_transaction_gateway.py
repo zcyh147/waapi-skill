@@ -1078,6 +1078,15 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     assert schema["operation"]["additional_properties"] is False
     assert "argument_contract" in schema["operation"]
     assert "identity_contract" in schema["operation"]
+    assert schema["operation"]["selection_guidance"]["use_when"] == [
+        "Exactly one existing object receives only a notes change."
+    ]
+    assert schema["operation"]["selection_guidance"]["preferred_over"] == [
+        {
+            "target": "object.set",
+            "when": "the request is only one isolated notes edit",
+        }
+    ]
     assert schema["request_envelope"] == {
         "contract": OPERATION_REQUEST_CONTRACT,
         "version": "2022.1",
@@ -4886,6 +4895,26 @@ def test_generic_isolated_call_runs_full_chain_with_bound_io_audit(tmp_path: Pat
             (
                 "arguments.import_file",
                 "tab_file_audio_sources",
+                "live_project_files",
+            ),
+        ),
+        (
+            "2023.1",
+            "object.set",
+            {
+                "objects": [
+                    {
+                        "object": {"kind": "id", "value": "{TARGET}"},
+                        "import": {
+                            "files": [
+                                {"audio_file": "/remote-only/source.wav"}
+                            ]
+                        },
+                    }
+                ]
+            },
+            (
+                "arguments.objects[].recursive.import",
                 "live_project_files",
             ),
         ),

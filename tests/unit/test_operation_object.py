@@ -15,6 +15,7 @@ from wwise_waapi.operation_object import (  # pyright: ignore[reportMissingImpor
     materialize_waapi_rtpc,
     normalize_conflict_policy,
     normalize_object_forest,
+    normalize_object_lists,
     normalize_object_tree,
     normalize_property_descriptors,
     normalize_reference_descriptors,
@@ -392,3 +393,85 @@ def test_rtpc_descriptors_fail_closed(payload: object, error_code: str) -> None:
     with pytest.raises(ObjectOperationContractError) as exc:
         normalize_rtpc_descriptors(payload)
     assert exc.value.error_code == error_code
+
+
+def test_closed_object_lists_normalize_empty_clear_and_recursive_nodes() -> None:
+    lists = normalize_object_lists(
+        [
+            {"name": "Clips", "objects": []},
+            {
+                "name": "Sequences",
+                "objects": [
+                    {
+                        "type": "MusicSegment",
+                        "name": "Intro",
+                        "children": [{"type": "MusicTrack", "name": "Track"}],
+                    }
+                ],
+            },
+        ]
+    )
+
+    assert [item.name for item in lists] == ["Clips", "Sequences"]
+    assert lists[0].objects == ()
+    assert [node.request_path for node in lists[1].nodes] == [
+        "$.lists[1].objects[0]",
+        "$.lists[1].objects[0].children[0]",
+    ]
+
+
+def test_closed_object_lists_reject_duplicate_or_raw_list_names() -> None:
+    with pytest.raises(ObjectOperationContractError) as duplicate:
+        normalize_object_lists(
+            [
+                {"name": "Clips", "objects": []},
+                {"name": "clips", "objects": []},
+            ]
+        )
+    assert duplicate.value.error_code == "DUPLICATE_LIST"
+
+    with pytest.raises(ObjectOperationContractError) as raw:
+        normalize_object_lists([{"name": "@Clips", "objects": []}])
+    assert raw.value.error_code == "INVALID_FIELD_NAME"
+
+
+def test_object_set_result_binds_only_reviewed_dynamic_list_associations() -> None:
+    rows = flatten_set_result(
+        {
+            "objects": [
+                {
+                    "id": "{OWNER}",
+                    "name": "Owner",
+                    "@Clips": [
+                        {
+                            "id": "{CLIP}",
+                            "name": "Clip",
+                            "children": [{"id": "{CHILD}", "name": "Child"}],
+                        }
+                    ],
+                }
+            ]
+        },
+        allowed_lists=["Clips"],
+    )
+
+    assert [(row.name, row.collection) for row in rows] == [
+        ("Owner", None),
+        ("Clip", "Clips"),
+        ("Child", "children"),
+    ]
+
+    with pytest.raises(ObjectOperationContractError) as unexpected:
+        flatten_set_result(
+            {
+                "objects": [
+                    {
+                        "id": "{OWNER}",
+                        "name": "Owner",
+                        "@Effects": [{"id": "{EFFECT}", "name": "Effect"}],
+                    }
+                ]
+            },
+            allowed_lists=["Clips"],
+        )
+    assert unexpected.value.error_code == "INVALID_RESULT_SHAPE"

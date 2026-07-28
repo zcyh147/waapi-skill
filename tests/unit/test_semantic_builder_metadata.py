@@ -162,10 +162,25 @@ def test_source_note_must_unlock_before_preview() -> None:
 
 
 def test_get_types_parser_returns_records_and_rejects_missing_required_fields() -> None:
-    records = parse_get_types_result({"return": [{"classId": 1, "name": "Sound", "type": "Sound"}]})
+    records = parse_get_types_result(
+        {
+            "return": [
+                {
+                    "classId": 1,
+                    "name": "Sound",
+                    "type": "Sound",
+                    "diagnostic": "retained internally",
+                }
+            ]
+        }
+    )
 
     assert records[0].class_id == 1
     assert records[0].as_dict()["name"] == "Sound"
+    assert "raw" not in records[0].as_dict()
+    assert records[0].as_dict(include_raw=True)["raw"]["diagnostic"] == (
+        "retained internally"
+    )
 
     with pytest.raises(SemanticValidationError) as exc:
         parse_get_types_result({"return": [{"name": "Sound", "type": "Sound"}]})
@@ -188,10 +203,21 @@ def test_property_and_reference_names_parser_requires_return_string_array() -> N
 
 
 def test_property_info_parser_rejects_missing_required_fields() -> None:
-    record = parse_get_property_info_result({"name": "Volume", "type": "Real32", "supports": {"randomizer": True}})
+    record = parse_get_property_info_result(
+        {
+            "name": "Volume",
+            "type": "Real32",
+            "supports": {"randomizer": True},
+            "diagnostic": "retained internally",
+        }
+    )
 
     assert record.name == "Volume"
     assert record.supports == {"randomizer": True}
+    assert "raw" not in record.as_dict()
+    assert record.as_dict(include_raw=True)["raw"]["diagnostic"] == (
+        "retained internally"
+    )
 
     with pytest.raises(SemanticValidationError) as exc:
         parse_get_property_info_result({"name": "Volume"})

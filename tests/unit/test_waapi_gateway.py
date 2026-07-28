@@ -539,6 +539,91 @@ def test_selected_accepts_only_an_explicit_empty_objects_array(tmp_path: Path) -
     assert payload["objects"] == []
 
 
+def test_selected_adds_bounded_manifest_validated_return_fields(tmp_path: Path) -> None:
+    selected_row = {
+        "id": "{11111111-1111-1111-1111-111111111111}",
+        "name": "Selected Sound",
+        "type": "Sound",
+        "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Selected Sound",
+        "@Volume": -6.0,
+        "parent.name": "Default Work Unit",
+    }
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(command_line=False),
+            "ak.wwise.ui.getSelectedObjects": {"objects": [selected_row]},
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "selected",
+            "--return-field",
+            "@Volume",
+            "--return-field",
+            "parent.name",
+            "--return-field",
+            "@Volume",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0
+    assert payload["return_fields"] == [
+        "id",
+        "name",
+        "type",
+        "path",
+        "@Volume",
+        "parent.name",
+    ]
+    assert payload["objects"] == [selected_row]
+    assert payload["schema_validation"]["request"]["uri"] == (
+        "ak.wwise.ui.getSelectedObjects"
+    )
+    assert payload["schema_validation"]["result"]["uri"] == (
+        "ak.wwise.ui.getSelectedObjects"
+    )
+    assert client.calls[-1] == (
+        "ak.wwise.ui.getSelectedObjects",
+        {},
+        {
+            "return": [
+                "id",
+                "name",
+                "type",
+                "path",
+                "@Volume",
+                "parent.name",
+            ]
+        },
+    )
+
+
+@pytest.mark.parametrize("return_field", ("", " Volume", "Volume ", "bad\nfield"))
+def test_selected_rejects_invalid_return_fields_before_connecting(
+    tmp_path: Path,
+    return_field: str,
+) -> None:
+    called = False
+
+    def client_factory(url: str) -> FakeClient:
+        nonlocal called
+        called = True
+        raise AssertionError(url)
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["selected", "--return-field", return_field],
+        env=gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert called is False
+
+
 @pytest.mark.parametrize(
     "selected_result",
     (
@@ -845,6 +930,24 @@ def test_generic_call_rejects_hostile_json_before_connecting(
     assert payload["error_code"] == "GatewayInputError"
     assert message in payload["message"]
     assert called is False
+
+
+def test_preview_request_json_has_inline_audio_specific_bounded_limits() -> None:
+    inline_value = "x" * (200 * 1024)
+    parsed = waapi_gateway.parse_preview_request_object(
+        json.dumps({"audio_file_base64": inline_value})
+    )
+    assert parsed["audio_file_base64"] == inline_value
+
+    with pytest.raises(waapi_gateway.GatewayInputError, match="262144-byte string limit"):
+        waapi_gateway.parse_preview_request_object(
+            json.dumps({"audio_file_base64": "x" * (256 * 1024 + 1)})
+        )
+
+    with pytest.raises(waapi_gateway.GatewayInputError, match="393216-byte JSON input limit"):
+        waapi_gateway.parse_preview_request_object(
+            json.dumps({"first": "x" * (200 * 1024), "second": "y" * (200 * 1024)})
+        )
 
 
 @pytest.mark.parametrize(
@@ -1666,6 +1769,230 @@ def test_capability_matrix_is_available_offline_without_config_or_client(tmp_pat
     assert "capabilities" not in payload
 
 
+def test_object_types_searches_packaged_catalog_without_connecting(
+    tmp_path: Path,
+) -> None:
+    called = False
+
+    def client_factory(url: str) -> FakeClient:
+        nonlocal called
+        called = True
+        raise AssertionError(f"offline object type catalog must not connect to {url}")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "--version",
+            "2022.1",
+            "object-types",
+            "--query",
+            "audio source",
+            "--object-type",
+            "WObject",
+            "--limit",
+            "5",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 0
+    assert called is False
+    assert payload["offline"] is True
+    assert payload["versions"] == ["2022.1"]
+    catalog = payload["catalogs"]["2022.1"]
+    assert catalog["row_count"] == 107
+    assert catalog["types"][0]["name"] == "AudioFileSource"
+    assert catalog["returned_count"] <= 5
+    assert len(json.dumps(payload).encode("utf-8")) < 8_000
+
+    for filtered_summary in (
+        ["--query", "Sound"],
+        ["--object-type", "WObject"],
+    ):
+        exit_code, rejected = waapi_gateway.execute_gateway(
+            [
+                "--version",
+                "2022.1",
+                "object-types",
+                "--summary-only",
+                *filtered_summary,
+            ],
+            env=gateway_env(tmp_path),
+            client_factory=client_factory,
+        )
+        assert exit_code == 2
+        assert rejected["error_code"] == "GatewayInputError"
+        assert "--summary-only cannot be combined" in rejected["message"]
+        assert called is False
+
+
+def test_metadata_transaction_cache_is_bound_to_exact_live_session(
+    tmp_path: Path,
+) -> None:
+    calls: list[tuple[str, Mapping[str, Any], Mapping[str, Any]]] = []
+
+    def read(
+        uri: str,
+        args: Mapping[str, Any],
+        options: Mapping[str, Any],
+    ) -> Mapping[str, Any]:
+        calls.append((uri, args, options))
+        return {
+            "name": "Volume",
+            "type": "Real32",
+            "restriction": {"min": -96.3, "max": 12.0},
+        }
+
+    connection = waapi_gateway.GatewayConnection(
+        host="127.0.0.1",
+        port=8080,
+        version_hint="2022.1",
+        evidence_dir=None,
+        timeout=10.0,
+        deadline=waapi_gateway.GatewayDeadline.start(10.0),
+    )
+    info = {
+        "processId": 4242,
+        "sessionId": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+        "version": {
+            "build": 8584,
+            "major": 1,
+            "minor": 19,
+            "schema": 110,
+            "year": 2022,
+        },
+    }
+    project = {"id": PROJECT_GUID}
+    waapi_gateway._METADATA_SESSION_CACHE.clear()
+    cached = waapi_gateway.metadata_cached_transaction_read_call(
+        read,
+        connection=connection,
+        version="2022.1",
+        live_info=info,
+        project=project,
+        state_dir=tmp_path,
+    )
+    call_args = {"classId": 65552, "property": "Volume"}
+
+    assert cached("ak.wwise.core.object.getPropertyInfo", call_args, {})[
+        "name"
+    ] == "Volume"
+    assert cached("ak.wwise.core.object.getPropertyInfo", call_args, {})[
+        "name"
+    ] == "Volume"
+    assert len(calls) == 1
+
+    # A fresh in-memory layer simulates the next gateway CLI process.  The
+    # exact live-session identity still reuses the validated durable entry.
+    waapi_gateway._METADATA_SESSION_CACHE.clear()
+    next_process = waapi_gateway.metadata_cached_transaction_read_call(
+        read,
+        connection=connection,
+        version="2022.1",
+        live_info=info,
+        project=project,
+        state_dir=tmp_path,
+    )
+    assert next_process(
+        "ak.wwise.core.object.getPropertyInfo",
+        call_args,
+        {},
+    )["name"] == "Volume"
+    assert len(calls) == 1
+
+    changed_session = dict(info)
+    changed_session["sessionId"] = "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}"
+    other = waapi_gateway.metadata_cached_transaction_read_call(
+        read,
+        connection=connection,
+        version="2022.1",
+        live_info=changed_session,
+        project=project,
+        state_dir=tmp_path,
+    )
+    other("ak.wwise.core.object.getPropertyInfo", call_args, {})
+    assert len(calls) == 2
+
+    invalid_calls = 0
+
+    def invalid_read(
+        uri: str,
+        args: Mapping[str, Any],
+        options: Mapping[str, Any],
+    ) -> Mapping[str, Any]:
+        nonlocal invalid_calls
+        invalid_calls += 1
+        return {"name": "DifferentProperty", "type": "Real32"}
+
+    invalid_args = {"classId": 65552, "property": "Pitch"}
+    for _ in range(2):
+        waapi_gateway._METADATA_SESSION_CACHE.clear()
+        invalid = waapi_gateway.metadata_cached_transaction_read_call(
+            invalid_read,
+            connection=connection,
+            version="2022.1",
+            live_info=info,
+            project=project,
+            state_dir=tmp_path,
+        )
+        invalid(
+            "ak.wwise.core.object.getPropertyInfo",
+            invalid_args,
+            {},
+        )
+    assert invalid_calls == 2
+
+    object_calls = 0
+
+    def object_read(
+        uri: str,
+        args: Mapping[str, Any],
+        options: Mapping[str, Any],
+    ) -> Mapping[str, Any]:
+        nonlocal object_calls
+        object_calls += 1
+        return {"name": "Volume", "type": "Real32"}
+
+    object_args = {
+        "object": r"\Actor-Mixer Hierarchy\Default Work Unit\Target",
+        "property": "Volume",
+    }
+    object_preview = waapi_gateway.metadata_cached_transaction_read_call(
+        object_read,
+        connection=connection,
+        version="2022.1",
+        live_info=info,
+        project=project,
+        state_dir=tmp_path,
+    )
+    object_preview(
+        "ak.wwise.core.object.getPropertyInfo",
+        object_args,
+        {},
+    )
+    object_preview(
+        "ak.wwise.core.object.getPropertyInfo",
+        object_args,
+        {},
+    )
+    assert object_calls == 1
+    next_object_preview = waapi_gateway.metadata_cached_transaction_read_call(
+        object_read,
+        connection=connection,
+        version="2022.1",
+        live_info=info,
+        project=project,
+        state_dir=tmp_path,
+    )
+    next_object_preview(
+        "ak.wwise.core.object.getPropertyInfo",
+        object_args,
+        {},
+    )
+    assert object_calls == 2
+    waapi_gateway._METADATA_SESSION_CACHE.clear()
+
+
 def test_capabilities_default_to_fifty_compact_rows_and_explicit_zero_returns_all(tmp_path: Path) -> None:
     no_client = lambda url: (_ for _ in ()).throw(AssertionError(url))
 
@@ -1774,6 +2101,36 @@ def test_describe_defaults_to_compact_cross_version_schema_offline(tmp_path: Pat
     assert capability["schema"]["status"] == "ok"
     assert "full" not in capability["schema"]
     assert payload["schema_detail"] == "summary"
+
+
+def test_describe_returns_uri_specific_selection_guidance_without_connecting(
+    tmp_path: Path,
+) -> None:
+    connections: list[str] = []
+
+    def fail_if_connected(url: str) -> Any:
+        connections.append(url)
+        raise AssertionError(url)
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "--version",
+            "2025.1",
+            "describe",
+            "ak.soundengine.setRTPCValue",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=fail_if_connected,
+    )
+
+    assert exit_code == 0
+    assert connections == []
+    guidance = payload["availability"]["2025.1"]["capability"]["interface"][
+        "selection_guidance"
+    ]
+    assert guidance["domain"] == "runtime_soundengine"
+    assert guidance["choose_instead"][0]["target"] == "object.setRTPC"
+    assert len(json.dumps(payload, ensure_ascii=False).encode("utf-8")) < 16_000
 
 
 def test_describe_full_schema_is_explicit_offline_opt_in(tmp_path: Path) -> None:
@@ -4164,7 +4521,8 @@ def test_metadata_types_uses_fixed_builder_and_result_parser(tmp_path: Path) -> 
     assert exit_code == 0
     assert payload["operation"] == "types"
     assert payload["normalized"][0]["name"] == "Sound"
-    assert payload["normalized"][0]["raw"]["extra"] == "preserved"
+    assert "raw" not in payload["normalized"][0]
+    assert "extra" not in payload["normalized"][0]
     assert "summary_only" not in payload
     assert "agent_result" not in payload
     assert client.calls[-1][0] == "ak.wwise.core.object.getTypes"

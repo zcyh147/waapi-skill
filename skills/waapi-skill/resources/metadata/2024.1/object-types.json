@@ -1,0 +1,560 @@
+{
+  "metadata": {
+    "contract": "waapi-skill.object-type-catalog/v1",
+    "generator": "tests.maintenance.build_object_type_catalogs",
+    "inventory_source": "live-getTypes",
+    "resource_sha256": "8daceaf900968920c70d438f84e04c603b007c5880354e9b471f384b65857dc9",
+    "row_count": 109,
+    "source_result_sha256": "851810a2a78461574e15442f5fab45782b2670927a9c41de1c46c4c4b87bffe9",
+    "source_uri": "ak.wwise.core.object.getTypes",
+    "wwise_build": "2024.1.13.9056",
+    "wwise_version_target": "2024.1"
+  },
+  "types": [
+    {
+      "classId": 4718608,
+      "name": "AcousticTexture",
+      "type": "WObject"
+    },
+    {
+      "classId": 327696,
+      "name": "Action",
+      "type": "WObject"
+    },
+    {
+      "classId": 4980752,
+      "name": "ActionException",
+      "type": "WObject"
+    },
+    {
+      "classId": 524304,
+      "name": "ActorMixer",
+      "type": "WObject"
+    },
+    {
+      "classId": 131073,
+      "name": "ADPCM",
+      "type": "Conversion"
+    },
+    {
+      "classId": 2686992,
+      "name": "Attenuation",
+      "type": "WObject"
+    },
+    {
+      "classId": 4653072,
+      "name": "AudioDevice",
+      "type": "WObject"
+    },
+    {
+      "classId": 16,
+      "name": "AudioFileSource",
+      "type": "WObject"
+    },
+    {
+      "classId": 3997712,
+      "name": "AuxBus",
+      "type": "WObject"
+    },
+    {
+      "classId": 11796487,
+      "name": "Auxiliary",
+      "type": "AudioDevice"
+    },
+    {
+      "classId": 65011712,
+      "name": "BatchRenameSettings",
+      "type": "Inner"
+    },
+    {
+      "classId": 1900560,
+      "name": "BlendContainer",
+      "type": "WObject"
+    },
+    {
+      "classId": 1966096,
+      "name": "BlendTrack",
+      "type": "WObject"
+    },
+    {
+      "classId": 1376272,
+      "name": "Bus",
+      "type": "WObject"
+    },
+    {
+      "classId": 11534343,
+      "name": "Communication",
+      "type": "AudioDevice"
+    },
+    {
+      "classId": 11599879,
+      "name": "Controller Headphones",
+      "type": "AudioDevice"
+    },
+    {
+      "classId": 11730951,
+      "name": "Controller Speaker",
+      "type": "AudioDevice"
+    },
+    {
+      "classId": 4390928,
+      "name": "ControlSurfaceBinding",
+      "type": "WObject"
+    },
+    {
+      "classId": 4456464,
+      "name": "ControlSurfaceBindingGroup",
+      "type": "WObject"
+    },
+    {
+      "classId": 4325392,
+      "name": "ControlSurfaceSession",
+      "type": "WObject"
+    },
+    {
+      "classId": 3604496,
+      "name": "Conversion",
+      "type": "WObject"
+    },
+    {
+      "classId": 917520,
+      "name": "Curve",
+      "type": "WObject"
+    },
+    {
+      "classId": 5177360,
+      "name": "CustomState",
+      "type": "WObject"
+    },
+    {
+      "classId": 3014672,
+      "name": "DialogueEvent",
+      "type": "WObject"
+    },
+    {
+      "classId": 11468807,
+      "name": "DVR Bypass",
+      "type": "AudioDevice"
+    },
+    {
+      "classId": 1114128,
+      "name": "Effect",
+      "type": "WObject"
+    },
+    {
+      "classId": 5505040,
+      "name": "EffectSlot",
+      "type": "WObject"
+    },
+    {
+      "classId": 262160,
+      "name": "Event",
+      "type": "WObject"
+    },
+    {
+      "classId": 3735568,
+      "name": "ExternalSource",
+      "type": "WObject"
+    },
+    {
+      "classId": 3670032,
+      "name": "ExternalSourceFile",
+      "type": "WObject"
+    },
+    {
+      "classId": 131088,
+      "name": "Folder",
+      "type": "WObject"
+    },
+    {
+      "classId": 1507344,
+      "name": "GameParameter",
+      "type": "WObject"
+    },
+    {
+      "classId": 4915216,
+      "name": "Language",
+      "type": "WObject"
+    },
+    {
+      "classId": 5373968,
+      "name": "Marker",
+      "type": "WObject"
+    },
+    {
+      "classId": 5308432,
+      "name": "Metadata",
+      "type": "WObject"
+    },
+    {
+      "classId": 5242896,
+      "name": "MidiFileSource",
+      "type": "WObject"
+    },
+    {
+      "classId": 4128784,
+      "name": "MidiParameter",
+      "type": "WObject"
+    },
+    {
+      "classId": 3473424,
+      "name": "MixingSession",
+      "type": "WObject"
+    },
+    {
+      "classId": 983056,
+      "name": "Modifier",
+      "type": "WObject"
+    },
+    {
+      "classId": 4259856,
+      "name": "ModulatorEnvelope",
+      "type": "WObject"
+    },
+    {
+      "classId": 4194320,
+      "name": "ModulatorLfo",
+      "type": "WObject"
+    },
+    {
+      "classId": 5111824,
+      "name": "ModulatorTime",
+      "type": "WObject"
+    },
+    {
+      "classId": 5439504,
+      "name": "MultiSwitchEntry",
+      "type": "WObject"
+    },
+    {
+      "classId": 3932176,
+      "name": "MusicClip",
+      "type": "WObject"
+    },
+    {
+      "classId": 4063248,
+      "name": "MusicClipMidi",
+      "type": "WObject"
+    },
+    {
+      "classId": 3866640,
+      "name": "MusicCue",
+      "type": "WObject"
+    },
+    {
+      "classId": 5046288,
+      "name": "MusicEventCue",
+      "type": "WObject"
+    },
+    {
+      "classId": 2555920,
+      "name": "MusicFade",
+      "type": "WObject"
+    },
+    {
+      "classId": 2228240,
+      "name": "MusicPlaylistContainer",
+      "type": "WObject"
+    },
+    {
+      "classId": 2359312,
+      "name": "MusicPlaylistItem",
+      "type": "WObject"
+    },
+    {
+      "classId": 1769488,
+      "name": "MusicSegment",
+      "type": "WObject"
+    },
+    {
+      "classId": 2490384,
+      "name": "MusicStinger",
+      "type": "WObject"
+    },
+    {
+      "classId": 2293776,
+      "name": "MusicSwitchContainer",
+      "type": "WObject"
+    },
+    {
+      "classId": 1835024,
+      "name": "MusicTrack",
+      "type": "WObject"
+    },
+    {
+      "classId": 3801104,
+      "name": "MusicTrackSequence",
+      "type": "WObject"
+    },
+    {
+      "classId": 2424848,
+      "name": "MusicTransition",
+      "type": "WObject"
+    },
+    {
+      "classId": 11862023,
+      "name": "No Output",
+      "type": "AudioDevice"
+    },
+    {
+      "classId": 1572880,
+      "name": "ObjectSettingAssoc",
+      "type": "WObject"
+    },
+    {
+      "classId": 2752528,
+      "name": "Panner",
+      "type": "WObject"
+    },
+    {
+      "classId": 720912,
+      "name": "Path2D",
+      "type": "WObject"
+    },
+    {
+      "classId": 65537,
+      "name": "PCM",
+      "type": "Conversion"
+    },
+    {
+      "classId": 4522000,
+      "name": "Platform",
+      "type": "WObject"
+    },
+    {
+      "classId": 3538960,
+      "name": "PluginDataSource",
+      "type": "WObject"
+    },
+    {
+      "classId": 786448,
+      "name": "Position",
+      "type": "WObject"
+    },
+    {
+      "classId": 196624,
+      "name": "Project",
+      "type": "WObject"
+    },
+    {
+      "classId": 2097168,
+      "name": "Query",
+      "type": "WObject"
+    },
+    {
+      "classId": 589840,
+      "name": "RandomSequenceContainer",
+      "type": "WObject"
+    },
+    {
+      "classId": 11927559,
+      "name": "Remote System",
+      "type": "AudioDevice"
+    },
+    {
+      "classId": 1441808,
+      "name": "RTPC",
+      "type": "WObject"
+    },
+    {
+      "classId": 2162704,
+      "name": "SearchCriteria",
+      "type": "WObject"
+    },
+    {
+      "classId": 65552,
+      "name": "Sound",
+      "type": "WObject"
+    },
+    {
+      "classId": 1179664,
+      "name": "SoundBank",
+      "type": "WObject"
+    },
+    {
+      "classId": 1703952,
+      "name": "SoundcasterSession",
+      "type": "WObject"
+    },
+    {
+      "classId": 1048592,
+      "name": "SourcePlugin",
+      "type": "WObject"
+    },
+    {
+      "classId": 393232,
+      "name": "State",
+      "type": "WObject"
+    },
+    {
+      "classId": 458768,
+      "name": "StateGroup",
+      "type": "WObject"
+    },
+    {
+      "classId": 1310736,
+      "name": "Switch",
+      "type": "WObject"
+    },
+    {
+      "classId": 655376,
+      "name": "SwitchContainer",
+      "type": "WObject"
+    },
+    {
+      "classId": 1245200,
+      "name": "SwitchGroup",
+      "type": "WObject"
+    },
+    {
+      "classId": 11403271,
+      "name": "System",
+      "type": "AudioDevice"
+    },
+    {
+      "classId": 2621456,
+      "name": "Trigger",
+      "type": "WObject"
+    },
+    {
+      "classId": 3342352,
+      "name": "UserProjectSettings",
+      "type": "WObject"
+    },
+    {
+      "classId": 262145,
+      "name": "Vorbis",
+      "type": "Conversion"
+    },
+    {
+      "classId": 1310721,
+      "name": "WEM Opus",
+      "type": "Conversion"
+    },
+    {
+      "classId": 1638416,
+      "name": "WorkUnit",
+      "type": "WObject"
+    },
+    {
+      "classId": 12451843,
+      "name": "Wwise 3D Audio Bed Mixer",
+      "type": "Effect"
+    },
+    {
+      "classId": 13107202,
+      "name": "Wwise Audio Input",
+      "type": "Source"
+    },
+    {
+      "classId": 7077891,
+      "name": "Wwise Compressor",
+      "type": "Effect"
+    },
+    {
+      "classId": 6946819,
+      "name": "Wwise Delay",
+      "type": "Effect"
+    },
+    {
+      "classId": 7143427,
+      "name": "Wwise Expander",
+      "type": "Effect"
+    },
+    {
+      "classId": 8192003,
+      "name": "Wwise Flanger",
+      "type": "Effect"
+    },
+    {
+      "classId": 9109507,
+      "name": "Wwise Gain",
+      "type": "Effect"
+    },
+    {
+      "classId": 8257539,
+      "name": "Wwise Guitar Distortion",
+      "type": "Effect"
+    },
+    {
+      "classId": 9043971,
+      "name": "Wwise Harmonizer",
+      "type": "Effect"
+    },
+    {
+      "classId": 7536643,
+      "name": "Wwise Matrix Reverb",
+      "type": "Effect"
+    },
+    {
+      "classId": 8454147,
+      "name": "Wwise Meter",
+      "type": "Effect"
+    },
+    {
+      "classId": 6881283,
+      "name": "Wwise Parametric EQ",
+      "type": "Effect"
+    },
+    {
+      "classId": 7208963,
+      "name": "Wwise Peak Limiter",
+      "type": "Effect"
+    },
+    {
+      "classId": 8912899,
+      "name": "Wwise Pitch Shifter",
+      "type": "Effect"
+    },
+    {
+      "classId": 8650755,
+      "name": "Wwise Recorder",
+      "type": "Effect"
+    },
+    {
+      "classId": 7733251,
+      "name": "Wwise RoomVerb",
+      "type": "Effect"
+    },
+    {
+      "classId": 6619138,
+      "name": "Wwise Silence",
+      "type": "Source"
+    },
+    {
+      "classId": 6553602,
+      "name": "Wwise Sine",
+      "type": "Source"
+    },
+    {
+      "classId": 8847363,
+      "name": "Wwise Stereo Delay",
+      "type": "Effect"
+    },
+    {
+      "classId": 9699330,
+      "name": "Wwise Synth One",
+      "type": "Source"
+    },
+    {
+      "classId": 58982409,
+      "name": "Wwise System Output Settings",
+      "type": "Metadata"
+    },
+    {
+      "classId": 8519683,
+      "name": "Wwise Time Stretch",
+      "type": "Effect"
+    },
+    {
+      "classId": 6684674,
+      "name": "Wwise Tone Generator",
+      "type": "Source"
+    },
+    {
+      "classId": 8585219,
+      "name": "Wwise Tremolo",
+      "type": "Effect"
+    }
+  ]
+}

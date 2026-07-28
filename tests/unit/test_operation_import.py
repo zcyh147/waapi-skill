@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 import csv
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -11,6 +13,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 from wwise_waapi.operation_import import (  # pyright: ignore[reportMissingImports]
     AUDIO_IMPORT_PLAN_CONTRACT,
     AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS,
+    MAX_AUDIO_IMPORT_BASE64_ENCODED_CHARS,
     MAX_IMPORT_ITEMS,
     MAX_TAB_ROWS,
     SUPPORTED_WWISE_VERSIONS,
@@ -44,6 +47,11 @@ def _write_tsv(root: Path, headers: list[str], rows: list[list[str]], name: str 
         writer.writerow(headers)
         writer.writerows(rows)
     return path
+
+
+def _inline_wav(relative_path: str = "Generated/inline.wav") -> tuple[str, bytes]:
+    payload = b"RIFF" + (4).to_bytes(4, "little") + b"WAVE" + b"data"
+    return f"{relative_path}|{base64.b64encode(payload).decode('ascii')}", payload
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
@@ -266,11 +274,11 @@ def test_audio_import_language_validation_exempts_sfx_but_not_mixed_localized_ro
     assert mixed_plan["oracle"]["language_requires_live_project_validation"] is True
 
 
-def test_audio_import_plan_rejects_open_ended_fields_and_raw_event(tmp_path: Path) -> None:
+def test_audio_import_plan_rejects_raw_native_fields_and_raw_event(tmp_path: Path) -> None:
     media = _write_media(tmp_path)
     base = {"object_path": OLD_ROOT + r"\Target", "audio_file": str(media)}
 
-    for unsupported in ("switchAssignation", "dialogueEvent", "@Volume", "properties"):
+    for unsupported in ("switchAssignation", "dialogueEvent", "@Volume", "default"):
         with pytest.raises(ImportContractError) as caught:
             build_audio_import_plan(
                 [base | {unsupported: "unsafe"}],
@@ -289,13 +297,33 @@ def test_audio_import_plan_rejects_open_ended_fields_and_raw_event(tmp_path: Pat
     assert raw_event.value.error_code == "INVALID_ARGUMENT"
 
 
+def test_audio_import_plan_rejects_malformed_closed_property_collection(tmp_path: Path) -> None:
+    media = _write_media(tmp_path)
+
+    with pytest.raises(ImportContractError) as caught:
+        build_audio_import_plan(
+            [
+                {
+                    "object_path": OLD_ROOT + r"\Target",
+                    "audio_file": str(media),
+                    "properties": "unsafe",
+                }
+            ],
+            version="2022.1",
+            import_operation="createNew",
+        )
+
+    assert caught.value.error_code == "INVALID_ARGUMENT"
+    assert "properties" in str(caught.value)
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
         ("originals_subfolder", "../escape"),
         ("originals_subfolder", r"C:\escape"),
         ("import_language", "  "),
-        ("object_type", "MadeUpContainer"),
+        ("object_type", r"Made\UpContainer"),
         ("event", {"path": r"\Events\Default Work Unit\Bad", "action": "Delete"}),
     ],
 )
@@ -311,6 +339,231 @@ def test_audio_import_plan_rejects_invalid_structured_values(
             version="2022.1",
             import_operation="createNew",
         )
+
+
+def test_audio_import_plan_merges_defaults_and_overrides_named_fields(tmp_path: Path) -> None:
+    media = _write_media(tmp_path, "defaults.wav")
+    output_bus = {"path": r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus"}
+
+    plan = build_audio_import_plan(
+        [
+            {
+                "audio_file": str(media),
+                "properties": [{"name": "Volume", "value": -6.0}],
+            }
+        ],
+        version="2022.1",
+        import_operation="createNew",
+        defaults={
+            "object_path": r"Imported\<Sound SFX>DefaultsTarget",
+            "import_location": OLD_ROOT,
+            "object_type": "Sound SFX",
+            "import_language": "SFX",
+            "notes": "default note",
+            "properties": [
+                {"name": "Volume", "value": -3.0},
+                {"name": "IsLoopingEnabled", "value": True},
+            ],
+            "references": [{"name": "OutputBus", "target": output_bus}],
+        },
+    )
+
+    assert plan["dispatch_args"]["imports"][0] == {
+        "objectPath": r"Imported\<Sound SFX>DefaultsTarget",
+        "importLocation": OLD_ROOT,
+        "audioFile": str(media.resolve()),
+        "objectType": "Sound SFX",
+        "importLanguage": "SFX",
+        "notes": "default note",
+    }
+    target = plan["oracle"]["targets"][0]
+    assert target["canonical_target_path"] == OLD_ROOT + r"\Imported\DefaultsTarget"
+    assert target["requested_properties"] == [
+        {"name": "Volume", "value": -6.0},
+        {"name": "IsLoopingEnabled", "value": True},
+    ]
+    assert target["requested_references"] == [
+        {"name": "OutputBus", "target": output_bus},
+    ]
+
+
+def test_audio_import_plan_preserves_closed_property_and_reference_descriptors(
+    tmp_path: Path,
+) -> None:
+    media = _write_media(tmp_path, "descriptors.wav")
+    target_identity = {"id": "{01234567-89AB-CDEF-0123-456789ABCDEF}"}
+
+    plan = build_audio_import_plan(
+        [
+            {
+                "object_path": OLD_ROOT + r"\<Sound SFX>DescriptorTarget",
+                "audio_file": str(media),
+                "properties": [
+                    {"name": "IsLoopingEnabled", "value": True},
+                    {"name": "MaxSoundPerInstance", "value": 5},
+                ],
+                "references": [{"name": "OutputBus", "target": target_identity}],
+            }
+        ],
+        version="2022.1",
+        import_operation="createNew",
+    )
+
+    target = plan["oracle"]["targets"][0]
+    assert target["requested_properties"] == [
+        {"name": "IsLoopingEnabled", "value": True},
+        {"name": "MaxSoundPerInstance", "value": 5},
+    ]
+    assert target["requested_references"] == [
+        {"name": "OutputBus", "target": target_identity},
+    ]
+    assert "@IsLoopingEnabled" not in plan["dispatch_args"]["imports"][0]
+
+
+def test_audio_import_plan_accepts_bounded_canonical_base64_wav() -> None:
+    encoded, payload = _inline_wav("Generated/Inline.wav")
+
+    plan = build_audio_import_plan(
+        [
+            {
+                "object_path": OLD_ROOT + r"\<Sound SFX>InlineTarget",
+                "audio_file_base64": encoded,
+            }
+        ],
+        version="2022.1",
+        import_operation="createNew",
+    )
+
+    dispatch = plan["dispatch_args"]["imports"][0]
+    assert dispatch["audioFileBase64"].startswith(r"Generated\Inline.wav|")
+    target = plan["oracle"]["targets"][0]
+    assert target["source_file"] == {
+        "kind": "inline_base64",
+        "relative_path": r"Generated\Inline.wav",
+        "size": len(payload),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+    }
+    assert target["expected_audio_file_source_result_path"].endswith(
+        r"\InlineTarget\Inline"
+    )
+    assert plan["file_proofs"] == []
+
+
+def test_audio_import_plan_rejects_request_wide_base64_total_after_defaults() -> None:
+    payload = (
+        b"RIFF"
+        + (100 * 1024 - 8).to_bytes(4, "little")
+        + b"WAVE"
+        + (b"x" * (100 * 1024 - 12))
+    )
+    encoded = "Generated/shared.wav|" + base64.b64encode(payload).decode("ascii")
+
+    with pytest.raises(ImportContractError) as caught:
+        build_audio_import_plan(
+            [
+                {"object_path": OLD_ROOT + r"\<Sound SFX>First"},
+                {"object_path": OLD_ROOT + r"\<Sound SFX>Second"},
+            ],
+            version="2022.1",
+            import_operation="createNew",
+            defaults={"audio_file_base64": encoded},
+        )
+
+    assert caught.value.error_code == "LIMIT_EXCEEDED"
+    assert caught.value.details["field"] == "audio_file_base64"
+    assert caught.value.details["counted_through_index"] == 1
+    assert caught.value.details["encoded_characters"] > (
+        MAX_AUDIO_IMPORT_BASE64_ENCODED_CHARS
+    )
+    assert caught.value.details["limit"] == MAX_AUDIO_IMPORT_BASE64_ENCODED_CHARS
+    assert caught.value.details["aggregation"] == "effective_rows_after_defaults"
+
+
+def test_audio_import_plan_rejects_regular_file_and_base64_in_same_row(
+    tmp_path: Path,
+) -> None:
+    media = _write_media(tmp_path, "exclusive.wav")
+    encoded, _ = _inline_wav()
+
+    with pytest.raises(ImportContractError) as caught:
+        build_audio_import_plan(
+            [
+                {
+                    "object_path": OLD_ROOT + r"\<Sound SFX>ExclusiveTarget",
+                    "audio_file": str(media),
+                    "audio_file_base64": encoded,
+                }
+            ],
+            version="2022.1",
+            import_operation="createNew",
+        )
+
+    assert caught.value.error_code == "INVALID_ARGUMENT"
+
+
+def test_audio_import_plan_accepts_structure_only_typed_row() -> None:
+    plan = build_audio_import_plan(
+        [
+            {
+                "object_path": OLD_ROOT + r"\Structure\<Random Container>CreatedContainer",
+                "notes": "created without media",
+            }
+        ],
+        version="2022.1",
+        import_operation="createNew",
+    )
+
+    assert plan["dispatch_args"]["imports"][0] == {
+        "objectPath": OLD_ROOT + r"\Structure\<Random Container>CreatedContainer",
+        "objectType": "Random Container",
+        "notes": "created without media",
+    }
+    target = plan["oracle"]["targets"][0]
+    assert target["media_expected"] is False
+    assert target["requested_object_type"] == "Random Container"
+    assert "source_file" not in target
+    assert plan["oracle"]["media_hash_readback_required"] is False
+
+
+def test_audio_import_plan_derives_relative_target_from_import_location(
+    tmp_path: Path,
+) -> None:
+    media = _write_media(tmp_path, "relative.wav")
+
+    plan = build_audio_import_plan(
+        [
+            {
+                "object_path": r"Relative\<Sound SFX>LocatedTarget",
+                "import_location": OLD_ROOT + r"\Imports",
+                "audio_file": str(media),
+            }
+        ],
+        version="2022.1",
+        import_operation="createNew",
+    )
+
+    assert plan["dispatch_args"]["imports"][0]["importLocation"] == OLD_ROOT + r"\Imports"
+    assert plan["oracle"]["targets"][0]["canonical_target_path"] == (
+        OLD_ROOT + r"\Imports\Relative\LocatedTarget"
+    )
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_audio_import_plan_exposes_auto_add_to_source_control(
+    version: str,
+    tmp_path: Path,
+) -> None:
+    root = NEW_ROOT if version == "2025.1" else OLD_ROOT
+    media = _write_media(tmp_path, f"auto-add-{version}.wav")
+
+    plan = build_audio_import_plan(
+        [{"object_path": root + r"\AutoAddTarget", "audio_file": str(media)}],
+        version=version,
+        import_operation="createNew",
+        auto_add_to_source_control=True,
+    )
+
+    assert plan["dispatch_args"]["autoAddToSourceControl"] is True
 
 
 def test_audio_import_plan_rejects_duplicate_targets_and_item_limit(tmp_path: Path) -> None:
@@ -492,14 +745,14 @@ def test_tab_parser_supports_exact_absolute_target_and_2025_root(tmp_path: Path)
     [
         "Originals Sub Folder",
         "Import Language",
-        "Switch Assignation",
-        "Dialogue Event",
-        "@Volume",
-        "Property[Volume]",
         "Reference[Output Bus]",
+        "Unknown Header",
     ],
 )
-def test_tab_parser_rejects_unreviewed_columns(unsupported_header: str, tmp_path: Path) -> None:
+def test_tab_parser_rejects_columns_outside_native_header_grammar(
+    unsupported_header: str,
+    tmp_path: Path,
+) -> None:
     media = _write_media(tmp_path)
     tsv = _write_tsv(
         tmp_path,
@@ -519,9 +772,147 @@ def test_tab_parser_rejects_unreviewed_columns(unsupported_header: str, tmp_path
     assert unsupported_header in caught.value.details["unsupported"]
 
 
+def test_tab_parser_records_dynamic_properties_references_and_auto_fields(
+    tmp_path: Path,
+) -> None:
+    media = _write_media(tmp_path, "dynamic-fields.wav")
+    tsv = _write_tsv(
+        tmp_path,
+        [
+            "Audio File",
+            "Object Path",
+            "@Volume",
+            "Property[IsLoopingEnabled]",
+            "Reference[OutputBus]",
+        ],
+        [
+            [
+                str(media),
+                r"<Sound SFX>DynamicTarget",
+                "-6.5",
+                "true",
+                r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus",
+            ]
+        ],
+        name="dynamic-fields.tsv",
+    )
+
+    plan = parse_tab_delimited_import_file(
+        tsv,
+        version="2022.1",
+        import_location=OLD_ROOT,
+        import_language="SFX",
+        import_operation="createNew",
+    )
+
+    assert plan["oracle"]["targets"][0]["requested_dynamic_fields"] == [
+        {"kind": "auto", "name": "Volume", "value": "-6.5", "header": "@Volume"},
+        {
+            "kind": "property",
+            "name": "IsLoopingEnabled",
+            "value": "true",
+            "header": "Property[IsLoopingEnabled]",
+        },
+        {
+            "kind": "reference",
+            "name": "OutputBus",
+            "value": r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus",
+            "header": "Reference[OutputBus]",
+        },
+    ]
+
+
+def test_tab_parser_records_dialogue_and_switch_directives(tmp_path: Path) -> None:
+    tsv = _write_tsv(
+        tmp_path,
+        ["Object Path", "Object Type", "Dialogue Event", "Switch Assignation"],
+        [
+            [
+                r"<Sound SFX>DirectiveTarget",
+                "Sound SFX",
+                "DialogueEvent=Greeting",
+                "Switch=Day",
+            ]
+        ],
+        name="directives.tsv",
+    )
+
+    plan = parse_tab_delimited_import_file(
+        tsv,
+        version="2022.1",
+        import_location=OLD_ROOT,
+        import_language="SFX",
+        import_operation="createNew",
+    )
+
+    assert plan["rows"][0]["dialogue_events"] == ["DialogueEvent=Greeting"]
+    assert plan["rows"][0]["switch_assignments"] == ["Switch=Day"]
+    target = plan["oracle"]["targets"][0]
+    assert target["requested_dialogue_events"] == ["DialogueEvent=Greeting"]
+    assert target["requested_switch_assignments"] == ["Switch=Day"]
+    assert plan["oracle"]["dialogue_event_side_effects_present"] is True
+    assert plan["oracle"]["switch_assignment_side_effects_present"] is True
+
+
+def test_tab_parser_accepts_bounded_base64_wav(tmp_path: Path) -> None:
+    encoded, payload = _inline_wav("TabInline.wav")
+    tsv = _write_tsv(
+        tmp_path,
+        ["Audio File Base64", "Object Path"],
+        [[encoded, r"<Sound SFX>TabInlineTarget"]],
+        name="inline.tsv",
+    )
+
+    plan = parse_tab_delimited_import_file(
+        tsv,
+        version="2022.1",
+        import_location=OLD_ROOT,
+        import_language="SFX",
+        import_operation="createNew",
+    )
+
+    assert plan["rows"][0]["audio_file_base64"] == "TabInline.wav"
+    target = plan["oracle"]["targets"][0]
+    assert target["source_file"]["kind"] == "inline_base64"
+    assert target["source_file"]["size"] == len(payload)
+    assert target["expected_audio_file_source_result_path"].endswith(
+        r"\TabInlineTarget\TabInline"
+    )
+    assert plan["source_file_proofs"] == []
+
+
+def test_tab_parser_accepts_repeated_event_columns(tmp_path: Path) -> None:
+    media = _write_media(tmp_path, "repeated-events.wav")
+    first = r"\Events\Default Work Unit\Imports\Play_Target@Play"
+    second = r"\Events\Default Work Unit\Imports\Stop_Target@Stop"
+    tsv = _write_tsv(
+        tmp_path,
+        ["Audio File", "Object Path", "Event", "Event"],
+        [[str(media), r"<Sound SFX>EventTarget", first, second]],
+        name="repeated-events.tsv",
+    )
+
+    plan = parse_tab_delimited_import_file(
+        tsv,
+        version="2022.1",
+        import_location=OLD_ROOT,
+        import_language="SFX",
+        import_operation="createNew",
+    )
+
+    expected = [
+        {"path": r"\Events\Default Work Unit\Imports\Play_Target", "action": "Play"},
+        {"path": r"\Events\Default Work Unit\Imports\Stop_Target", "action": "Stop"},
+    ]
+    assert plan["rows"][0]["events"] == expected
+    assert plan["oracle"]["targets"][0]["requested_events"] == expected
+    assert "event" not in plan["rows"][0]
+    assert plan["oracle"]["event_side_effects_present"] is True
+
+
 def test_tab_parser_rejects_missing_duplicate_and_malformed_headers(tmp_path: Path) -> None:
     media = _write_media(tmp_path)
-    missing = _write_tsv(tmp_path, ["Object Path"], [["Target"]], name="missing.tsv")
+    missing = _write_tsv(tmp_path, ["Audio File"], [[str(media)]], name="missing.tsv")
     duplicate = _write_tsv(
         tmp_path,
         ["Audio File", "Audio File", "Object Path"],

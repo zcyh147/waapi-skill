@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any, Mapping
@@ -22,6 +23,15 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
 GUID = "{11111111-1111-1111-1111-111111111111}"
 PARENT_GUID = "{22222222-2222-2222-2222-222222222222}"
 TARGET_GUID = "{33333333-3333-3333-3333-333333333333}"
+SOUND_TYPE_RESULT = {
+    "return": [
+        {
+            "classId": 65552,
+            "name": "Sound",
+            "type": "WObject",
+        }
+    ]
+}
 
 
 class ScriptedReader:
@@ -195,8 +205,23 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     assert specs["audio.import"]["implemented"] is True
     assert "identity_contract" not in specs["audio.import"]
     import_items = specs["audio.import"]["argument_contract"]["properties"]["imports"]["items"]
-    assert import_items["required"] == ["object_path", "audio_file"]
+    assert import_items["required"] == []
+    assert {
+        "audio_file",
+        "audio_file_base64",
+        "dialogue_event",
+        "import_location",
+        "properties",
+        "references",
+        "switch_assignment",
+    } <= set(import_items["optional"])
     assert import_items["additionalProperties"] is False
+    assert specs["audio.import"]["argument_contract"][
+        "maximumEffectiveAudioFileBase64EncodedCharacters"
+    ] == 256 * 1024
+    assert specs["object.set"]["argument_contract"][
+        "maximumCanonicalRequestBytes"
+    ] == 256 * 1024
     for operation in ("audio.import", "audio.importTabDelimited"):
         assert "auto_check_out_to_source_control" in specs[operation]["optional_arguments"]
         auto_check_out = specs[operation]["argument_contract"]["properties"][
@@ -209,6 +234,23 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
             "explicit use on 2021.1/2022.1 fails before connection" in constraint
             for constraint in specs[operation]["constraints"]
         )
+    delete_auto_check_out = specs["object.delete"]["argument_contract"][
+        "properties"
+    ]["auto_check_out_to_source_control"]
+    assert specs["object.delete"]["optional_arguments"] == [
+        "auto_check_out_to_source_control"
+    ]
+    assert delete_auto_check_out["type"] == "boolean"
+    assert delete_auto_check_out["default"] is False
+    assert delete_auto_check_out["supported_versions"] == [
+        "2023.1",
+        "2024.1",
+        "2025.1",
+    ]
+    reference_target = specs["object.setReference"]["argument_contract"][
+        "properties"
+    ]["target"]
+    assert reference_target["oneOf"][1]["type"] == "null"
     assert specs["soundbank.setInclusions"]["argument_contract"]["properties"]["mode"]["enum"] == [
         "add",
         "remove",
@@ -285,6 +327,110 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     assert "attested_project_layout" not in generate["optional_arguments"]
     assert "attested_project_layout" not in generate["argument_contract"]["properties"]
     assert any("filePath" in constraint and "WPROJ" in constraint for constraint in generate["constraints"])
+
+
+def test_operation_catalog_exposes_business_intent_selection_guidance() -> None:
+    specs = {spec.name: spec.as_dict() for spec in list_operation_specs()}
+    guided_operations = {
+        "waapi.undoGroup",
+        "audio.import",
+        "audio.importTabDelimited",
+        "object.create",
+        "object.delete",
+        "object.setName",
+        "object.setNotes",
+        "object.setProperty",
+        "object.setReference",
+        "object.setLinked",
+        "object.createPlugin",
+        "object.setRTPC",
+        "object.set",
+        "lua.executeCliFile",
+        "lua.executeCoreFile",
+        "lua.executeCoreInline",
+        "ui.commands.execute",
+        "ui.captureScreen",
+        "soundbank.setInclusions",
+        "soundbank.generate",
+        "soundbank.convertExternalSources",
+        "soundbank.processDefinitionFiles",
+        "switchContainer.addAssignment",
+        "switchContainer.removeAssignment",
+    }
+
+    for name in guided_operations:
+        guidance = specs[name]["selection_guidance"]
+        assert set(guidance) == {
+            "principle",
+            "use_when",
+            "avoid_when",
+            "preferred_over",
+            "choose_instead",
+        }
+        assert guidance["use_when"]
+        assert all(isinstance(item, str) and item for item in guidance["use_when"])
+        for relation in ("preferred_over", "choose_instead"):
+            assert all(set(item) == {"target", "when"} for item in guidance[relation])
+
+    direct_import = specs["audio.import"]["selection_guidance"]
+    assert any("one row or a batch" in item for item in direct_import["use_when"])
+    assert {
+        item["target"] for item in direct_import["preferred_over"]
+    } >= {"audio.importTabDelimited", "object.create", "object.set"}
+    assert any(
+        "invent an intermediate TSV" in item["when"]
+        for item in direct_import["preferred_over"]
+    )
+
+    tab_import = specs["audio.importTabDelimited"]["selection_guidance"]
+    assert any("existing absolute TSV" in item for item in tab_import["use_when"])
+    assert any("many rows" in item for item in tab_import["avoid_when"])
+    assert {item["target"] for item in tab_import["choose_instead"]} >= {
+        "audio.import",
+        "waapi.call",
+    }
+
+    object_set = specs["object.set"]["selection_guidance"]
+    assert {
+        item["target"] for item in object_set["choose_instead"]
+    } >= {
+        "object.create",
+        "audio.import",
+        "object.createPlugin",
+        "object.setRTPC",
+        "object.setLinked",
+    }
+    assert any(
+        item["target"] == "audio.import"
+        and "subordinate" in item["when"]
+        for item in object_set["preferred_over"]
+    )
+
+    inclusions = specs["soundbank.setInclusions"]["selection_guidance"]
+    definitions = specs["soundbank.processDefinitionFiles"]["selection_guidance"]
+    assert inclusions["choose_instead"] == [
+        {
+            "target": "soundbank.processDefinitionFiles",
+            "when": "existing caller-owned Definition TSV files are the requested source of truth",
+        }
+    ]
+    assert definitions["choose_instead"][0]["target"] == "soundbank.setInclusions"
+
+    undo_group = specs["waapi.undoGroup"]["selection_guidance"]
+    assert any("one Wwise Undo step" in item for item in undo_group["use_when"])
+    assert any(
+        item["target"] == "the matching dedicated batch operation"
+        for item in undo_group["choose_instead"]
+    )
+
+    generate = specs["soundbank.generate"]["selection_guidance"]
+    assert any("generation-only" in item for item in generate["use_when"])
+    assert any(
+        item["target"] == "soundbank.setInclusions"
+        for item in generate["choose_instead"]
+    )
+
+    assert "selection_guidance" not in specs["debug.setAutomationMode"]
 
 
 @pytest.mark.parametrize("version", ["2021.1", "2022.1"])
@@ -917,6 +1063,184 @@ def test_property_and_reference_metadata_are_live_runtime_inputs_not_request_fie
     assert prepared_reference["resolved_roles"]["target"]["object"] == TARGET_GUID
 
 
+def test_reference_can_be_explicitly_cleared_and_null_is_verified() -> None:
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.get": [
+                {"return": [object_row()]},
+                {
+                    "return": [
+                        {
+                            "id": GUID,
+                            "path": object_row()["path"],
+                            "OutputBus": {"id": TARGET_GUID},
+                        }
+                    ]
+                },
+            ],
+            "ak.wwise.core.object.getPropertyInfo": [
+                {
+                    "name": "OutputBus",
+                    "type": "Reference",
+                    "supports": {"reference": True},
+                    "restriction": {
+                        "type": "reference",
+                        "restrictions": [{"type": ["Bus"]}],
+                    },
+                }
+            ],
+        }
+    )
+    prepared = prepare_operation(
+        parse_operation_request(
+            request(
+                "object.setReference",
+                {
+                    "object": {"kind": "id", "value": GUID},
+                    "reference": "OutputBus",
+                    "target": None,
+                },
+            )
+        ),
+        read_call=reader,
+    ).as_dict()
+
+    assert prepared["dispatch"]["args"] == {
+        "object": GUID,
+        "reference": "OutputBus",
+        "value": None,
+    }
+    assert "target" not in prepared["resolved_roles"]
+    assert prepared["verification_plan"]["expected_clear"] is True
+    assert prepared["verification_plan"]["expected_target_id"] is None
+
+    verified = verify_prepared_operation(
+        prepared,
+        execution_result={},
+        read_call=ScriptedReader(
+            {
+                "ak.wwise.core.object.get": [
+                    {"return": [{"id": GUID, "OutputBus": None}]}
+                ]
+            }
+        ),
+    )
+    assert verified.status == "verified"
+    assert next(
+        item for item in verified.assertions if item["name"] == "reference is cleared"
+    )["passed"] is True
+
+
+def test_reference_clear_rejects_live_not_null_restriction() -> None:
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.get": [
+                {"return": [object_row()]},
+                {
+                    "return": [
+                        {
+                            "id": GUID,
+                            "path": object_row()["path"],
+                            "OutputBus": {"id": TARGET_GUID},
+                        }
+                    ]
+                },
+            ],
+            "ak.wwise.core.object.getPropertyInfo": [
+                {
+                    "name": "OutputBus",
+                    "type": "Reference",
+                    "supports": {"reference": True},
+                    "restriction": {
+                        "type": "reference",
+                        "restrictions": ["notNull"],
+                    },
+                }
+            ],
+        }
+    )
+
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(
+            parse_operation_request(
+                request(
+                    "object.setReference",
+                    {
+                        "object": {"kind": "id", "value": GUID},
+                        "reference": "OutputBus",
+                        "target": None,
+                    },
+                )
+            ),
+            read_call=reader,
+        )
+
+    assert rejected.value.error_code == "REFERENCE_NOT_CLEARABLE"
+
+
+@pytest.mark.parametrize("enabled", (False, True))
+def test_object_delete_exposes_versioned_auto_check_out(enabled: bool) -> None:
+    prepared = prepare_operation(
+        parse_operation_request(
+            request(
+                "object.delete",
+                {
+                    "object": {"kind": "id", "value": GUID},
+                    "auto_check_out_to_source_control": enabled,
+                },
+                version="2023.1",
+            )
+        ),
+        read_call=ScriptedReader(
+            {"ak.wwise.core.object.get": [{"return": [object_row()]}]}
+        ),
+    ).as_dict()
+
+    assert prepared["dispatch"]["args"] == {
+        "object": GUID,
+        "autoCheckOutToSourceControl": enabled,
+    }
+    assert prepared["pre_state"]["source_control_policy"] == {
+        "auto_check_out_to_source_control": enabled,
+        "supported": True,
+        "dispatched": True,
+    }
+
+
+def test_object_delete_defaults_auto_check_out_false_in_new_lanes() -> None:
+    prepared = prepare_operation(
+        parse_operation_request(
+            request(
+                "object.delete",
+                {"object": {"kind": "id", "value": GUID}},
+                version="2025.1",
+            )
+        ),
+        read_call=ScriptedReader(
+            {"ak.wwise.core.object.get": [{"return": [object_row()]}]}
+        ),
+    ).as_dict()
+
+    assert prepared["dispatch"]["args"]["autoCheckOutToSourceControl"] is False
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1"))
+def test_object_delete_rejects_auto_check_out_in_old_lanes(version: str) -> None:
+    with pytest.raises(OperationContractError) as rejected:
+        parse_operation_request(
+            request(
+                "object.delete",
+                {
+                    "object": {"kind": "id", "value": GUID},
+                    "auto_check_out_to_source_control": False,
+                },
+                version=version,
+            )
+        )
+
+    assert rejected.value.error_code == "VERSION_BEHAVIOR_BOUNDARY"
+
+
 def test_reference_target_is_checked_against_legacy_live_restrictions() -> None:
     source_id = "{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}"
     group_id = "{bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb}"
@@ -1282,6 +1606,7 @@ def test_audio_import_closes_nested_fields_files_targets_defaults_and_verificati
                     {"return": [parent_row]},
                     {"return": []},
                 ],
+                "ak.wwise.core.object.getTypes": [SOUND_TYPE_RESULT],
                 "ak.wwise.core.getProjectInfo": [project_info],
             }
         ),
@@ -1379,6 +1704,463 @@ def test_audio_import_closes_nested_fields_files_targets_defaults_and_verificati
     )
     assert guard["status"] == "repreview_required"
     assert any(item["name"] == "file_proofs[0] unchanged since preview" and not item["passed"] for item in guard["assertions"])
+
+
+def test_audio_import_materializes_defaults_base64_properties_references_and_row_location(
+    tmp_path: Path,
+) -> None:
+    project_info = project_info_row(tmp_path / "SampleProject")
+    import_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Imports"
+    target_path = import_path + r"\Inline"
+    import_parent = object_row(
+        object_id=PARENT_GUID,
+        name="Imports",
+        object_type="ActorMixer",
+        path=import_path,
+        parent="{actor-root}",
+    )
+    output_bus = object_row(
+        object_id=TARGET_GUID,
+        name="Master Audio Bus",
+        object_type="Bus",
+        path=r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus",
+        parent="{master-root}",
+    )
+    inline_wav = b"RIFF\x04\x00\x00\x00WAVE"
+    inline_source = "SFX/inline.wav|" + base64.b64encode(inline_wav).decode("ascii")
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.get": [
+                {"return": [import_parent]},
+                {"return": [output_bus]},
+                {"return": [import_parent]},
+                {"return": []},
+            ],
+            "ak.wwise.core.object.getPropertyInfo": [
+                {
+                    "name": "Volume",
+                    "type": "Real32",
+                    "restriction": {"type": "range", "min": -200.0, "max": 200.0},
+                },
+                {
+                    "name": "OutputBus",
+                    "type": "Reference",
+                    "restriction": {
+                        "type": "reference",
+                        "restrictions": [{"type": ["Bus"]}],
+                    },
+                },
+            ],
+            "ak.wwise.core.object.getTypes": [SOUND_TYPE_RESULT],
+            "ak.wwise.core.getProjectInfo": [project_info],
+        }
+    )
+
+    prepared = prepare_operation(
+        parse_operation_request(
+            request(
+                "audio.import",
+                {
+                    "defaults": {
+                        "object_type": "Sound",
+                        "properties": [{"name": "Volume", "value": -12.0}],
+                        "references": [
+                            {
+                                "name": "OutputBus",
+                                "target": {"kind": "id", "value": TARGET_GUID},
+                            }
+                        ],
+                    },
+                    "imports": [
+                        {
+                            "object_path": r"<Sound>Inline",
+                            "import_location": {
+                                "kind": "path",
+                                "value": import_path,
+                            },
+                            "audio_file_base64": inline_source,
+                            # Per-row values replace same-token defaults.
+                            "properties": [{"name": "Volume", "value": -6.0}],
+                        }
+                    ],
+                    "auto_add_to_source_control": True,
+                },
+            )
+        ),
+        read_call=reader,
+    ).as_dict()
+
+    dispatch = prepared["dispatch"]
+    assert dispatch["uri"] == "ak.wwise.core.audio.import"
+    assert dispatch["args"]["autoAddToSourceControl"] is True
+    assert dispatch["args"]["imports"] == [
+        {
+            "objectPath": r"<Sound>Inline",
+            "importLocation": import_path,
+            "audioFileBase64": (
+                "SFX\\inline.wav|" + base64.b64encode(inline_wav).decode("ascii")
+            ),
+            "objectType": "Sound",
+            "@Volume": -6.0,
+            "@OutputBus": TARGET_GUID,
+        }
+    ]
+    assert "@Volume" in dispatch["options"]["return"]
+    assert "@OutputBus" in dispatch["options"]["return"]
+    target = prepared["verification_plan"]["targets"][0]
+    assert target["canonical_target_path"] == target_path
+    assert target["metadata_object_type"] == "Sound"
+    assert target["metadata_class_id"] == 65552
+    assert target["validated_properties"] == [
+        {
+            "name": "Volume",
+            "value": -6.0,
+            "metadata_type": "Real32",
+            "source": "request",
+        }
+    ]
+    assert target["validated_references"] == [
+        {
+            "name": "OutputBus",
+            "target_id": TARGET_GUID,
+            "source": "request",
+        }
+    ]
+    assert (
+        prepared["resolved_roles"]["imports[0].import_location"]["object"]
+        == PARENT_GUID
+    )
+    assert (
+        prepared["resolved_roles"]["targets[0].references[0].target"]["object"]
+        == TARGET_GUID
+    )
+    metadata_calls = [
+        (args, options)
+        for uri, args, options in reader.calls
+        if uri == "ak.wwise.core.object.getPropertyInfo"
+    ]
+    assert metadata_calls == [
+        ({"property": "Volume", "classId": 65552}, {}),
+        ({"property": "OutputBus", "classId": 65552}, {}),
+    ]
+    assert [
+        (args, options)
+        for uri, args, options in reader.calls
+        if uri == "ak.wwise.core.object.getTypes"
+    ] == [({}, {})]
+
+
+def test_audio_import_unknown_type_fails_from_live_type_catalog() -> None:
+    reader = ScriptedReader(
+        {"ak.wwise.core.object.getTypes": [SOUND_TYPE_RESULT]}
+    )
+
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(
+            parse_operation_request(
+                request(
+                    "audio.import",
+                    {
+                        "imports": [
+                            {
+                                "object_path": (
+                                    r"\Actor-Mixer Hierarchy\Default Work Unit"
+                                    r"\<ImaginaryType>Closed"
+                                ),
+                                "object_type": "ImaginaryType",
+                            }
+                        ]
+                    },
+                )
+            ),
+            read_call=reader,
+        )
+
+    assert rejected.value.error_code == "INVALID_OBJECT_TYPE"
+    assert reader.calls == [
+        ("ak.wwise.core.object.getTypes", {}, {})
+    ]
+
+
+def test_audio_import_does_not_fallback_to_packaged_type_when_live_host_omits_it() -> None:
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.getTypes": [
+                {
+                    "return": [
+                        {
+                            "classId": 1,
+                            "name": "ActorMixer",
+                            "type": "WObject",
+                        }
+                    ]
+                }
+            ]
+        }
+    )
+
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(
+            parse_operation_request(
+                request(
+                    "audio.import",
+                    {
+                        "imports": [
+                            {
+                                "object_path": (
+                                    r"\Actor-Mixer Hierarchy\Default Work Unit"
+                                    r"\<Sound>LiveTypeRequired"
+                                ),
+                                "object_type": "Sound",
+                            }
+                        ]
+                    },
+                )
+            ),
+            read_call=reader,
+        )
+
+    assert rejected.value.error_code == "INVALID_OBJECT_TYPE"
+    assert reader.calls == [
+        ("ak.wwise.core.object.getTypes", {}, {})
+    ]
+
+
+def test_tab_import_validates_dynamic_property_and_reference_columns_before_preview(
+    tmp_path: Path,
+) -> None:
+    import_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Imports"
+    import_parent = object_row(
+        object_id=PARENT_GUID,
+        name="Imports",
+        object_type="ActorMixer",
+        path=import_path,
+        parent="{actor-root}",
+    )
+    output_bus_path = (
+        r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus"
+    )
+    output_bus = object_row(
+        object_id=TARGET_GUID,
+        name="Master Audio Bus",
+        object_type="Bus",
+        path=output_bus_path,
+        parent="{master-root}",
+    )
+    import_file = tmp_path / "dynamic.tsv"
+    import_file.write_text(
+        "\t".join(
+            (
+                "Object Path",
+                "Object Type",
+                "Property[Volume]",
+                "Reference[OutputBus]",
+            )
+        )
+        + "\n"
+        + "\t".join(
+            (
+                r"<Sound>Tabbed",
+                "Sound",
+                "-9.5",
+                output_bus_path,
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.get": [
+                {"return": [import_parent]},
+                {"return": [output_bus]},
+                {"return": [import_parent]},
+                {"return": []},
+            ],
+            "ak.wwise.core.object.getPropertyInfo": [
+                {
+                    "name": "Volume",
+                    "type": "Real32",
+                    "restriction": {"type": "range", "min": -200.0, "max": 200.0},
+                },
+                {
+                    "name": "OutputBus",
+                    "type": "Reference",
+                    "restriction": {
+                        "type": "reference",
+                        "restrictions": [{"type": ["Bus"]}],
+                    },
+                },
+            ],
+            "ak.wwise.core.object.getTypes": [SOUND_TYPE_RESULT],
+        }
+    )
+
+    prepared = prepare_operation(
+        parse_operation_request(
+            request(
+                "audio.importTabDelimited",
+                {
+                    "import_file": str(import_file),
+                    "import_location": {"kind": "id", "value": PARENT_GUID},
+                    "import_language": "SFX",
+                    "auto_add_to_source_control": True,
+                },
+            )
+        ),
+        read_call=reader,
+    ).as_dict()
+
+    assert prepared["dispatch"] == {
+        "uri": "ak.wwise.core.audio.importTabDelimited",
+        "args": {
+            "importFile": str(import_file.resolve()),
+            "importLocation": PARENT_GUID,
+            "importLanguage": "SFX",
+            "importOperation": "createNew",
+            "autoAddToSourceControl": True,
+        },
+        "options": {
+            "return": [
+                "id",
+                "name",
+                "type",
+                "path",
+                "parent",
+                "notes",
+                "activeSource",
+                "originalFilePath",
+                "sound:originalWavFilePath",
+                "audioSource:language",
+                "@Volume",
+                "@OutputBus",
+            ]
+        },
+    }
+    target = prepared["verification_plan"]["targets"][0]
+    assert target["metadata_class_id"] == 65552
+    assert target["validated_properties"] == [
+        {
+            "name": "Volume",
+            "value": -9.5,
+            "metadata_type": "Real32",
+            "source": "tab",
+        }
+    ]
+    assert target["validated_references"] == [
+        {
+            "name": "OutputBus",
+            "target_id": TARGET_GUID,
+            "source": "tab",
+        }
+    ]
+    assert [
+        (args, options)
+        for uri, args, options in reader.calls
+        if uri == "ak.wwise.core.object.getTypes"
+    ] == [({}, {})]
+
+
+def test_tab_import_rejects_duplicate_dynamic_field_before_metadata_read(
+    tmp_path: Path,
+) -> None:
+    import_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Imports"
+    import_parent = object_row(
+        object_id=PARENT_GUID,
+        name="Imports",
+        object_type="ActorMixer",
+        path=import_path,
+        parent="{actor-root}",
+    )
+    import_file = tmp_path / "duplicate-dynamic.tsv"
+    import_file.write_text(
+        "Object Path\tObject Type\tProperty[Volume]\t@Volume\n"
+        "<Sound>Duplicate\tSound\t-6\t-9\n",
+        encoding="utf-8",
+    )
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.get": [{"return": [import_parent]}],
+            "ak.wwise.core.object.getTypes": [SOUND_TYPE_RESULT],
+        }
+    )
+
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(
+            parse_operation_request(
+                request(
+                    "audio.importTabDelimited",
+                    {
+                        "import_file": str(import_file),
+                        "import_location": {
+                            "kind": "path",
+                            "value": import_path,
+                        },
+                        "import_language": "SFX",
+                    },
+                )
+            ),
+            read_call=reader,
+        )
+
+    assert rejected.value.error_code == "DUPLICATE_FIELD"
+    assert all(
+        uri != "ak.wwise.core.object.getPropertyInfo"
+        for uri, _args, _options in reader.calls
+    )
+
+
+def test_tab_import_rejects_value_that_live_property_type_cannot_parse(
+    tmp_path: Path,
+) -> None:
+    import_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Imports"
+    import_parent = object_row(
+        object_id=PARENT_GUID,
+        name="Imports",
+        object_type="ActorMixer",
+        path=import_path,
+        parent="{actor-root}",
+    )
+    import_file = tmp_path / "bad-property-type.tsv"
+    import_file.write_text(
+        "Object Path\tObject Type\tProperty[IsLoopingEnabled]\n"
+        "<Sound>BadBool\tSound\tnot-a-boolean\n",
+        encoding="utf-8",
+    )
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.get": [{"return": [import_parent]}],
+            "ak.wwise.core.object.getPropertyInfo": [
+                {"name": "IsLoopingEnabled", "type": "Bool"}
+            ],
+            "ak.wwise.core.object.getTypes": [SOUND_TYPE_RESULT],
+        }
+    )
+
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(
+            parse_operation_request(
+                request(
+                    "audio.importTabDelimited",
+                    {
+                        "import_file": str(import_file),
+                        "import_location": {
+                            "kind": "path",
+                            "value": import_path,
+                        },
+                        "import_language": "SFX",
+                    },
+                )
+            ),
+            read_call=reader,
+        )
+
+    assert rejected.value.error_code == "INVALID_PROPERTY_VALUE"
+    assert reader.calls[-1][0] == "ak.wwise.core.object.getPropertyInfo"
+    assert reader.calls[-1][1] == {
+        "property": "IsLoopingEnabled",
+        "classId": 65552,
+    }
 
 
 @pytest.mark.parametrize("version", ["2021.1", "2022.1"])
@@ -1527,6 +2309,7 @@ def test_audio_import_uses_versioned_authoring_roots_for_2025_containers(tmp_pat
                     },
                     {"return": []},
                 ],
+                "ak.wwise.core.object.getTypes": [SOUND_TYPE_RESULT],
                 "ak.wwise.core.getProjectInfo": [project_info],
             }
         ),

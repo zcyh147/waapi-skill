@@ -76,6 +76,7 @@ def test_locality_contract_covers_every_closed_operation_schema_with_local_paths
     assert set().union(*partitions) == set(by_name)
     assert CONDITIONAL_LOCAL_FILESYSTEM_OPERATIONS == frozenset(
         {
+            "object.set",
             "ui.commands.execute",
             "ui.commands.register",
             "ui.commands.unregister",
@@ -113,6 +114,7 @@ def test_locality_contract_covers_every_closed_operation_schema_with_local_paths
         "lua.executeCliFile",
         "lua.executeCoreFile",
         "lua.executeCoreInline",
+        "object.set",
         "soundbank.convertExternalSources",
         "soundbank.processDefinitionFiles",
         "ui.commands.execute",
@@ -189,6 +191,53 @@ def test_ui_locality_is_conditional_and_capture_screen_stays_remote_capable() ->
         "arguments.commands[].handler.working_directory",
     )
     assert local_filesystem_path_roles(request("ui.captureScreen", {})) == ()
+
+
+def test_object_set_locality_is_conditional_on_recursive_import() -> None:
+    assert local_filesystem_path_roles(
+        request(
+            "object.set",
+            {
+                "objects": [
+                    {
+                        "object": {"kind": "id", "value": "{TARGET}"},
+                        "properties": [{"name": "Volume", "value": -3}],
+                    }
+                ]
+            },
+        )
+    ) == ()
+    assert local_filesystem_path_roles(
+        request(
+            "object.set",
+            {
+                "objects": [
+                    {
+                        "object": {"kind": "id", "value": "{TARGET}"},
+                        "children": [
+                            {
+                                "type": "Sound",
+                                "name": "Imported",
+                                "import": {
+                                    "files": [
+                                        {
+                                            "audio_file_base64": (
+                                                "inline.wav|UklGRgAAAAAAV0FWRQ=="
+                                            )
+                                        }
+                                    ]
+                                },
+                            }
+                        ],
+                    }
+                ]
+            },
+            version="2023.1",
+        )
+    ) == (
+        "arguments.objects[].recursive.import",
+        "live_project_files",
+    )
 
 
 def test_waapi_call_locality_comes_only_from_isolated_execution_route() -> None:

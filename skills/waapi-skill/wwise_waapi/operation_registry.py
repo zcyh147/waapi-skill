@@ -23,7 +23,6 @@ from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
 from .canonical import canonical_json_bytes
-from .builders.imports import ImportBuilder
 from .builders.identity import ObjectIdentity, ResolvedObject, plan_object_resolution
 from .builders.metadata import (
     GET_PROPERTY_INFO_URI,
@@ -55,17 +54,23 @@ from .io_policy import IOPolicyError, validate_isolated_io
 from .operation_import import (
     AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS,
     ImportContractError,
+    MAX_AUDIO_IMPORT_BASE64_ENCODED_CHARS,
     build_audio_import_plan,
     expected_audio_file_source_result_path,
     language_requires_live_project_validation,
     normalize_auto_check_out_to_source_control,
+    normalize_inline_audio_file,
+    normalize_originals_subfolder,
     parse_tab_delimited_import_file,
     regular_file_proof as import_regular_file_proof,
     unsupported_localized_existing_fields,
+    validate_import_media_extension,
     verify_regular_file_proof as verify_import_file_proof,
 )
 from .operation_object import (
     DEFAULT_MAX_NODES,
+    DEFAULT_MAX_REQUEST_BYTES,
+    ObjectImportDescriptor,
     ObjectNodeDescriptor,
     ObjectOperationContractError,
     ObjectResultNode,
@@ -77,6 +82,9 @@ from .operation_object import (
     materialize_waapi_node,
     materialize_waapi_rtpc,
     normalize_object_forest,
+    normalize_object_import,
+    normalize_object_list_name,
+    normalize_object_lists,
     normalize_property_descriptors,
     normalize_reference_descriptors,
     normalize_rtpc_descriptors,
@@ -144,6 +152,20 @@ SOUNDBANK_GET_INCLUSIONS_URI = "ak.wwise.core.soundbank.getInclusions"
 SWITCHCONTAINER_GET_ASSIGNMENTS_URI = "ak.wwise.core.switchContainer.getAssignments"
 REMOTE_GET_CONNECTION_STATUS_URI = "ak.wwise.core.remote.getConnectionStatus"
 REMOTE_CONNECT_URI = "ak.wwise.core.remote.connect"
+OBJECT_SET_IMPORT_VERSIONS = frozenset(
+    {"2023.1", "2024.1", "2025.1"}
+)
+OBJECT_SET_IMPORT_READBACK_FIELDS = (
+    "id",
+    "name",
+    "type",
+    "path",
+    "parent",
+    "activeSource",
+    "audioSource:language",
+    "originalFilePath",
+    "sound:originalWavFilePath",
+)
 REMOTE_DISCONNECT_URI = "ak.wwise.core.remote.disconnect"
 TRANSPORT_CREATE_URI = "ak.wwise.core.transport.create"
 TRANSPORT_DESTROY_URI = "ak.wwise.core.transport.destroy"
@@ -253,6 +275,17 @@ DEFINITION_SHORT_ID_OBJECT_TYPE_CODES: Mapping[str, int] = {
 }
 OBJECT_REPLACE_SNAPSHOT_FIELDS = ("id", "path")
 OBJECT_REPLACE_MAX_SUBTREE_NODES = 128
+OBJECT_LIST_SNAPSHOT_FIELDS = (
+    "id",
+    "name",
+    "type",
+    "path",
+    "parent",
+    "owner",
+    "notes",
+)
+OBJECT_LIST_MAX_SUBTREE_NODES = 128
+OBJECT_DEDICATED_LIST_NAMES = frozenset({"effects", "rtpc"})
 RTPC_SNAPSHOT_FIELDS = (
     "id",
     "name",
@@ -315,14 +348,22 @@ IMPORT_ROOTS_BY_VERSION: Mapping[str, frozenset[str]] = {
     "2024.1": frozenset({"Actor-Mixer Hierarchy", "Interactive Music Hierarchy"}),
     "2025.1": frozenset({"Containers", "Interactive Music Hierarchy"}),
 }
-IMPORT_ITEM_REQUIRED_FIELDS = ("object_path", "audio_file")
+IMPORT_ITEM_REQUIRED_FIELDS: tuple[str, ...] = ()
 IMPORT_ITEM_OPTIONAL_FIELDS = (
+    "object_path",
     "object_type",
+    "audio_file",
+    "audio_file_base64",
     "import_language",
+    "import_location",
     "originals_subfolder",
     "notes",
     "audio_source_notes",
     "event",
+    "dialogue_event",
+    "switch_assignment",
+    "properties",
+    "references",
 )
 # ``audio.import`` exposes an Event string, but the useful postcondition is the
 # Action object created below that Event.  Keep both the reflected return fields
@@ -537,6 +578,198 @@ _OBJECT_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
         },
     },
 }
+_OBJECT_SET_IMPORT_FILE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    "type": "object",
+    "required": [],
+    "optional": [
+        "audio_file",
+        "audio_file_base64",
+        "originals_subfolder",
+        "language",
+        "object_type",
+    ],
+    "additionalProperties": False,
+    "description": "Exactly one of audio_file or audio_file_base64 is required.",
+    "properties": {
+        "audio_file": {
+            "type": "string",
+            "absoluteRegularFile": True,
+            "description": "Absolute WAV, AMB, MID, or MIDI source file proved before preview.",
+        },
+        "audio_file_base64": {
+            "type": "string",
+            "minLength": 17,
+            "maxLength": 256 * 1024,
+            "description": (
+                "A relative .wav path below Project Originals, a vertical bar, "
+                "and bounded canonical RIFF/WAVE base64 data."
+            ),
+        },
+        "originals_subfolder": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "Reviewed relative subfolder below Wwise Originals.",
+        },
+        "language": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": (
+                "SFX or an exact existing Project language name for this media file."
+            ),
+        },
+        "object_type": {
+            **_OBJECT_CREATE_TYPE_TOKEN_SCHEMA,
+            "description": (
+                "Exact live metadata token for the object created for this "
+                "imported media file."
+            ),
+        },
+    },
+}
+_OBJECT_SET_IMPORT_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    "type": "object",
+    "required": ["files"],
+    "optional": ["auto_add_to_source_control"],
+    "additionalProperties": False,
+    "properties": {
+        "files": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "items": _OBJECT_SET_IMPORT_FILE_ARGUMENT_SCHEMA,
+        },
+        "auto_add_to_source_control": {"type": "boolean"},
+    },
+}
+_OBJECT_SET_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    "type": "object",
+    "required": ["type", "name"],
+    "additionalProperties": False,
+    "properties": {
+        "type": _OBJECT_CREATE_TYPE_TOKEN_SCHEMA,
+        "name": {"type": "string", "minLength": 1},
+        "notes": {"type": "string"},
+        "platform": {
+            **PLATFORM_ARGUMENT_SCHEMA,
+            "description": (
+                "Per-node platform override available in Wwise 2022.1-2025.1."
+            ),
+        },
+        "language": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": (
+                "Exact existing Project language name for a newly created Sound Voice; "
+                "available in Wwise 2022.1 and newer."
+            ),
+        },
+        "import": {
+            **_OBJECT_SET_IMPORT_ARGUMENT_SCHEMA,
+            "supported_versions": ["2023.1", "2024.1", "2025.1"],
+        },
+        "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
+        "references": {"type": "array", "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA},
+        "children": {
+            "type": "array",
+            "description": (
+                "Recursive closed object.set node DSL with the same fields; "
+                "depth 8 and 128 total nodes."
+            ),
+        },
+    },
+}
+_OBJECT_LIST_NAME_SCHEMA: Mapping[str, Any] = {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 128,
+    "pattern": r"^[:_a-zA-Z0-9]+$",
+    "description": (
+        "Canonical Wwise object-list name without the native @ prefix. "
+        "Source/Effect plug-ins and RTPCs remain dedicated operations."
+    ),
+}
+_OBJECT_LIST_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    "type": "object",
+    "required": ["name", "objects"],
+    "additionalProperties": False,
+    "properties": {
+        "name": _OBJECT_LIST_NAME_SCHEMA,
+        "objects": {
+            "type": "array",
+            "maxItems": 32,
+            "items": _OBJECT_SET_NODE_ARGUMENT_SCHEMA,
+            "description": (
+                "Closed recursive object-node DSL. An empty array is meaningful "
+                "only with list_mode=replaceAll, where it clears the reviewed list."
+            ),
+        },
+    },
+}
+
+_IMPORT_EVENT_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    "type": "object",
+    "required": ["path"],
+    "optional": ["action"],
+    "additionalProperties": False,
+    "properties": {
+        "path": {"type": "string", "pattern": r"^\\Events\\"},
+        "action": {
+            "type": "string",
+            "enum": ["Play", "Stop", "Pause", "Resume", "Break", "Seek"],
+        },
+    },
+}
+_IMPORT_COMMON_ARGUMENT_PROPERTIES: Mapping[str, Any] = {
+    "object_path": {"type": "string", "minLength": 1},
+    "object_type": {"type": "string", "minLength": 1, "maxLength": 128},
+    "audio_file": {"type": "string", "absoluteRegularFile": True},
+    "audio_file_base64": {
+        "type": "string",
+        "minLength": 17,
+        "maxLength": 256 * 1024,
+        "description": (
+            "A relative .wav path below Project Originals, a vertical bar, and "
+            "canonical RIFF/WAVE base64 data."
+        ),
+    },
+    "import_language": {"type": "string", "minLength": 1},
+    "import_location": IDENTITY_ARGUMENT_SCHEMA,
+    "originals_subfolder": {"type": "string"},
+    "notes": {"type": "string"},
+    "audio_source_notes": {"type": "string"},
+    "event": _IMPORT_EVENT_ARGUMENT_SCHEMA,
+    "dialogue_event": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 16 * 1024,
+        "description": "One native Wwise Dialogue Event import directive.",
+    },
+    "switch_assignment": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 16 * 1024,
+        "description": "One native Wwise Switch Assignation import directive.",
+    },
+    "properties": {
+        "type": "array",
+        "maxItems": 64,
+        "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA,
+    },
+    "references": {
+        "type": "array",
+        "maxItems": 64,
+        "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA,
+    },
+}
+_IMPORT_DEFAULT_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    "type": "object",
+    "required": [],
+    "optional": list(_IMPORT_COMMON_ARGUMENT_PROPERTIES),
+    "additionalProperties": False,
+    "properties": dict(_IMPORT_COMMON_ARGUMENT_PROPERTIES),
+}
 
 _SOUNDBANK_GENERATE_ITEM_SCHEMA: Mapping[str, Any] = {
     "type": "object",
@@ -568,6 +801,17 @@ _IMPORT_AUTO_CHECK_OUT_SCHEMA: Mapping[str, Any] = {
     "description": (
         "Ask Wwise to check out affected source-control files before import. "
         "Omission defaults to false; explicit use is accepted only in Wwise 2023.1-2025.1."
+    ),
+}
+
+_DELETE_AUTO_CHECK_OUT_SCHEMA: Mapping[str, Any] = {
+    "type": "boolean",
+    "default": False,
+    "supported_versions": list(AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS),
+    "description": (
+        "Ask Wwise to check out affected source-control files before deletion. "
+        "Omission defaults to false; explicit use is accepted only in Wwise "
+        "2023.1-2025.1."
     ),
 }
 
@@ -653,6 +897,7 @@ class OperationSpec:
     implemented: bool = True
     boundary: str | None = None
     supported_versions: tuple[str, ...] = SUPPORTED_WWISE_VERSION_KEYS
+    selection_guidance: Mapping[str, Any] = field(default_factory=dict)
 
     def as_compact_dict(self) -> dict[str, Any]:
         """Return the stable public inventory row without nested schemas."""
@@ -685,6 +930,8 @@ class OperationSpec:
             "argument_contract": _json_mapping(self.argument_contract),
             "constraints": list(self.constraints),
         }
+        if self.selection_guidance:
+            result["selection_guidance"] = _json_mapping(self.selection_guidance)
         if self.identity_arguments:
             result["identity_contract"] = {
                 "one_of": ["id", "path", "waql", "scoped-name"],
@@ -757,8 +1004,8 @@ ReadCall = Callable[[str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, An
 # Positive contract for dedicated operations whose adapters bind paths on the
 # gateway machine. Generic ``waapi.call`` locality is derived separately from
 # its versioned ``isolated_transaction`` execution route. Conditional UI
-# descriptor paths remain request-shaped and are classified by the locality
-# module.
+# descriptor paths and ``object.set`` import branches remain request-shaped and
+# are classified by the locality module.
 LOCAL_FILESYSTEM_OPERATION_ROLES: Mapping[str, tuple[str, ...]] = {
     "audio.import": (
         "arguments.imports[].audio_file",
@@ -796,6 +1043,7 @@ LOCAL_FILESYSTEM_OPERATION_ROLES: Mapping[str, tuple[str, ...]] = {
 }
 CONDITIONAL_LOCAL_FILESYSTEM_OPERATIONS = frozenset(
     {
+        "object.set",
         "ui.commands.execute",
         "ui.commands.register",
         "ui.commands.unregister",
@@ -814,7 +1062,6 @@ NO_LOCAL_FILESYSTEM_OPERATIONS = frozenset(
         "object.createPlugin",
         "object.delete",
         "object.move",
-        "object.set",
         "object.setLinked",
         "object.setName",
         "object.setNotes",
@@ -828,6 +1075,33 @@ NO_LOCAL_FILESYSTEM_OPERATIONS = frozenset(
         "waapi.undoGroup",
     }
 )
+
+
+def _selection_guidance(
+    *,
+    use_when: Sequence[str],
+    avoid_when: Sequence[str] = (),
+    preferred_over: Sequence[tuple[str, str]] = (),
+    choose_instead: Sequence[tuple[str, str]] = (),
+) -> Mapping[str, Any]:
+    """Describe business-intent routing without changing execution authority."""
+
+    return {
+        "principle": (
+            "Choose from the user's intended business outcome, not merely from "
+            "whether this native API can encode the request."
+        ),
+        "use_when": tuple(use_when),
+        "avoid_when": tuple(avoid_when),
+        "preferred_over": tuple(
+            {"target": target, "when": condition}
+            for target, condition in preferred_over
+        ),
+        "choose_instead": tuple(
+            {"target": target, "when": condition}
+            for target, condition in choose_instead
+        ),
+    }
 
 
 OPERATION_SPECS: Mapping[str, OperationSpec] = {
@@ -866,6 +1140,25 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "inner calls are selected from an immutable version-specific project-mutation allowlist",
             "inner failure triggers same-connection cancelGroup; cancellation is not rollback verification",
             "begin/end/cancel uncertainty is terminal and never retried automatically",
+        ),
+        selection_guidance=_selection_guidance(
+            use_when=(
+                "The user explicitly wants several heterogeneous allowlisted mutations to appear as one Wwise Undo step.",
+            ),
+            avoid_when=(
+                "One dedicated semantic operation already covers the complete batch and provides stronger operation-specific verification.",
+                "The Agent is grouping unrelated changes without an explicit one-Undo-step intent.",
+            ),
+            choose_instead=(
+                (
+                    "the matching dedicated batch operation",
+                    "one operation owns the complete requested outcome",
+                ),
+                (
+                    "separate ordered transactions",
+                    "the user requests several outcomes but not one Wwise Undo step",
+                ),
+            ),
         ),
     ),
     "waapi.call": OperationSpec(
@@ -924,63 +1217,117 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "audio.import",
         "ak.wwise.core.audio.import",
         "import",
-        "Import absolute regular audio files with a closed createNew/useExisting/replaceExisting policy and verify every requested target and copied source file.",
+        "Import media or object structure with validated properties/references and a closed createNew/useExisting/replaceExisting policy.",
         ("imports",),
-        ("import_operation", "auto_check_out_to_source_control"),
-        argument_contract=_object_contract(
-            ("imports",),
-            {
-                "imports": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": _object_contract(
-                        IMPORT_ITEM_REQUIRED_FIELDS,
-                        {
-                            "object_path": {"type": "string", "pattern": r"^\\"},
-                            "object_type": {"type": "string", "minLength": 1},
-                            "audio_file": {"type": "string", "absoluteRegularFile": True},
-                            "import_language": {"type": "string", "minLength": 1},
-                            "originals_subfolder": {"type": "string"},
-                            "notes": {"type": "string"},
-                            "audio_source_notes": {"type": "string"},
-                            "event": _object_contract(
-                                ("path",),
-                                {
-                                    "path": {"type": "string", "pattern": r"^\\Events\\"},
-                                    "action": {
-                                        "type": "string",
-                                        "enum": ["Play", "Stop", "Pause", "Resume", "Break", "Seek"],
-                                    },
-                                },
-                                optional=("action",),
-                            ),
-                        },
-                        optional=IMPORT_ITEM_OPTIONAL_FIELDS,
-                    ),
-                },
-                "import_operation": {
-                    "type": "string",
-                    "enum": ["createNew", "useExisting", "replaceExisting"],
-                },
-                "auto_check_out_to_source_control": _IMPORT_AUTO_CHECK_OUT_SCHEMA,
-            },
-            optional=("import_operation", "auto_check_out_to_source_control"),
+        (
+            "defaults",
+            "import_operation",
+            "auto_add_to_source_control",
+            "auto_check_out_to_source_control",
         ),
+        argument_contract={
+            **_object_contract(
+                ("imports",),
+                {
+                    "imports": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": _object_contract(
+                            IMPORT_ITEM_REQUIRED_FIELDS,
+                            {
+                                **_IMPORT_COMMON_ARGUMENT_PROPERTIES,
+                            },
+                            optional=IMPORT_ITEM_OPTIONAL_FIELDS,
+                        ),
+                    },
+                    "defaults": _IMPORT_DEFAULT_ARGUMENT_SCHEMA,
+                    "import_operation": {
+                        "type": "string",
+                        "enum": ["createNew", "useExisting", "replaceExisting"],
+                    },
+                    "auto_add_to_source_control": {"type": "boolean", "default": False},
+                    "auto_check_out_to_source_control": _IMPORT_AUTO_CHECK_OUT_SCHEMA,
+                },
+                optional=(
+                    "defaults",
+                    "import_operation",
+                    "auto_add_to_source_control",
+                    "auto_check_out_to_source_control",
+                ),
+            ),
+            "maximumEffectiveAudioFileBase64EncodedCharacters": (
+                MAX_AUDIO_IMPORT_BASE64_ENCODED_CHARS
+            ),
+        },
         constraints=(
             "all source files and targets are preflighted before the single dispatch",
+            "defaults are expanded into sealed per-row values; row properties/references override defaults by exact token",
+            "after defaults expansion, the sum of canonical audio_file_base64 strings is limited to 262144 encoded characters",
+            "dynamic @ fields are produced only after live object-type and getPropertyInfo validation",
+            "each row accepts one regular audio_file, one bounded RIFF/WAVE audio_file_base64, or a typed structure-only import",
             "useExisting preserves an existing target GUID; replaceExisting requires the old GUID to disappear",
             "a live non-SFX localized useExisting row dispatches only audioFile/objectPath/importLanguage; objectType is consumed by live type preflight and other requested row fields are rejected",
             "replaceExisting is irreversible and must be exercised only in a disposable project copy during tests",
+            "auto_add_to_source_control is explicit and defaults to false",
             "auto_check_out_to_source_control defaults to false and is accepted only in Wwise 2023.1-2025.1; explicit use on 2021.1/2022.1 fails before connection",
+        ),
+        selection_guidance=_selection_guidance(
+            use_when=(
+                "The user describes media, object paths, properties, references, Events, or import defaults directly, for one row or a batch.",
+                "Media import is the primary business outcome, including create, reuse, or replace of target objects.",
+                "Structure-only rows are part of the same explicit import manifest.",
+                "Event or Switch Assignation creation is an explicit side effect of those same imported rows.",
+            ),
+            avoid_when=(
+                "The user already supplied a tab-delimited file or explicitly requested that existing table workflow.",
+                "The request is only a new object hierarchy with no media or import-manifest intent.",
+                "In Wwise 2023.1 or later, media import is only one subordinate part of a broader atomic mutation of existing objects.",
+            ),
+            preferred_over=(
+                (
+                    "audio.importTabDelimited",
+                    "the Agent would otherwise have to invent an intermediate TSV, or batch size is the only reason to choose a table",
+                ),
+                (
+                    "object.create",
+                    "media import is the primary requested outcome",
+                ),
+                (
+                    "object.set",
+                    "the request is only an import rather than a broader existing-object mutation",
+                ),
+                (
+                    "switchContainer.addAssignment",
+                    "the Switch Assignation is part of the same media import rather than an independent edit to existing objects",
+                ),
+            ),
+            choose_instead=(
+                (
+                    "audio.importTabDelimited",
+                    "the caller owns an existing TSV or explicitly requests that file-based workflow",
+                ),
+                (
+                    "object.create",
+                    "the request is a pure new object tree with no media",
+                ),
+                (
+                    "object.set",
+                    "Wwise is 2023.1 or later and the import belongs inside a broader atomic mutation of existing targets",
+                ),
+            ),
         ),
     ),
     "audio.importTabDelimited": OperationSpec(
         "audio.importTabDelimited",
         "ak.wwise.core.audio.importTabDelimited",
         "import",
-        "Import a bounded strict-UTF-8 tab-delimited file whose targets and source-file proofs are derived by the packaged parser.",
+        "Import a bounded strict-UTF-8 tab-delimited file with native property/reference, base64, Event, Dialogue Event, and Switch Assignation columns.",
         ("import_file", "import_location", "import_language"),
-        ("import_operation", "auto_check_out_to_source_control"),
+        (
+            "import_operation",
+            "auto_add_to_source_control",
+            "auto_check_out_to_source_control",
+        ),
         argument_contract=_object_contract(
             ("import_file", "import_location", "import_language"),
             {
@@ -991,16 +1338,42 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     "type": "string",
                     "enum": ["createNew", "useExisting", "replaceExisting"],
                 },
+                "auto_add_to_source_control": {"type": "boolean", "default": False},
                 "auto_check_out_to_source_control": _IMPORT_AUTO_CHECK_OUT_SCHEMA,
             },
-            optional=("import_operation", "auto_check_out_to_source_control"),
+            optional=(
+                "import_operation",
+                "auto_add_to_source_control",
+                "auto_check_out_to_source_control",
+            ),
         ),
         identity_arguments=("import_location",),
         constraints=(
-            "accepted columns are version-pinned and importLanguage is a call argument, never a TSV column",
-            "the parser hashes the TSV and every referenced absolute regular media file before preview",
+            "fixed and dynamic native headers are parsed under bounded grammar; importLanguage remains a call argument",
+            "the parser hashes the TSV, regular media, and decoded inline base64 before preview",
             "a missing or invalid row rejects the whole request before dispatch",
+            "auto_add_to_source_control is explicit and defaults to false",
             "auto_check_out_to_source_control defaults to false and is accepted only in Wwise 2023.1-2025.1; explicit use on 2021.1/2022.1 fails before connection",
+        ),
+        selection_guidance=_selection_guidance(
+            use_when=(
+                "The user supplies an existing absolute TSV and asks Wwise Authoring to process it.",
+                "The user explicitly requests the native tab-delimited import workflow, replay, or externally maintained import manifest.",
+            ),
+            avoid_when=(
+                "The Agent would need to create a TSV solely to translate natural-language parameters.",
+                "The only reason for choosing this operation is that the import contains many rows.",
+            ),
+            choose_instead=(
+                (
+                    "audio.import",
+                    "the import rows are expressed directly by the user or can be represented directly in the closed request",
+                ),
+                (
+                    "waapi.call",
+                    "the user explicitly requests WwiseConsole or CLI tab-delimited import rather than the connected Authoring project",
+                ),
+            ),
         ),
     ),
     "object.create": OperationSpec(
@@ -1009,7 +1382,17 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "object-mutation",
         "Create or merge one bounded recursive object tree under a live-resolved parent, including a guarded replace confined to one explicitly authorized root.",
         ("parent", "type", "name"),
-        ("notes", "properties", "references", "children", "on_name_conflict", "replace_owned_root"),
+        (
+            "notes",
+            "properties",
+            "references",
+            "children",
+            "platform",
+            "list",
+            "auto_add_to_source_control",
+            "on_name_conflict",
+            "replace_owned_root",
+        ),
         argument_contract=_object_contract(
             ("parent", "type", "name"),
             {
@@ -1019,6 +1402,9 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "notes": {"type": "string"},
                 "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
                 "references": {"type": "array", "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA},
+                "platform": PLATFORM_ARGUMENT_SCHEMA,
+                "list": _OBJECT_LIST_NAME_SCHEMA,
+                "auto_add_to_source_control": {"type": "boolean", "default": False},
                 "children": {
                     "type": "array",
                     "items": _OBJECT_NODE_ARGUMENT_SCHEMA,
@@ -1048,6 +1434,9 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "properties",
                 "references",
                 "children",
+                "platform",
+                "list",
+                "auto_add_to_source_control",
                 "on_name_conflict",
                 "replace_owned_root",
             ),
@@ -1056,10 +1445,48 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         constraints=(
             "maximum depth 8, 128 nodes, and 32 children per parent",
             "one existing named root that only receives a recursive descendant merge remains an object.create request: identify its existing parent, repeat the root type/name, and use on_name_conflict=merge",
-            "parent must live-resolve below a management root to one reviewed writable WorkUnit, Folder, Actor-Mixer container, or Interactive-Music container type",
+            "ordinary child creation requires one reviewed writable hierarchy parent; list creation requires a non-protected live owner and a canonical list token",
             "replace_owned_root is an explicit reviewed authorization boundary, not independently proven ownership; replace requires the collision strictly below that non-protected live root and a complete pre-state snapshot of at most 128 old subtree GUID/path rows",
-            "fail, rename, and merge reject replace_owned_root; raw @ fields, classId, plug-ins, lists, RTPCs, Clips, Sequences, and Stingers are not exposed",
+            "list insertion supports fail, rename, and merge but not replace; raw @ fields, classId, plug-ins, and RTPC rows are not exposed",
+            "platform applies to validated properties/references and is verified through the same platform view",
+            "auto_add_to_source_control is explicit and defaults to false",
             "the complete returned GUID topology and every requested field are read back after execution",
+        ),
+        selection_guidance=_selection_guidance(
+            use_when=(
+                "The request creates one wholly new recursive root.",
+                "Exactly one same-name existing root remains unchanged while only a descendant tree is merged below it.",
+                "The request replaces one exact same-name subtree through the guarded on_name_conflict=replace contract.",
+            ),
+            avoid_when=(
+                "The request changes fields or references on an existing root, targets multiple existing roots, or appends below an explicitly existing nested container.",
+                "Media import is the primary requested outcome.",
+                "The Agent would otherwise emulate copy, move, or delete-plus-create behavior.",
+            ),
+            preferred_over=(
+                (
+                    "audio.import",
+                    "the request is a pure object hierarchy with no media and no import-manifest intent",
+                ),
+                (
+                    "object.delete",
+                    "the requested outcome is one guarded same-name subtree replacement rather than deletion alone",
+                ),
+            ),
+            choose_instead=(
+                (
+                    "object.set",
+                    "any existing-root exclusion applies or several existing roots must change atomically",
+                ),
+                (
+                    "audio.import",
+                    "media import is the primary requested outcome",
+                ),
+                (
+                    "object.copy or object.move",
+                    "the user explicitly requests copy or move; report their packaged boundary rather than emulate them",
+                ),
+            ),
         ),
     ),
     "object.delete": OperationSpec(
@@ -1068,8 +1495,35 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "object-mutation",
         "Delete one live-resolved non-protected object and verify GUID absence.",
         ("object",),
-        argument_contract=_object_contract(("object",), {"object": IDENTITY_ARGUMENT_SCHEMA}),
+        ("auto_check_out_to_source_control",),
+        argument_contract=_object_contract(
+            ("object",),
+            {
+                "object": IDENTITY_ARGUMENT_SCHEMA,
+                "auto_check_out_to_source_control": _DELETE_AUTO_CHECK_OUT_SCHEMA,
+            },
+            optional=("auto_check_out_to_source_control",),
+        ),
         identity_arguments=("object",),
+        constraints=(
+            "auto_check_out_to_source_control defaults to false and is accepted only in Wwise 2023.1-2025.1; explicit use on 2021.1/2022.1 fails before connection",
+        ),
+        selection_guidance=_selection_guidance(
+            use_when=("The intended outcome is deletion of one existing object and nothing replaces it.",),
+            avoid_when=(
+                "Deletion is only an implementation step toward replace, move, or another higher-level outcome.",
+            ),
+            choose_instead=(
+                (
+                    "object.create",
+                    "one exact same-name subtree replacement fits its guarded replace contract",
+                ),
+                (
+                    "object.move",
+                    "the intended outcome is moving an object; report the packaged boundary rather than synthesize delete/create",
+                ),
+            ),
+        ),
     ),
     "object.setName": OperationSpec(
         "object.setName",
@@ -1082,6 +1536,12 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             {"object": IDENTITY_ARGUMENT_SCHEMA, "value": {"type": "string", "minLength": 1}},
         ),
         identity_arguments=("object",),
+        selection_guidance=_selection_guidance(
+            use_when=("Exactly one existing object receives only a rename.",),
+            avoid_when=("The rename is one part of a multi-field or multi-object atomic change.",),
+            preferred_over=(("object.set", "the request is only one isolated rename"),),
+            choose_instead=(("object.set", "several changes must remain in one batch"),),
+        ),
     ),
     "object.setNotes": OperationSpec(
         "object.setNotes",
@@ -1094,6 +1554,12 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             {"object": IDENTITY_ARGUMENT_SCHEMA, "value": {"type": "string"}},
         ),
         identity_arguments=("object",),
+        selection_guidance=_selection_guidance(
+            use_when=("Exactly one existing object receives only a notes change.",),
+            avoid_when=("The notes edit is one part of a multi-field or multi-object atomic change.",),
+            preferred_over=(("object.set", "the request is only one isolated notes edit"),),
+            choose_instead=(("object.set", "several changes must remain in one batch"),),
+        ),
     ),
     "object.setProperty": OperationSpec(
         "object.setProperty",
@@ -1113,12 +1579,25 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             optional=("platform",),
         ),
         identity_arguments=("object",),
+        selection_guidance=_selection_guidance(
+            use_when=("Exactly one existing object receives one scalar property value.",),
+            avoid_when=(
+                "Several properties, references, objects, children, or imports must change atomically.",
+                "The requested concept is platform link state or an RTPC curve rather than a scalar value.",
+            ),
+            preferred_over=(("object.set", "the request is one isolated scalar property edit"),),
+            choose_instead=(
+                ("object.set", "several ordinary changes must remain in one batch"),
+                ("object.setLinked", "the user asks to link or unlink a platform value"),
+                ("object.setRTPC", "the user asks for an RTPC curve"),
+            ),
+        ),
     ),
     "object.setReference": OperationSpec(
         "object.setReference",
         "ak.wwise.core.object.setReference",
         "property-reference",
-        "Set one reference for the current or an explicit platform after resolving source and target GUIDs.",
+        "Set or clear one reference for the current or an explicit platform after resolving every non-null identity.",
         ("object", "reference", "target"),
         ("platform",),
         argument_contract=_object_contract(
@@ -1126,12 +1605,39 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             {
                 "object": IDENTITY_ARGUMENT_SCHEMA,
                 "reference": {"type": "string", "minLength": 1},
-                "target": IDENTITY_ARGUMENT_SCHEMA,
+                "target": {
+                    "oneOf": [
+                        IDENTITY_ARGUMENT_SCHEMA,
+                        {
+                            "type": "null",
+                            "description": (
+                                "Explicitly clear the reference; omitted target is "
+                                "never interpreted as a clear request."
+                            ),
+                        },
+                    ]
+                },
                 "platform": PLATFORM_ARGUMENT_SCHEMA,
             },
             optional=("platform",),
         ),
         identity_arguments=("object", "target"),
+        constraints=(
+            "target=null is an explicit closed clear operation and is rejected when live metadata contains a notNull restriction",
+            "a non-null target is live-resolved and checked against live reference type restrictions",
+        ),
+        selection_guidance=_selection_guidance(
+            use_when=("Exactly one existing object receives one reference set or clear.",),
+            avoid_when=(
+                "Several references, fields, objects, or children must change atomically.",
+                "The request changes platform link state instead of the reference target.",
+            ),
+            preferred_over=(("object.set", "the request is one isolated reference edit"),),
+            choose_instead=(
+                ("object.set", "several ordinary changes must remain in one batch"),
+                ("object.setLinked", "the user asks to link or unlink the reference for a platform"),
+            ),
+        ),
     ),
     "object.setLinked": OperationSpec(
         "object.setLinked",
@@ -1155,6 +1661,17 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "the same object/property/platform tuple is rebound before execution",
         ),
         supported_versions=("2023.1", "2024.1", "2025.1"),
+        selection_guidance=_selection_guidance(
+            use_when=(
+                "The user explicitly asks to link or unlink one property, reference, or object list for a platform.",
+            ),
+            avoid_when=("The user wants to change the field value rather than its platform link state.",),
+            preferred_over=(
+                ("object.setProperty", "the requested outcome is link state, not a scalar property value"),
+                ("object.setReference", "the requested outcome is link state, not a reference target"),
+                ("object.set", "the requested outcome is link state, which object.set intentionally does not own"),
+            ),
+        ),
     ),
     "object.createPlugin": OperationSpec(
         "object.createPlugin",
@@ -1184,6 +1701,19 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "the returned association and post-read id/name/type/classId/parent/owner must bind uniquely to the immutable plan",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
+        selection_guidance=_selection_guidance(
+            use_when=(
+                "The user asks to create one Source or Effect plug-in from an exact supplied classId.",
+            ),
+            avoid_when=(
+                "The request is ordinary object creation with no plug-in semantics.",
+                "The Agent would have to guess a classId from a display name.",
+            ),
+            preferred_over=(
+                ("object.create", "the requested object is a Source or Effect plug-in"),
+                ("object.set", "the requested list mutation is plug-in creation"),
+            ),
+        ),
     ),
     "object.setRTPC": OperationSpec(
         "object.setRTPC",
@@ -1222,68 +1752,165 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "the complete RTPC list is sealed before execution and read back after execution",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
+        selection_guidance=_selection_guidance(
+            use_when=("The user asks to add or update one RTPC curve.",),
+            avoid_when=("The request is only a scalar property value with no ControlInput curve.",),
+            preferred_over=(
+                ("object.setProperty", "the requested outcome is an RTPC curve"),
+                ("object.set", "the requested list mutation is an RTPC curve"),
+            ),
+        ),
     ),
     "object.set": OperationSpec(
         "object.set",
         "ak.wwise.core.object.set",
         "object-mutation",
-        "Batch fields and genuinely new recursive children against one or more existing live-resolved targets.",
+        "Batch fields, renames, recursive children, and closed object-list creation against live-resolved targets.",
         ("objects",),
-        ("on_name_conflict",),
-        argument_contract=_object_contract(
-            ("objects",),
-            {
-                "objects": {
-                    "type": "array",
-                    "minItems": 1,
-                    "description": (
-                        "Each existing object that receives fields or new direct children is its own "
-                        "target row, including an existing nested container."
-                    ),
-                    "items": _object_contract(
-                        ("object",),
-                        {
-                            "object": IDENTITY_ARGUMENT_SCHEMA,
-                            "notes": {"type": "string"},
-                            "platform": PLATFORM_ARGUMENT_SCHEMA,
-                            "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
-                            "references": {"type": "array", "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA},
-                            "children": {
-                                "type": "array",
-                                "items": _OBJECT_NODE_ARGUMENT_SCHEMA,
-                                "description": (
-                                    "Only genuinely new direct children belong here. Never redeclare an "
-                                    "existing nested container as a child; give it a separate objects[] "
-                                    "row and put only its new descendants there."
-                                ),
-                            },
-                        },
-                        optional=("notes", "platform", "properties", "references", "children"),
-                    ),
-                },
-                "on_name_conflict": {
-                    "type": "string",
-                    "enum": ["fail", "rename", "merge"],
-                    "description": (
-                        "Applies only to genuinely new children, never to existing objects[] "
-                        "targets. Use fail for children requested as new or absent; use merge "
-                        "only when the user explicitly requests collision merging for a new "
-                        "child name."
-                    ),
-                },
-            },
-            optional=("on_name_conflict",),
+        (
+            "platform",
+            "list_mode",
+            "on_name_conflict",
+            "auto_add_to_source_control",
         ),
+        argument_contract={
+            **_object_contract(
+                ("objects",),
+                {
+                    "objects": {
+                        "type": "array",
+                        "minItems": 1,
+                        "description": (
+                            "Each existing object that receives fields or new direct children is its own "
+                            "target row, including an existing nested container."
+                        ),
+                        "items": _object_contract(
+                            ("object",),
+                            {
+                                "object": IDENTITY_ARGUMENT_SCHEMA,
+                                "name": {"type": "string", "minLength": 1},
+                                "notes": {"type": "string"},
+                                "platform": PLATFORM_ARGUMENT_SCHEMA,
+                                "list_mode": {
+                                    "type": "string",
+                                    "enum": ["append", "replaceAll"],
+                                },
+                                "on_name_conflict": {
+                                    "type": "string",
+                                    "enum": ["fail", "rename", "merge"],
+                                },
+                                "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
+                                "references": {"type": "array", "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA},
+                                "import": {
+                                    **_OBJECT_SET_IMPORT_ARGUMENT_SCHEMA,
+                                    "supported_versions": ["2023.1", "2024.1", "2025.1"],
+                                    "description": (
+                                        "Import media into the existing live-resolved target. "
+                                        "Only reviewed importable object types are accepted."
+                                    ),
+                                },
+                                "children": {
+                                    "type": "array",
+                                    "items": _OBJECT_SET_NODE_ARGUMENT_SCHEMA,
+                                    "description": (
+                                        "Only genuinely new direct children belong here. Never redeclare an "
+                                        "existing nested container as a child; give it a separate objects[] "
+                                        "row and put only its new descendants there."
+                                    ),
+                                },
+                                "lists": {
+                                    "type": "array",
+                                    "maxItems": 32,
+                                    "items": _OBJECT_LIST_ARGUMENT_SCHEMA,
+                                    "description": (
+                                        "Closed native object-list assignments. Plug-in and RTPC "
+                                        "lists remain routed through object.createPlugin and object.setRTPC."
+                                    ),
+                                },
+                            },
+                            optional=(
+                                "name",
+                                "notes",
+                                "platform",
+                                "list_mode",
+                                "on_name_conflict",
+                                "properties",
+                                "references",
+                                "import",
+                                "children",
+                                "lists",
+                            ),
+                        ),
+                    },
+                    "platform": PLATFORM_ARGUMENT_SCHEMA,
+                    "list_mode": {
+                        "type": "string",
+                        "enum": ["append", "replaceAll"],
+                        "default": "append",
+                    },
+                    "on_name_conflict": {
+                        "type": "string",
+                        "enum": ["fail", "rename", "merge"],
+                        "description": (
+                            "Applies only to genuinely new children, never to existing objects[] "
+                            "targets. Use fail for children requested as new or absent; use merge "
+                            "only when the user explicitly requests collision merging for a new "
+                            "child name."
+                        ),
+                    },
+                    "auto_add_to_source_control": {"type": "boolean", "default": False},
+                },
+                optional=(
+                    "platform",
+                    "list_mode",
+                    "on_name_conflict",
+                    "auto_add_to_source_control",
+                ),
+            ),
+            "maximumCanonicalRequestBytes": DEFAULT_MAX_REQUEST_BYTES,
+        },
         identity_arguments=("objects[].object",),
         constraints=(
             "every target and field pre-state is captured before the one non-retryable batch dispatch",
             "every existing nested container that receives descendants is a separate objects[] target; children contain only genuinely new direct descendants",
-            "on_name_conflict applies only to new children; existing objects[] targets do not imply merge, and children requested as new or absent use fail",
-            "each target row may set properties/references for one explicit platform; link state remains the dedicated object.setLinked operation",
-            "children are append/merge only; listMode, replaceAll, raw @ keys, plug-ins, and RTPCs are rejected",
+            "existing objects[] targets do not imply merge; on_name_conflict governs only genuinely new child or list-member names",
+            "top-level platform, list_mode, and on_name_conflict may be overridden by one closed target row",
+            "a requested name keeps the same GUID and parent; fail/rename collisions are sealed before dispatch",
+            "each target row may set properties/references for one effective platform; link state remains the dedicated object.setLinked operation",
+            "closed object lists are emitted only from [{name, objects}] descriptors; plug-ins and RTPCs remain dedicated operations",
+            "replaceAll seals every current direct list member and every descendant GUID, rechecks the complete snapshot before execution, and verifies exact replacement afterward",
+            "the canonical normalized request is limited to 262144 bytes, including inline Base64 audio",
+            "auto_add_to_source_control is explicit and defaults to false",
             "a partial result or any per-target readback mismatch fails verification",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
+        selection_guidance=_selection_guidance(
+            use_when=(
+                "One atomic request changes fields, references, children, or lists on existing targets.",
+                "The request targets multiple existing objects.",
+                "In Wwise 2023.1 or later, media import is subordinate to a broader mutation of existing targets.",
+            ),
+            avoid_when=(
+                "The request is only one isolated rename, notes edit, scalar property edit, or reference edit.",
+                "The request is a wholly new recursive root or a pure descendant-tree merge below one unchanged same-name root.",
+                "Media import alone is the primary requested outcome.",
+                "The requested concept is plug-in creation, RTPC editing, or platform link state.",
+            ),
+            preferred_over=(
+                ("object.setName", "rename is only one part of a larger atomic batch"),
+                ("object.setNotes", "notes are only one part of a larger atomic batch"),
+                ("object.setProperty", "properties are only part of a larger atomic batch"),
+                ("object.setReference", "references are only part of a larger atomic batch"),
+                ("audio.import", "Wwise is 2023.1 or later and import is subordinate to the same broader existing-object mutation"),
+            ),
+            choose_instead=(
+                ("object.create", "the request is a new root or permitted pure descendant-tree merge"),
+                ("audio.import", "the request is primarily media import"),
+                ("object.createPlugin", "the request creates a Source or Effect plug-in"),
+                ("object.setRTPC", "the request adds or updates an RTPC curve"),
+                ("object.setLinked", "the request changes platform link state"),
+            ),
+        ),
     ),
     "lua.executeCliFile": OperationSpec(
         "lua.executeCliFile",
@@ -1319,6 +1946,19 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "Lua side effects are not inferred, confined, rolled back, or retried",
         ),
         supported_versions=("2023.1", "2024.1", "2025.1"),
+        selection_guidance=_selection_guidance(
+            use_when=(
+                "The user explicitly asks for WwiseConsole or CLI execution of an existing Lua file and supplies its exact path.",
+            ),
+            avoid_when=(
+                "The request is for the already connected Authoring project.",
+                "The Agent would have to author, repair, wrap, or synthesize Lua.",
+            ),
+            choose_instead=(
+                ("lua.executeCoreFile", "the user wants the existing file executed in connected Authoring"),
+                ("lua.executeCoreInline", "Wwise is 2025.1 and the user supplied exact inline Lua rather than a file"),
+            ),
+        ),
     ),
     "lua.executeCoreFile": OperationSpec(
         "lua.executeCoreFile",
@@ -1348,6 +1988,19 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "Lua side effects are not inferred, confined, rolled back, or retried",
         ),
         supported_versions=("2023.1", "2024.1", "2025.1"),
+        selection_guidance=_selection_guidance(
+            use_when=(
+                "The user supplies an existing Lua file and wants it executed in the connected Authoring process.",
+            ),
+            avoid_when=(
+                "The user explicitly asks for WwiseConsole or CLI execution.",
+                "The Agent would have to author, repair, wrap, or synthesize Lua.",
+            ),
+            choose_instead=(
+                ("lua.executeCliFile", "the user explicitly requests the CLI host"),
+                ("lua.executeCoreInline", "Wwise is 2025.1 and the user supplied exact inline Lua rather than a file"),
+            ),
+        ),
     ),
     "lua.executeCoreInline": OperationSpec(
         "lua.executeCoreInline",
@@ -1381,6 +2034,19 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "Lua side effects are not inferred, confined, rolled back, or retried",
         ),
         supported_versions=("2025.1",),
+        selection_guidance=_selection_guidance(
+            use_when=(
+                "Wwise is 2025.1 and the current user message supplies the exact inline Lua to execute in connected Authoring.",
+            ),
+            avoid_when=(
+                "The user supplied a Lua file path rather than complete inline source.",
+                "The Agent would have to author, repair, wrap, or augment the Lua.",
+            ),
+            choose_instead=(
+                ("lua.executeCoreFile", "the user supplied an existing file for connected Authoring"),
+                ("lua.executeCliFile", "the user explicitly requests CLI execution of an existing file"),
+            ),
+        ),
     ),
     "debug.setAsserts": OperationSpec(
         "debug.setAsserts",
@@ -1501,6 +2167,22 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "the command ID must be present in a fresh getCommands result immediately before dispatch",
             "files is available only in Wwise 2025.1 and every file identity/content proof is replayed before dispatch",
             "generic command effects have no business-state readback and are never retried automatically",
+        ),
+        selection_guidance=_selection_guidance(
+            use_when=(
+                "The user explicitly asks to execute an installed Wwise UI command or perform GUI command automation.",
+                "No dedicated semantic operation owns the requested business outcome.",
+            ),
+            avoid_when=(
+                "A dedicated operation can express and verify the requested project change.",
+                "The command is being chosen only as a shortcut around a closed semantic boundary.",
+            ),
+            choose_instead=(
+                (
+                    "the matching dedicated operation",
+                    "the request names a supported import, object, SoundBank, Switch Container, debug, Lua, or capture outcome",
+                ),
+            ),
         ),
     ),
     "ui.commands.register": OperationSpec(
@@ -1626,6 +2308,13 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "rect is always a complete x/y/width/height object even though 2021.1 reflection did not mark its members required",
             "the returned image must have a declared image content type and valid bounded base64",
         ),
+        selection_guidance=_selection_guidance(
+            use_when=("The requested outcome is a Wwise UI or named-view image.",),
+            avoid_when=("A generic UI command is being used to approximate the same screenshot outcome.",),
+            preferred_over=(
+                ("ui.commands.execute", "the requested business result is a screenshot"),
+            ),
+        ),
     ),
     "object.copy": OperationSpec(
         "object.copy",
@@ -1690,6 +2379,27 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "add upserts the complete filter row for each requested object while preserving other objects",
             "remove requires an exact live filter-row match and removes the requested object inclusion",
         ),
+        selection_guidance=_selection_guidance(
+            use_when=(
+                "The user directly describes additions, removals, replacement, or clearing of one live SoundBank's inclusion rows.",
+            ),
+            avoid_when=(
+                "The user supplies SoundBank Definition TSV files and asks Wwise to process those files.",
+                "The Agent would need to invent a Definition TSV only to encode direct inclusion parameters.",
+            ),
+            preferred_over=(
+                (
+                    "soundbank.processDefinitionFiles",
+                    "the inclusion changes are expressed directly rather than through caller-owned Definition files",
+                ),
+            ),
+            choose_instead=(
+                (
+                    "soundbank.processDefinitionFiles",
+                    "existing caller-owned Definition TSV files are the requested source of truth",
+                ),
+            ),
+        ),
     ),
     "soundbank.generate": OperationSpec(
         "soundbank.generate",
@@ -1730,6 +2440,22 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "Wwise 2021.1 derives project paths from the live Project filePath plus a hashed strict WPROJ parse; later versions use live core.getProjectInfo",
             "execution replays project/file/artifact guards; verification requires each requested Bank artifact to be created or changed and non-empty",
         ),
+        selection_guidance=_selection_guidance(
+            use_when=(
+                "The user wants to generate SoundBanks in the already connected Authoring project.",
+                "Event or AuxBus descriptors are generation-only inputs for the requested artifact run.",
+            ),
+            avoid_when=(
+                "The user explicitly requests WwiseConsole, CLI, or command-line generation.",
+                "The user only asks to wait for or stream SoundBank generation notifications.",
+                "The user asks to persistently change the SoundBank's saved inclusion rows.",
+            ),
+            choose_instead=(
+                ("waapi.call", "explicit CLI generation intent selects the versioned ak.wwise.cli.generateSoundbank route"),
+                ("wait-topic or stream-topic", "the request is observation-only"),
+                ("soundbank.setInclusions", "the requested outcome is a persistent inclusion edit"),
+            ),
+        ),
     ),
     "soundbank.convertExternalSources": OperationSpec(
         "soundbank.convertExternalSources",
@@ -1762,6 +2488,15 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "execution rejects input, project, or output-tree drift; verification requires every exact WEM output and rejects partial success",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
+        selection_guidance=_selection_guidance(
+            use_when=(
+                "The user wants the connected Authoring project to convert existing .wsources manifests.",
+            ),
+            avoid_when=("The user explicitly requests WwiseConsole or CLI conversion.",),
+            choose_instead=(
+                ("waapi.call", "explicit CLI intent selects the versioned ak.wwise.cli.convertExternalSource route"),
+            ),
+        ),
     ),
     "soundbank.processDefinitionFiles": OperationSpec(
         "soundbank.processDefinitionFiles",
@@ -1782,6 +2517,18 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "execution replays file/project and SoundBank inclusion snapshots; verification checks exact target inclusions and one unrelated control Bank",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
+        selection_guidance=_selection_guidance(
+            use_when=(
+                "The user supplies existing SoundBank Definition TSV files and asks connected Authoring to process them.",
+            ),
+            avoid_when=(
+                "The user directly describes inclusion rows and the Agent would need to invent a TSV.",
+            ),
+            choose_instead=(
+                ("soundbank.setInclusions", "the requested inclusion changes are expressed directly"),
+                ("waapi.call", "explicit WwiseConsole or CLI Definition-file processing intent selects the versioned CLI route"),
+            ),
+        ),
     ),
     "switchContainer.addAssignment": OperationSpec(
         "switchContainer.addAssignment",
@@ -1804,6 +2551,14 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "state_or_switch must be a direct child of the group referenced by SwitchGroupOrStateGroup",
             "the closed add policy rejects a child that already has any assignment",
         ),
+        selection_guidance=_selection_guidance(
+            use_when=("The user asks to add one Switch Container child assignment.",),
+            avoid_when=("The Agent would otherwise express the assignment as a generic object list/reference edit.",),
+            preferred_over=(
+                ("object.set", "the requested outcome is a Switch Container assignment"),
+                ("object.setReference", "the requested outcome is a Switch Container assignment"),
+            ),
+        ),
     ),
     "switchContainer.removeAssignment": OperationSpec(
         "switchContainer.removeAssignment",
@@ -1825,6 +2580,14 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "child must be a direct child of switch_container",
             "state_or_switch must be a direct child of the group referenced by SwitchGroupOrStateGroup",
             "the exact child and state_or_switch pair must already exist",
+        ),
+        selection_guidance=_selection_guidance(
+            use_when=("The user asks to remove one existing Switch Container child assignment.",),
+            avoid_when=("The Agent would otherwise express the removal as a generic object list/reference edit.",),
+            preferred_over=(
+                ("object.set", "the requested outcome is removal of a Switch Container assignment"),
+                ("object.setReference", "the requested outcome is removal of a Switch Container assignment"),
+            ),
         ),
     ),
 }
@@ -2341,6 +3104,28 @@ def _prepare_object_create(
     read: ReadCall,
 ) -> tuple[SemanticPreview, dict[str, ResolvedObject], dict[str, Any], dict[str, Any], dict[str, Any]]:
     requested_conflict = arguments.get("on_name_conflict", "fail")
+    platform = (
+        _non_empty_string(arguments.get("platform"), field="platform")
+        if "platform" in arguments
+        else None
+    )
+    list_name = (
+        normalize_object_list_name(
+            arguments.get("list"),
+            request_path="$.arguments.list",
+        )
+        if "list" in arguments
+        else None
+    )
+    auto_add_to_source_control = arguments.get(
+        "auto_add_to_source_control",
+        False,
+    )
+    if not isinstance(auto_add_to_source_control, bool):
+        raise OperationContractError(
+            "INVALID_ARGUMENT",
+            "object.create auto_add_to_source_control must be a JSON boolean.",
+        )
     replace_owned_root_supplied = "replace_owned_root" in arguments
     if requested_conflict == "replace" and not replace_owned_root_supplied:
         raise OperationContractError(
@@ -2354,7 +3139,15 @@ def _prepare_object_create(
             details={"on_name_conflict": requested_conflict},
         )
     parent = _resolve_identity(arguments.get("parent"), role="parent", read=read)
-    _require_object_create_writable_parent(parent)
+    if list_name is None:
+        _require_object_create_writable_parent(parent)
+    else:
+        _require_object_list_owner(parent)
+        if requested_conflict == "replace":
+            raise OperationContractError(
+                "LIST_REPLACE_REQUIRES_OBJECT_SET",
+                "object.create list insertion does not expose destructive replace; use object.set with list_mode=replaceAll.",
+            )
     roles: dict[str, ResolvedObject] = {"parent": parent}
     replace_owned_root: ResolvedObject | None = None
     if requested_conflict == "replace":
@@ -2391,11 +3184,107 @@ def _prepare_object_create(
         resolved_references=resolved_references,
         derived_properties=derived_properties,
     )
-    root_path = _child_path(parent.row.get("path"), normalized.root.name, field="parent.path")
+    for index, spec in enumerate(node_specs):
+        spec["platform"] = platform
+        spec["collection"] = (
+            list_name if index == 0 and list_name is not None else "children"
+        )
+    root_path = (
+        _child_path(parent.row.get("path"), normalized.root.name, field="parent.path")
+        if list_name is None
+        else None
+    )
     conflict = normalized.on_name_conflict
     path_snapshots: list[dict[str, Any]] = []
+    list_snapshots: list[dict[str, Any]] = []
+    merge_field_snapshots: list[dict[str, Any]] = []
     replace_subtree_snapshots: list[dict[str, Any]] = []
-    if conflict == "fail":
+    list_before: list[dict[str, Any]] = []
+    if list_name is not None:
+        list_before = _normalize_object_list_snapshot(
+            _read_object_list(
+                parent.object,
+                list_name,
+                fields=OBJECT_LIST_SNAPSHOT_FIELDS,
+                read=read,
+                platform=platform,
+            ),
+            owner_id=parent.object,
+            list_name=list_name,
+        )
+        list_snapshots.append(
+            {
+                "object_id": parent.object,
+                "list": list_name,
+                "fields": list(OBJECT_LIST_SNAPSHOT_FIELDS),
+                "platform": platform,
+                "rows": list_before,
+            }
+        )
+        collisions = [
+            row
+            for row in list_before
+            if isinstance(row.get("name"), str)
+            and row["name"].casefold() == normalized.root.name.casefold()
+        ]
+        if len(collisions) > 1:
+            raise OperationContractError(
+                "AMBIGUOUS_IDENTITY",
+                "The requested object-list name collides with more than one live member.",
+                details={"list": list_name, "name": normalized.root.name, "rows": collisions},
+            )
+        if conflict == "fail" and collisions:
+            raise OperationContractError(
+                "TARGET_EXISTS",
+                "object.create list insertion with fail requires the requested member name to be absent.",
+                details={"list": list_name, "name": normalized.root.name, "rows": collisions},
+            )
+        if conflict == "merge" and collisions:
+            if not _object_type_matches(collisions[0].get("type"), node_specs[0]):
+                raise OperationContractError(
+                    "INVALID_TARGET_TYPE",
+                    "object.create list merge collision has a different live object type.",
+                    details={
+                        "list": list_name,
+                        "expected": node_specs[0]["canonical_type"],
+                        "actual": collisions[0].get("type"),
+                    },
+                )
+            node_specs[0]["preexisting_id"] = collisions[0].get("id")
+            if normalized.root.children:
+                raise OperationContractError(
+                    "LIST_MERGE_CHILDREN_UNSUPPORTED",
+                    "A pre-existing object.create list member with requested descendants requires a dedicated list operation.",
+                    details={"list": list_name, "name": normalized.root.name},
+                )
+            merge_fields = _object_spec_return_fields(node_specs[0])
+            merge_options: dict[str, Any] = {"return": merge_fields}
+            if platform is not None:
+                merge_options["platform"] = platform
+            merge_rows = _rows(
+                read(
+                    OBJECT_GET_URI,
+                    {"from": {"id": [collisions[0].get("id")]}},
+                    merge_options,
+                )
+            )
+            if len(merge_rows) != 1:
+                raise OperationContractError(
+                    "INVALID_READBACK",
+                    "The merged object.create list member must resolve exactly once.",
+                )
+            merge_field_snapshots.append(
+                {
+                    "object_id": collisions[0].get("id"),
+                    "fields": merge_fields,
+                    "platform": platform,
+                    "rows": merge_rows,
+                }
+            )
+        if conflict == "rename":
+            node_specs[0]["rename_collision_rows"] = collisions
+    elif conflict == "fail":
+        assert isinstance(root_path, str)
         rows = _read_object_path_rows(root_path, fields=IDENTITY_RETURN_FIELDS, read=read)
         if rows:
             raise OperationContractError(
@@ -2405,6 +3294,7 @@ def _prepare_object_create(
             )
         path_snapshots.append({"path": root_path, "fields": list(IDENTITY_RETURN_FIELDS), "rows": []})
     elif conflict == "merge":
+        assert isinstance(root_path, str)
         for spec in node_specs:
             expected_path = _request_node_expected_path(parent.row.get("path"), spec, node_specs)
             fields = _object_spec_return_fields(spec)
@@ -2426,6 +3316,7 @@ def _prepare_object_create(
             if rows:
                 spec["preexisting_id"] = rows[0].get("id")
     elif conflict == "rename":
+        assert isinstance(root_path, str)
         rows = _read_object_path_rows(root_path, fields=IDENTITY_RETURN_FIELDS, read=read)
         if len(rows) > 1:
             raise OperationContractError(
@@ -2437,6 +3328,7 @@ def _prepare_object_create(
         if not rows:
             node_specs[0]["expected_path"] = root_path
     else:  # replace
+        assert isinstance(root_path, str)
         if replace_owned_root is None:  # pragma: no cover - guarded above and by request parsing.
             raise OperationContractError(
                 "REPLACE_OWNERSHIP_REQUIRED",
@@ -2509,7 +3401,15 @@ def _prepare_object_create(
                 node_specs,
             )
 
-    parent_children = _read_direct_children(parent.object, fields=IDENTITY_RETURN_FIELDS, read=read)
+    parent_children = (
+        _read_direct_children(
+            parent.object,
+            fields=IDENTITY_RETURN_FIELDS,
+            read=read,
+        )
+        if list_name is None
+        else []
+    )
     trusted_root = _materialize_canonical_object_node(
         normalized.root,
         canonical_types=canonical_types,
@@ -2520,8 +3420,12 @@ def _prepare_object_create(
         "parent": parent.object,
         **trusted_root,
         "onNameConflict": conflict,
-        "autoAddToSourceControl": False,
+        "autoAddToSourceControl": auto_add_to_source_control,
     }
+    if platform is not None:
+        dispatch_args["platform"] = platform
+    if list_name is not None:
+        dispatch_args["list"] = list_name
     preview = _closed_operation_preview(
         uri="ak.wwise.core.object.create",
         args=dispatch_args,
@@ -2532,6 +3436,9 @@ def _prepare_object_create(
             "closed_object_tree": True,
             "node_count": len(node_specs),
             "on_name_conflict": conflict,
+            "platform": platform,
+            "list": list_name,
+            "auto_add_to_source_control": auto_add_to_source_control,
             "replaced_subtree_node_count": (
                 len(replace_subtree_snapshots[0]["rows"])
                 if replace_subtree_snapshots
@@ -2542,14 +3449,19 @@ def _prepare_object_create(
     graph_guard = {
         "kind": "object-create-graph",
         "path_snapshots": path_snapshots,
-        "children_snapshots": [
-            {
-                "object_id": parent.object,
-                "fields": list(IDENTITY_RETURN_FIELDS),
-                "rows": parent_children,
-            }
-        ],
-        "field_snapshots": [],
+        "children_snapshots": (
+            [
+                {
+                    "object_id": parent.object,
+                    "fields": list(IDENTITY_RETURN_FIELDS),
+                    "rows": parent_children,
+                }
+            ]
+            if list_name is None
+            else []
+        ),
+        "list_snapshots": list_snapshots,
+        "field_snapshots": merge_field_snapshots,
         "subtree_snapshots": replace_subtree_snapshots,
     }
     verification = {
@@ -2557,8 +3469,14 @@ def _prepare_object_create(
         "version": request.version,
         "parent_id": parent.object,
         "on_name_conflict": conflict,
+        "list": list_name,
+        "list_before": list_before,
         "nodes": node_specs,
-        "preexisting_root_rows": path_snapshots[0]["rows"] if path_snapshots else [],
+        "preexisting_root_rows": (
+            path_snapshots[0]["rows"]
+            if path_snapshots
+            else node_specs[0].get("rename_collision_rows", [])
+        ),
         "replaced_subtree_rows": (
             replace_subtree_snapshots[0]["rows"]
             if replace_subtree_snapshots
@@ -3063,13 +3981,49 @@ def _prepare_object_set(
 ) -> tuple[SemanticPreview, dict[str, ResolvedObject], dict[str, Any], dict[str, Any], dict[str, Any]]:
     raw_objects = _mapping_sequence(arguments.get("objects"), field="objects")
     conflict = str(arguments.get("on_name_conflict", "fail"))
+    global_platform = (
+        _non_empty_string(arguments.get("platform"), field="platform")
+        if "platform" in arguments
+        else None
+    )
+    global_list_mode = str(arguments.get("list_mode", "append"))
+    auto_add_to_source_control = arguments.get(
+        "auto_add_to_source_control",
+        False,
+    )
+    if not isinstance(auto_add_to_source_control, bool):
+        raise OperationContractError(
+            "INVALID_ARGUMENT",
+            "object.set auto_add_to_source_control must be a JSON boolean.",
+        )
     type_catalog = _read_object_type_catalog(read)
     roles: dict[str, ResolvedObject] = {}
     dispatch_objects: list[dict[str, Any]] = []
     node_specs: list[dict[str, Any]] = []
     field_snapshots: list[dict[str, Any]] = []
     children_snapshots: list[dict[str, Any]] = []
+    list_snapshots: list[dict[str, Any]] = []
+    list_subtree_snapshots: list[dict[str, Any]] = []
     path_snapshots: list[dict[str, Any]] = []
+    object_set_file_proofs: list[dict[str, Any]] = []
+    requested_languages: set[str] = set()
+    materialized_imports: dict[str, dict[str, Any]] = {}
+    project_info_cache: dict[str, Mapping[str, Any]] = {}
+
+    def import_context_read(
+        uri: str,
+        args: Mapping[str, Any],
+        options: Mapping[str, Any],
+    ) -> Mapping[str, Any]:
+        if uri == GET_PROJECT_INFO_URI and not args and not options:
+            cached = project_info_cache.get(uri)
+            if cached is not None:
+                return cached
+            result = read(uri, args, options)
+            project_info_cache[uri] = result
+            return result
+        return read(uri, args, options)
+
     resolved_target_ids: dict[str, int] = {}
     for index, item in enumerate(raw_objects):
         merge_child_snapshots: list[dict[str, Any]] = []
@@ -3077,8 +4031,10 @@ def _prepare_object_set(
         platform = (
             _non_empty_string(item.get("platform"), field=f"objects[{index}].platform")
             if "platform" in item
-            else None
+            else global_platform
         )
+        row_conflict = str(item.get("on_name_conflict", conflict))
+        row_list_mode = str(item.get("list_mode", global_list_mode))
         target_key = _identity_key(target.object)
         previous_index = resolved_target_ids.get(target_key)
         if previous_index is not None:
@@ -3103,19 +4059,35 @@ def _prepare_object_set(
         )
         children = normalize_object_forest(
             item.get("children", []),
-            on_name_conflict=conflict,
+            on_name_conflict=row_conflict,
             base_path=f"$.objects[{index}].children",
+            allow_platform=True,
+            allow_language=True,
+            allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS,
+        )
+        lists = normalize_object_lists(
+            item.get("lists", []),
+            request_path=f"$.objects[{index}].lists",
+            allow_platform=True,
+            allow_language=True,
+            allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS,
         )
         if children.roots:
             _require_object_create_writable_parent(target)
+        if lists:
+            _require_object_list_owner(target)
         target_spec: dict[str, Any] = {
             "request_path": f"$.objects[{index}]",
             "parent_request_path": None,
             "existing_target": True,
             "target_id": target.object,
-            "requested_name": target.row.get("name"),
+            "requested_name": item.get("name", target.row.get("name")),
+            "original_name": target.row.get("name"),
             "requested_type": target.row.get("type"),
             "canonical_type": target.row.get("type"),
+            "collection": None,
+            "on_name_conflict": row_conflict,
+            "list_mode": row_list_mode,
             "notes_supplied": "notes" in item,
             "requested_notes": item.get("notes"),
             "platform": platform,
@@ -3123,8 +4095,39 @@ def _prepare_object_set(
             "references": [],
         }
         trusted: dict[str, Any] = {"object": target.object}
-        if platform is not None:
+        if "import" in item:
+            if request.version not in OBJECT_SET_IMPORT_VERSIONS:
+                raise OperationContractError(
+                    "VERSION_BEHAVIOR_BOUNDARY",
+                    "object.set import is available only in Wwise 2023.1-2025.1.",
+                    details={"version": request.version},
+                )
+            try:
+                row_import = normalize_object_import(
+                    item.get("import"),
+                    request_path=f"$.objects[{index}].import",
+                )
+            except ObjectOperationContractError as exc:
+                raise OperationContractError(
+                    exc.error_code,
+                    str(exc),
+                    details=exc.details,
+                ) from exc
+            trusted_import, import_spec = _prepare_object_set_import(
+                row_import,
+                canonical_type=target.row.get("type"),
+                type_catalog=type_catalog,
+                file_proofs=object_set_file_proofs,
+                default_auto_add_to_source_control=auto_add_to_source_control,
+            )
+            trusted["import"] = trusted_import
+            target_spec["import"] = import_spec
+        if "platform" in item:
             trusted["platform"] = platform
+        if "on_name_conflict" in item:
+            trusted["onNameConflict"] = row_conflict
+        if "list_mode" in item:
+            trusted["listMode"] = row_list_mode
         property_info_by_name: dict[str, PropertyInfoMetadataRecord] = {}
         derived_target_properties: dict[str, Any] = {}
         if "notes" in item:
@@ -3132,6 +4135,25 @@ def _prepare_object_set(
             if not isinstance(notes, str):
                 raise OperationContractError("INVALID_ARGUMENT", f"object.set objects[{index}].notes must be a string.")
             trusted["notes"] = notes
+        if "name" in item:
+            requested_name = item.get("name")
+            if not isinstance(requested_name, str) or not requested_name.strip():
+                raise OperationContractError(
+                    "INVALID_ARGUMENT",
+                    f"object.set objects[{index}].name must be a non-empty string.",
+                )
+            if requested_name == target.row.get("name"):
+                raise OperationContractError(
+                    "NO_OP",
+                    f"object.set objects[{index}].name already matches the live target.",
+                )
+            if row_conflict == "merge":
+                raise OperationContractError(
+                    "INVALID_CONFLICT_POLICY",
+                    "Renaming an existing object does not support on_name_conflict=merge.",
+                    details={"index": index},
+                )
+            trusted["name"] = requested_name
         for descriptor in properties:
             info = _read_property_info(read, object_id=target.object, name=descriptor.name)
             _require_object_property_value(info, descriptor.value)
@@ -3193,6 +4215,26 @@ def _prepare_object_set(
             resolved_references=resolved_references,
             derived_properties=derived_child_properties,
         )
+        child_spec_by_path = {
+            str(spec["request_path"]): spec for spec in child_specs
+        }
+        for node in children.nodes:
+            if node.language is not None:
+                requested_languages.add(node.language)
+            if node.import_arg is not None:
+                trusted_import, import_spec = _prepare_object_set_import(
+                    node.import_arg,
+                    canonical_type=canonical_types[node.request_path],
+                    type_catalog=type_catalog,
+                    file_proofs=object_set_file_proofs,
+                    default_auto_add_to_source_control=auto_add_to_source_control,
+                )
+                materialized_imports[node.request_path] = trusted_import
+                child_spec_by_path[node.request_path]["import"] = import_spec
+        for child_spec in child_specs:
+            child_spec.setdefault("platform", platform)
+            child_spec["collection"] = "children"
+            child_spec["on_name_conflict"] = row_conflict
         if children.roots:
             trusted["children"] = [
                 _materialize_canonical_object_node(
@@ -3200,10 +4242,55 @@ def _prepare_object_set(
                     canonical_types=canonical_types,
                     resolved_references=resolved_references,
                     derived_properties=derived_child_properties,
+                    materialized_imports=materialized_imports,
                 )
                 for root in children.roots
             ]
-        target_path = target.row.get("path")
+        target_path = _absolute_live_object_path(
+            target.row.get("path"),
+            field=f"objects[{index}].path",
+        )
+        target_spec["old_path"] = target_path
+        future_target_path = target_path
+        if "name" in item:
+            parent_path = target_path.rsplit("\\", 1)[0]
+            future_target_path = _child_path(
+                parent_path,
+                item.get("name"),
+                field=f"objects[{index}].parent_path",
+            )
+            rename_rows = _read_object_path_rows(
+                future_target_path,
+                fields=IDENTITY_RETURN_FIELDS,
+                read=read,
+            )
+            rename_rows = [
+                row
+                for row in rename_rows
+                if not _same_identity(row.get("id"), target.object)
+            ]
+            if len(rename_rows) > 1:
+                raise OperationContractError(
+                    "AMBIGUOUS_IDENTITY",
+                    "object.set rename collision path resolved more than once.",
+                    details={"path": future_target_path, "rows": rename_rows},
+                )
+            if row_conflict == "fail" and rename_rows:
+                raise OperationContractError(
+                    "TARGET_EXISTS",
+                    "object.set rename with fail requires the exact requested path to be absent.",
+                    details={"path": future_target_path, "rows": rename_rows},
+                )
+            path_snapshots.append(
+                {
+                    "path": future_target_path,
+                    "fields": list(IDENTITY_RETURN_FIELDS),
+                    "rows": rename_rows,
+                }
+            )
+            target_spec["rename_collision_rows"] = rename_rows
+            if row_conflict == "fail":
+                target_spec["expected_path"] = future_target_path
         for child_spec in child_specs:
             child_spec["target_index"] = index
             child_spec["parent_request_path"] = (
@@ -3211,15 +4298,30 @@ def _prepare_object_set(
                 if child_spec["parent_request_path"] is None
                 else child_spec["parent_request_path"]
             )
-            expected_path = _request_node_expected_path(
-                target_path,
-                child_spec,
-                child_specs,
-                root_request_path=target_spec["request_path"],
+            expected_path = (
+                _request_node_expected_path(
+                    future_target_path,
+                    child_spec,
+                    child_specs,
+                    root_request_path=target_spec["request_path"],
+                )
+                if row_conflict in {"fail", "merge"}
+                else None
             )
-            if conflict == "merge":
+            if row_conflict == "merge":
+                assert isinstance(expected_path, str)
                 fields = _object_spec_return_fields(child_spec)
-                rows = _read_object_path_rows(expected_path, fields=fields, read=read)
+                snapshot_platform = child_spec.get("platform")
+                snapshot_language = _localized_import_read_language(
+                    child_spec.get("requested_language")
+                )
+                rows = _read_object_path_rows(
+                    expected_path,
+                    fields=fields,
+                    read=read,
+                    platform=snapshot_platform,
+                    language=snapshot_language,
+                )
                 if len(rows) > 1:
                     raise OperationContractError(
                         "AMBIGUOUS_IDENTITY",
@@ -3232,7 +4334,15 @@ def _prepare_object_set(
                         "object.set merge collision has a different live object type.",
                         details={"path": expected_path, "expected": child_spec["canonical_type"], "actual": rows[0].get("type")},
                     )
-                path_snapshots.append({"path": expected_path, "fields": fields, "rows": rows})
+                path_snapshots.append(
+                    {
+                        "path": expected_path,
+                        "fields": fields,
+                        "platform": snapshot_platform,
+                        "language": snapshot_language,
+                        "rows": rows,
+                    }
+                )
                 child_spec["expected_path"] = expected_path
                 if rows:
                     child_spec["preexisting_id"] = rows[0].get("id")
@@ -3249,17 +4359,234 @@ def _prepare_object_set(
                             "rows": preexisting_children,
                         }
                     )
-            elif conflict == "fail" and child_spec["parent_request_path"] == target_spec["request_path"]:
+            elif (
+                row_conflict == "fail"
+                and child_spec["parent_request_path"] == target_spec["request_path"]
+            ):
+                assert isinstance(expected_path, str)
                 fields = _object_spec_return_fields(child_spec)
-                rows = _read_object_path_rows(expected_path, fields=fields, read=read)
+                snapshot_platform = child_spec.get("platform")
+                snapshot_language = _localized_import_read_language(
+                    child_spec.get("requested_language")
+                )
+                rows = _read_object_path_rows(
+                    expected_path,
+                    fields=fields,
+                    read=read,
+                    platform=snapshot_platform,
+                    language=snapshot_language,
+                )
                 if rows:
                     raise OperationContractError(
                         "TARGET_EXISTS",
                         "object.set append-only child creation with fail requires each root child path to be absent.",
                         details={"path": expected_path, "rows": rows},
                     )
-                path_snapshots.append({"path": expected_path, "fields": fields, "rows": rows})
+                path_snapshots.append(
+                    {
+                        "path": expected_path,
+                        "fields": fields,
+                        "platform": snapshot_platform,
+                        "language": snapshot_language,
+                        "rows": rows,
+                    }
+                )
                 child_spec["expected_path"] = expected_path
+
+        list_specs: list[dict[str, Any]] = []
+        target_list_snapshots: list[dict[str, Any]] = []
+        for list_index, descriptor in enumerate(lists):
+            if descriptor.name.casefold() in OBJECT_DEDICATED_LIST_NAMES:
+                raise OperationContractError(
+                    "DEDICATED_OPERATION_REQUIRED",
+                    "Effect and RTPC object lists must use object.createPlugin or object.setRTPC.",
+                    details={
+                        "index": index,
+                        "list_index": list_index,
+                        "list": descriptor.name,
+                    },
+                )
+            before_rows = _normalize_object_list_snapshot(
+                _read_object_list(
+                    target.object,
+                    descriptor.name,
+                    fields=OBJECT_LIST_SNAPSHOT_FIELDS,
+                    read=read,
+                    platform=platform,
+                ),
+                owner_id=target.object,
+                list_name=descriptor.name,
+            )
+            list_snapshot = {
+                "object_id": target.object,
+                "list": descriptor.name,
+                "fields": list(OBJECT_LIST_SNAPSHOT_FIELDS),
+                "platform": platform,
+                "rows": before_rows,
+            }
+            list_snapshots.append(list_snapshot)
+            target_list_snapshots.append(list_snapshot)
+            if row_list_mode == "replaceAll":
+                replacement_subtrees = _capture_object_list_replace_subtrees(
+                    before_rows,
+                    read=read,
+                )
+                for subtree in replacement_subtrees:
+                    subtree["object_id"] = target.object
+                    subtree["list"] = descriptor.name
+                list_subtree_snapshots.extend(replacement_subtrees)
+
+            prepared_specs = _prepare_object_node_specs(
+                descriptor.nodes,
+                type_catalog=type_catalog,
+                read=read,
+                roles=roles,
+                canonical_types=canonical_types,
+                resolved_references=resolved_references,
+                derived_properties=derived_child_properties,
+            )
+            prepared_spec_by_path = {
+                str(spec["request_path"]): spec for spec in prepared_specs
+            }
+            for node in descriptor.nodes:
+                if node.language is not None:
+                    requested_languages.add(node.language)
+                if node.import_arg is not None:
+                    trusted_import, import_spec = _prepare_object_set_import(
+                        node.import_arg,
+                        canonical_type=canonical_types[node.request_path],
+                        type_catalog=type_catalog,
+                        file_proofs=object_set_file_proofs,
+                        default_auto_add_to_source_control=auto_add_to_source_control,
+                    )
+                    materialized_imports[node.request_path] = trusted_import
+                    prepared_spec_by_path[node.request_path]["import"] = (
+                        import_spec
+                    )
+            root_paths = {root.request_path for root in descriptor.objects}
+            root_specs = [
+                spec
+                for spec in prepared_specs
+                if spec.get("request_path") in root_paths
+            ]
+            if len(root_specs) != len(descriptor.objects):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "Closed object-list roots could not be bound to their normalized descriptors.",
+                )
+            for list_spec in prepared_specs:
+                is_root = list_spec.get("request_path") in root_paths
+                list_spec["target_index"] = index
+                list_spec.setdefault("platform", platform)
+                list_spec["collection"] = descriptor.name if is_root else "children"
+                list_spec["list_owner_id"] = target.object
+                list_spec["list_name"] = descriptor.name
+                list_spec["list_mode"] = row_list_mode
+                list_spec["on_name_conflict"] = row_conflict
+                if is_root:
+                    list_spec["parent_request_path"] = target_spec["request_path"]
+            collisions_by_name: dict[str, list[dict[str, Any]]] = {}
+            for root_spec in root_specs:
+                requested_name = root_spec.get("requested_name")
+                collisions = [
+                    row
+                    for row in before_rows
+                    if isinstance(row.get("name"), str)
+                    and isinstance(requested_name, str)
+                    and row["name"].casefold() == requested_name.casefold()
+                ]
+                collisions_by_name[str(requested_name)] = collisions
+                if len(collisions) > 1:
+                    raise OperationContractError(
+                        "AMBIGUOUS_IDENTITY",
+                        "A requested object-list member name resolves more than once.",
+                        details={
+                            "list": descriptor.name,
+                            "name": requested_name,
+                            "rows": collisions,
+                        },
+                    )
+                if row_list_mode == "append" and row_conflict == "fail" and collisions:
+                    raise OperationContractError(
+                        "TARGET_EXISTS",
+                        "Appending an object-list member with fail requires its name to be absent.",
+                        details={
+                            "list": descriptor.name,
+                            "name": requested_name,
+                            "rows": collisions,
+                        },
+                    )
+                if row_list_mode == "append" and row_conflict == "merge" and collisions:
+                    if not _object_type_matches(collisions[0].get("type"), root_spec):
+                        raise OperationContractError(
+                            "INVALID_TARGET_TYPE",
+                            "An object-list merge collision has a different live type.",
+                            details={
+                                "list": descriptor.name,
+                                "name": requested_name,
+                                "expected": root_spec.get("canonical_type"),
+                                "actual": collisions[0].get("type"),
+                            },
+                        )
+                    direct_requested_children = [
+                        spec
+                        for spec in prepared_specs
+                        if spec.get("parent_request_path") == root_spec.get("request_path")
+                    ]
+                    if direct_requested_children:
+                        raise OperationContractError(
+                            "LIST_MERGE_CHILDREN_UNSUPPORTED",
+                            "A pre-existing object-list member with requested descendants requires a dedicated list operation.",
+                            details={
+                                "list": descriptor.name,
+                                "name": requested_name,
+                            },
+                        )
+                    root_spec["preexisting_id"] = collisions[0].get("id")
+                    existing_fields = _object_spec_return_fields(root_spec)
+                    snapshot_platform = root_spec.get("platform")
+                    snapshot_language = _localized_import_read_language(
+                        root_spec.get("requested_language")
+                    )
+                    existing_options: dict[str, Any] = {
+                        "return": existing_fields,
+                    }
+                    if snapshot_platform is not None:
+                        existing_options["platform"] = snapshot_platform
+                    if snapshot_language is not None:
+                        existing_options["language"] = snapshot_language
+                    existing_rows = _rows(
+                        read(
+                            OBJECT_GET_URI,
+                            {"from": {"id": [collisions[0].get("id")]}},
+                            existing_options,
+                        )
+                    )
+                    if len(existing_rows) != 1:
+                        raise OperationContractError(
+                            "INVALID_READBACK",
+                            "A merged object-list member must resolve exactly once.",
+                        )
+                    field_snapshots.append(
+                        {
+                            "object_id": collisions[0].get("id"),
+                            "fields": existing_fields,
+                            "platform": snapshot_platform,
+                            "language": snapshot_language,
+                            "rows": existing_rows,
+                        }
+                    )
+            trusted[f"@{descriptor.name}"] = [
+                _materialize_canonical_object_node(
+                    root,
+                    canonical_types=canonical_types,
+                    resolved_references=resolved_references,
+                    derived_properties=derived_child_properties,
+                    materialized_imports=materialized_imports,
+                )
+                for root in descriptor.objects
+            ]
+            list_specs.extend(prepared_specs)
 
         snapshot_fields = _dedupe_fields(
             [
@@ -3285,6 +4612,9 @@ def _prepare_object_set(
             }
         )
         target_spec["pre_state"] = snapshot_rows[0]
+        target_spec["expected_parent_id"] = _parent_value(
+            snapshot_rows[0].get("parent")
+        )
         child_rows = _read_direct_children(target.object, fields=IDENTITY_RETURN_FIELDS, read=read)
         children_snapshots.append(
             {"object_id": target.object, "fields": list(IDENTITY_RETURN_FIELDS), "rows": child_rows}
@@ -3292,8 +4622,13 @@ def _prepare_object_set(
         children_snapshots.extend(merge_child_snapshots)
         target_spec["preexisting_children"] = child_rows
         target_spec["children_request_paths"] = [row["request_path"] for row in child_specs]
+        target_spec["list_snapshots"] = target_list_snapshots
+        target_spec["list_request_paths"] = [
+            row["request_path"] for row in list_specs
+        ]
         node_specs.append(target_spec)
         node_specs.extend(child_specs)
+        node_specs.extend(list_specs)
         if len(node_specs) > DEFAULT_MAX_NODES:
             raise OperationContractError(
                 "NODE_LIMIT_EXCEEDED",
@@ -3302,22 +4637,70 @@ def _prepare_object_set(
             )
         dispatch_objects.append(trusted)
 
+    has_imports = any(
+        isinstance(spec.get("import"), Mapping) for spec in node_specs
+    )
+    for spec in node_specs:
+        import_spec = spec.get("import")
+        if not isinstance(import_spec, Mapping):
+            continue
+        for source in import_spec.get("sources", []):
+            if not isinstance(source, Mapping):
+                continue
+            language = source.get("requested_language")
+            if language_requires_live_project_validation(language):
+                requested_languages.add(str(language))
+
+    language_inventory: Mapping[str, Any] | None = None
+    if requested_languages:
+        language_inventory = _read_import_language_inventory(
+            request.version,
+            read=import_context_read,
+        )
+        available_languages = {
+            str(row["name"])
+            for row in language_inventory.get("languages", [])
+            if isinstance(row, Mapping) and isinstance(row.get("name"), str)
+        }
+        unavailable = sorted(requested_languages - available_languages)
+        if unavailable:
+            raise OperationContractError(
+                "UNKNOWN_PROJECT_LANGUAGE",
+                "Every object.set Sound Voice language must exactly match the live Project language inventory.",
+                details={
+                    "requested": sorted(requested_languages),
+                    "unavailable": unavailable,
+                    "available": sorted(available_languages),
+                },
+            )
+    originals_context: Mapping[str, Any] | None = None
+    if has_imports:
+        originals_context = _read_import_originals_context(
+            request.version,
+            read=import_context_read,
+        )
+
     dispatch_args = {
         "objects": dispatch_objects,
         "onNameConflict": conflict,
-        "listMode": "append",
-        "autoAddToSourceControl": False,
+        "listMode": global_list_mode,
+        "autoAddToSourceControl": auto_add_to_source_control,
     }
+    if global_platform is not None:
+        dispatch_args["platform"] = global_platform
     preview = _closed_operation_preview(
         uri="ak.wwise.core.object.set",
         args=dispatch_args,
-        options={"return": list(IDENTITY_RETURN_FIELDS)},
+        options={"return": [*IDENTITY_RETURN_FIELDS, "owner"]},
         version=request.version,
         family="object-mutation",
         metadata={
             "closed_object_batch": True,
             "target_count": len(raw_objects),
             "node_count": len(node_specs),
+            "platform": global_platform,
+            "list_mode": global_list_mode,
+            "auto_add_to_source_control": auto_add_to_source_control,
             "partial_success_is_failure": True,
         },
     )
@@ -3325,12 +4708,40 @@ def _prepare_object_set(
         "kind": "object-set-batch",
         "path_snapshots": path_snapshots,
         "children_snapshots": children_snapshots,
+        "list_snapshots": list_snapshots,
+        "list_subtree_snapshots": list_subtree_snapshots,
         "field_snapshots": field_snapshots,
+    }
+    import_guard = {
+        "file_proofs": object_set_file_proofs,
+        "originals_context": (
+            dict(originals_context)
+            if isinstance(originals_context, Mapping)
+            else None
+        ),
+        "language_inventory": (
+            dict(language_inventory)
+            if isinstance(language_inventory, Mapping)
+            else None
+        ),
     }
     verification = {
         "kind": "object-set-batch",
         "version": request.version,
         "on_name_conflict": conflict,
+        "list_names": sorted(
+            {
+                str(row.get("list_name"))
+                for row in node_specs
+                if isinstance(row.get("list_name"), str)
+            }
+        ),
+        "replaced_list_subtree_rows": [
+            dict(row)
+            for snapshot in list_subtree_snapshots
+            for row in snapshot.get("rows", [])
+            if isinstance(row, Mapping)
+        ],
         "nodes": node_specs,
     }
     cleanup = {
@@ -3339,7 +4750,13 @@ def _prepare_object_set(
         "automatic_retry": False,
         "partial_success_possible": len(raw_objects) > 1,
     }
-    return preview, roles, {"object_graph_guard": graph_guard, "object_set_nodes": node_specs}, verification, cleanup
+    state: dict[str, Any] = {
+        "object_graph_guard": graph_guard,
+        "object_set_nodes": node_specs,
+    }
+    if has_imports or requested_languages:
+        state["import_guard"] = import_guard
+    return preview, roles, state, verification, cleanup
 
 
 def _prepare_object_set_linked(
@@ -3671,6 +5088,32 @@ def _resolve_object_type(
     return row
 
 
+def _resolve_object_set_import_type(
+    requested: str,
+    *,
+    catalog: Sequence[ObjectTypeMetadataRecord],
+) -> ObjectTypeMetadataRecord:
+    """Resolve one native import ``objectType`` without opening raw type input."""
+
+    token = _object_type_token(requested)
+    matches = [
+        row
+        for row in catalog
+        if token == _object_type_token(row.name)
+    ]
+    if len(matches) != 1:
+        raise OperationContractError(
+            "INVALID_IMPORT_OBJECT_TYPE",
+            "object.set import object_type must resolve to exactly one live metadata name.",
+            details={
+                "requested": requested,
+                "matches": [row.as_dict() for row in matches],
+            },
+        )
+    row = matches[0]
+    return row
+
+
 def _prepare_object_node_specs(
     nodes: Sequence[ObjectNodeDescriptor],
     *,
@@ -3702,6 +5145,21 @@ def _prepare_object_node_specs(
             "properties": [],
             "references": [],
         }
+        if node.language is not None:
+            if _object_type_token(type_info.name) != "sound":
+                raise OperationContractError(
+                    "INVALID_LANGUAGE_TARGET",
+                    "object.set language is meaningful only for a newly created Sound Voice.",
+                    details={
+                        "request_path": node.request_path,
+                        "canonical_type": type_info.name,
+                    },
+                )
+            spec["requested_language"] = node.language
+        if node.platform is not None:
+            spec["platform"] = node.platform
+        if node.import_arg is not None:
+            spec["import_requested"] = True
         property_info_by_name: dict[str, PropertyInfoMetadataRecord] = {}
         node_derived_properties: dict[str, Any] = {}
         for descriptor in node.properties:
@@ -3739,6 +5197,157 @@ def _prepare_object_node_specs(
             derived_properties[node.request_path] = node_derived_properties
         specs.append(spec)
     return specs
+
+
+def _prepare_object_set_import(
+    descriptor: ObjectImportDescriptor,
+    *,
+    canonical_type: Any,
+    type_catalog: Sequence[ObjectTypeMetadataRecord],
+    file_proofs: list[dict[str, Any]],
+    default_auto_add_to_source_control: bool,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Bind one reviewed native ``importArg`` to immutable source proofs."""
+
+    if not isinstance(canonical_type, str) or not canonical_type:
+        raise OperationContractError(
+            "UNSUPPORTED_IMPORT_TARGET",
+            "object.set import target type must come from the live-resolved object or node.",
+            details={
+                "request_path": descriptor.request_path,
+                "canonical_type": canonical_type,
+            },
+        )
+    dispatch_files: list[dict[str, Any]] = []
+    source_specs: list[dict[str, Any]] = []
+    source_keys: set[str] = set()
+    for index, item in enumerate(descriptor.files):
+        field = item.request_path
+        dispatch_row: dict[str, Any] = {}
+        if item.audio_file is not None:
+            try:
+                proof = import_regular_file_proof(
+                    item.audio_file,
+                    field=f"{field}.audio_file",
+                )
+                validate_import_media_extension(
+                    str(proof["path"]),
+                    field=f"{field}.audio_file",
+                )
+            except ImportContractError as exc:
+                raise OperationContractError(
+                    exc.error_code,
+                    str(exc),
+                    details=exc.details,
+                ) from exc
+            source_identity = f"file:{str(proof['path']).casefold()}"
+            dispatch_row["audioFile"] = proof["path"]
+            source = {
+                "index": index,
+                "kind": "regular_file",
+                **proof,
+            }
+            expected_filename = _import_path_leaf_name(proof["path"])
+            file_proofs.append(
+                {
+                    "field": f"{field}.audio_file",
+                    "proof": dict(proof),
+                }
+            )
+        else:
+            try:
+                encoded, inline_proof = normalize_inline_audio_file(
+                    item.audio_file_base64,
+                    field=f"{field}.audio_file_base64",
+                )
+            except ImportContractError as exc:
+                raise OperationContractError(
+                    exc.error_code,
+                    str(exc),
+                    details=exc.details,
+                ) from exc
+            source_identity = (
+                "inline:"
+                f"{str(inline_proof['relative_path']).casefold()}:"
+                f"{inline_proof['sha256']}"
+            )
+            dispatch_row["audioFileBase64"] = encoded
+            source = {
+                "index": index,
+                **inline_proof,
+            }
+            expected_filename = _import_path_leaf_name(
+                inline_proof["relative_path"]
+            )
+        if not expected_filename:
+            raise OperationContractError(
+                "INVALID_IMPORT_SOURCE",
+                "object.set import source must have a sealed file name.",
+                details={"request_path": field},
+            )
+        source["expected_original_filename"] = expected_filename
+        source["expected_object_name"] = Path(expected_filename).stem
+        if item.originals_subfolder is not None:
+            try:
+                subfolder = normalize_originals_subfolder(
+                    item.originals_subfolder,
+                    field=f"{field}.originals_subfolder",
+                )
+            except ImportContractError as exc:
+                raise OperationContractError(
+                    exc.error_code,
+                    str(exc),
+                    details=exc.details,
+                ) from exc
+            dispatch_row["originalsSubFolder"] = subfolder
+            source["requested_originals_subfolder"] = subfolder
+        if item.language is not None:
+            dispatch_row["language"] = item.language
+            source["requested_language"] = item.language
+        if item.object_type is not None:
+            type_info = _resolve_object_set_import_type(
+                item.object_type,
+                catalog=type_catalog,
+            )
+            dispatch_row["objectType"] = type_info.name
+            source["requested_object_type"] = type_info.name
+            source["requested_object_type_class_id"] = type_info.class_id
+        source_key = ":".join(
+            (
+                source_identity,
+                str(dispatch_row.get("language", "")).casefold(),
+                str(dispatch_row.get("objectType", "")).casefold(),
+                str(dispatch_row.get("originalsSubFolder", "")).casefold(),
+            )
+        )
+        if source_key in source_keys:
+            raise OperationContractError(
+                "DUPLICATE_IMPORT_SOURCE",
+                "One object.set import must not repeat the same media source and destination semantics.",
+                details={"request_path": descriptor.request_path, "index": index},
+            )
+        source_keys.add(source_key)
+        dispatch_files.append(dispatch_row)
+        source_specs.append(source)
+
+    effective_auto_add = (
+        descriptor.auto_add_to_source_control
+        if descriptor.auto_add_to_source_control is not None
+        else default_auto_add_to_source_control
+    )
+    dispatch: dict[str, Any] = {
+        "files": dispatch_files,
+        "autoAddToSourceControl": effective_auto_add,
+    }
+    return dispatch, {
+        "sources": source_specs,
+        "canonical_type": canonical_type,
+        "readback_contract": (
+            "copied Originals paths are located from the imported target and "
+            "its descendants, then each copied file is hashed against its "
+            "immutable source proof"
+        ),
+    }
 
 
 def _read_property_info(
@@ -4055,9 +5664,24 @@ def _materialize_canonical_object_node(
     canonical_types: Mapping[str, str],
     resolved_references: Mapping[str, Any],
     derived_properties: Mapping[str, Mapping[str, Any]],
+    materialized_imports: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     try:
-        payload = materialize_waapi_node(node, resolved_references=resolved_references)
+        subtree_import_paths = {
+            item.request_path
+            for item in flatten_request_nodes((node,))
+            if item.import_arg is not None
+        }
+        import_bindings = {
+            path: dict(value)
+            for path, value in dict(materialized_imports or {}).items()
+            if path in subtree_import_paths
+        }
+        payload = materialize_waapi_node(
+            node,
+            resolved_references=resolved_references,
+            materialized_imports=import_bindings,
+        )
     except ObjectOperationContractError as exc:
         raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
 
@@ -4166,10 +5790,13 @@ def _import_object_get_options(
     fields: Sequence[str],
     *,
     language: str | None = None,
+    platform: str | None = None,
 ) -> dict[str, Any]:
     options: dict[str, Any] = {"return": list(fields)}
     if language is not None:
         options["language"] = language
+    if platform is not None:
+        options["platform"] = platform
     return options
 
 
@@ -4179,12 +5806,17 @@ def _read_object_path_rows(
     fields: Sequence[str],
     read: ReadCall,
     language: str | None = None,
+    platform: str | None = None,
 ) -> list[dict[str, Any]]:
     return _rows(
         read(
             OBJECT_GET_URI,
             {"from": {"path": [path]}},
-            _import_object_get_options(fields, language=language),
+            _import_object_get_options(
+                fields,
+                language=language,
+                platform=platform,
+            ),
         )
     )
 
@@ -4201,6 +5833,200 @@ def _read_direct_children(object_id: Any, *, fields: Sequence[str], read: ReadCa
             {"return": list(fields)},
         )
     )
+
+
+def _read_object_list(
+    object_id: Any,
+    list_name: str,
+    *,
+    fields: Sequence[str],
+    read: ReadCall,
+    platform: str | None = None,
+) -> list[dict[str, Any]]:
+    try:
+        canonical_name = normalize_object_list_name(
+            list_name,
+            request_path="object_list.name",
+        )
+    except ObjectOperationContractError as exc:
+        raise OperationContractError(
+            exc.error_code,
+            str(exc),
+            details=exc.details,
+        ) from exc
+    options: dict[str, Any] = {"return": list(fields)}
+    if platform is not None:
+        options["platform"] = platform
+    return _rows(
+        read(
+            OBJECT_GET_URI,
+            {
+                "from": {"id": [object_id]},
+                "transform": [{"select": [f"@{canonical_name}"]}],
+            },
+            options,
+        )
+    )
+
+
+def _normalize_object_list_snapshot(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    owner_id: Any,
+    list_name: str,
+) -> list[dict[str, Any]]:
+    if len(rows) > OBJECT_LIST_MAX_SUBTREE_NODES:
+        raise OperationContractError(
+            "LIST_SNAPSHOT_LIMIT_EXCEEDED",
+            "The existing object list exceeds the complete snapshot limit.",
+            details={
+                "list": list_name,
+                "count": len(rows),
+                "limit": OBJECT_LIST_MAX_SUBTREE_NODES,
+            },
+        )
+    normalized: list[dict[str, Any]] = []
+    identity_keys: set[str] = set()
+    for index, raw_row in enumerate(rows):
+        row = dict(raw_row)
+        object_id = row.get("id")
+        object_type = row.get("type")
+        name = row.get("name")
+        if (
+            not _valid_object_id(object_id)
+            or not isinstance(object_type, str)
+            or not object_type
+            or not isinstance(name, str)
+        ):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "Every object-list snapshot row must expose canonical id/name/type fields.",
+                details={"list": list_name, "index": index, "row": row},
+            )
+        owner = _reference_identity(row.get("owner"))
+        parent = _parent_value(row.get("parent"))
+        if not (
+            _same_identity(owner, owner_id)
+            or _same_identity(parent, owner_id)
+        ):
+            raise OperationContractError(
+                "LIST_OWNER_MISMATCH",
+                "An object-list snapshot row is not owned by the reviewed target.",
+                details={
+                    "list": list_name,
+                    "index": index,
+                    "expected_owner": owner_id,
+                    "owner": owner,
+                    "parent": parent,
+                    "row": row,
+                },
+            )
+        identity_key = _identity_key(object_id)
+        if identity_key in identity_keys:
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "An object-list snapshot contains duplicate GUIDs.",
+                details={"list": list_name, "object_id": object_id},
+            )
+        identity_keys.add(identity_key)
+        normalized.append(row)
+    return sorted(normalized, key=lambda row: _identity_key(row["id"]))
+
+
+def _normalize_object_identity_subtree(
+    root_rows: Sequence[Mapping[str, Any]],
+    descendant_rows: Sequence[Mapping[str, Any]],
+    *,
+    expected_root_id: Any,
+) -> list[dict[str, Any]]:
+    if (
+        len(root_rows) != 1
+        or not _same_identity(root_rows[0].get("id"), expected_root_id)
+    ):
+        raise OperationContractError(
+            "IDENTITY_MISMATCH",
+            "The object-list replacement subtree root changed during snapshot capture.",
+            details={
+                "expected_root_id": expected_root_id,
+                "root_rows": [dict(row) for row in root_rows],
+            },
+        )
+    rows = [dict(root_rows[0]), *(dict(row) for row in descendant_rows)]
+    if len(rows) > OBJECT_LIST_MAX_SUBTREE_NODES:
+        raise OperationContractError(
+            "LIST_SUBTREE_LIMIT_EXCEEDED",
+            "An existing object-list member subtree exceeds the complete GUID snapshot limit.",
+            details={
+                "root_id": expected_root_id,
+                "count": len(rows),
+                "limit": OBJECT_LIST_MAX_SUBTREE_NODES,
+            },
+        )
+    identity_keys: list[str] = []
+    for index, row in enumerate(rows):
+        object_id = row.get("id")
+        if not _valid_object_id(object_id):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "Every object-list replacement subtree row must expose a canonical GUID.",
+                details={"root_id": expected_root_id, "index": index, "row": row},
+            )
+        identity_keys.append(_identity_key(object_id))
+    if len(identity_keys) != len(set(identity_keys)):
+        raise OperationContractError(
+            "INVALID_READBACK",
+            "An object-list replacement subtree snapshot contains duplicate GUIDs.",
+            details={"root_id": expected_root_id, "rows": rows},
+        )
+    return [rows[0], *sorted(rows[1:], key=lambda row: _identity_key(row["id"]))]
+
+
+def _capture_object_list_replace_subtrees(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    read: ReadCall,
+) -> list[dict[str, Any]]:
+    snapshots: list[dict[str, Any]] = []
+    total_nodes = 0
+    for index, row in enumerate(rows):
+        root_id = row.get("id")
+        root_result = read(
+            OBJECT_GET_URI,
+            {"from": {"id": [root_id]}},
+            {"return": list(OBJECT_LIST_SNAPSHOT_FIELDS)},
+        )
+        descendants_result = read(
+            OBJECT_GET_URI,
+            {
+                "from": {"id": [root_id]},
+                "transform": [{"select": ["descendants"]}],
+            },
+            {"return": list(OBJECT_LIST_SNAPSHOT_FIELDS)},
+        )
+        subtree = _normalize_object_identity_subtree(
+            _rows(root_result),
+            _rows(descendants_result),
+            expected_root_id=root_id,
+        )
+        total_nodes += len(subtree)
+        if total_nodes > OBJECT_LIST_MAX_SUBTREE_NODES:
+            raise OperationContractError(
+                "LIST_SUBTREE_LIMIT_EXCEEDED",
+                "The combined object-list replacement forest exceeds the complete GUID snapshot limit.",
+                details={
+                    "member_index": index,
+                    "count": total_nodes,
+                    "limit": OBJECT_LIST_MAX_SUBTREE_NODES,
+                },
+            )
+        snapshots.append(
+            {
+                "root_id": root_id,
+                "fields": list(OBJECT_LIST_SNAPSHOT_FIELDS),
+                "rows": subtree,
+            }
+        )
+    return snapshots
 
 
 def _capture_replace_subtree_snapshot(
@@ -4289,8 +6115,19 @@ def _object_spec_return_fields(spec: Mapping[str, Any]) -> list[str]:
     return _dedupe_fields(
         [
             *IDENTITY_RETURN_FIELDS,
+            *(
+                ("owner",)
+                if spec.get("collection") not in {None, "children"}
+                else ()
+            ),
             *(row.get("name") for row in spec.get("properties", []) if isinstance(row, Mapping)),
             *(row.get("name") for row in spec.get("references", []) if isinstance(row, Mapping)),
+            *(
+                OBJECT_SET_IMPORT_READBACK_FIELDS
+                if isinstance(spec.get("import"), Mapping)
+                or isinstance(spec.get("requested_language"), str)
+                else ()
+            ),
         ]
     )
 
@@ -4481,7 +6318,32 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         target = _resolve_identity(arguments["object"], role="object", read=read)
         _reject_protected_delete(target)
         roles["object"] = target
-        preview = ObjectMutationBuilder(version=request.version).delete(object=target)
+        try:
+            auto_check_out = normalize_auto_check_out_to_source_control(
+                arguments.get("auto_check_out_to_source_control"),
+                version=request.version,
+                supplied="auto_check_out_to_source_control" in arguments,
+            )
+        except ImportContractError as exc:
+            raise OperationContractError(
+                exc.error_code,
+                str(exc),
+                details=exc.details,
+            ) from exc
+        preview = ObjectMutationBuilder(version=request.version).delete(
+            object=target,
+            auto_check_out_to_source_control=auto_check_out,
+        )
+        metadata["source_control_policy"] = {
+            "auto_check_out_to_source_control": auto_check_out,
+            "supported": (
+                request.version in AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS
+            ),
+            "dispatched": (
+                "autoCheckOutToSourceControl"
+                in preview.envelope.args
+            ),
+        }
         verification = {"kind": "guid-absent", "object_id": target.object}
         cleanup = {"kind": "none-after-delete", "irreversible": True}
     elif request.operation in {"object.setName", "object.setNotes"}:
@@ -4568,9 +6430,17 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 "platform": platform,
             }
         else:
-            target = _resolve_identity(arguments["target"], role="target", read=read)
-            roles["target"] = target
-            _require_reference_target_allowed(info, target)
+            target_payload = arguments["target"]
+            target = (
+                _resolve_identity(target_payload, role="target", read=read)
+                if target_payload is not None
+                else None
+            )
+            if target is None:
+                _require_reference_clear_allowed(info)
+            else:
+                roles["target"] = target
+                _require_reference_target_allowed(info, target)
             preview = PropertyReferenceBuilder(version=request.version).set_reference(
                 object=source,
                 reference=field_value,
@@ -4582,7 +6452,10 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 "kind": "same-guid-reference",
                 "object_id": source.object,
                 "field": field_value,
-                "expected_target_id": target.object,
+                "expected_target_id": (
+                    target.object if target is not None else None
+                ),
+                "expected_clear": target is None,
                 "platform": platform,
             }
         cleanup = {"kind": "restore-pre-state", "snapshot": dict(source.row), "field_metadata": info.as_dict()}
@@ -5119,23 +6992,65 @@ def _prepare_audio_import(
     read: ReadCall,
 ) -> tuple[SemanticPreview, dict[str, ResolvedObject], dict[str, Any], dict[str, Any], dict[str, Any]]:
     raw_imports = _mapping_sequence(arguments.get("imports"), field="imports")
+    raw_defaults = arguments.get("defaults")
+    if raw_defaults is not None and not isinstance(raw_defaults, Mapping):
+        raise OperationContractError("INVALID_ARGUMENT", "defaults must be a JSON object.")
+    resolved_imports = [dict(row) for row in raw_imports]
+    resolved_defaults = dict(raw_defaults) if isinstance(raw_defaults, Mapping) else None
+    location_roles: dict[str, ResolvedObject] = {}
+
+    def resolve_location(scope: dict[str, Any], *, role: str) -> None:
+        if "import_location" not in scope:
+            return
+        resolved = _resolve_identity(
+            scope.get("import_location"),
+            role=role,
+            read=read,
+        )
+        _require_import_parent(resolved, index=0)
+        path = resolved.row.get("path")
+        if not isinstance(path, str) or not path.startswith("\\"):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                f"{role} must expose an absolute Wwise path.",
+            )
+        scope["import_location"] = path
+        location_roles[role] = resolved
+
+    if resolved_defaults is not None:
+        resolve_location(resolved_defaults, role="defaults.import_location")
+    for index, row in enumerate(resolved_imports):
+        resolve_location(row, role=f"imports[{index}].import_location")
+
     operation = arguments.get("import_operation", "createNew")
     try:
         plan = build_audio_import_plan(
-            raw_imports,
+            resolved_imports,
             version=request.version,
             import_operation=str(operation),
+            defaults=resolved_defaults,
+            auto_add_to_source_control=arguments.get(
+                "auto_add_to_source_control",
+                False,
+            ),
             auto_check_out_to_source_control=arguments.get(
                 "auto_check_out_to_source_control"
             ),
         )
     except ImportContractError as exc:
         raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
-    return _prepare_closed_import_plan(
+    preview, roles, state, verification, cleanup = _prepare_closed_import_plan(
         request,
         source_operation="audio.import",
         plan=plan,
         read=read,
+    )
+    return (
+        preview,
+        {**location_roles, **roles},
+        state,
+        verification,
+        cleanup,
     )
 
 
@@ -5157,6 +7072,10 @@ def _prepare_audio_import_tab_delimited(
             import_location=location_path,
             import_language=str(arguments.get("import_language")),
             import_operation=str(arguments.get("import_operation", "createNew")),
+            auto_add_to_source_control=arguments.get(
+                "auto_add_to_source_control",
+                False,
+            ),
             auto_check_out_to_source_control=arguments.get(
                 "auto_check_out_to_source_control"
             ),
@@ -5655,6 +7574,384 @@ def _import_originals_root_from_context(value: Any, *, version: str) -> str:
     return str(value["originals_root"])
 
 
+def _prepare_import_dynamic_fields(
+    request: OperationRequest,
+    *,
+    source_operation: str,
+    raw_targets: Sequence[Mapping[str, Any]],
+    dispatch_args: Mapping[str, Any],
+    read: ReadCall,
+) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, ResolvedObject]]:
+    """Validate and materialize native ``@Property`` import fields.
+
+    The public request never contains a raw ``@`` key.  Property/reference
+    tokens are checked against live class-scoped metadata, references are
+    resolved to canonical IDs, and only then are the trusted WAAPI keys added
+    to ``audio.import`` rows.  Tab-delimited files already contain their wire
+    columns, so this path validates and seals their typed readback oracle
+    without rewriting the proven input file.
+    """
+
+    if source_operation not in {"audio.import", "audio.importTabDelimited"}:
+        raise OperationContractError(
+            "INVALID_PREVIEW",
+            "Unknown closed import operation for dynamic-field validation.",
+        )
+    targets = [dict(row) for row in raw_targets]
+    # The packaged catalog is discovery evidence, not mutation authority.
+    # Resolve the class id from the connected Wwise instance.  The gateway
+    # wraps this exact read with the session-bound metadata cache, so repeated
+    # previews avoid another WAAPI round trip without accepting stale
+    # cross-build or plug-in-specific type metadata.
+    type_catalog = _read_object_type_catalog(read)
+    property_info_cache: dict[tuple[int, str], PropertyInfoMetadataRecord] = {}
+    identity_cache: dict[bytes, ResolvedObject] = {}
+    roles: dict[str, ResolvedObject] = {}
+
+    raw_dispatch_rows = dispatch_args.get("imports")
+    if source_operation == "audio.import":
+        if (
+            not isinstance(raw_dispatch_rows, list)
+            or len(raw_dispatch_rows) != len(targets)
+            or not all(isinstance(row, Mapping) for row in raw_dispatch_rows)
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "audio.import dynamic fields require one dispatch row per target.",
+            )
+        dispatch_rows = [dict(row) for row in raw_dispatch_rows]
+    else:
+        dispatch_rows = []
+
+    def property_info(class_id: int, name: str) -> PropertyInfoMetadataRecord:
+        cache_key = (class_id, name.casefold())
+        cached = property_info_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        info = _read_property_info(read, class_id=class_id, name=name)
+        property_info_cache[cache_key] = info
+        return info
+
+    def resolve_reference(identity: Mapping[str, Any], *, role: str) -> ResolvedObject:
+        try:
+            cache_key = canonical_json_bytes(dict(identity))
+        except (TypeError, ValueError) as exc:
+            raise OperationContractError(
+                "INVALID_IDENTITY",
+                f"{role} identity is not canonical JSON.",
+            ) from exc
+        cached = identity_cache.get(cache_key)
+        if cached is None:
+            cached = _resolve_identity(identity, role=role, read=read)
+            identity_cache[cache_key] = cached
+        roles[role] = cached
+        return cached
+
+    for index, target in enumerate(targets):
+        requested_type = target.get("requested_object_type", "Sound")
+        if not isinstance(requested_type, str):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "An import target has a malformed requested object type.",
+                details={"index": index, "requested_type": requested_type},
+            )
+        metadata_type = _import_metadata_object_type(requested_type)
+        type_info = _resolve_object_type(metadata_type, catalog=type_catalog)
+        target["metadata_object_type"] = type_info.name
+        target["metadata_class_id"] = type_info.class_id
+
+        raw_properties = target.get("requested_properties", [])
+        raw_references = target.get("requested_references", [])
+        raw_dynamic = target.get("requested_dynamic_fields", [])
+        if not isinstance(raw_properties, list) or not all(
+            isinstance(item, Mapping) for item in raw_properties
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "Import property descriptors are malformed.",
+                details={"index": index},
+            )
+        if not isinstance(raw_references, list) or not all(
+            isinstance(item, Mapping) for item in raw_references
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "Import reference descriptors are malformed.",
+                details={"index": index},
+            )
+        if not isinstance(raw_dynamic, list) or not all(
+            isinstance(item, Mapping) for item in raw_dynamic
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "Tab-delimited dynamic-field descriptors are malformed.",
+                details={"index": index},
+            )
+
+        property_requests: list[dict[str, Any]] = [
+            {"name": item.get("name"), "value": item.get("value"), "source": "request"}
+            for item in raw_properties
+        ]
+        reference_requests: list[dict[str, Any]] = [
+            {"name": item.get("name"), "target": item.get("target"), "source": "request"}
+            for item in raw_references
+        ]
+        for dynamic_index, item in enumerate(raw_dynamic):
+            name = item.get("name")
+            kind = item.get("kind")
+            value = item.get("value")
+            if (
+                not isinstance(name, str)
+                or kind not in {"property", "reference", "auto"}
+                or not isinstance(value, str)
+            ):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "A tab-delimited dynamic field lacks a closed name, kind, or value.",
+                    details={"index": index, "dynamic_index": dynamic_index},
+                )
+            info = property_info(type_info.class_id, name)
+            is_reference = _metadata_is_reference(info)
+            if kind == "property" and is_reference:
+                raise OperationContractError(
+                    "INVALID_PROPERTY",
+                    "A Property[...] column resolves to live reference metadata.",
+                    details={"index": index, "name": name},
+                )
+            if kind == "reference" and not is_reference:
+                raise OperationContractError(
+                    "INVALID_REFERENCE",
+                    "A Reference[...] column resolves to live property metadata.",
+                    details={"index": index, "name": name},
+                )
+            if is_reference:
+                reference_requests.append(
+                    {
+                        "name": name,
+                        "target": _tab_import_reference_identity(
+                            value,
+                            field=f"targets[{index}].dynamic[{dynamic_index}]",
+                        ),
+                        "source": "tab",
+                    }
+                )
+            else:
+                property_requests.append(
+                    {
+                        "name": name,
+                        "value": _coerce_tab_import_property_value(
+                            info,
+                            value,
+                            field=f"targets[{index}].dynamic[{dynamic_index}]",
+                        ),
+                        "source": "tab",
+                    }
+                )
+
+        property_specs: list[dict[str, Any]] = []
+        property_info_by_name: dict[str, PropertyInfoMetadataRecord] = {}
+        seen_fields: set[str] = set()
+        for property_index, descriptor in enumerate(property_requests):
+            name = descriptor.get("name")
+            if not isinstance(name, str) or not name:
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "An import property descriptor lacks a name.",
+                    details={"index": index, "property_index": property_index},
+                )
+            key = name.casefold()
+            if key in seen_fields:
+                raise OperationContractError(
+                    "DUPLICATE_FIELD",
+                    "An import target assigns one property/reference more than once.",
+                    details={"index": index, "name": name},
+                )
+            seen_fields.add(key)
+            info = property_info(type_info.class_id, name)
+            _require_object_property_value(info, descriptor.get("value"))
+            property_info_by_name[key] = info
+            property_specs.append(
+                {
+                    "name": info.name,
+                    "value": descriptor.get("value"),
+                    "metadata_type": info.type,
+                    "source": descriptor.get("source"),
+                }
+            )
+
+        reference_specs: list[dict[str, Any]] = []
+        derived_properties: dict[str, Any] = {}
+        for reference_index, descriptor in enumerate(reference_requests):
+            name = descriptor.get("name")
+            identity = descriptor.get("target")
+            if not isinstance(name, str) or not name or not isinstance(identity, Mapping):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "An import reference descriptor lacks a name or closed identity.",
+                    details={"index": index, "reference_index": reference_index},
+                )
+            key = name.casefold()
+            if key in seen_fields:
+                raise OperationContractError(
+                    "DUPLICATE_FIELD",
+                    "An import target assigns one property/reference more than once.",
+                    details={"index": index, "name": name},
+                )
+            seen_fields.add(key)
+            info = property_info(type_info.class_id, name)
+            _require_object_reference_metadata(info)
+            activation_properties = _apply_reference_activation_dependencies(
+                info,
+                read=read,
+                class_id=type_info.class_id,
+                property_specs=property_specs,
+                property_info_by_name=property_info_by_name,
+                derived_properties=derived_properties,
+                request_path=f"targets[{index}].references[{reference_index}]",
+            )
+            resolved = resolve_reference(
+                identity,
+                role=f"targets[{index}].references[{reference_index}].target",
+            )
+            _require_reference_target_allowed(info, resolved)
+            reference_spec: dict[str, Any] = {
+                "name": info.name,
+                "target_id": resolved.object,
+                "source": descriptor.get("source"),
+            }
+            if activation_properties:
+                reference_spec["activation_properties"] = list(
+                    activation_properties
+                )
+            reference_specs.append(reference_spec)
+
+        if source_operation == "audio.import":
+            wire_row = dispatch_rows[index]
+            for spec in property_specs:
+                wire_row[f"@{spec['name']}"] = spec["value"]
+            for spec in reference_specs:
+                wire_row[f"@{spec['name']}"] = spec["target_id"]
+            dispatch_rows[index] = wire_row
+        else:
+            explicitly_supplied = {
+                str(item.get("name")).casefold()
+                for item in property_requests
+                if isinstance(item.get("name"), str)
+            }
+            missing_activation_columns = sorted(
+                name
+                for name in derived_properties
+                if name.casefold() not in explicitly_supplied
+            )
+            if missing_activation_columns:
+                raise OperationContractError(
+                    "TAB_REFERENCE_DEPENDENCY_REQUIRES_COLUMN",
+                    "A tab-delimited reference requires explicit Boolean activation property columns.",
+                    details={
+                        "index": index,
+                        "missing_properties": missing_activation_columns,
+                    },
+                )
+
+        if property_specs:
+            target["validated_properties"] = property_specs
+        if reference_specs:
+            target["validated_references"] = reference_specs
+        targets[index] = target
+
+    trusted_dispatch = dict(dispatch_args)
+    if source_operation == "audio.import":
+        trusted_dispatch["imports"] = dispatch_rows
+    return targets, trusted_dispatch, roles
+
+
+def _metadata_is_reference(info: PropertyInfoMetadataRecord) -> bool:
+    return (
+        info.type.casefold() in {"reference", "objectreference"}
+        or info.restriction.get("type") == "reference"
+    )
+
+
+def _import_metadata_object_type(value: str) -> str:
+    token = _object_type_token(value)
+    aliases = {
+        "soundsfx": "Sound",
+        "soundvoice": "Sound",
+        "randomcontainer": "RandomSequenceContainer",
+        "sequencecontainer": "RandomSequenceContainer",
+        "randomsequencecontainer": "RandomSequenceContainer",
+        "actormixer": "ActorMixer",
+        "blendcontainer": "BlendContainer",
+        "switchcontainer": "SwitchContainer",
+        "musicplaylistcontainer": "MusicRanSeqCntr",
+        "musicswitchcontainer": "MusicSwitchContainer",
+        "musicsegment": "MusicSegment",
+        "musictrack": "MusicTrack",
+        "virtualfolder": "Folder",
+        "propertycontainer": "Folder",
+    }
+    return aliases.get(token, value)
+
+
+def _tab_import_reference_identity(value: str, *, field: str) -> Mapping[str, Any]:
+    if value.startswith("\\"):
+        return {"kind": "path", "value": value}
+    if re.fullmatch(r"\{[0-9A-Fa-f-]{36}\}", value):
+        return {"kind": "id", "value": value}
+    raise OperationContractError(
+        "INVALID_IDENTITY",
+        f"{field} reference values must be an absolute Wwise path or canonical GUID.",
+        details={"value": value},
+    )
+
+
+def _coerce_tab_import_property_value(
+    info: PropertyInfoMetadataRecord,
+    value: str,
+    *,
+    field: str,
+) -> Any:
+    property_type = info.type.casefold()
+    try:
+        if property_type in {"bool", "boolean"}:
+            normalized = value.casefold()
+            if normalized not in {"true", "false"}:
+                raise ValueError
+            result: Any = normalized == "true"
+        elif property_type in {
+            "int8",
+            "int16",
+            "int32",
+            "int64",
+            "uint8",
+            "uint16",
+            "uint32",
+            "uint64",
+            "integer",
+        }:
+            if re.fullmatch(r"-?(?:0|[1-9][0-9]*)", value) is None:
+                raise ValueError
+            result = int(value, 10)
+        elif property_type in {"real32", "real64", "float", "double"}:
+            result = float(value)
+        elif property_type in {"string", "cstring"}:
+            result = value
+        else:
+            raise ValueError
+    except (OverflowError, ValueError) as exc:
+        raise OperationContractError(
+            "INVALID_PROPERTY_VALUE",
+            f"{field} cannot be converted using live property metadata.",
+            details={
+                "property": info.name,
+                "metadata_type": info.type,
+                "value": value,
+            },
+        ) from exc
+    _require_object_property_value(info, result)
+    return result
+
+
 def _prepare_closed_import_plan(
     request: OperationRequest,
     *,
@@ -5671,11 +7968,6 @@ def _prepare_closed_import_plan(
         request.version in AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS
     )
     auto_check_out_dispatched = "autoCheckOutToSourceControl" in dispatch_args
-    if dispatch_args.get("autoAddToSourceControl") is not False:
-        raise OperationContractError(
-            "INVALID_PREVIEW",
-            "Closed import plans must keep autoAddToSourceControl disabled.",
-        )
     if auto_check_out_dispatched != auto_check_out_supported:
         raise OperationContractError(
             "INVALID_PREVIEW",
@@ -5694,7 +7986,10 @@ def _prepare_closed_import_plan(
             "Closed import autoCheckOutToSourceControl must be a JSON boolean.",
         )
     source_control_policy = {
-        "auto_add_to_source_control": False,
+        "auto_add_to_source_control": dispatch_args.get(
+            "autoAddToSourceControl",
+            False,
+        ),
         "auto_check_out_to_source_control": dispatch_args.get(
             "autoCheckOutToSourceControl",
             False,
@@ -5705,13 +8000,25 @@ def _prepare_closed_import_plan(
     raw_targets = oracle.get("targets")
     if not isinstance(raw_targets, list) or not all(isinstance(row, Mapping) for row in raw_targets):
         raise OperationContractError("INVALID_PREVIEW", "Closed import target oracle is malformed.")
+    if type(dispatch_args.get("autoAddToSourceControl")) is not bool:
+        raise OperationContractError(
+            "INVALID_PREVIEW",
+            "Closed import autoAddToSourceControl must be a JSON boolean.",
+        )
     import_operation = policy.get("import_operation")
     roles: dict[str, ResolvedObject] = {}
-    targets: list[dict[str, Any]] = []
+    targets, dispatch_args, dynamic_roles = _prepare_import_dynamic_fields(
+        request,
+        source_operation=source_operation,
+        raw_targets=raw_targets,
+        dispatch_args=dispatch_args,
+        read=read,
+    )
+    roles.update(dynamic_roles)
     path_snapshots: list[dict[str, Any]] = []
     event_paths: set[str] = set()
     allowed_result_paths: set[str] = set()
-    for index, raw_target in enumerate(raw_targets):
+    for index, raw_target in enumerate(targets):
         target = dict(raw_target)
         target_path = target.get("canonical_target_path")
         if not isinstance(target_path, str):
@@ -5775,26 +8082,56 @@ def _prepare_closed_import_plan(
             "expected_audio_file_source_result_path"
         )
         source_file = target.get("source_file")
-        source_file_path = (
-            source_file.get("path") if isinstance(source_file, Mapping) else None
-        )
-        if not isinstance(source_file_path, str):
+        media_expected = target.get("media_expected")
+        if not isinstance(media_expected, bool):
             raise OperationContractError(
                 "INVALID_PREVIEW",
-                "The closed import target lacks a proven source file path.",
+                "The closed import target lacks an explicit media expectation.",
                 details={"target_path": target_path},
             )
-        try:
-            derived_source_path = expected_audio_file_source_result_path(
-                target_path,
-                source_file_path,
+        if media_expected:
+            if not isinstance(source_file, Mapping):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "A media import target lacks a sealed source proof.",
+                    details={"target_path": target_path},
+                )
+            source_kind = source_file.get("kind")
+            source_name_path = (
+                source_file.get("path")
+                if source_kind == "regular_file"
+                else source_file.get("relative_path")
+                if source_kind == "inline_base64"
+                else None
             )
-        except ImportContractError as exc:
-            raise OperationContractError(
-                "INVALID_PREVIEW",
-                "The closed import AudioFileSource result path cannot be derived safely.",
-                details=exc.as_dict(),
-            ) from exc
+            if (
+                not isinstance(source_name_path, str)
+                or not isinstance(source_file.get("sha256"), str)
+            ):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "The closed import source proof has an unsupported kind or filename.",
+                    details={"target_path": target_path, "source_file": source_file},
+                )
+            try:
+                derived_source_path = expected_audio_file_source_result_path(
+                    target_path,
+                    source_name_path,
+                )
+            except ImportContractError as exc:
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "The closed import AudioFileSource result path cannot be derived safely.",
+                    details=exc.as_dict(),
+                ) from exc
+        else:
+            if source_file is not None or expected_source_path is not None:
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "A structure-only import target must not claim media proof or an AudioFileSource.",
+                    details={"target_path": target_path},
+                )
+            derived_source_path = None
         if expected_source_path != derived_source_path:
             raise OperationContractError(
                 "INVALID_PREVIEW",
@@ -5862,12 +8199,22 @@ def _prepare_closed_import_plan(
             # that established this localized row's immutable pre-state.
             target_snapshot["options"] = read_options
         path_snapshots.append(target_snapshot)
-        event = target.get("requested_event")
-        if isinstance(event, Mapping):
+        raw_events = target.get("requested_events")
+        events = (
+            [dict(event) for event in raw_events if isinstance(event, Mapping)]
+            if isinstance(raw_events, list)
+            else (
+                [dict(target["requested_event"])]
+                if isinstance(target.get("requested_event"), Mapping)
+                else []
+            )
+        )
+        event_pre_state: list[dict[str, Any]] = []
+        for event_index, event in enumerate(events):
             _require_exact_keys(
                 event,
                 required=("path", "action"),
-                context=f"targets[{index}].requested_event",
+                context=f"targets[{index}].events[{event_index}]",
             )
             event_path = event.get("path")
             event_action = event.get("action")
@@ -5901,17 +8248,28 @@ def _prepare_closed_import_plan(
                     "The closed import Event field only supports a new, case-owned Event path.",
                     details={"event_path": event_path, "rows": event_rows},
                 )
-            target["event_pre_state_rows"] = event_rows
+            event_pre_state.append({"path": event_path, "rows": event_rows})
             path_snapshots.append({"path": event_path, "fields": list(IDENTITY_RETURN_FIELDS), "rows": event_rows})
-        targets.append(target)
+        if events:
+            target["validated_events"] = events
+            target["event_pre_state"] = event_pre_state
+            if len(events) == 1:
+                target["event_pre_state_rows"] = event_pre_state[0]["rows"]
+        targets[index] = target
 
     if import_operation == "useExisting":
         unsupported_existing_rows: list[dict[str, Any]] = []
         for index, target in enumerate(targets):
             if not target.get("pre_state_rows"):
                 continue
+            language = target.get("requested_language")
+            localized_existing = (
+                isinstance(language, str) and language.casefold() != "sfx"
+            )
+            if not localized_existing:
+                continue
             unsupported = unsupported_localized_existing_fields(
-                import_language=target.get("requested_language"),
+                import_language=language,
                 originals_subfolder_supplied=(
                     "requested_originals_subfolder" in target
                 ),
@@ -5919,8 +8277,34 @@ def _prepare_closed_import_plan(
                 audio_source_notes_supplied=(
                     "requested_audio_source_notes" in target
                 ),
-                event_supplied="requested_event" in target,
+                event_supplied=(
+                    "requested_event" in target
+                    or bool(target.get("requested_events"))
+                ),
             )
+            additional_unsupported = [
+                field_name
+                for field_name, present in (
+                    ("audio_file_base64", (
+                        isinstance(target.get("source_file"), Mapping)
+                        and target["source_file"].get("kind") == "inline_base64"
+                    )),
+                    ("import_location", "requested_import_location" in target),
+                    ("dialogue_event", (
+                        "requested_dialogue_event" in target
+                        or bool(target.get("requested_dialogue_events"))
+                    )),
+                    ("switch_assignment", (
+                        "requested_switch_assignment" in target
+                        or bool(target.get("requested_switch_assignments"))
+                    )),
+                    ("properties", bool(target.get("validated_properties"))),
+                    ("references", bool(target.get("validated_references"))),
+                    ("dynamic_fields", bool(target.get("requested_dynamic_fields"))),
+                )
+                if present
+            ]
+            unsupported = (*unsupported, *additional_unsupported)
             if (
                 source_operation == "audio.importTabDelimited"
                 and "requested_object_type" in target
@@ -6116,9 +8500,14 @@ def _prepare_closed_import_plan(
     # root.  This also gives Wine ``Y:\``/``Z:\`` result paths one sealed,
     # exact wire-to-host mapping and prevents verification against an
     # unrelated host file with matching bytes.
-    originals_context: Mapping[str, Any] = _read_import_originals_context(
-        request.version,
-        read=read,
+    media_present = any(target.get("media_expected") is True for target in targets)
+    originals_context: Mapping[str, Any] | None = (
+        _read_import_originals_context(
+            request.version,
+            read=read,
+        )
+        if media_present
+        else None
     )
     language_inventory: Mapping[str, Any] | None = None
     if requested_languages:
@@ -6148,7 +8537,16 @@ def _prepare_closed_import_plan(
     preview = _closed_operation_preview(
         uri=uri,
         args=dispatch_args,
-        options={"return": _import_target_return_fields({}, version=request.version)},
+        options={
+            "return": _dedupe_fields(
+                field
+                for target in targets
+                for field in _import_target_return_fields(
+                    target,
+                    version=request.version,
+                )
+            )
+        },
         version=request.version,
         family="import",
         metadata={
@@ -6183,7 +8581,11 @@ def _prepare_closed_import_plan(
         "path_snapshots": path_snapshots,
         "language_inventory": _json_mapping(language_inventory) if language_inventory is not None else None,
     }
-    guard["originals_context"] = _json_mapping(originals_context)
+    guard["originals_context"] = (
+        _json_mapping(originals_context)
+        if originals_context is not None
+        else None
+    )
     verification = {
         "kind": "closed-audio-import",
         "source_operation": source_operation,
@@ -6194,8 +8596,31 @@ def _prepare_closed_import_plan(
         "allowed_result_paths": sorted(allowed_result_paths),
         "result_contract": oracle.get("result_contract"),
         "error_log_is_failure": True,
+        "native_directive_boundaries": sorted(
+            {
+                boundary
+                for target in targets
+                for boundary, present in (
+                    (
+                        "dialogue_event_result_and_target_verified_side_effect_not_fully_reconstructed",
+                        "requested_dialogue_event" in target
+                        or bool(target.get("requested_dialogue_events")),
+                    ),
+                    (
+                        "switch_assignment_result_and_target_verified_side_effect_not_fully_reconstructed",
+                        "requested_switch_assignment" in target
+                        or bool(target.get("requested_switch_assignments")),
+                    ),
+                )
+                if present
+            }
+        ),
     }
-    verification["originals_context"] = _json_mapping(originals_context)
+    verification["originals_context"] = (
+        _json_mapping(originals_context)
+        if originals_context is not None
+        else None
+    )
     cleanup = {
         "kind": "discard-case-owned-project-copy",
         "automatic": False,
@@ -6304,6 +8729,14 @@ def _import_target_return_fields(
         "sound:originalWavFilePath",
         "audioSource:language",
     ]
+    for key in ("validated_properties", "validated_references"):
+        descriptors = target.get(key)
+        if not isinstance(descriptors, list):
+            continue
+        for descriptor in descriptors:
+            name = descriptor.get("name") if isinstance(descriptor, Mapping) else None
+            if isinstance(name, str) and name:
+                fields.append(f"@{name}")
     # Wwise 2022.1 rejects ``originalRelativeFilePath``, and the manifests do
     # not establish dynamic object.get accessor support in the other lanes.
     # Every lane therefore derives the relative path from an authoritative
@@ -8033,6 +10466,14 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                         "Object graph field snapshot platform is malformed.",
                     )
                 options["platform"] = platform
+            language = snapshot.get("language")
+            if language is not None:
+                if not isinstance(language, str) or not language:
+                    raise OperationContractError(
+                        "INVALID_PREVIEW",
+                        "Object graph field snapshot language is malformed.",
+                    )
+                options["language"] = language
             result = read_call(OBJECT_GET_URI, args, options)
             if not isinstance(result, Mapping):
                 raise OperationContractError("INVALID_READBACK", "Object graph field guard must return an object.")
@@ -8067,6 +10508,136 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                     "evidence": {"expected": expected, "actual": actual},
                 }
             )
+        for index, snapshot in enumerate(graph_guard.get("list_snapshots", [])):
+            if not isinstance(snapshot, Mapping):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "Object graph list snapshot is malformed.",
+                )
+            object_id = snapshot.get("object_id")
+            list_name = snapshot.get("list")
+            fields = snapshot.get("fields")
+            expected = snapshot.get("rows")
+            if (
+                not _valid_object_id(object_id)
+                or not isinstance(list_name, str)
+                or fields != list(OBJECT_LIST_SNAPSHOT_FIELDS)
+                or not isinstance(expected, list)
+            ):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "Object graph list snapshot lacks its owner, list, fields, or rows.",
+                )
+            args = {
+                "from": {"id": [object_id]},
+                "transform": [{"select": [f"@{list_name}"]}],
+            }
+            options = {"return": list(OBJECT_LIST_SNAPSHOT_FIELDS)}
+            platform = snapshot.get("platform")
+            if platform is not None:
+                if not isinstance(platform, str) or not platform:
+                    raise OperationContractError(
+                        "INVALID_PREVIEW",
+                        "Object graph list snapshot platform is malformed.",
+                    )
+                options["platform"] = platform
+            result = read_call(OBJECT_GET_URI, args, options)
+            if not isinstance(result, Mapping):
+                raise OperationContractError(
+                    "INVALID_READBACK",
+                    "Object graph list guard must return an object.",
+                )
+            actual = _normalize_object_list_snapshot(
+                _rows(result),
+                owner_id=object_id,
+                list_name=list_name,
+            )
+            readbacks.append(
+                {
+                    "role": f"object-graph-list[{index}]",
+                    "uri": OBJECT_GET_URI,
+                    "args": args,
+                    "options": options,
+                    "result": dict(result),
+                }
+            )
+            assertions.append(
+                {
+                    "name": f"object graph list snapshot {index} unchanged",
+                    "passed": actual == expected,
+                    "evidence": {"expected": expected, "actual": actual},
+                }
+            )
+        for index, snapshot in enumerate(
+            graph_guard.get("list_subtree_snapshots", [])
+        ):
+            if not isinstance(snapshot, Mapping):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "Object graph list subtree snapshot is malformed.",
+                )
+            root_id = snapshot.get("root_id")
+            fields = snapshot.get("fields")
+            expected = snapshot.get("rows")
+            if (
+                not _valid_object_id(root_id)
+                or fields != list(OBJECT_LIST_SNAPSHOT_FIELDS)
+                or not isinstance(expected, list)
+            ):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "Object graph list subtree snapshot lacks its root, fields, or rows.",
+                )
+            root_args = {"from": {"id": [root_id]}}
+            descendants_args = {
+                "from": {"id": [root_id]},
+                "transform": [{"select": ["descendants"]}],
+            }
+            options = {"return": list(OBJECT_LIST_SNAPSHOT_FIELDS)}
+            root_result = read_call(OBJECT_GET_URI, root_args, options)
+            descendants_result = read_call(
+                OBJECT_GET_URI,
+                descendants_args,
+                options,
+            )
+            if not isinstance(root_result, Mapping) or not isinstance(
+                descendants_result,
+                Mapping,
+            ):
+                raise OperationContractError(
+                    "INVALID_READBACK",
+                    "Object graph list subtree guard reads must return objects.",
+                )
+            actual = _normalize_object_identity_subtree(
+                _rows(root_result),
+                _rows(descendants_result),
+                expected_root_id=root_id,
+            )
+            readbacks.extend(
+                [
+                    {
+                        "role": f"object-graph-list-subtree-root[{index}]",
+                        "uri": OBJECT_GET_URI,
+                        "args": root_args,
+                        "options": options,
+                        "result": dict(root_result),
+                    },
+                    {
+                        "role": f"object-graph-list-subtree-descendants[{index}]",
+                        "uri": OBJECT_GET_URI,
+                        "args": descendants_args,
+                        "options": options,
+                        "result": dict(descendants_result),
+                    },
+                ]
+            )
+            assertions.append(
+                {
+                    "name": f"object graph list subtree snapshot {index} unchanged",
+                    "passed": actual == expected,
+                    "evidence": {"expected": expected, "actual": actual},
+                }
+            )
         for index, snapshot in enumerate(graph_guard.get("path_snapshots", [])):
             if not isinstance(snapshot, Mapping):
                 raise OperationContractError("INVALID_PREVIEW", "Object graph path snapshot is malformed.")
@@ -8077,6 +10648,22 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 raise OperationContractError("INVALID_PREVIEW", "Object graph path snapshot lacks path/fields/rows.")
             args = {"from": {"path": [path]}}
             options = {"return": fields}
+            platform = snapshot.get("platform")
+            if platform is not None:
+                if not isinstance(platform, str) or not platform:
+                    raise OperationContractError(
+                        "INVALID_PREVIEW",
+                        "Object graph path snapshot platform is malformed.",
+                    )
+                options["platform"] = platform
+            language = snapshot.get("language")
+            if language is not None:
+                if not isinstance(language, str) or not language:
+                    raise OperationContractError(
+                        "INVALID_PREVIEW",
+                        "Object graph path snapshot language is malformed.",
+                    )
+                options["language"] = language
             result = read_call(OBJECT_GET_URI, args, options)
             if not isinstance(result, Mapping):
                 raise OperationContractError("INVALID_READBACK", "Object graph path guard must return an object.")
@@ -8632,8 +11219,11 @@ def _bind_object_set_result_nodes(
     Wwise returns only parent associations that own created child/list objects;
     field-only targets may be absent and association order is not the request
     order.  Parent GUIDs are therefore the only trusted root binding.  Child
-    rows are then matched inside that sealed parent topology, with every new
-    node required exactly once and every unreviewed returned node rejected.
+    rows are then matched inside that sealed parent topology.  Every explicitly
+    requested new node is required exactly once.  Native ``importArg`` may also
+    report object children that were created implicitly from the sealed media
+    sources; those result-only subtrees are consumed here and proved later by
+    the import hash/type/topology verifier.
     """
 
     spec_by_path: dict[str, Mapping[str, Any]] = {}
@@ -8686,9 +11276,46 @@ def _bind_object_set_result_nodes(
             return False
         if spec.get("preexisting_id") is not None:
             return node.name == requested_name
-        if on_name_conflict == "rename":
+        effective_conflict = spec.get("on_name_conflict", on_name_conflict)
+        if effective_conflict == "rename":
             return node.name == requested_name or node.name.startswith(requested_name)
         return node.name == requested_name
+
+    def consume_import_result_subtree(
+        node: ObjectResultNode,
+        *,
+        import_parent_path: str,
+    ) -> None:
+        result_id_key = _identity_key(node.object)
+        previous_path = seen_result_ids.get(result_id_key)
+        if previous_path is not None:
+            raise ObjectOperationContractError(
+                "DUPLICATE_RESULT_IDENTITY",
+                "object.set returned one object identity for multiple result nodes.",
+                details={
+                    "object_id": node.object,
+                    "first_path": previous_path,
+                    "request_path": node.request_path,
+                },
+            )
+        seen_result_ids[result_id_key] = (
+            f"{import_parent_path}.import-result:{node.request_path}"
+        )
+        for child in returned_children.get(node.request_path, ()):
+            if child.collection != "children":
+                raise ObjectOperationContractError(
+                    "UNEXPECTED_RESULT_NODE",
+                    "object.set import returned an unreviewed object-list association.",
+                    details={
+                        "import_parent_request_path": import_parent_path,
+                        "object_id": child.object,
+                        "collection": child.collection,
+                    },
+                )
+            consume_import_result_subtree(
+                child,
+                import_parent_path=import_parent_path,
+            )
 
     def bind_node(node: ObjectResultNode, spec: Mapping[str, Any]) -> None:
         request_path = str(spec.get("request_path"))
@@ -8718,17 +11345,33 @@ def _bind_object_set_result_nodes(
 
         available = list(children_by_parent.get(request_path, ()))
         for child in returned_children.get(node.request_path, ()):  # result-relative parent path
-            sealed_matches = [
+            collection_matches = [
                 candidate
                 for candidate in available
+                if child.collection
+                == candidate.get("collection", "children")
+            ]
+            sealed_matches = [
+                candidate
+                for candidate in collection_matches
                 if candidate.get("preexisting_id") is not None
                 and _same_identity(child.object, candidate.get("preexisting_id"))
             ]
             matches = sealed_matches or [
                 candidate
-                for candidate in available
+                for candidate in collection_matches
                 if name_matches(child, candidate)
             ]
+            if (
+                not matches
+                and child.collection == "children"
+                and isinstance(spec.get("import"), Mapping)
+            ):
+                consume_import_result_subtree(
+                    child,
+                    import_parent_path=request_path,
+                )
+                continue
             if len(matches) != 1:
                 raise ObjectOperationContractError(
                     "UNEXPECTED_RESULT_NODE",
@@ -9872,6 +12515,26 @@ def verify_prepared_operation(
         if not isinstance(raw_specs, list) or not all(isinstance(row, Mapping) for row in raw_specs):
             raise OperationContractError("INVALID_PREVIEW", "Object graph verification nodes are malformed.")
         specs = [dict(row) for row in raw_specs]
+        verified_import_direct_child_ids: dict[str, set[str]] = {}
+        object_set_originals_root: str | None = None
+        if kind == "object-set-batch" and any(
+            isinstance(spec.get("import"), Mapping) for spec in specs
+        ):
+            raw_pre_state = prepared.get("pre_state")
+            raw_import_guard = (
+                raw_pre_state.get("import_guard")
+                if isinstance(raw_pre_state, Mapping)
+                else None
+            )
+            raw_originals_context = (
+                raw_import_guard.get("originals_context")
+                if isinstance(raw_import_guard, Mapping)
+                else None
+            )
+            object_set_originals_root = _import_originals_root_from_context(
+                raw_originals_context,
+                version=version,
+            )
         payload = _execution_payload(execution_result)
         result_nodes: tuple[ObjectResultNode, ...] = ()
         result_by_path: dict[str, ObjectResultNode] = {}
@@ -9880,7 +12543,18 @@ def verify_prepared_operation(
                 result_nodes = flatten_create_result(payload)
                 result_by_path = {row.request_path: row for row in result_nodes}
             else:
-                result_nodes = flatten_set_result(payload)
+                raw_list_names = plan.get("list_names", [])
+                if not isinstance(raw_list_names, list) or not all(
+                    isinstance(item, str) for item in raw_list_names
+                ):
+                    raise OperationContractError(
+                        "INVALID_PREVIEW",
+                        "Object-set list-name verification scope is malformed.",
+                    )
+                result_nodes = flatten_set_result(
+                    payload,
+                    allowed_lists=raw_list_names,
+                )
                 result_by_path = _bind_object_set_result_nodes(
                     result_nodes,
                     specs,
@@ -9961,7 +12635,21 @@ def verify_prepared_operation(
                     "INVALID_PREVIEW",
                     "Object graph verification platform is malformed.",
                 )
-            rows = read_object(object_id=object_id, fields=fields, platform=platform)
+            requested_language = spec.get("requested_language")
+            if requested_language is not None and (
+                not isinstance(requested_language, str)
+                or not requested_language
+            ):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "Object graph verification language is malformed.",
+                )
+            rows = read_object(
+                object_id=object_id,
+                fields=fields,
+                language=_localized_import_read_language(requested_language),
+                platform=platform,
+            )
             check(f"{request_path} GUID resolves exactly once", len(rows) == 1, rows)
             if len(rows) != 1:
                 continue
@@ -9977,12 +12665,27 @@ def verify_prepared_operation(
                 {"requested": spec.get("requested_type"), "canonical": spec.get("canonical_type"), "actual": row.get("type")},
             )
             returned_name = result_node.name if result_node is not None else None
-            if plan.get("on_name_conflict") == "rename" and spec.get("existing_target") is not True:
+            effective_conflict = spec.get(
+                "on_name_conflict",
+                plan.get("on_name_conflict"),
+            )
+            if effective_conflict == "rename" and (
+                spec.get("existing_target") is not True
+                or spec.get("original_name") != spec.get("requested_name")
+            ):
+                actual_name = row.get("name")
+                requested_name = spec.get("requested_name")
                 name_ok = (
-                    result_node is not None
-                    and isinstance(row.get("name"), str)
-                    and bool(row.get("name"))
-                    and row.get("name") == returned_name
+                    isinstance(actual_name, str)
+                    and isinstance(requested_name, str)
+                    and (
+                        actual_name == requested_name
+                        or actual_name.startswith(requested_name)
+                    )
+                    and (
+                        result_node is None
+                        or actual_name == returned_name
+                    )
                 )
             else:
                 name_ok = row.get("name") == spec.get("requested_name") and (
@@ -10009,13 +12712,22 @@ def verify_prepared_operation(
                     )
                 )
             else:
-                expected_parent_id = None
+                expected_parent_id = spec.get("expected_parent_id")
             if expected_parent_id is not None:
-                check(
-                    f"{request_path} parent edge matches the requested topology",
-                    _same_identity(_parent_value(row.get("parent")), expected_parent_id),
-                    {"expected": expected_parent_id, "actual": _parent_value(row.get("parent"))},
-                )
+                collection = spec.get("collection")
+                if collection not in {None, "children"}:
+                    actual_owner = _reference_identity(row.get("owner"))
+                    check(
+                        f"{request_path} list owner matches the requested topology",
+                        _same_identity(actual_owner, expected_parent_id),
+                        {"expected": expected_parent_id, "actual": actual_owner},
+                    )
+                else:
+                    check(
+                        f"{request_path} parent edge matches the requested topology",
+                        _same_identity(_parent_value(row.get("parent")), expected_parent_id),
+                        {"expected": expected_parent_id, "actual": _parent_value(row.get("parent"))},
+                    )
             expected_path = spec.get("expected_path")
             if isinstance(expected_path, str):
                 check(
@@ -10056,6 +12768,432 @@ def verify_prepared_operation(
                     _same_identity(actual, field_spec.get("target_id")),
                     {"expected": field_spec.get("target_id"), "actual": actual},
                 )
+            import_spec = spec.get("import")
+            if isinstance(import_spec, Mapping) or isinstance(
+                requested_language,
+                str,
+            ):
+                raw_sources: list[Mapping[str, Any]] = []
+                if isinstance(import_spec, Mapping):
+                    raw_import_sources = import_spec.get("sources")
+                    if (
+                        not isinstance(raw_import_sources, list)
+                        or not raw_import_sources
+                        or not all(
+                            isinstance(source, Mapping)
+                            for source in raw_import_sources
+                        )
+                        or not isinstance(object_set_originals_root, str)
+                    ):
+                        raise OperationContractError(
+                            "INVALID_PREVIEW",
+                            "object.set import verification lacks sources or the sealed Originals root.",
+                        )
+                    raw_sources = list(raw_import_sources)
+
+                base_read_language = _localized_import_read_language(
+                    requested_language
+                )
+                read_languages: list[str | None] = [base_read_language]
+                for raw_source in raw_sources:
+                    source_language = raw_source.get("requested_language")
+                    if source_language is not None and (
+                        not isinstance(source_language, str)
+                        or not source_language
+                    ):
+                        raise OperationContractError(
+                            "INVALID_PREVIEW",
+                            "object.set import source language is malformed.",
+                        )
+                    source_type = raw_source.get("requested_object_type")
+                    if source_type is not None and (
+                        not isinstance(source_type, str)
+                        or not source_type
+                    ):
+                        raise OperationContractError(
+                            "INVALID_PREVIEW",
+                            "object.set import source object type is malformed.",
+                        )
+                    if source_language is not None:
+                        read_language = _localized_import_read_language(
+                            source_language
+                        )
+                        if read_language not in read_languages:
+                            read_languages.append(read_language)
+
+                grouped_candidates: dict[str | None, list[dict[str, Any]]] = {}
+                for read_language in read_languages:
+                    target_rows = (
+                        [row]
+                        if read_language == base_read_language
+                        else read_object(
+                            object_id=object_id,
+                            fields=OBJECT_SET_IMPORT_READBACK_FIELDS,
+                            language=read_language,
+                            platform=platform,
+                        )
+                    )
+                    language_rows = list(target_rows)
+                    for target_row in target_rows:
+                        active_source_id = _reference_identity(
+                            _field_value(target_row, "activeSource")
+                        )
+                        if (
+                            _valid_object_id(active_source_id)
+                            and not _same_identity(active_source_id, object_id)
+                        ):
+                            language_rows.extend(
+                                read_object(
+                                    object_id=active_source_id,
+                                    fields=OBJECT_SET_IMPORT_READBACK_FIELDS,
+                                    language=read_language,
+                                    platform=platform,
+                                )
+                            )
+                    if isinstance(import_spec, Mapping):
+                        descendant_args = {
+                            "from": {"id": [object_id]},
+                            "transform": [{"select": ["descendants"]}],
+                        }
+                        descendant_options = {
+                            "return": list(OBJECT_SET_IMPORT_READBACK_FIELDS)
+                        }
+                        if read_language is not None:
+                            descendant_options["language"] = read_language
+                        if platform is not None:
+                            descendant_options["platform"] = platform
+                        descendant_result = read_call(
+                            OBJECT_GET_URI,
+                            descendant_args,
+                            descendant_options,
+                        )
+                        if not isinstance(descendant_result, Mapping):
+                            raise OperationContractError(
+                                "INVALID_READBACK",
+                                "object.set import descendant verification must return an object.",
+                            )
+                        readbacks.append(
+                            {
+                                "role": (
+                                    f"{request_path}.import-descendants"
+                                    f"[{read_language or 'default'}]"
+                                ),
+                                "uri": OBJECT_GET_URI,
+                                "args": descendant_args,
+                                "options": descendant_options,
+                                "result": dict(descendant_result),
+                            }
+                        )
+                        language_rows.extend(_rows(descendant_result))
+                    grouped_candidates[read_language] = language_rows
+
+                candidate_rows: list[dict[str, Any]] = []
+                seen_candidate_keys: set[str] = set()
+                for read_language, language_rows in grouped_candidates.items():
+                    for candidate in language_rows:
+                        candidate_id = candidate.get("id")
+                        candidate_path = candidate.get("path")
+                        reported_language = _import_language_name(
+                            _field_value(candidate, "audioSource:language")
+                        )
+                        reported_original = _field_value(
+                            candidate,
+                            "originalFilePath",
+                        ) or _field_value(
+                            candidate,
+                            "sound:originalWavFilePath",
+                        )
+                        candidate_key = ":".join(
+                            (
+                                (
+                                    f"id:{_identity_key(candidate_id)}"
+                                    if _valid_object_id(candidate_id)
+                                    else f"path:{candidate_path}"
+                                ),
+                                str(
+                                    reported_language
+                                    or read_language
+                                    or ""
+                                ).casefold(),
+                                str(reported_original or "").casefold(),
+                            )
+                        )
+                        if candidate_key in seen_candidate_keys:
+                            continue
+                        seen_candidate_keys.add(candidate_key)
+                        candidate_rows.append(candidate)
+
+                if isinstance(requested_language, str):
+                    reported_languages = [
+                        name
+                        for name in (
+                            _import_language_name(
+                                _field_value(candidate, "audioSource:language")
+                            )
+                            for candidate in grouped_candidates.get(
+                                base_read_language,
+                                [],
+                            )
+                        )
+                        if isinstance(name, str)
+                    ]
+                    check(
+                        f"{request_path} Sound Voice language matches exactly",
+                        bool(reported_languages)
+                        and set(reported_languages) == {requested_language},
+                        {
+                            "expected": requested_language,
+                            "reported": reported_languages,
+                        },
+                    )
+
+                if isinstance(import_spec, Mapping):
+                    copied_candidates: list[dict[str, Any]] = []
+                    for candidate_index, candidate in enumerate(candidate_rows):
+                        copied_path = _field_value(
+                            candidate,
+                            "originalFilePath",
+                        )
+                        if copied_path is None:
+                            copied_path = _field_value(
+                                candidate,
+                                "sound:originalWavFilePath",
+                            )
+                        if copied_path is None:
+                            continue
+                        try:
+                            relative = _import_relative_original_path(
+                                copied_path,
+                                originals_root=object_set_originals_root,
+                            )
+                            copied_proof = import_regular_file_proof(
+                                relative["copied_path"],
+                                field=(
+                                    f"{request_path}.import copied source "
+                                    f"{candidate_index}"
+                                ),
+                            )
+                        except (OperationContractError, ImportContractError) as exc:
+                            copied_candidates.append(
+                                {
+                                    "candidate": candidate,
+                                    "reported_path": copied_path,
+                                    "error": (
+                                        exc.as_dict()
+                                        if hasattr(exc, "as_dict")
+                                        else str(exc)
+                                    ),
+                                }
+                            )
+                            continue
+                        copied_candidates.append(
+                            {
+                                "candidate": candidate,
+                                **relative,
+                                "proof": copied_proof,
+                            }
+                        )
+
+                    matched_candidate_keys: set[str] = set()
+                    for source_index, raw_source in enumerate(raw_sources):
+                        if not isinstance(raw_source, Mapping):
+                            raise OperationContractError(
+                                "INVALID_PREVIEW",
+                                "object.set import source proof is malformed.",
+                            )
+                        requested_hash = raw_source.get("sha256")
+                        requested_subfolder = raw_source.get(
+                            "requested_originals_subfolder"
+                        )
+                        requested_source_language = raw_source.get(
+                            "requested_language"
+                        )
+                        requested_source_type = raw_source.get(
+                            "requested_object_type"
+                        )
+                        expected_filename = raw_source.get(
+                            "expected_original_filename"
+                        )
+                        expected_object_name = raw_source.get(
+                            "expected_object_name"
+                        )
+                        if (
+                            not isinstance(expected_filename, str)
+                            or not expected_filename
+                            or not isinstance(expected_object_name, str)
+                            or not expected_object_name
+                        ):
+                            raise OperationContractError(
+                                "INVALID_PREVIEW",
+                                "object.set import source lacks its sealed file and object names.",
+                                details={
+                                    "request_path": request_path,
+                                    "source_index": source_index,
+                                },
+                            )
+                        matches = [
+                            candidate
+                            for candidate in copied_candidates
+                            if isinstance(candidate.get("proof"), Mapping)
+                            and candidate["proof"].get("sha256")
+                            == requested_hash
+                            and _import_path_leaf_name(
+                                candidate.get("relative_path")
+                            ).casefold()
+                            == expected_filename.casefold()
+                            and (
+                                requested_subfolder is None
+                                or _import_originals_subfolder_matches(
+                                    candidate.get("relative_path"),
+                                    requested_subfolder,
+                                )
+                            )
+                            and (
+                                requested_source_language is None
+                                or _import_language_name(
+                                    _field_value(
+                                        candidate.get("candidate", {}),
+                                        "audioSource:language",
+                                    )
+                                )
+                                == requested_source_language
+                            )
+                        ]
+                        matches_by_key = {
+                            ":".join(
+                                (
+                                    (
+                                        _identity_key(
+                                            candidate.get(
+                                                "candidate",
+                                                {},
+                                            ).get("id")
+                                        )
+                                        if isinstance(
+                                            candidate.get("candidate"),
+                                            Mapping,
+                                        )
+                                        and _valid_object_id(
+                                            candidate.get(
+                                                "candidate",
+                                                {},
+                                            ).get("id")
+                                        )
+                                        else ""
+                                    ),
+                                    str(candidate.get("copied_path")),
+                                    str(
+                                        _import_language_name(
+                                            _field_value(
+                                                candidate.get(
+                                                    "candidate",
+                                                    {},
+                                                ),
+                                                "audioSource:language",
+                                            )
+                                        )
+                                        or ""
+                                    ),
+                                )
+                            ): candidate
+                            for candidate in matches
+                            if isinstance(candidate.get("copied_path"), str)
+                        }
+                        unique_match_keys = set(matches_by_key)
+                        media_match_ok = (
+                            len(unique_match_keys) == 1
+                            and not bool(
+                                unique_match_keys & matched_candidate_keys
+                            )
+                        )
+                        check(
+                            (
+                                f"{request_path}.import source {source_index} "
+                                "was copied once with the exact hash"
+                            ),
+                            media_match_ok,
+                            {
+                                "expected_sha256": requested_hash,
+                                "expected_original_filename": expected_filename,
+                                "requested_originals_subfolder": requested_subfolder,
+                                "requested_language": requested_source_language,
+                                "requested_object_type": requested_source_type,
+                                "matches": matches,
+                                "all_candidates": copied_candidates,
+                            },
+                        )
+                        matched_candidate_keys.update(unique_match_keys)
+                        if not media_match_ok:
+                            continue
+                        matched_media = next(iter(matches_by_key.values()))
+                        matched_row = matched_media.get("candidate")
+                        if not isinstance(matched_row, Mapping):
+                            continue
+                        ancestor_chain = _import_candidate_ancestor_chain(
+                            matched_row,
+                            candidate_rows,
+                            target_id=object_id,
+                        )
+                        topology_ok = ancestor_chain is not None
+                        check(
+                            (
+                                f"{request_path}.import source {source_index} "
+                                "belongs to the sealed target topology"
+                            ),
+                            topology_ok,
+                            {
+                                "target_id": object_id,
+                                "matched_candidate": matched_row,
+                                "ancestor_chain": ancestor_chain,
+                            },
+                        )
+                        if ancestor_chain is None:
+                            continue
+
+                        type_ok = True
+                        type_matches: list[Mapping[str, Any]] = []
+                        if requested_source_type is not None:
+                            type_matches = [
+                                candidate
+                                for candidate in ancestor_chain
+                                if _object_type_token(candidate.get("type"))
+                                == _object_type_token(requested_source_type)
+                                and _import_created_name_matches(
+                                    candidate.get("name"),
+                                    expected_object_name,
+                                    on_name_conflict=spec.get(
+                                        "on_name_conflict",
+                                        plan.get("on_name_conflict"),
+                                    ),
+                                )
+                            ]
+                            unique_type_ids = {
+                                _identity_key(candidate.get("id"))
+                                for candidate in type_matches
+                                if _valid_object_id(candidate.get("id"))
+                            }
+                            type_ok = len(unique_type_ids) == 1
+                            check(
+                                (
+                                    f"{request_path}.import source "
+                                    f"{source_index} created the requested "
+                                    "object type"
+                                ),
+                                type_ok,
+                                {
+                                    "requested_object_type": requested_source_type,
+                                    "expected_object_name": expected_object_name,
+                                    "matches": type_matches,
+                                    "ancestor_chain": ancestor_chain,
+                                },
+                            )
+                        if type_ok and ancestor_chain:
+                            direct_child_id = ancestor_chain[-1].get("id")
+                            if _valid_object_id(direct_child_id):
+                                verified_import_direct_child_ids.setdefault(
+                                    request_path,
+                                    set(),
+                                ).add(_identity_key(direct_child_id))
 
         if kind == "object-create-graph" and plan.get("on_name_conflict") == "replace":
             replaced_rows = plan.get("replaced_subtree_rows")
@@ -10205,6 +13343,8 @@ def verify_prepared_operation(
         if kind == "object-set-batch":
             direct_specs_by_parent: dict[str, list[Mapping[str, Any]]] = {}
             for child_spec in specs:
+                if child_spec.get("collection") not in {None, "children"}:
+                    continue
                 parent_path = child_spec.get("parent_request_path")
                 if isinstance(parent_path, str):
                     direct_specs_by_parent.setdefault(parent_path, []).append(child_spec)
@@ -10214,6 +13354,7 @@ def verify_prepared_operation(
                 if row.get("existing_target") is True
                 or row.get("preexisting_id") is not None
                 or direct_specs_by_parent.get(str(row.get("request_path")))
+                or isinstance(row.get("import"), Mapping)
             ]
             for parent_spec in closure_specs:
                 parent_path = str(parent_spec.get("request_path"))
@@ -10244,6 +13385,9 @@ def verify_prepared_operation(
                         complete_expected = False
                         continue
                     expected_ids.add(_identity_key(child_id))
+                expected_ids.update(
+                    verified_import_direct_child_ids.get(parent_path, set())
+                )
                 actual_identity_keys = [
                     _identity_key(row.get("id"))
                     for row in actual_children
@@ -10264,6 +13408,172 @@ def verify_prepared_operation(
                         "actual_is_closed": actual_is_closed,
                         "rows": actual_children,
                     },
+                )
+        list_roots_by_owner: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
+        for list_spec in specs:
+            collection = list_spec.get("collection")
+            parent_path = list_spec.get("parent_request_path")
+            if (
+                isinstance(collection, str)
+                and collection != "children"
+            ):
+                if kind == "object-create-graph" and parent_path is None:
+                    parent_path = "$create-parent"
+                if not isinstance(parent_path, str):
+                    continue
+                list_roots_by_owner.setdefault(
+                    (parent_path, collection),
+                    [],
+                ).append(list_spec)
+        if kind == "object-set-batch":
+            for owner_spec in specs:
+                if owner_spec.get("existing_target") is not True:
+                    continue
+                owner_path = owner_spec.get("request_path")
+                snapshots = owner_spec.get("list_snapshots", [])
+                if not isinstance(owner_path, str) or not isinstance(
+                    snapshots,
+                    list,
+                ):
+                    continue
+                for snapshot in snapshots:
+                    list_name = (
+                        snapshot.get("list")
+                        if isinstance(snapshot, Mapping)
+                        else None
+                    )
+                    if isinstance(list_name, str):
+                        list_roots_by_owner.setdefault(
+                            (owner_path, list_name),
+                            [],
+                        )
+        for (owner_path, list_name), list_root_specs in list_roots_by_owner.items():
+            owner_id = (
+                plan.get("parent_id")
+                if owner_path == "$create-parent"
+                else resolved_id_by_path.get(owner_path)
+            )
+            if not _valid_object_id(owner_id):
+                check(
+                    f"{owner_path}.@{list_name} has a canonical owner GUID",
+                    False,
+                    {"owner_id": owner_id},
+                )
+                continue
+            owner_spec = spec_by_path.get(owner_path, {})
+            if kind == "object-create-graph":
+                before_rows = plan.get("list_before", [])
+                list_mode = "append"
+            else:
+                raw_snapshots = owner_spec.get("list_snapshots", [])
+                matching = [
+                    row
+                    for row in raw_snapshots
+                    if isinstance(row, Mapping) and row.get("list") == list_name
+                ] if isinstance(raw_snapshots, list) else []
+                if len(matching) != 1:
+                    check(
+                        f"{owner_path}.@{list_name} has one sealed pre-state snapshot",
+                        False,
+                        {"snapshots": raw_snapshots},
+                    )
+                    continue
+                before_rows = matching[0].get("rows", [])
+                list_mode = owner_spec.get("list_mode", "append")
+            if not isinstance(before_rows, list):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "Object-list verification pre-state is malformed.",
+                )
+            expected_ids = (
+                set()
+                if list_mode == "replaceAll"
+                else {
+                    _identity_key(row.get("id"))
+                    for row in before_rows
+                    if isinstance(row, Mapping) and _valid_object_id(row.get("id"))
+                }
+            )
+            complete_expected = True
+            for list_root_spec in list_root_specs:
+                object_id = resolved_id_by_path.get(
+                    str(list_root_spec.get("request_path"))
+                )
+                if not _valid_object_id(object_id):
+                    complete_expected = False
+                    continue
+                expected_ids.add(_identity_key(object_id))
+            args = {
+                "from": {"id": [owner_id]},
+                "transform": [{"select": [f"@{list_name}"]}],
+            }
+            options = {"return": list(OBJECT_LIST_SNAPSHOT_FIELDS)}
+            list_platform = (
+                list_root_specs[0].get("platform")
+                if list_root_specs
+                else owner_spec.get("platform")
+            )
+            if isinstance(list_platform, str) and list_platform:
+                options["platform"] = list_platform
+            result = read_call(OBJECT_GET_URI, args, options)
+            if not isinstance(result, Mapping):
+                raise OperationContractError(
+                    "INVALID_READBACK",
+                    "Object-list verification must return an object.",
+                )
+            actual_rows = _normalize_object_list_snapshot(
+                _rows(result),
+                owner_id=owner_id,
+                list_name=list_name,
+            )
+            readbacks.append(
+                {
+                    "uri": OBJECT_GET_URI,
+                    "args": args,
+                    "options": options,
+                    "result": dict(result),
+                }
+            )
+            actual_ids = {_identity_key(row["id"]) for row in actual_rows}
+            check(
+                f"{owner_path}.@{list_name} GUID set matches the reviewed {list_mode} operation",
+                complete_expected and actual_ids == expected_ids,
+                {
+                    "expected": sorted(expected_ids),
+                    "actual": sorted(actual_ids),
+                    "complete_expected": complete_expected,
+                    "rows": actual_rows,
+                },
+            )
+        if kind == "object-set-batch":
+            replaced_rows = plan.get("replaced_list_subtree_rows", [])
+            if not isinstance(replaced_rows, list):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "Object-list replaceAll old-subtree verification is malformed.",
+                )
+            seen_old_ids: set[str] = set()
+            for index, old_row in enumerate(replaced_rows):
+                if not isinstance(old_row, Mapping) or not _valid_object_id(
+                    old_row.get("id")
+                ):
+                    raise OperationContractError(
+                        "INVALID_PREVIEW",
+                        "Object-list replaceAll old-subtree row is malformed.",
+                    )
+                old_id = old_row.get("id")
+                old_key = _identity_key(old_id)
+                if old_key in seen_old_ids:
+                    continue
+                seen_old_ids.add(old_key)
+                old_rows = read_object(
+                    object_id=old_id,
+                    fields=OBJECT_LIST_SNAPSHOT_FIELDS,
+                )
+                check(
+                    f"replaced object-list subtree GUID {index} is absent",
+                    not old_rows,
+                    {"old_row": dict(old_row), "remaining_rows": old_rows},
                 )
     elif kind == "created-guid-present":
         created_id = _execution_result_id(execution_result)
@@ -10352,9 +13662,17 @@ def verify_prepared_operation(
         )
         check("reference source resolves exactly once", len(rows) == 1, rows)
         if len(rows) == 1:
-            actual = _reference_identity(_field_value(rows[0], field_name))
+            raw_actual = _field_value(rows[0], field_name)
+            actual = _reference_identity(raw_actual)
             expected = plan.get("expected_target_id")
-            if actual is None:
+            expected_clear = plan.get("expected_clear") is True
+            if expected_clear:
+                check(
+                    "reference is cleared",
+                    _reference_value_is_null(raw_actual),
+                    {"actual": raw_actual, "expected": None},
+                )
+            elif actual is None:
                 return VerificationResult(
                     operation,
                     "indeterminate",
@@ -10362,7 +13680,12 @@ def verify_prepared_operation(
                     tuple(readbacks),
                     "Wwise did not expose a canonical target identity for the reference readback.",
                 )
-            check("reference target matches", _same_identity(actual, expected), {"actual": actual, "expected": expected})
+            else:
+                check(
+                    "reference target matches",
+                    _same_identity(actual, expected),
+                    {"actual": actual, "expected": expected},
+                )
     elif kind == "ui-capture-screen-result":
         version = plan.get("version")
         max_chars = plan.get("max_base64_chars")
@@ -10583,6 +13906,7 @@ def verify_prepared_operation(
         uri = plan.get("uri")
         import_operation = plan.get("import_operation")
         result_contract = plan.get("result_contract")
+        native_directive_boundaries = plan.get("native_directive_boundaries", [])
         expected_uri = (
             {
                 "audio.import": "ak.wwise.core.audio.import",
@@ -10601,6 +13925,15 @@ def verify_prepared_operation(
             or not isinstance(import_operation, str)
             or import_operation not in {"createNew", "useExisting", "replaceExisting"}
             or plan.get("error_log_is_failure") is not True
+            or not isinstance(native_directive_boundaries, list)
+            or not all(
+                boundary
+                in {
+                    "dialogue_event_result_and_target_verified_side_effect_not_fully_reconstructed",
+                    "switch_assignment_result_and_target_verified_side_effect_not_fully_reconstructed",
+                }
+                for boundary in native_directive_boundaries
+            )
         ):
             raise OperationContractError(
                 "INVALID_PREVIEW",
@@ -10621,7 +13954,10 @@ def verify_prepared_operation(
                     "expected": expected_result_contract,
                     "actual": result_contract,
                 },
-            )
+                )
+        if native_directive_boundaries:
+            verification_strength = "operation_specific_readback_with_explicit_native_directive_boundary"
+            business_state_verified = False
 
         check_result_schema(str(uri), str(version))
         payload = _execution_payload(execution_result)
@@ -10687,10 +14023,26 @@ def verify_prepared_operation(
             )
         targets = [dict(row) for row in raw_targets]
         originals_context = plan.get("originals_context")
-        originals_root = _import_originals_root_from_context(
-            originals_context,
-            version=version,
+        media_present = any(
+            target.get("media_expected") is True
+            or (
+                target.get("media_expected") is None
+                and isinstance(target.get("source_file"), Mapping)
+            )
+            for target in targets
         )
+        if media_present:
+            originals_root: str | None = _import_originals_root_from_context(
+                originals_context,
+                version=version,
+            )
+        else:
+            if originals_context is not None:
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "A structure-only import must not bind an Originals filesystem context.",
+                )
+            originals_root = None
         raw_allowed_result_paths = plan.get("allowed_result_paths")
         if (
             not isinstance(raw_allowed_result_paths, list)
@@ -10717,6 +14069,16 @@ def verify_prepared_operation(
         for target in targets:
             target_path = target.get("canonical_target_path")
             source_proof = target.get("source_file")
+            media_expected = target.get("media_expected")
+            if media_expected is None:
+                # Backward-compatible interpretation for sealed v1 previews
+                # produced before structure-only rows were introduced.
+                media_expected = isinstance(source_proof, Mapping)
+            source_kind = (
+                source_proof.get("kind", "regular_file")
+                if isinstance(source_proof, Mapping)
+                else None
+            )
             pre_state_rows = target.get("pre_state_rows")
             expected_source_path = target.get(
                 "expected_audio_file_source_result_path"
@@ -10725,9 +14087,16 @@ def verify_prepared_operation(
             if (
                 not isinstance(target_path, str)
                 or not target_path.startswith("\\")
-                or not isinstance(source_proof, Mapping)
-                or not isinstance(source_proof.get("path"), str)
-                or not isinstance(source_proof.get("sha256"), str)
+                or not isinstance(media_expected, bool)
+                or (
+                    media_expected
+                    and (
+                        not isinstance(source_proof, Mapping)
+                        or source_kind not in {"regular_file", "inline_base64"}
+                        or not isinstance(source_proof.get("sha256"), str)
+                    )
+                )
+                or (not media_expected and source_proof is not None)
                 or not isinstance(pre_state_rows, list)
                 or len(pre_state_rows) > 1
                 or not all(isinstance(row, Mapping) for row in pre_state_rows)
@@ -10739,6 +14108,8 @@ def verify_prepared_operation(
                         "requested_originals_subfolder",
                         "requested_notes",
                         "requested_audio_source_notes",
+                        "requested_dialogue_event",
+                        "requested_switch_assignment",
                     )
                 )
                 or notes_destination not in {"target_object", "audio_file_source"}
@@ -10746,23 +14117,61 @@ def verify_prepared_operation(
                     "requested_event" in target
                     and not isinstance(target.get("requested_event"), Mapping)
                 )
+                or (
+                    "validated_properties" in target
+                    and (
+                        not isinstance(target.get("validated_properties"), list)
+                        or not all(
+                            isinstance(item, Mapping)
+                            and isinstance(item.get("name"), str)
+                            and isinstance(item.get("metadata_type"), str)
+                            for item in target.get("validated_properties", [])
+                        )
+                    )
+                )
+                or (
+                    "validated_references" in target
+                    and (
+                        not isinstance(target.get("validated_references"), list)
+                        or not all(
+                            isinstance(item, Mapping)
+                            and isinstance(item.get("name"), str)
+                            and _valid_object_id(item.get("target_id"))
+                            for item in target.get("validated_references", [])
+                        )
+                    )
+                )
             ):
                 raise OperationContractError(
                     "INVALID_PREVIEW",
                     "A closed audio import target oracle is malformed.",
                     details={"target": target},
                 )
-            try:
-                derived_source_path = expected_audio_file_source_result_path(
-                    target_path,
-                    str(source_proof["path"]),
+            if media_expected:
+                source_name_path = (
+                    source_proof.get("path")
+                    if source_kind == "regular_file"
+                    else source_proof.get("relative_path")
                 )
-            except ImportContractError as exc:
-                raise OperationContractError(
-                    "INVALID_PREVIEW",
-                    "A closed audio import target has an unsafe AudioFileSource result path.",
-                    details=exc.as_dict(),
-                ) from exc
+                if not isinstance(source_name_path, str):
+                    raise OperationContractError(
+                        "INVALID_PREVIEW",
+                        "A closed audio import source proof lacks its filename.",
+                        details={"target_path": target_path, "source_proof": source_proof},
+                    )
+                try:
+                    derived_source_path = expected_audio_file_source_result_path(
+                        target_path,
+                        source_name_path,
+                    )
+                except ImportContractError as exc:
+                    raise OperationContractError(
+                        "INVALID_PREVIEW",
+                        "A closed audio import target has an unsafe AudioFileSource result path.",
+                        details=exc.as_dict(),
+                    ) from exc
+            else:
+                derived_source_path = None
             if expected_source_path != derived_source_path:
                 raise OperationContractError(
                     "INVALID_PREVIEW",
@@ -10829,11 +14238,41 @@ def verify_prepared_operation(
                     "An existing useExisting target cannot bind both Notes fields to one AudioFileSource.",
                     details={"target_path": target_path},
                 )
-            event = target.get("requested_event")
-            if isinstance(event, Mapping):
+            validated_events = target.get("validated_events")
+            events = (
+                validated_events
+                if isinstance(validated_events, list)
+                else (
+                    [target["requested_event"]]
+                    if isinstance(target.get("requested_event"), Mapping)
+                    else []
+                )
+            )
+            event_pre_state = target.get("event_pre_state")
+            if events and not isinstance(event_pre_state, list):
+                event_pre_state = [
+                    {
+                        "path": events[0].get("path"),
+                        "rows": target.get("event_pre_state_rows"),
+                    }
+                ]
+            if not isinstance(event_pre_state, list):
+                event_pre_state = []
+            if len(events) != len(event_pre_state):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "Closed import Event pre-state does not match the sealed Event list.",
+                    details={"target_path": target_path},
+                )
+            for event, pre_state in zip(events, event_pre_state, strict=True):
+                if not isinstance(event, Mapping) or not isinstance(pre_state, Mapping):
+                    raise OperationContractError(
+                        "INVALID_PREVIEW",
+                        "A closed import Event entry is malformed.",
+                    )
                 event_path = event.get("path")
                 event_action = event.get("action")
-                event_pre_state_rows = target.get("event_pre_state_rows")
+                event_pre_state_rows = pre_state.get("rows")
                 if (
                     set(event) != {"path", "action"}
                     or not isinstance(event_path, str)
@@ -10841,6 +14280,7 @@ def verify_prepared_operation(
                     or not isinstance(event_action, str)
                     or event_action not in event_action_types
                     or event_pre_state_rows != []
+                    or pre_state.get("path") != event_path
                 ):
                     raise OperationContractError(
                         "INVALID_PREVIEW",
@@ -10917,25 +14357,54 @@ def verify_prepared_operation(
             target_path = str(target["canonical_target_path"])
             target_number = target.get("index", target.get("row_number", ordinal))
             label = f"import target {target_number}"
-            source_proof = target["source_file"]
+            source_proof = target.get("source_file")
+            media_expected = target.get("media_expected")
+            if media_expected is None:
+                media_expected = isinstance(source_proof, Mapping)
+            source_kind = (
+                source_proof.get("kind", "regular_file")
+                if isinstance(source_proof, Mapping)
+                else None
+            )
             read_language = _localized_import_read_language(
                 target.get("requested_language")
             )
-            try:
-                current_source_proof = verify_import_file_proof(
-                    source_proof,
-                    field=f"{label} source_file",
-                )
-            except ImportContractError as exc:
-                check(f"{label} source WAV still matches its preview proof", False, exc.as_dict())
-            else:
+            if source_kind == "regular_file" and isinstance(source_proof, Mapping):
+                try:
+                    current_source_proof = verify_import_file_proof(
+                        source_proof,
+                        field=f"{label} source_file",
+                    )
+                except ImportContractError as exc:
+                    check(f"{label} source WAV still matches its preview proof", False, exc.as_dict())
+                else:
+                    check(
+                        f"{label} source WAV still matches its preview proof",
+                        current_source_proof.get("sha256") == source_proof.get("sha256"),
+                        {
+                            "path": current_source_proof.get("path"),
+                            "sha256": current_source_proof.get("sha256"),
+                        },
+                    )
+            elif source_kind == "inline_base64" and isinstance(source_proof, Mapping):
                 check(
-                    f"{label} source WAV still matches its preview proof",
-                    current_source_proof.get("sha256") == source_proof.get("sha256"),
+                    f"{label} inline WAV proof is sealed",
+                    isinstance(source_proof.get("relative_path"), str)
+                    and isinstance(source_proof.get("size"), int)
+                    and source_proof.get("size", 0) > 0
+                    and isinstance(source_proof.get("sha256"), str)
+                    and len(str(source_proof.get("sha256"))) == 64,
                     {
-                        "path": current_source_proof.get("path"),
-                        "sha256": current_source_proof.get("sha256"),
+                        "relative_path": source_proof.get("relative_path"),
+                        "size": source_proof.get("size"),
+                        "sha256": source_proof.get("sha256"),
                     },
+                )
+            elif media_expected:
+                check(
+                    f"{label} has one supported source proof",
+                    False,
+                    {"source_proof": source_proof},
                 )
 
             returned_matches = [
@@ -11056,6 +14525,39 @@ def verify_prepared_operation(
                     _import_object_type_matches(live_row.get("type"), expected_type),
                     {"expected": expected_type, "actual": live_row.get("type")},
                 )
+                for property_spec in target.get("validated_properties", []):
+                    property_name = property_spec.get("name")
+                    expected_value = property_spec.get("value")
+                    actual_value = _field_value(live_row, f"@{property_name}")
+                    check(
+                        f"{label} property {property_name} matches exactly",
+                        _typed_value_equal(
+                            actual_value,
+                            expected_value,
+                            str(property_spec.get("metadata_type", "")),
+                        ),
+                        {
+                            "property": property_name,
+                            "expected": expected_value,
+                            "actual": actual_value,
+                            "metadata_type": property_spec.get("metadata_type"),
+                        },
+                    )
+                for reference_spec in target.get("validated_references", []):
+                    reference_name = reference_spec.get("name")
+                    expected_reference = reference_spec.get("target_id")
+                    actual_reference = _reference_identity(
+                        _field_value(live_row, f"@{reference_name}")
+                    )
+                    check(
+                        f"{label} reference {reference_name} matches exactly",
+                        _same_identity(actual_reference, expected_reference),
+                        {
+                            "reference": reference_name,
+                            "expected": expected_reference,
+                            "actual": actual_reference,
+                        },
+                    )
                 notes_destination = target["requested_notes_destination"]
                 if (
                     "requested_notes" in target
@@ -11175,96 +14677,113 @@ def verify_prepared_operation(
                         {"expected": target.get("requested_language"), "actual": actual_language},
                     )
 
-                copied_path = _field_value(source_state, "originalFilePath")
-                if copied_path is None and source_state is not live_row:
-                    copied_path = _field_value(live_row, "originalFilePath")
-                if copied_path is None:
-                    copied_path = _field_value(live_row, "sound:originalWavFilePath")
-                derived_original: dict[str, str] | None = None
-                try:
-                    derived_original = _import_relative_original_path(
-                        copied_path,
-                        originals_root=originals_root,
-                    )
-                except OperationContractError as exc:
-                    check(
-                        f"{label} copied original WAV is inside the sealed Project Originals root",
-                        False,
-                        {
-                            "reported_path": copied_path,
-                            "originals_root": originals_root,
-                            "error": exc.as_dict(),
-                        },
-                    )
-                    if "requested_originals_subfolder" in target:
+                if media_expected:
+                    copied_path = _field_value(source_state, "originalFilePath")
+                    if copied_path is None and source_state is not live_row:
+                        copied_path = _field_value(live_row, "originalFilePath")
+                    if copied_path is None:
+                        copied_path = _field_value(
+                            live_row,
+                            "sound:originalWavFilePath",
+                        )
+                    derived_original: dict[str, str] | None = None
+                    try:
+                        derived_original = _import_relative_original_path(
+                            copied_path,
+                            originals_root=originals_root,
+                        )
+                    except OperationContractError as exc:
                         check(
-                            f"{label} Originals subfolder matches",
+                            f"{label} copied original WAV is inside the sealed Project Originals root",
                             False,
                             {
-                                "requested": target.get("requested_originals_subfolder"),
+                                "reported_path": copied_path,
+                                "originals_root": originals_root,
                                 "error": exc.as_dict(),
                             },
                         )
-                    copied_path = None
-                else:
-                    copied_path = derived_original["copied_path"]
-                    check(
-                        f"{label} copied original WAV is inside the sealed Project Originals root",
-                        True,
-                        derived_original,
-                    )
-                    if "requested_originals_subfolder" in target:
-                        check(
-                            f"{label} Originals subfolder matches",
-                            _import_originals_subfolder_matches(
-                                derived_original["relative_path"],
-                                target.get("requested_originals_subfolder"),
-                            ),
-                            {
-                                "requested": target.get("requested_originals_subfolder"),
-                                "originals_root": derived_original["originals_root"],
-                                "copied_path": derived_original["copied_path"],
-                                "derived_relative_path": derived_original["relative_path"],
-                            },
-                        )
-                if copied_path is not None:
-                    try:
-                        copied_proof = import_regular_file_proof(
-                            copied_path,
-                            field=f"{label} original WAV",
-                        )
-                    except ImportContractError as exc:
-                        check(f"{label} copied original WAV is readable and regular", False, exc.as_dict())
-                    else:
-                        check(
-                            f"{label} copied original WAV hash matches the source",
-                            copied_proof.get("sha256") == source_proof.get("sha256"),
-                            {
-                                "source_path": source_proof.get("path"),
-                                "source_sha256": source_proof.get("sha256"),
-                                "copied_path": copied_proof.get("path"),
-                                "copied_sha256": copied_proof.get("sha256"),
-                            },
-                        )
-                        if expected_result_contract == "required_log_files_objects":
-                            file_matches: list[str] = []
-                            for item in result_files:
-                                try:
-                                    result_file = _import_relative_original_path(
-                                        item,
-                                        originals_root=originals_root,
-                                    )
-                                except OperationContractError:
-                                    continue
-                                if _import_file_path_key(
-                                    result_file["copied_path"]
-                                ) == _import_file_path_key(copied_proof.get("path")):
-                                    file_matches.append(item)
+                        if "requested_originals_subfolder" in target:
                             check(
-                                f"{label} copied original WAV is reported exactly once",
-                                len(file_matches) == 1,
-                                {"copied_path": copied_proof.get("path"), "matches": file_matches},
+                                f"{label} Originals subfolder matches",
+                                False,
+                                {
+                                    "requested": target.get("requested_originals_subfolder"),
+                                    "error": exc.as_dict(),
+                                },
                             )
+                        copied_path = None
+                    else:
+                        copied_path = derived_original["copied_path"]
+                        check(
+                            f"{label} copied original WAV is inside the sealed Project Originals root",
+                            True,
+                            derived_original,
+                        )
+                        if "requested_originals_subfolder" in target:
+                            check(
+                                f"{label} Originals subfolder matches",
+                                _import_originals_subfolder_matches(
+                                    derived_original["relative_path"],
+                                    target.get("requested_originals_subfolder"),
+                                ),
+                                {
+                                    "requested": target.get("requested_originals_subfolder"),
+                                    "originals_root": derived_original["originals_root"],
+                                    "copied_path": derived_original["copied_path"],
+                                    "derived_relative_path": derived_original["relative_path"],
+                                },
+                            )
+                    if copied_path is not None:
+                        try:
+                            copied_proof = import_regular_file_proof(
+                                copied_path,
+                                field=f"{label} original WAV",
+                            )
+                        except ImportContractError as exc:
+                            check(
+                                f"{label} copied original WAV is readable and regular",
+                                False,
+                                exc.as_dict(),
+                            )
+                        else:
+                            check(
+                                f"{label} copied original WAV hash matches the source",
+                                copied_proof.get("sha256")
+                                == source_proof.get("sha256"),
+                                {
+                                    "source_path": source_proof.get(
+                                        "path",
+                                        source_proof.get("relative_path"),
+                                    ),
+                                    "source_sha256": source_proof.get("sha256"),
+                                    "copied_path": copied_proof.get("path"),
+                                    "copied_sha256": copied_proof.get("sha256"),
+                                },
+                            )
+                            if expected_result_contract == "required_log_files_objects":
+                                file_matches: list[str] = []
+                                for item in result_files:
+                                    try:
+                                        result_file = _import_relative_original_path(
+                                            item,
+                                            originals_root=originals_root,
+                                        )
+                                    except OperationContractError:
+                                        continue
+                                    if _import_file_path_key(
+                                        result_file["copied_path"]
+                                    ) == _import_file_path_key(
+                                        copied_proof.get("path")
+                                    ):
+                                        file_matches.append(item)
+                                check(
+                                    f"{label} copied original WAV is reported exactly once",
+                                    len(file_matches) == 1,
+                                    {
+                                        "copied_path": copied_proof.get("path"),
+                                        "matches": file_matches,
+                                    },
+                                )
 
             preexisting_id = target.get("preexisting_id")
             if import_operation == "createNew":
@@ -11301,8 +14820,19 @@ def verify_prepared_operation(
                     {"live_id": live_id},
                 )
 
-            event = target.get("requested_event")
-            if isinstance(event, Mapping):
+            events = target.get("validated_events")
+            if not isinstance(events, list):
+                events = (
+                    [target["requested_event"]]
+                    if isinstance(target.get("requested_event"), Mapping)
+                    else []
+                )
+            for event_index, event in enumerate(events):
+                if not isinstance(event, Mapping):
+                    raise OperationContractError(
+                        "INVALID_PREVIEW",
+                        "A closed audio import Event oracle entry is malformed.",
+                    )
                 event_path = event.get("path")
                 if not isinstance(event_path, str) or not event_path.startswith("\\"):
                     raise OperationContractError(
@@ -11311,28 +14841,33 @@ def verify_prepared_operation(
                         details={"target_path": target_path, "event": dict(event)},
                     )
                 event_rows = read_object(path=event_path, fields=IDENTITY_RETURN_FIELDS)
-                check(f"{label} Event exact path resolves once", len(event_rows) == 1, event_rows)
+                event_label = (
+                    f"{label} Event"
+                    if len(events) == 1
+                    else f"{label} Event {event_index}"
+                )
+                check(f"{event_label} exact path resolves once", len(event_rows) == 1, event_rows)
                 if len(event_rows) == 1:
                     event_row = event_rows[0]
                     event_id = event_row.get("id")
                     check(
-                        f"{label} Event path matches exactly",
+                        f"{event_label} path matches exactly",
                         event_row.get("path") == event_path,
                         {"expected": event_path, "actual": event_row.get("path")},
                     )
                     check(
-                        f"{label} Event type is Event",
+                        f"{event_label} type is Event",
                         _object_type_token(event_row.get("type")) == "event",
                         event_row.get("type"),
                     )
-                    check(f"{label} Event GUID is canonical", _valid_object_id(event_id), event_id)
+                    check(f"{event_label} GUID is canonical", _valid_object_id(event_id), event_id)
                     if _valid_object_id(event_id):
                         action_rows = read_direct_children(
                             object_id=event_id,
                             fields=event_action_fields,
                         )
                         check(
-                            f"{label} Event contains exactly one direct Action",
+                            f"{event_label} contains exactly one direct Action",
                             len(action_rows) == 1,
                             action_rows,
                         )
@@ -11346,17 +14881,17 @@ def verify_prepared_operation(
                             )
                             actual_target = _field_value(action_row, "Target")
                             check(
-                                f"{label} Event child type is Action",
+                                f"{event_label} child type is Action",
                                 _object_type_token(action_row.get("type")) == "action",
                                 action_row.get("type"),
                             )
                             check(
-                                f"{label} Event Action GUID is canonical",
+                                f"{event_label} Action GUID is canonical",
                                 _valid_object_id(action_id),
                                 action_id,
                             )
                             check(
-                                f"{label} Event Action parent is the exact Event",
+                                f"{event_label} Action parent is the exact Event",
                                 _same_identity(_reference_identity(action_row.get("parent")), event_id),
                                 {
                                     "expected_event_id": event_id,
@@ -11364,7 +14899,7 @@ def verify_prepared_operation(
                                 },
                             )
                             check(
-                                f"{label} Event Action type matches exactly",
+                                f"{event_label} Action type matches exactly",
                                 actual_action_type == expected_action_type,
                                 {
                                     "requested_action": expected_action,
@@ -11374,7 +14909,7 @@ def verify_prepared_operation(
                                 },
                             )
                             check(
-                                f"{label} Event Action target is the imported object",
+                                f"{event_label} Action target is the imported object",
                                 _import_event_action_target_matches(
                                     actual_target,
                                     expected_id=live_id,
@@ -12038,26 +15573,66 @@ def _validate_nested_request_shape(
             )
         return
     if operation == "audio.import":
-        for index, item in enumerate(_mapping_sequence(arguments.get("imports"), field="imports")):
+        import_items = _mapping_sequence(arguments.get("imports"), field="imports")
+        scopes: list[tuple[str, Mapping[str, Any]]] = []
+        defaults = arguments.get("defaults")
+        if defaults is not None:
+            if not isinstance(defaults, Mapping):
+                raise OperationContractError(
+                    "INVALID_ARGUMENT",
+                    "audio.import defaults must be a JSON object.",
+                )
+            _require_exact_keys(
+                defaults,
+                required=(),
+                optional=IMPORT_ITEM_OPTIONAL_FIELDS,
+                context="audio.import defaults",
+            )
+            scopes.append(("audio.import defaults", defaults))
+        for index, item in enumerate(import_items):
             _require_exact_keys(
                 item,
                 required=IMPORT_ITEM_REQUIRED_FIELDS,
                 optional=IMPORT_ITEM_OPTIONAL_FIELDS,
                 context=f"audio.import imports[{index}]",
             )
+            scopes.append((f"audio.import imports[{index}]", item))
+        for scope_name, item in scopes:
             event = item.get("event")
             if event is not None:
                 if not isinstance(event, Mapping):
                     raise OperationContractError(
                         "INVALID_ARGUMENT",
-                        f"audio.import imports[{index}].event must be a structured JSON object.",
+                        f"{scope_name}.event must be a structured JSON object.",
                     )
                 _require_exact_keys(
                     event,
                     required=("path",),
                     optional=("action",),
-                    context=f"audio.import imports[{index}].event",
+                    context=f"{scope_name}.event",
                 )
+            if "import_location" in item:
+                _validate_identity_payload_shape(
+                    item.get("import_location"),
+                    role=f"{scope_name}.import_location",
+                )
+            references = item.get("references", [])
+            if references is not None:
+                if not isinstance(references, list):
+                    raise OperationContractError(
+                        "INVALID_ARGUMENT",
+                        f"{scope_name}.references must be a JSON array.",
+                    )
+                for reference_index, reference in enumerate(references):
+                    if not isinstance(reference, Mapping):
+                        raise OperationContractError(
+                            "INVALID_ARGUMENT",
+                            f"{scope_name}.references[{reference_index}] must be a JSON object.",
+                        )
+                    _validate_identity_payload_shape(
+                        reference.get("target"),
+                        role=f"{scope_name}.references[{reference_index}].target",
+                    )
         _validate_import_source_control_option(arguments, version=version)
         return
     if operation == "audio.importTabDelimited":
@@ -12105,6 +15680,25 @@ def _validate_nested_request_shape(
     if operation == "object.create":
         _validate_identity_payload_shape(arguments.get("parent"), role="parent")
         conflict = arguments.get("on_name_conflict", "fail")
+        if "platform" in arguments:
+            _non_empty_string(arguments.get("platform"), field="platform")
+        if "list" in arguments:
+            try:
+                normalize_object_list_name(
+                    arguments.get("list"),
+                    request_path="$.arguments.list",
+                )
+            except ObjectOperationContractError as exc:
+                raise OperationContractError(
+                    exc.error_code,
+                    str(exc),
+                    details=exc.details,
+                ) from exc
+            if conflict == "replace":
+                raise OperationContractError(
+                    "LIST_REPLACE_REQUIRES_OBJECT_SET",
+                    "object.create list insertion does not expose destructive replace; use a closed object.set list with list_mode=replaceAll.",
+                )
         replace_owned_root_supplied = "replace_owned_root" in arguments
         if conflict == "replace":
             if not replace_owned_root_supplied:
@@ -12136,9 +15730,27 @@ def _validate_nested_request_shape(
         except ObjectOperationContractError as exc:
             raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         return
+    if operation == "object.delete":
+        _validate_identity_payload_shape(arguments.get("object"), role="object")
+        try:
+            normalize_auto_check_out_to_source_control(
+                arguments.get("auto_check_out_to_source_control"),
+                version=version,
+                supplied="auto_check_out_to_source_control" in arguments,
+            )
+        except ImportContractError as exc:
+            raise OperationContractError(
+                exc.error_code,
+                str(exc),
+                details=exc.details,
+            ) from exc
+        return
     if operation in {"object.setProperty", "object.setReference"}:
         _validate_identity_payload_shape(arguments.get("object"), role="object")
-        if operation == "object.setReference":
+        if (
+            operation == "object.setReference"
+            and arguments.get("target") is not None
+        ):
             _validate_identity_payload_shape(arguments.get("target"), role="target")
         if "platform" in arguments:
             _non_empty_string(arguments.get("platform"), field="platform")
@@ -12192,18 +15804,35 @@ def _validate_nested_request_shape(
                 details={"count": len(raw_objects), "limit": 32},
             )
         conflict = arguments.get("on_name_conflict", "fail")
+        list_mode = arguments.get("list_mode", "append")
+        if "platform" in arguments:
+            _non_empty_string(arguments.get("platform"), field="platform")
         descriptor_keys: set[bytes] = set()
         total_nodes = len(raw_objects)
+        saw_list_assignment = False
         for index, item in enumerate(raw_objects):
             _require_exact_keys(
                 item,
                 required=("object",),
-                optional=("notes", "platform", "properties", "references", "children"),
+                optional=(
+                    "name",
+                    "notes",
+                    "platform",
+                    "list_mode",
+                    "on_name_conflict",
+                    "properties",
+                    "references",
+                    "import",
+                    "children",
+                    "lists",
+                ),
                 context=f"object.set objects[{index}]",
             )
             _validate_identity_payload_shape(item.get("object"), role=f"objects[{index}].object")
             if "platform" in item:
                 _non_empty_string(item.get("platform"), field=f"objects[{index}].platform")
+            row_conflict = item.get("on_name_conflict", conflict)
+            row_list_mode = item.get("list_mode", list_mode)
             descriptor_key = canonical_json_bytes(item.get("object"))
             if descriptor_key in descriptor_keys:
                 raise OperationContractError(
@@ -12212,10 +15841,21 @@ def _validate_nested_request_shape(
                     details={"index": index, "identity": item.get("object")},
                 )
             descriptor_keys.add(descriptor_key)
-            if not any(field in item for field in ("notes", "properties", "references", "children")):
+            if not any(
+                field in item
+                for field in (
+                    "name",
+                    "notes",
+                    "properties",
+                    "references",
+                    "import",
+                    "children",
+                    "lists",
+                )
+            ):
                 raise OperationContractError(
                     "NO_OP",
-                    f"object.set objects[{index}] must request at least one field or child change.",
+                    f"object.set objects[{index}] must request at least one field, child, or list change.",
                 )
             try:
                 normalize_property_descriptors(
@@ -12226,14 +15866,58 @@ def _validate_nested_request_shape(
                     item.get("references", []),
                     request_path=f"$.objects[{index}].references",
                 )
+                if "import" in item:
+                    if version not in OBJECT_SET_IMPORT_VERSIONS:
+                        raise OperationContractError(
+                            "VERSION_BEHAVIOR_BOUNDARY",
+                            "object.set import is available only in Wwise 2023.1-2025.1.",
+                            details={"version": version},
+                        )
+                    normalize_object_import(
+                        item.get("import"),
+                        request_path=f"$.objects[{index}].import",
+                    )
                 forest = normalize_object_forest(
                     item.get("children", []),
-                    on_name_conflict=conflict,
+                    on_name_conflict=row_conflict,
                     base_path=f"$.objects[{index}].children",
+                    allow_platform=True,
+                    allow_language=True,
+                    allow_import=version in OBJECT_SET_IMPORT_VERSIONS,
                 )
                 total_nodes += len(forest.nodes)
+                lists = normalize_object_lists(
+                    item.get("lists", []),
+                    request_path=f"$.objects[{index}].lists",
+                    allow_platform=True,
+                    allow_language=True,
+                    allow_import=version in OBJECT_SET_IMPORT_VERSIONS,
+                )
+                saw_list_assignment = saw_list_assignment or bool(lists)
+                list_nodes = sum(len(descriptor.nodes) for descriptor in lists)
+                total_nodes += list_nodes
+                if row_list_mode == "append" and any(
+                    not descriptor.objects for descriptor in lists
+                ):
+                    raise OperationContractError(
+                        "NO_OP",
+                        f"object.set objects[{index}] append lists must contain at least one object.",
+                    )
+                if (
+                    item.get("list_mode") == "replaceAll"
+                    and not lists
+                ):
+                    raise OperationContractError(
+                        "NO_OP",
+                        f"object.set objects[{index}] list_mode=replaceAll requires one closed lists[] assignment.",
+                    )
             except ObjectOperationContractError as exc:
                 raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+        if list_mode == "replaceAll" and not saw_list_assignment:
+            raise OperationContractError(
+                "NO_OP",
+                "object.set list_mode=replaceAll requires at least one closed lists[] assignment.",
+            )
         if total_nodes > DEFAULT_MAX_NODES:
             raise OperationContractError(
                 "NODE_LIMIT_EXCEEDED",
@@ -12586,6 +16270,72 @@ def _import_path_segments(value: Any) -> list[str]:
     return [segment.casefold() for segment in re.split(r"[\\/]+", value) if segment]
 
 
+def _import_path_leaf_name(value: Any) -> str:
+    if not isinstance(value, str):
+        return ""
+    parts = [segment for segment in re.split(r"[\\/]+", value) if segment]
+    return parts[-1] if parts else ""
+
+
+def _import_candidate_ancestor_chain(
+    candidate: Mapping[str, Any],
+    candidates: Sequence[Mapping[str, Any]],
+    *,
+    target_id: Any,
+) -> list[Mapping[str, Any]] | None:
+    """Return the source-to-direct-child chain below one import target.
+
+    ``[]`` means the copied-media evidence is the target object itself.  ``None``
+    means the reflected parent graph is incomplete, cyclic, or escapes the
+    sealed import target.
+    """
+
+    candidate_id = candidate.get("id")
+    if not _valid_object_id(candidate_id) or not _valid_object_id(target_id):
+        return None
+    if _same_identity(candidate_id, target_id):
+        return []
+    by_id: dict[str, Mapping[str, Any]] = {}
+    for row in candidates:
+        row_id = row.get("id")
+        if _valid_object_id(row_id):
+            by_id.setdefault(_identity_key(row_id), row)
+    chain: list[Mapping[str, Any]] = []
+    seen: set[str] = set()
+    current: Mapping[str, Any] = candidate
+    while True:
+        current_id = current.get("id")
+        if not _valid_object_id(current_id):
+            return None
+        current_key = _identity_key(current_id)
+        if current_key in seen:
+            return None
+        seen.add(current_key)
+        chain.append(current)
+        parent_id = _parent_value(current.get("parent"))
+        if _same_identity(parent_id, target_id):
+            return chain
+        if not _valid_object_id(parent_id):
+            return None
+        parent = by_id.get(_identity_key(parent_id))
+        if parent is None:
+            return None
+        current = parent
+
+
+def _import_created_name_matches(
+    actual: Any,
+    expected: Any,
+    *,
+    on_name_conflict: Any,
+) -> bool:
+    if not isinstance(actual, str) or not isinstance(expected, str):
+        return False
+    if on_name_conflict == "rename":
+        return actual == expected or actual.startswith(expected)
+    return actual == expected
+
+
 def _import_originals_subfolder_matches(relative_path: Any, requested: Any) -> bool:
     actual_segments = _import_path_segments(relative_path)
     requested_segments = _import_path_segments(requested)
@@ -12727,6 +16477,57 @@ def _require_reference_target_allowed(
         )
 
 
+def _require_reference_clear_allowed(
+    metadata: PropertyInfoMetadataRecord,
+) -> None:
+    """Reject an explicit clear when live metadata proves the reference non-null."""
+
+    restrictions = metadata.restriction.get("restrictions")
+    if restrictions is None:
+        return
+    if not isinstance(restrictions, list):
+        raise OperationContractError(
+            "INVALID_METADATA",
+            "Reference restriction metadata must be an array when present.",
+            details={
+                "reference": metadata.name,
+                "restriction": dict(metadata.restriction),
+            },
+        )
+    for item in restrictions:
+        if isinstance(item, str):
+            if item == "notNull":
+                raise OperationContractError(
+                    "REFERENCE_NOT_CLEARABLE",
+                    "Live getPropertyInfo metadata marks this reference as non-null.",
+                    details={
+                        "reference": metadata.name,
+                        "restriction": dict(metadata.restriction),
+                    },
+                )
+            if item == "playable":
+                # A target classifier is unnecessary when no target remains.
+                continue
+            raise OperationContractError(
+                "INVALID_METADATA",
+                "Reference restriction metadata contains an unknown string flag.",
+                details={
+                    "reference": metadata.name,
+                    "restriction": dict(metadata.restriction),
+                    "flag": item,
+                },
+            )
+        if not isinstance(item, Mapping):
+            raise OperationContractError(
+                "INVALID_METADATA",
+                "Reference restriction entries must be objects or supported string flags.",
+                details={
+                    "reference": metadata.name,
+                    "restriction": dict(metadata.restriction),
+                },
+            )
+
+
 def _reference_type_token(value: str) -> str:
     token = "".join(character for character in value.casefold() if character.isalnum())
     aliases = {
@@ -12798,6 +16599,24 @@ def _require_object_create_writable_parent(parent: ResolvedObject) -> None:
                 "allowed_types": sorted(OBJECT_CREATE_WRITABLE_PARENT_TYPES),
                 "parent": parent.as_dict(),
             },
+        )
+
+
+def _require_object_list_owner(owner: ResolvedObject) -> None:
+    row = owner.row
+    path = row.get("path")
+    object_type = row.get("type")
+    if (
+        object_type == "Project"
+        or path in {"\\", ""}
+        or not isinstance(path, str)
+        or not path.startswith("\\")
+        or path.count("\\") <= 1
+    ):
+        raise OperationContractError(
+            "PROTECTED_LIST_OWNER",
+            "Project and management roots cannot own object-list mutations through the closed interface.",
+            details={"owner": owner.as_dict()},
         )
 
 
@@ -12893,6 +16712,17 @@ def _reference_identity(value: Any) -> Any:
     if isinstance(value, (str, int)) and not isinstance(value, bool):
         return value
     return None
+
+
+def _reference_value_is_null(value: Any) -> bool:
+    if value is None:
+        return True
+    identity = _reference_identity(value)
+    return (
+        isinstance(identity, str)
+        and identity.casefold()
+        == "{00000000-0000-0000-0000-000000000000}"
+    )
 
 
 def _typed_value_equal(actual: Any, expected: Any, metadata_type: str) -> bool:

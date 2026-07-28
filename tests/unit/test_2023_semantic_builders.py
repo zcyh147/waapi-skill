@@ -7,11 +7,6 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.builders.common import BuilderFamily, SemanticPreview  # pyright: ignore[reportMissingImports]
 from wwise_waapi.builders.identity import ObjectIdentity  # pyright: ignore[reportMissingImports]
-from wwise_waapi.builders.imports import (  # pyright: ignore[reportMissingImports]
-    AUDIO_IMPORT_URI,
-    ImportItem,
-    build_audio_import_preview,
-)
 from wwise_waapi.builders.metadata import PropertyInfoMetadataRecord  # pyright: ignore[reportMissingImports]
 from wwise_waapi.builders.object_mutation import (  # pyright: ignore[reportMissingImports]
     OBJECT_CREATE_URI,
@@ -99,21 +94,6 @@ def test_2023_property_reference_helper_accepts_version_and_validates_schema() -
     assert_destructive_evidence(preview)
 
 
-def test_2023_import_helper_accepts_version_and_requires_mutation_evidence() -> None:
-    preview = build_audio_import_preview(
-        [ImportItem(object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\<Sound>Preview", audio_file="/tmp/preview.wav")],
-        import_operation="createNew",
-        source_note_checker=source_note_checker_2023(),
-        version=VERSION_2023,
-    )
-
-    assert_2023_preview(preview, family=BuilderFamily.IMPORT, uri=AUDIO_IMPORT_URI, destructive=True)
-    assert preview.envelope.metadata["destructive_behavior"].startswith("preview-only")
-    assert preview.readback_plan == ()
-    assert preview.envelope.metadata["execution_result_readback_binding"]["source"]["result_path"] == "objects[].id"
-    assert_destructive_evidence(preview)
-
-
 def test_2023_soundbank_helper_accepts_version_and_keeps_artifact_evidence_only() -> None:
     preview = build_generate_preview(
         soundbanks=[{"name": "PreviewBank", "events": [GUID_A], "inclusions": ["event"]}],
@@ -166,7 +146,6 @@ def test_2023_builders_never_load_2022_semantic_or_schema_resources(monkeypatch:
         build_object_get_query(type="Sound", return_fields=("id",), source_note_checker=source_note_checker_2023(), version=VERSION_2023),
         ObjectMutationBuilder(version=VERSION_2023, source_note_checker=source_note_checker_2023()).create(parent=ObjectIdentity(id=GUID_A), type="ActorMixer", name="Preview"),
         build_set_name_preview(object=ObjectIdentity(id=GUID_A), value="Preview", source_note_checker=source_note_checker_2023(), version=VERSION_2023),
-        build_audio_import_preview([ImportItem(object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\<Sound>Preview", audio_file="/tmp/preview.wav")], import_operation="createNew", source_note_checker=source_note_checker_2023(), version=VERSION_2023),
         build_generate_preview(soundbanks=[{"name": "PreviewBank"}], source_note_checker=source_note_checker_2023(), version=VERSION_2023),
         build_add_assignment_preview(switch_container=GUID_A, child=GUID_B, state_or_switch=GUID_C, existing_assignments=[], source_note_checker=source_note_checker_2023(), version=VERSION_2023),
     )

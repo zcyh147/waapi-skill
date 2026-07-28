@@ -12,7 +12,11 @@ Use this reference for read-only inspection: current project facts, current sele
 
 1. Map current project/version to `gateway.py status`, Bus listing to `gateway.py buses`, and selection to `gateway.py selected`.
 2. Run that command before any repository discovery.
-3. Map object discovery to `gateway.py query-object` and metadata discovery to `gateway.py metadata`. Ordinary subscribe/listen/monitor wording uses one bounded `gateway.py wait-topic`; only explicit streaming or persistent intent uses `gateway.py stream-topic`.
+3. Map object discovery to `gateway.py query-object`, packaged object-type
+   discovery to `gateway.py object-types`, and live property/reference metadata
+   to `gateway.py metadata`. Ordinary subscribe/listen/monitor wording uses one
+   bounded `gateway.py wait-topic`; only explicit streaming or persistent intent
+   uses `gateway.py stream-topic`.
 4. Use offline `gateway.py capabilities --all-versions --summary-only` first for a broad support overview, then narrow a list with `--query`, `--category`, `--item-type`, `--family`, or `--route`. If a URI is already known and the user is asking about its route, schema, availability, or boundary, skip the list and use `gateway.py describe <uri>` directly. This discovery rule does not apply when the user explicitly asks to call one of the two reviewed reflection inventories in the next step.
 5. The generic form is `gateway.py call <uri> --args-json '<object>' --options-json '<object>'`. It accepts only catalog rows whose current version reports `preferred_route: manifest_dispatch`; the reflected request and returned result are recursively validated and size/time bounded. The two zero-input reflection inventories remain fast routes: when the user explicitly asks to invoke `ak.wwise.waapi.getFunctions` or `ak.wwise.waapi.getTopics` with empty args/options, run that one `call` directly without `describe` or `capabilities`. Other known bounded reads may use `call` after `describe` confirms the route. Fixed functions return `FIXED_COMMAND_REQUIRED`, `ak.wwise.core.object.get` retains `QUERY_OBJECT_REQUIRED`, topics return `WAIT_TOPIC_REQUIRED`, and broader reads return `TRANSACTION_REQUIRED` rather than being inferred safe from a `get`-shaped name.
 
@@ -64,6 +68,8 @@ python scripts/run.py gateway.py query-object --path '\Events\Default Work Unit'
 python scripts/run.py gateway.py query-object --type Event --where-json '{"field":"name","operator":":","value":"Play"}' --take 100
 python scripts/run.py gateway.py query-object --search 'ExactName' --where-json '{"field":"name","operator":"=","value":"ExactName"}' --take 1 --return-field id --return-field name --return-field type --return-field path
 python scripts/run.py gateway.py --version 2025.1 query-object --type AudioFileSource --take 1000 --match-original-file-path '<first-complete-returned-Path>' --match-original-file-path '<second-complete-returned-Path>'
+python scripts/run.py gateway.py --version 2022.1 object-types --query 'audio source' --object-type WObject --limit 20
+python scripts/run.py gateway.py --version 2022.1 object-types --summary-only
 python scripts/run.py gateway.py metadata types --summary-only
 python scripts/run.py gateway.py metadata property-info --object '{GUID}' --property Volume
 python scripts/run.py gateway.py project-default-work-units
@@ -211,7 +217,21 @@ python scripts/run.py gateway.py query-object --path '\Actor-Mixer Hierarchy\Def
 
 `capabilities` returns at most 50 compact rows by default, including each row's public route and transaction boundary. Use `--limit 0` only when every matching row is explicitly needed, and add `--detail` only for nested interface, schema-summary, policy, and evidence auditing. `describe` intentionally returns only the compact schema summary. Add `--full-schema` only when the task requires the complete reflected args/options/result schema; do not pay that context cost for ordinary route or availability checks.
 
-For a machine-readable object-type summary, use the fixed `metadata types --summary-only` route. Its successful payload exposes the bounded projection as `agent_result`; compact-serialize that object exactly into the requested result envelope and stop. Do not derive a replacement from `normalized`, alter its keys or values, or repeat the metadata command after success. This fixed-read projection follows the same terminal `agent_result` rule as a successful transaction payload.
+Use `object-types` first for object-type discovery. It searches a compact,
+version-pinned catalog without connecting to Wwise and returns at most 20 rows
+per version by default. Add `--query`, `--object-type`, or a bounded `--limit`
+instead of loading every type into context. Use live `metadata types` only when
+the user explicitly needs the currently running Authoring instance reflected
+again. `--summary-only` describes the complete packaged catalog and therefore
+cannot be combined with `--query` or `--object-type`.
+
+For a machine-readable live object-type summary, use the fixed
+`metadata types --summary-only` route. Its successful payload exposes the
+bounded projection as `agent_result`; compact-serialize that object exactly into
+the requested result envelope and stop. Do not derive a replacement from
+`normalized`, alter its keys or values, or repeat the metadata command after success.
+This fixed-read projection follows the same terminal `agent_result`
+rule as a successful transaction payload.
 
 Use the three version-stable fixed reads instead of composing their reflected
 payloads. `profiler-game-objects` accepts only a non-negative millisecond time
@@ -228,7 +248,7 @@ availability, reporting, and value separate for the `defaultWorkUnits` and
 command exposes its stable projection as the terminal `agent_result`; do not
 rebuild it from the raw version-specific fields.
 
-`query-object` accepts exactly one source: `--path`, `--object-id`, `--type`, `--search`, or `--query`. Here `--query` means an existing Wwise Query Editor object identified by a canonical `{GUID}` or an absolute `\Queries\...` path with single backslash hierarchy separators. It never accepts raw WAQL such as `from type Sound`; use the other closed source and transform flags instead. Supported `--select` values are `descendants`, `ancestors`, `referencesTo`, `children`, and `parent`; `this` and `owner` remain outside the packaged boundary. In `--where-json`, `=` is exact equality and `:` is a contains/match predicate; when the user says a field must equal an exact value, use `=` even if the source is `--search`. Every broad source (`--type`, `--search`, `--query`) and every `--select` transform requires either `--take N`, where `N` is between `0` and `1000`, or the explicit `--all-results` opt-in. `--take` and `--all-results` cannot be combined. Use `--all-results` only when the user explicitly requests an unbounded result set. Exact path/GUID lookup without a transform remains one-object bounded and needs neither flag. A bounded success that exceeds its `take`, an untransformed exact lookup that returns more than one row, or a fixed `buses` result above 1000 rows is rejected as protocol drift; `--all-results` remains unbounded for genuinely broad queries. The fixed `buses` command uses `take 1000`, reports that bound in its JSON, and marks a 1000-row response as possibly truncated. The gateway defaults to `id,name,type,path`; supplying any `--return-field` replaces that default list, so repeat the flag for every field needed. An untransformed exact `--path` lookup must return `path`, and an exact `--object-id` lookup must return `id`; the gateway normalizes path separators/case or GUID case and rejects a mismatched returned identity. For exact identity inspection, keep those four fields explicit for an exact path/GUID identity lookup. Successful object queries must return a JSON object containing a `return` array of JSON object rows; an invalid response shape or bound is a structured error, never an empty-result substitute. A successful selection must likewise contain an explicit `objects` array whose every row is an object; only `objects: []` means a valid empty selection.
+`query-object` accepts exactly one source: `--path`, `--object-id`, `--type`, `--search`, or `--query`. Here `--query` means an existing Wwise Query Editor object identified by a canonical `{GUID}` or an absolute `\Queries\...` path with single backslash hierarchy separators. It never accepts raw WAQL such as `from type Sound`; use the other closed source and transform flags instead. Supported `--select` values are `descendants`, `ancestors`, `referencesTo`, `children`, and `parent`; `this` and `owner` remain outside the packaged boundary. In `--where-json`, `=` is exact equality and `:` is a contains/match predicate; when the user says a field must equal an exact value, use `=` even if the source is `--search`. Every broad source (`--type`, `--search`, `--query`) and every `--select` transform requires either `--take N`, where `N` is between `0` and `1000`, or the explicit `--all-results` opt-in. `--take` and `--all-results` cannot be combined. Use `--all-results` only when the user explicitly requests an unbounded result set. Exact path/GUID lookup without a transform remains one-object bounded and needs neither flag. A bounded success that exceeds its `take`, an untransformed exact lookup that returns more than one row, or a fixed `buses` result above 1000 rows is rejected as protocol drift; `--all-results` remains unbounded for genuinely broad queries. The fixed `buses` command uses `take 1000`, reports that bound in its JSON, and marks a 1000-row response as possibly truncated. The gateway defaults to `id,name,type,path`; supplying any `--return-field` replaces that default list, so repeat the flag for every field needed. An untransformed exact `--path` lookup must return `path`, and an exact `--object-id` lookup must return `id`; the gateway normalizes path separators/case or GUID case and rejects a mismatched returned identity. For exact identity inspection, keep those four fields explicit for an exact path/GUID identity lookup. Successful object queries must return a JSON object containing a `return` array of JSON object rows; an invalid response shape or bound is a structured error, never an empty-result substitute. A successful selection must likewise contain an explicit `objects` array whose every row is an object; only `objects: []` means a valid empty selection. `selected` always retains `id,name,type,path` and accepts repeatable `--return-field` flags for up to 32 unique manifest-validated accessors when the current-selection answer needs properties or related-object fields.
 
 `wait-topic` accepts only an exact URI in the reviewed topic allowlist. Its `--event-count` defaults to `1` and is restricted to `1..64`. Route ordinary vague requests to subscribe, listen, monitor, or keep an eye on a Topic here. An ordinary omitted duration uses 10 seconds; before invoking the gateway, tell the user naturally that this invocation will use that default and that they may request another duration. A user-supplied positive finite duration is authoritative: convert its units to seconds without rounding and place the exact value in the gateway-global `--timeout <positive-finite-seconds>` position before `wait-topic`. Do not silently clamp it to the ordinary default or to a topic recommendation. When the user explicitly asks for no time limit but still requests a fixed event count, omit global `--timeout`, add the subcommand flag `--no-timeout`, and tell them that the wait continues until all requested matching events arrive or they cancel it. Do not combine the two flags, and do not infer `--no-timeout` from ordinary listening language.
 
@@ -260,6 +280,16 @@ uses a fresh live `getCommands` result immediately before dispatch.
 
 The gateway itself keeps the ordinary 10-second omitted-duration default for `ak.wwise.core.soundbank.generated` too. At the Skill layer, when the user omits a duration for this Topic, explicitly pass gateway-global `--timeout 120` because the matching generation may need to finish after the subscription is established. Before invoking the gateway, tell the user that this subscription will use 120 seconds. This is an explicit Skill-selected timeout, not a different gateway default. A user-supplied positive finite duration or explicit no-time-limit bounded wait still takes precedence exactly as described above; explicit persistent streaming instead uses `stream-topic` and its streaming duration policy. Use exactly `{"return":["id","name","type","path"]}` as the subscription options. Those four fields provide the bounded SoundBank identity needed for the user-facing result and are the closed route default; do not vary them from case wording. Set `--event-count` to the number of requested Bank × platform × language cells. Build `--match-json` only from names explicitly present in the user's request: include `soundbank.name` when one Bank name is common to every requested cell, and include `platform.name` when one platform name is common to every cell. If neither dimension has one common name, omit `--match-json` instead of passing an empty object. Never discover or inject a GUID only to construct the subscription predicate; exact GUID correlation belongs to the trusted post-return oracle, not to the model-authored command.
 
+Choose the SoundBank Topic from the requested observation. Use
+`ak.wwise.core.soundbank.generated` for per-Bank × platform × language result
+events. Use `ak.wwise.core.soundbank.generationDone` only for the overall
+generation-cycle or log notification. `generationDone` is not proof that every
+Bank succeeded or that requested artifacts exist; when success or artifact
+completion matters, use the generating operation's terminal verification
+instead of upgrading that Topic event into business evidence. A `describe` of
+either Topic returns the same distinction under
+`interface.selection_guidance`.
+
 `object.created` fires before the final name is applied, so do not match it by the requested name. An ActorMixer create reports event type `ActorMixer` in Wwise 2021.1-2024.1 but `PropertyContainer` in Wwise 2025.1; use the version-specific type as a bounded predicate and correlate `event.object.id` with trusted publisher evidence when exact ownership matters. `ak.wwise.debug.assertFailed` is available through the same bounded `wait-topic` route and its versioned publish schema; it is a diagnostic event, not proof that an assertion request was safely recovered. Any unreviewed future topic returns `UNSUPPORTED_BY_SKILL_INTERFACE` before subscription.
 
 `debug-wal-tree` is the only route for `ak.wwise.debug.getWalTree` and is
@@ -280,6 +310,7 @@ For `ak.wwise.ui.getSelectedObjects`, prefer the live selected-object query firs
 
 - If the endpoint returns selected object rows, report them clearly.
 - If the endpoint returns an empty selection, report that explicit empty selection.
+- When the user also asks for selected-object properties or related fields, add one `--return-field` per required accessor. The gateway always retains `id`, `name`, `type`, and `path`, deduplicates additions, and rejects an oversized or malformed projection before connecting.
 - If the connected endpoint is a headless or command-line WwiseConsole instance where the UI selection API is unavailable, report that boundary clearly and stop. Do not drift into repo/docs research and do not invent a fallback selection result.
 
 ## Dispatcher rules

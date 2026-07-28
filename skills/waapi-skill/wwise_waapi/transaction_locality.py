@@ -81,6 +81,15 @@ def local_filesystem_path_roles(
         return ()
 
     if operation in CONDITIONAL_LOCAL_FILESYSTEM_OPERATIONS:
+        if operation == "object.set":
+            return (
+                (
+                    "arguments.objects[].recursive.import",
+                    "live_project_files",
+                )
+                if _contains_object_import(arguments.get("objects"))
+                else ()
+            )
         if operation == "ui.commands.execute":
             return ("arguments.files",) if "files" in arguments else ()
         return _ui_command_descriptor_path_roles(arguments.get("commands"))
@@ -95,6 +104,19 @@ def local_filesystem_path_roles(
     if route_lookup(version, uri) != "isolated_transaction":
         return ()
     return ("execution_contract.isolated_transaction",)
+
+
+def _contains_object_import(value: Any) -> bool:
+    if isinstance(value, Mapping):
+        if "import" in value:
+            return True
+        return any(_contains_object_import(item) for item in value.values())
+    if isinstance(value, Sequence) and not isinstance(
+        value,
+        (str, bytes, bytearray),
+    ):
+        return any(_contains_object_import(item) for item in value)
+    return False
 
 
 def _ui_command_descriptor_path_roles(value: Any) -> tuple[str, ...]:

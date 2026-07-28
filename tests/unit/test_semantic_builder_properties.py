@@ -176,6 +176,25 @@ def test_set_reference_preview_uses_target_object_value_and_evidence_plan() -> N
     assert preview.evidence_plan[2]["topic"] == "ak.wwise.core.object.referenceChanged"
 
 
+def test_set_reference_preview_supports_an_explicit_null_clear() -> None:
+    preview = builder().set_reference(
+        object=exact_sound(),
+        reference="OutputBus",
+        target=None,
+        reference_info=output_bus_info(),
+    )
+
+    assert_mutating_preview(
+        preview,
+        SET_REFERENCE_URI,
+        {"object": exact_sound().id, "reference": "OutputBus", "value": None},
+    )
+    applicability = preview.envelope.metadata["applicability"]
+    assert applicability["target_identity"] is None
+    assert applicability["clears_reference"] is True
+    assert preview.evidence_plan[2]["expected_identity"]["target"] is None
+
+
 def test_set_reference_accepts_legacy_live_metadata_with_reference_restriction_type() -> None:
     metadata = PropertyInfoMetadataRecord(
         name="SwitchGroupOrStateGroup",

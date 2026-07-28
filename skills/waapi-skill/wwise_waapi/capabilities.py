@@ -42,6 +42,7 @@ from .execution_contracts import (
 from .manifest import ManifestStore
 from .operation_registry import OPERATION_SPECS
 from .safety import ApiSafety, REVIEWED_FIXED_FUNCTION_URIS, classify_api_safety
+from .selection_guidance import selection_guidance_for_uri
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 
 
@@ -85,6 +86,7 @@ class CapabilityRecord:
     policy: Mapping[str, Any] | None = None
     evidence: Mapping[str, Any] = field(default_factory=dict)
     execution_contract: Mapping[str, Any] = field(default_factory=dict)
+    selection_guidance: Mapping[str, Any] = field(default_factory=dict)
     manifest_runtime_profile: str = CONSOLE_EXECUTION_PROFILE
     authoring_ui_profile: str = "not_reflected_separately"
     host_surface: str | None = None
@@ -158,6 +160,10 @@ class CapabilityRecord:
         if self.authoring_ui_commands_supplement_evidence:
             interface["authoring_ui_commands_supplement_evidence"] = _json_safe(
                 self.authoring_ui_commands_supplement_evidence
+            )
+        if self.selection_guidance:
+            interface["selection_guidance"] = _json_safe(
+                self.selection_guidance
             )
         return {
             "version": self.version,
@@ -374,6 +380,7 @@ class CapabilityCatalog:
                         policy=policy_record,
                         evidence=_evidence_record(deferred.get(uri)),
                         execution_contract=execution_contract.as_dict(),
+                        selection_guidance=selection_guidance_for_uri(uri),
                         manifest_runtime_profile=(
                             str(
                                 manifest.get("metadata", {}).get(

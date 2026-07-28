@@ -58,6 +58,22 @@ from wwise_waapi.builders.metadata import (  # noqa: E402  # pyright: ignore[rep
     parse_is_property_enabled_result,
     parse_property_and_reference_names_result,
 )
+from wwise_waapi.metadata_catalog import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    MAX_OBJECT_TYPE_SEARCH_RESULTS,
+    MetadataCatalogError,
+    MetadataCatalogMissingError,
+    ObjectTypeCatalogStore,
+)
+from wwise_waapi.metadata_cache import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    DurableMetadataCache,
+    GET_PROPERTY_AND_REFERENCE_NAMES_URI,
+    GET_PROPERTY_INFO_URI as CACHE_GET_PROPERTY_INFO_URI,
+    GET_TYPES_URI as CACHE_GET_TYPES_URI,
+    MetadataCacheError,
+    MetadataCacheLookup,
+    MetadataSessionIdentity,
+    SessionMetadataCache,
+)
 from wwise_waapi.builders.query import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_QUERY_TAKE,
     SUPPORTED_SELECTS,
@@ -197,6 +213,7 @@ OFFLINE_COMMANDS = frozenset(
         "describe",
         "operations",
         "operation-schema",
+        "object-types",
         "config-show",
         "config-set",
         "transaction-show",
@@ -237,6 +254,11 @@ MAX_GATEWAY_JSON_INPUT_BYTES = 256 * 1024
 MAX_GATEWAY_JSON_DEPTH = 32
 MAX_GATEWAY_JSON_NODES = 10_000
 MAX_GATEWAY_JSON_STRING_BYTES = 64 * 1024
+# Transaction preview is the sole public JSON lane that accepts inline audio.
+# Keep its envelope well below macOS argv limits while allowing one reviewed
+# 180 KiB decoded WAV (roughly 240 KiB of canonical Base64).
+MAX_PREVIEW_JSON_INPUT_BYTES = 384 * 1024
+MAX_PREVIEW_JSON_STRING_BYTES = 256 * 1024
 # ``transaction-show --summary-only`` must carry the exact immutable request,
 # but every other review field has a closed projection.  This ceiling bounds
 # that summary fragment independently of request complexity; the small outer
@@ -286,6 +308,9 @@ MAX_MEDIA_POOL_RETURN_FIELDS = 32
 MAX_MEDIA_POOL_SEARCH_TEXT_CHARS = 1024
 MAX_MEDIA_POOL_FILTER_TOKEN_CHARS = 256
 MAX_MEDIA_POOL_FILTER_VALUE_CHARS = 4096
+SELECTED_REQUIRED_RETURN_FIELDS = ("id", "name", "type", "path")
+MAX_SELECTED_RETURN_FIELDS = 32
+MAX_SELECTED_RETURN_FIELD_CHARS = 256
 MEDIA_POOL_FLOAT_FILTER_FIELDS_BY_VERSION: Mapping[str, frozenset[str]] = {
     "2025.1": frozenset({"WAV/Duration"}),
 }
@@ -295,6 +320,7 @@ ORIGINAL_FILE_REFERENCE_RETURN_FIELDS = ("id", "path", "originalFilePath")
 MAX_ORIGINAL_FILE_PATH_CANDIDATES = 64
 MAX_ORIGINAL_FILE_PATH_BYTES = 1024
 MAX_ORIGINAL_FILE_REFERENCE_PATH_BYTES = 512
+_METADATA_SESSION_CACHE = SessionMetadataCache()
 MAX_ORIGINAL_FILE_REFERENCE_DETAILS_PER_CANDIDATE = 4
 MAX_ORIGINAL_FILE_REFERENCE_DETAILS = (
     MAX_ORIGINAL_FILE_PATH_CANDIDATES
@@ -912,7 +938,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("status", help="Return live Wwise version and current project information")
     subparsers.add_parser("buses", help="Return all Bus objects with id, name, type, and path")
-    subparsers.add_parser("selected", help="Return current UI selection or a clear command-line/UI boundary")
+    selected = subparsers.add_parser(
+        "selected",
+        help="Return current UI selection or a clear command-line/UI boundary",
+    )
+    selected.add_argument(
+        "--return-field",
+        action="append",
+        dest="return_fields",
+        help=(
+            "Add one bounded object accessor to the selected-object projection; "
+            "id, name, type, and path are always retained"
+        ),
+    )
     subparsers.add_parser(
         "project-default-work-units",
         help="Report version-aware default project Work Units without fabricating unavailable fields",
@@ -1166,6 +1204,38 @@ def build_parser() -> argparse.ArgumentParser:
     )
     operation_schema.add_argument("operation")
 
+    object_types = subparsers.add_parser(
+        "object-types",
+        help=(
+            "Search the compact packaged Wwise object-type catalog without "
+            "connecting to Wwise"
+        ),
+    )
+    object_types.add_argument("--all-versions", action="store_true")
+    object_types.add_argument(
+        "--query",
+        help="Case-insensitive name/category keywords; all keywords must match",
+    )
+    object_types.add_argument(
+        "--object-type",
+        help="Exact broad type/category filter, for example WObject or Conversion",
+    )
+    object_types.add_argument(
+        "--limit",
+        type=int,
+        default=20,
+        metavar=f"1..{MAX_OBJECT_TYPE_SEARCH_RESULTS}",
+        help=(
+            "Maximum rows returned per version; defaults to 20 and is capped "
+            f"at {MAX_OBJECT_TYPE_SEARCH_RESULTS}"
+        ),
+    )
+    object_types.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="Return only packaged catalog counts and digests",
+    )
+
     subparsers.add_parser(
         "config-show",
         help="Show effective public config and its external/legacy source without connecting to Wwise",
@@ -1339,6 +1409,10 @@ def _execute_gateway_unconstrained(
         if route_boundary is not None:
             return finish(2, route_boundary)
         preflight_json_inputs(args)
+        if args.command == "selected":
+            args.return_fields = list(
+                normalize_selected_return_fields(args.return_fields)
+            )
         if args.command == "query-object":
             preflight_query_object_input(args, env=source_env)
         if args.command == "metadata":
@@ -2462,7 +2536,7 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
                 f"wait-topic --event-count must be between 1 and {MAX_WAIT_EVENT_COUNT}"
             )
     elif args.command == "preview":
-        parse_json_object(args.request_json, "--request-json")
+        parse_preview_request_object(args.request_json)
     elif args.command == "debug-validate-call":
         for field_name, option_name in (
             ("args_json", "--args-json"),
@@ -2614,6 +2688,82 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "versions": list(versions),
             "schema_detail": "full" if args.full_schema else "summary",
             "availability": availability,
+        }
+    if args.command == "object-types":
+        if (
+            isinstance(args.limit, bool)
+            or not isinstance(args.limit, int)
+            or not 1 <= args.limit <= MAX_OBJECT_TYPE_SEARCH_RESULTS
+        ):
+            raise GatewayInputError(
+                "object-types --limit must be an integer from 1 to "
+                f"{MAX_OBJECT_TYPE_SEARCH_RESULTS}"
+            )
+        if args.summary_only and (
+            args.query is not None or args.object_type is not None
+        ):
+            raise GatewayInputError(
+                "object-types --summary-only cannot be combined with "
+                "--query or --object-type because summary counts describe the "
+                "complete packaged catalog"
+            )
+        versions = resolve_catalog_versions(args, env=env)
+        store = ObjectTypeCatalogStore()
+        catalogs: dict[str, Any] = {}
+        total_matches = 0
+        total_returned = 0
+        for version in versions:
+            try:
+                catalog = store.load(version)
+                matches = (
+                    ()
+                    if args.summary_only
+                    else catalog.search(
+                        args.query,
+                        object_type=args.object_type,
+                        limit=args.limit,
+                    )
+                )
+            except (MetadataCatalogError, MetadataCatalogMissingError) as exc:
+                raise GatewayInputError(
+                    f"Packaged object-type metadata is invalid for Wwise "
+                    f"{version}: {exc}"
+                ) from exc
+            if args.summary_only:
+                match_count: int | None = None
+                returned = 0
+            else:
+                # ``search`` deliberately returns a bounded page.  Report
+                # whether the page is full without loading the complete
+                # catalog into the agent response.
+                match_count = len(matches)
+                returned = len(matches)
+                total_matches += match_count
+                total_returned += returned
+            row: dict[str, Any] = {
+                **catalog.as_summary(),
+                "filters": {
+                    "query": args.query,
+                    "object_type": args.object_type,
+                },
+                "returned_count": returned,
+            }
+            if match_count is not None:
+                row["match_count_in_bounded_page"] = match_count
+                row["page_full"] = match_count == args.limit
+                row["types"] = [record.as_dict() for record in matches]
+            catalogs[version] = row
+        return {
+            "contract": GATEWAY_RESULT_CONTRACT,
+            "ok": True,
+            "status": "ok",
+            "command": "object-types",
+            "offline": True,
+            "versions": list(versions),
+            "summary_only": bool(args.summary_only),
+            "returned_count": total_returned,
+            "match_count_in_bounded_pages": total_matches,
+            "catalogs": catalogs,
         }
     if args.command == "operations":
         operations = [
@@ -3991,13 +4141,39 @@ def dispatch_command(
             ),
         }
     if args.command == "selected":
+        return_fields = normalize_selected_return_fields(args.return_fields)
+        request_validation = None
+        try:
+            selected_capability = CapabilityCatalog().describe(
+                detected_version,
+                GET_SELECTED_URI,
+            )
+        except CapabilityNotFoundError:
+            # Preserve the existing explicit absent-from-manifest boundary and
+            # its dispatcher evidence for versions without this reflected API.
+            pass
+        else:
+            if (
+                selected_capability.preferred_route != "fixed_command"
+                or "selected" not in selected_capability.fixed_commands
+            ):
+                raise GatewayInputError(
+                    f"{GET_SELECTED_URI} is not bound to the packaged selected route "
+                    f"in Wwise {detected_version}"
+                )
+            request_validation = validate_semantic_payload(
+                GET_SELECTED_URI,
+                {},
+                {"return": list(return_fields)},
+                version=detected_version,
+            )
         result = dispatch(
             dispatcher,
             GET_SELECTED_URI,
             connection=connection,
             version=detected_version,
             args={},
-            options={"return": ["id", "name", "type", "path"]},
+            options={"return": list(return_fields)},
         )
         if not result.get("ok") and selected_ui_boundary(result, live_info=live_info):
             absent = result.get("error_code") == "API_NOT_FOUND"
@@ -4007,6 +4183,15 @@ def dispatch_command(
                 **common,
                 "api_attempted": GET_SELECTED_URI,
                 "call": dispatch_call_summary(result),
+                "return_fields": list(return_fields),
+                "schema_validation": {
+                    "request": (
+                        request_validation.as_dict()
+                        if request_validation is not None
+                        else None
+                    ),
+                    "result": None,
+                },
                 "message": (
                     "ak.wwise.ui.getSelectedObjects is absent from this version's packaged manifest."
                     if absent
@@ -4019,12 +4204,34 @@ def dispatch_command(
                 "objects": None,
             }
         rows = strict_selected_rows(result) if result.get("ok") else []
+        result_validation = (
+            validate_semantic_result(
+                GET_SELECTED_URI,
+                result.get("result"),
+                version=detected_version,
+            )
+            if result.get("ok")
+            else None
+        )
         return {
             "ok": bool(result.get("ok")),
             "status": "ok" if result.get("ok") else "error",
             **common,
             "api_attempted": GET_SELECTED_URI,
             "call": dispatch_call_summary(result),
+            "return_fields": list(return_fields),
+            "schema_validation": {
+                "request": (
+                    request_validation.as_dict()
+                    if request_validation is not None
+                    else None
+                ),
+                "result": (
+                    result_validation.as_dict()
+                    if result_validation is not None
+                    else None
+                ),
+            },
             "count": len(rows) if result.get("ok") else None,
             "objects": rows if result.get("ok") else None,
         }
@@ -4808,7 +5015,7 @@ def dispatch_transaction_command(
         version=detected_version,
     )
     if args.command == "preview":
-        request_payload = parse_json_object(args.request_json, "--request-json")
+        request_payload = parse_preview_request_object(args.request_json)
         authoring_boundary = live_authoring_transaction_boundary(
             request_payload,
             command="preview",
@@ -4851,6 +5058,14 @@ def dispatch_transaction_command(
             project=project,
             project_guard_mode=project_guard_mode,
             target_project_path=target_project_path,
+        )
+        read_call = metadata_cached_transaction_read_call(
+            read_call,
+            connection=connection,
+            version=detected_version,
+            live_info=live_info,
+            project=project,
+            state_dir=state_dir,
         )
         artifact = build_transaction_artifact(
             request_payload,
@@ -7606,6 +7821,34 @@ def strict_object_get_rows(
     return [dict(row) for row in rows]
 
 
+def normalize_selected_return_fields(
+    requested: Sequence[str] | None,
+) -> tuple[str, ...]:
+    """Return a bounded projection while retaining stable selection identity."""
+
+    fields = list(SELECTED_REQUIRED_RETURN_FIELDS)
+    for value in requested or ():
+        if (
+            not isinstance(value, str)
+            or not value
+            or value != value.strip()
+            or len(value) > MAX_SELECTED_RETURN_FIELD_CHARS
+            or any(ord(character) < 0x20 for character in value)
+        ):
+            raise GatewayInputError(
+                "selected --return-field values must be non-empty, trimmed "
+                f"accessors of at most {MAX_SELECTED_RETURN_FIELD_CHARS} characters"
+            )
+        if value not in fields:
+            fields.append(value)
+        if len(fields) > MAX_SELECTED_RETURN_FIELDS:
+            raise GatewayInputError(
+                f"selected accepts at most {MAX_SELECTED_RETURN_FIELDS} unique "
+                "return fields including id, name, type, and path"
+            )
+    return tuple(fields)
+
+
 def strict_selected_rows(result: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Require the exact documented selected-object success shape."""
 
@@ -7648,7 +7891,7 @@ def strict_selected_rows(result: Mapping[str, Any]) -> list[dict[str, Any]]:
     invalid_field_rows = {
         index: [
             field
-            for field in ("id", "name", "type", "path")
+            for field in SELECTED_REQUIRED_RETURN_FIELDS
             if not isinstance(row.get(field), str) or not str(row.get(field)).strip()
         ]
         for index, row in enumerate(rows)
@@ -7662,7 +7905,7 @@ def strict_selected_rows(result: Mapping[str, Any]) -> list[dict[str, Any]]:
             "selected returned rows without id, name, type, and path strings.",
             details={
                 "command": "selected",
-                "required_string_fields": ["id", "name", "type", "path"],
+                "required_string_fields": list(SELECTED_REQUIRED_RETURN_FIELDS),
                 "invalid_rows": invalid_field_rows,
                 "evidence_path": result.get("evidence_path"),
             },
@@ -8772,11 +9015,190 @@ def transaction_read_call(
 
     return read
 
-def parse_json_object(text: str, option_name: str) -> dict[str, Any]:
-    payload = parse_strict_json(text, option_name)
+
+def metadata_cached_transaction_read_call(
+    read_call: Callable[
+        [str, Mapping[str, Any], Mapping[str, Any]],
+        Mapping[str, Any],
+    ],
+    *,
+    connection: GatewayConnection,
+    version: str,
+    live_info: Mapping[str, Any],
+    project: Mapping[str, Any] | None,
+    state_dir: Path,
+) -> Callable[
+    [str, Mapping[str, Any], Mapping[str, Any]],
+    Mapping[str, Any],
+]:
+    """Memoize immutable metadata reads for one exact live Wwise session.
+
+    The cache is never an authority for dynamic values.  Its identity binds the
+    endpoint, Wwise build/schema/session/process, project, and packaged
+    object-type catalog digest.  If any identity fact is unavailable, the
+    gateway safely retains the uncached read path.
+    """
+
+    if project is None or not isinstance(state_dir, Path) or not state_dir.is_absolute():
+        return read_call
+    try:
+        catalog = ObjectTypeCatalogStore().load(version)
+        identity = MetadataSessionIdentity.from_live_context(
+            endpoint=connection.url,
+            live_info=live_info,
+            project=project,
+            resource_digest=catalog.resource_sha256,
+        )
+    except (
+        MetadataCacheError,
+        MetadataCatalogError,
+        MetadataCatalogMissingError,
+    ):
+        return read_call
+    try:
+        durable_cache: DurableMetadataCache | None = DurableMetadataCache(
+            state_dir=state_dir,
+        )
+    except MetadataCacheError:
+        durable_cache = None
+    preview_cache = SessionMetadataCache()
+
+    def cached_read(
+        uri: str,
+        args: Mapping[str, Any],
+        options: Mapping[str, Any],
+    ) -> Mapping[str, Any]:
+        lookup = metadata_cache_lookup(uri, args=args, options=options)
+        if lookup is None:
+            return read_call(uri, args, options)
+        hot_cache = (
+            _METADATA_SESSION_CACHE
+            if lookup.durable_safe
+            else preview_cache
+        )
+        cached = hot_cache.get(identity, lookup)
+        if cached is not None:
+            if not isinstance(cached, Mapping):  # pragma: no cover - cache invariant
+                raise OperationContractError(
+                    "INVALID_METADATA_CACHE",
+                    "A cached metadata result is not a JSON object.",
+                    details={"uri": uri},
+                )
+            return dict(cached)
+        durable = (
+            durable_cache.get(identity, lookup)
+            if durable_cache is not None
+            else None
+        )
+        if isinstance(durable, Mapping) and valid_metadata_cache_result(
+            lookup,
+            durable,
+        ):
+            try:
+                hot_cache.put(identity, lookup, durable)
+            except MetadataCacheError:
+                pass
+            return dict(durable)
+        result = read_call(uri, args, options)
+        if not valid_metadata_cache_result(lookup, result):
+            return result
+        try:
+            hot_cache.put(identity, lookup, result)
+        except MetadataCacheError:
+            # Oversized or otherwise uncacheable results still remain valid
+            # live evidence for this transaction; caching is only an
+            # optimization and must not block the operation.
+            pass
+        else:
+            if durable_cache is not None:
+                durable_cache.put(identity, lookup, result)
+        return result
+
+    return cached_read
+
+
+def valid_metadata_cache_result(
+    lookup: MetadataCacheLookup,
+    result: Mapping[str, Any],
+) -> bool:
+    """Accept only parsed metadata successes into either cache layer."""
+
+    try:
+        if lookup.uri == CACHE_GET_TYPES_URI:
+            return bool(parse_get_types_result(result))
+        if lookup.uri == GET_PROPERTY_AND_REFERENCE_NAMES_URI:
+            parse_property_and_reference_names_result(result)
+            return True
+        if lookup.uri == CACHE_GET_PROPERTY_INFO_URI:
+            info = parse_get_property_info_result(result)
+            return info.name == lookup.property_name
+    except (SemanticValidationError, TypeError, ValueError):
+        return False
+    return False
+
+
+def metadata_cache_lookup(
+    uri: str,
+    *,
+    args: Mapping[str, Any],
+    options: Mapping[str, Any],
+) -> MetadataCacheLookup | None:
+    """Translate only exact reviewed metadata calls into cache keys."""
+
+    if options or not isinstance(args, Mapping):
+        return None
+    try:
+        if uri == CACHE_GET_TYPES_URI and not args:
+            return MetadataCacheLookup.types()
+        if uri == GET_PROPERTY_AND_REFERENCE_NAMES_URI:
+            if set(args) == {"classId"}:
+                return MetadataCacheLookup.names(class_id=args["classId"])
+            if set(args) == {"object"}:
+                return MetadataCacheLookup.names(object_id=args["object"])
+            return None
+        if uri == CACHE_GET_PROPERTY_INFO_URI:
+            if set(args) == {"classId", "property"}:
+                return MetadataCacheLookup.property_info(
+                    class_id=args["classId"],
+                    property_name=args["property"],
+                )
+            if set(args) == {"object", "property"}:
+                return MetadataCacheLookup.property_info(
+                    object_id=args["object"],
+                    property_name=args["property"],
+                )
+    except MetadataCacheError:
+        return None
+    return None
+
+
+def parse_json_object(
+    text: str,
+    option_name: str,
+    *,
+    max_document_bytes: int = MAX_GATEWAY_JSON_INPUT_BYTES,
+    max_string_bytes: int = MAX_GATEWAY_JSON_STRING_BYTES,
+) -> dict[str, Any]:
+    payload = parse_strict_json(
+        text,
+        option_name,
+        max_document_bytes=max_document_bytes,
+        max_string_bytes=max_string_bytes,
+    )
     if not isinstance(payload, dict):
         raise GatewayInputError(f"{option_name} must decode to a JSON object")
     return payload
+
+
+def parse_preview_request_object(text: str) -> dict[str, Any]:
+    """Parse the larger, still argv-safe preview envelope used by inline audio."""
+
+    return parse_json_object(
+        text,
+        "--request-json",
+        max_document_bytes=MAX_PREVIEW_JSON_INPUT_BYTES,
+        max_string_bytes=MAX_PREVIEW_JSON_STRING_BYTES,
+    )
 
 
 def parse_optional_json(text: str | None, option_name: str) -> Any:
@@ -8785,7 +9207,13 @@ def parse_optional_json(text: str | None, option_name: str) -> Any:
     return parse_strict_json(text, option_name)
 
 
-def parse_strict_json(text: str, option_name: str) -> Any:
+def parse_strict_json(
+    text: str,
+    option_name: str,
+    *,
+    max_document_bytes: int = MAX_GATEWAY_JSON_INPUT_BYTES,
+    max_string_bytes: int = MAX_GATEWAY_JSON_STRING_BYTES,
+) -> Any:
     """Parse one bounded strict JSON document and validate its value graph."""
 
     if not isinstance(text, str):
@@ -8794,9 +9222,9 @@ def parse_strict_json(text: str, option_name: str) -> Any:
         encoded_size = len(text.encode("utf-8"))
     except UnicodeEncodeError as exc:
         raise GatewayInputError(f"{option_name} must contain valid Unicode") from exc
-    if encoded_size > MAX_GATEWAY_JSON_INPUT_BYTES:
+    if encoded_size > max_document_bytes:
         raise GatewayInputError(
-            f"{option_name} exceeds the {MAX_GATEWAY_JSON_INPUT_BYTES}-byte JSON input limit"
+            f"{option_name} exceeds the {max_document_bytes}-byte JSON input limit"
         )
     try:
         payload = json.loads(
@@ -8813,7 +9241,11 @@ def parse_strict_json(text: str, option_name: str) -> Any:
         ) from exc
     except ValueError as exc:
         raise GatewayInputError(f"{option_name} must be strict JSON: {exc}") from exc
-    _validate_gateway_json_graph(payload, option_name=option_name)
+    _validate_gateway_json_graph(
+        payload,
+        option_name=option_name,
+        max_string_bytes=max_string_bytes,
+    )
     return payload
 
 
@@ -9262,7 +9694,12 @@ def _reject_duplicate_gateway_json_keys(pairs: list[tuple[str, Any]]) -> dict[st
     return payload
 
 
-def _validate_gateway_json_graph(value: Any, *, option_name: str) -> None:
+def _validate_gateway_json_graph(
+    value: Any,
+    *,
+    option_name: str,
+    max_string_bytes: int = MAX_GATEWAY_JSON_STRING_BYTES,
+) -> None:
     stack: list[tuple[Any, int]] = [(value, 1)]
     nodes = 0
     while stack:
@@ -9277,7 +9714,11 @@ def _validate_gateway_json_graph(value: Any, *, option_name: str) -> None:
                 f"{option_name} exceeds the {MAX_GATEWAY_JSON_NODES}-node JSON input limit"
             )
         if isinstance(current, str):
-            _validate_gateway_json_string(current, option_name=option_name)
+            _validate_gateway_json_string(
+                current,
+                option_name=option_name,
+                max_string_bytes=max_string_bytes,
+            )
             continue
         if isinstance(current, float) and not math.isfinite(current):
             raise GatewayInputError(f"{option_name} must not contain non-finite numbers")
@@ -9288,21 +9729,30 @@ def _validate_gateway_json_graph(value: Any, *, option_name: str) -> None:
                     f"{option_name} exceeds the {MAX_GATEWAY_JSON_NODES}-node JSON input limit"
                 )
             for key, item in current.items():
-                _validate_gateway_json_string(key, option_name=option_name)
+                _validate_gateway_json_string(
+                    key,
+                    option_name=option_name,
+                    max_string_bytes=max_string_bytes,
+                )
                 stack.append((item, depth + 1))
         elif isinstance(current, list):
             stack.extend((item, depth + 1) for item in current)
 
 
-def _validate_gateway_json_string(value: str, *, option_name: str) -> None:
+def _validate_gateway_json_string(
+    value: str,
+    *,
+    option_name: str,
+    max_string_bytes: int = MAX_GATEWAY_JSON_STRING_BYTES,
+) -> None:
     try:
         size = len(value.encode("utf-8"))
     except UnicodeEncodeError as exc:
         raise GatewayInputError(f"{option_name} must contain valid Unicode") from exc
-    if size > MAX_GATEWAY_JSON_STRING_BYTES:
+    if size > max_string_bytes:
         raise GatewayInputError(
             f"{option_name} contains a string longer than the "
-            f"{MAX_GATEWAY_JSON_STRING_BYTES}-byte string limit"
+            f"{max_string_bytes}-byte string limit"
         )
 
 

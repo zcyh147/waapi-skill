@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import math
 from collections import Counter
+from copy import deepcopy
 from typing import Mapping
+
+import pytest
 
 from wwise_waapi.authorization import (
     DEFAULT_TRANSACTION_AUTHORIZATION_MODES,
@@ -18,6 +21,14 @@ from wwise_waapi.execution_contracts import (
     PROJECT_GUARD_TRANSITION_TO_NONE,
     PROJECT_GUARD_TRANSITION_TO_PATH,
     ExecutionContractRegistry,
+)
+from wwise_waapi.native_surface_policy import (
+    NativeSurfacePolicyError,
+    load_native_surface_policy,
+    validate_native_surface_policy,
+)
+from wwise_waapi.operation_registry import (
+    FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS,
 )
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 
@@ -241,3 +252,142 @@ def test_managed_session_openers_name_version_valid_companion_routes() -> None:
                 assert companion in by_uri
                 assert by_uri[companion].executable is True
                 assert by_uri[companion].lifecycle_strategy == "session_close"
+
+
+def test_native_surface_policy_partitions_every_function_and_binds_high_risk_differences() -> None:
+    summary = validate_native_surface_policy()
+
+    assert summary["route_audit"] == {
+        "contract": "waapi-skill.public-function-route-audit/v1",
+        "profiles": {
+            "wwise-console": {
+                "function_rows": 662,
+                "unique_function_uris": 167,
+                "generic_reflected_rows": 450,
+                "generic_reflected_unique_uris": 118,
+                "special_rows": 212,
+                "special_unique_uris": 49,
+            },
+            "wwise-authoring-ui": {
+                "function_rows": 670,
+                "unique_function_uris": 167,
+                "generic_reflected_rows": 452,
+                "generic_reflected_unique_uris": 118,
+                "special_rows": 218,
+                "special_unique_uris": 49,
+            },
+        },
+        "reviewed_special_uri_count": 49,
+        "reviewed_generic_restriction_count": 6,
+    }
+    assert summary["version_rows"] == 67
+    assert summary["rules"] == 31
+    assert summary["scopes"] == 161
+    assert summary["schema_selectors"] == 738
+    assert summary["semantic_boundaries"] == 47
+    assert sum(summary["selectors_by_status"].values()) == 738
+    assert summary["selectors_by_status"]["intentionally_blocked"] > 0
+    assert summary["selectors_by_status"]["missing"] == 0
+
+
+def test_native_surface_policy_records_closed_import_semantic_boundaries() -> None:
+    payload = load_native_surface_policy()
+    rules = payload["rules"]
+    direct_rules = [
+        rule for rule in rules if rule["uri"] == "ak.wwise.core.audio.import"
+    ]
+    tab_rules = [
+        rule
+        for rule in rules
+        if rule["uri"] == "ak.wwise.core.audio.importTabDelimited"
+    ]
+
+    for rule in direct_rules:
+        boundaries = {
+            row["selector"]: row["status"]
+            for row in rule["semantic_boundaries"]
+        }
+        assert boundaries[
+            "args.imports[].event::relative-existing-or-duplicate-target"
+        ] == "intentionally_blocked"
+        assert boundaries[
+            "args.default-or-imports[].pattern:@reference::childOfReference"
+        ] == "intentionally_blocked"
+
+    for rule in tab_rules:
+        boundaries = {
+            row["selector"]: row["status"]
+            for row in rule["semantic_boundaries"]
+        }
+        assert boundaries[
+            "tab-columns.Event::relative-existing-or-duplicate-target"
+        ] == "intentionally_blocked"
+        assert boundaries[
+            "tab-columns.Reference[]-or-@reference::childOfReference"
+        ] == "intentionally_blocked"
+        assert boundaries[
+            "tab-columns.Object Path::blank-audio-name-inference"
+        ] == "intentionally_blocked"
+        assert boundaries[
+            "tab-columns.Audio File::relative-to-import-file"
+        ] == "intentionally_blocked"
+
+
+def test_native_surface_policy_rejects_an_unreviewed_special_route() -> None:
+    payload = deepcopy(load_native_surface_policy())
+    payload["route_audit"]["reviewed_special_uris"].pop()
+
+    with pytest.raises(
+        NativeSurfacePolicyError,
+        match="special URI inventory changed",
+    ):
+        validate_native_surface_policy(payload)
+
+
+def test_native_surface_policy_rejects_an_unreviewed_generic_restriction() -> None:
+    payload = deepcopy(load_native_surface_policy())
+    payload["route_audit"]["reviewed_generic_restrictions"].pop(
+        "ak.wwise.core.mediaPool.get"
+    )
+
+    with pytest.raises(
+        NativeSurfacePolicyError,
+        match="generic restriction inventory changed",
+    ):
+        validate_native_surface_policy(payload)
+
+
+def test_native_surface_policy_rejects_one_unclassified_reflected_field() -> None:
+    payload = deepcopy(load_native_surface_policy())
+    first_scope = payload["rules"][0]["scopes"][0]["classifications"]
+    removed = first_scope["mapped"].pop()
+
+    with pytest.raises(
+        NativeSurfacePolicyError,
+        match=rf"unclassified=.*{removed}",
+    ):
+        validate_native_surface_policy(payload)
+
+
+def test_native_surface_policy_owns_the_generic_custom_command_blocks() -> None:
+    payload = load_native_surface_policy()
+    reviewed: dict[tuple[str, str], set[str]] = {}
+    for rule in payload["rules"]:
+        uri = rule["uri"]
+        if uri not in FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS:
+            continue
+        args_scope = next(
+            scope for scope in rule["scopes"] if scope["pointer"] == "/argsSchema"
+        )
+        blocked = set(
+            args_scope["classifications"]["intentionally_blocked"]
+        )
+        for version in rule["versions"]:
+            reviewed[(version, uri)] = blocked
+
+    expected = {
+        (version, uri): set(fields)
+        for version in SUPPORTED_WWISE_VERSION_KEYS
+        for uri, fields in FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS.items()
+    }
+    assert reviewed == expected

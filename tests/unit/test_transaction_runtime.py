@@ -179,7 +179,7 @@ def test_runtime_guard_detects_any_packaged_builder_change(tmp_path: Path) -> No
 @pytest.mark.parametrize(
     "relative_path",
     (
-        "wwise_waapi/builders/imports.py",
+        "wwise_waapi/operation_import.py",
         "wwise_waapi/builders/soundbank.py",
         "wwise_waapi/builders/switchcontainer.py",
         "wwise_waapi/builders/container_suitability.py",

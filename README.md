@@ -45,6 +45,8 @@ The skill does not front-load every reference file into context.
 It loads only the resources needed for the current task and version, including:
 
 - `resources/manifest/<version>/`
+- `resources/metadata/<version>/object-types.json`
+- `resources/native_surface_policy.json`
 - `resources/semantic/<version>/`
 - `resources/waql/<version>/`
 - `resources/deferred/<version>.json`
@@ -144,6 +146,31 @@ Inspect either packaged profile offline with
 `gateway.py capabilities --profile wwise-authoring-ui`; this catalog option
 cannot override the profile detected from a live host.
 
+The complete five-version public Function audit contains 167 unique URIs.
+Of those, 118 use the generic reflected-schema route without a URI-specific
+restriction; 49 use a fixed command, dedicated transaction, or one of six
+generic routes with an explicit field/value/combination restriction. Common
+time, size, result, and safety ceilings still apply to every generic call. The
+packaged native-surface policy pins that complete 118/49 partition and gives selector-level
+classifications for the 15 high-risk URIs whose public request shape differs
+materially from reflection. A normalized equivalent—such as a typed
+`properties` row that becomes native `@Property` syntax—keeps the business
+capability without exposing an unchecked raw escape hatch. Fields intentionally
+blocked by the policy are implementation internals, arbitrary process hooks, or
+forms whose effect cannot be safely bound and verified; they are not silently
+dropped.
+
+Object-type discovery has a separate compact, versioned index generated from
+real `ak.wwise.core.object.getTypes` results. The five catalogs contain 105,
+107, 109, 109, and 125 rows respectively and occupy about 55 KiB in total.
+`gateway.py object-types` searches that index offline and returns a bounded
+page rather than putting every type into the agent context. Live property and
+reference metadata remains authoritative for mutations. Stable type and
+class-scoped metadata reads may be reused across gateway invocations only while
+the endpoint, full Wwise build/schema/session/process, project, and packaged
+catalog digest all still match. Object-scoped metadata is reused only inside one
+preview, while dynamic enablement and curve state are never cached.
+
 Both profiles route APIs through fixed commands, bounded direct calls, bounded
 topic waits, policy-gated transactions, isolated I/O transactions, or the
 same-connection Undo Group composite. Lua file routes accept only an existing
@@ -154,9 +181,9 @@ repairs, or wraps Lua. Private debug APIs use bounded reads/topics or explicit
 non-retry transactions, with restart/assert/crash terminating in an
 indeterminate lifecycle result.
 
-The named operation layer also provides closed, version-aware business contracts for object creation and mutation, plug-in creation, RTPC/platform-link editing, audio import, SoundBank workflows, Lua/debug operations, screenshots, and Authoring UI command execution/registration/unregistration. `object.createPlugin` accepts only an exact class ID and a closed Source/Effect descriptor, uses fixed Effect references in `2022.1` or an appended EffectSlot in later versions, and verifies the created plug-in through live readback. UI command execution verifies only the reflected empty result—not the arbitrary GUI or project effect—while registration and unregistration additionally verify live command-ID membership. For `soundbank.generate`, Wwise `2021.1` derives its project and output context from the live Project object's `filePath` and `workunitIsDirty` accessors plus a contained, hashed, strictly parsed `.wproj`; no caller-authored project layout is accepted. Later versions bind the reflected `core.getProjectInfo` result. These routes bind an immutable preview to explicit confirmation or durable `allow_changes` authority and use the strongest available operation-specific readback instead of trusting only a successful WAAPI response. Once a URI has an implemented dedicated operation, the generic `waapi.call` fallback is rejected with `DEDICATED_OPERATION_REQUIRED` so raw payloads cannot bypass that contract.
+The named operation layer also provides closed, version-aware business contracts for object creation and mutation, plug-in creation, RTPC/platform-link editing, audio import, SoundBank workflows, Lua/debug operations, screenshots, and Authoring UI command execution/registration/unregistration. Direct `audio.import` now accepts defaults, per-row import locations, file or bounded WAV base64 sources, structure-only rows, properties, references, Event/Dialogue Event/Switch directives, and source-control options; the tab-delimited lane recognizes the corresponding native columns and repeated Event fields. Property and reference tokens are validated against live class metadata and folded into the same immutable import transaction, so an agent does not need to pre-query each property and then issue a second mutation. `object.create` and `object.set` expose their reviewed platform, list, rename, source-control, recursive child, property, reference, plug-in, and RTPC forms through closed descriptors with drift-aware readback. In particular, recursive `object.set` platform/language fields are available from `2022.1`, and its per-object audio-import descriptors—including file/Base64 source, Originals subfolder, language, and live-resolved source type—are available from `2023.1`, matching the reflected version boundaries. `object.createPlugin` accepts only an exact class ID and a closed Source/Effect descriptor, uses fixed Effect references in `2022.1` or an appended EffectSlot in later versions, and verifies the created plug-in through live readback. UI command execution verifies only the reflected empty result—not the arbitrary GUI or project effect—while registration and unregistration additionally verify live command-ID membership. For `soundbank.generate`, Wwise `2021.1` derives its project and output context from the live Project object's `filePath` and `workunitIsDirty` accessors plus a contained, hashed, strictly parsed `.wproj`; no caller-authored project layout is accepted. Later versions bind the reflected `core.getProjectInfo` result. These routes bind an immutable preview to explicit confirmation or durable `allow_changes` authority and use the strongest available operation-specific readback instead of trusting only a successful WAAPI response. Once a URI has an implemented dedicated operation, the generic `waapi.call` fallback is rejected with `DEDICATED_OPERATION_REQUIRED` so raw payloads cannot bypass that contract.
 
-The focused code-only gate currently runs **1932 program tests**, including one packaged-route-contract case for every covered default-profile version/API row, the separate Authoring overlay/UI-command contracts, the configurable and explicitly unbounded topic-wait lifecycle, the three modification-policy branches (including catalog-proven read transactions under `read_only`), the gateway-owned conversation-context contract, and the named-operation contract/verifier matrices above. This proves packaged routing, schema handling, safety boundaries, I/O confinement, transaction behavior, fake-dispatch execution, and deterministic onboarding facts; it is not a claim that all 808 rows have been exercised against a real Wwise process. For the current policy candidate, the memory-off `modification_policy_9-c7` campaign passed all nine Wwise 2022.1 tasks: three isolated repetitions each of `read_only`, question-style `ask_before_changes`, and same-turn `allow_changes`. Its six authorized write tasks each created and verified seven objects through 46 business assertions, while all source-project hashes remained unchanged and every sandbox was cleaned. The earlier memory-off `h80-release-c38` campaign separately passed all 80 approved real-Wwise heavy-API scenarios (70 on 2022.1, five on 2024.1, and five on 2025.1); that historical evidence applies to those scenarios and its sealed candidate, not the whole interface or this later policy candidate. See [the detailed five-version coverage contract](./skills/waapi-skill/references/waapi-coverage.md).
+The focused code-only gate currently runs **2046 program tests**, including one packaged-route-contract case for every covered default-profile version/API row, the separate Authoring overlay/UI-command contracts, business-intent selection guidance for overlapping operations, the configurable and explicitly unbounded topic-wait lifecycle, the three modification-policy branches (including catalog-proven read transactions under `read_only`), the gateway-owned conversation-context contract, and the named-operation contract/verifier matrices above. This proves packaged routing, schema handling, safety boundaries, I/O confinement, transaction behavior, fake-dispatch execution, and deterministic onboarding facts; it is not a claim that all 808 rows have been exercised against a real Wwise process. For the current policy candidate, the memory-off `modification_policy_9-c7` campaign passed all nine Wwise 2022.1 tasks: three isolated repetitions each of `read_only`, question-style `ask_before_changes`, and same-turn `allow_changes`. Its six authorized write tasks each created and verified seven objects through 46 business assertions, while all source-project hashes remained unchanged and every sandbox was cleaned. The earlier memory-off `h80-release-c38` campaign separately passed all 80 approved real-Wwise heavy-API scenarios (70 on 2022.1, five on 2024.1, and five on 2025.1); that historical evidence applies to those scenarios and its sealed candidate, not the whole interface or this later policy candidate. See [the detailed five-version coverage contract](./skills/waapi-skill/references/waapi-coverage.md).
 
 ---
 
@@ -284,6 +311,7 @@ Check the live version/project and query objects without composing WAAPI code:
 
 ```bash
 python scripts/run.py gateway.py status
+python scripts/run.py gateway.py object-types --query 'audio source' --limit 20
 python scripts/run.py gateway.py query-object \
   --path '\Events\Default Work Unit' \
   --return-field id --return-field name --return-field type --return-field path

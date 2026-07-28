@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from collections import deque
 import os
 from pathlib import Path
@@ -34,6 +35,15 @@ OLD_ROOT = r"\Actor-Mixer Hierarchy\Default Work Unit"
 NEW_ROOT = r"\Containers\Default Work Unit"
 WWISE_2021_PROJECT_ID = "{16164796-C6E6-491A-8799-C42A33110A84}"
 WWISE_2021_PROJECT = Path(__file__).resolve().parents[1] / "_org" / "2021.1" / "SampleProject.wproj"
+LIVE_SOUND_TYPES = {
+    "return": [
+        {
+            "classId": 65552,
+            "name": "Sound",
+            "type": "WObject",
+        }
+    ]
+}
 
 
 class ScriptedReader:
@@ -70,6 +80,8 @@ class ScriptedReader:
 
     def __call__(self, uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
         self.calls.append((uri, dict(args), dict(options)))
+        if uri == "ak.wwise.core.object.getTypes":
+            return LIVE_SOUND_TYPES
         if uri == "ak.wwise.core.getProjectInfo":
             return {
                 "id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
@@ -127,6 +139,8 @@ class Import2021Reader:
         self.responses = deque(responses)
 
     def __call__(self, uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
+        if uri == "ak.wwise.core.object.getTypes":
+            return LIVE_SOUND_TYPES
         if uri != "ak.wwise.core.object.get":
             raise AssertionError((uri, args, options))
         if args.get("waql") == "from type Project take 2":
@@ -758,6 +772,72 @@ def test_use_existing_rejects_only_live_localized_rows_with_non_audio_fields(
             "target_path": existing_path,
             "import_language": "Japanese",
             "unsupported_fields": ["originals_subfolder", "notes"],
+        }
+    ]
+
+
+def test_use_existing_live_sfx_preserves_inline_base64_and_native_directives(
+    tmp_path: Path,
+) -> None:
+    target_path = OLD_ROOT + r"\ExistingSfx"
+    anchor = {
+        "id": PARENT_GUID,
+        "name": "Default Work Unit",
+        "type": "WorkUnit",
+        "path": OLD_ROOT,
+        "parent": {"id": SECOND_GUID},
+        "notes": "",
+    }
+    existing = {
+        "id": OLD_GUID,
+        "name": "ExistingSfx",
+        "type": "Sound",
+        "path": target_path,
+        "parent": {"id": PARENT_GUID},
+        "notes": "preserved",
+    }
+    inline_wav = b"RIFF\x04\x00\x00\x00WAVE"
+    inline_source = (
+        "SFX/existing.wav|" + base64.b64encode(inline_wav).decode("ascii")
+    )
+    request = parse_operation_request(
+        {
+            "contract": OPERATION_REQUEST_CONTRACT,
+            "version": "2022.1",
+            "operation": "audio.import",
+            "arguments": {
+                "import_operation": "useExisting",
+                "imports": [
+                    {
+                        "object_path": target_path,
+                        "audio_file_base64": inline_source,
+                        "import_language": "SFX",
+                        "dialogue_event": r"\Dialogue Events\Existing",
+                        "switch_assignment": r"\Switches\Footwear\Boots",
+                    }
+                ],
+            },
+        }
+    )
+
+    prepared = prepare_operation(
+        request,
+        read_call=ScriptedReader(
+            [{"return": [anchor]}, {"return": [existing]}],
+            project_root=tmp_path,
+        ),
+    ).as_dict()
+
+    assert prepared["dispatch"]["args"]["imports"] == [
+        {
+            "objectPath": target_path,
+            "audioFileBase64": (
+                "SFX\\existing.wav|"
+                + base64.b64encode(inline_wav).decode("ascii")
+            ),
+            "importLanguage": "SFX",
+            "dialogueEvent": r"\Dialogue Events\Existing",
+            "switchAssignation": r"\Switches\Footwear\Boots",
         }
     ]
 

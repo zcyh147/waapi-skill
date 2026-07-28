@@ -1061,6 +1061,62 @@ def test_object_create_merge_and_object_set_existing_target_routing_are_disjoint
     assert "Choose `object.create` only when the requested top-level object itself is new" not in OPERATE
 
 
+def test_business_outcome_arbitrates_overlapping_operations_and_execution_domains() -> None:
+    operate_flat = " ".join(OPERATE.split())
+    skill_flat = " ".join(SKILL.split())
+
+    assert "Choose by business outcome, not native API overlap" in OPERATE
+    assert "operation.selection_guidance" in OPERATE
+    assert "interface.selection_guidance" in OPERATE
+    assert "Batch size alone never establishes table-file intent" in operate_flat
+    assert "`audio.import` is already batch-capable" in operate_flat
+    assert "ask for that artifact instead of creating it" in operate_flat
+    assert "Agent-generated TSV" in OPERATE
+    assert "Create a pure new object hierarchy with no media" in operate_flat
+    assert "one subordinate part of a broader atomic existing-object mutation" in operate_flat
+    assert "Choose overlaps by business outcome" in skill_flat
+
+    for dedicated_concept in (
+        "Game Parameter range",
+        "Randomizer",
+        "Attenuation Curve",
+        "State structure",
+        "Conversion Plug-in",
+        "Active Source",
+        "Blend assignment",
+    ):
+        assert dedicated_concept in OPERATE
+    assert "one explicitly requested Wwise Undo step" in operate_flat
+    assert "one dedicated batch operation already owns the whole outcome" in operate_flat
+
+    assert "Durable edits to saved Wwise project objects" in operate_flat
+    assert "Current SoundEngine playback, Game Object, listener, spatial, Bank" in operate_flat
+    assert "every SoundEngine route receives a runtime-domain fallback" in operate_flat
+    assert "do not assume every `ak.wwise.core.*` route persists project data" in operate_flat
+    assert "auditioning an Authoring object uses `ak.wwise.core.transport.*`" in operate_flat
+    assert "`object.setRTPC` authors a curve" in operate_flat
+    assert "`ak.soundengine.setRTPCValue` changes a runtime value" in operate_flat
+    assert "`switchContainer.*Assignment` edits project relationships" in operate_flat
+    assert "`ak.soundengine.setSwitch` changes a runtime Switch" in operate_flat
+    assert "`setCursorTime` is absolute positioning" in operate_flat
+    assert "`moveCursor` is relative movement" in operate_flat
+
+    assert "same import create its Event or Switch Assignation side effect" in operate_flat
+    assert "standalone `sourceControl.*` route only for an independent" in operate_flat
+    assert "`soundbank.generate` does not persistently replace" in operate_flat
+    assert "two ordered transactions" in operate_flat
+
+
+def test_soundbank_topic_selection_distinguishes_per_result_from_cycle_notice() -> None:
+    query_flat = " ".join(QUERY.split())
+
+    assert "Use `ak.wwise.core.soundbank.generated` for per-Bank × platform × language result events" in query_flat
+    assert "Use `ak.wwise.core.soundbank.generationDone` only for the overall generation-cycle" in query_flat
+    assert "`generationDone` is not proof that every Bank succeeded" in query_flat
+    assert "use the generating operation's terminal verification" in query_flat
+    assert "`interface.selection_guidance`" in query_flat
+
+
 def test_existing_root_merge_request_shapes_are_unambiguous() -> None:
     operate_flat = " ".join(OPERATE.split())
     assert "set `parent` to its existing parent" in operate_flat

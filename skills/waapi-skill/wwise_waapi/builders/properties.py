@@ -163,15 +163,23 @@ class PropertyReferenceBuilder:
         *,
         object: ObjectIdentity | ResolvedObject,
         reference: str,
-        target: ObjectIdentity | ResolvedObject,
+        target: ObjectIdentity | ResolvedObject | None,
         reference_info: PropertyInfoMetadataRecord,
         platform: str | int | None = None,
     ) -> SemanticPreview:
         source = _resolved_exact_object("object", object)
-        target_object = _resolved_exact_object("target", target)
+        target_object = (
+            _resolved_exact_object("target", target)
+            if target is not None
+            else None
+        )
         _require_metadata_match(reference, reference_info)
         _require_reference_metadata(reference_info)
-        args: dict[str, Any] = {"object": source.object, "reference": reference, "value": target_object.object}
+        args: dict[str, Any] = {
+            "object": source.object,
+            "reference": reference,
+            "value": target_object.object if target_object is not None else None,
+        }
         if platform is not None:
             _require_object_arg("platform", platform)
             args["platform"] = platform
@@ -179,8 +187,22 @@ class PropertyReferenceBuilder:
             PropertyReferenceOperation.SET_REFERENCE,
             args,
             readback_plan=_object_value_readback(source, ("id", "path", reference), "read back changed reference by exact identity when WAAPI exposes it"),
-            evidence_items=(reference_changed_topic_expectation(source, reference, target_object).as_dict(), _property_metadata_evidence(reference_info, None, platform)),
-            operation_metadata={"reference_info": reference_info.as_dict(), "target_identity": target_object.as_dict(), "platform": platform},
+            evidence_items=(
+                reference_changed_topic_expectation(
+                    source,
+                    reference,
+                    target_object,
+                ).as_dict(),
+                _property_metadata_evidence(reference_info, None, platform),
+            ),
+            operation_metadata={
+                "reference_info": reference_info.as_dict(),
+                "target_identity": (
+                    target_object.as_dict() if target_object is not None else None
+                ),
+                "clears_reference": target_object is None,
+                "platform": platform,
+            },
         )
 
     def set_randomizer(
@@ -351,8 +373,24 @@ def property_changed_topic_expectation(object: ResolvedObject, property: str, va
     return TopicExpectationPlan("ak.wwise.core.object.propertyChanged", object.as_dict(), ("id", "path", "property", "old", "new"), f"expect propertyChanged payload for {property!r} value {value!r}")
 
 
-def reference_changed_topic_expectation(object: ResolvedObject, reference: str, target: ResolvedObject) -> TopicExpectationPlan:
-    return TopicExpectationPlan("ak.wwise.core.object.referenceChanged", {"source": object.as_dict(), "target": target.as_dict()}, ("id", "path", "reference", "old", "new"), f"expect referenceChanged payload for {reference!r}")
+def reference_changed_topic_expectation(
+    object: ResolvedObject,
+    reference: str,
+    target: ResolvedObject | None,
+) -> TopicExpectationPlan:
+    return TopicExpectationPlan(
+        "ak.wwise.core.object.referenceChanged",
+        {
+            "source": object.as_dict(),
+            "target": target.as_dict() if target is not None else None,
+        },
+        ("id", "path", "reference", "old", "new"),
+        (
+            f"expect referenceChanged payload clearing {reference!r}"
+            if target is None
+            else f"expect referenceChanged payload for {reference!r}"
+        ),
+    )
 
 
 def attenuation_curve_changed_topic_expectation(object: ResolvedObject, curve_type: str) -> TopicExpectationPlan:

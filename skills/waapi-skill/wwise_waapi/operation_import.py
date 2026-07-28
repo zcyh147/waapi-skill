@@ -9,13 +9,15 @@ file and never calls WAAPI.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import csv
 import hashlib
 import io
 import os
 import re
 import stat
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Mapping, Sequence
 
 
@@ -42,23 +44,39 @@ LOCALIZED_EXISTING_UNSUPPORTED_FIELDS = (
 MAX_IMPORT_ITEMS = 128
 MAX_TAB_BYTES = 256 * 1024
 MAX_TAB_ROWS = 128
-MAX_TAB_COLUMNS = 16
+MAX_TAB_COLUMNS = 64
 MAX_TAB_CELL_CHARS = 16 * 1024
 MAX_TEXT_CHARS = 16 * 1024
+MAX_INLINE_AUDIO_BYTES = 180 * 1024
+MAX_AUDIO_IMPORT_BASE64_ENCODED_CHARS = 256 * 1024
+MAX_IMPORT_FIELDS_PER_ROW = 64
 
-_AUDIO_IMPORT_REQUIRED_FIELDS = frozenset({"object_path", "audio_file"})
+_AUDIO_IMPORT_REQUIRED_FIELDS = frozenset()
 _AUDIO_IMPORT_OPTIONAL_FIELDS = frozenset(
     {
+        "object_path",
         "object_type",
+        "audio_file",
+        "audio_file_base64",
         "import_language",
+        "import_location",
         "originals_subfolder",
         "notes",
         "audio_source_notes",
         "event",
+        "dialogue_event",
+        "switch_assignment",
+        "properties",
+        "references",
     }
 )
+_AUDIO_IMPORT_DEFAULT_FIELDS = _AUDIO_IMPORT_OPTIONAL_FIELDS
 _EVENT_ACTIONS = frozenset({"Play", "Stop", "Pause", "Resume", "Break", "Seek"})
 _TYPED_PATH_SEGMENT = re.compile(r"^<([^<>]+)>([^<>]+)$")
+_DYNAMIC_FIELD_NAME = re.compile(r"^[:_a-zA-Z0-9]+$")
+_PROPERTY_HEADER = re.compile(r"^Property\[([:_a-zA-Z0-9]+)\]$")
+_REFERENCE_HEADER = re.compile(r"^Reference\[([:_a-zA-Z0-9]+)\]$")
+_AT_HEADER = re.compile(r"^@([:_a-zA-Z0-9]+)$")
 _WINDOWS_DRIVE = re.compile(r"^[A-Za-z]:")
 
 IMPORT_ROOTS_BY_VERSION: Mapping[str, frozenset[str]] = {
@@ -74,49 +92,21 @@ IMPORT_ROOTS_BY_VERSION: Mapping[str, frozenset[str]] = {
 _TAB_HEADERS = frozenset(
     {
         "Audio File",
+        "Audio File Base64",
         "Object Path",
         "Object Type",
         "OriginalsSubFolder",
         "Notes",
         "Audio Source Notes",
         "Event",
+        "Dialogue Event",
+        "Switch Assignation",
     }
 )
 TAB_HEADERS_BY_VERSION: Mapping[str, frozenset[str]] = {
     version: _TAB_HEADERS for version in SUPPORTED_WWISE_VERSIONS
 }
-REQUIRED_TAB_HEADERS = frozenset({"Audio File", "Object Path"})
-
-# Both WAAPI/internal names and the reviewed tab-import display names are
-# accepted.  Unknown strings are rejected rather than passed through.
-_IMPORT_OBJECT_TYPES = frozenset(
-    {
-        "Actor-Mixer",
-        "ActorMixer",
-        "Blend Container",
-        "BlendContainer",
-        "Folder",
-        "Music Playlist Container",
-        "Music Segment",
-        "Music Switch Container",
-        "Music Track",
-        "MusicRanSeqCntr",
-        "MusicSegment",
-        "MusicSwitchContainer",
-        "MusicTrack",
-        "Property Container",
-        "Random Container",
-        "RandomSequenceContainer",
-        "Sequence Container",
-        "Sound",
-        "Sound SFX",
-        "Sound Voice",
-        "Switch Container",
-        "SwitchContainer",
-        "Virtual Folder",
-    }
-)
-
+REQUIRED_TAB_HEADERS = frozenset({"Object Path"})
 
 class ImportContractError(ValueError):
     """A closed import request or source artifact failed validation."""
@@ -290,22 +280,51 @@ def verify_regular_file_proof(proof: Mapping[str, Any], *, field: str) -> dict[s
     return actual
 
 
+def normalize_inline_audio_file(
+    value: Any,
+    *,
+    field: str,
+) -> tuple[str, dict[str, Any]]:
+    """Return canonical bounded ``relative.wav|base64`` data and its proof."""
+
+    return _normalize_audio_file_base64(value, field=field)
+
+
+def normalize_originals_subfolder(value: Any, *, field: str) -> str:
+    """Normalize one path segment below Wwise's managed Originals root."""
+
+    return _require_originals_subfolder(value, field=field)
+
+
+def validate_import_media_extension(path: str, *, field: str) -> None:
+    """Require one of the version-independent reviewed import media suffixes."""
+
+    _require_media_extension(path, field=field)
+
+
 def build_audio_import_plan(
     imports: Sequence[Mapping[str, Any]],
     *,
     version: str,
     import_operation: str,
+    defaults: Mapping[str, Any] | None = None,
+    auto_add_to_source_control: bool = False,
     auto_check_out_to_source_control: bool | None = None,
 ) -> dict[str, Any]:
     """Normalize the closed ``audio.import`` item DSL into a JSON plan."""
 
     lane = _require_version(version)
     policy = import_operation_policy(import_operation)
+    auto_add = _require_boolean(
+        auto_add_to_source_control,
+        field="auto_add_to_source_control",
+    )
     auto_check_out = normalize_auto_check_out_to_source_control(
         auto_check_out_to_source_control,
         version=lane,
         supplied=auto_check_out_to_source_control is not None,
     )
+    normalized_defaults = _normalize_import_defaults(defaults)
     if isinstance(imports, (str, bytes)) or not isinstance(imports, Sequence):
         raise ImportContractError("INVALID_ARGUMENT", "imports must be a JSON array.")
     if not imports:
@@ -321,6 +340,7 @@ def build_audio_import_plan(
     targets: list[dict[str, Any]] = []
     file_proofs: list[dict[str, Any]] = []
     seen_targets: set[str] = set()
+    total_audio_file_base64_encoded_chars = 0
     for index, raw in enumerate(imports):
         if not isinstance(raw, Mapping):
             raise ImportContractError(
@@ -334,8 +354,37 @@ def build_audio_import_plan(
             optional=_AUDIO_IMPORT_OPTIONAL_FIELDS,
             context=f"imports[{index}]",
         )
-        object_path = _require_text(raw.get("object_path"), field=f"imports[{index}].object_path")
-        target = canonical_import_target(object_path, version=lane)
+        effective = _merge_import_defaults(
+            normalized_defaults,
+            raw,
+            field=f"imports[{index}]",
+        )
+        object_path = _require_text(
+            effective.get("object_path"),
+            field=f"imports[{index}].object_path",
+        )
+        import_location = (
+            canonical_import_location(
+                effective.get("import_location"),
+                version=lane,
+            )
+            if "import_location" in effective
+            else None
+        )
+        if object_path.startswith("\\"):
+            target = canonical_import_target(object_path, version=lane)
+        elif import_location is not None:
+            target = derive_tab_target(
+                object_path,
+                import_location=import_location,
+                version=lane,
+            )
+        else:
+            raise ImportContractError(
+                "INVALID_TARGET",
+                "A relative object_path requires import_location.",
+                details={"index": index, "object_path": object_path},
+            )
         target_key = target["canonical_target_path"].casefold()
         if target_key in seen_targets:
             raise ImportContractError(
@@ -345,55 +394,178 @@ def build_audio_import_plan(
             )
         seen_targets.add(target_key)
 
-        proof = regular_file_proof(raw.get("audio_file"), field=f"imports[{index}].audio_file")
-        _require_media_extension(proof["path"], field=f"imports[{index}].audio_file")
-        dispatch: dict[str, Any] = {"objectPath": object_path, "audioFile": proof["path"]}
+        has_audio_file = "audio_file" in effective
+        has_audio_base64 = "audio_file_base64" in effective
+        if has_audio_file and has_audio_base64:
+            raise ImportContractError(
+                "INVALID_ARGUMENT",
+                "An import row must not provide both audio_file and audio_file_base64.",
+                details={"index": index},
+            )
+
+        dispatch: dict[str, Any] = {"objectPath": object_path}
         oracle_row: dict[str, Any] = {
             "index": index,
             **target,
-            "source_file": dict(proof),
             "pre_state_required": True,
+            "media_expected": has_audio_file or has_audio_base64,
         }
-        expected_source_path = expected_audio_file_source_result_path(
-            target["canonical_target_path"],
-            proof["path"],
-        )
-        if expected_source_path is not None:
-            oracle_row["expected_audio_file_source_result_path"] = expected_source_path
+        if import_location is not None:
+            dispatch["importLocation"] = import_location
+            oracle_row["requested_import_location"] = import_location
 
-        if "object_type" in raw:
-            object_type = _require_object_type(raw.get("object_type"), field=f"imports[{index}].object_type")
+        source_name_path: str | None = None
+        if has_audio_file:
+            proof = regular_file_proof(
+                effective.get("audio_file"),
+                field=f"imports[{index}].audio_file",
+            )
+            _require_media_extension(
+                proof["path"],
+                field=f"imports[{index}].audio_file",
+            )
+            source_proof = {"kind": "regular_file", **proof}
+            dispatch["audioFile"] = proof["path"]
+            source_name_path = proof["path"]
+            file_proofs.append({"index": index, **proof})
+            oracle_row["source_file"] = source_proof
+        elif has_audio_base64:
+            encoded, source_proof = _normalize_audio_file_base64(
+                effective.get("audio_file_base64"),
+                field=f"imports[{index}].audio_file_base64",
+            )
+            total_audio_file_base64_encoded_chars += len(encoded)
+            if (
+                total_audio_file_base64_encoded_chars
+                > MAX_AUDIO_IMPORT_BASE64_ENCODED_CHARS
+            ):
+                raise ImportContractError(
+                    "LIMIT_EXCEEDED",
+                    "audio.import exceeds the request-wide encoded Base64 limit "
+                    "after defaults expansion.",
+                    details={
+                        "field": "audio_file_base64",
+                        "counted_through_index": index,
+                        "encoded_characters": total_audio_file_base64_encoded_chars,
+                        "limit": MAX_AUDIO_IMPORT_BASE64_ENCODED_CHARS,
+                        "aggregation": "effective_rows_after_defaults",
+                    },
+                )
+            dispatch["audioFileBase64"] = encoded
+            source_name_path = str(source_proof["relative_path"])
+            oracle_row["source_file"] = source_proof
+
+        if source_name_path is not None:
+            expected_source_path = expected_audio_file_source_result_path(
+                target["canonical_target_path"],
+                source_name_path,
+            )
+            if expected_source_path is not None:
+                oracle_row["expected_audio_file_source_result_path"] = expected_source_path
+
+        requested_type = effective.get("object_type")
+        if requested_type is None:
+            requested_type = _typed_leaf_object_type(object_path)
+        if requested_type is not None:
+            object_type = _require_object_type(
+                requested_type,
+                field=f"imports[{index}].object_type",
+            )
             dispatch["objectType"] = object_type
             oracle_row["requested_object_type"] = object_type
-        if "import_language" in raw:
-            language = _require_language(raw.get("import_language"), field=f"imports[{index}].import_language")
+        elif not oracle_row["media_expected"]:
+            raise ImportContractError(
+                "INVALID_ARGUMENT",
+                "A structure-only import row requires object_type or a typed final object_path segment.",
+                details={"index": index, "object_path": object_path},
+            )
+        if "import_language" in effective:
+            if not oracle_row["media_expected"]:
+                raise ImportContractError(
+                    "INVALID_ARGUMENT",
+                    "import_language requires an audio source in the same effective row.",
+                    details={"index": index},
+                )
+            language = _require_language(
+                effective.get("import_language"),
+                field=f"imports[{index}].import_language",
+            )
             dispatch["importLanguage"] = language
             oracle_row["requested_language"] = language
-        if "originals_subfolder" in raw:
+        if "originals_subfolder" in effective:
+            if not oracle_row["media_expected"]:
+                raise ImportContractError(
+                    "INVALID_ARGUMENT",
+                    "originals_subfolder requires an audio source in the same effective row.",
+                    details={"index": index},
+                )
             subfolder = _require_originals_subfolder(
-                raw.get("originals_subfolder"),
+                effective.get("originals_subfolder"),
                 field=f"imports[{index}].originals_subfolder",
             )
             dispatch["originalsSubFolder"] = subfolder
             oracle_row["requested_originals_subfolder"] = subfolder
         for public_name, waapi_name in (("notes", "notes"), ("audio_source_notes", "audioSourceNotes")):
-            if public_name in raw:
-                value = _require_bounded_text(raw.get(public_name), field=f"imports[{index}].{public_name}")
+            if public_name in effective:
+                if public_name == "audio_source_notes" and not oracle_row["media_expected"]:
+                    raise ImportContractError(
+                        "INVALID_ARGUMENT",
+                        "audio_source_notes requires an audio source in the same effective row.",
+                        details={"index": index},
+                    )
+                value = _require_bounded_text(
+                    effective.get(public_name),
+                    field=f"imports[{index}].{public_name}",
+                )
                 dispatch[waapi_name] = value
                 oracle_row[f"requested_{public_name}"] = value
-        if "event" in raw:
-            event = _normalize_structured_event(raw.get("event"), field=f"imports[{index}].event")
+        if "event" in effective:
+            event = _normalize_structured_event(
+                effective.get("event"),
+                field=f"imports[{index}].event",
+            )
             dispatch["event"] = event["waapi_value"]
             oracle_row["requested_event"] = {key: value for key, value in event.items() if key != "waapi_value"}
+        if "dialogue_event" in effective:
+            dialogue_event = _require_native_import_directive(
+                effective.get("dialogue_event"),
+                field=f"imports[{index}].dialogue_event",
+            )
+            dispatch["dialogueEvent"] = dialogue_event
+            oracle_row["requested_dialogue_event"] = dialogue_event
+        if "switch_assignment" in effective:
+            switch_assignment = _require_native_import_directive(
+                effective.get("switch_assignment"),
+                field=f"imports[{index}].switch_assignment",
+            )
+            dispatch["switchAssignation"] = switch_assignment
+            oracle_row["requested_switch_assignment"] = switch_assignment
+
+        properties = _normalize_named_value_rows(
+            effective.get("properties", ()),
+            field=f"imports[{index}].properties",
+        )
+        references = _normalize_reference_rows(
+            effective.get("references", ()),
+            field=f"imports[{index}].references",
+        )
+        _reject_property_reference_name_collisions(
+            properties,
+            references,
+            field=f"imports[{index}]",
+        )
+        if properties:
+            oracle_row["requested_properties"] = properties
+        if references:
+            oracle_row["requested_references"] = references
 
         dispatch_rows.append(dispatch)
-        file_proofs.append({"index": index, **proof})
         targets.append(oracle_row)
 
     dispatch_args: dict[str, Any] = {
         "imports": dispatch_rows,
         "importOperation": policy["import_operation"],
-        "autoAddToSourceControl": False,
+        "autoAddToSourceControl": auto_add,
     }
     if auto_check_out is not None:
         dispatch_args["autoCheckOutToSourceControl"] = auto_check_out
@@ -412,7 +584,15 @@ def build_audio_import_plan(
                 for row in targets
             ),
             "event_side_effects_present": any("requested_event" in row for row in targets),
-            "media_hash_readback_required": True,
+            "dialogue_event_side_effects_present": any(
+                "requested_dialogue_event" in row for row in targets
+            ),
+            "switch_assignment_side_effects_present": any(
+                "requested_switch_assignment" in row for row in targets
+            ),
+            "media_hash_readback_required": any(
+                row.get("media_expected") is True for row in targets
+            ),
             "no_retry_after_dispatch": True,
         },
     }
@@ -425,12 +605,17 @@ def parse_tab_delimited_import_file(
     import_location: str,
     import_language: str,
     import_operation: str,
+    auto_add_to_source_control: bool = False,
     auto_check_out_to_source_control: bool | None = None,
 ) -> dict[str, Any]:
     """Parse and prove a reviewed UTF-8 TSV subset without trusting caller rows."""
 
     lane = _require_version(version)
     policy = import_operation_policy(import_operation)
+    auto_add = _require_boolean(
+        auto_add_to_source_control,
+        field="auto_add_to_source_control",
+    )
     auto_check_out = normalize_auto_check_out_to_source_control(
         auto_check_out_to_source_control,
         version=lane,
@@ -503,17 +688,35 @@ def parse_tab_delimited_import_file(
                 details={"row": offset, "expected": len(headers), "actual": len(cells)},
             )
         for column, cell in zip(headers, cells, strict=True):
-            if len(cell) > MAX_TAB_CELL_CHARS:
+            cell_limit = (
+                MAX_TAB_BYTES
+                if column == "Audio File Base64"
+                else MAX_TAB_CELL_CHARS
+            )
+            if len(cell) > cell_limit:
                 raise ImportContractError(
                     "LIMIT_EXCEEDED",
                     "A tab-delimited cell exceeds the closed character limit.",
-                    details={"row": offset, "column": column, "limit": MAX_TAB_CELL_CHARS},
+                    details={"row": offset, "column": column, "limit": cell_limit},
                 )
-        fields = dict(zip(headers, cells, strict=True))
-        audio_file = _require_text(fields["Audio File"], field=f"row[{offset}].Audio File")
-        proof = regular_file_proof(audio_file, field=f"row[{offset}].Audio File")
-        _require_media_extension(proof["path"], field=f"row[{offset}].Audio File")
-        object_path = _require_text(fields["Object Path"], field=f"row[{offset}].Object Path")
+        pairs = list(zip(headers, cells, strict=True))
+
+        def single_value(header: str) -> str:
+            values = [cell for column, cell in pairs if column == header]
+            return values[0] if values else ""
+
+        audio_file = single_value("Audio File")
+        audio_file_base64 = single_value("Audio File Base64")
+        if audio_file and audio_file_base64:
+            raise ImportContractError(
+                "INVALID_TAB_FILE",
+                "A tab-delimited row must not provide both Audio File and Audio File Base64.",
+                details={"row": offset},
+            )
+        object_path = _require_text(
+            single_value("Object Path"),
+            field=f"row[{offset}].Object Path",
+        )
         target = derive_tab_target(object_path, import_location=location, version=lane)
         target_key = target["canonical_target_path"].casefold()
         if target_key in seen_targets:
@@ -526,46 +729,168 @@ def parse_tab_delimited_import_file(
 
         row_plan: dict[str, Any] = {
             "row_number": offset,
-            "audio_file": proof["path"],
             "object_path": object_path,
             **target,
         }
         oracle_row: dict[str, Any] = {
             "row_number": offset,
             **target,
-            "source_file": dict(proof),
-            "requested_language": language,
             "pre_state_required": True,
+            "media_expected": bool(audio_file or audio_file_base64),
         }
-        expected_source_path = expected_audio_file_source_result_path(
-            target["canonical_target_path"],
-            proof["path"],
-        )
-        if expected_source_path is not None:
-            oracle_row["expected_audio_file_source_result_path"] = expected_source_path
-        if fields.get("Object Type"):
-            object_type = _require_object_type(fields["Object Type"], field=f"row[{offset}].Object Type")
+        if oracle_row["media_expected"]:
+            oracle_row["requested_language"] = language
+        source_name_path: str | None = None
+        if audio_file:
+            proof = regular_file_proof(
+                audio_file,
+                field=f"row[{offset}].Audio File",
+            )
+            _require_media_extension(
+                proof["path"],
+                field=f"row[{offset}].Audio File",
+            )
+            source_proof = {"kind": "regular_file", **proof}
+            row_plan["audio_file"] = proof["path"]
+            oracle_row["source_file"] = source_proof
+            source_proofs.append({"row_number": offset, **proof})
+            source_name_path = proof["path"]
+        elif audio_file_base64:
+            _, source_proof = _normalize_audio_file_base64(
+                audio_file_base64,
+                field=f"row[{offset}].Audio File Base64",
+            )
+            row_plan["audio_file_base64"] = source_proof["relative_path"]
+            oracle_row["source_file"] = source_proof
+            source_name_path = str(source_proof["relative_path"])
+
+        if source_name_path is not None:
+            expected_source_path = expected_audio_file_source_result_path(
+                target["canonical_target_path"],
+                source_name_path,
+            )
+            if expected_source_path is not None:
+                oracle_row["expected_audio_file_source_result_path"] = expected_source_path
+
+        object_type_value = single_value("Object Type")
+        inferred_type = _typed_leaf_object_type(object_path)
+        if object_type_value:
+            object_type = _require_object_type(
+                object_type_value,
+                field=f"row[{offset}].Object Type",
+            )
             row_plan["object_type"] = object_type
             oracle_row["requested_object_type"] = object_type
-        if fields.get("OriginalsSubFolder"):
+        elif inferred_type is not None:
+            oracle_row["requested_object_type"] = _require_object_type(
+                inferred_type,
+                field=f"row[{offset}].Object Path",
+            )
+        elif not oracle_row["media_expected"]:
+            raise ImportContractError(
+                "INVALID_TAB_FILE",
+                "A structure-only tab row requires Object Type or a typed final Object Path segment.",
+                details={"row": offset},
+            )
+
+        originals_subfolder = single_value("OriginalsSubFolder")
+        if originals_subfolder:
+            if not oracle_row["media_expected"]:
+                raise ImportContractError(
+                    "INVALID_TAB_FILE",
+                    "OriginalsSubFolder requires Audio File or Audio File Base64.",
+                    details={"row": offset},
+                )
             subfolder = _require_originals_subfolder(
-                fields["OriginalsSubFolder"],
+                originals_subfolder,
                 field=f"row[{offset}].OriginalsSubFolder",
             )
             row_plan["originals_subfolder"] = subfolder
             oracle_row["requested_originals_subfolder"] = subfolder
         for header, key in (("Notes", "notes"), ("Audio Source Notes", "audio_source_notes")):
-            if fields.get(header):
-                value = _require_bounded_text(fields[header], field=f"row[{offset}].{header}")
+            field_value = single_value(header)
+            if field_value:
+                if header == "Audio Source Notes" and not oracle_row["media_expected"]:
+                    raise ImportContractError(
+                        "INVALID_TAB_FILE",
+                        "Audio Source Notes requires Audio File or Audio File Base64.",
+                        details={"row": offset},
+                    )
+                value = _require_bounded_text(
+                    field_value,
+                    field=f"row[{offset}].{header}",
+                )
                 row_plan[key] = value
                 oracle_row[f"requested_{key}"] = value
-        if fields.get("Event"):
-            event = _parse_tab_event(fields["Event"], field=f"row[{offset}].Event")
-            row_plan["event"] = {key: value for key, value in event.items() if key != "waapi_value"}
-            oracle_row["requested_event"] = dict(row_plan["event"])
+
+        requested_events = [
+            {
+                key: value
+                for key, value in _parse_tab_event(
+                    cell,
+                    field=f"row[{offset}].Event",
+                ).items()
+                if key != "waapi_value"
+            }
+            for header, cell in pairs
+            if header == "Event" and cell
+        ]
+        if requested_events:
+            row_plan["events"] = requested_events
+            oracle_row["requested_events"] = requested_events
+            if len(requested_events) == 1:
+                # Compatibility with the original one-Event verifier.
+                row_plan["event"] = requested_events[0]
+                oracle_row["requested_event"] = requested_events[0]
+
+        dialogue_events = [
+            _require_native_import_directive(
+                cell,
+                field=f"row[{offset}].Dialogue Event",
+            )
+            for header, cell in pairs
+            if header == "Dialogue Event" and cell
+        ]
+        if dialogue_events:
+            row_plan["dialogue_events"] = dialogue_events
+            oracle_row["requested_dialogue_events"] = dialogue_events
+
+        switch_assignments = [
+            _require_native_import_directive(
+                cell,
+                field=f"row[{offset}].Switch Assignation",
+            )
+            for header, cell in pairs
+            if header == "Switch Assignation" and cell
+        ]
+        if switch_assignments:
+            row_plan["switch_assignments"] = switch_assignments
+            oracle_row["requested_switch_assignments"] = switch_assignments
+
+        dynamic_fields: list[dict[str, Any]] = []
+        for header, cell in pairs:
+            dynamic = _parse_dynamic_tab_header(header)
+            if dynamic is None or not cell:
+                continue
+            dynamic_fields.append(
+                {
+                    "kind": dynamic["kind"],
+                    "name": dynamic["name"],
+                    "value": _require_bounded_text(
+                        cell,
+                        field=f"row[{offset}].{header}",
+                    ),
+                    "header": header,
+                }
+            )
+        _reject_duplicate_dynamic_fields(
+            dynamic_fields,
+            field=f"row[{offset}]",
+        )
+        if dynamic_fields:
+            oracle_row["requested_dynamic_fields"] = dynamic_fields
 
         rows.append(row_plan)
-        source_proofs.append({"row_number": offset, **proof})
         target_oracle.append(oracle_row)
 
     dispatch_args: dict[str, Any] = {
@@ -573,7 +898,7 @@ def parse_tab_delimited_import_file(
         "importLocation": location,
         "importLanguage": language,
         "importOperation": policy["import_operation"],
-        "autoAddToSourceControl": False,
+        "autoAddToSourceControl": auto_add,
     }
     if auto_check_out is not None:
         dispatch_args["autoCheckOutToSourceControl"] = auto_check_out
@@ -597,10 +922,20 @@ def parse_tab_delimited_import_file(
             "language_requires_live_project_validation": (
                 language_requires_live_project_validation(language)
             ),
-            "event_side_effects_present": any("requested_event" in row for row in target_oracle),
+            "event_side_effects_present": any(
+                "requested_events" in row for row in target_oracle
+            ),
+            "dialogue_event_side_effects_present": any(
+                "requested_dialogue_events" in row for row in target_oracle
+            ),
+            "switch_assignment_side_effects_present": any(
+                "requested_switch_assignments" in row for row in target_oracle
+            ),
             "all_sources_validated_before_dispatch": True,
             "missing_or_unreadable_source_policy": "reject_before_preview_and_dispatch",
-            "media_hash_readback_required": True,
+            "media_hash_readback_required": any(
+                row.get("media_expected") is True for row in target_oracle
+            ),
             "no_retry_after_dispatch": True,
         },
     }
@@ -640,7 +975,10 @@ def expected_audio_file_source_result_path(
         field="canonical_target_path",
         absolute=True,
     )
-    source_path = Path(source_file_path)
+    # Inline Base64 paths are normalized to Wwise/Windows separators even when
+    # the gateway runs on macOS or Linux.  PureWindowsPath also handles the
+    # ordinary POSIX absolute paths accepted for file-backed imports.
+    source_path = PureWindowsPath(source_file_path)
     extension = source_path.suffix.casefold()
     if extension in {".mid", ".midi"}:
         return None
@@ -693,6 +1031,342 @@ def derive_tab_target(object_path: str, *, import_location: str, version: str) -
     return canonical_import_target(combined, version=lane)
 
 
+def _normalize_import_defaults(value: Mapping[str, Any] | None) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        raise ImportContractError(
+            "INVALID_ARGUMENT",
+            "defaults must be a JSON object.",
+        )
+    _require_exact_keys(
+        value,
+        required=frozenset(),
+        optional=_AUDIO_IMPORT_DEFAULT_FIELDS,
+        context="defaults",
+    )
+    return dict(value)
+
+
+def _merge_import_defaults(
+    defaults: Mapping[str, Any],
+    row: Mapping[str, Any],
+    *,
+    field: str,
+) -> dict[str, Any]:
+    merged = dict(defaults)
+    merged.update(row)
+    for collection_name, normalizer in (
+        ("properties", _normalize_named_value_rows),
+        ("references", _normalize_reference_rows),
+    ):
+        default_rows = normalizer(
+            defaults.get(collection_name, ()),
+            field=f"defaults.{collection_name}",
+        )
+        item_rows = normalizer(
+            row.get(collection_name, ()),
+            field=f"{field}.{collection_name}",
+        )
+        by_name = {str(item["name"]).casefold(): dict(item) for item in default_rows}
+        for item in item_rows:
+            by_name[str(item["name"]).casefold()] = dict(item)
+        if by_name:
+            merged[collection_name] = list(by_name.values())
+        else:
+            merged.pop(collection_name, None)
+    requested_field_count = len(merged)
+    requested_field_count += len(merged.get("properties", ()))
+    requested_field_count += len(merged.get("references", ()))
+    if requested_field_count > MAX_IMPORT_FIELDS_PER_ROW:
+        raise ImportContractError(
+            "LIMIT_EXCEEDED",
+            "An effective import row exceeds the closed field limit.",
+            details={
+                "field": field,
+                "count": requested_field_count,
+                "limit": MAX_IMPORT_FIELDS_PER_ROW,
+            },
+        )
+    return merged
+
+
+def _normalize_named_value_rows(value: Any, *, field: str) -> list[dict[str, Any]]:
+    if value in (None, ()):
+        return []
+    if isinstance(value, (str, bytes, bytearray)) or not isinstance(value, Sequence):
+        raise ImportContractError("INVALID_ARGUMENT", f"{field} must be a JSON array.")
+    if len(value) > MAX_IMPORT_FIELDS_PER_ROW:
+        raise ImportContractError(
+            "LIMIT_EXCEEDED",
+            f"{field} exceeds the closed field limit.",
+            details={"count": len(value), "limit": MAX_IMPORT_FIELDS_PER_ROW},
+        )
+    result: list[dict[str, Any]] = []
+    names: set[str] = set()
+    for index, raw in enumerate(value):
+        if not isinstance(raw, Mapping):
+            raise ImportContractError(
+                "INVALID_ARGUMENT",
+                f"{field}[{index}] must be a JSON object.",
+            )
+        _require_exact_keys(
+            raw,
+            required=frozenset({"name", "value"}),
+            optional=frozenset(),
+            context=f"{field}[{index}]",
+        )
+        name = _require_dynamic_field_name(
+            raw.get("name"),
+            field=f"{field}[{index}].name",
+        )
+        key = name.casefold()
+        if key in names:
+            raise ImportContractError(
+                "DUPLICATE_FIELD",
+                f"{field} contains the same name more than once.",
+                details={"name": name},
+            )
+        names.add(key)
+        item_value = raw.get("value")
+        if (
+            item_value is None
+            or isinstance(item_value, (list, Mapping))
+            or isinstance(item_value, float)
+            and not _is_finite_number(item_value)
+            or isinstance(item_value, str)
+            and (len(item_value) > MAX_TEXT_CHARS or "\x00" in item_value)
+        ):
+            raise ImportContractError(
+                "INVALID_ARGUMENT",
+                f"{field}[{index}].value must be a bounded finite JSON scalar.",
+                details={"name": name},
+            )
+        result.append({"name": name, "value": item_value})
+    return result
+
+
+def _normalize_reference_rows(value: Any, *, field: str) -> list[dict[str, Any]]:
+    if value in (None, ()):
+        return []
+    if isinstance(value, (str, bytes, bytearray)) or not isinstance(value, Sequence):
+        raise ImportContractError("INVALID_ARGUMENT", f"{field} must be a JSON array.")
+    if len(value) > MAX_IMPORT_FIELDS_PER_ROW:
+        raise ImportContractError(
+            "LIMIT_EXCEEDED",
+            f"{field} exceeds the closed field limit.",
+            details={"count": len(value), "limit": MAX_IMPORT_FIELDS_PER_ROW},
+        )
+    result: list[dict[str, Any]] = []
+    names: set[str] = set()
+    for index, raw in enumerate(value):
+        if not isinstance(raw, Mapping):
+            raise ImportContractError(
+                "INVALID_ARGUMENT",
+                f"{field}[{index}] must be a JSON object.",
+            )
+        _require_exact_keys(
+            raw,
+            required=frozenset({"name", "target"}),
+            optional=frozenset(),
+            context=f"{field}[{index}]",
+        )
+        name = _require_dynamic_field_name(
+            raw.get("name"),
+            field=f"{field}[{index}].name",
+        )
+        key = name.casefold()
+        if key in names:
+            raise ImportContractError(
+                "DUPLICATE_FIELD",
+                f"{field} contains the same name more than once.",
+                details={"name": name},
+            )
+        target = raw.get("target")
+        if not isinstance(target, Mapping):
+            raise ImportContractError(
+                "INVALID_ARGUMENT",
+                f"{field}[{index}].target must be a closed object identity.",
+            )
+        names.add(key)
+        result.append({"name": name, "target": dict(target)})
+    return result
+
+
+def _reject_property_reference_name_collisions(
+    properties: Sequence[Mapping[str, Any]],
+    references: Sequence[Mapping[str, Any]],
+    *,
+    field: str,
+) -> None:
+    property_names = {
+        str(item.get("name")).casefold()
+        for item in properties
+        if isinstance(item.get("name"), str)
+    }
+    reference_names = {
+        str(item.get("name")).casefold()
+        for item in references
+        if isinstance(item.get("name"), str)
+    }
+    collisions = sorted(property_names & reference_names)
+    if collisions:
+        raise ImportContractError(
+            "DUPLICATE_FIELD",
+            "An import field cannot be both a property and a reference.",
+            details={"field": field, "names": collisions},
+        )
+
+
+def _normalize_audio_file_base64(value: Any, *, field: str) -> tuple[str, dict[str, Any]]:
+    encoded = _require_text(value, field=field)
+    relative_path, separator, payload = encoded.partition("|")
+    if not separator or not relative_path or not payload:
+        raise ImportContractError(
+            "INVALID_ARGUMENT",
+            f"{field} must use '<relative .wav path>|<base64 WAV data>'.",
+        )
+    normalized_path = _require_inline_relative_wav_path(
+        relative_path,
+        field=f"{field}.relative_path",
+    )
+    try:
+        decoded = base64.b64decode(payload.encode("ascii"), validate=True)
+    except (UnicodeEncodeError, binascii.Error) as exc:
+        raise ImportContractError(
+            "INVALID_ARGUMENT",
+            f"{field} contains invalid canonical base64.",
+        ) from exc
+    if not decoded or len(decoded) > MAX_INLINE_AUDIO_BYTES:
+        raise ImportContractError(
+            "LIMIT_EXCEEDED",
+            f"{field} exceeds the bounded inline-audio limit or is empty.",
+            details={"size": len(decoded), "limit": MAX_INLINE_AUDIO_BYTES},
+        )
+    if len(decoded) < 12 or decoded[:4] != b"RIFF" or decoded[8:12] != b"WAVE":
+        raise ImportContractError(
+            "INVALID_FILE",
+            f"{field} must contain a RIFF/WAVE payload.",
+        )
+    canonical_payload = base64.b64encode(decoded).decode("ascii")
+    canonical = f"{normalized_path}|{canonical_payload}"
+    return canonical, {
+        "kind": "inline_base64",
+        "relative_path": normalized_path,
+        "size": len(decoded),
+        "sha256": hashlib.sha256(decoded).hexdigest(),
+    }
+
+
+def _require_inline_relative_wav_path(value: Any, *, field: str) -> str:
+    path = _require_text(value, field=field)
+    if (
+        path.startswith(("/", "\\"))
+        or _WINDOWS_DRIVE.match(path)
+        or len(path) > 1024
+    ):
+        raise ImportContractError(
+            "INVALID_ARGUMENT",
+            f"{field} must be relative to the Project Originals folder.",
+        )
+    segments = re.split(r"[\\/]", path)
+    if any(
+        not segment
+        or segment in {".", ".."}
+        or segment != segment.strip()
+        or any(character in segment for character in ("\x00", ":", "\r", "\n", "\t"))
+        for segment in segments
+    ):
+        raise ImportContractError(
+            "INVALID_ARGUMENT",
+            f"{field} contains an unsafe path segment.",
+        )
+    normalized = "\\".join(segments)
+    if Path(normalized).suffix.casefold() != ".wav":
+        raise ImportContractError(
+            "INVALID_FILE",
+            f"{field} must end in .wav.",
+        )
+    return normalized
+
+
+def _typed_leaf_object_type(object_path: str) -> str | None:
+    leaf = object_path.rsplit("\\", 1)[-1]
+    match = _TYPED_PATH_SEGMENT.fullmatch(leaf)
+    return match.group(1).strip() if match is not None else None
+
+
+def _parse_dynamic_tab_header(header: str) -> dict[str, str] | None:
+    for kind, pattern in (
+        ("property", _PROPERTY_HEADER),
+        ("reference", _REFERENCE_HEADER),
+        ("auto", _AT_HEADER),
+    ):
+        match = pattern.fullmatch(header)
+        if match is not None:
+            return {"kind": kind, "name": match.group(1)}
+    return None
+
+
+def _reject_duplicate_dynamic_fields(
+    fields: Sequence[Mapping[str, Any]],
+    *,
+    field: str,
+) -> None:
+    seen: dict[str, str] = {}
+    for item in fields:
+        name = item.get("name")
+        kind = item.get("kind")
+        if not isinstance(name, str) or not isinstance(kind, str):
+            raise ImportContractError(
+                "INVALID_TAB_FILE",
+                f"{field} contains a malformed dynamic field.",
+            )
+        key = name.casefold()
+        if key in seen:
+            raise ImportContractError(
+                "DUPLICATE_FIELD",
+                f"{field} assigns one dynamic field more than once.",
+                details={"name": name, "kinds": [seen[key], kind]},
+            )
+        seen[key] = kind
+
+
+def _require_dynamic_field_name(value: Any, *, field: str) -> str:
+    name = _require_text(value, field=field)
+    if len(name) > 128 or _DYNAMIC_FIELD_NAME.fullmatch(name) is None:
+        raise ImportContractError(
+            "INVALID_ARGUMENT",
+            f"{field} is not a valid Wwise property/reference token.",
+        )
+    return name
+
+
+def _require_native_import_directive(value: Any, *, field: str) -> str:
+    text = _require_text(value, field=field)
+    if len(text) > MAX_TEXT_CHARS or any(
+        character in text for character in ("\r", "\n", "\t")
+    ):
+        raise ImportContractError(
+            "INVALID_ARGUMENT",
+            f"{field} must be one bounded single-line Wwise import directive.",
+        )
+    return text
+
+
+def _require_boolean(value: Any, *, field: str) -> bool:
+    if type(value) is not bool:
+        raise ImportContractError(
+            "INVALID_ARGUMENT",
+            f"{field} must be a JSON boolean.",
+        )
+    return value
+
+
+def _is_finite_number(value: float) -> bool:
+    return value == value and value not in {float("inf"), float("-inf")}
+
+
 def _validate_tab_headers(headers: Sequence[str], *, version: str) -> None:
     if len(headers) > MAX_TAB_COLUMNS:
         raise ImportContractError(
@@ -702,19 +1376,42 @@ def _validate_tab_headers(headers: Sequence[str], *, version: str) -> None:
         )
     if any(not header for header in headers):
         raise ImportContractError("INVALID_TAB_FILE", "import_file header names must not be empty.")
-    if len(set(headers)) != len(headers):
+    repeatable = {"Event", "Dialogue Event", "Switch Assignation"}
+    duplicate_singletons = sorted(
+        {
+            header
+            for header in headers
+            if headers.count(header) > 1 and header not in repeatable
+        }
+    )
+    if duplicate_singletons:
         raise ImportContractError(
             "INVALID_TAB_FILE",
-            "Duplicate tab-delimited headers are not supported by the closed parser.",
-            details={"headers": list(headers)},
+            "Only Event, Dialogue Event, and Switch Assignation columns may repeat.",
+            details={"duplicate_headers": duplicate_singletons},
         )
     allowed = TAB_HEADERS_BY_VERSION[version]
-    unsupported = sorted(set(headers) - allowed)
+    unsupported = sorted(
+        {
+            header
+            for header in headers
+            if header not in allowed and _parse_dynamic_tab_header(header) is None
+        }
+    )
     if unsupported:
         raise ImportContractError(
             "UNSUPPORTED_COLUMN",
-            "import_file contains columns outside the reviewed closed subset.",
-            details={"version": version, "unsupported": unsupported, "allowed": sorted(allowed)},
+            "import_file contains columns outside the closed native header grammar.",
+            details={
+                "version": version,
+                "unsupported": unsupported,
+                "fixed_headers": sorted(allowed),
+                "dynamic_headers": [
+                    "@PropertyOrReference",
+                    "Property[Name]",
+                    "Reference[Name]",
+                ],
+            },
         )
     missing = sorted(REQUIRED_TAB_HEADERS - set(headers))
     if missing:
@@ -907,11 +1604,14 @@ def _require_originals_subfolder(value: Any, *, field: str) -> str:
 
 def _require_object_type(value: Any, *, field: str) -> str:
     object_type = _require_text(value, field=field)
-    if object_type not in _IMPORT_OBJECT_TYPES:
+    if (
+        len(object_type) > 128
+        or any(character in object_type for character in ("\\", "/", "<", ">", "\r", "\n", "\t"))
+    ):
         raise ImportContractError(
             "INVALID_ARGUMENT",
-            f"{field} is outside the reviewed import type set.",
-            details={"object_type": object_type, "supported": sorted(_IMPORT_OBJECT_TYPES)},
+            f"{field} is not a bounded Wwise object type token.",
+            details={"object_type": object_type},
         )
     return object_type
 
@@ -1080,6 +1780,7 @@ __all__ = [
     "AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS",
     "IMPORT_ROOTS_BY_VERSION",
     "ImportContractError",
+    "MAX_AUDIO_IMPORT_BASE64_ENCODED_CHARS",
     "MAX_IMPORT_ITEMS",
     "MAX_TAB_BYTES",
     "MAX_TAB_COLUMNS",
@@ -1094,8 +1795,12 @@ __all__ = [
     "canonical_import_target",
     "derive_tab_target",
     "import_operation_policy",
+    "language_requires_live_project_validation",
     "normalize_auto_check_out_to_source_control",
+    "normalize_inline_audio_file",
+    "normalize_originals_subfolder",
     "parse_tab_delimited_import_file",
     "regular_file_proof",
+    "validate_import_media_extension",
     "verify_regular_file_proof",
 ]

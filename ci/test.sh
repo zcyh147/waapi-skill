@@ -419,13 +419,19 @@ run_program() {
     tests/unit/test_waapi_gateway.py::test_wait_topic_rejects_ambiguous_or_implicit_unbounded_timeout_before_connecting
     tests/unit/test_waapi_gateway.py::test_wait_topic_keyboard_interrupt_closes_transport_subscription
     tests/unit/test_waapi_gateway.py::test_wait_topic_no_timeout_keeps_transport_connect_finitely_bounded
+    tests/unit/test_waapi_gateway.py::test_object_types_searches_packaged_catalog_without_connecting
+    tests/unit/test_waapi_gateway.py::test_metadata_transaction_cache_is_bound_to_exact_live_session
     tests/unit/test_script_helpers.py::test_run_main_returns_standard_interrupt_code_without_wrapper_traceback
     tests/unit/test_io_policy.py
     tests/unit/test_transaction_locality.py
     tests/unit/test_platform_paths.py
     tests/unit/test_transaction_cleanup.py
     tests/unit/test_operation_import.py
+    tests/unit/test_metadata_catalog.py
+    tests/unit/test_metadata_session_cache.py
+    tests/unit/test_semantic_builder_metadata.py
     tests/unit/test_operation_object.py
+    tests/unit/test_object_native_surface.py
     tests/unit/test_operation_plugin.py
     tests/unit/test_operation_plugin_registry.py
     tests/unit/test_operation_platform_rtpc.py

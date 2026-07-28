@@ -26,7 +26,6 @@ REQUIRED_PUBLIC_EXPORTS = {
     "ObjectMutationBuilder",
     "PropertyReferenceBuilder",
     "MetadataBuilder",
-    "ImportBuilder",
     "SoundBankBuilder",
     "SwitchContainerAssignmentBuilder",
     "SemanticPreview",

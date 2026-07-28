@@ -38,10 +38,24 @@ DEFAULT_MAX_FIELD_NAME_LENGTH = 128
 DEFAULT_MAX_NOTES_LENGTH = 64 * 1024
 DEFAULT_MAX_RTPCS = 32
 DEFAULT_MAX_RTPC_POINTS = 256
+DEFAULT_MAX_IMPORT_FILES = 16
 
 NODE_FIELDS = frozenset({"type", "name", "notes", "properties", "references", "children"})
+OBJECT_SET_NODE_FIELDS = NODE_FIELDS | {"platform", "language", "import"}
+LIST_FIELDS = frozenset({"name", "objects"})
 PROPERTY_FIELDS = frozenset({"name", "value"})
 REFERENCE_FIELDS = frozenset({"name", "target"})
+IMPORT_FIELDS = frozenset({"files"})
+IMPORT_OPTIONAL_FIELDS = frozenset({"auto_add_to_source_control"})
+IMPORT_FILE_OPTIONAL_FIELDS = frozenset(
+    {
+        "audio_file",
+        "audio_file_base64",
+        "originals_subfolder",
+        "language",
+        "object_type",
+    }
+)
 RTPC_FIELDS = frozenset({"property", "control_input", "points"})
 RTPC_OPTIONAL_FIELDS = frozenset({"notes"})
 RTPC_POINT_FIELDS = frozenset({"x", "y", "shape"})
@@ -186,6 +200,49 @@ class ObjectReferenceDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
+class ObjectImportFileDescriptor:
+    """One closed native ``object.set`` import file before filesystem proof."""
+
+    request_path: str
+    audio_file: str | None
+    audio_file_base64: str | None
+    originals_subfolder: str | None
+    language: str | None
+    object_type: str | None
+
+    def as_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        if self.audio_file is not None:
+            result["audio_file"] = self.audio_file
+        if self.audio_file_base64 is not None:
+            result["audio_file_base64"] = self.audio_file_base64
+        if self.originals_subfolder is not None:
+            result["originals_subfolder"] = self.originals_subfolder
+        if self.language is not None:
+            result["language"] = self.language
+        if self.object_type is not None:
+            result["object_type"] = self.object_type
+        return result
+
+
+@dataclass(frozen=True, slots=True)
+class ObjectImportDescriptor:
+    """Closed ``importArg`` subset supported by Wwise 2023.1 and newer."""
+
+    request_path: str
+    files: tuple[ObjectImportFileDescriptor, ...]
+    auto_add_to_source_control: bool | None
+
+    def as_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "files": [item.as_dict() for item in self.files]
+        }
+        if self.auto_add_to_source_control is not None:
+            result["auto_add_to_source_control"] = self.auto_add_to_source_control
+        return result
+
+
+@dataclass(frozen=True, slots=True)
 class RtpcCurvePoint:
     x: int | float
     y: int | float
@@ -225,6 +282,9 @@ class ObjectNodeDescriptor:
     type: str
     name: str
     notes: str | None
+    platform: str | None
+    language: str | None
+    import_arg: ObjectImportDescriptor | None
     properties: tuple[ObjectPropertyDescriptor, ...]
     references: tuple[ObjectReferenceDescriptor, ...]
     children: tuple[ObjectNodeDescriptor, ...]
@@ -233,6 +293,12 @@ class ObjectNodeDescriptor:
         result: dict[str, Any] = {"type": self.type, "name": self.name}
         if self.notes is not None:
             result["notes"] = self.notes
+        if self.platform is not None:
+            result["platform"] = self.platform
+        if self.language is not None:
+            result["language"] = self.language
+        if self.import_arg is not None:
+            result["import"] = self.import_arg.as_dict()
         if self.properties:
             result["properties"] = [item.as_dict() for item in self.properties]
         if self.references:
@@ -240,6 +306,22 @@ class ObjectNodeDescriptor:
         if self.children:
             result["children"] = [item.as_dict() for item in self.children]
         return result
+
+
+@dataclass(frozen=True, slots=True)
+class ObjectListDescriptor:
+    """One closed native object-list assignment for an existing owner."""
+
+    request_path: str
+    name: str
+    objects: tuple[ObjectNodeDescriptor, ...]
+    nodes: tuple[ObjectNodeDescriptor, ...]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "objects": [item.as_dict() for item in self.objects],
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -271,6 +353,7 @@ class ObjectResultNode:
     object: ObjectId
     name: str
     child_count: int
+    collection: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -357,11 +440,19 @@ def normalize_object_tree(
     replace_owned: bool = False,
     limits: ObjectTreeLimits = ObjectTreeLimits(),
     base_path: str = "$",
+    allow_platform: bool = False,
+    allow_language: bool = False,
+    allow_import: bool = False,
 ) -> NormalizedObjectTree:
     """Normalize one root and return its deterministic request-relative list."""
 
     request_size = _request_size(payload, limits=limits, path=base_path)
-    state = _NormalizationState(limits)
+    state = _NormalizationState(
+        limits,
+        allow_platform=allow_platform,
+        allow_language=allow_language,
+        allow_import=allow_import,
+    )
     root = state.node(payload, request_path=base_path, parent_path=None, depth=1)
     return NormalizedObjectTree(
         root=root,
@@ -376,10 +467,20 @@ def normalize_object_node(
     *,
     limits: ObjectTreeLimits = ObjectTreeLimits(),
     base_path: str = "$",
+    allow_platform: bool = False,
+    allow_language: bool = False,
+    allow_import: bool = False,
 ) -> ObjectNodeDescriptor:
     """Normalize one node when conflict policy is owned by a surrounding call."""
 
-    return normalize_object_tree(payload, limits=limits, base_path=base_path).root
+    return normalize_object_tree(
+        payload,
+        limits=limits,
+        base_path=base_path,
+        allow_platform=allow_platform,
+        allow_language=allow_language,
+        allow_import=allow_import,
+    ).root
 
 
 def normalize_object_forest(
@@ -389,6 +490,9 @@ def normalize_object_forest(
     replace_owned: bool = False,
     limits: ObjectTreeLimits = ObjectTreeLimits(),
     base_path: str = "$",
+    allow_platform: bool = False,
+    allow_language: bool = False,
+    allow_import: bool = False,
 ) -> NormalizedObjectForest:
     """Normalize sibling roots under one shared node/size budget."""
 
@@ -405,7 +509,12 @@ def normalize_object_forest(
             f"{base_path} exceeds the per-parent child limit.",
             details={"path": base_path, "count": len(payload), "limit": limits.max_children_per_node},
         )
-    state = _NormalizationState(limits)
+    state = _NormalizationState(
+        limits,
+        allow_platform=allow_platform,
+        allow_language=allow_language,
+        allow_import=allow_import,
+    )
     roots = tuple(
         state.node(
             item,
@@ -421,6 +530,210 @@ def normalize_object_forest(
         nodes=flatten_request_nodes(roots),
         on_name_conflict=normalize_conflict_policy(on_name_conflict, replace_owned=replace_owned),
         request_size_bytes=request_size,
+    )
+
+
+def normalize_object_list_name(
+    value: Any,
+    *,
+    request_path: str = "$.list",
+    limits: ObjectTreeLimits = ObjectTreeLimits(),
+) -> str:
+    """Normalize one native object-list token without accepting a raw ``@`` key."""
+
+    return _field_name(value, path=request_path, limits=limits)
+
+
+def normalize_object_lists(
+    payload: Any,
+    *,
+    request_path: str = "$.lists",
+    limits: ObjectTreeLimits = ObjectTreeLimits(),
+    allow_platform: bool = False,
+    allow_language: bool = False,
+    allow_import: bool = False,
+) -> tuple[ObjectListDescriptor, ...]:
+    """Normalize the closed ``[{name, objects}]`` object-list DSL.
+
+    An empty ``objects`` array is retained so a surrounding, explicitly sealed
+    ``replaceAll`` operation can clear a list.  ``append`` callers must reject
+    that no-op at the operation layer.
+    """
+
+    _request_size(payload, limits=limits, path=request_path)
+    rows = _descriptor_rows(
+        payload,
+        request_path=request_path,
+        limit=limits.max_children_per_node,
+    )
+    result: list[ObjectListDescriptor] = []
+    total_nodes = 0
+    for index, item in enumerate(rows):
+        path = f"{request_path}[{index}]"
+        _exact_fields(item, required=LIST_FIELDS, optional=frozenset(), path=path)
+        name = normalize_object_list_name(
+            item.get("name"),
+            request_path=f"{path}.name",
+            limits=limits,
+        )
+        forest = normalize_object_forest(
+            item.get("objects"),
+            limits=limits,
+            base_path=f"{path}.objects",
+            allow_platform=allow_platform,
+            allow_language=allow_language,
+            allow_import=allow_import,
+        )
+        total_nodes += len(forest.nodes)
+        if total_nodes > limits.max_nodes:
+            raise ObjectOperationContractError(
+                "NODE_LIMIT_EXCEEDED",
+                "The object lists exceed the shared total node limit.",
+                details={
+                    "path": request_path,
+                    "count": total_nodes,
+                    "limit": limits.max_nodes,
+                },
+            )
+        result.append(
+            ObjectListDescriptor(
+                request_path=path,
+                name=name,
+                objects=forest.roots,
+                nodes=forest.nodes,
+            )
+        )
+    names = [item.name.casefold() for item in result]
+    if len(names) != len(set(names)):
+        raise ObjectOperationContractError(
+            "DUPLICATE_LIST",
+            "One object.set target must not assign the same object list more than once.",
+            details={"path": request_path},
+        )
+    return tuple(result)
+
+
+def normalize_object_import(
+    payload: Any,
+    *,
+    request_path: str = "$.import",
+    max_files: int = DEFAULT_MAX_IMPORT_FILES,
+) -> ObjectImportDescriptor:
+    """Normalize the reviewed ``importArg`` subset without touching files.
+
+    The operation registry subsequently proves every regular file, canonicalizes
+    bounded inline WAV data, and binds those immutable values to the preview.
+    This pure layer accepts no other native import fields.
+    """
+
+    mapping = _mapping(payload, path=request_path)
+    _exact_fields(
+        mapping,
+        required=IMPORT_FIELDS,
+        optional=IMPORT_OPTIONAL_FIELDS,
+        path=request_path,
+    )
+    raw_files = mapping.get("files")
+    if not isinstance(raw_files, list):
+        raise ObjectOperationContractError(
+            "INVALID_IMPORT_FILES",
+            f"{request_path}.files must be an array.",
+            details={
+                "path": f"{request_path}.files",
+                "actual_type": type(raw_files).__name__,
+            },
+        )
+    limit = _positive_limit(max_files, field="max_files")
+    if not raw_files or len(raw_files) > limit:
+        raise ObjectOperationContractError(
+            "IMPORT_FILE_LIMIT",
+            f"{request_path}.files must contain between 1 and {limit} entries.",
+            details={"path": f"{request_path}.files", "count": len(raw_files), "limit": limit},
+        )
+    files: list[ObjectImportFileDescriptor] = []
+    for index, raw in enumerate(raw_files):
+        path = f"{request_path}.files[{index}]"
+        row = _mapping(raw, path=path)
+        _exact_fields(
+            row,
+            required=frozenset(),
+            optional=IMPORT_FILE_OPTIONAL_FIELDS,
+            path=path,
+        )
+        has_file = "audio_file" in row
+        has_inline = "audio_file_base64" in row
+        if has_file == has_inline:
+            raise ObjectOperationContractError(
+                "INVALID_IMPORT_SOURCE",
+                f"{path} must provide exactly one of audio_file or audio_file_base64.",
+                details={"path": path},
+            )
+        audio_file = (
+            _bounded_import_text(
+                row.get("audio_file"),
+                path=f"{path}.audio_file",
+                max_length=4096,
+            )
+            if has_file
+            else None
+        )
+        audio_file_base64 = (
+            _bounded_import_text(
+                row.get("audio_file_base64"),
+                path=f"{path}.audio_file_base64",
+                max_length=256 * 1024,
+            )
+            if has_inline
+            else None
+        )
+        originals_subfolder = (
+            _bounded_import_text(
+                row.get("originals_subfolder"),
+                path=f"{path}.originals_subfolder",
+                max_length=512,
+            )
+            if "originals_subfolder" in row
+            else None
+        )
+        language = (
+            _bounded_import_text(
+                row.get("language"),
+                path=f"{path}.language",
+                max_length=128,
+            )
+            if "language" in row
+            else None
+        )
+        object_type = (
+            _bounded_import_text(
+                row.get("object_type"),
+                path=f"{path}.object_type",
+                max_length=128,
+            )
+            if "object_type" in row
+            else None
+        )
+        files.append(
+            ObjectImportFileDescriptor(
+                request_path=path,
+                audio_file=audio_file,
+                audio_file_base64=audio_file_base64,
+                originals_subfolder=originals_subfolder,
+                language=language,
+                object_type=object_type,
+            )
+        )
+    auto_add = mapping.get("auto_add_to_source_control")
+    if auto_add is not None and type(auto_add) is not bool:
+        raise ObjectOperationContractError(
+            "INVALID_IMPORT_SOURCE_CONTROL",
+            f"{request_path}.auto_add_to_source_control must be a JSON boolean.",
+            details={"path": f"{request_path}.auto_add_to_source_control"},
+        )
+    return ObjectImportDescriptor(
+        request_path=request_path,
+        files=tuple(files),
+        auto_add_to_source_control=auto_add,
     )
 
 
@@ -617,6 +930,7 @@ def materialize_waapi_node(
     node: ObjectNodeDescriptor,
     *,
     resolved_references: Mapping[str, ObjectId] | None = None,
+    materialized_imports: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build one trusted native WAAPI child object from normalized descriptors.
 
@@ -626,6 +940,10 @@ def materialize_waapi_node(
     """
 
     resolved = dict(resolved_references or {})
+    imports = {
+        key: dict(value)
+        for key, value in dict(materialized_imports or {}).items()
+    }
     required_paths = {
         reference.request_path
         for request_node in flatten_request_nodes((node,))
@@ -639,11 +957,33 @@ def materialize_waapi_node(
             "Resolved reference bindings must match the normalized reference descriptors exactly.",
             details={"missing": missing, "unexpected": unexpected},
         )
+    required_import_paths = {
+        request_node.request_path
+        for request_node in flatten_request_nodes((node,))
+        if request_node.import_arg is not None
+    }
+    missing_imports = sorted(required_import_paths - set(imports))
+    unexpected_imports = sorted(set(imports) - required_import_paths)
+    if missing_imports or unexpected_imports:
+        raise ObjectOperationContractError(
+            "IMPORT_BINDING_MISMATCH",
+            "Trusted import bindings must match normalized import descriptors exactly.",
+            details={
+                "missing": missing_imports,
+                "unexpected": unexpected_imports,
+            },
+        )
 
     def build(current: ObjectNodeDescriptor) -> dict[str, Any]:
         result: dict[str, Any] = {"type": current.type, "name": current.name}
         if current.notes is not None:
             result["notes"] = current.notes
+        if current.platform is not None:
+            result["platform"] = current.platform
+        if current.language is not None:
+            result["language"] = current.language
+        if current.import_arg is not None:
+            result["import"] = imports[current.request_path]
         for prop in current.properties:
             result[f"@{prop.name}"] = prop.value
         for reference in current.references:
@@ -682,8 +1022,9 @@ def flatten_set_result(
     *,
     base_path: str = "$.objects",
     max_nodes: int = DEFAULT_MAX_NODES,
+    allowed_lists: Sequence[str] = (),
 ) -> tuple[ObjectResultNode, ...]:
-    """Flatten an ``object.set`` result body, including each target association."""
+    """Flatten an ``object.set`` result body, including reviewed list fields."""
 
     mapping = _mapping(payload, path="$result")
     unknown_root = set(mapping) - {"objects"}
@@ -701,18 +1042,87 @@ def flatten_set_result(
             details={"path": "$result.objects", "actual_type": type(objects).__name__},
         )
     limit = _positive_limit(max_nodes, field="max_nodes")
+    normalized_lists = {
+        normalize_object_list_name(
+            item,
+            request_path=f"$allowed_lists[{index}]",
+        )
+        for index, item in enumerate(allowed_lists)
+    }
     counter = [0]
     result: list[ObjectResultNode] = []
     for index, item in enumerate(objects):
-        result.extend(
-            _flatten_result_node(
-                item,
-                request_path=f"{base_path}[{index}]",
-                parent_path=None,
-                max_nodes=limit,
-                counter=counter,
+        request_path = f"{base_path}[{index}]"
+        row = _mapping(item, path=request_path)
+        dynamic_fields = {
+            key[1:]: key
+            for key in row
+            if key.startswith("@")
+        }
+        unexpected = sorted(set(dynamic_fields) - normalized_lists)
+        if unexpected:
+            raise ObjectOperationContractError(
+                "INVALID_RESULT_SHAPE",
+                "object.set result contains an unreviewed object-list association.",
+                details={
+                    "path": request_path,
+                    "unexpected_lists": unexpected,
+                    "allowed_lists": sorted(normalized_lists),
+                },
+            )
+        object_id, name = _result_identity(row, request_path=request_path)
+        children = _result_collection_rows(
+            row.get("children", []),
+            request_path=f"{request_path}.children",
+        )
+        list_rows = {
+            list_name: _result_collection_rows(
+                row.get(wire_name, []),
+                request_path=f"{request_path}.{wire_name}",
+                allow_single=True,
+            )
+            for list_name, wire_name in dynamic_fields.items()
+        }
+        counter[0] += 1
+        if counter[0] > limit:
+            raise ObjectOperationContractError(
+                "RESULT_NODE_LIMIT_EXCEEDED",
+                "The reflected object result exceeds the node limit.",
+                details={"path": request_path, "count": counter[0], "limit": limit},
+            )
+        result.append(
+            ObjectResultNode(
+                request_path,
+                None,
+                object_id,
+                name,
+                len(children) + sum(len(rows) for rows in list_rows.values()),
+                None,
             )
         )
+        for child_index, child in enumerate(children):
+            result.extend(
+                _flatten_result_node(
+                    child,
+                    request_path=f"{request_path}.children[{child_index}]",
+                    parent_path=request_path,
+                    max_nodes=limit,
+                    counter=counter,
+                    collection="children",
+                )
+            )
+        for list_name, rows in list_rows.items():
+            for child_index, child in enumerate(rows):
+                result.extend(
+                    _flatten_result_node(
+                        child,
+                        request_path=f"{request_path}.@{list_name}[{child_index}]",
+                        parent_path=request_path,
+                        max_nodes=limit,
+                        counter=counter,
+                        collection=list_name,
+                    )
+                )
     return tuple(result)
 
 
@@ -763,8 +1173,18 @@ def bind_request_result_topology(
 
 
 class _NormalizationState:
-    def __init__(self, limits: ObjectTreeLimits) -> None:
+    def __init__(
+        self,
+        limits: ObjectTreeLimits,
+        *,
+        allow_platform: bool,
+        allow_language: bool,
+        allow_import: bool,
+    ) -> None:
         self.limits = limits
+        self.allow_platform = allow_platform
+        self.allow_language = allow_language
+        self.allow_import = allow_import
         self.node_count = 0
 
     def node(
@@ -789,7 +1209,23 @@ class _NormalizationState:
                 details={"path": request_path, "count": self.node_count, "limit": self.limits.max_nodes},
             )
         mapping = _mapping(payload, path=request_path)
-        _exact_fields(mapping, required={"type", "name"}, optional=NODE_FIELDS - {"type", "name"}, path=request_path)
+        allowed_fields = (
+            OBJECT_SET_NODE_FIELDS
+            if self.allow_platform or self.allow_language or self.allow_import
+            else NODE_FIELDS
+        )
+        if not self.allow_platform:
+            allowed_fields = allowed_fields - {"platform"}
+        if not self.allow_language:
+            allowed_fields = allowed_fields - {"language"}
+        if not self.allow_import:
+            allowed_fields = allowed_fields - {"import"}
+        _exact_fields(
+            mapping,
+            required={"type", "name"},
+            optional=allowed_fields - {"type", "name"},
+            path=request_path,
+        )
         object_type = _bounded_token(
             mapping.get("type"),
             path=f"{request_path}.type",
@@ -816,6 +1252,32 @@ class _NormalizationState:
                     f"{request_path}.notes exceeds the length limit.",
                     details={"path": f"{request_path}.notes", "length": len(notes), "limit": self.limits.max_notes_length},
                 )
+        platform = (
+            _bounded_import_text(
+                mapping.get("platform"),
+                path=f"{request_path}.platform",
+                max_length=128,
+            )
+            if "platform" in mapping
+            else None
+        )
+        language = (
+            _bounded_import_text(
+                mapping.get("language"),
+                path=f"{request_path}.language",
+                max_length=128,
+            )
+            if "language" in mapping
+            else None
+        )
+        import_arg = (
+            normalize_object_import(
+                mapping.get("import"),
+                request_path=f"{request_path}.import",
+            )
+            if "import" in mapping
+            else None
+        )
         properties = _normalize_properties(
             mapping.get("properties", []),
             request_path=f"{request_path}.properties",
@@ -877,6 +1339,9 @@ class _NormalizationState:
             type=object_type,
             name=name,
             notes=notes,
+            platform=platform,
+            language=language,
+            import_arg=import_arg,
             properties=properties,
             references=references,
             children=children,
@@ -988,6 +1453,7 @@ def _flatten_result_node(
     parent_path: str | None,
     max_nodes: int,
     counter: list[int],
+    collection: str = "children",
 ) -> list[ObjectResultNode]:
     counter[0] += 1
     if counter[0] > max_nodes:
@@ -997,23 +1463,28 @@ def _flatten_result_node(
             details={"path": request_path, "count": counter[0], "limit": max_nodes},
         )
     mapping = _mapping(payload, path=request_path)
-    object_id = mapping.get("id")
-    _require_object_id(object_id, path=f"{request_path}.id")
-    name = mapping.get("name")
-    if not isinstance(name, str):
+    dynamic_fields = sorted(key for key in mapping if key.startswith("@"))
+    if dynamic_fields:
         raise ObjectOperationContractError(
             "INVALID_RESULT_SHAPE",
-            f"{request_path}.name must be a string.",
-            details={"path": f"{request_path}.name", "actual_type": type(name).__name__},
+            "Nested object results contain an unreviewed object-list association.",
+            details={"path": request_path, "unexpected_fields": dynamic_fields},
         )
-    children = mapping.get("children", [])
-    if not isinstance(children, list):
-        raise ObjectOperationContractError(
-            "INVALID_RESULT_SHAPE",
-            f"{request_path}.children must be an array when present.",
-            details={"path": f"{request_path}.children", "actual_type": type(children).__name__},
+    object_id, name = _result_identity(mapping, request_path=request_path)
+    children = _result_collection_rows(
+        mapping.get("children", []),
+        request_path=f"{request_path}.children",
+    )
+    result = [
+        ObjectResultNode(
+            request_path,
+            parent_path,
+            object_id,
+            name,
+            len(children),
+            collection,
         )
-    result = [ObjectResultNode(request_path, parent_path, object_id, name, len(children))]
+    ]
     for index, child in enumerate(children):
         result.extend(
             _flatten_result_node(
@@ -1022,9 +1493,46 @@ def _flatten_result_node(
                 parent_path=request_path,
                 max_nodes=max_nodes,
                 counter=counter,
+                collection="children",
             )
         )
     return result
+
+
+def _result_identity(mapping: Mapping[str, Any], *, request_path: str) -> tuple[ObjectId, str]:
+    object_id = mapping.get("id")
+    _require_object_id(object_id, path=f"{request_path}.id")
+    name = mapping.get("name")
+    if not isinstance(name, str):
+        raise ObjectOperationContractError(
+            "INVALID_RESULT_SHAPE",
+            f"{request_path}.name must be a string.",
+            details={
+                "path": f"{request_path}.name",
+                "actual_type": type(name).__name__,
+            },
+        )
+    return object_id, name
+
+
+def _result_collection_rows(
+    value: Any,
+    *,
+    request_path: str,
+    allow_single: bool = False,
+) -> list[dict[str, Any]]:
+    if allow_single and isinstance(value, Mapping):
+        return [_mapping(value, path=request_path)]
+    if not isinstance(value, list):
+        raise ObjectOperationContractError(
+            "INVALID_RESULT_SHAPE",
+            f"{request_path} must be an array when present.",
+            details={"path": request_path, "actual_type": type(value).__name__},
+        )
+    return [
+        _mapping(item, path=f"{request_path}[{index}]")
+        for index, item in enumerate(value)
+    ]
 
 
 def _request_size(payload: Any, *, limits: ObjectTreeLimits, path: str) -> int:
@@ -1109,6 +1617,28 @@ def _field_name(value: Any, *, path: str, limits: ObjectTreeLimits) -> str:
             details={"path": path, "name": name},
         )
     return name
+
+
+def _bounded_import_text(value: Any, *, path: str, max_length: int) -> str:
+    if not isinstance(value, str) or not value or value != value.strip():
+        raise ObjectOperationContractError(
+            "INVALID_STRING",
+            f"{path} must be a non-empty string without leading or trailing whitespace.",
+            details={"path": path, "actual_type": type(value).__name__},
+        )
+    if len(value) > max_length:
+        raise ObjectOperationContractError(
+            "STRING_LIMIT_EXCEEDED",
+            f"{path} exceeds the length limit.",
+            details={"path": path, "length": len(value), "limit": max_length},
+        )
+    if any(ord(character) < 32 for character in value):
+        raise ObjectOperationContractError(
+            "INVALID_STRING",
+            f"{path} must not contain control characters.",
+            details={"path": path},
+        )
+    return value
 
 
 def _bounded_token(
@@ -1227,6 +1757,9 @@ __all__ = [
     "NormalizedObjectTree",
     "ObjectConflictPolicy",
     "ObjectIdentityDescriptor",
+    "ObjectImportDescriptor",
+    "ObjectImportFileDescriptor",
+    "ObjectListDescriptor",
     "ObjectNodeDescriptor",
     "ObjectOperationContractError",
     "ObjectPropertyDescriptor",
@@ -1247,6 +1780,9 @@ __all__ = [
     "materialize_waapi_rtpc",
     "normalize_conflict_policy",
     "normalize_object_forest",
+    "normalize_object_import",
+    "normalize_object_list_name",
+    "normalize_object_lists",
     "normalize_object_node",
     "normalize_object_tree",
     "normalize_property_descriptors",

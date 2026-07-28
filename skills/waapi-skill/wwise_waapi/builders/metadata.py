@@ -76,8 +76,15 @@ class ObjectTypeMetadataRecord:
     type: str
     raw: Mapping[str, Any] = field(default_factory=dict)
 
-    def as_dict(self) -> dict[str, Any]:
-        return {"classId": self.class_id, "name": self.name, "type": self.type, "raw": dict(self.raw)}
+    def as_dict(self, *, include_raw: bool = False) -> dict[str, Any]:
+        payload = {
+            "classId": self.class_id,
+            "name": self.name,
+            "type": self.type,
+        }
+        if include_raw:
+            payload["raw"] = dict(self.raw)
+        return payload
 
 
 @dataclass(slots=True, frozen=True)
@@ -105,8 +112,8 @@ class PropertyInfoMetadataRecord:
     audio_engine_id: int | None = None
     raw: Mapping[str, Any] = field(default_factory=dict)
 
-    def as_dict(self) -> dict[str, Any]:
-        return {
+    def as_dict(self, *, include_raw: bool = False) -> dict[str, Any]:
+        payload = {
             "name": self.name,
             "type": self.type,
             "default": self.default,
@@ -116,8 +123,10 @@ class PropertyInfoMetadataRecord:
             "dependencies": [dict(item) for item in self.dependencies],
             "ui": dict(self.ui),
             "audioEngineId": self.audio_engine_id,
-            "raw": dict(self.raw),
         }
+        if include_raw:
+            payload["raw"] = dict(self.raw)
+        return payload
 
 
 @dataclass(slots=True, frozen=True)
@@ -139,13 +148,15 @@ class AttenuationCurveMetadataRecord:
     points: tuple[Mapping[str, Any], ...] = ()
     raw: Mapping[str, Any] = field(default_factory=dict)
 
-    def as_dict(self) -> dict[str, Any]:
-        return {
+    def as_dict(self, *, include_raw: bool = False) -> dict[str, Any]:
+        payload = {
             "curveType": self.curve_type,
             "use": self.use,
             "points": [dict(point) for point in self.points],
-            "raw": dict(self.raw),
         }
+        if include_raw:
+            payload["raw"] = dict(self.raw)
+        return payload
 
 
 @dataclass(slots=True, frozen=True)

@@ -51,6 +51,9 @@ CONFLICT_POLICIES = ("rename", "replace", "fail", "merge")
 COPY_MOVE_CONFLICT_POLICIES = ("rename", "replace", "fail")
 LIST_MODES = ("replaceAll", "append")
 PASTE_MODES = ("replaceEntire", "addReplace", "addKeep")
+AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS = ("2023.1", "2024.1", "2025.1")
+
+
 class ObjectMutationOperation(str, Enum):
     """Supported P1 object mutation operations."""
 
@@ -171,11 +174,33 @@ class ObjectMutationBuilder:
         *,
         object: ObjectIdentity | ResolvedObject,
         object_rows: Sequence[Mapping[str, Any]] | Mapping[str, Any] | None = None,
+        auto_check_out_to_source_control: bool | None = None,
     ) -> SemanticPreview:
         resolved = _resolve_identity("object", object, object_rows)
+        args: dict[str, Any] = {"object": resolved.object}
+        if self.version in AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS:
+            if (
+                auto_check_out_to_source_control is not None
+                and type(auto_check_out_to_source_control) is not bool
+            ):
+                raise _schema_error(
+                    "auto_check_out_to_source_control must be a JSON boolean.",
+                    auto_check_out_to_source_control=auto_check_out_to_source_control,
+                )
+            args["autoCheckOutToSourceControl"] = bool(
+                auto_check_out_to_source_control
+            )
+        elif auto_check_out_to_source_control is not None:
+            raise _schema_error(
+                "auto_check_out_to_source_control is available only in Wwise 2023.1-2025.1.",
+                version=self.version,
+                supported_versions=list(
+                    AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS
+                ),
+            )
         return self._build_preview(
             ObjectMutationOperation.DELETE,
-            {"object": resolved.object},
+            args,
             {},
             identities={"object": resolved.as_dict()},
             readback=(_object_absence_readback(resolved.object),),

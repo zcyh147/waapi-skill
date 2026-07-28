@@ -1,13 +1,13 @@
 ---
 name: waapi-skill
-description: Use this skill for Wwise and WAAPI work through the existing skill-local Python runtime, versioned manifests, semantic builders, bounded subscriptions, and safe dispatcher calls. Always use this skill when the user asks about the current Wwise project or version, current selection, object lookup, hierarchy browsing, properties, imports, soundbanks, switch assignments, topic waits, WAAPI connection/setup, or Wwise project changes, even if they do not explicitly say “WAAPI”. For every Skill-backed Wwise task, begin with the injected absolute SKILL.md locator; never search the current workspace or infer a repository-relative Skill path. Before any other shell action, read only the injected absolute SKILL.md locator in one command; that first command must not also run pwd, git, rg, ls, find, inspect a user file, or invoke the gateway. This is especially important for Wwise CLI, project migration, and the reviewed 2024.1 audio conversion route.
+description: Use this skill for Wwise and WAAPI work through the existing skill-local Python runtime, versioned manifests, semantic builders, bounded subscriptions, and safe dispatcher calls. Always use this skill when the user asks about the current Wwise project or version, current selection, object lookup, hierarchy browsing, properties, imports, soundbanks, switch assignments, topic waits, WAAPI connection/setup, or Wwise project changes, even if they do not explicitly say “WAAPI”. For every Skill-backed Wwise task, begin with the injected absolute SKILL.md locator; never search the current workspace or infer a repository-relative Skill path. Before any other shell action, read only the injected absolute SKILL.md locator in one command; that first command must not also run pwd, git, rg, ls, find, inspect a user file, or invoke the gateway.
 ---
 
 # Wwise WAAPI Skill
 
-Use this skill to automate Wwise through its packaged, version-aware WAAPI runtime. The executable gateway is the interface. Do not replace it with temporary scripts, inline Python, direct `WaapiClient` calls, or repository archaeology.
+Automate Wwise only through the packaged, version-aware gateway. Do not replace it with temporary scripts, inline Python, direct `WaapiClient` calls, or repository archaeology.
 
-In a fresh task, make the first shell action only the injected `SKILL.md` read. Do not prepend or append `pwd`, `git`, `rg`, `ls`, `find`, `printf`, a user-file read, a gateway command, or any other workspace action to that initial read. Finish that one read before deciding the next command.
+In a fresh task, make the first shell action only the injected `SKILL.md` read. Do not prepend or append `pwd`, `git`, `rg`, `ls`, `find`, `printf`, a user-file read, or a gateway command. Finish that read before the next command.
 
 Supported Wwise versions are `2021.1`, `2022.1`, `2023.1`, `2024.1`, and `2025.1`.
 
@@ -22,7 +22,7 @@ Use the first gateway command already required by the user's task. If the first 
 ## Entry rules
 
 1. Route the request into **setup**, **query**, or **operate** from the user's words.
-2. Bootstrap only from the injected absolute `SKILL.md` locator. Never guess a repository-relative `skills/waapi-skill` path or run `pwd`, `git status`, `ls`, `find`, `rg`, or another working-directory/repository probe to locate the Skill, including for Wwise CLI and project-migration requests.
+2. Bootstrap only from the injected absolute `SKILL.md` locator. Never guess a repository-relative `skills/waapi-skill` path or run `pwd`, `git status`, `ls`, `find`, `rg`, or another workspace probe to locate the Skill, including for Wwise CLI and project-migration requests.
 3. For the common live reads below, run the matching gateway command immediately. Derive the absolute Skill directory from the injected absolute `SKILL.md` locator and invoke its absolute `scripts/run.py` path; do not rely on an unrecorded shell working directory. Do this before `ls`, `find`, `rg`, documentation research, or reading implementation files.
 4. Use connection settings in this order: explicit gateway flags, `WWISE_WAAPI_HOST` / `WWISE_WAAPI_PORT` / `WWISE_VERSION`, then the external saved config reported by `config-show`. Put the runtime version selector after `gateway.py` and before its subcommand. The exact full shape is `python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2022.1 operation-schema object.copy`; `--wwise-version` is accepted in that gateway-global position as a compatibility alias and is also the saved-config field after `config-set`. Do not inspect or hand-edit config files. Do not scan unrelated ports or processes.
 5. Treat gateway JSON as authoritative. Every gateway command must leave its complete JSON visible to the conversation before the next command: never suppress or redirect its output, request a zero/short tool-output budget, or continue from the shell exit code alone. If no complete JSON is visible, stop and report that missing result instead of assuming success. On a structured error or boundary, report it; do not improvise another WAAPI client or write a helper.
@@ -53,6 +53,7 @@ python scripts/run.py gateway.py --version <supported-version> call ak.wwise.waa
 python scripts/run.py gateway.py --version <supported-version> call <bounded-read-uri> --args-json '<object>' --options-json '<object>'
 python scripts/run.py gateway.py query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path
 python scripts/run.py gateway.py query-object --type Event --take 100
+python scripts/run.py gateway.py --version <supported-version> object-types --query '<type keywords>' --limit 20
 python scripts/run.py gateway.py metadata types --summary-only
 python scripts/run.py gateway.py wait-topic <topic-uri>
 python scripts/run.py gateway.py --timeout <positive-finite-seconds> wait-topic <topic-uri> --event-count <1..64> --match-json '<object>'
@@ -84,7 +85,8 @@ Use exactly one command for the corresponding intent:
 | inspect packaged API support, schema, route, or boundary | `capabilities` / `describe` |
 | call a capability whose catalog route is `manifest_dispatch` | `call` with reflected args/options |
 | object lookup by path, id, type, search, or query object | `query-object` |
-| object type/property/reference metadata | `metadata` |
+| packaged object-type discovery without Wwise | `object-types` |
+| live object type/property/reference metadata | `metadata` |
 | wait for one or a fixed bounded count of topic events | `wait-topic` |
 | explicitly stream topic events continuously | `stream-topic` |
 | inspect project-changing operation support | `operations` / `operation-schema` |
@@ -181,8 +183,9 @@ In ordinary agent use, omit `--state-dir`: the Gateway owns a deterministic exte
 Fast route from this entry file:
 
 - Closed transaction operations are `waapi.call`, `waapi.undoGroup`, `object.create`, `object.createPlugin`, `object.set`, `object.setLinked`, `object.setRTPC`, `object.delete`, `object.setName`, `object.setNotes`, `object.setProperty`, `object.setReference`, `audio.import`, `audio.importTabDelimited`, `soundbank.setInclusions`, `soundbank.generate`, `soundbank.convertExternalSources`, `soundbank.processDefinitionFiles`, `switchContainer.addAssignment`, `switchContainer.removeAssignment`, `ui.captureScreen`, `ui.commands.execute`, `ui.commands.register`, `ui.commands.unregister`, `lua.executeCliFile`, `lua.executeCoreFile`, `lua.executeCoreInline`, `debug.setAsserts`, `debug.setAutomationMode`, `debug.restartWaapiServers`, `debug.testAssert`, and `debug.testCrash`. For a new request, read `references/waapi-operate.md` in its own tool call, then run the named `operation-schema` and transaction commands as separate tool calls. For an existing transaction continuation, do not reread an already-visible Skill or operate reference; skip `operation-schema` and `preview`; start with `transaction-show`.
-- For an object-tree request, evaluate the `object.set` lock before considering an existing-root `object.create` merge. Any requested field or reference change on an existing root, more than one existing root, or an append under a nested container explicitly identified as existing selects `object.set` and excludes `object.create`. Only after all three exclusions are absent may `object.create` merge into exactly one same-name existing root, and then only when that root stays unchanged and the request is a pure descendant-tree merge. A wholly new recursive root also uses `object.create`.
-- The complete operate reference owns the closed operation inventory, version-specific direct `waapi.call` fast routes and request mappings, named-operation choice, Authoring/CLI distinction, host/path boundaries, exact transaction commands, and operation-specific verification limits. Follow that reference literally after its one complete read; do not infer or duplicate a missing request shape from this entry file.
+- For an object-tree request, evaluate the `object.set` lock before considering `object.create`: existing-root field/reference changes, multiple roots, or appends below an explicitly existing nested container select `object.set`. Only after all three exclusions are absent may `object.create` merge beneath exactly one same-name existing root while leaving it unchanged; new roots also use `object.create`.
+- Choose overlaps by business outcome and obey `operation.selection_guidance` or `describe`'s `interface.selection_guidance`. Direct batches use `audio.import`; an existing caller-supplied TSV or explicit table workflow uses `audio.importTabDelimited`. Keep Authoring, runtime, audition, and GUI domains distinct; the operate reference owns details.
+- The operate reference owns version-specific direct `waapi.call` fast routes and request mappings plus all remaining operation rules. Follow that reference literally after its one complete read.
 
 Conditional read for a closed transaction: `references/waapi-operate.md`
 

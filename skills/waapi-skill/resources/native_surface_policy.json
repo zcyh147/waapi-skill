@@ -1,0 +1,1866 @@
+{
+  "contract": "waapi-skill.native-surface-policy/v1",
+  "scope": "high_risk_request_surface_differences",
+  "statuses": [
+    "mapped",
+    "normalized_equivalent",
+    "intentionally_blocked",
+    "missing"
+  ],
+  "route_audit": {
+    "contract": "waapi-skill.public-function-route-audit/v1",
+    "profiles": {
+      "wwise-console": {
+        "function_rows": 662,
+        "unique_function_uris": 167,
+        "generic_reflected_rows": 450,
+        "generic_reflected_unique_uris": 118,
+        "special_rows": 212,
+        "special_unique_uris": 49
+      },
+      "wwise-authoring-ui": {
+        "function_rows": 670,
+        "unique_function_uris": 167,
+        "generic_reflected_rows": 452,
+        "generic_reflected_unique_uris": 118,
+        "special_rows": 218,
+        "special_unique_uris": 49
+      }
+    },
+    "reviewed_generic_restrictions": {
+      "ak.wwise.cli.convertExternalSource": "Wwise 2022.1 processes only the first source-file and last repeated platform, so the public route rejects those partial-success combinations.",
+      "ak.wwise.cli.generateSoundbank": "Arbitrary custom opening, closing, pre-generation, and post-generation process hooks are blocked.",
+      "ak.wwise.cli.tabDelimitedImport": "Arbitrary custom opening and closing process hooks are blocked.",
+      "ak.wwise.core.audio.convert": "Wwise 2024.1 and 2025.1 reflection exposes unresolved array item schemas; the public route requires bounded non-empty string arrays.",
+      "ak.wwise.core.mediaPool.get": "The public read requires a bounded maxResults request and applies bounded text and result ceilings.",
+      "ak.wwise.core.transport.destroy": "Transport ID zero is rejected because it cannot identify a real created transport."
+    },
+    "reviewed_special_uris": [
+      "ak.wwise.cli.convertExternalSource",
+      "ak.wwise.cli.executeLuaScript",
+      "ak.wwise.cli.generateSoundbank",
+      "ak.wwise.cli.tabDelimitedImport",
+      "ak.wwise.core.audio.convert",
+      "ak.wwise.core.audio.import",
+      "ak.wwise.core.audio.importTabDelimited",
+      "ak.wwise.core.executeLuaScript",
+      "ak.wwise.core.getInfo",
+      "ak.wwise.core.getProjectInfo",
+      "ak.wwise.core.mediaPool.get",
+      "ak.wwise.core.object.create",
+      "ak.wwise.core.object.delete",
+      "ak.wwise.core.object.get",
+      "ak.wwise.core.object.getAttenuationCurve",
+      "ak.wwise.core.object.getPropertyAndReferenceNames",
+      "ak.wwise.core.object.getPropertyInfo",
+      "ak.wwise.core.object.getTypes",
+      "ak.wwise.core.object.isPropertyEnabled",
+      "ak.wwise.core.object.set",
+      "ak.wwise.core.object.setLinked",
+      "ak.wwise.core.object.setName",
+      "ak.wwise.core.object.setNotes",
+      "ak.wwise.core.object.setProperty",
+      "ak.wwise.core.object.setReference",
+      "ak.wwise.core.profiler.getGameObjects",
+      "ak.wwise.core.profiler.getVoiceContributions",
+      "ak.wwise.core.soundbank.convertExternalSources",
+      "ak.wwise.core.soundbank.generate",
+      "ak.wwise.core.soundbank.processDefinitionFiles",
+      "ak.wwise.core.soundbank.setInclusions",
+      "ak.wwise.core.switchContainer.addAssignment",
+      "ak.wwise.core.switchContainer.removeAssignment",
+      "ak.wwise.core.transport.destroy",
+      "ak.wwise.core.undo.beginGroup",
+      "ak.wwise.core.undo.cancelGroup",
+      "ak.wwise.core.undo.endGroup",
+      "ak.wwise.debug.enableAsserts",
+      "ak.wwise.debug.enableAutomationMode",
+      "ak.wwise.debug.getWalTree",
+      "ak.wwise.debug.restartWaapiServers",
+      "ak.wwise.debug.testAssert",
+      "ak.wwise.debug.testCrash",
+      "ak.wwise.debug.validateCall",
+      "ak.wwise.ui.captureScreen",
+      "ak.wwise.ui.commands.execute",
+      "ak.wwise.ui.commands.register",
+      "ak.wwise.ui.commands.unregister",
+      "ak.wwise.ui.getSelectedObjects"
+    ]
+  },
+  "coverage": {
+    "wwise-console": [
+      "ak.wwise.cli.executeLuaScript",
+      "ak.wwise.cli.generateSoundbank",
+      "ak.wwise.cli.tabDelimitedImport",
+      "ak.wwise.core.audio.import",
+      "ak.wwise.core.audio.importTabDelimited",
+      "ak.wwise.core.executeLuaScript",
+      "ak.wwise.core.object.create",
+      "ak.wwise.core.object.delete",
+      "ak.wwise.core.object.get",
+      "ak.wwise.core.object.set",
+      "ak.wwise.core.object.setReference",
+      "ak.wwise.core.soundbank.convertExternalSources",
+      "ak.wwise.core.soundbank.generate",
+      "ak.wwise.ui.getSelectedObjects"
+    ],
+    "wwise-authoring-ui": [
+      "ak.wwise.ui.commands.register"
+    ]
+  },
+  "rules": [
+    {
+      "uri": "ak.wwise.cli.generateSoundbank",
+      "profile": "wwise-console",
+      "versions": ["2021.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["waapi.call"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [
+              "abort-on-load-issues",
+              "audio-source-from-original",
+              "bank",
+              "cache",
+              "clear-audio-file-cache",
+              "continue-on-error",
+              "header-file",
+              "header-file-path",
+              "import-definition-file",
+              "import-language",
+              "language",
+              "license",
+              "no-decode",
+              "no-wwise-dat",
+              "output",
+              "platform",
+              "project",
+              "quiet",
+              "readable-soundbanks",
+              "save",
+              "skip-languages",
+              "soundbank-path",
+              "source-by-platform",
+              "source-file",
+              "tab-delimited-import-file",
+              "tab-delimited-operation",
+              "use-stable-guid",
+              "verbose"
+            ],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [
+              "custom-global-closing-cmd",
+              "custom-global-opening-cmd",
+              "custom-post-gen-cmd",
+              "custom-pre-gen-cmd"
+            ],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": []
+    },
+    {
+      "uri": "ak.wwise.cli.generateSoundbank",
+      "profile": "wwise-console",
+      "versions": ["2022.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["waapi.call"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [
+              "abort-on-load-issues",
+              "audio-source-from-original",
+              "bank",
+              "cache",
+              "clear-audio-file-cache",
+              "continue-on-error",
+              "header-file",
+              "header-file-path",
+              "import-definition-file",
+              "import-language",
+              "language",
+              "license",
+              "no-decode",
+              "no-source-control",
+              "no-wwise-dat",
+              "output",
+              "platform",
+              "project",
+              "quiet",
+              "readable-soundbanks",
+              "root-output-path",
+              "save",
+              "skip-languages",
+              "soundbank-path",
+              "source-by-platform",
+              "source-file",
+              "tab-delimited-import-file",
+              "tab-delimited-operation",
+              "use-stable-guid",
+              "use-user-overrides",
+              "verbose"
+            ],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [
+              "custom-global-closing-cmd",
+              "custom-global-opening-cmd",
+              "custom-post-gen-cmd",
+              "custom-pre-gen-cmd"
+            ],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": []
+    },
+    {
+      "uri": "ak.wwise.cli.generateSoundbank",
+      "profile": "wwise-console",
+      "versions": ["2023.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["waapi.call"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [
+              "abort-on-load-issues",
+              "audio-source-from-original",
+              "bank",
+              "cache",
+              "clear-audio-file-cache",
+              "continue-on-error",
+              "header-file",
+              "header-file-path",
+              "import-definition-file",
+              "import-language",
+              "language",
+              "license",
+              "license-file",
+              "no-decode",
+              "no-source-control",
+              "no-wwise-dat",
+              "output",
+              "platform",
+              "project",
+              "quiet",
+              "readable-soundbanks",
+              "root-output-path",
+              "save",
+              "skip-languages",
+              "soundbank-path",
+              "source-by-platform",
+              "source-file",
+              "tab-delimited-import-file",
+              "tab-delimited-operation",
+              "use-stable-guid",
+              "use-user-overrides",
+              "verbose"
+            ],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [
+              "custom-global-closing-cmd",
+              "custom-global-opening-cmd",
+              "custom-post-gen-cmd",
+              "custom-pre-gen-cmd"
+            ],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": []
+    },
+    {
+      "uri": "ak.wwise.cli.generateSoundbank",
+      "profile": "wwise-console",
+      "versions": ["2024.1", "2025.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["waapi.call"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [
+              "abort-on-load-issues",
+              "audio-source-from-original",
+              "bank",
+              "cache",
+              "clear-audio-file-cache",
+              "continue-on-error",
+              "header-file",
+              "header-file-path",
+              "import-definition-file",
+              "import-language",
+              "language",
+              "license",
+              "license-file",
+              "no-decode",
+              "no-source-control",
+              "output",
+              "platform",
+              "project",
+              "quiet",
+              "readable-soundbanks",
+              "root-output-path",
+              "save",
+              "skip-languages",
+              "soundbank-path",
+              "source-by-platform",
+              "source-file",
+              "tab-delimited-import-file",
+              "tab-delimited-operation",
+              "use-stable-guid",
+              "use-user-overrides",
+              "verbose"
+            ],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [
+              "custom-global-closing-cmd",
+              "custom-global-opening-cmd",
+              "custom-post-gen-cmd",
+              "custom-pre-gen-cmd"
+            ],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": []
+    },
+    {
+      "uri": "ak.wwise.cli.tabDelimitedImport",
+      "profile": "wwise-console",
+      "versions": ["2021.1", "2022.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["waapi.call"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [
+              "audio-source-from-original",
+              "continue-on-error",
+              "import-language",
+              "project",
+              "quiet",
+              "tab-delimited-import-file",
+              "tab-delimited-operation",
+              "verbose"
+            ],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [
+              "custom-global-closing-cmd",
+              "custom-global-opening-cmd"
+            ],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": []
+    },
+    {
+      "uri": "ak.wwise.cli.tabDelimitedImport",
+      "profile": "wwise-console",
+      "versions": ["2023.1", "2024.1", "2025.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["waapi.call"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [
+              "audio-source-from-original",
+              "continue-on-error",
+              "import-language",
+              "no-source-control",
+              "project",
+              "quiet",
+              "tab-delimited-import-file",
+              "tab-delimited-operation",
+              "verbose"
+            ],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [
+              "custom-global-closing-cmd",
+              "custom-global-opening-cmd"
+            ],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": []
+    },
+    {
+      "uri": "ak.wwise.core.object.get",
+      "profile": "wwise-console",
+      "versions": ["2021.1", "2022.1", "2023.1"],
+      "execution_mode": "fixed_command",
+      "operations": [],
+      "fixed_commands": ["query-object", "buses"],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": ["from", "transform", "waql"],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "$ref:#/definitions/objectReturnOptions"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.waql::caller-supplied-raw-expression",
+          "status": "intentionally_blocked",
+          "reason": "The fixed route builds bounded WAQL from reviewed source, filter, selection, and take inputs instead of dispatching an unrestricted expression."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.object.get",
+      "profile": "wwise-console",
+      "versions": ["2024.1", "2025.1"],
+      "execution_mode": "fixed_command",
+      "operations": [],
+      "fixed_commands": ["query-object", "buses"],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": ["from", "transform", "waql"],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "$ref:waapi_definitions.json#/definitions/objectReturnOptions"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.waql::caller-supplied-raw-expression",
+          "status": "intentionally_blocked",
+          "reason": "The fixed route builds bounded WAQL from reviewed source, filter, selection, and take inputs instead of dispatching an unrestricted expression."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.ui.getSelectedObjects",
+      "profile": "wwise-console",
+      "versions": ["2021.1", "2022.1", "2023.1"],
+      "execution_mode": "fixed_command",
+      "operations": [],
+      "fixed_commands": ["selected"],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "$ref:#/definitions/objectReturnOptions"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "options.return::arbitrary-fields",
+          "status": "normalized_equivalent",
+          "reason": "The fixed selected command accepts caller-requested object accessors under a bounded projection while always retaining stable identity fields."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.audio.import",
+      "profile": "wwise-console",
+      "versions": ["2021.1", "2022.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["audio.import"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "autoAddToSourceControl",
+              "default",
+              "importOperation",
+              "imports"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/argsSchema/properties/default",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "audioFile",
+              "audioFileBase64",
+              "audioSourceNotes",
+              "dialogueEvent",
+              "event",
+              "importLanguage",
+              "importLocation",
+              "notes",
+              "objectPath",
+              "objectType",
+              "originalsSubFolder",
+              "pattern:^@[:_a-zA-Z0-9]+$",
+              "switchAssignation"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/argsSchema/properties/imports/items",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "audioFile",
+              "audioFileBase64",
+              "audioSourceNotes",
+              "dialogueEvent",
+              "event",
+              "importLanguage",
+              "importLocation",
+              "notes",
+              "objectPath",
+              "objectType",
+              "originalsSubFolder",
+              "pattern:^@[:_a-zA-Z0-9]+$",
+              "switchAssignation"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "$ref:#/definitions/objectReturnOptions"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.default.objectPath::implicit-target",
+          "status": "normalized_equivalent",
+          "reason": "A reviewed default object_path may be inherited by normalized import rows, then remains bound to the same target preflight and post-import verification."
+        },
+        {
+          "selector": "args.imports[].event::relative-existing-or-duplicate-target",
+          "status": "intentionally_blocked",
+          "reason": "The closed Event form requires an absolute Events path, requires that path to be absent before dispatch, and requires one unique Event path per import row; native relative paths and appending Actions to an existing Event are not exposed."
+        },
+        {
+          "selector": "args.default-or-imports[].pattern:@reference::childOfReference",
+          "status": "intentionally_blocked",
+          "reason": "Canonical reference tokens are accepted only when live metadata has no childOfReference ordering dependency; constrained references require a dedicated ordered operation."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.audio.import",
+      "profile": "wwise-console",
+      "versions": ["2023.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["audio.import"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "autoAddToSourceControl",
+              "autoCheckOutToSourceControl",
+              "default",
+              "importOperation",
+              "imports"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/argsSchema/properties/default",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "audioFile",
+              "audioFileBase64",
+              "audioSourceNotes",
+              "dialogueEvent",
+              "event",
+              "importLanguage",
+              "importLocation",
+              "notes",
+              "objectPath",
+              "objectType",
+              "originalsSubFolder",
+              "pattern:^@[:_a-zA-Z0-9]+$",
+              "switchAssignation"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/argsSchema/properties/imports/items",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "audioFile",
+              "audioFileBase64",
+              "audioSourceNotes",
+              "dialogueEvent",
+              "event",
+              "importLanguage",
+              "importLocation",
+              "notes",
+              "objectPath",
+              "objectType",
+              "originalsSubFolder",
+              "pattern:^@[:_a-zA-Z0-9]+$",
+              "switchAssignation"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "$ref:#/definitions/objectReturnOptions"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.default.objectPath::implicit-target",
+          "status": "normalized_equivalent",
+          "reason": "A reviewed default object_path may be inherited by normalized import rows, then remains bound to the same target preflight and post-import verification."
+        },
+        {
+          "selector": "args.imports[].event::relative-existing-or-duplicate-target",
+          "status": "intentionally_blocked",
+          "reason": "The closed Event form requires an absolute Events path, requires that path to be absent before dispatch, and requires one unique Event path per import row; native relative paths and appending Actions to an existing Event are not exposed."
+        },
+        {
+          "selector": "args.default-or-imports[].pattern:@reference::childOfReference",
+          "status": "intentionally_blocked",
+          "reason": "Canonical reference tokens are accepted only when live metadata has no childOfReference ordering dependency; constrained references require a dedicated ordered operation."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.audio.import",
+      "profile": "wwise-console",
+      "versions": ["2024.1", "2025.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["audio.import"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "autoAddToSourceControl",
+              "autoCheckOutToSourceControl",
+              "default",
+              "importOperation",
+              "imports"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/argsSchema/properties/default",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "audioFile",
+              "audioFileBase64",
+              "audioSourceNotes",
+              "dialogueEvent",
+              "event",
+              "importLanguage",
+              "importLocation",
+              "notes",
+              "objectPath",
+              "objectType",
+              "originalsSubFolder",
+              "pattern:^@[:_a-zA-Z0-9]+$",
+              "switchAssignation"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/argsSchema/properties/imports/items",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "audioFile",
+              "audioFileBase64",
+              "audioSourceNotes",
+              "dialogueEvent",
+              "event",
+              "importLanguage",
+              "importLocation",
+              "notes",
+              "objectPath",
+              "objectType",
+              "originalsSubFolder",
+              "pattern:^@[:_a-zA-Z0-9]+$",
+              "switchAssignation"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "$ref:waapi_definitions.json#/definitions/objectReturnOptions"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.default.objectPath::implicit-target",
+          "status": "normalized_equivalent",
+          "reason": "A reviewed default object_path may be inherited by normalized import rows, then remains bound to the same target preflight and post-import verification."
+        },
+        {
+          "selector": "args.imports[].event::relative-existing-or-duplicate-target",
+          "status": "intentionally_blocked",
+          "reason": "The closed Event form requires an absolute Events path, requires that path to be absent before dispatch, and requires one unique Event path per import row; native relative paths and appending Actions to an existing Event are not exposed."
+        },
+        {
+          "selector": "args.default-or-imports[].pattern:@reference::childOfReference",
+          "status": "intentionally_blocked",
+          "reason": "Canonical reference tokens are accepted only when live metadata has no childOfReference ordering dependency; constrained references require a dedicated ordered operation."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.audio.importTabDelimited",
+      "profile": "wwise-console",
+      "versions": ["2021.1", "2022.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["audio.importTabDelimited"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "autoAddToSourceControl",
+              "importFile",
+              "importLanguage",
+              "importLocation",
+              "importOperation"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "$ref:#/definitions/objectReturnOptions"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "tab-columns::property-reference-dialogue-switch-families",
+          "status": "intentionally_blocked",
+          "reason": "The bounded TSV parser accepts fixed columns plus canonical-token property/reference, base64, Event, Dialogue Event, and Switch Assignation columns; display-name aliases are not treated as native header equivalents."
+        },
+        {
+          "selector": "tab-columns.Event::relative-existing-or-duplicate-target",
+          "status": "intentionally_blocked",
+          "reason": "Every non-empty Event column must name an absolute, previously absent, row-unique Events path; native relative paths and appending Actions to an existing Event are not exposed."
+        },
+        {
+          "selector": "tab-columns.Reference[]-or-@reference::childOfReference",
+          "status": "intentionally_blocked",
+          "reason": "Canonical reference-token columns are accepted only when live metadata has no childOfReference ordering dependency; constrained references require a dedicated ordered operation."
+        },
+        {
+          "selector": "tab-columns.Object Path::blank-audio-name-inference",
+          "status": "intentionally_blocked",
+          "reason": "Every reviewed TSV row requires a non-empty Object Path; native inference of the object name from a blank Object Path is not exposed."
+        },
+        {
+          "selector": "tab-columns.Audio File::relative-to-import-file",
+          "status": "intentionally_blocked",
+          "reason": "A regular Audio File cell must contain an absolute proven file path; native paths relative to the tab-delimited file are not exposed."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.audio.importTabDelimited",
+      "profile": "wwise-console",
+      "versions": ["2023.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["audio.importTabDelimited"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "autoAddToSourceControl",
+              "autoCheckOutToSourceControl",
+              "importFile",
+              "importLanguage",
+              "importLocation",
+              "importOperation"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "$ref:#/definitions/objectReturnOptions"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "tab-columns::property-reference-dialogue-switch-families",
+          "status": "intentionally_blocked",
+          "reason": "The bounded TSV parser accepts fixed columns plus canonical-token property/reference, base64, Event, Dialogue Event, and Switch Assignation columns; display-name aliases are not treated as native header equivalents."
+        },
+        {
+          "selector": "tab-columns.Event::relative-existing-or-duplicate-target",
+          "status": "intentionally_blocked",
+          "reason": "Every non-empty Event column must name an absolute, previously absent, row-unique Events path; native relative paths and appending Actions to an existing Event are not exposed."
+        },
+        {
+          "selector": "tab-columns.Reference[]-or-@reference::childOfReference",
+          "status": "intentionally_blocked",
+          "reason": "Canonical reference-token columns are accepted only when live metadata has no childOfReference ordering dependency; constrained references require a dedicated ordered operation."
+        },
+        {
+          "selector": "tab-columns.Object Path::blank-audio-name-inference",
+          "status": "intentionally_blocked",
+          "reason": "Every reviewed TSV row requires a non-empty Object Path; native inference of the object name from a blank Object Path is not exposed."
+        },
+        {
+          "selector": "tab-columns.Audio File::relative-to-import-file",
+          "status": "intentionally_blocked",
+          "reason": "A regular Audio File cell must contain an absolute proven file path; native paths relative to the tab-delimited file are not exposed."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.audio.importTabDelimited",
+      "profile": "wwise-console",
+      "versions": ["2024.1", "2025.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["audio.importTabDelimited"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "autoAddToSourceControl",
+              "autoCheckOutToSourceControl",
+              "importFile",
+              "importLanguage",
+              "importLocation",
+              "importOperation"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "$ref:waapi_definitions.json#/definitions/objectReturnOptions"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "tab-columns::property-reference-dialogue-switch-families",
+          "status": "intentionally_blocked",
+          "reason": "The bounded TSV parser accepts fixed columns plus canonical-token property/reference, base64, Event, Dialogue Event, and Switch Assignation columns; display-name aliases are not treated as native header equivalents."
+        },
+        {
+          "selector": "tab-columns.Event::relative-existing-or-duplicate-target",
+          "status": "intentionally_blocked",
+          "reason": "Every non-empty Event column must name an absolute, previously absent, row-unique Events path; native relative paths and appending Actions to an existing Event are not exposed."
+        },
+        {
+          "selector": "tab-columns.Reference[]-or-@reference::childOfReference",
+          "status": "intentionally_blocked",
+          "reason": "Canonical reference-token columns are accepted only when live metadata has no childOfReference ordering dependency; constrained references require a dedicated ordered operation."
+        },
+        {
+          "selector": "tab-columns.Object Path::blank-audio-name-inference",
+          "status": "intentionally_blocked",
+          "reason": "Every reviewed TSV row requires a non-empty Object Path; native inference of the object name from a blank Object Path is not exposed."
+        },
+        {
+          "selector": "tab-columns.Audio File::relative-to-import-file",
+          "status": "intentionally_blocked",
+          "reason": "A regular Audio File cell must contain an absolute proven file path; native paths relative to the tab-delimited file are not exposed."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.object.create",
+      "profile": "wwise-console",
+      "versions": ["2021.1", "2022.1", "2023.1"],
+      "execution_mode": "transaction",
+      "operations": ["object.create"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "autoAddToSourceControl",
+              "children",
+              "list",
+              "name",
+              "notes",
+              "onNameConflict",
+              "parent",
+              "platform",
+              "type"
+            ],
+            "intentionally_blocked": ["pattern:^@[:_a-zA-Z0-9]+$"],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/argsSchema/localDefinitions/children/items",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "children",
+              "name",
+              "notes",
+              "type"
+            ],
+            "intentionally_blocked": ["pattern:^@[:_a-zA-Z0-9]+$"],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.pattern:^@[:_a-zA-Z0-9]+$::closed-scalar-property-reference-subset",
+          "status": "intentionally_blocked",
+          "reason": "Closed scalar property, reference, and object-list descriptors are available; raw plug-in, RTPC, and unverified object variants remain outside the native pattern boundary."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.object.create",
+      "profile": "wwise-console",
+      "versions": ["2024.1", "2025.1"],
+      "execution_mode": "transaction",
+      "operations": ["object.create"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "autoAddToSourceControl",
+              "children",
+              "list",
+              "name",
+              "notes",
+              "onNameConflict",
+              "parent",
+              "platform",
+              "type"
+            ],
+            "intentionally_blocked": [
+              "id",
+              "pattern:^@[:_a-zA-Z0-9]+$"
+            ],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/argsSchema/definitions/children/items",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "children",
+              "name",
+              "notes",
+              "type"
+            ],
+            "intentionally_blocked": [
+              "id",
+              "pattern:^@[:_a-zA-Z0-9]+$"
+            ],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.pattern:^@[:_a-zA-Z0-9]+$::closed-scalar-property-reference-subset",
+          "status": "intentionally_blocked",
+          "reason": "Closed scalar property, reference, and object-list descriptors are available; raw plug-in, RTPC, and unverified object variants remain outside the native pattern boundary."
+        },
+        {
+          "selector": "args.id::caller-assigned-internal-guid",
+          "status": "intentionally_blocked",
+          "reason": "The reflected field is explicitly for internal use and the Skill keeps Wwise responsible for object identity allocation."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.object.set",
+      "profile": "wwise-console",
+      "versions": ["2022.1"],
+      "execution_mode": "transaction",
+      "operations": ["object.createPlugin", "object.set", "object.setRTPC"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "autoAddToSourceControl",
+              "listMode",
+              "objects",
+              "onNameConflict",
+              "platform"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/argsSchema/properties/objects/items",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "children",
+              "listMode",
+              "name",
+              "notes",
+              "object",
+              "onNameConflict",
+              "platform"
+            ],
+            "intentionally_blocked": ["pattern:^@[:_a-zA-Z0-9]+$"],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/argsSchema/localDefinitions/object",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "children",
+              "classId",
+              "language",
+              "name",
+              "notes",
+              "platform",
+              "type"
+            ],
+            "intentionally_blocked": ["pattern:^@[:_a-zA-Z0-9]+$"],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "$ref:#/definitions/objectReturnOptions"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.onNameConflict::replace",
+          "status": "intentionally_blocked",
+          "reason": "The closed object.set path supports fail, rename, and merge; destructive raw replace remains outside this operation."
+        },
+        {
+          "selector": "args.objects[].pattern:^@[:_a-zA-Z0-9]+$::raw-list-plugin-rtpc-variants",
+          "status": "intentionally_blocked",
+          "reason": "Closed scalar/reference and object-list descriptors are available, while plug-ins and RTPCs use their verified dedicated operations and unverified raw variants remain blocked."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.object.set",
+      "profile": "wwise-console",
+      "versions": ["2023.1"],
+      "execution_mode": "transaction",
+      "operations": ["object.createPlugin", "object.set", "object.setRTPC"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "autoAddToSourceControl",
+              "listMode",
+              "objects",
+              "onNameConflict",
+              "platform"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/argsSchema/properties/objects/items",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "children",
+              "import",
+              "listMode",
+              "name",
+              "notes",
+              "object",
+              "onNameConflict",
+              "platform"
+            ],
+            "intentionally_blocked": ["pattern:^@[:_a-zA-Z0-9]+$"],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/argsSchema/localDefinitions/object",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "children",
+              "classId",
+              "import",
+              "language",
+              "name",
+              "notes",
+              "platform",
+              "type"
+            ],
+            "intentionally_blocked": ["pattern:^@[:_a-zA-Z0-9]+$"],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "$ref:#/definitions/objectReturnOptions"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.onNameConflict::replace",
+          "status": "intentionally_blocked",
+          "reason": "The closed object.set path supports fail, rename, and merge; destructive raw replace remains outside this operation."
+        },
+        {
+          "selector": "args.objects[].pattern:^@[:_a-zA-Z0-9]+$::raw-list-plugin-rtpc-variants",
+          "status": "intentionally_blocked",
+          "reason": "Closed scalar/reference and object-list descriptors are available, while plug-ins and RTPCs use their verified dedicated operations and unverified raw variants remain blocked."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.object.set",
+      "profile": "wwise-console",
+      "versions": ["2024.1", "2025.1"],
+      "execution_mode": "transaction",
+      "operations": ["object.createPlugin", "object.set", "object.setRTPC"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "autoAddToSourceControl",
+              "listMode",
+              "objects",
+              "onNameConflict",
+              "platform"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/argsSchema/properties/objects/items",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "children",
+              "import",
+              "listMode",
+              "name",
+              "notes",
+              "object",
+              "onNameConflict",
+              "platform"
+            ],
+            "intentionally_blocked": ["pattern:^@[:_a-zA-Z0-9]+$"],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/argsSchema/definitions/object",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "children",
+              "classId",
+              "import",
+              "language",
+              "name",
+              "notes",
+              "platform",
+              "type"
+            ],
+            "intentionally_blocked": [
+              "id",
+              "pattern:^@[:_a-zA-Z0-9]+$"
+            ],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "$ref:waapi_definitions.json#/definitions/objectReturnOptions"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.onNameConflict::replace",
+          "status": "intentionally_blocked",
+          "reason": "The closed object.set path supports fail, rename, and merge; destructive raw replace remains outside this operation."
+        },
+        {
+          "selector": "args.objects[].pattern:^@[:_a-zA-Z0-9]+$::raw-list-plugin-rtpc-variants",
+          "status": "intentionally_blocked",
+          "reason": "Closed scalar/reference and object-list descriptors are available, while plug-ins and RTPCs use their verified dedicated operations and unverified raw variants remain blocked."
+        },
+        {
+          "selector": "args.objects[].children[].id::caller-assigned-internal-guid",
+          "status": "intentionally_blocked",
+          "reason": "The reflected field is for internal use and Wwise remains responsible for allocating object IDs."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.object.delete",
+      "profile": "wwise-console",
+      "versions": ["2021.1", "2022.1"],
+      "execution_mode": "transaction",
+      "operations": ["object.delete"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": ["object"],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": []
+    },
+    {
+      "uri": "ak.wwise.core.object.delete",
+      "profile": "wwise-console",
+      "versions": ["2023.1", "2024.1", "2025.1"],
+      "execution_mode": "transaction",
+      "operations": ["object.delete"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "autoCheckOutToSourceControl",
+              "object"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": []
+    },
+    {
+      "uri": "ak.wwise.core.object.setReference",
+      "profile": "wwise-console",
+      "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
+      "execution_mode": "transaction",
+      "operations": ["object.setReference"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "object",
+              "platform",
+              "reference",
+              "value"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.value::null-clear",
+          "status": "normalized_equivalent",
+          "reason": "The closed reference operation accepts an explicit null target, validates live not-null restrictions, and verifies the cleared reference."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.cli.executeLuaScript",
+      "profile": "wwise-console",
+      "versions": ["2023.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["lua.executeCliFile"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": ["lua-script"],
+            "intentionally_blocked": [
+              "allow-migration",
+              "do-file",
+              "lua-path",
+              "project",
+              "require"
+            ],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.lua-script::user-file-only",
+          "status": "normalized_equivalent",
+          "reason": "The Skill seals an exact user-supplied Lua file and supplies its path through lua-script; it never authors Lua source."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.cli.executeLuaScript",
+      "profile": "wwise-console",
+      "versions": ["2024.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["lua.executeCliFile"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": ["lua-script", "watchdog-timeout"],
+            "intentionally_blocked": [
+              "allow-migration",
+              "do-file",
+              "lua-path",
+              "project",
+              "require"
+            ],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.lua-script::user-file-only",
+          "status": "normalized_equivalent",
+          "reason": "The Skill seals an exact user-supplied Lua file and supplies its path through lua-script; it never authors Lua source."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.cli.executeLuaScript",
+      "profile": "wwise-console",
+      "versions": ["2025.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["lua.executeCliFile"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": ["lua-script", "watchdog-timeout"],
+            "intentionally_blocked": [
+              "allow-migration",
+              "do-file",
+              "lua-path",
+              "no-color",
+              "project",
+              "require"
+            ],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.lua-script::user-file-only",
+          "status": "normalized_equivalent",
+          "reason": "The Skill seals an exact user-supplied Lua file and supplies its path through lua-script; it never authors Lua source."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.executeLuaScript",
+      "profile": "wwise-console",
+      "versions": ["2023.1", "2024.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["lua.executeCoreFile"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": ["luaScript"],
+            "intentionally_blocked": ["doFiles", "luaPaths", "requires"],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.luaScript::user-file-only",
+          "status": "normalized_equivalent",
+          "reason": "The Skill seals an exact user-supplied Lua file and supplies its path through luaScript; arbitrary loader arrays remain closed."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.executeLuaScript",
+      "profile": "wwise-console",
+      "versions": ["2025.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["lua.executeCoreFile", "lua.executeCoreInline"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": ["luaScript", "luaString"],
+            "intentionally_blocked": ["doFiles", "luaPaths", "requires"],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.luaString::user-supplied-verbatim-only",
+          "status": "normalized_equivalent",
+          "reason": "Inline Lua is accepted only when copied exactly from the current user request and sealed before execution."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.soundbank.generate",
+      "profile": "wwise-console",
+      "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["soundbank.generate"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "clearAudioFileCache",
+              "languages",
+              "platforms",
+              "rebuildInitBank",
+              "rebuildSoundBanks",
+              "skipLanguages",
+              "soundbanks",
+              "writeToDisk"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.writeToDisk::false",
+          "status": "intentionally_blocked",
+          "reason": "The artifact verifier requires writeToDisk=true and the dedicated operation does not claim in-memory generation effects."
+        },
+        {
+          "selector": "args.soundbanks-or-platforms::omitted-or-empty-broad-scope",
+          "status": "intentionally_blocked",
+          "reason": "The dedicated operation requires an explicit non-empty Bank and platform scope to keep generation and verification bounded."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.soundbank.convertExternalSources",
+      "profile": "wwise-console",
+      "versions": ["2022.1", "2023.1", "2024.1", "2025.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["soundbank.convertExternalSources"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": ["sources"],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/argsSchema/properties/sources/items",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": ["input", "output", "platform"],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.sources[].output::omitted",
+          "status": "intentionally_blocked",
+          "reason": "The isolated verifier requires each final output root to be explicit and confined below io_root."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.ui.commands.register",
+      "profile": "wwise-authoring-ui",
+      "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
+      "execution_mode": "managed_transaction",
+      "operations": ["ui.commands.register"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": ["commands"],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.commands[].program-args-luaScript::raw-handler",
+          "status": "intentionally_blocked",
+          "reason": "Registration accepts only the closed descriptor-backed command form; arbitrary program, argument, and Lua handler definitions remain unavailable."
+        }
+      ]
+    }
+  ]
+}
