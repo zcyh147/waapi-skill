@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Mapping
 
 import pytest  # pyright: ignore[reportMissingImports]
@@ -11,6 +12,7 @@ from wwise_waapi.builders.metadata import (  # pyright: ignore[reportMissingImpo
 )
 from wwise_waapi.metadata_discovery import (  # pyright: ignore[reportMissingImports]
     DEFAULT_METADATA_DISCOVERY_LIMIT,
+    MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES,
     MAX_METADATA_DISCOVERY_FALLBACK_DETAIL_SCAN,
     MAX_METADATA_DISCOVERY_LIMIT,
     MAX_METADATA_DISCOVERY_NAMES,
@@ -90,7 +92,7 @@ def _self_dependency(name: str) -> dict[str, Any]:
     }
 
 
-def test_object_type_discovery_resolves_live_name_and_returns_rich_candidates() -> None:
+def test_object_type_discovery_resolves_live_name_and_returns_compact_candidates() -> None:
     names = [
         "IgnoreParentMaxSoundInstance",
         "IsLoopingEnabled",
@@ -103,14 +105,16 @@ def test_object_type_discovery_resolves_live_name_and_returns_rich_candidates() 
         info={name: _property_info(name) for name in names},
     )
 
-    result = discover_metadata(
+    discovery = discover_metadata(
         read_call=reader,
         object_type="sound",
         queries=["looping enabled", "max sound instance"],
-    ).as_dict()
+    )
+    result = discovery.as_dict()
 
     assert result["contract"] == METADATA_DISCOVERY_CONTRACT
     assert result["authority"] == "live-waapi"
+    assert result["result_detail"] == "compact"
     assert result["scope"] == {
         "kind": "object_type",
         "requested": "sound",
@@ -127,10 +131,48 @@ def test_object_type_discovery_resolves_live_name_and_returns_rich_candidates() 
     )
     assert looping["kind"] == "property"
     assert looping["metadata"]["type"] == "Boolean"
-    assert looping["match_evidence"][0]["sources"][0] == {
+    assert "match_evidence" not in looping
+    assert set(looping["metadata"]) == {
+        "name",
+        "type",
+        "default",
+        "display",
+        "restriction",
+    }
+    detailed = discovery.as_dict(detail=True)
+    assert detailed["contract"] == "waapi-skill.metadata-discovery/v1"
+    assert "result_detail" not in detailed
+    assert set(detailed) == {
+        "contract",
+        "authority",
+        "scope",
+        "queries",
+        "available_name_count",
+        "candidate_count",
+        "query_results",
+        "candidates",
+        "dependency_candidates",
+        "dependency_closure_complete",
+        "unresolved_dependencies",
+        "fallback_detail_scan",
+        "selection_required",
+        "exact_live_name_required_for_mutation",
+    }
+    detailed_looping = next(
+        row
+        for row in detailed["candidates"]
+        if row["name"] == "IsLoopingEnabled"
+    )
+    assert detailed_looping["match_evidence"][0]["sources"][0] == {
         "field": "name",
         "value": "IsLoopingEnabled",
     }
+    assert {
+        "supports",
+        "ui",
+        "audioEngineId",
+        "dependencies",
+    } <= set(detailed_looping["metadata"])
     assert result["selection_required"] is True
     assert result["exact_live_name_required_for_mutation"] is True
 
@@ -185,14 +227,9 @@ def test_display_metadata_can_match_a_second_query_without_static_aliases() -> N
     output_bus = next(
         row for row in result["candidates"] if row["name"] == "OutputBus"
     )
-    evidence = next(
-        row
-        for row in output_bus["match_evidence"]
-        if row["query"] == "master"
-    )
-    assert {"field": "live_metadata", "value": "Master Routing"} in evidence[
-        "sources"
-    ]
+    assert output_bus["matched_queries"] == ["output", "master"]
+    assert output_bus["metadata"]["display"] == {"name": "Master Routing"}
+    assert "match_evidence" not in output_bus
     assert result["fallback_detail_scan"]["status"] == "complete"
 
 
@@ -338,9 +375,32 @@ def test_same_object_dependency_closure_is_live_bounded_and_cycle_safe() -> None
         "EnableRouting",
         "OverrideOutput",
     ]
+    assert candidate["dependency_requirements"] == [
+        {
+            "type": "override",
+            "action": "Enable",
+            "context": "Self",
+            "property": "OverrideOutput",
+            "required_values": [True],
+        }
+    ]
     assert [row["name"] for row in result["dependency_candidates"]] == [
         "EnableRouting",
         "OverrideOutput",
+    ]
+    override = next(
+        row
+        for row in result["dependency_candidates"]
+        if row["name"] == "OverrideOutput"
+    )
+    assert override["dependency_requirements"] == [
+        {
+            "type": "override",
+            "action": "Enable",
+            "context": "Self",
+            "property": "EnableRouting",
+            "required_values": [True],
+        }
     ]
     assert {
         call[1]["property"]
@@ -387,6 +447,146 @@ def test_dependency_cycle_below_root_does_not_repeat_reads_or_exhaust_depth() ->
     ] == ["OutputBus", "FirstGate", "SecondGate"]
 
 
+def test_compact_dependency_requirements_preserve_all_live_conditions() -> None:
+    dependency = {
+        "type": "property",
+        "action": "Enable",
+        "context": "Self",
+        "property": "ActivationGate",
+        "conditions": [
+            {
+                "restriction": {
+                    "type": "enum",
+                    "values": [{"displayName": "True", "value": True}],
+                }
+            },
+            {
+                "referenceIsSet": {
+                    "reference": "OutputBus",
+                    "value": True,
+                }
+            },
+        ],
+    }
+    reader = MetadataReader(
+        names=["ActivationGate", "TargetSetting"],
+        info={
+            "ActivationGate": _property_info("ActivationGate"),
+            "TargetSetting": _property_info(
+                "TargetSetting",
+                dependencies=[dependency],
+            ),
+        },
+    )
+
+    result = discover_metadata(
+        read_call=reader,
+        class_id=65552,
+        queries=["TargetSetting"],
+        limit=1,
+    ).as_dict()
+
+    assert result["candidates"][0]["dependency_requirements"] == [
+        {**dependency, "required_values": [True]}
+    ]
+
+
+def test_compact_five_query_agent_result_stays_below_terminal_visibility_bound() -> None:
+    queries = ("loop", "limit", "output", "pitch", "stream")
+    names: list[str] = []
+    info: dict[str, Mapping[str, Any]] = {}
+    gate_names: list[str] = []
+    for query_index, query in enumerate(queries):
+        gate = f"ActivationGate{query_index}"
+        gate_names.append(gate)
+        for candidate_index in range(4):
+            name = f"{query.title()}Setting{candidate_index}"
+            names.append(name)
+            info[name] = _property_info(
+                name,
+                property_type="Real32",
+                display_name=f"{query.title()} setting {candidate_index}",
+                dependencies=(
+                    [_self_dependency(gate)]
+                    if candidate_index == 0
+                    else []
+                ),
+                supports={
+                    "unlink": True,
+                    "rtpc": "Exclusive",
+                    "randomizer": False,
+                },
+                restriction={"type": "range", "min": -200.0, "max": 200.0},
+                ui={
+                    "value": {
+                        "min": -200.0,
+                        "max": 200.0,
+                        "decimals": 3,
+                        "step": 0.1,
+                        "fine": 0.01,
+                        "infinity": 0.0,
+                    },
+                    "displayAs": {
+                        "lrMix": False,
+                        "musicNote": False,
+                        "bitfield": False,
+                    },
+                    "dataMeaning": "None",
+                    "autoUpdate": False,
+                },
+                audioEngineId=1000 + query_index * 10 + candidate_index,
+            )
+        info[gate] = _property_info(gate)
+    names.extend(gate_names)
+    reader = MetadataReader(names=names, info=info)
+
+    discovery = discover_metadata(
+        read_call=reader,
+        object_type="Sound",
+        queries=queries,
+        limit=8,
+    )
+    compact = discovery.as_dict()
+    detailed = discovery.as_dict(detail=True)
+    compact_bytes = (
+        len(
+            json.dumps(
+                compact,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=False,
+                allow_nan=False,
+            ).encode("utf-8")
+        )
+        + 1
+    )
+
+    assert len(compact["query_results"]) == 5
+    assert len(compact["candidates"]) == 20
+    assert compact["candidate_count"] == len(compact["candidates"])
+    assert [row["name"] for row in compact["candidates"]] == [
+        row["name"] for row in detailed["candidates"]
+    ]
+    assert len(compact["dependency_candidates"]) == 5
+    assert compact_bytes <= MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES
+    assert len(json.dumps(detailed, ensure_ascii=False, indent=2)) > compact_bytes
+    assert all(
+        set(row["metadata"]).isdisjoint(
+            {"supports", "ui", "audioEngineId", "dependencies"}
+        )
+        for row in (
+            *compact["candidates"],
+            *compact["dependency_candidates"],
+        )
+    )
+    assert all(
+        row["metadata"]["range"] == {"min": -200.0, "max": 200.0}
+        for row in compact["candidates"]
+    )
+    first = compact["candidates"][0]
+    assert first["dependency_requirements"][0]["required_values"] == [True]
+
+
 def test_non_self_or_unresolvable_dependencies_are_reported_not_guessed() -> None:
     reader = MetadataReader(
         names=["OutputBus"],
@@ -425,6 +625,102 @@ def test_non_self_or_unresolvable_dependencies_are_reported_not_guessed() -> Non
         for call in reader.calls
         if call[0] == GET_PROPERTY_INFO_URI
     ] == ["OutputBus"]
+
+
+def test_is_master_bus_visibility_predicate_is_terminal_not_a_property_edge() -> None:
+    predicate = {
+        "action": "Show",
+        "context": "Self",
+        "type": "isMasterBus",
+        "value": False,
+    }
+    reader = MetadataReader(
+        names=["IgnoreParentMaxSoundInstance"],
+        info={
+            "IgnoreParentMaxSoundInstance": _property_info(
+                "IgnoreParentMaxSoundInstance",
+                dependencies=[predicate],
+            )
+        },
+    )
+
+    result = discover_metadata(
+        read_call=reader,
+        class_id=65552,
+        queries=["ignore parent playback limit"],
+    ).as_dict()
+
+    assert result["dependency_closure_complete"] is True
+    assert result["unresolved_dependencies"] == []
+    assert result["dependency_candidates"] == []
+    assert result["candidates"][0]["same_object_dependencies"] == []
+    assert result["candidates"][0]["dependency_requirements"] == []
+    detailed = discover_metadata(
+        read_call=MetadataReader(
+            names=["IgnoreParentMaxSoundInstance"],
+            info={
+                "IgnoreParentMaxSoundInstance": _property_info(
+                    "IgnoreParentMaxSoundInstance",
+                    dependencies=[predicate],
+                )
+            },
+        ),
+        class_id=65552,
+        queries=["ignore parent playback limit"],
+    ).as_dict(detail=True)
+    assert detailed["candidates"][0]["metadata"]["dependencies"] == [predicate]
+    assert [
+        call[1]["property"]
+        for call in reader.calls
+        if call[0] == GET_PROPERTY_INFO_URI
+    ] == ["IgnoreParentMaxSoundInstance"]
+
+
+@pytest.mark.parametrize(
+    "predicate",
+    [
+        {
+            "action": "Show",
+            "context": "Parent",
+            "type": "isMasterBus",
+            "value": False,
+        },
+        {
+            "action": "Show",
+            "context": "Self",
+            "type": "isMasterBus",
+        },
+        {
+            "action": "Show",
+            "context": "Self",
+            "type": "futureStructuralPredicate",
+            "value": False,
+        },
+    ],
+)
+def test_unreviewed_structural_dependencies_remain_unresolved(
+    predicate: dict[str, object],
+) -> None:
+    reader = MetadataReader(
+        names=["IgnoreParentMaxSoundInstance"],
+        info={
+            "IgnoreParentMaxSoundInstance": _property_info(
+                "IgnoreParentMaxSoundInstance",
+                dependencies=[predicate],
+            )
+        },
+    )
+
+    result = discover_metadata(
+        read_call=reader,
+        class_id=65552,
+        queries=["ignore parent playback limit"],
+    ).as_dict()
+
+    assert result["dependency_closure_complete"] is False
+    assert result["unresolved_dependencies"][0]["reason"] == (
+        "not-a-resolvable-same-object-property"
+    )
 
 
 @pytest.mark.parametrize(

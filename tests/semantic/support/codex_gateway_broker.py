@@ -111,6 +111,106 @@ _CROCKFORD_BASE32_ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz"
 _CONFIRMATION_TOKEN_RE = re.compile(
     rf"^ct1-[{_CROCKFORD_BASE32_ALPHABET}]{{24}}$"
 )
+_AUDIO_IMPORT_SCALAR_ROW_FIELDS = frozenset(
+    {
+        "object_path",
+        "object_type",
+        "audio_file",
+        "audio_file_base64",
+        "import_language",
+        "originals_subfolder",
+        "notes",
+        "audio_source_notes",
+        "dialogue_event",
+        "switch_assignment",
+    }
+)
+_AUDIO_IMPORT_STRUCTURED_ROW_FIELDS = frozenset(
+    {
+        "import_location",
+        "event",
+    }
+)
+_AUDIO_IMPORT_NAMED_ROW_FIELDS = frozenset(
+    {
+        "properties",
+        "references",
+    }
+)
+_AUDIO_IMPORT_FIXED_ROW_FIELDS = (
+    _AUDIO_IMPORT_SCALAR_ROW_FIELDS
+    | _AUDIO_IMPORT_STRUCTURED_ROW_FIELDS
+)
+_AUDIO_IMPORT_DEFAULTABLE_ROW_FIELDS = (
+    _AUDIO_IMPORT_FIXED_ROW_FIELDS
+    | _AUDIO_IMPORT_NAMED_ROW_FIELDS
+)
+_AUDIO_IMPORT_NON_EMPTY_SCALAR_ROW_FIELDS = frozenset(
+    {
+        "object_path",
+        "object_type",
+        "audio_file",
+        "audio_file_base64",
+        "import_language",
+        "originals_subfolder",
+        "dialogue_event",
+        "switch_assignment",
+    }
+)
+_AUDIO_IMPORT_SCALAR_ROW_FIELD_LIMITS = MappingProxyType(
+    {
+        "object_type": 128,
+        "audio_file_base64": 256 * 1024,
+        "originals_subfolder": 512,
+        "notes": 16 * 1024,
+        "audio_source_notes": 16 * 1024,
+        "dialogue_event": 16 * 1024,
+        "switch_assignment": 16 * 1024,
+    }
+)
+_AUDIO_IMPORT_EVENT_ACTIONS = frozenset(
+    {"Play", "Stop", "Pause", "Resume", "Break", "Seek"}
+)
+_AUDIO_IMPORT_TAB_REQUIRED_ARGUMENT_FIELDS = frozenset(
+    {"import_file", "import_location", "import_language"}
+)
+_AUDIO_IMPORT_TAB_OPTIONAL_ARGUMENT_FIELDS = frozenset(
+    {
+        "import_operation",
+        "auto_add_to_source_control",
+        "auto_check_out_to_source_control",
+    }
+)
+_AUDIO_IMPORT_TAB_OPERATIONS = frozenset(
+    {"createNew", "useExisting", "replaceExisting"}
+)
+_AUDIO_IMPORT_TAB_AUTO_CHECK_OUT_VERSIONS = frozenset(
+    {"2023.1", "2024.1", "2025.1"}
+)
+_OBJECT_SET_ARGUMENT_FIELDS = frozenset(
+    {
+        "objects",
+        "platform",
+        "list_mode",
+        "on_name_conflict",
+        "auto_add_to_source_control",
+    }
+)
+_OBJECT_SET_SUPPORTED_VERSIONS = frozenset(
+    {"2022.1", "2023.1", "2024.1", "2025.1"}
+)
+_OBJECT_SET_SCHEMA_DEFAULTS = MappingProxyType(
+    {
+        "list_mode": "append",
+        "on_name_conflict": "fail",
+        "auto_add_to_source_control": False,
+    }
+)
+_SOUNDBANK_GENERATE_DEFAULT_FALSE_ARGUMENT_FIELDS = (
+    "rebuild_soundbanks",
+    "clear_audio_file_cache",
+    "rebuild_init_bank",
+)
 
 
 class GatewayBrokerError(RuntimeError):
@@ -129,10 +229,223 @@ class SemanticJsonArgument:
     equivalence: str = "wire_exact"
 
     def __post_init__(self) -> None:
-        if self.equivalence not in {"wire_exact", "object_operation_v1"}:
+        if self.equivalence not in {
+            "wire_exact",
+            "object_operation_v1",
+            "soundbank_generate_v1",
+        }:
             raise ValueError(
-                "SemanticJsonArgument.equivalence must be wire_exact or object_operation_v1"
+                "SemanticJsonArgument.equivalence must be wire_exact, "
+                "object_operation_v1, or soundbank_generate_v1"
             )
+        if self.equivalence == "soundbank_generate_v1":
+            try:
+                _normalize_soundbank_generate_request(self.expected)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "soundbank_generate_v1 requires one valid "
+                    "soundbank.generate request"
+                ) from exc
+
+
+@dataclass(frozen=True, slots=True)
+class MetadataQueryArgument:
+    """One bounded natural-language query in a metadata-discover step.
+
+    The business prompt may lead two fresh agents to phrase the same lookup
+    differently.  Mutation authority therefore comes from the exact live
+    candidate tokens used later, not from requiring one magic search phrase.
+    """
+
+    label: str
+    maximum_chars: int = 160
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.maximum_chars, bool)
+            or not isinstance(self.maximum_chars, int)
+            or not 1 <= self.maximum_chars <= 160
+        ):
+            raise ValueError(
+                "MetadataQueryArgument.maximum_chars must be an integer from 1 through 160"
+            )
+        if (
+            not isinstance(self.label, str)
+            or not self.label
+            or self.label != self.label.strip()
+            or len(self.label) > self.maximum_chars
+            or any(
+                ord(character) < 32 or ord(character) == 127
+                for character in self.label
+            )
+        ):
+            raise ValueError(
+                "MetadataQueryArgument.label must be bounded natural-language text"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class MetadataTokenProjection:
+    """Stable live metadata fields for one mutation-relevant exact token."""
+
+    name: str
+    kind: str
+    metadata_type: str
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.name, str)
+            or not self.name
+            or self.name != self.name.strip()
+            or len(self.name) > 256
+            or any(
+                ord(character) < 32 or ord(character) == 127
+                for character in self.name
+            )
+        ):
+            raise ValueError(
+                "MetadataTokenProjection.name must be one bounded exact value"
+            )
+        if self.name.startswith("@"):
+            raise ValueError(
+                "MetadataTokenProjection.name must omit the native @ prefix"
+            )
+        if self.kind not in {"property", "reference"}:
+            raise ValueError(
+                "MetadataTokenProjection.kind must be property or reference"
+            )
+        if (
+            not isinstance(self.metadata_type, str)
+            or self.metadata_type != self.metadata_type.strip()
+            or len(self.metadata_type) > 256
+            or any(
+                ord(character) < 32 or ord(character) == 127
+                for character in self.metadata_type
+            )
+            or self.kind == "property"
+            and not self.metadata_type
+        ):
+            raise ValueError(
+                "MetadataTokenProjection.metadata_type must be bounded; "
+                "only live references may omit it"
+            )
+
+    def as_dict(self) -> dict[str, str]:
+        return {
+            "name": self.name,
+            "kind": self.kind,
+            "metadata_type": self.metadata_type,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class MetadataBoundJsonArgument:
+    """Request JSON whose dynamic names must come from one prior read."""
+
+    expected: Any
+    metadata_step: str
+    object_type: str
+    required_tokens: tuple[str, ...]
+    expected_required_token_projection: (
+        tuple[MetadataTokenProjection, ...] | None
+    ) = None
+    equivalence: str = "wire_exact"
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.metadata_step, str)
+            or not self.metadata_step
+            or self.metadata_step != self.metadata_step.strip()
+            or len(self.metadata_step) > 160
+        ):
+            raise ValueError(
+                "MetadataBoundJsonArgument.metadata_step must be non-empty"
+            )
+        if (
+            not isinstance(self.object_type, str)
+            or not self.object_type
+            or self.object_type != self.object_type.strip()
+            or len(self.object_type) > 256
+            or any(
+                ord(character) < 32 or ord(character) == 127
+                for character in self.object_type
+            )
+        ):
+            raise ValueError(
+                "MetadataBoundJsonArgument.object_type must be one bounded exact name"
+            )
+        if (
+            not self.required_tokens
+            or any(
+                not isinstance(value, str)
+                or not value
+                or value != value.strip()
+                or value.startswith("@")
+                or len(value) > 256
+                or any(
+                    ord(character) < 32 or ord(character) == 127
+                    for character in value
+                )
+                for value in self.required_tokens
+            )
+            or len(self.required_tokens)
+            != len({value.casefold() for value in self.required_tokens})
+        ):
+            raise ValueError(
+                "MetadataBoundJsonArgument.required_tokens must be unique exact live names"
+            )
+        projection = self.expected_required_token_projection
+        if projection is not None and (
+            not isinstance(projection, tuple)
+            or any(
+                not isinstance(item, MetadataTokenProjection)
+                for item in projection
+            )
+            or tuple(item.name for item in projection)
+            != self.required_tokens
+        ):
+            raise ValueError(
+                "MetadataBoundJsonArgument expected projection must match required_tokens in order"
+            )
+        if self.equivalence not in {
+            "wire_exact",
+            "audio_import_v1",
+            "audio_import_tab_v1",
+            "object_set_v1",
+        }:
+            raise ValueError(
+                "MetadataBoundJsonArgument.equivalence must be "
+                "wire_exact, audio_import_v1, audio_import_tab_v1, "
+                "or object_set_v1"
+            )
+        if self.equivalence == "audio_import_v1":
+            try:
+                normalized = _normalize_audio_import_request(self.expected)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "audio_import_v1 requires one valid audio.import request"
+                ) from exc
+            request_tokens = _audio_import_field_names(normalized)
+            if not request_tokens.issubset(set(self.required_tokens)):
+                raise ValueError(
+                    "audio_import_v1 request field names must be bound to "
+                    "required live metadata tokens"
+                )
+        elif self.equivalence == "audio_import_tab_v1":
+            try:
+                _normalize_audio_import_tab_request(self.expected)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "audio_import_tab_v1 requires one valid "
+                    "audio.importTabDelimited request"
+                ) from exc
+        elif self.equivalence == "object_set_v1":
+            try:
+                _normalize_object_set_request(self.expected)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "object_set_v1 requires one valid object.set request"
+                ) from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,7 +460,13 @@ class ResponseBinding:
     pointer: str
 
 
-ExpectedArgument = str | SemanticJsonArgument | ResponseBinding
+ExpectedArgument = (
+    str
+    | SemanticJsonArgument
+    | MetadataQueryArgument
+    | MetadataBoundJsonArgument
+    | ResponseBinding
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -673,7 +992,1033 @@ def _semantic_json_equal(actual: Any, expected: SemanticJsonArgument) -> bool:
         return _canonical_json_bytes(actual) == _canonical_json_bytes(
             expected.expected
         )
+    if expected.equivalence == "soundbank_generate_v1":
+        try:
+            normalized_actual = _normalize_soundbank_generate_request(actual)
+            normalized_expected = _normalize_soundbank_generate_request(
+                expected.expected
+            )
+        except (TypeError, ValueError):
+            return False
+        return _canonical_json_bytes(
+            normalized_actual
+        ) == _canonical_json_bytes(normalized_expected)
     return _object_operation_json_equal(actual, expected.expected)
+
+
+def _normalize_soundbank_generate_request(value: Any) -> dict[str, Any]:
+    """Insert only reviewed false defaults at their original schema scopes.
+
+    A per-Bank ``rebuild`` value is never promoted to or replaced by the
+    batch-wide ``rebuild_soundbanks`` value.  Every non-default field remains
+    wire-significant after this narrow normalization.
+    """
+
+    if (
+        not isinstance(value, Mapping)
+        or not all(isinstance(key, str) for key in value)
+        or set(value)
+        != {"contract", "version", "operation", "arguments"}
+        or value.get("contract") != "waapi-skill.operation-request/v1"
+        or value.get("version") not in _SUPPORTED_WWISE_VERSIONS
+        or value.get("operation") != "soundbank.generate"
+    ):
+        raise ValueError(
+            "soundbank_generate_v1 requires one closed "
+            "soundbank.generate request"
+        )
+    arguments = value.get("arguments")
+    if (
+        not isinstance(arguments, Mapping)
+        or not all(isinstance(key, str) for key in arguments)
+    ):
+        raise ValueError(
+            "soundbank_generate_v1 arguments must be one JSON object"
+        )
+    for field in _SOUNDBANK_GENERATE_DEFAULT_FALSE_ARGUMENT_FIELDS:
+        if field in arguments and type(arguments[field]) is not bool:
+            raise ValueError(
+                f"soundbank_generate_v1 {field} must be a JSON boolean"
+            )
+
+    soundbanks = arguments.get("soundbanks")
+    if not isinstance(soundbanks, list) or not soundbanks:
+        raise ValueError(
+            "soundbank_generate_v1 requires a non-empty soundbanks array"
+        )
+    normalized_soundbanks: list[dict[str, Any]] = []
+    for row in soundbanks:
+        if (
+            not isinstance(row, Mapping)
+            or not all(isinstance(key, str) for key in row)
+            or (
+                "rebuild" in row
+                and type(row["rebuild"]) is not bool
+            )
+        ):
+            raise ValueError(
+                "soundbank_generate_v1 SoundBank rows must be JSON objects "
+                "with boolean rebuild values"
+            )
+        normalized_row = dict(row)
+        normalized_row.setdefault("rebuild", False)
+        normalized_soundbanks.append(normalized_row)
+
+    normalized_arguments = dict(arguments)
+    normalized_arguments["soundbanks"] = normalized_soundbanks
+    for field in _SOUNDBANK_GENERATE_DEFAULT_FALSE_ARGUMENT_FIELDS:
+        normalized_arguments.setdefault(field, False)
+    normalized = dict(value)
+    normalized["arguments"] = normalized_arguments
+    return normalized
+
+
+def _metadata_bound_json_equal(
+    actual: Any,
+    expected: MetadataBoundJsonArgument,
+) -> bool:
+    if expected.equivalence == "wire_exact":
+        return _canonical_json_bytes(actual) == _canonical_json_bytes(
+            expected.expected
+        )
+    try:
+        if expected.equivalence == "audio_import_v1":
+            if not _audio_import_actual_defaults_are_expected_subset(
+                actual,
+                expected.expected,
+            ):
+                return False
+            normalized_actual = _normalize_audio_import_request(actual)
+            normalized_expected = _normalize_audio_import_request(
+                expected.expected
+            )
+        elif expected.equivalence == "object_set_v1":
+            normalized_actual = _normalize_metadata_bound_object_set_request(
+                actual,
+                expected,
+            )
+            normalized_expected = (
+                _normalize_metadata_bound_object_set_request(
+                    expected.expected,
+                    expected,
+                )
+            )
+        else:
+            normalized_actual = _normalize_audio_import_tab_request(actual)
+            normalized_expected = _normalize_audio_import_tab_request(
+                expected.expected
+            )
+    except (TypeError, ValueError):
+        return False
+    return _canonical_json_bytes(
+        normalized_actual
+    ) == _canonical_json_bytes(normalized_expected)
+
+
+def _metadata_bound_semantic_value(
+    actual: Any,
+    expected: MetadataBoundJsonArgument,
+) -> Any:
+    if expected.equivalence == "audio_import_v1":
+        return _normalize_audio_import_request(actual)
+    if expected.equivalence == "audio_import_tab_v1":
+        return _normalize_audio_import_tab_request(actual)
+    if expected.equivalence == "object_set_v1":
+        return _normalize_metadata_bound_object_set_request(actual, expected)
+    return actual
+
+
+def _normalize_object_set_request(value: Any) -> dict[str, Any]:
+    """Remove only reviewed root defaults declared by the object.set schema.
+
+    The equivalence intentionally does not inherit the broader object-operation
+    matcher. Nested row defaults, ``on_name_conflict``, integer-property numeric
+    types, and empty collections all remain wire-significant. A later
+    metadata-bound pass normalizes only equal JSON integer/float spellings for
+    properties proven by live metadata to be real-valued.
+    """
+
+    if (
+        not isinstance(value, Mapping)
+        or not all(isinstance(key, str) for key in value)
+        or set(value)
+        != {"contract", "version", "operation", "arguments"}
+        or value.get("contract") != "waapi-skill.operation-request/v1"
+        or value.get("version") not in _OBJECT_SET_SUPPORTED_VERSIONS
+        or value.get("operation") != "object.set"
+    ):
+        raise ValueError(
+            "object_set_v1 requires one closed object.set request"
+        )
+    arguments = value.get("arguments")
+    if (
+        not isinstance(arguments, Mapping)
+        or not all(isinstance(key, str) for key in arguments)
+        or set(arguments) - _OBJECT_SET_ARGUMENT_FIELDS
+    ):
+        raise ValueError("object_set_v1 arguments are not closed")
+    objects = arguments.get("objects")
+    if (
+        not isinstance(objects, list)
+        or not objects
+        or any(
+            not isinstance(item, Mapping)
+            or not all(isinstance(key, str) for key in item)
+            for item in objects
+        )
+    ):
+        raise ValueError(
+            "object_set_v1 requires a non-empty objects array"
+        )
+    if (
+        "platform" in arguments
+        and (
+            not isinstance(arguments["platform"], str)
+            or not arguments["platform"]
+        )
+    ):
+        raise ValueError("object_set_v1 platform is invalid")
+    if (
+        "list_mode" in arguments
+        and arguments["list_mode"] not in {"append", "replaceAll"}
+    ):
+        raise ValueError("object_set_v1 list_mode is invalid")
+    if (
+        "on_name_conflict" in arguments
+        and arguments["on_name_conflict"]
+        not in {"fail", "rename", "merge"}
+    ):
+        raise ValueError("object_set_v1 on_name_conflict is invalid")
+    if (
+        "auto_add_to_source_control" in arguments
+        and type(arguments["auto_add_to_source_control"]) is not bool
+    ):
+        raise ValueError(
+            "object_set_v1 auto_add_to_source_control must be a JSON boolean"
+        )
+
+    normalized_arguments = dict(arguments)
+    for field, default in _OBJECT_SET_SCHEMA_DEFAULTS.items():
+        if (
+            field in normalized_arguments
+            and type(normalized_arguments[field]) is type(default)
+            and normalized_arguments[field] == default
+        ):
+            normalized_arguments.pop(field)
+    normalized = dict(value)
+    normalized["arguments"] = normalized_arguments
+    return normalized
+
+
+def _normalize_metadata_bound_object_set_request(
+    value: Any,
+    expected: MetadataBoundJsonArgument,
+) -> dict[str, Any]:
+    """Canonicalize equal spellings only for live-proven real properties."""
+
+    normalized = _normalize_object_set_request(value)
+    projection = expected.expected_required_token_projection
+    if projection is None:
+        return normalized
+    real_property_names = {
+        item.name
+        for item in projection
+        if item.kind == "property"
+        and item.metadata_type.casefold()
+        in {"real32", "real64", "float", "double"}
+    }
+    if not real_property_names:
+        return normalized
+
+    def visit(item: Any) -> Any:
+        if isinstance(item, list):
+            return [visit(child) for child in item]
+        if not isinstance(item, Mapping):
+            return item
+        result = {key: visit(child) for key, child in item.items()}
+        properties = result.get("properties")
+        if not isinstance(properties, list):
+            return result
+        normalized_properties: list[Any] = []
+        for descriptor in properties:
+            if not isinstance(descriptor, Mapping):
+                normalized_properties.append(descriptor)
+                continue
+            row = dict(descriptor)
+            property_value = row.get("value")
+            if (
+                row.get("name") in real_property_names
+                and type(property_value) is int
+            ):
+                try:
+                    converted = float(property_value)
+                except (OverflowError, ValueError):
+                    converted = None
+                if (
+                    converted is not None
+                    and math.isfinite(converted)
+                    and converted == property_value
+                ):
+                    row["value"] = converted
+            normalized_properties.append(row)
+        result["properties"] = normalized_properties
+        return result
+
+    canonical = visit(normalized)
+    assert isinstance(canonical, dict)
+    return canonical
+
+
+def _normalize_audio_import_tab_request(value: Any) -> dict[str, Any]:
+    """Normalize only schema-declared no-op tab-import defaults.
+
+    Every business-bearing field remains wire-exact.  Wwise 2021.1/2022.1 do
+    not expose ``auto_check_out_to_source_control`` at all, so even an explicit
+    false value is rejected in those lanes rather than normalized away.
+    """
+
+    if (
+        not isinstance(value, Mapping)
+        or not all(isinstance(key, str) for key in value)
+        or set(value)
+        != {"contract", "version", "operation", "arguments"}
+        or value.get("contract") != "waapi-skill.operation-request/v1"
+        or value.get("operation") != "audio.importTabDelimited"
+    ):
+        raise ValueError(
+            "audio_import_tab_v1 requires one closed "
+            "audio.importTabDelimited request"
+        )
+    version = value.get("version")
+    if version not in _SUPPORTED_WWISE_VERSIONS:
+        raise ValueError(
+            "audio_import_tab_v1 requires one supported Wwise version"
+        )
+    arguments = value.get("arguments")
+    if (
+        not isinstance(arguments, Mapping)
+        or not all(isinstance(key, str) for key in arguments)
+        or not _AUDIO_IMPORT_TAB_REQUIRED_ARGUMENT_FIELDS.issubset(arguments)
+        or set(arguments)
+        - (
+            _AUDIO_IMPORT_TAB_REQUIRED_ARGUMENT_FIELDS
+            | _AUDIO_IMPORT_TAB_OPTIONAL_ARGUMENT_FIELDS
+        )
+    ):
+        raise ValueError(
+            "audio_import_tab_v1 arguments are not closed"
+        )
+    if (
+        not isinstance(arguments.get("import_file"), str)
+        or not arguments["import_file"]
+        or "\x00" in arguments["import_file"]
+        or not _is_audio_import_identity(arguments.get("import_location"))
+        or not isinstance(arguments.get("import_language"), str)
+        or not arguments["import_language"]
+        or arguments["import_language"]
+        != arguments["import_language"].strip()
+        or "\x00" in arguments["import_language"]
+    ):
+        raise ValueError(
+            "audio_import_tab_v1 required arguments are invalid"
+        )
+    if (
+        "import_operation" in arguments
+        and arguments["import_operation"] not in _AUDIO_IMPORT_TAB_OPERATIONS
+    ):
+        raise ValueError(
+            "audio_import_tab_v1 import_operation is invalid"
+        )
+    for field in (
+        "auto_add_to_source_control",
+        "auto_check_out_to_source_control",
+    ):
+        if field in arguments and type(arguments[field]) is not bool:
+            raise ValueError(
+                f"audio_import_tab_v1 {field} must be a JSON boolean"
+            )
+    if (
+        version not in _AUDIO_IMPORT_TAB_AUTO_CHECK_OUT_VERSIONS
+        and "auto_check_out_to_source_control" in arguments
+    ):
+        raise ValueError(
+            "audio_import_tab_v1 auto_check_out_to_source_control is "
+            "unsupported in this Wwise version"
+        )
+
+    normalized_arguments = dict(arguments)
+    normalized_arguments.setdefault("import_operation", "createNew")
+    normalized_arguments.setdefault("auto_add_to_source_control", False)
+    if version in _AUDIO_IMPORT_TAB_AUTO_CHECK_OUT_VERSIONS:
+        normalized_arguments.setdefault(
+            "auto_check_out_to_source_control",
+            False,
+        )
+    normalized = dict(value)
+    normalized["arguments"] = normalized_arguments
+    return normalized
+
+
+def _audio_import_actual_defaults_are_expected_subset(
+    actual: Any,
+    expected: Any,
+) -> bool:
+    """Permit trusted defaults to remain or expand, never to be refactored."""
+
+    actual_properties, actual_references = (
+        _audio_import_default_named_fields(actual)
+    )
+    expected_properties, expected_references = (
+        _audio_import_default_named_fields(expected)
+    )
+    for actual_fields, expected_fields in (
+        (actual_properties, expected_properties),
+        (actual_references, expected_references),
+    ):
+        if any(
+            name not in expected_fields
+            or _canonical_json_bytes(item)
+            != _canonical_json_bytes(expected_fields[name])
+            for name, item in actual_fields.items()
+        ):
+            return False
+    return True
+
+
+def _audio_import_default_named_fields(
+    request: Any,
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    if not isinstance(request, Mapping):
+        raise ValueError("audio_import_v1 request must be an object")
+    arguments = request.get("arguments")
+    if not isinstance(arguments, Mapping):
+        raise ValueError("audio_import_v1 arguments must be an object")
+    defaults = arguments.get("defaults", {})
+    if not isinstance(defaults, Mapping):
+        raise ValueError("audio_import_v1 defaults must be an object")
+    return (
+        _named_audio_import_fields(
+            defaults.get("properties", []),
+            path="arguments.defaults.properties",
+            kind="property",
+        ),
+        _named_audio_import_fields(
+            defaults.get("references", []),
+            path="arguments.defaults.references",
+            kind="reference",
+        ),
+    )
+
+
+def _normalize_audio_import_request(value: Any) -> dict[str, Any]:
+    """Expand safe audio.import defaults into deterministic effective rows.
+
+    ``properties`` and ``references`` are closed name-keyed collections.
+    Defaults apply to every import row and an exact row name replaces the
+    corresponding default item.  Their array order is immaterial, and the
+    separate trusted-default subset check prevents an actual request from
+    inventing dynamic defaults.  Closed non-named row fields use the public
+    operation's ordinary default-then-row replacement semantics.  Every field
+    outside the closed row schema remains invalid.
+    """
+
+    if (
+        not isinstance(value, Mapping)
+        or value.get("operation") != "audio.import"
+        or not all(isinstance(key, str) for key in value)
+    ):
+        raise ValueError(
+            "audio_import_v1 requires an audio.import request object"
+        )
+    arguments = value.get("arguments")
+    if (
+        not isinstance(arguments, Mapping)
+        or not all(isinstance(key, str) for key in arguments)
+    ):
+        raise ValueError(
+            "audio_import_v1 requires an arguments object"
+        )
+    imports = arguments.get("imports")
+    if not isinstance(imports, list) or not imports:
+        raise ValueError(
+            "audio_import_v1 requires a non-empty imports array"
+        )
+
+    raw_defaults = arguments.get("defaults", {})
+    if not isinstance(raw_defaults, Mapping) or not all(
+        isinstance(key, str) for key in raw_defaults
+    ):
+        raise ValueError(
+            "audio_import_v1 defaults must be an object"
+        )
+    _validate_audio_import_row_scope(
+        raw_defaults,
+        path="arguments.defaults",
+    )
+    fixed_defaults = {
+        key: raw_defaults[key]
+        for key in raw_defaults
+        if key in _AUDIO_IMPORT_FIXED_ROW_FIELDS
+    }
+    default_properties = _named_audio_import_fields(
+        raw_defaults.get("properties", []),
+        path="arguments.defaults.properties",
+        kind="property",
+    )
+    default_references = _named_audio_import_fields(
+        raw_defaults.get("references", []),
+        path="arguments.defaults.references",
+        kind="reference",
+    )
+    _reject_cross_kind_audio_import_names(
+        default_properties,
+        default_references,
+        path="arguments.defaults",
+    )
+
+    normalized_request = dict(value)
+    normalized_arguments = dict(arguments)
+    normalized_defaults = {
+        key: item
+        for key, item in raw_defaults.items()
+        if key not in _AUDIO_IMPORT_FIXED_ROW_FIELDS
+    }
+    normalized_defaults.pop("properties", None)
+    normalized_defaults.pop("references", None)
+    if normalized_defaults:
+        normalized_arguments["defaults"] = normalized_defaults
+    else:
+        normalized_arguments.pop("defaults", None)
+
+    normalized_imports: list[dict[str, Any]] = []
+    for index, raw_row in enumerate(imports):
+        if not isinstance(raw_row, Mapping) or not all(
+            isinstance(key, str) for key in raw_row
+        ):
+            raise ValueError(
+                f"audio_import_v1 imports[{index}] must be an object"
+            )
+        _validate_audio_import_row_scope(
+            raw_row,
+            path=f"arguments.imports[{index}]",
+        )
+        row = {**fixed_defaults, **raw_row}
+        row_properties = _named_audio_import_fields(
+            row.get("properties", []),
+            path=f"arguments.imports[{index}].properties",
+            kind="property",
+        )
+        row_references = _named_audio_import_fields(
+            row.get("references", []),
+            path=f"arguments.imports[{index}].references",
+            kind="reference",
+        )
+        _reject_cross_kind_audio_import_names(
+            row_properties,
+            row_references,
+            path=f"arguments.imports[{index}]",
+        )
+        effective_properties = _merge_audio_import_fields(
+            default_properties,
+            row_properties,
+            path=f"arguments.imports[{index}].properties",
+        )
+        effective_references = _merge_audio_import_fields(
+            default_references,
+            row_references,
+            path=f"arguments.imports[{index}].references",
+        )
+        _reject_cross_kind_audio_import_names(
+            effective_properties,
+            effective_references,
+            path=f"arguments.imports[{index}] effective fields",
+        )
+        if effective_properties:
+            row["properties"] = [
+                effective_properties[name]
+                for name in sorted(effective_properties)
+            ]
+        else:
+            row.pop("properties", None)
+        if effective_references:
+            row["references"] = [
+                effective_references[name]
+                for name in sorted(effective_references)
+            ]
+        else:
+            row.pop("references", None)
+        normalized_imports.append(row)
+
+    normalized_arguments["imports"] = normalized_imports
+    normalized_request["arguments"] = normalized_arguments
+    return normalized_request
+
+
+def _validate_audio_import_row_scope(
+    value: Mapping[str, Any],
+    *,
+    path: str,
+) -> None:
+    unsupported = sorted(
+        set(value) - _AUDIO_IMPORT_DEFAULTABLE_ROW_FIELDS
+    )
+    if unsupported:
+        raise ValueError(
+            f"audio_import_v1 {path} contains unsupported or case-mismatched "
+            f"fields: {unsupported!r}"
+        )
+    for name in _AUDIO_IMPORT_SCALAR_ROW_FIELDS:
+        if name not in value:
+            continue
+        item = value[name]
+        if (
+            not isinstance(item, str)
+            or "\x00" in item
+            or name in _AUDIO_IMPORT_NON_EMPTY_SCALAR_ROW_FIELDS
+            and (
+                not item
+                or item != item.strip()
+            )
+        ):
+            raise ValueError(
+                f"audio_import_v1 {path}.{name} is not a valid string"
+            )
+        limit = _AUDIO_IMPORT_SCALAR_ROW_FIELD_LIMITS.get(name)
+        if limit is not None and len(item) > limit:
+            raise ValueError(
+                f"audio_import_v1 {path}.{name} exceeds its closed limit"
+            )
+        if name in {"dialogue_event", "switch_assignment"} and any(
+            character in item for character in ("\r", "\n", "\t")
+        ):
+            raise ValueError(
+                f"audio_import_v1 {path}.{name} must be one line"
+            )
+    if (
+        "import_location" in value
+        and not _is_audio_import_identity(value["import_location"])
+    ):
+        raise ValueError(
+            f"audio_import_v1 {path}.import_location is not a closed identity"
+        )
+    if "event" in value:
+        event = value["event"]
+        if (
+            not isinstance(event, Mapping)
+            or not all(isinstance(key, str) for key in event)
+            or set(event) - {"path", "action"}
+            or "path" not in event
+            or not isinstance(event.get("path"), str)
+            or not event["path"]
+            or event["path"] != event["path"].strip()
+            or "\x00" in event["path"]
+            or not event["path"].startswith("\\Events\\")
+            or (
+                "action" in event
+                and (
+                    not isinstance(event["action"], str)
+                    or event["action"] not in _AUDIO_IMPORT_EVENT_ACTIONS
+                )
+            )
+        ):
+            raise ValueError(
+                f"audio_import_v1 {path}.event is not a closed event"
+            )
+
+
+def _named_audio_import_fields(
+    value: Any,
+    *,
+    path: str,
+    kind: str,
+) -> dict[str, dict[str, Any]]:
+    if kind not in {"property", "reference"}:
+        raise AssertionError("audio import named-field kind is invalid")
+    if not isinstance(value, list):
+        raise ValueError(f"audio_import_v1 {path} must be an array")
+    result: dict[str, dict[str, Any]] = {}
+    folded_names: set[str] = set()
+    for index, raw in enumerate(value):
+        if (
+            not isinstance(raw, Mapping)
+            or not all(isinstance(key, str) for key in raw)
+        ):
+            raise ValueError(
+                f"audio_import_v1 {path}[{index}] must be an object"
+            )
+        name = raw.get("name")
+        if (
+            not isinstance(name, str)
+            or not name
+            or name != name.strip()
+            or name.startswith("@")
+            or len(name) > 256
+            or any(
+                ord(character) < 32 or ord(character) == 127
+                for character in name
+            )
+        ):
+            raise ValueError(
+                f"audio_import_v1 {path}[{index}].name is invalid"
+            )
+        folded_name = name.casefold()
+        if folded_name in folded_names:
+            raise ValueError(
+                f"audio_import_v1 {path} repeats name {name!r}"
+            )
+        if kind == "property":
+            if set(raw) != {"name", "value"} or not _is_audio_import_property_value(
+                raw.get("value")
+            ):
+                raise ValueError(
+                    f"audio_import_v1 {path}[{index}] is not a closed property"
+                )
+        elif set(raw) != {"name", "target"} or not _is_audio_import_identity(
+            raw.get("target")
+        ):
+            raise ValueError(
+                f"audio_import_v1 {path}[{index}] is not a closed reference"
+            )
+        folded_names.add(folded_name)
+        result[name] = dict(raw)
+    return result
+
+
+def _reject_cross_kind_audio_import_names(
+    properties: Mapping[str, Any],
+    references: Mapping[str, Any],
+    *,
+    path: str,
+) -> None:
+    overlap = {
+        name.casefold() for name in properties
+    } & {
+        name.casefold() for name in references
+    }
+    if overlap:
+        raise ValueError(
+            f"audio_import_v1 {path} repeats names across properties "
+            "and references"
+        )
+
+
+def _merge_audio_import_fields(
+    defaults: Mapping[str, dict[str, Any]],
+    row: Mapping[str, dict[str, Any]],
+    *,
+    path: str,
+) -> dict[str, dict[str, Any]]:
+    default_spelling = {
+        name.casefold(): name for name in defaults
+    }
+    for name in row:
+        prior = default_spelling.get(name.casefold())
+        if prior is not None and prior != name:
+            raise ValueError(
+                f"audio_import_v1 {path} has a case-colliding "
+                f"default/row name: {prior!r} and {name!r}"
+            )
+    return {**defaults, **row}
+
+
+def _is_audio_import_property_value(value: Any) -> bool:
+    if isinstance(value, (str, bool)):
+        return True
+    if isinstance(value, int) and not isinstance(value, bool):
+        try:
+            return math.isfinite(float(value))
+        except OverflowError:
+            return False
+    return isinstance(value, float) and math.isfinite(value)
+
+
+def _is_audio_import_identity(value: Any) -> bool:
+    if (
+        not isinstance(value, Mapping)
+        or not all(isinstance(key, str) for key in value)
+    ):
+        return False
+    kind = value.get("kind")
+    if kind == "id" and set(value) == {"kind", "value"}:
+        identity = value.get("value")
+        return (
+            isinstance(identity, str) and bool(identity)
+        ) or (
+            isinstance(identity, int) and not isinstance(identity, bool)
+        )
+    if kind in {"path", "waql"} and set(value) == {"kind", "value"}:
+        return isinstance(value.get("value"), str) and bool(value["value"])
+    if kind == "scoped-name" and set(value) == {
+        "kind",
+        "name",
+        "type",
+        "parent",
+    }:
+        parent = value.get("parent")
+        return (
+            isinstance(value.get("name"), str)
+            and bool(value["name"])
+            and isinstance(value.get("type"), str)
+            and bool(value["type"])
+            and isinstance(parent, Mapping)
+            and parent.get("kind") in {"id", "path"}
+            and _is_audio_import_identity(parent)
+        )
+    return False
+
+
+def _audio_import_field_names(
+    normalized_request: Mapping[str, Any],
+) -> frozenset[str]:
+    arguments = normalized_request["arguments"]
+    result: set[str] = set()
+    for row in arguments["imports"]:
+        for key in ("properties", "references"):
+            for item in row.get(key, []):
+                result.add(item["name"])
+    return frozenset(result)
+
+
+def _validate_metadata_discover_query_arguments(
+    step: ExpectedGatewayStep,
+    supplied_arguments: Sequence[str],
+) -> tuple[str, ...] | None:
+    """Close the one flexible argv surface used by compound metadata reads."""
+
+    query_specs = tuple(
+        item
+        for item in step.arguments
+        if isinstance(item, MetadataQueryArgument)
+    )
+    if not query_specs:
+        return None
+    if step.subcommand != "metadata" or step.arguments[0] != "discover":
+        raise GatewayInvocationError(
+            "MetadataQueryArgument is valid only for metadata discover"
+        )
+    if not 1 <= len(query_specs) <= 8:
+        raise GatewayInvocationError(
+            "metadata discover allow-list must contain 1..8 bounded queries"
+        )
+    object_type = (
+        step.arguments[2]
+        if len(step.arguments) >= 3
+        and step.arguments[:2] == ("discover", "--object-type")
+        else None
+    )
+    if (
+        not isinstance(object_type, str)
+        or not object_type
+        or object_type != object_type.strip()
+        or len(object_type) > 256
+    ):
+        raise GatewayInvocationError(
+            "metadata discover allow-list must use one bounded object-type scope"
+        )
+    configured_shape: list[Any] = [
+        "discover",
+        "--object-type",
+        object_type,
+    ]
+    for query_spec in query_specs:
+        configured_shape.extend(("--query", query_spec))
+    configured_shape.extend(("--limit", "8"))
+    if list(step.arguments) != configured_shape:
+        raise GatewayInvocationError(
+            "metadata discover allow-list must contain only its exact "
+            "object-type, 1..8 query slots, and --limit 8"
+        )
+
+    if (
+        len(supplied_arguments) < 7
+        or len(supplied_arguments) > 21
+        or (len(supplied_arguments) - 1) % 2
+        or supplied_arguments[0] != "discover"
+    ):
+        raise GatewayInvocationError(
+            "metadata discover scope must be exactly the configured "
+            "object-type, 1..8 bounded --query pairs, and --limit 8"
+        )
+
+    supplied_object_types: list[str] = []
+    supplied_limits: list[str] = []
+    queries: list[str] = []
+    for index in range(1, len(supplied_arguments), 2):
+        flag = supplied_arguments[index]
+        value = supplied_arguments[index + 1]
+        if flag == "--object-type":
+            supplied_object_types.append(value)
+        elif flag == "--query":
+            queries.append(value)
+        elif flag == "--limit":
+            supplied_limits.append(value)
+        else:
+            raise GatewayInvocationError(
+                "metadata discover accepts only its configured --object-type, "
+                "--query, and --limit options"
+            )
+    if (
+        supplied_object_types != [object_type]
+        or supplied_limits != ["8"]
+        or not 1 <= len(queries) <= 8
+    ):
+        raise GatewayInvocationError(
+            "metadata discover scope must be exactly one configured "
+            "--object-type, 1..8 --query values, and one --limit 8"
+        )
+    query_values = tuple(queries)
+    maximum_chars = min(item.maximum_chars for item in query_specs)
+    if any(
+        not query
+        or query != query.strip()
+        or query.startswith("--")
+        or len(query) > maximum_chars
+        or any(
+            ord(character) < 32 or ord(character) == 127
+            for character in query
+        )
+        for query in query_values
+    ):
+        raise GatewayInvocationError(
+            "metadata discover query values must be bounded, non-empty "
+            "natural-language text"
+        )
+    normalized = [
+        " ".join(query.split()).casefold()
+        for query in query_values
+    ]
+    if len(normalized) != len(set(normalized)):
+        raise GatewayInvocationError(
+            "metadata discover query values must be distinct"
+        )
+    if sum(len(query) for query in query_values) > 640:
+        raise GatewayInvocationError(
+            "metadata discover query text exceeds the combined bound"
+        )
+    return query_values
+
+
+def _metadata_discovery_live_projection(
+    payload: Mapping[str, Any],
+    *,
+    object_type: str,
+) -> Mapping[str, MetadataTokenProjection]:
+    """Return stable exact-token fields from one brokered discovery result."""
+
+    agent_result = payload.get("agent_result", payload)
+    if (
+        not isinstance(agent_result, Mapping)
+        or agent_result.get("contract") != "waapi-skill.metadata-discovery/v2"
+        or agent_result.get("result_detail") != "compact"
+        or agent_result.get("authority") != "live-waapi"
+        or agent_result.get("selection_required") is not True
+        or agent_result.get("exact_live_name_required_for_mutation") is not True
+        or agent_result.get("dependency_closure_complete") is not True
+        or agent_result.get("unresolved_dependencies") != []
+    ):
+        raise GatewayInvocationError(
+            "metadata-bound mutation requires one complete live discovery payload"
+        )
+    scope = agent_result.get("scope")
+    resolved = scope.get("resolved") if isinstance(scope, Mapping) else None
+    if (
+        not isinstance(scope, Mapping)
+        or scope.get("kind") != "object_type"
+        or scope.get("requested") != object_type
+        or not isinstance(resolved, Mapping)
+        or resolved.get("name") != object_type
+    ):
+        raise GatewayInvocationError(
+            "metadata-bound mutation requires the exact configured live object-type scope"
+        )
+    projections: list[MetadataTokenProjection] = []
+    for key in ("candidates", "dependency_candidates"):
+        rows = agent_result.get(key)
+        if not isinstance(rows, list):
+            raise GatewayInvocationError(
+                f"metadata discovery {key} evidence is malformed"
+            )
+        for row in rows:
+            name = row.get("name") if isinstance(row, Mapping) else None
+            kind = row.get("kind") if isinstance(row, Mapping) else None
+            metadata = row.get("metadata") if isinstance(row, Mapping) else None
+            metadata_type = (
+                metadata.get("type")
+                if isinstance(metadata, Mapping)
+                else None
+            )
+            if (
+                not isinstance(name, str)
+                or not name
+                or name != name.strip()
+                or len(name) > 256
+                or name.startswith("@")
+                or kind not in {"property", "reference"}
+                or not isinstance(metadata_type, str)
+                or kind == "property"
+                and not metadata_type
+            ):
+                raise GatewayInvocationError(
+                    f"metadata discovery {key} lacks one stable token projection"
+                )
+            try:
+                projections.append(
+                    MetadataTokenProjection(
+                        name=name,
+                        kind=kind,
+                        metadata_type=metadata_type,
+                    )
+                )
+            except ValueError as exc:
+                raise GatewayInvocationError(
+                    f"metadata discovery {key} contains an invalid token projection"
+                ) from exc
+    if len(projections) != len(
+        {item.name.casefold() for item in projections}
+    ):
+        raise GatewayInvocationError(
+            "metadata discovery repeats a candidate/dependency name"
+        )
+    return MappingProxyType({item.name: item for item in projections})
+
+
+def project_required_metadata_tokens(
+    payload: Mapping[str, Any],
+    *,
+    object_type: str,
+    required_tokens: Sequence[str],
+) -> tuple[MetadataTokenProjection, ...]:
+    """Project only mutation-relevant stable fields from live discovery.
+
+    Ranking, candidate order, matched queries, display metadata, defaults, and
+    other version-sensitive details are deliberately excluded.
+    """
+
+    tokens = tuple(required_tokens)
+    if (
+        not tokens
+        or any(
+            not isinstance(token, str)
+            or not token
+            or token != token.strip()
+            or token.startswith("@")
+            for token in tokens
+        )
+        or len(tokens) != len({token.casefold() for token in tokens})
+    ):
+        raise GatewayInvocationError(
+            "required metadata tokens must be unique exact names"
+        )
+    available = _metadata_discovery_live_projection(
+        payload,
+        object_type=object_type,
+    )
+    missing = [token for token in tokens if token not in available]
+    if missing:
+        raise GatewayInvocationError(
+            f"required metadata tokens are absent from live discovery: {missing!r}"
+        )
+    return tuple(available[token] for token in tokens)
 
 
 def _object_operation_json_equal(actual: Any, expected: Any) -> bool:
@@ -1049,12 +2394,30 @@ def _json_pointer(payload: Any, pointer: str) -> Any:
     return current
 
 
-def _decode_json_argument(value: str) -> Any:
+def _decode_json_argument(
+    value: str,
+    *,
+    reject_duplicate_keys: bool = False,
+) -> Any:
     def reject_constant(constant: str) -> Any:
         raise ValueError(f"non-finite JSON constant {constant!r}")
 
+    def object_pairs(
+        pairs: list[tuple[str, Any]],
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, item in pairs:
+            if reject_duplicate_keys and key in result:
+                raise ValueError(f"duplicate JSON object key {key!r}")
+            result[key] = item
+        return result
+
     try:
-        return json.loads(value, parse_constant=reject_constant)
+        return json.loads(
+            value,
+            parse_constant=reject_constant,
+            object_pairs_hook=object_pairs,
+        )
     except (json.JSONDecodeError, ValueError) as exc:
         raise GatewayInvocationError(f"argument is not strict JSON: {exc}") from exc
 
@@ -2356,7 +3719,14 @@ class CodexGatewayBroker:
                 *supplied_arguments[event_count_index:],
             )
             execution_arguments = (*expected_prefix, *validation_arguments)
-        if len(validation_arguments) != len(step.arguments):
+        metadata_queries = _validate_metadata_discover_query_arguments(
+            step,
+            validation_arguments,
+        )
+        if (
+            metadata_queries is None
+            and len(validation_arguments) != len(step.arguments)
+        ):
             raise GatewayInvocationError(
                 f"expected step {step.name!r} to have {len(step.arguments)} arguments; "
                 f"received {len(supplied_arguments)}"
@@ -2376,43 +3746,139 @@ class CodexGatewayBroker:
             self.expected_wwise_version,
             *expected_prefix,
         ]
-        for index, (supplied, expected) in enumerate(
-            zip(validation_arguments, step.arguments)
-        ):
-            if isinstance(expected, str):
-                if (
-                    index not in unordered_return_field_indexes
-                    and supplied != expected
-                ):
-                    raise GatewayInvocationError(
-                        f"step {step.name!r} argument {index} must be exactly {expected!r}"
+        if metadata_queries is not None:
+            semantic_values.extend(
+                (
+                    "metadata-discover-query-set/v1",
+                    step.arguments[2],
+                    list(metadata_queries),
+                    8,
+                )
+            )
+        else:
+            for index, (supplied, expected) in enumerate(
+                zip(validation_arguments, step.arguments)
+            ):
+                if isinstance(expected, str):
+                    if (
+                        index not in unordered_return_field_indexes
+                        and supplied != expected
+                    ):
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} argument {index} must be exactly {expected!r}"
+                        )
+                    semantic_values.append(expected)
+                elif isinstance(expected, SemanticJsonArgument):
+                    actual_json = _decode_json_argument(
+                        supplied,
+                        reject_duplicate_keys=(
+                            expected.equivalence
+                            == "soundbank_generate_v1"
+                        ),
                     )
-                semantic_values.append(expected)
-            elif isinstance(expected, SemanticJsonArgument):
-                actual_json = _decode_json_argument(supplied)
-                if not _semantic_json_equal(actual_json, expected):
+                    if not _semantic_json_equal(actual_json, expected):
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} argument {index} JSON is not semantically equal to the allow-list"
+                        )
+                    semantic_values.append(expected.expected)
+                elif isinstance(expected, MetadataQueryArgument):
                     raise GatewayInvocationError(
-                        f"step {step.name!r} argument {index} JSON is not semantically equal to the allow-list"
+                        "metadata query slot escaped its closed discover validator"
                     )
-                semantic_values.append(expected.expected)
-            elif isinstance(expected, ResponseBinding):
-                source = self._payloads_by_step.get(expected.step)
-                if source is None:
-                    raise GatewayInvocationError(
-                        f"step {step.name!r} binding source {expected.step!r} is unavailable"
+                elif isinstance(expected, MetadataBoundJsonArgument):
+                    actual_json = _decode_json_argument(
+                        supplied,
+                        reject_duplicate_keys=(
+                            expected.equivalence
+                            in {
+                                "audio_import_v1",
+                                "audio_import_tab_v1",
+                                "object_set_v1",
+                            }
+                        ),
                     )
-                bound = _json_pointer(source, expected.pointer)
-                if not isinstance(bound, (str, int, float, bool)) or bound is None:
-                    raise GatewayInvocationError(
-                        f"step {step.name!r} binding {expected.pointer!r} is not a scalar argv value"
+                    if not _metadata_bound_json_equal(actual_json, expected):
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} argument {index} JSON is not "
+                            "semantically equal to the metadata-bound allow-list"
+                        )
+                    source = self._payloads_by_step.get(expected.metadata_step)
+                    if source is None:
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} metadata source "
+                            f"{expected.metadata_step!r} is unavailable"
+                        )
+                    source_steps = tuple(
+                        candidate
+                        for candidate in self.expected_steps
+                        if candidate.name == expected.metadata_step
                     )
-                if supplied != str(bound):
-                    raise GatewayInvocationError(
-                        f"step {step.name!r} argument {index} does not match {expected.step}{expected.pointer}"
+                    if (
+                        len(source_steps) != 1
+                        or source_steps[0].subcommand != "metadata"
+                        or len(source_steps[0].arguments) < 3
+                        or source_steps[0].arguments[:2]
+                        != ("discover", "--object-type")
+                        or source_steps[0].arguments[2] != expected.object_type
+                    ):
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} metadata source does not bind "
+                            f"object type {expected.object_type!r}"
+                        )
+                    actual_projection = project_required_metadata_tokens(
+                        source,
+                        object_type=expected.object_type,
+                        required_tokens=expected.required_tokens,
                     )
-                semantic_values.append(bound)
-            else:  # pragma: no cover - type checker prevents this for normal callers
-                raise GatewayInvocationError(f"unsupported expected argument at index {index}")
+                    expected_projection = (
+                        expected.expected_required_token_projection
+                    )
+                    if (
+                        expected_projection is not None
+                        and actual_projection != expected_projection
+                    ):
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} live metadata projection differs "
+                            f"from the trusted projection for {expected.metadata_step!r}"
+                        )
+                    semantic_values.extend(
+                        (
+                            _metadata_bound_semantic_value(
+                                actual_json,
+                                expected,
+                            ),
+                            expected.equivalence,
+                            expected.metadata_step,
+                            expected.object_type,
+                            list(expected.required_tokens),
+                            (
+                                [
+                                    item.as_dict()
+                                    for item in expected_projection
+                                ]
+                                if expected_projection is not None
+                                else None
+                            ),
+                        )
+                    )
+                elif isinstance(expected, ResponseBinding):
+                    source = self._payloads_by_step.get(expected.step)
+                    if source is None:
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} binding source {expected.step!r} is unavailable"
+                        )
+                    bound = _json_pointer(source, expected.pointer)
+                    if not isinstance(bound, (str, int, float, bool)) or bound is None:
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} binding {expected.pointer!r} is not a scalar argv value"
+                        )
+                    if supplied != str(bound):
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} argument {index} does not match {expected.step}{expected.pointer}"
+                        )
+                    semantic_values.append(bound)
+                else:  # pragma: no cover - type checker prevents this for normal callers
+                    raise GatewayInvocationError(f"unsupported expected argument at index {index}")
         return (
             _sha256_bytes(_canonical_json_bytes(semantic_values)),
             tuple(execution_arguments),
@@ -2746,6 +4212,9 @@ __all__ = [
     "GatewayBrokerRecord",
     "GatewayBrokerReconciliation",
     "GatewayInvocationError",
+    "MetadataBoundJsonArgument",
+    "MetadataQueryArgument",
+    "MetadataTokenProjection",
     "ResolvedGatewayInvocation",
     "ResponseBinding",
     "SemanticJsonArgument",
@@ -2763,6 +4232,7 @@ __all__ = [
     "TrustedStepObserver",
     "TrustedStepPreObserver",
     "reconcile_gateway_commands",
+    "project_required_metadata_tokens",
     "resolve_gateway_invocation",
     "validate_transaction_show_confirmation_payload",
 ]

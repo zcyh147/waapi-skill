@@ -8,9 +8,11 @@ import pytest
 from wwise_waapi.io_policy import validate_isolated_io  # pyright: ignore[reportMissingImports]
 from wwise_waapi.platform_paths import (  # pyright: ignore[reportMissingImports]
     WINDOWS_WWISE_CONSOLE_ENV_TEMPLATE,
+    WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT,
     WwiseWirePathError,
     adapt_cli_dispatch_paths,
     build_wwise_console_command,
+    requires_wwise_wire_path_adaptation,
     resolve_windows_wwise_console_from_env,
     windows_wwise_console_path,
 )
@@ -262,6 +264,67 @@ def test_local_wine_2022_soundbank_waapi_translates_only_reflected_path_fields(
         "$.args.sources[0].input",
         "$.args.sources[0].output",
     ]
+
+
+def test_local_wine_tab_import_translates_only_the_audited_import_file(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    project = home / "case" / "project" / "SampleProject.wproj"
+    project.parent.mkdir(parents=True)
+    project.write_text("<Project/>", encoding="utf-8")
+    long_root = home.joinpath(*(f"segment-{index}-" + "x" * 42 for index in range(5)))
+    long_root.mkdir(parents=True)
+    import_file = long_root / "compound-import.tsv"
+    import_file.write_text(
+        "Object Path\tObject Type\n<Random Container>Batch\tRandom Container\n",
+        encoding="utf-8",
+    )
+    assert len(str(import_file)) >= 260
+    uri = "ak.wwise.core.audio.importTabDelimited"
+    args = {
+        "importFile": str(import_file),
+        "importLocation": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+        "importLanguage": "SFX",
+        "importOperation": "createNew",
+        "autoAddToSourceControl": False,
+    }
+    options = {"return": ["id", "name"]}
+    audit = {
+        "contract": WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT,
+        "uri": uri,
+        "scope": "transient_dispatch_read_paths_only",
+        "paths": [
+            {
+                "section": "args",
+                "json_path": "$.args.importFile",
+                "field": "importFile",
+                "role": "read",
+                "raw_path": str(import_file),
+                "resolved_path": str(import_file.resolve()),
+            }
+        ],
+    }
+
+    adapted = adapt_cli_dispatch_paths(
+        uri=uri,
+        args=args,
+        options=options,
+        io_audit=audit,
+        project_guard=_wine_project_guard(home, project),
+        host_os_name="posix",
+        account_home=home,
+    )
+
+    assert requires_wwise_wire_path_adaptation(uri) is True
+    assert adapted.args == {
+        **args,
+        "importFile": "Y:\\" + "\\".join(import_file.relative_to(home).parts),
+    }
+    assert adapted.options == options
+    assert args["importFile"] == str(import_file)
+    assert adapted.proof["translated_path_count"] == 1
+    assert adapted.proof["path_bindings"][0]["json_path"] == "$.args.importFile"
 
 
 def test_local_wine_2022_process_definition_files_translates_only_sealed_files(

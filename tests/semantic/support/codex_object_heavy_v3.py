@@ -1,4 +1,4 @@
-"""Closed runner-owned recipes for the fifteen Wwise 2022 object-heavy cases.
+"""Closed runner-owned recipes for the reviewed object-heavy cases.
 
 The declarative V3 suite describes natural prompts and business assertions.  A
 real fresh-Codex campaign additionally needs deterministic fixture state, one
@@ -27,27 +27,41 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import dataclass, fields, is_dataclass, replace
 from types import MappingProxyType
 from typing import Any, Literal, TypeAlias
 
+from tests.semantic.support.codex_version_layout_v3 import (
+    CodexVersionLayoutError,
+    CodexVersionLayoutV3,
+    get_codex_version_layout_v3,
+)
+
 
 VERSION = "2022.1"
+COMPOUND_VERSIONS = ("2022.1", "2025.1")
 OPERATION_REQUEST_CONTRACT = "waapi-skill.operation-request/v1"
 OBJECT_CREATE_URI = "ak.wwise.core.object.create"
 OBJECT_GET_URI = "ak.wwise.core.object.get"
 OBJECT_SET_URI = "ak.wwise.core.object.set"
 OBJECT_HEAVY_RECIPE_CONTRACT = "waapi-skill.codex-object-heavy-recipe/v3"
 
-ACTOR_DWU = r"\Actor-Mixer Hierarchy\Default Work Unit"
-ACTOR_ROOT = r"\Actor-Mixer Hierarchy"
-MASTER_DWU = r"\Master-Mixer Hierarchy\Default Work Unit"
+_BASE_LAYOUT = get_codex_version_layout_v3(VERSION)
+ACTOR_DWU = _BASE_LAYOUT.containers_dwu
+ACTOR_ROOT = _BASE_LAYOUT.containers_root
+MASTER_DWU = _BASE_LAYOUT.busses_dwu
 SEMANTIC_LAB = ACTOR_DWU + r"\SemanticLab"
 
 OBJECT_CREATE_CASE_IDS = tuple(f"OBJ22-F-CREATE-{index:02d}" for index in range(1, 6))
 OBJECT_GET_CASE_IDS = tuple(f"OBJ22-F-GET-{index:02d}" for index in range(1, 6))
 OBJECT_SET_CASE_IDS = tuple(f"OBJ22-F-SET-{index:02d}" for index in range(1, 6))
 OBJECT_HEAVY_CASE_IDS = OBJECT_CREATE_CASE_IDS + OBJECT_GET_CASE_IDS + OBJECT_SET_CASE_IDS
+OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS = (
+    "OBJ22-F-CREATE-02",
+    "OBJ22-F-CREATE-03",
+    "OBJ22-F-SET-01",
+    "OBJ22-F-SET-02",
+)
 
 Scalar: TypeAlias = str | int | float | bool | None
 FrozenJSON: TypeAlias = Scalar | tuple["FrozenJSON", ...] | Mapping[str, "FrozenJSON"]
@@ -293,17 +307,24 @@ class OperationRequestSpec:
         "verify",
     )
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self, *, version: str = VERSION) -> dict[str, Any]:
+        try:
+            get_codex_version_layout_v3(version)
+        except CodexVersionLayoutError as exc:
+            raise ObjectHeavyRecipeError(str(exc)) from exc
         return {
             "contract": OPERATION_REQUEST_CONTRACT,
-            "version": VERSION,
+            "version": version,
             "operation": self.operation,
             "arguments": _plain(self.arguments),
         }
 
-    def canonical_json(self) -> str:
+    def canonical_json(self, *, version: str = VERSION) -> str:
         return json.dumps(
-            self.as_dict(), ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            self.as_dict(version=version),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
         )
 
 
@@ -372,6 +393,151 @@ def _plain(value: Any) -> Any:
     if isinstance(value, tuple):
         return [_plain(item) for item in value]
     return value
+
+
+def _translate_scalar(
+    value: Scalar,
+    layout: CodexVersionLayoutV3,
+) -> Scalar:
+    return layout.translate_2022_path(value) if isinstance(value, str) else value
+
+
+def _translate_frozen_json(
+    value: FrozenJSON,
+    layout: CodexVersionLayoutV3,
+) -> FrozenJSON:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return _translate_scalar(value, layout)
+    if isinstance(value, Mapping):
+        return MappingProxyType(
+            {
+                str(key): _translate_frozen_json(item, layout)
+                for key, item in value.items()
+            }
+        )
+    return tuple(_translate_frozen_json(item, layout) for item in value)
+
+
+def _translate_fixture_object(
+    value: FixtureObject,
+    layout: CodexVersionLayoutV3,
+) -> FixtureObject:
+    return replace(
+        value,
+        path=layout.translate_2022_path(value.path),
+        object_type=layout.reflected_type(value.object_type),
+        properties=tuple(
+            replace(item, value=_translate_scalar(item.value, layout))
+            for item in value.properties
+        ),
+    )
+
+
+def _translate_expected_object(
+    value: ExpectedObject,
+    layout: CodexVersionLayoutV3,
+) -> ExpectedObject:
+    return replace(
+        value,
+        object_type=layout.reflected_type(value.object_type),
+        path=(
+            layout.translate_2022_path(value.path)
+            if value.path is not None
+            else None
+        ),
+        parent_path=(
+            layout.translate_2022_path(value.parent_path)
+            if value.parent_path is not None
+            else None
+        ),
+        fields=tuple(
+            replace(item, value=_translate_scalar(item.value, layout))
+            for item in value.fields
+        ),
+    )
+
+
+def _translate_object_recipe(
+    recipe: ObjectHeavyRecipe,
+    layout: CodexVersionLayoutV3,
+) -> ObjectHeavyRecipe:
+    if recipe.version != VERSION:
+        raise ObjectHeavyRecipeError("only the reviewed 2022 recipe may be translated")
+    if recipe.scenario_id not in OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS:
+        raise ObjectHeavyRecipeError(
+            f"{recipe.scenario_id} is not approved for Wwise {layout.version}"
+        )
+    request = recipe.request
+    if not isinstance(request, OperationRequestSpec):
+        raise ObjectHeavyRecipeError(
+            f"{recipe.scenario_id} cross-version compound case must be a mutation"
+        )
+    translated = replace(
+        recipe,
+        version=layout.version,
+        prompt_literals=tuple(
+            layout.translate_2022_path(item) for item in recipe.prompt_literals
+        ),
+        fixture=replace(
+            recipe.fixture,
+            objects=tuple(
+                _translate_fixture_object(item, layout)
+                for item in recipe.fixture.objects
+            ),
+            absent_paths=tuple(
+                layout.translate_2022_path(item)
+                for item in recipe.fixture.absent_paths
+            ),
+            absent_sibling_prefixes=tuple(
+                (layout.translate_2022_path(parent), prefix)
+                for parent, prefix in recipe.fixture.absent_sibling_prefixes
+            ),
+        ),
+        request=replace(
+            request,
+            arguments=_translate_frozen_json(request.arguments, layout),
+        ),
+        oracle=replace(
+            recipe.oracle,
+            expected_objects=tuple(
+                _translate_expected_object(item, layout)
+                for item in recipe.oracle.expected_objects
+            ),
+            rules=tuple(
+                replace(
+                    rule,
+                    expected=tuple(
+                        (
+                            name,
+                            (
+                                tuple(
+                                    layout.translate_2022_path(item)
+                                    for item in expected
+                                )
+                                if isinstance(expected, tuple)
+                                else _translate_scalar(expected, layout)
+                            ),
+                        )
+                        for name, expected in rule.expected
+                    ),
+                )
+                for rule in recipe.oracle.rules
+            ),
+        ),
+        cleanup=replace(
+            recipe.cleanup,
+            owned_object_roots=tuple(
+                layout.translate_2022_path(item)
+                for item in recipe.cleanup.owned_object_roots
+            ),
+            protected_object_roots=tuple(
+                layout.translate_2022_path(item)
+                for item in recipe.cleanup.protected_object_roots
+            ),
+        ),
+    )
+    _validate_recipe(translated)
+    return translated
 
 
 def _identity(path: str) -> dict[str, str]:
@@ -1873,8 +2039,17 @@ def _validate_recipe(recipe: ObjectHeavyRecipe) -> None:
         raise ObjectHeavyRecipeError(f"{recipe.scenario_id} has the wrong contract")
     if recipe.scenario_id not in OBJECT_HEAVY_CASE_IDS:
         raise ObjectHeavyRecipeError(f"unknown object-heavy scenario: {recipe.scenario_id}")
-    if recipe.version != VERSION:
-        raise ObjectHeavyRecipeError(f"{recipe.scenario_id} must use Wwise {VERSION}")
+    try:
+        get_codex_version_layout_v3(recipe.version)
+    except CodexVersionLayoutError as exc:
+        raise ObjectHeavyRecipeError(str(exc)) from exc
+    if (
+        recipe.version != VERSION
+        and recipe.scenario_id not in OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS
+    ):
+        raise ObjectHeavyRecipeError(
+            f"{recipe.scenario_id} is not approved for Wwise {recipe.version}"
+        )
     expected_api = (
         OBJECT_CREATE_URI
         if recipe.scenario_id in OBJECT_CREATE_CASE_IDS
@@ -1969,7 +2144,7 @@ def _validate_recipe(recipe: ObjectHeavyRecipe) -> None:
             raise ObjectHeavyRecipeError(
                 f"{recipe.scenario_id} operation mismatch: {recipe.request.operation}"
             )
-        payload = recipe.request.as_dict()
+        payload = recipe.request.as_dict(version=recipe.version)
         _reject_executable_request_values(payload, path="$request")
         if recipe.oracle.exact_row_keys:
             raise ObjectHeavyRecipeError(
@@ -1990,7 +2165,7 @@ def _validate_query_request(recipe: ObjectHeavyRecipe) -> None:
     assert isinstance(recipe.request, QueryObjectRequestSpec)
     request = recipe.request
     argv = request.argv
-    if argv[:4] != ("gateway.py", "--version", VERSION, "query-object"):
+    if argv[:4] != ("gateway.py", "--version", recipe.version, "query-object"):
         raise ObjectHeavyRecipeError(
             f"{recipe.scenario_id} query must use the packaged query-object route"
         )
@@ -2195,15 +2370,44 @@ _RECIPES: Mapping[str, ObjectHeavyRecipe] = MappingProxyType(
 if tuple(_RECIPES) != OBJECT_HEAVY_CASE_IDS:  # pragma: no cover - import-time seal.
     raise ObjectHeavyRecipeError("object-heavy recipe registry order or coverage drifted")
 
+_CROSS_VERSION_RECIPES: Mapping[tuple[str, str], ObjectHeavyRecipe] = (
+    MappingProxyType(
+        {
+            (scenario_id, version): _translate_object_recipe(
+                _RECIPES[scenario_id],
+                get_codex_version_layout_v3(version),
+            )
+            for scenario_id in OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS
+            for version in COMPOUND_VERSIONS
+            if version != VERSION
+        }
+    )
+)
 
-def build_object_heavy_v3_recipe(scenario_id: str) -> ObjectHeavyRecipe:
+
+def build_object_heavy_v3_recipe(
+    scenario_id: str,
+    version: str = VERSION,
+) -> ObjectHeavyRecipe:
     """Return one immutable reviewed recipe; arbitrary IDs fail closed."""
 
     try:
-        return _RECIPES[scenario_id]
+        get_codex_version_layout_v3(version)
+    except CodexVersionLayoutError as exc:
+        raise ObjectHeavyRecipeError(str(exc)) from exc
+    try:
+        base = _RECIPES[scenario_id]
     except KeyError as exc:
         raise ObjectHeavyRecipeError(
             f"unknown object-heavy V3 scenario: {scenario_id}"
+        ) from exc
+    if version == VERSION:
+        return base
+    try:
+        return _CROSS_VERSION_RECIPES[(scenario_id, version)]
+    except KeyError as exc:
+        raise ObjectHeavyRecipeError(
+            f"{scenario_id} is not approved for Wwise {version}"
         ) from exc
 
 
@@ -2216,7 +2420,9 @@ def all_object_heavy_v3_recipes() -> tuple[ObjectHeavyRecipe, ...]:
 __all__ = [
     "ACTOR_DWU",
     "ACTOR_ROOT",
+    "COMPOUND_VERSIONS",
     "MASTER_DWU",
+    "OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS",
     "OBJECT_CREATE_CASE_IDS",
     "OBJECT_GET_CASE_IDS",
     "OBJECT_HEAVY_CASE_IDS",

@@ -151,9 +151,23 @@ def _property_info(name: str) -> dict[str, Any]:
         "name": name,
         "type": "Real32",
         "default": 0.0,
+        "supports": {
+            "unlink": True,
+            "rtpc": "Exclusive",
+            "randomizer": False,
+        },
         "display": {"name": name},
         "restriction": {"min": -96.3, "max": 12.0},
         "dependencies": [],
+        "ui": {
+            "value": {
+                "min": -96.3,
+                "max": 12.0,
+                "decimals": 1,
+                "step": 0.1,
+            }
+        },
+        "audioEngineId": 42,
     }
 
 
@@ -294,6 +308,10 @@ def _metadata_responses(
             ],
             "--limit must be between 1 and 8",
         ),
+        (
+            ["metadata", "types", "--detail"],
+            "--detail are supported only for the discover operation",
+        ),
     ),
 )
 def test_metadata_discover_preflight_rejects_before_client_creation(
@@ -409,11 +427,14 @@ def test_metadata_discover_dispatches_only_closed_reads_for_all_versions(
     assert payload["metadata_authority"] == "live-waapi"
     assert list(payload)[-1] == "agent_result"
     assert payload["agent_result"]["contract"] == (
-        "waapi-skill.metadata-discovery/v1"
+        "waapi-skill.metadata-discovery/v2"
     )
     assert payload["agent_result"]["authority"] == "live-waapi"
+    assert payload["agent_result"]["result_detail"] == "compact"
     assert payload["agent_result"]["candidates"][0]["name"] == "Volume"
     assert payload["agent_result"]["candidates"][0]["metadata"]["name"] == "Volume"
+    assert "supports" not in payload["agent_result"]["candidates"][0]["metadata"]
+    assert "match_evidence" not in payload["agent_result"]["candidates"][0]
 
     call_uris = [call[0] for call in client.calls]
     expected_uris = {
@@ -438,6 +459,152 @@ def test_metadata_discover_dispatches_only_closed_reads_for_all_versions(
     assert names_call[1] == expected_scope_args
     assert info_call[1] == {**expected_scope_args, "property": "Volume"}
     assert client.disconnected is True
+
+
+def test_metadata_discover_detail_is_an_explicit_full_audit_opt_in(
+    tmp_path: Path,
+) -> None:
+    client = FakeClient(_metadata_responses(tmp_path))
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "metadata",
+            "discover",
+            "--class-id",
+            str(SOUND_CLASS_ID),
+            "--query",
+            "Volume",
+            "--limit",
+            "1",
+            "--detail",
+        ],
+        env=_gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert exit_code == 0, payload
+    result = payload["agent_result"]
+    assert result["contract"] == "waapi-skill.metadata-discovery/v1"
+    assert "result_detail" not in result
+    candidate = result["candidates"][0]
+    assert candidate["match_evidence"]
+    assert candidate["metadata"]["supports"]["rtpc"] == "Exclusive"
+    assert candidate["metadata"]["ui"]["value"]["min"] == -96.3
+    assert candidate["metadata"]["audioEngineId"] == 42
+
+
+def _compact_five_query_gateway_payload(
+    tmp_path: Path,
+) -> dict[str, Any]:
+    queries = ("loop", "limit", "output", "pitch", "stream")
+    names = tuple(
+        f"{query.title()}Setting{index}"
+        for query in queries
+        for index in range(4)
+    )
+    gate_by_query = {
+        query: f"ActivationGate{index}"
+        for index, query in enumerate(queries)
+    }
+    all_names = (*names, *gate_by_query.values())
+    responses = _metadata_responses(tmp_path, names=all_names)
+
+    def property_info(
+        args: Mapping[str, Any] | None,
+        _options: Mapping[str, Any] | None,
+    ) -> Mapping[str, Any]:
+        assert isinstance(args, Mapping)
+        name = args.get("property")
+        assert isinstance(name, str)
+        if name in gate_by_query.values():
+            return {
+                "name": name,
+                "type": "bool",
+                "default": False,
+                "display": {
+                    "name": name,
+                    "index": 1700,
+                    "group": "Audio/Advanced Settings/Activation",
+                },
+                "restriction": {},
+                "dependencies": [],
+                "ui": {"value": {"min": 0.0, "max": 0.0}},
+                "audioEngineId": 0xFFFFFFFF,
+            }
+        query = next(
+            item for item in queries if name.startswith(item.title())
+        )
+        index = int(name[-1])
+        return {
+            **_property_info(name),
+            "display": {
+                "name": f"{query.title()} setting {index}",
+                "index": 1500 + index,
+                "group": (
+                    "Audio/Advanced Settings/Compound Metadata "
+                    f"Resolution/{query.title()}"
+                ),
+            },
+            "restriction": {
+                "type": "range",
+                "min": -200.0,
+                "max": 200.0,
+            },
+            "dependencies": (
+                [
+                    {
+                        "type": "override",
+                        "action": "Enable",
+                        "context": "Self",
+                        "property": gate_by_query[query],
+                    }
+                ]
+                if index == 0
+                else []
+            ),
+        }
+
+    responses[GET_PROPERTY_INFO_URI] = property_info
+    client = FakeClient(responses)
+    query_argv = [
+        item
+        for query in queries
+        for item in ("--query", query)
+    ]
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "metadata",
+            "discover",
+            "--object-type",
+            "Sound",
+            *query_argv,
+            "--limit",
+            "8",
+        ],
+        env=_gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert exit_code == 0, payload
+    return payload
+
+
+def test_compact_five_query_complete_gateway_stdout_stays_below_32_kib(
+    tmp_path: Path,
+) -> None:
+    payload = _compact_five_query_gateway_payload(tmp_path)
+
+    assert payload["agent_result"]["candidate_count"] == 20
+    assert len(payload["agent_result"]["dependency_candidates"]) == 5
+    assert (
+        waapi_gateway.gateway_json_document_size(payload["agent_result"])
+        <= 28 * 1024
+    )
+    assert (
+        waapi_gateway.gateway_json_document_size(payload)
+        <= waapi_gateway.MAX_METADATA_DISCOVERY_GATEWAY_RESULT_BYTES
+    )
 
 
 def test_metadata_discover_persists_and_reuses_exact_live_session_cache(

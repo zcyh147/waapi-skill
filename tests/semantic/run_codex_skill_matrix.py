@@ -108,12 +108,18 @@ DEFAULT_V3_SUITE = SKILL_ROOT / "evals" / "suite-v3.json"
 DEFAULT_MODIFICATION_POLICY_V3_SUITE = (
     SKILL_ROOT / "evals" / "modification-policy-9.json"
 )
+DEFAULT_COMPOUND_HEAVY_V1_SUITE = (
+    REPO_ROOT / "tests" / "semantic" / "data" / "compound-heavy-v1" / "profile.json"
+)
 DEFAULT_ITERATION_ROOT = SKILL_ROOT.parent / "waapi-skill-workspace" / "iteration-9-v2-matrix"
 DEFAULT_HEAVY_V3_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "heavy-cross-version-80"
 )
 DEFAULT_MODIFICATION_POLICY_V3_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "modification-policy-9"
+)
+DEFAULT_COMPOUND_HEAVY_V1_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "compound-heavy-cross-version-24"
 )
 DEFAULT_CODEX_BINARY = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
 DEFAULT_AUTH_JSON = Path.home() / ".codex" / "auth.json"
@@ -146,8 +152,13 @@ MISSING_QUERY_RESULT_KEYS = frozenset({"count", "objects", "not_found"})
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 HEAVY_V3_PROFILE_ID = "heavy_cross_version_80"
 MODIFICATION_POLICY_V3_PROFILE_ID = "modification_policy_9"
+COMPOUND_HEAVY_V1_PROFILE_ID = "compound_heavy_cross_version_24"
 EXECUTABLE_V3_PROFILE_IDS = frozenset(
-    {HEAVY_V3_PROFILE_ID, MODIFICATION_POLICY_V3_PROFILE_ID}
+    {
+        HEAVY_V3_PROFILE_ID,
+        MODIFICATION_POLICY_V3_PROFILE_ID,
+        COMPOUND_HEAVY_V1_PROFILE_ID,
+    }
 )
 HEAVY_V3_RUN_CONFIG_CONTRACT = "waapi-skill.codex-heavy-matrix-config/v3"
 HEAVY_V3_SUMMARY_CONTRACT = "waapi-skill.codex-heavy-matrix-summary/v3"
@@ -287,6 +298,16 @@ HeavyV3DependencyPreflight = Callable[[], Mapping[str, Any]]
 def load_heavy_v3_units(options: RunnerOptions) -> tuple[Any, ...]:
     """Load and filter the reviewed V3 bundle without importing live runners."""
 
+    if options.profile == COMPOUND_HEAVY_V1_PROFILE_ID:
+        compound_module = importlib.import_module(
+            "tests.semantic.support.codex_compound_heavy_v1"
+        )
+        profile = compound_module.load_compound_heavy_profile(
+            options.suite_path,
+            unit_ids=options.case_ids,
+            versions=options.versions,
+        )
+        return tuple(profile.units)
     if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID:
         policy_module = importlib.import_module(
             "tests.semantic.support.codex_modification_policy_v3"
@@ -658,9 +679,15 @@ def _heavy_v3_unit_row(unit: Any, *, sequence: int) -> dict[str, Any]:
         "api": api,
         "runner": "cli" if api.startswith("ak.wwise.cli.") else "project",
     }
+    base_scenario_id = getattr(unit, "base_scenario_id", None)
+    if base_scenario_id is not None:
+        if not isinstance(base_scenario_id, str) or not base_scenario_id:
+            raise HeavyV3MatrixError(
+                "V3 heavy unit has an invalid base-scenario identity"
+            )
+        row["base_scenario_id"] = base_scenario_id
     policy = getattr(unit, "project_modification_policy", None)
     if policy is not None:
-        base_scenario_id = getattr(unit, "base_scenario_id", None)
         repetition = getattr(unit, "repetition", None)
         expected_dispatch = getattr(
             unit,
@@ -3168,6 +3195,8 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     args = parser.parse_args(argv)
     is_executable_v3 = args.profile in EXECUTABLE_V3_PROFILE_IDS
     is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
+    is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
+    is_terra_v3 = is_policy_v3 or is_compound_v1
     if args.timeout <= 0:
         parser.error("--timeout must be greater than zero")
     if len(set(args.version)) != len(args.version):
@@ -3188,29 +3217,44 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         parser.error(
             f"{MODIFICATION_POLICY_V3_PROFILE_ID} supports only --version 2022.1"
         )
+    if is_compound_v1 and any(
+        version not in {"2022.1", "2025.1"} for version in args.version
+    ):
+        parser.error(
+            f"{COMPOUND_HEAVY_V1_PROFILE_ID} supports only "
+            "--version 2022.1 and 2025.1"
+        )
     model = args.model or (
-        "gpt-5.6-terra" if is_policy_v3 else "gpt-5.6-sol"
+        "gpt-5.6-terra" if is_terra_v3 else "gpt-5.6-sol"
     )
     service_tier = args.service_tier or (
-        "default" if is_policy_v3 else "priority"
+        "default" if is_terra_v3 else "priority"
     )
-    if is_policy_v3 and (
+    if is_terra_v3 and (
         model != "gpt-5.6-terra"
         or args.reasoning_effort != "medium"
         or service_tier != "default"
     ):
         parser.error(
-            f"{MODIFICATION_POLICY_V3_PROFILE_ID} requires "
+            f"{args.profile} requires "
             "gpt-5.6-terra / medium / default"
         )
     suite = args.suite or str(
-        DEFAULT_MODIFICATION_POLICY_V3_SUITE
-        if is_policy_v3
+        (
+            DEFAULT_MODIFICATION_POLICY_V3_SUITE
+            if is_policy_v3
+            else DEFAULT_COMPOUND_HEAVY_V1_SUITE
+        )
+        if is_terra_v3
         else (DEFAULT_V3_SUITE if is_executable_v3 else DEFAULT_SUITE)
     )
     iteration_root = args.iteration_root or str(
-        DEFAULT_MODIFICATION_POLICY_V3_ITERATION_ROOT
-        if is_policy_v3
+        (
+            DEFAULT_MODIFICATION_POLICY_V3_ITERATION_ROOT
+            if is_policy_v3
+            else DEFAULT_COMPOUND_HEAVY_V1_ITERATION_ROOT
+        )
+        if is_terra_v3
         else (
             DEFAULT_HEAVY_V3_ITERATION_ROOT
             if is_executable_v3

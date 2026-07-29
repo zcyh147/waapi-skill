@@ -11,6 +11,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from tests.semantic.support.codex_object_heavy_v3 import (
     OBJECT_CREATE_CASE_IDS,
+    OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS,
     OBJECT_GET_CASE_IDS,
     OBJECT_HEAVY_CASE_IDS,
     OBJECT_SET_CASE_IDS,
@@ -182,6 +183,64 @@ def test_mutation_requests_parse_through_the_production_closed_contract() -> Non
             "value": r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab\Generated",
         },
     }
+
+
+@pytest.mark.parametrize("case_id", OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS)
+def test_compound_object_recipe_translates_paths_and_reflected_types_for_2025(
+    case_id: str,
+) -> None:
+    old = build_object_heavy_v3_recipe(case_id)
+    new = build_object_heavy_v3_recipe(case_id, "2025.1")
+
+    assert old.version == "2022.1"
+    assert new.version == "2025.1"
+    assert new is build_object_heavy_v3_recipe(case_id, "2025.1")
+    assert new.digest != old.digest
+    assert all(
+        not (
+            isinstance(value, str)
+            and value.startswith(
+                (r"\Actor-Mixer Hierarchy", r"\Master-Mixer Hierarchy")
+            )
+        )
+        for value in _walk(new)
+    )
+    assert all(
+        item.path.startswith(r"\Containers\Default Work Unit\SemanticLab")
+        for item in new.fixture.objects
+    )
+    old_fixture = {item.key: item for item in old.fixture.objects}
+    new_fixture = {item.key: item for item in new.fixture.objects}
+    assert {
+        key
+        for key, item in new_fixture.items()
+        if item.object_type == "PropertyContainer"
+    } == {
+        key
+        for key, item in old_fixture.items()
+        if item.object_type == "ActorMixer"
+    }
+    assert all(
+        item.object_type != "ActorMixer" for item in new.oracle.expected_objects
+    )
+
+    assert isinstance(new.request, OperationRequestSpec)
+    payload = new.request.as_dict(version=new.version)
+    parsed = parse_operation_request(payload)
+    assert parsed.version == "2025.1"
+    assert parsed.operation == new.request.operation
+    assert json.loads(
+        new.request.canonical_json(version=new.version)
+    ) == payload
+    if new.api.endswith(".create"):
+        assert payload["arguments"]["type"] == "ActorMixer"
+
+
+def test_unreviewed_object_cases_and_layout_versions_fail_closed() -> None:
+    with pytest.raises(ObjectHeavyRecipeError, match="not approved"):
+        build_object_heavy_v3_recipe("OBJ22-F-GET-01", "2025.1")
+    with pytest.raises(ObjectHeavyRecipeError, match="unsupported"):
+        build_object_heavy_v3_recipe("OBJ22-F-CREATE-02", "2024.1")
 
 
 def test_set_03_uses_raw_pitch_cents_and_exact_bus_references() -> None:
@@ -481,6 +540,7 @@ def test_materialized_object_contract_has_every_hidden_oracle_binding_field() ->
 def test_public_builder_accepts_no_code_callback_or_command_extension() -> None:
     assert tuple(inspect.signature(build_object_heavy_v3_recipe).parameters) == (
         "scenario_id",
+        "version",
     )
     assert not inspect.signature(build_object_heavy_v3_recipe).parameters[
         "scenario_id"

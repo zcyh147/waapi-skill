@@ -121,6 +121,10 @@ user's approval.
 - Preserve unrelated user changes and avoid destructive Git commands.
 - Keep `SKILL.md` lean and route detail into the four current `waapi-*.md`
   references. Do not reintroduce broad repository research into normal Skill use.
+- Treat `waapi-operate.md` as the compact cross-operation control plane.
+  Operation-specific fields, nested shapes, and version deltas belong in the
+  version-aware `operation-schema` or `describe` result; do not add per-API
+  Markdown merely to repeat structured gateway contracts.
 - Keep `agent_result` exact for machine-readable replies. Do not rebuild it from
   summaries, and preserve its final insertion-order position in gateway payloads.
 - All live results and structured failures must stay bounded. Cleanup failures,

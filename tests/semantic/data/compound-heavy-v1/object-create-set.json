@@ -1,0 +1,108 @@
+{
+  "contract": "waapi-skill.codex-compound-heavy-cases/v1",
+  "cases": [
+    {
+      "base_scenario_id": "OBJ22-F-CREATE-02",
+      "api": "ak.wwise.core.object.create",
+      "versions": [
+        "2022.1",
+        "2025.1"
+      ],
+      "prompt": "在当前 Wwise 版本的默认容器工作单元中，整理 `SemanticLab\\NPC` 下已有的 `Robot_VO`。它原来的 `Idle` 随机容器和 `Idle_A` Sound 都要保留，再一次补齐 `Alert`、`Combat`、`Damage` 三组随机容器，每组各放两个同名前缀的 A/B Sound；三组备注依次写“警戒对白”“战斗对白”“受击对白”。请合并到原节点，不要产生 `Robot_VO_01`，完成后列出四组的实际路径和类型。",
+      "confirmation_prompt": "可以，按这个结构合并到现有 `Robot_VO`，保留原来的 `Idle` 分支。",
+      "fixture_patch": {
+        "asset_spec": {
+          "identity_binding": {
+            "contract": "waapi-skill.compound-object-identity/v1",
+            "fixture_key": "robot"
+          }
+        },
+        "prerequisites": [
+          "resolve the current version lane's default container work unit and create SemanticLab/NPC with one Robot_VO collision",
+          "seed Robot_VO with an Idle RandomSequenceContainer and Idle_A Sound, then seal their GUIDs, fields, ordered child graph, and source-project hashes"
+        ]
+      }
+    },
+    {
+      "base_scenario_id": "OBJ22-F-CREATE-03",
+      "api": "ak.wwise.core.object.create",
+      "versions": [
+        "2022.1",
+        "2025.1"
+      ],
+      "prompt": "在当前 Wwise 版本默认容器工作单元的 `SemanticLab\\Weapons` 下，新建另一套 Actor Mixer `Impact_Library`。现有同名旧分支及其 `Legacy` 内容必须完整保留，让新分支自动取得不冲突的名称；新分支备注写“新版材质碰撞库”，Volume 设为 -1.5 dB，并包含 `Metal`、`Wood` 两个随机容器，每个容器都放 `Light`、`Heavy` 两个 Sound。完成后告诉我新分支的实际名称，并核对旧分支未变化。",
+      "confirmation_prompt": "可以，保留旧分支，按预览创建自动换名的新材质碰撞库。",
+      "fixture_patch": {
+        "asset_spec": {
+          "metadata_binding": {
+            "contract": "waapi-skill.compound-object-metadata/v1",
+            "queries": [
+              "volume"
+            ],
+            "required_tokens": [
+              "Volume"
+            ]
+          }
+        },
+        "prerequisites": [
+          "resolve the current version lane's default container work unit and create SemanticLab/Weapons with one Impact_Library collision",
+          "seed the protected Legacy subtree and seal collision GUIDs, notes, Volume, sibling names, child graph, and source-project hashes"
+        ]
+      }
+    },
+    {
+      "base_scenario_id": "OBJ22-F-SET-01",
+      "api": "ak.wwise.core.object.set",
+      "versions": [
+        "2022.1",
+        "2025.1"
+      ],
+      "prompt": "一次整理当前 Wwise 版本默认容器工作单元里的 Actor Mixer `SemanticLab\\Combat`：把根节点备注改成“战斗音频入口”，Volume 设为 -3 dB，并在下面新增 `Melee` 随机容器以及 `Light`、`Heavy` 两个 Sound。已有的 `Ranged` 分支连同对象身份、顺序和其他属性都不要改变，完成后把更新后的根节点和两条分支结构一起列出来。",
+      "confirmation_prompt": "确认按这个结构和属性一次更新，同时完整保留现有 `Ranged` 分支。",
+      "fixture_patch": {
+        "asset_spec": {
+          "metadata_binding": {
+            "contract": "waapi-skill.compound-object-metadata/v1",
+            "queries": [
+              "volume"
+            ],
+            "required_tokens": [
+              "Volume"
+            ]
+          }
+        },
+        "prerequisites": [
+          "resolve the current version lane's default container work unit and create SemanticLab/Combat with a distinct notes and Volume baseline",
+          "seed and seal the protected Ranged subtree, confirm the Melee paths are absent, and record source-project hashes"
+        ]
+      }
+    },
+    {
+      "base_scenario_id": "OBJ22-F-SET-02",
+      "api": "ak.wwise.core.object.set",
+      "versions": [
+        "2022.1",
+        "2025.1"
+      ],
+      "prompt": "批量更新当前 Wwise 版本默认容器工作单元中 `SemanticLab\\UI` 下的三个 Actor Mixer：`Confirm`、`Cancel`、`Error`。Volume 分别设为 -1、-2、-4 dB，备注依次改为“确认操作反馈”“取消操作反馈”“错误操作反馈”，并只给 `Error` 新增一个 `Error_Layer` Sound。三个节点原有的 Pitch、已有子对象和其他未提及内容都保持不变，完成后汇总三项属性结果与新增层级。",
+      "confirmation_prompt": "可以，一次完成这三项更新，并核对所有未涉及的属性和已有子对象。",
+      "fixture_patch": {
+        "asset_spec": {
+          "metadata_binding": {
+            "contract": "waapi-skill.compound-object-metadata/v1",
+            "queries": [
+              "volume"
+            ],
+            "required_tokens": [
+              "Volume"
+            ]
+          }
+        },
+        "prerequisites": [
+          "resolve the current version lane's default container work unit and create SemanticLab/UI with Confirm, Cancel, and Error baselines",
+          "seed distinct Pitch values and protected existing children, prove Error_Layer is absent, and seal every GUID, field, child set, and source-project hash"
+        ]
+      }
+    }
+  ]
+}

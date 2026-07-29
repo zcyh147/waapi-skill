@@ -1,0 +1,65 @@
+{
+  "contract": "waapi-skill.codex-compound-heavy-cases/v1",
+  "cases": [
+    {
+      "base_scenario_id": "O22-SB-GENERATE-01",
+      "api": "ak.wwise.core.soundbank.generate",
+      "versions": [
+        "2022.1",
+        "2025.1"
+      ],
+      "fixture_patch": {
+        "prerequisites": [
+          "one fresh matching-version project copy contains Main_UI, Gameplay, Dialogue_Chapter11, and Test_Debug and is saved with isDirty=false",
+          "the runtime resolves the current version's container, bus, and main-bus layout before creating events, media, dependencies, and control banks",
+          "Windows platform identity, SoundBank output roots, copied-media roots, cache roots, complete before trees, and source-project hashes are sealed"
+        ]
+      }
+    },
+    {
+      "base_scenario_id": "O22-SB-GENERATE-03",
+      "api": "ak.wwise.core.soundbank.generate",
+      "versions": [
+        "2022.1",
+        "2025.1"
+      ],
+      "fixture_patch": {
+        "prerequisites": [
+          "one fresh matching-version project copy contains Weapons_Core, Ambience, Frontend, and Debug",
+          "the runtime resolves the current version's container, bus, and main-bus layout before materializing both banks and every dependency",
+          "Windows and Mac platform identities, non-overlapping output and cache trees, and source-project hashes are sealed before execution"
+        ]
+      }
+    },
+    {
+      "base_scenario_id": "O22-SB-SET-INCLUSIONS-01",
+      "api": "ak.wwise.core.soundbank.setInclusions",
+      "versions": [
+        "2022.1",
+        "2025.1"
+      ],
+      "fixture_patch": {
+        "prerequisites": [
+          "one fresh matching-version project copy contains Gameplay_Test, Main_UI, Ambience, and three unique Event objects",
+          "Gameplay_Test initially contains only the complete Play_Debug_Loop inclusion while target and control SoundBank GUIDs are sealed",
+          "the exact getInclusions state, object identities, project files, and source-project hashes are sealed before preview"
+        ]
+      }
+    },
+    {
+      "base_scenario_id": "O22-SB-SET-INCLUSIONS-05",
+      "api": "ak.wwise.core.soundbank.setInclusions",
+      "versions": [
+        "2022.1",
+        "2025.1"
+      ],
+      "fixture_patch": {
+        "prerequisites": [
+          "one fresh matching-version project copy contains Ambience_Release, Ambience_Control, Forest, City, and Rain with unique identities",
+          "Forest starts media-only, City starts with events, structures, and media, and Rain is absent from the target SoundBank",
+          "the exact target and control getInclusions state, every GUID, project files, and source-project hashes are sealed before preview"
+        ]
+      }
+    }
+  ]
+}

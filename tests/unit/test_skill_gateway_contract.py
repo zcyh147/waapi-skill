@@ -221,16 +221,15 @@ def test_existing_transaction_continuation_precedes_named_operation_schema() -> 
     assert "an artifact hash alone is not a transaction lookup key" in skill
     assert "run `transaction-show <transaction-id> --summary-only` first" in skill
     assert "skip `operation-schema` and `preview`; start with `transaction-show`" in skill
-    assert "An existing transaction continuation outranks the named-operation rule" in operate
-    assert "A transaction id is required: an artifact hash alone is not a lookup key" in operate
-    assert "The first gateway command is `transaction-show <transaction-id> --summary-only`" in operate
+    assert "An existing transaction continuation always outranks operation selection" in operate
+    assert "an artifact hash is not a lookup key" in operate
+    assert "transaction-show <transaction-id> --summary-only" in operate
     assert "Do not call `operations`, `operation-schema`, or `preview` first" in operate
-    assert "always preserves the exact immutable `request`" in operate
-    assert "complete cleanup spec" in operate
-    assert "`summary_contract` and `detail_level`" in operate
-    assert "A digest projection is an intentional bounded review" in operate
-    assert "Never reconstruct omitted" in operate
-    assert operate.index("## Choose the transaction phase first") < operate.index("## Closed transaction flow")
+    assert "`next_command.shell_command` as the sole executable representation" in operate
+    assert "Copy the entire string verbatim as one shell tool call" in operate
+    assert operate.index("## Choose the phase and first Gateway command") < operate.index(
+        "## Continue only from Gateway-owned commands"
+    )
 
 
 def test_public_readmes_route_users_only_through_the_packaged_gateway() -> None:

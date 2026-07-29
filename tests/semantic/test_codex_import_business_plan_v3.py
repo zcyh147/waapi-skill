@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType
@@ -8,8 +9,18 @@ from typing import Any
 import pytest
 
 from tests.semantic.support.codex_eval_bundle_v3 import load_eval_bundle_v3
-from tests.semantic.support.codex_eval_protocol_v3 import StructuredRefusal, build_transaction_protocol
-from tests.semantic.support.codex_import_assets_v3 import materialize_import_case
+from tests.semantic.support.codex_eval_protocol_v3 import (
+    StructuredRefusal,
+    build_metadata_transaction_protocol,
+    build_transaction_protocol,
+)
+from tests.semantic.support.codex_gateway_broker import (
+    project_required_metadata_tokens,
+)
+from tests.semantic.support.codex_import_assets_v3 import (
+    bound_import_metadata_tokens,
+    materialize_import_case,
+)
 from tests.semantic.support.codex_import_business_plan_v3 import (
     ImportBusinessPlanError,
     compile_import_business_plan,
@@ -28,6 +39,10 @@ from tests.semantic.support.codex_import_runtime_v3 import (
     ImportRowState,
     ImportRuntimeSnapshot,
     build_import_runtime_plan,
+)
+from tests.semantic.test_codex_import_runtime_v3 import (
+    _compound_prepared,
+    _sound_discovery,
 )
 
 
@@ -161,6 +176,476 @@ def test_all_ten_real_scenarios_compile_recompute_and_archive(tmp_path: Path) ->
             assert [request["operation"] for request in sections.static_expectation["operation_requests"]] == [
                 "audio.import" if current.api.endswith(".import") else "audio.importTabDelimited"
             ] * len(materialized.operation_requests)
+
+
+@pytest.mark.parametrize(
+    "unit_id",
+    [
+        f"CMP{year}-{scenario_id}"
+        for year in ("22", "25")
+        for scenario_id in (
+            "O22-AUDIO-IMPORT-02",
+            "O22-AUDIO-IMPORT-03",
+            "O22-AUDIO-TAB-03",
+            "O22-AUDIO-TAB-04",
+        )
+    ],
+)
+def test_compound_import_plans_seal_dynamic_metadata_bus_and_cleanup_evidence(
+    tmp_path: Path,
+    unit_id: str,
+) -> None:
+    unit, materialized, backend, fixtures, runtime = _compound_prepared(
+        tmp_path,
+        unit_id=unit_id,
+    )
+    tokens = bound_import_metadata_tokens(materialized)
+    projection = project_required_metadata_tokens(
+        _sound_discovery(),
+        object_type="Sound",
+        required_tokens=tokens,
+    )
+    protocol = build_metadata_transaction_protocol(
+        materialized.operation_requests,
+        object_type="Sound",
+        metadata_queries=materialized.metadata_queries,
+        required_tokens=tokens,
+        expected_required_token_projection=projection,
+        equivalence=(
+            "audio_import_v1"
+            if unit.scenario.api == "ak.wwise.core.audio.import"
+            else "audio_import_tab_v1"
+        ),
+    )
+    before = runtime.hidden_before
+    assert before is not None
+
+    sections = compile_import_business_plan(
+        unit.scenario,
+        materialized,
+        runtime.plan,
+        before,
+        protocol,
+    )
+    validate_import_business_plan(
+        sections,
+        unit.scenario,
+        materialized,
+        runtime.plan,
+        before,
+        protocol,
+        verify_files=True,
+    )
+    parsed = parse_import_business_plan_sections(sections.writer_kwargs())
+    validate_import_business_plan_archive(
+        parsed,
+        scenario=unit.scenario,
+        protocol=protocol,
+        verify_files=True,
+    )
+    canonical_archive = json.loads(
+        json.dumps(
+            sections.writer_kwargs(),
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+        )
+    )
+    canonical_parsed = parse_import_business_plan_sections(canonical_archive)
+    validate_import_business_plan_archive(
+        canonical_parsed,
+        scenario=unit.scenario,
+        protocol=protocol,
+        verify_files=True,
+    )
+
+    static = sections.static_expectation
+    live = sections.live_binding
+    assert static["family_schema_version"] == "waapi-skill.import-business-plan/v2"
+    assert static["metadata_projection"] == [
+        item.as_dict() for item in projection
+    ]
+    assert static["dynamic_tokens"] == list(tokens)
+    assert all(
+        bool(row["dynamic_properties"]) == bool(row["dynamic_references"])
+        for row in static["row_contracts"]
+    )
+    modes = [row["dynamic_mode"] for row in static["row_contracts"]]
+    if unit.base_scenario_id == "O22-AUDIO-TAB-04":
+        assert modes == [
+            "preserve",
+            "preserve",
+            "preserve",
+            "mutate",
+            "mutate",
+            "mutate",
+        ]
+    else:
+        assert modes and set(modes) == {"mutate"}
+    assert all(
+        bool(row["dynamic_properties"])
+        == (row["dynamic_mode"] == "mutate")
+        for row in static["row_contracts"]
+    )
+    assert live["reference_fixtures"]["targets"]
+    request_targets = static["metadata_binding"]["reference_targets"]
+    oracle_targets = {
+        item["key"]: item for item in live["reference_fixtures"]["targets"]
+    }
+    assert set(request_targets) == set(oracle_targets)
+    for key, request_target in request_targets.items():
+        oracle_target = oracle_targets[key]
+        assert request_target == {
+            "kind": "path",
+            "value": oracle_target["path"],
+        }
+        assert request_target["value"] != oracle_target["id"]
+        assert any(
+            reference["target_fixture"] == key
+            and reference["target_id"] == oracle_target["id"]
+            for row in static["row_contracts"]
+            for reference in row["dynamic_references"]
+        )
+    assert live["cleanup_boundaries"]["order"] == [
+        "import_roots",
+        "reference_busses",
+        "asset_root",
+    ]
+
+    backend.apply_case(unit.scenario, runtime.plan)
+    verification = runtime.verify_after_execution()
+    verification.assert_passed()
+    validate_import_archived_verification(
+        sections,
+        _plain(verification),
+    )
+
+    cleanup = runtime.cleanup_success()
+    assert cleanup.paths_absent and cleanup.assets_removed
+    assert fixtures.cleaned
+
+
+@pytest.mark.parametrize("token_drift", ("missing", "extra", "mismatched"))
+def test_compound_import_archive_rejects_dynamic_token_set_drift(
+    tmp_path: Path,
+    token_drift: str,
+) -> None:
+    unit, materialized, _backend, _fixtures, runtime = _compound_prepared(
+        tmp_path,
+        unit_id="CMP25-O22-AUDIO-IMPORT-02",
+    )
+    tokens = bound_import_metadata_tokens(materialized)
+    projection = project_required_metadata_tokens(
+        _sound_discovery(),
+        object_type="Sound",
+        required_tokens=tokens,
+    )
+    protocol = build_metadata_transaction_protocol(
+        materialized.operation_requests,
+        object_type="Sound",
+        metadata_queries=materialized.metadata_queries,
+        required_tokens=tokens,
+        expected_required_token_projection=projection,
+        equivalence="audio_import_v1",
+    )
+    before = runtime.hidden_before
+    assert before is not None
+    sections = compile_import_business_plan(
+        unit.scenario,
+        materialized,
+        runtime.plan,
+        before,
+        protocol,
+    )
+    static = _plain(sections.static_expectation)
+    if token_drift == "missing":
+        static["dynamic_tokens"].pop()
+    elif token_drift == "extra":
+        static["dynamic_tokens"].append("UnexpectedLiveToken")
+    else:
+        static["dynamic_tokens"][0] = static["dynamic_tokens"][0].swapcase()
+
+    with pytest.raises(
+        ImportBusinessPlanError,
+        match="dynamic tokens differ from metadata binding",
+    ):
+        validate_import_business_plan_archive(
+            replace(
+                sections,
+                static_expectation=MappingProxyType(static),
+            ),
+            scenario=unit.scenario,
+            protocol=protocol,
+        )
+
+
+@pytest.mark.parametrize(
+    "relabel_as_preserve,expected_error",
+    (
+        (False, "mutate row requires dynamic expectations"),
+        (True, "closed useExisting tab-import boundary"),
+    ),
+)
+def test_compound_import_archive_rejects_required_row_with_both_dynamic_lists_empty(
+    tmp_path: Path,
+    relabel_as_preserve: bool,
+    expected_error: str,
+) -> None:
+    unit, materialized, _backend, _fixtures, runtime = _compound_prepared(
+        tmp_path,
+        unit_id="CMP25-O22-AUDIO-TAB-04",
+    )
+    tokens = bound_import_metadata_tokens(materialized)
+    projection = project_required_metadata_tokens(
+        _sound_discovery(),
+        object_type="Sound",
+        required_tokens=tokens,
+    )
+    protocol = build_metadata_transaction_protocol(
+        materialized.operation_requests,
+        object_type="Sound",
+        metadata_queries=materialized.metadata_queries,
+        required_tokens=tokens,
+        expected_required_token_projection=projection,
+        equivalence="audio_import_tab_v1",
+    )
+    before = runtime.hidden_before
+    assert before is not None
+    sections = compile_import_business_plan(
+        unit.scenario,
+        materialized,
+        runtime.plan,
+        before,
+        protocol,
+    )
+    static = _plain(sections.static_expectation)
+    target = next(
+        row for row in static["row_contracts"]
+        if row["dynamic_mode"] == "mutate"
+    )
+    target["dynamic_properties"] = []
+    target["dynamic_references"] = []
+    if relabel_as_preserve:
+        target["dynamic_mode"] = "preserve"
+    live = _plain(sections.live_binding)
+    candidate = replace(
+        sections,
+        static_expectation=MappingProxyType(static),
+        delta_rules=tuple(
+            MappingProxyType(rule) for rule in _rules(static, live)
+        ),
+        fixture_spec=MappingProxyType(
+            {
+                "kind": "import_compound_materialized_runtime_v2",
+                "sha256": _hash({"static": static, "live": live}),
+            }
+        ),
+    )
+
+    with pytest.raises(
+        ImportBusinessPlanError,
+        match=expected_error,
+    ):
+        validate_import_business_plan_archive(
+            candidate,
+            scenario=unit.scenario,
+            protocol=protocol,
+        )
+
+
+def test_compound_import_archive_rejects_projection_cleanup_and_reference_drift(
+    tmp_path: Path,
+) -> None:
+    unit, materialized, backend, fixtures, runtime = _compound_prepared(
+        tmp_path,
+        unit_id="CMP25-O22-AUDIO-IMPORT-02",
+    )
+    tokens = bound_import_metadata_tokens(materialized)
+    projection = project_required_metadata_tokens(
+        _sound_discovery(),
+        object_type="Sound",
+        required_tokens=tokens,
+    )
+    protocol = build_metadata_transaction_protocol(
+        materialized.operation_requests,
+        object_type="Sound",
+        metadata_queries=materialized.metadata_queries,
+        required_tokens=tokens,
+        expected_required_token_projection=projection,
+        equivalence=(
+            "audio_import_v1"
+            if unit.scenario.api == "ak.wwise.core.audio.import"
+            else "audio_import_tab_v1"
+        ),
+    )
+    before = runtime.hidden_before
+    assert before is not None
+    sections = compile_import_business_plan(
+        unit.scenario,
+        materialized,
+        runtime.plan,
+        before,
+        protocol,
+    )
+
+    bad_static = _plain(sections.static_expectation)
+    bad_static["metadata_projection"][0]["metadata_type"] = "String"
+    with pytest.raises(ImportBusinessPlanError, match="projection"):
+        validate_import_business_plan_archive(
+            replace(
+                sections,
+                static_expectation=MappingProxyType(bad_static),
+            ),
+            scenario=unit.scenario,
+            protocol=protocol,
+        )
+
+    bad_live = _plain(sections.live_binding)
+    bad_live["cleanup_boundaries"]["reference_bus_paths"] = []
+    bad_live["reference_fixtures_sha256"] = _hash(
+        bad_live["reference_fixtures"]
+    )
+    with pytest.raises(ImportBusinessPlanError, match="cleanup"):
+        validate_import_business_plan_archive(
+            replace(
+                sections,
+                live_binding=MappingProxyType(bad_live),
+            ),
+            scenario=unit.scenario,
+            protocol=protocol,
+        )
+
+    backend.apply_case(unit.scenario, runtime.plan)
+    verification = _plain(runtime.verify_after_execution())
+    verification["after"]["rows"][0]["references"][0]["target_id"] = (
+        fixtures.main_bus.id
+    )
+    with pytest.raises(ImportBusinessPlanError, match="non-default Bus"):
+        validate_import_archived_verification(sections, verification)
+
+
+def test_compound_preserve_archive_rejects_token_and_value_tamper(
+    tmp_path: Path,
+) -> None:
+    unit, materialized, backend, fixtures, runtime = _compound_prepared(
+        tmp_path,
+        unit_id="CMP22-O22-AUDIO-TAB-04",
+    )
+    tokens = bound_import_metadata_tokens(materialized)
+    protocol = build_metadata_transaction_protocol(
+        materialized.operation_requests,
+        object_type="Sound",
+        metadata_queries=materialized.metadata_queries,
+        required_tokens=tokens,
+        expected_required_token_projection=project_required_metadata_tokens(
+            _sound_discovery(),
+            object_type="Sound",
+            required_tokens=tokens,
+        ),
+        equivalence="audio_import_tab_v1",
+    )
+    before = runtime.hidden_before
+    assert before is not None
+    sections = compile_import_business_plan(
+        unit.scenario,
+        materialized,
+        runtime.plan,
+        before,
+        protocol,
+    )
+    preserve_key = next(
+        row["row_key"]
+        for row in sections.static_expectation["row_contracts"]
+        if row["dynamic_mode"] == "preserve"
+    )
+
+    static = _plain(sections.static_expectation)
+    static_row = next(
+        row for row in static["row_contracts"] if row["row_key"] == preserve_key
+    )
+    static_row["preserve_property_tokens"][0] = "UnexpectedLiveToken"
+    live = _plain(sections.live_binding)
+    static_tamper = replace(
+        sections,
+        static_expectation=MappingProxyType(static),
+        delta_rules=tuple(
+            MappingProxyType(rule) for rule in _rules(static, live)
+        ),
+        fixture_spec=MappingProxyType(
+            {
+                "kind": "import_compound_materialized_runtime_v2",
+                "sha256": _hash({"static": static, "live": live}),
+            }
+        ),
+    )
+    with pytest.raises(
+        ImportBusinessPlanError,
+        match="preservation tokens differ from live metadata",
+    ):
+        validate_import_business_plan_archive(
+            static_tamper,
+            scenario=unit.scenario,
+            protocol=protocol,
+        )
+
+    live = _plain(sections.live_binding)
+    before_row = next(
+        row
+        for row in live["before_snapshot"]["rows"]
+        if row["row_key"] == preserve_key
+    )
+    before_row["properties"].pop()
+    live["before_snapshot_sha256"] = _hash(live["before_snapshot"])
+    static = _plain(sections.static_expectation)
+    before_tamper = replace(
+        sections,
+        live_binding=MappingProxyType(live),
+        delta_rules=tuple(
+            MappingProxyType(rule) for rule in _rules(static, live)
+        ),
+        fixture_spec=MappingProxyType(
+            {
+                "kind": "import_compound_materialized_runtime_v2",
+                "sha256": _hash({"static": static, "live": live}),
+            }
+        ),
+    )
+    with pytest.raises(
+        ImportBusinessPlanError,
+        match="preservation snapshot token set is incomplete",
+    ):
+        validate_import_business_plan_archive(
+            before_tamper,
+            scenario=unit.scenario,
+            protocol=protocol,
+        )
+
+    backend.apply_case(unit.scenario, runtime.plan)
+    verification = _plain(runtime.verify_after_execution())
+    after_row = next(
+        row
+        for row in verification["after"]["rows"]
+        if row["row_key"] == preserve_key
+    )
+    after_row["properties"][0]["value"] = True
+    with pytest.raises(
+        ImportBusinessPlanError,
+        match="preserved property .* changed after import",
+    ):
+        validate_import_archived_verification(sections, verification)
+
+    verification = _plain(runtime.verify_after_execution())
+    after_row = next(
+        row
+        for row in verification["after"]["rows"]
+        if row["row_key"] == preserve_key
+    )
+    after_row["references"][0]["target_id"] = fixtures.fixtures[0].id
+    with pytest.raises(
+        ImportBusinessPlanError,
+        match="preserved reference .* changed after import",
+    ):
+        validate_import_archived_verification(sections, verification)
 
 
 def test_archived_verification_enforces_guid_event_and_zero_dispatch_rules(tmp_path: Path) -> None:

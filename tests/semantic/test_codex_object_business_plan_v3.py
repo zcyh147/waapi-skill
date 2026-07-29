@@ -10,12 +10,22 @@ import pytest
 
 from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
+    build_metadata_transaction_protocol,
+    build_schema_query_transaction_protocol,
     build_transaction_protocol,
     call_step,
     query_object_step,
 )
+from tests.semantic.support.codex_compound_heavy_v1 import (
+    load_compound_heavy_profile,
+)
+from tests.semantic.support.codex_gateway_broker import (
+    MetadataBoundJsonArgument,
+    MetadataTokenProjection,
+)
 from tests.semantic.support.codex_object_business_plan_v3 import (
     ObjectBusinessPlanError,
+    build_object_merge_query_protocol,
     compile_object_business_plan,
     parse_object_business_plan_sections,
     seal_object_input_file_manifest,
@@ -42,8 +52,9 @@ from tests.semantic.support.codex_object_runtime_v3 import (
 def _case(
     case_id: str,
     root: Path,
+    version: str = "2022.1",
 ):
-    recipe = build_object_heavy_v3_recipe(case_id)
+    recipe = build_object_heavy_v3_recipe(case_id, version)
     ids = {
         item.key: (
             "{" + f"00000000-0000-0000-0000-{index:012d}" + "}"
@@ -117,7 +128,12 @@ def _case(
             (
                 any(reference.name == "OutputBus" for reference in item.references)
                 if item.object_type
-                in {"ActorMixer", "RandomSequenceContainer", "Sound"}
+                in {
+                    "ActorMixer",
+                    "PropertyContainer",
+                    "RandomSequenceContainer",
+                    "Sound",
+                }
                 else None
             ),
         )
@@ -147,7 +163,7 @@ def _case(
     )
     request = recipe.request
     protocol = (
-        build_transaction_protocol([request.as_dict()])
+        build_transaction_protocol([request.as_dict(version=recipe.version)])
         if isinstance(request, OperationRequestSpec)
         else build_direct_protocol(
             [query_object_step("query-object", request.argv[3:])]
@@ -200,6 +216,287 @@ def test_all_fifteen_object_cases_compile_and_archive_validate(
         ["query-object"],
         ["tx01.execute"],
     )
+
+
+@pytest.mark.parametrize(
+    "case_id",
+    (
+        "OBJ22-F-CREATE-02",
+        "OBJ22-F-CREATE-03",
+        "OBJ22-F-SET-01",
+        "OBJ22-F-SET-02",
+    ),
+)
+def test_compound_object_2025_business_plan_compiles_and_archive_validates(
+    case_id: str,
+    tmp_path: Path,
+) -> None:
+    scenario, recipe, protocol, before, manifest = _case(
+        case_id,
+        tmp_path,
+        "2025.1",
+    )
+
+    sections = compile_object_business_plan(
+        scenario,
+        recipe,
+        protocol,
+        before,
+        manifest,
+    )
+    validate_object_business_plan(
+        sections,
+        scenario=scenario,
+        recipe=recipe,
+        protocol=protocol,
+        before=before,
+        input_file_manifest=manifest,
+        verify_files=True,
+    )
+    archived = validate_archived_object_business_plan(
+        sections.writer_kwargs(),
+        scenario=scenario,
+        recipe=recipe,
+        protocol=protocol,
+        verify_files=True,
+    )
+
+    assert archived.writer_kwargs() == sections.writer_kwargs()
+    assert sections.static_expectation["version"] == "2025.1"
+    assert sections.static_expectation["request"]["value"]["version"] == "2025.1"
+    assert any(
+        row["type"] == "PropertyContainer"
+        for row in sections.live_binding["before_snapshot"]["objects"]
+    )
+
+
+@pytest.mark.parametrize(
+    "case_id",
+    (
+        "OBJ22-F-CREATE-03",
+        "OBJ22-F-SET-01",
+        "OBJ22-F-SET-02",
+    ),
+)
+@pytest.mark.parametrize(
+    ("version", "object_type"),
+    (
+        ("2022.1", "ActorMixer"),
+        ("2025.1", "PropertyContainer"),
+    ),
+)
+def test_compound_object_metadata_protocol_is_archived_and_revalidated(
+    case_id: str,
+    version: str,
+    object_type: str,
+    tmp_path: Path,
+) -> None:
+    profile_path = (
+        Path(__file__).resolve().parent
+        / "data"
+        / "compound-heavy-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in load_compound_heavy_profile(profile_path).units
+        if row.base_scenario_id == case_id and row.version == version
+    )
+    _scenario_value, recipe, _protocol, before, manifest = _case(
+        case_id,
+        tmp_path,
+        version,
+    )
+    protocol = build_metadata_transaction_protocol(
+        (recipe.request.as_dict(version=version),),
+        object_type=object_type,
+        metadata_queries=("volume",),
+        required_tokens=("Volume",),
+        expected_required_token_projection=(
+            MetadataTokenProjection("Volume", "property", "Real32"),
+        ),
+        equivalence=(
+            "object_set_v1"
+            if recipe.request.operation == "object.set"
+            else "wire_exact"
+        ),
+        schema_first=True,
+    )
+
+    sections = compile_object_business_plan(
+        unit.scenario,
+        recipe,
+        protocol,
+        before,
+        manifest,
+    )
+    validate_object_business_plan(
+        sections,
+        scenario=unit.scenario,
+        recipe=recipe,
+        protocol=protocol,
+        before=before,
+        input_file_manifest=manifest,
+        verify_files=True,
+    )
+    archived = validate_archived_object_business_plan(
+        sections.writer_kwargs(),
+        scenario=unit.scenario,
+        recipe=recipe,
+        protocol=protocol,
+        verify_files=True,
+    )
+
+    assert archived.writer_kwargs() == sections.writer_kwargs()
+    assert sections.payload_bindings["primary_steps"] == ["tx01.execute"]
+    assert "metadata.discover" in sections.payload_bindings["verification_steps"]
+    preview = next(
+        step for step in protocol.steps if step.subcommand == "preview"
+    )
+    argument = preview.arguments[2]
+    assert isinstance(argument, MetadataBoundJsonArgument)
+    assert argument.equivalence == (
+        "object_set_v1"
+        if recipe.request.operation == "object.set"
+        else "wire_exact"
+    )
+
+
+def test_compound_object_metadata_protocol_requires_trusted_projection(
+    tmp_path: Path,
+) -> None:
+    profile_path = (
+        Path(__file__).resolve().parent
+        / "data"
+        / "compound-heavy-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in load_compound_heavy_profile(profile_path).units
+        if row.unit_id == "CMP22-OBJ22-F-SET-01"
+    )
+    _scenario_value, recipe, _protocol, before, manifest = _case(
+        unit.base_scenario_id,
+        tmp_path,
+        unit.version,
+    )
+    protocol = build_metadata_transaction_protocol(
+        (recipe.request.as_dict(version=unit.version),),
+        object_type="ActorMixer",
+        metadata_queries=("volume",),
+        required_tokens=("Volume",),
+        schema_first=True,
+    )
+
+    with pytest.raises(
+        ObjectBusinessPlanError,
+        match="trusted live metadata projection",
+    ):
+        compile_object_business_plan(
+            unit.scenario,
+            recipe,
+            protocol,
+            before,
+            manifest,
+        )
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+def test_compound_merge_query_protocol_is_archived_and_revalidated(
+    version: str,
+    tmp_path: Path,
+) -> None:
+    profile_path = (
+        Path(__file__).resolve().parent
+        / "data"
+        / "compound-heavy-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in load_compound_heavy_profile(profile_path).units
+        if row.base_scenario_id == "OBJ22-F-CREATE-02"
+        and row.version == version
+    )
+    _scenario_value, recipe, _protocol, before, manifest = _case(
+        unit.base_scenario_id,
+        tmp_path,
+        version,
+    )
+    protocol = build_object_merge_query_protocol(unit.scenario, recipe)
+    assert protocol is not None
+
+    sections = compile_object_business_plan(
+        unit.scenario,
+        recipe,
+        protocol,
+        before,
+        manifest,
+    )
+    archived = validate_archived_object_business_plan(
+        sections.writer_kwargs(),
+        scenario=unit.scenario,
+        recipe=recipe,
+        protocol=protocol,
+        verify_files=True,
+    )
+
+    assert archived.writer_kwargs() == sections.writer_kwargs()
+    assert "object.merge-root" in sections.payload_bindings["verification_steps"]
+    assert sections.payload_bindings["verification_steps"][-1] == "tx01.verify"
+
+
+def test_compound_merge_query_protocol_rejects_a_different_root(
+    tmp_path: Path,
+) -> None:
+    profile_path = (
+        Path(__file__).resolve().parent
+        / "data"
+        / "compound-heavy-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in load_compound_heavy_profile(profile_path).units
+        if row.unit_id == "CMP25-OBJ22-F-CREATE-02"
+    )
+    _scenario_value, recipe, _protocol, before, manifest = _case(
+        unit.base_scenario_id,
+        tmp_path,
+        unit.version,
+    )
+    wrong_protocol = build_schema_query_transaction_protocol(
+        (recipe.request.as_dict(version=unit.version),),
+        query_step=query_object_step(
+            "object.merge-root",
+            (
+                "query-object",
+                "--path",
+                r"\Containers\Default Work Unit\SemanticLab\NPC\Other",
+                "--return-field",
+                "id",
+                "--return-field",
+                "name",
+                "--return-field",
+                "type",
+                "--return-field",
+                "path",
+            ),
+        ),
+    )
+
+    with pytest.raises(
+        ObjectBusinessPlanError,
+        match="exact reviewed request",
+    ):
+        compile_object_business_plan(
+            unit.scenario,
+            recipe,
+            wrong_protocol,
+            before,
+            manifest,
+        )
 
 
 def test_object_archive_rejects_static_live_file_delta_and_extra_field_tamper(

@@ -13,6 +13,13 @@ from typing import Any, Mapping, Sequence
 import pytest
 
 from tests.semantic.support.codex_eval_bundle_v3 import load_eval_bundle_v3
+from tests.semantic.support.codex_compound_heavy_v1 import (
+    load_compound_heavy_profile,
+)
+from tests.semantic.support.codex_soundbank_business_plan_v3 import (
+    compile_soundbank_business_plan,
+    validate_soundbank_business_plan,
+)
 from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
     build_transaction_protocol,
@@ -47,6 +54,14 @@ from wwise_waapi.operation_soundbank import parse_soundbank_definition_file
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SUITE_V3 = REPO_ROOT / "skills" / "waapi-skill" / "evals" / "suite-v3.json"
+COMPOUND_PROFILE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "compound-heavy-v1"
+    / "profile.json"
+)
 QUERY_REFERENCE = (
     REPO_ROOT / "skills" / "waapi-skill" / "references" / "waapi-query.md"
 )
@@ -83,7 +98,13 @@ class FakeSoundBankBackend:
         self.project_info = _project_info(blueprint)
         for fixture in blueprint.object_fixtures:
             if not fixture.owned:
-                self._insert(fixture.path, fixture.name, fixture.object_type)
+                self._insert(
+                    fixture.path,
+                    fixture.name,
+                    soundbank_runtime.get_codex_version_layout_v3(
+                        blueprint.version
+                    ).reflected_type(fixture.object_type),
+                )
 
     def _insert(self, path: str, name: str, object_type: str) -> str:
         if path.casefold() in self.by_path:
@@ -163,7 +184,13 @@ class FakeSoundBankBackend:
     def create_object(self, fixture: ObjectFixture) -> str:
         if fixture.path.casefold() in self.by_path:
             raise AssertionError(f"duplicate fake fixture path {fixture.path}")
-        object_id = self._insert(fixture.path, fixture.name, fixture.object_type)
+        object_id = self._insert(
+            fixture.path,
+            fixture.name,
+            soundbank_runtime.get_codex_version_layout_v3(
+                self.blueprint.version
+            ).reflected_type(fixture.object_type),
+        )
         if self.omit_conversion_short_id and fixture.object_type == "Conversion":
             self.rows[object_id.casefold()].pop("shortId")
         if fixture.object_type == "SoundBank":
@@ -487,6 +514,8 @@ def _scenarios() -> list[Any]:
 def _unprepared_runtime(
     tmp_path: Path,
     scenario: Any,
+    *,
+    version: str = "2022.1",
 ) -> tuple[PreparedSoundBankRuntime, FakeSoundBankBackend]:
     owned = tmp_path / "owned"
     project_root = owned / "sandbox" / "SampleProject"
@@ -496,7 +525,7 @@ def _unprepared_runtime(
     (project_root / "Default Work Unit.wwu").write_text("<WorkUnit/>\n", encoding="utf-8")
     blueprint = build_soundbank_blueprint(
         scenario,
-        version="2022.1",
+        version=version,
         sandbox_project=project,
         io_root=owned,
         asset_root=owned / "assets" / scenario.id,
@@ -506,10 +535,171 @@ def _unprepared_runtime(
     return runtime, backend
 
 
-def _runtime(tmp_path: Path, scenario: Any) -> tuple[PreparedSoundBankRuntime, FakeSoundBankBackend]:
-    runtime, backend = _unprepared_runtime(tmp_path, scenario)
+def _runtime(
+    tmp_path: Path,
+    scenario: Any,
+    *,
+    version: str = "2022.1",
+) -> tuple[PreparedSoundBankRuntime, FakeSoundBankBackend]:
+    runtime, backend = _unprepared_runtime(tmp_path, scenario, version=version)
     runtime.prepare()
     return runtime, backend
+
+
+def _compound_scenario(base_scenario_id: str, version: str) -> Any:
+    profile = load_compound_heavy_profile(COMPOUND_PROFILE)
+    return next(
+        row.scenario
+        for row in profile.units
+        if row.base_scenario_id == base_scenario_id and row.version == version
+    )
+
+
+def test_dirty_fixture_normalization_never_saves_a_different_live_project(
+    tmp_path: Path,
+) -> None:
+    scenario = _compound_scenario("O22-SB-GENERATE-01", "2025.1")
+    runtime, backend = _unprepared_runtime(tmp_path, scenario, version="2025.1")
+    wrong_project = runtime.blueprint.io_root / "wrong-project" / "Other.wproj"
+    wrong_project.parent.mkdir()
+    wrong_project.write_text("<Project/>\n", encoding="utf-8")
+    backend.project_info["path"] = str(wrong_project)
+    backend.project_info["isDirty"] = True
+
+    with pytest.raises(
+        SoundBankRuntimeError,
+        match="does not identify the scenario-owned project",
+    ):
+        soundbank_runtime._normalize_fixture_project_info(
+            backend,
+            blueprint=runtime.blueprint,
+        )
+
+    assert ("save", None) not in backend.calls
+
+
+def test_dirty_private_fixture_is_saved_once_and_rechecked_clean(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = _compound_scenario("O22-SB-GENERATE-01", "2025.1")
+    runtime, backend = _unprepared_runtime(tmp_path, scenario, version="2025.1")
+    backend.project_info["isDirty"] = True
+    reads: list[bool] = []
+
+    def get_project_info() -> Mapping[str, Any]:
+        reads.append(bool(backend.project_info["isDirty"]))
+        return json.loads(json.dumps(backend.project_info))
+
+    def save_project() -> None:
+        backend.calls.append(("save", None))
+        backend.project_info["isDirty"] = False
+
+    monkeypatch.setattr(backend, "get_project_info", get_project_info)
+    monkeypatch.setattr(backend, "save_project", save_project)
+
+    normalized = soundbank_runtime._normalize_fixture_project_info(
+        backend,
+        blueprint=runtime.blueprint,
+    )
+
+    assert reads == [True, False]
+    assert backend.calls == [("save", None)]
+    assert normalized["path"] == str(runtime.blueprint.sandbox_project)
+    assert normalized["isDirty"] is False
+
+
+def test_dirty_private_fixture_fails_if_save_does_not_make_it_clean(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = _compound_scenario("O22-SB-GENERATE-01", "2025.1")
+    runtime, backend = _unprepared_runtime(tmp_path, scenario, version="2025.1")
+    backend.project_info["isDirty"] = True
+    reads = 0
+    original_get_project_info = backend.get_project_info
+
+    def get_project_info() -> Mapping[str, Any]:
+        nonlocal reads
+        reads += 1
+        return original_get_project_info()
+
+    monkeypatch.setattr(backend, "get_project_info", get_project_info)
+
+    with pytest.raises(
+        SoundBankRuntimeError,
+        match="fixture project must be saved and clean",
+    ):
+        soundbank_runtime._normalize_fixture_project_info(
+            backend,
+            blueprint=runtime.blueprint,
+        )
+
+    assert reads == 2
+    assert backend.calls == [("save", None)]
+
+
+@pytest.mark.parametrize(
+    "base_scenario_id",
+    (
+        "O22-SB-GENERATE-01",
+        "O22-SB-GENERATE-03",
+        "O22-SB-SET-INCLUSIONS-01",
+        "O22-SB-SET-INCLUSIONS-05",
+    ),
+)
+def test_compound_soundbank_cases_materialize_on_2025_layout(
+    tmp_path: Path,
+    base_scenario_id: str,
+) -> None:
+    profile = load_compound_heavy_profile(COMPOUND_PROFILE)
+    unit = next(
+        row
+        for row in profile.units
+        if row.base_scenario_id == base_scenario_id and row.version == "2025.1"
+    )
+
+    runtime, backend = _unprepared_runtime(
+        tmp_path / base_scenario_id,
+        unit.scenario,
+        version=unit.version,
+    )
+    if unit.scenario.api == "ak.wwise.core.soundbank.generate":
+        cache_root = runtime.blueprint.io_root / "io" / "cache"
+        cache_root.mkdir(parents=True, exist_ok=True)
+        backend.project_info["directories"]["cache"] = str(cache_root)
+    runtime.prepare()
+    case = runtime.materialized
+    assert case is not None
+    assert case.operation_requests[0]["version"] == "2025.1"
+    before = runtime.hidden_before
+    assert before is not None
+    protocol = build_transaction_protocol(case.operation_requests)
+    business_plan = compile_soundbank_business_plan(case, before, protocol)
+    validate_soundbank_business_plan(
+        business_plan,
+        case,
+        before,
+        protocol,
+        verify_files=True,
+    )
+    assert business_plan.static_expectation["version"] == "2025.1"
+    assert all(
+        not row.path.startswith(r"\Actor-Mixer Hierarchy")
+        and not row.path.startswith(r"\Master-Mixer Hierarchy")
+        for row in case.blueprint.object_fixtures
+    )
+    if unit.scenario.api == "ak.wwise.core.soundbank.generate":
+        actor_root = next(
+            row
+            for row in case.blueprint.object_fixtures
+            if row.key == "fixture.actor_root"
+        )
+        assert actor_root.parent_path == r"\Containers\Default Work Unit"
+        live_actor = backend.read_objects(path=actor_root.path)
+        assert len(live_actor) == 1
+        assert live_actor[0]["type"] == "PropertyContainer"
+    assert runtime.verify_preview_unchanged().passed
 
 
 @pytest.mark.parametrize(

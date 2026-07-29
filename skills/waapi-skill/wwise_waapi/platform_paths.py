@@ -21,8 +21,12 @@ except ImportError:  # pragma: no cover - native Windows uses identity dispatch
 WINDOWS_WWISE_CONSOLE_PARTS = ("Authoring", "x64", "Release", "bin", "WwiseConsole.exe")
 WINDOWS_WWISE_CONSOLE_ENV_TEMPLATE = r"%WWISEROOT%\Authoring\x64\Release\bin\WwiseConsole.exe"
 WWISE_WIRE_PATH_ADAPTATION_CONTRACT = "waapi-skill.wwise-wire-path-adaptation/v1"
+WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT = (
+    "waapi-skill.wwise-wire-path-input-audit/v1"
+)
 WINE_WIRE_PATH_WAAPI_URIS = frozenset(
     {
+        "ak.wwise.core.audio.importTabDelimited",
         "ak.wwise.core.soundbank.convertExternalSources",
         "ak.wwise.core.soundbank.processDefinitionFiles",
     }
@@ -80,8 +84,8 @@ def adapt_cli_dispatch_paths(
     helper deep-copies the dispatch and replaces only the exact JSON paths
     named by that audit.  A translated path must round-trip through the same
     sealed Wine drive mapping before the transient dispatch is returned.  The
-    translation surface is closed to Wwise CLI calls plus the two reviewed
-    SoundBank WAAPI functions whose reflected payloads contain OS paths.
+    translation surface is closed to Wwise CLI calls plus reviewed WAAPI
+    functions whose reflected payloads contain OS paths.
     """
 
     host_dispatch = {"args": _strict_json_copy(args), "options": _strict_json_copy(options)}

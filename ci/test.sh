@@ -463,6 +463,9 @@ run_program() {
     tests/unit/test_transaction_gateway.py::test_policy_authorized_allow_to_read_only_drift_blocks_before_connection
     tests/unit/test_transaction_gateway.py::test_preview_without_apply_stays_review_only_under_allow_changes
     tests/unit/test_transaction_gateway.py::test_allow_changes_keeps_dangerous_host_control_on_confirmation_path
+    tests/unit/test_transaction_gateway.py::test_operation_schema_discloses_exact_undo_inner_contracts_offline
+    tests/unit/test_transaction_gateway.py::test_operation_schema_exposes_closed_ui_command_items
+    tests/unit/test_transaction_gateway.py::test_audio_import_operation_schema_discloses_versioned_hierarchy_roots
     tests/unit/test_transaction_gateway.py::test_operation_schema_owns_exact_audio_convert_fast_route_contract
     tests/unit/test_transaction_gateway.py::test_generic_manifest_call_runs_full_preview_confirm_execute_verify_chain
     tests/unit/test_transaction_gateway.py::test_object_create_plugin_runs_full_preview_confirm_execute_verify_chain

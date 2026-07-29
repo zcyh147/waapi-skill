@@ -92,10 +92,22 @@ def _fake_transaction_next_command(
         result["requires_later_user_message"] = True
     if os.name == "nt":
         result["shell_family"] = "windows-cmd"
-        result["shell_command"] = subprocess.list2cmdline(full_argv)
+        shell_command = subprocess.list2cmdline(full_argv)
     else:
         result["shell_family"] = "posix-sh"
-        result["shell_command"] = shlex.join(full_argv)
+        shell_command = shlex.join(full_argv)
+    result["copy_instruction"] = {
+        "contract": "waapi-skill.gateway-command-copy-instruction/v1",
+        "source_field": "shell_command",
+        "action": "execute_verbatim_as_one_shell_tool_call",
+        "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+        ],
+    }
+    result["shell_command"] = shell_command
     return result
 
 

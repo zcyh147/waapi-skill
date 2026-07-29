@@ -51,7 +51,12 @@ def _row(item: MaterializedObject, *, path: str | None = None) -> dict[str, obje
         result[f"@{prop.name}"] = prop.value
     for reference in item.references:
         result[reference.name] = {"id": reference.target_id}
-    if item.type in {"ActorMixer", "RandomSequenceContainer", "Sound"}:
+    if item.type in {
+        "ActorMixer",
+        "PropertyContainer",
+        "RandomSequenceContainer",
+        "Sound",
+    }:
         result["OverrideOutput"] = any(
             reference.name == "OutputBus" for reference in item.references
         )
@@ -96,8 +101,11 @@ def test_object_fixture_audio_import_result_contract_is_versioned(
     assert set(result_schema.get("required", [])) == expected_required
 
 
-def _fixture_objects(case_id: str) -> tuple[MaterializedObject, ...]:
-    recipe = build_object_heavy_v3_recipe(case_id)
+def _fixture_objects(
+    case_id: str,
+    version: str = "2022.1",
+) -> tuple[MaterializedObject, ...]:
+    recipe = build_object_heavy_v3_recipe(case_id, version)
     ordered_fixture = sorted(
         recipe.fixture.objects,
         key=lambda item: (item.path.count("\\"), item.path),
@@ -1393,6 +1401,62 @@ def test_all_object_recipes_build_exact_single_or_two_turn_protocols() -> None:
             assert isinstance(recipe.request, QueryObjectRequestSpec)
             assert protocol.turn_prefix_counts == (1,)
             assert protocol.steps[0].subcommand == "query-object"
+
+
+@pytest.mark.parametrize(
+    "case_id",
+    (
+        "OBJ22-F-CREATE-02",
+        "OBJ22-F-CREATE-03",
+        "OBJ22-F-SET-01",
+        "OBJ22-F-SET-02",
+    ),
+)
+def test_compound_object_runtime_binds_2025_request_and_reflected_types(
+    case_id: str,
+) -> None:
+    recipe = build_object_heavy_v3_recipe(case_id, "2025.1")
+    scenario = SimpleNamespace(
+        id=case_id,
+        api=recipe.api,
+        versions=("2022.1", "2025.1"),
+    )
+    objects = _fixture_objects(case_id, "2025.1")
+    runtime = PreparedObjectRuntime(
+        scenario=scenario,
+        recipe=recipe,
+        backend=_StateBackend(objects),
+    )
+
+    snapshot = runtime.snapshot()
+    protocol = runtime.gateway_protocol()
+    preview_argument = protocol.steps[1].arguments[2]
+
+    assert {item.type for item in snapshot.objects} >= {
+        "PropertyContainer",
+        "Sound",
+    }
+    assert preview_argument.expected["version"] == "2025.1"
+    assert r"\\Containers\\Default Work Unit\\SemanticLab" in json.dumps(
+        preview_argument.expected,
+        ensure_ascii=False,
+    )
+
+
+def test_object_runtime_rejects_a_cross_version_scenario_mismatch() -> None:
+    recipe = build_object_heavy_v3_recipe("OBJ22-F-CREATE-02", "2025.1")
+    scenario = SimpleNamespace(
+        id=recipe.scenario_id,
+        api=recipe.api,
+        versions=("2022.1",),
+    )
+
+    with pytest.raises(ObjectRuntimeError, match="versions do not match"):
+        PreparedObjectRuntime(
+            scenario=scenario,
+            recipe=recipe,
+            backend=object(),
+        )
 
 
 def test_object_prompts_render_without_hidden_fixture_values() -> None:

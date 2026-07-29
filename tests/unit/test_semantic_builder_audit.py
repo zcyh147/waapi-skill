@@ -92,13 +92,14 @@ def test_source_note_required_field_strings_match_reflected_behavior() -> None:
 def test_skill_docs_route_builders_through_packaged_transaction_runtime_only() -> None:
     text = OPERATE_REFERENCE.read_text(encoding="utf-8")
 
-    assert "only normal execution path is the packaged transaction CLI" in text
+    assert "only normal change path is the packaged transaction CLI" in text
     assert "Do not import builders or planners from inline Python" in text
     assert "SemanticPlanner" not in text
     assert "XML editing" not in text
     assert "preview --apply --request-json" in text
-    assert "execute <transaction-id>" in text
-    assert "verify <transaction-id>" in text
+    assert "`next_command.shell_command`" in text
+    assert "Copy the entire string verbatim as one shell tool call" in text
+    assert "one complete terminal `verify` result ends the transaction" in text
     assert "Packaged semantic builder source-note families" not in text
     for family in INCLUDED_FAMILIES:
         assert f"builder family `{family}`" not in text

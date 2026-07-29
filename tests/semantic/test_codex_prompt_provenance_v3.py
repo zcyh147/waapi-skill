@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable
 
@@ -21,12 +22,14 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     OPERATION_REQUEST_CONTRACT,
     V3GatewayProtocol,
     build_direct_protocol,
+    build_metadata_transaction_protocol,
     build_transaction_protocol,
     call_step,
     wait_topic_step,
 )
 from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
+    MetadataTokenProjection,
     ResponseBinding,
     SemanticJsonArgument,
 )
@@ -34,6 +37,7 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (
     PROMPT_MATERIALIZATION_RECEIPT_CONTRACT,
     PROMPT_PROVENANCE_FILE,
     PromptProvenanceError,
+    _protocol_requests,
     _select_shared_cli_manifest,
     deserialize_protocol,
     prompt_materialization_receipt,
@@ -719,6 +723,92 @@ def test_structured_input_binds_every_leaf_to_exact_pointer(tmp_path: Path) -> N
     )
 
 
+def test_compound_import_visible_rows_are_sealed_as_trusted_prompt_source(
+    tmp_path: Path,
+) -> None:
+    root = _scenario_root(tmp_path)
+    scenario, _base_protocol, values = _audio_import_case(root)
+    scenario = replace(
+        scenario,
+        fixture={
+            "asset_spec": {
+                "compound": {
+                    "contract": "waapi-skill.compound-import/v1",
+                }
+            }
+        },
+    )
+    rows = json.loads(values["import_rows"])
+    request = _operation_request(
+        "audio.import",
+        {
+            "imports": [
+                {
+                    **{
+                        key: value
+                        for key, value in rows[0].items()
+                        if key != "metadata"
+                    },
+                    "properties": [
+                        {"name": "IsLoopingEnabled", "value": True}
+                    ],
+                }
+            ]
+        },
+    )
+    protocol = build_metadata_transaction_protocol(
+        (request,),
+        object_type="Sound",
+        metadata_queries=("looping enabled",),
+        required_tokens=("IsLoopingEnabled",),
+        expected_required_token_projection=(
+            MetadataTokenProjection(
+                "IsLoopingEnabled",
+                "property",
+                "bool",
+            ),
+        ),
+        equivalence="audio_import_v1",
+    )
+    evidence = _write(
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+        visible_values=values,
+        trusted_sources={"compound_import_visible_rows": rows},
+    )
+    stored_source = evidence.payload["trusted_sources"][
+        "compound_import_visible_rows"
+    ]
+    bindings = evidence.payload["request"]["inputs"][1]["leaf_bindings"]
+
+    assert stored_source["value"] == rows
+    assert len(stored_source["path_proofs"]) == 1
+    assert all(
+        binding["origin_pointer"].startswith(
+            "/compound_import_visible_rows/value/"
+        )
+        for binding in bindings
+    )
+    assert any(
+        binding["origin_kind"] == "owned_path"
+        for binding in bindings
+    )
+    assert all(
+        binding["origin_kind"] == "trusted_source"
+        for binding in bindings
+        if binding["origin_kind"] != "owned_path"
+    )
+    restored = _read_again(
+        evidence.path,
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+        visible_values=values,
+    )
+    assert restored.payload == evidence.payload
+
+
 @pytest.mark.parametrize("tamper", ("pointer", "origin", "missing"))
 def test_structured_leaf_binding_tamper_is_rejected(
     tmp_path: Path,
@@ -806,6 +896,56 @@ def test_protocol_strict_round_trip_preserves_all_argument_kinds() -> None:
     }
 
 
+def test_soundbank_generate_equivalence_round_trips_and_rejects_wrong_route() -> None:
+    request = _operation_request(
+        "soundbank.generate",
+        {
+            "soundbanks": [
+                {
+                    "name": "Main_UI",
+                    "artifact_expectation": "nonlocalized",
+                    "rebuild": False,
+                }
+            ],
+            "platforms": ["Windows"],
+            "skip_languages": True,
+            "write_to_disk": True,
+            "io_root": "/owned",
+            "rebuild_soundbanks": False,
+            "clear_audio_file_cache": False,
+            "rebuild_init_bank": False,
+        },
+    )
+    protocol = build_transaction_protocol((request,))
+    serialized = serialize_protocol(protocol)
+    argument = serialized["steps"][1]["arguments"][2]
+
+    assert argument["kind"] == "semantic_json_soundbank_generate_v1"
+    assert deserialize_protocol(serialized) == protocol
+    assert serialize_protocol(deserialize_protocol(serialized)) == serialized
+    assert _protocol_requests(serialized) == (
+        ("/steps/1/arguments/2/value", request),
+    )
+
+    wrong_route = json.loads(json.dumps(serialized))
+    wrong_argument = wrong_route["steps"][1]["arguments"][2]
+    wrong_argument["value"]["operation"] = "soundbank.setInclusions"
+    wrong_argument["sha256"] = hashlib.sha256(
+        json.dumps(
+            wrong_argument["value"],
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    with pytest.raises(
+        PromptProvenanceError,
+        match="equivalence contract",
+    ):
+        _protocol_requests(wrong_route)
+
+
 def test_protocol_round_trip_preserves_omitted_default_event_count_flag() -> None:
     protocol = build_direct_protocol(
         [
@@ -826,6 +966,278 @@ def test_protocol_round_trip_preserves_omitted_default_event_count_flag() -> Non
         serialized["steps"][0]["allow_omitted_default_event_count_one"]
         is True
     )
+
+
+def test_metadata_transaction_protocol_round_trips_its_scope_and_token_binding(
+    tmp_path: Path,
+) -> None:
+    request = _operation_request(
+        "object.set",
+        {
+            "object": {"kind": "path", "value": r"\Root\Target"},
+            "properties": [{"name": "Volume", "value": -3}],
+        },
+    )
+    protocol = build_metadata_transaction_protocol(
+        (request,),
+        object_type="ActorMixer",
+        metadata_queries=("output volume",),
+        required_tokens=("Volume",),
+        expected_required_token_projection=(
+            MetadataTokenProjection("Volume", "property", "Real32"),
+        ),
+    )
+
+    serialized = serialize_protocol(protocol)
+    restored = deserialize_protocol(serialized)
+
+    assert restored == protocol
+    assert serialize_protocol(restored) == serialized
+    assert _protocol_requests(serialized) == (
+        ("/steps/2/arguments/2/value", request),
+    )
+    assert serialized["steps"][0]["arguments"][4] == {
+        "kind": "metadata_query",
+        "label": "output volume",
+        "maximum_chars": 160,
+    }
+    assert serialized["steps"][2]["arguments"][2] == {
+        "kind": "metadata_bound_json",
+        "value": request,
+        "sha256": hashlib.sha256(
+            json.dumps(
+                request,
+                ensure_ascii=False,
+                allow_nan=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest(),
+        "equivalence": "wire_exact",
+        "metadata_step": "metadata.discover",
+        "object_type": "ActorMixer",
+        "required_tokens": ["Volume"],
+        "expected_required_token_projection": [
+            {
+                "name": "Volume",
+                "kind": "property",
+                "metadata_type": "Real32",
+            }
+        ],
+    }
+    scenario = _scenario(
+        api="ak.wwise.core.object.set",
+        protocol="preview_confirm",
+    )
+    evidence = _write(
+        scenario=scenario,
+        root=_scenario_root(tmp_path),
+        protocol=protocol,
+    )
+    assert evidence.prompts == (
+        scenario.prompt,
+        CONFIRMATION,
+    )
+
+
+def test_object_set_metadata_equivalence_round_trips_and_archive_revalidates(
+    tmp_path: Path,
+) -> None:
+    request = _operation_request(
+        "object.set",
+        {
+            "objects": [
+                {
+                    "object": {
+                        "kind": "path",
+                        "value": r"\Actor-Mixer Hierarchy\Target",
+                    },
+                    "properties": [{"name": "Volume", "value": -3}],
+                }
+            ]
+        },
+    )
+    protocol = build_metadata_transaction_protocol(
+        (request,),
+        object_type="ActorMixer",
+        metadata_queries=("volume",),
+        required_tokens=("Volume",),
+        expected_required_token_projection=(
+            MetadataTokenProjection("Volume", "property", "Real32"),
+        ),
+        equivalence="object_set_v1",
+    )
+    serialized = serialize_protocol(protocol)
+    argument = serialized["steps"][2]["arguments"][2]
+
+    assert argument["equivalence"] == "object_set_v1"
+    assert deserialize_protocol(serialized) == protocol
+    assert _protocol_requests(serialized) == (
+        ("/steps/2/arguments/2/value", request),
+    )
+
+    scenario = _scenario(
+        api="ak.wwise.core.object.set",
+        protocol="preview_confirm",
+    )
+    root = _scenario_root(tmp_path)
+    evidence = _write(
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+    )
+    restored = _read_again(
+        evidence.path,
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+    )
+    assert restored.payload == evidence.payload
+
+    payload = json.loads(evidence.path.read_text(encoding="utf-8"))
+    payload["protocol"]["value"]["steps"][2]["arguments"][2][
+        "equivalence"
+    ] = "wire_exact"
+    payload["protocol"]["sha256"] = hashlib.sha256(
+        json.dumps(
+            payload["protocol"]["value"],
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    _rewrite_payload(evidence.path, payload)
+
+    with pytest.raises(
+        PromptProvenanceError,
+        match="in-memory protocol differs",
+    ):
+        _read_again(
+            evidence.path,
+            scenario=scenario,
+            root=root,
+            protocol=protocol,
+        )
+
+
+def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
+    tmp_path: Path,
+) -> None:
+    request = _operation_request(
+        "audio.import",
+        {
+            "imports": [
+                {
+                    "object_path": r"\Actor-Mixer Hierarchy\Target",
+                    "audio_file": "/owned/source.wav",
+                }
+            ],
+            "defaults": {
+                "properties": [
+                    {"name": "IsLoopingEnabled", "value": True}
+                ]
+            },
+        },
+    )
+    protocol = build_metadata_transaction_protocol(
+        (request,),
+        object_type="Sound",
+        metadata_queries=("looping enabled",),
+        required_tokens=("IsLoopingEnabled",),
+        equivalence="audio_import_v1",
+    )
+    serialized = serialize_protocol(protocol)
+    argument = serialized["steps"][2]["arguments"][2]
+
+    assert argument["equivalence"] == "audio_import_v1"
+    assert deserialize_protocol(serialized) == protocol
+    assert _protocol_requests(serialized) == (
+        ("/steps/2/arguments/2/value", request),
+    )
+
+    scenario = _scenario(
+        api="ak.wwise.core.audio.import",
+        protocol="preview_confirm",
+    )
+    root = _scenario_root(tmp_path)
+    evidence = _write(
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+    )
+    payload = json.loads(evidence.path.read_text(encoding="utf-8"))
+    payload["protocol"]["value"]["steps"][2]["arguments"][2][
+        "equivalence"
+    ] = "wire_exact"
+    payload["protocol"]["sha256"] = hashlib.sha256(
+        json.dumps(
+            payload["protocol"]["value"],
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    _rewrite_payload(evidence.path, payload)
+
+    with pytest.raises(
+        PromptProvenanceError,
+        match="in-memory protocol differs",
+    ):
+        _read_again(
+            evidence.path,
+            scenario=scenario,
+            root=root,
+            protocol=protocol,
+        )
+
+
+def test_tab_import_metadata_equivalence_round_trips_and_rejects_wrong_route() -> None:
+    request = _operation_request(
+        "audio.importTabDelimited",
+        {
+            "import_file": "/owned/import.tsv",
+            "import_location": {
+                "kind": "path",
+                "value": r"\Actor-Mixer Hierarchy\Default Work Unit",
+            },
+            "import_language": "SFX",
+        },
+    )
+    protocol = build_metadata_transaction_protocol(
+        (request,),
+        object_type="Sound",
+        metadata_queries=("looping enabled",),
+        required_tokens=("IsLoopingEnabled",),
+        equivalence="audio_import_tab_v1",
+    )
+    serialized = serialize_protocol(protocol)
+    argument = serialized["steps"][2]["arguments"][2]
+
+    assert argument["equivalence"] == "audio_import_tab_v1"
+    assert deserialize_protocol(serialized) == protocol
+    assert _protocol_requests(serialized) == (
+        ("/steps/2/arguments/2/value", request),
+    )
+
+    wrong_route = json.loads(json.dumps(serialized))
+    wrong_argument = wrong_route["steps"][2]["arguments"][2]
+    wrong_argument["value"]["operation"] = "audio.import"
+    wrong_argument["sha256"] = hashlib.sha256(
+        json.dumps(
+            wrong_argument["value"],
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    with pytest.raises(
+        PromptProvenanceError,
+        match="equivalence contract",
+    ):
+        _protocol_requests(wrong_route)
 
 
 @pytest.mark.parametrize(

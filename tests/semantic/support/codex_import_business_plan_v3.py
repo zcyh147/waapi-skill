@@ -1,4 +1,4 @@
-"""Closed typed business plans for the ten 2022.1 core import scenarios.
+"""Closed typed business plans for ordinary and compound import scenarios.
 
 The plan is compiled after the runner has materialized its WAV/TSV inputs and
 prepared the hidden before snapshot, but before a Codex task is created.  It is
@@ -21,30 +21,49 @@ from typing import Any, Mapping, Sequence
 from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
     V3GatewayProtocol,
+    build_metadata_transaction_protocol,
     build_transaction_protocol,
 )
 from tests.semantic.support.codex_import_assets_v3 import (
+    ImportAssetMaterializationError,
     MaterializedImportCase,
+    bound_import_metadata_tokens,
     canonical_wwise_language,
+    compound_dynamic_modes_by_row,
 )
 from tests.semantic.support.codex_import_runtime_v3 import (
+    COMPOUND_SUPPORTED_VERSIONS,
     IMPORT_APIS,
     SUPPORTED_VERSION,
+    ImportCompoundRuntimeSnapshot,
     ImportRuntimePlan,
     ImportRuntimeSnapshot,
     _object_type_matches,
 )
+from tests.semantic.support.codex_gateway_broker import MetadataTokenProjection
 from tests.semantic.support.codex_prompt_provenance_v3 import serialize_protocol
+from tests.semantic.support.codex_version_layout_v3 import (
+    CodexVersionLayoutError,
+    get_codex_version_layout_v3,
+)
 
 
 IMPORT_BUSINESS_PLAN_SCHEMA = "waapi-skill.import-business-plan/v1"
 IMPORT_FIXTURE_KIND = "import_materialized_runtime_v1"
+COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA = "waapi-skill.import-business-plan/v2"
+COMPOUND_IMPORT_FIXTURE_KIND = "import_compound_materialized_runtime_v2"
 _REFUSAL_CODES = {"O22-AUDIO-TAB-01": "INPUT_FILE_NOT_FOUND"}
 _SHA256 = set("0123456789abcdef")
 _GUID_POLICIES = frozenset({"remain_absent_no_guid", "preserve_existing_guid", "preserve_shared_existing_guid", "replace_with_distinct_guid", "create_new_unique_guid", "create_once_then_preserve_shared_guid"})
 _IMPORT_OPERATIONS = frozenset({"createNew", "useExisting", "replaceExisting"})
 _GUID_RE = re.compile(r"^\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}$")
 _ASSERTION_IDS = ("import.request.exact", "import.rows.typed", "import.live.before", "import.files.fingerprinted", "import.delta.closed")
+_COMPOUND_ASSERTION_IDS = (
+    *_ASSERTION_IDS,
+    "import.metadata.live_bound",
+    "import.dynamic_fields.exact",
+    "import.reference_bus.local_and_cleanup",
+)
 
 
 class ImportBusinessPlanError(ValueError):
@@ -77,7 +96,7 @@ def compile_import_business_plan(
     scenario: Any,
     materialized: MaterializedImportCase,
     plan: ImportRuntimePlan,
-    before: ImportRuntimeSnapshot,
+    before: ImportRuntimeSnapshot | ImportCompoundRuntimeSnapshot,
     protocol: V3GatewayProtocol,
 ) -> ImportBusinessPlanSections:
     """Compile the one immutable import business plan from trusted state."""
@@ -95,7 +114,7 @@ def validate_import_business_plan(
     scenario: Any,
     materialized: MaterializedImportCase,
     plan: ImportRuntimePlan,
-    before: ImportRuntimeSnapshot,
+    before: ImportRuntimeSnapshot | ImportCompoundRuntimeSnapshot,
     protocol: V3GatewayProtocol,
     *,
     verify_files: bool = False,
@@ -161,7 +180,13 @@ def validate_import_business_plan_archive(
     if _plain(sections.payload_bindings) != expected_bindings:
         raise ImportBusinessPlanError("archived import primary/verification partition drifted")
     fixture = {"static": _plain(static), "live": _plain(live)}
-    if _plain(sections.fixture_spec) != {"kind": IMPORT_FIXTURE_KIND, "sha256": _hash(fixture)}:
+    fixture_kind = (
+        COMPOUND_IMPORT_FIXTURE_KIND
+        if static["family_schema_version"]
+        == COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA
+        else IMPORT_FIXTURE_KIND
+    )
+    if _plain(sections.fixture_spec) != {"kind": fixture_kind, "sha256": _hash(fixture)}:
         raise ImportBusinessPlanError("archived import fixture digest is misbound")
     return sections
 
@@ -209,41 +234,129 @@ def validate_import_archived_verification(
     _validate_after(static, live, evidence["after"])
 
 
-def _validate_runtime_inputs(scenario: Any, materialized: MaterializedImportCase, plan: ImportRuntimePlan, before: ImportRuntimeSnapshot, protocol: V3GatewayProtocol) -> None:
-    if not isinstance(materialized, MaterializedImportCase) or not isinstance(plan, ImportRuntimePlan) or not isinstance(before, ImportRuntimeSnapshot):
+def _validate_runtime_inputs(
+    scenario: Any,
+    materialized: MaterializedImportCase,
+    plan: ImportRuntimePlan,
+    before: ImportRuntimeSnapshot | ImportCompoundRuntimeSnapshot,
+    protocol: V3GatewayProtocol,
+) -> None:
+    if (
+        not isinstance(materialized, MaterializedImportCase)
+        or not isinstance(plan, ImportRuntimePlan)
+        or not isinstance(
+            before,
+            (ImportRuntimeSnapshot, ImportCompoundRuntimeSnapshot),
+        )
+    ):
         raise ImportBusinessPlanError("import compiler requires materialized case, runtime plan and before snapshot")
-    if plan.api not in IMPORT_APIS or plan.version != SUPPORTED_VERSION or getattr(scenario, "id", None) != plan.scenario_id or getattr(scenario, "api", None) != plan.api:
+    compound = plan.metadata_binding is not None
+    if (
+        plan.api not in IMPORT_APIS
+        or (
+            plan.version not in COMPOUND_SUPPORTED_VERSIONS
+            if compound
+            else plan.version != SUPPORTED_VERSION
+        )
+        or getattr(scenario, "id", None) != plan.scenario_id
+        or getattr(scenario, "api", None) != plan.api
+    ):
         raise ImportBusinessPlanError("import scenario/runtime identity is misbound")
+    if compound != isinstance(before, ImportCompoundRuntimeSnapshot):
+        raise ImportBusinessPlanError(
+            "compound import plan/snapshot shape is misbound"
+        )
+    if compound != (materialized.metadata_binding is not None):
+        raise ImportBusinessPlanError(
+            "compound import plan/materialized metadata binding is misbound"
+        )
     if materialized.scenario_id != plan.scenario_id or materialized.expected_primary_dispatch_count != plan.expected_primary_dispatch_count:
         raise ImportBusinessPlanError("materialized import identity or dispatch count drifted")
     if tuple(materialized.operation_requests) != tuple(plan.operation_requests) or before.scenario_id != plan.scenario_id:
         raise ImportBusinessPlanError("import requests or before snapshot are misbound")
     _validate_files(_file_manifest(materialized), verify_files=True)
-    _validate_expected_protocol(plan, protocol)
+    _validate_expected_protocol(plan, protocol, materialized)
 
 
-def _validate_expected_protocol(plan: ImportRuntimePlan, protocol: V3GatewayProtocol) -> None:
+def _validate_expected_protocol(
+    plan: ImportRuntimePlan,
+    protocol: V3GatewayProtocol,
+    materialized: MaterializedImportCase | None = None,
+) -> None:
     refusal = _REFUSAL_CODES.get(plan.scenario_id)
-    expected = build_transaction_protocol(plan.operation_requests, refusal=StructuredRefusal(refusal) if refusal else None)
+    if plan.metadata_binding is not None:
+        if materialized is None:
+            raise ImportBusinessPlanError(
+                "compound protocol validation requires the bound materialized case"
+            )
+        expected = build_metadata_transaction_protocol(
+            plan.operation_requests,
+            object_type="Sound",
+            metadata_queries=materialized.metadata_queries,
+            required_tokens=bound_import_metadata_tokens(materialized),
+            expected_required_token_projection=_metadata_projection_from_binding(
+                plan.metadata_binding,
+                required_tokens=bound_import_metadata_tokens(materialized),
+            ),
+            equivalence=(
+                "audio_import_v1"
+                if plan.api == "ak.wwise.core.audio.import"
+                else "audio_import_tab_v1"
+            ),
+        )
+    else:
+        expected = build_transaction_protocol(
+            plan.operation_requests,
+            refusal=StructuredRefusal(refusal) if refusal else None,
+        )
     if _plain(serialize_protocol(protocol)) != _plain(serialize_protocol(expected)):
         raise ImportBusinessPlanError("import protocol does not exactly bind sealed requests and transaction order")
 
 
 def _static(scenario: Any, materialized: MaterializedImportCase, plan: ImportRuntimePlan, protocol: V3GatewayProtocol) -> dict[str, Any]:
     requests = _plain(plan.operation_requests)
+    compound = plan.metadata_binding is not None
     rows = []
     request_ops = _operations_by_row(plan, materialized)
     for row in plan.rows:
-        rows.append({
+        contract = {
             "row_key": row.row_key, "target_path": row.target_path, "object_type": row.object_type,
             "language": row.language, "import_operation": request_ops[row.row_key], "guid_policy": row.guid_policy,
             "event": None if row.event_path is None else {"path": row.event_path, "action": row.event_action},
             "source_key": row.source_file.key, "pre_state_existence": row.pre_state_existence,
             "pre_state_guid_key": row.pre_state_guid_key,
             "originals_subfolder": row.originals_subfolder,
-        })
-    return {
-        "family_schema_version": IMPORT_BUSINESS_PLAN_SCHEMA, "family": "audio_import",
+        }
+        if compound:
+            raw = next(
+                (
+                    item
+                    for item in materialized.expected_rows
+                    if item.get("row_key") == row.row_key
+                ),
+                None,
+            )
+            if not isinstance(raw, Mapping):
+                raise ImportBusinessPlanError(
+                    f"compound row {row.row_key!r} is absent from materialized expectations"
+                )
+            contract["dynamic_properties"] = _plain(row.expected_properties)
+            contract["dynamic_references"] = _plain(row.expected_references)
+            contract["preserve_property_tokens"] = list(
+                row.preserve_property_tokens
+            )
+            contract["preserve_reference_tokens"] = list(
+                row.preserve_reference_tokens
+            )
+            contract["media_kind"] = raw.get("compound_media_kind")
+            contract["dynamic_mode"] = raw.get("compound_dynamic_mode")
+        rows.append(contract)
+    result = {
+        "family_schema_version": (
+            COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA
+            if compound
+            else IMPORT_BUSINESS_PLAN_SCHEMA
+        ), "family": "audio_import",
         "scenario_id": plan.scenario_id, "api": plan.api, "version": plan.version,
         "primary_dispatch_count": plan.expected_primary_dispatch_count,
         "operation_requests": requests, "operation_requests_sha256": _hash(requests),
@@ -251,6 +364,26 @@ def _static(scenario: Any, materialized: MaterializedImportCase, plan: ImportRun
         "refusal_error_code": _REFUSAL_CODES.get(plan.scenario_id),
         "scenario_api": getattr(scenario, "api", None),
     }
+    if compound:
+        binding = _plain(plan.metadata_binding)
+        queries = list(materialized.metadata_queries)
+        tokens = list(bound_import_metadata_tokens(materialized))
+        result.update(
+            {
+                "metadata_binding": binding,
+                "metadata_binding_sha256": _hash(binding),
+                "metadata_queries": queries,
+                "dynamic_tokens": tokens,
+                "metadata_projection": [
+                    item.as_dict()
+                    for item in _metadata_projection_from_binding(
+                        plan.metadata_binding,
+                        required_tokens=tokens,
+                    )
+                ],
+            }
+        )
+    return result
 
 
 def _operations_by_row(plan: ImportRuntimePlan, materialized: MaterializedImportCase) -> dict[str, str]:
@@ -275,15 +408,53 @@ def _operations_by_row(plan: ImportRuntimePlan, materialized: MaterializedImport
     return result
 
 
-def _live(plan: ImportRuntimePlan, before: ImportRuntimeSnapshot, materialized: MaterializedImportCase) -> dict[str, Any]:
+def _live(
+    plan: ImportRuntimePlan,
+    before: ImportRuntimeSnapshot | ImportCompoundRuntimeSnapshot,
+    materialized: MaterializedImportCase,
+) -> dict[str, Any]:
     snapshot = _plain(before)
     files = _file_manifest(materialized)
-    return {
-        "family_schema_version": IMPORT_BUSINESS_PLAN_SCHEMA,
+    compound = plan.metadata_binding is not None
+    result = {
+        "family_schema_version": (
+            COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA
+            if compound
+            else IMPORT_BUSINESS_PLAN_SCHEMA
+        ),
         "before_snapshot": snapshot, "before_snapshot_sha256": _hash(snapshot),
         "input_files": files, "input_files_sha256": _hash(files),
         "owned_paths": {"asset_root": str(plan.asset_root), "parents": [item.path for item in plan.parents], "events": list(plan.event_paths)},
     }
+    if compound:
+        if not isinstance(before, ImportCompoundRuntimeSnapshot):
+            raise ImportBusinessPlanError(
+                "compound plan requires a compound before snapshot"
+            )
+        reference_fixtures = {
+            "main_bus": _plain(before.main_bus),
+            "targets": _plain(before.reference_fixtures),
+        }
+        cleanup_boundaries = {
+            "order": ["import_roots", "reference_busses", "asset_root"],
+            "import_root_paths": [
+                item.path
+                for item in plan.parents
+                if item.parent_path in {plan.actor_dwu, plan.events_dwu}
+            ],
+            "reference_bus_paths": [
+                item.path for item in plan.reference_fixtures
+            ],
+            "asset_root": str(plan.asset_root),
+        }
+        result.update(
+            {
+                "reference_fixtures": reference_fixtures,
+                "reference_fixtures_sha256": _hash(reference_fixtures),
+                "cleanup_boundaries": cleanup_boundaries,
+            }
+        )
+    return result
 
 
 def _file_manifest(materialized: MaterializedImportCase) -> list[dict[str, Any]]:
@@ -299,7 +470,7 @@ def _rules(static: Mapping[str, Any], live: Mapping[str, Any]) -> list[dict[str,
     creates = [row["row_key"] for row in rows if row["guid_policy"] in {"create_new_unique_guid", "create_once_then_preserve_shared_guid"}]
     uses = [row["row_key"] for row in rows if row["guid_policy"] in {"preserve_existing_guid", "preserve_shared_existing_guid"}]
     replaces = [row["row_key"] for row in rows if row["guid_policy"] == "replace_with_distinct_guid"]
-    return [
+    rules = [
         {"kind": "import_exact_requests_v1", "requests_sha256": static["operation_requests_sha256"], "protocol_sha256": static["protocol_sha256"], "ordered_transaction_count": static["primary_dispatch_count"]},
         {"kind": "import_row_delta_v1", "subject": "target/type/language/importOperation/GUID", "rows": rows, "create_guid_rows": creates, "use_existing_guid_rows": uses, "replace_guid_rows": replaces},
         {"kind": "import_event_action_delta_v1", "subject": "event Play action", "events": [row["event"] for row in rows if row["event"] is not None]},
@@ -307,6 +478,43 @@ def _rules(static: Mapping[str, Any], live: Mapping[str, Any]) -> list[dict[str,
         {"kind": "import_immutable_inputs_v1", "subject": "WAV/TSV regular-file size sha256", "before_snapshot_sha256": live["before_snapshot_sha256"], "input_files_sha256": live["input_files_sha256"]},
         {"kind": "import_zero_dispatch_refusal_v1", "subject": "before_equals_after_and_exact_error", "enabled": static["primary_dispatch_count"] == 0, "error_code": static["refusal_error_code"]},
     ]
+    if static["family_schema_version"] == COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA:
+        rules.extend(
+            [
+                {
+                    "kind": "import_live_metadata_binding_v1",
+                    "metadata_binding_sha256": static["metadata_binding_sha256"],
+                    "queries": static["metadata_queries"],
+                    "exact_dynamic_tokens": static["dynamic_tokens"],
+                },
+                {
+                    "kind": "import_dynamic_readback_v1",
+                    "subject": "@property exact values, @reference exact GUIDs, and activation dependencies",
+                    "rows": [
+                        {
+                            "row_key": row["row_key"],
+                            "properties": row["dynamic_properties"],
+                            "references": row["dynamic_references"],
+                            "preserve_property_tokens": row[
+                                "preserve_property_tokens"
+                            ],
+                            "preserve_reference_tokens": row[
+                                "preserve_reference_tokens"
+                            ],
+                        }
+                        for row in rows
+                    ],
+                },
+                {
+                    "kind": "import_reference_bus_cleanup_v1",
+                    "reference_fixtures_sha256": live[
+                        "reference_fixtures_sha256"
+                    ],
+                    "cleanup_boundaries": live["cleanup_boundaries"],
+                },
+            ]
+        )
+    return rules
 
 
 def _partition(plan: ImportRuntimePlan, protocol: V3GatewayProtocol) -> tuple[list[str], list[str]]:
@@ -317,9 +525,24 @@ def _partition(plan: ImportRuntimePlan, protocol: V3GatewayProtocol) -> tuple[li
 def _sections(static: Mapping[str, Any], live: Mapping[str, Any], rules: Sequence[Mapping[str, Any]], primary: Sequence[str], verification: Sequence[str]) -> ImportBusinessPlanSections:
     fixture = {"static": _plain(static), "live": _plain(live)}
     return ImportBusinessPlanSections(
-        MappingProxyType({"kind": IMPORT_FIXTURE_KIND, "sha256": _hash(fixture)}),
+        MappingProxyType(
+            {
+                "kind": (
+                    COMPOUND_IMPORT_FIXTURE_KIND
+                    if static["family_schema_version"]
+                    == COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA
+                    else IMPORT_FIXTURE_KIND
+                ),
+                "sha256": _hash(fixture),
+            }
+        ),
         MappingProxyType({"primary_steps": list(primary), "verification_steps": list(verification)}),
-        _ASSERTION_IDS,
+        (
+            _COMPOUND_ASSERTION_IDS
+            if static["family_schema_version"]
+            == COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA
+            else _ASSERTION_IDS
+        ),
         MappingProxyType(_plain(static)), MappingProxyType(_plain(live)), tuple(MappingProxyType(_plain(item)) for item in rules),
     )
 
@@ -327,23 +550,75 @@ def _sections(static: Mapping[str, Any], live: Mapping[str, Any], rules: Sequenc
 def _validate_shape(sections: ImportBusinessPlanSections) -> None:
     if not isinstance(sections, ImportBusinessPlanSections):
         raise ImportBusinessPlanError("import sections have the wrong type")
-    if set(sections.fixture_spec) != {"kind", "sha256"} or sections.fixture_spec.get("kind") != IMPORT_FIXTURE_KIND or not _sha(sections.fixture_spec.get("sha256")):
+    if (
+        set(sections.fixture_spec) != {"kind", "sha256"}
+        or sections.fixture_spec.get("kind")
+        not in {IMPORT_FIXTURE_KIND, COMPOUND_IMPORT_FIXTURE_KIND}
+        or not _sha(sections.fixture_spec.get("sha256"))
+    ):
         raise ImportBusinessPlanError("import fixture schema is not closed")
     if set(sections.payload_bindings) != {"primary_steps", "verification_steps"} or any(not isinstance(v, list) or any(not isinstance(x, str) for x in v) for v in sections.payload_bindings.values()):
         raise ImportBusinessPlanError("import payload binding schema is not closed")
     if not sections.assertion_ids or any(not isinstance(item, str) or not item for item in sections.assertion_ids):
         raise ImportBusinessPlanError("import assertion ids are invalid")
-    if tuple(sections.assertion_ids) != _ASSERTION_IDS:
-        raise ImportBusinessPlanError("import assertion ids are not the fixed closed tuple")
     static, live = sections.static_expectation, sections.live_binding
+    compound = (
+        static.get("family_schema_version")
+        == COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA
+    )
+    expected_assertions = _COMPOUND_ASSERTION_IDS if compound else _ASSERTION_IDS
+    if tuple(sections.assertion_ids) != expected_assertions:
+        raise ImportBusinessPlanError("import assertion ids are not the fixed closed tuple")
     static_keys = {"family_schema_version", "family", "scenario_id", "api", "version", "primary_dispatch_count", "operation_requests", "operation_requests_sha256", "protocol_sha256", "row_contracts", "refusal_error_code", "scenario_api"}
     live_keys = {"family_schema_version", "before_snapshot", "before_snapshot_sha256", "input_files", "input_files_sha256", "owned_paths"}
-    if set(static) != static_keys or set(live) != live_keys or static.get("family_schema_version") != IMPORT_BUSINESS_PLAN_SCHEMA or live.get("family_schema_version") != IMPORT_BUSINESS_PLAN_SCHEMA:
+    if compound:
+        static_keys |= {
+            "metadata_binding",
+            "metadata_binding_sha256",
+            "metadata_queries",
+            "dynamic_tokens",
+            "metadata_projection",
+        }
+        live_keys |= {
+            "reference_fixtures",
+            "reference_fixtures_sha256",
+            "cleanup_boundaries",
+        }
+    expected_schema = (
+        COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA
+        if compound
+        else IMPORT_BUSINESS_PLAN_SCHEMA
+    )
+    expected_kind = (
+        COMPOUND_IMPORT_FIXTURE_KIND if compound else IMPORT_FIXTURE_KIND
+    )
+    if (
+        set(static) != static_keys
+        or set(live) != live_keys
+        or static.get("family_schema_version") != expected_schema
+        or live.get("family_schema_version") != expected_schema
+        or sections.fixture_spec.get("kind") != expected_kind
+    ):
         raise ImportBusinessPlanError("import static/live schema is not closed")
 
 
 def _validate_static_archive(static: Mapping[str, Any], live: Mapping[str, Any], scenario: Any, protocol: V3GatewayProtocol) -> None:
-    if static["api"] not in IMPORT_APIS or static["version"] != SUPPORTED_VERSION or static["family"] != "audio_import" or static["scenario_id"] != getattr(scenario, "id", None) or static["api"] != getattr(scenario, "api", None) or static["scenario_api"] != static["api"]:
+    compound = (
+        static["family_schema_version"]
+        == COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA
+    )
+    if (
+        static["api"] not in IMPORT_APIS
+        or (
+            static["version"] not in COMPOUND_SUPPORTED_VERSIONS
+            if compound
+            else static["version"] != SUPPORTED_VERSION
+        )
+        or static["family"] != "audio_import"
+        or static["scenario_id"] != getattr(scenario, "id", None)
+        or static["api"] != getattr(scenario, "api", None)
+        or static["scenario_api"] != static["api"]
+    ):
         raise ImportBusinessPlanError("archived import scenario identity is misbound")
     count = static["primary_dispatch_count"]
     if type(count) is not int or count < 0 or count != getattr(getattr(scenario, "primary_dispatch", None), "count", None):
@@ -355,13 +630,75 @@ def _validate_static_archive(static: Mapping[str, Any], live: Mapping[str, Any],
         raise ImportBusinessPlanError("archived zero-dispatch refusal is not closed")
     if count > 0 and (len(requests) != count or static["refusal_error_code"] is not None):
         raise ImportBusinessPlanError("archived import request count is invalid")
-    expected = build_transaction_protocol(requests, refusal=StructuredRefusal(static["refusal_error_code"]) if count == 0 else None)
+    if compound:
+        if (
+            not isinstance(static["metadata_queries"], list)
+            or not isinstance(static["dynamic_tokens"], list)
+            or not static["metadata_queries"]
+            or not static["dynamic_tokens"]
+        ):
+            raise ImportBusinessPlanError(
+                "archived compound metadata query/token evidence is invalid"
+            )
+        binding = static["metadata_binding"]
+        if (
+            not isinstance(binding, Mapping)
+            or static["metadata_binding_sha256"] != _hash(binding)
+        ):
+            raise ImportBusinessPlanError(
+                "archived compound metadata binding digest is invalid"
+            )
+        _validate_archived_metadata_binding(
+            binding,
+            dynamic_tokens=static["dynamic_tokens"],
+            reference_fixtures=live["reference_fixtures"],
+        )
+        projection = _metadata_projection_from_binding(
+            binding,
+            required_tokens=static["dynamic_tokens"],
+        )
+        if static["metadata_projection"] != [
+            item.as_dict() for item in projection
+        ]:
+            raise ImportBusinessPlanError(
+                "archived compound metadata projection drifted"
+            )
+        expected = build_metadata_transaction_protocol(
+            requests,
+            object_type="Sound",
+            metadata_queries=static["metadata_queries"],
+            required_tokens=static["dynamic_tokens"],
+            expected_required_token_projection=projection,
+            equivalence=(
+                "audio_import_v1"
+                if static["api"] == "ak.wwise.core.audio.import"
+                else "audio_import_tab_v1"
+            ),
+        )
+    else:
+        expected = build_transaction_protocol(
+            requests,
+            refusal=(
+                StructuredRefusal(static["refusal_error_code"])
+                if count == 0
+                else None
+            ),
+        )
     if _plain(serialize_protocol(protocol)) != _plain(serialize_protocol(expected)) or static["protocol_sha256"] != _hash(serialize_protocol(protocol)):
         raise ImportBusinessPlanError("archived import protocol/request order drifted")
     if not isinstance(static["row_contracts"], list) or not static["row_contracts"] or len({row.get("row_key") for row in static["row_contracts"] if isinstance(row, Mapping)}) != len(static["row_contracts"]):
         raise ImportBusinessPlanError("archived import row contracts are invalid")
+    legacy_row_keys = {"row_key", "target_path", "object_type", "language", "import_operation", "guid_policy", "event", "source_key", "pre_state_existence", "pre_state_guid_key", "originals_subfolder"}
+    compound_row_keys = legacy_row_keys | {
+        "dynamic_properties",
+        "dynamic_references",
+        "preserve_property_tokens",
+        "preserve_reference_tokens",
+        "media_kind",
+        "dynamic_mode",
+    }
     for row in static["row_contracts"]:
-        if not isinstance(row, Mapping) or set(row) != {"row_key", "target_path", "object_type", "language", "import_operation", "guid_policy", "event", "source_key", "pre_state_existence", "pre_state_guid_key", "originals_subfolder"} or not all(isinstance(row[key], str) for key in ("row_key", "target_path", "object_type", "language", "import_operation", "guid_policy", "source_key", "pre_state_existence")) or not (row["originals_subfolder"] is None or isinstance(row["originals_subfolder"], str)):
+        if not isinstance(row, Mapping) or set(row) != (compound_row_keys if compound else legacy_row_keys) or not all(isinstance(row[key], str) for key in ("row_key", "target_path", "object_type", "language", "import_operation", "guid_policy", "source_key", "pre_state_existence")) or not (row["originals_subfolder"] is None or isinstance(row["originals_subfolder"], str)):
             raise ImportBusinessPlanError("archived import row contract shape is invalid")
         if row["guid_policy"] not in _GUID_POLICIES or row["import_operation"] not in _IMPORT_OPERATIONS:
             raise ImportBusinessPlanError("archived import GUID policy or operation is unsupported")
@@ -374,6 +711,13 @@ def _validate_static_archive(static: Mapping[str, Any], live: Mapping[str, Any],
         event = row["event"]
         if event is not None and (not isinstance(event, Mapping) or set(event) != {"path", "action"} or event.get("action") != "Play" or not isinstance(event.get("path"), str)):
             raise ImportBusinessPlanError("archived import event action is not one Play target")
+        if compound:
+            _validate_archived_dynamic_row(
+                row,
+                api=static["api"],
+                binding=static["metadata_binding"],
+                reference_fixtures=live["reference_fixtures"],
+            )
     request_operations = {
         request.get("arguments", {}).get("import_operation")
         for request in requests
@@ -395,6 +739,18 @@ def _validate_rows_against_fixture_and_requests(static: Mapping[str, Any], live:
     tables = spec.get("tsv")
     if not isinstance(raw_rows, list) or not isinstance(tables, list):
         raise ImportBusinessPlanError("archived import fixture rows/tables are invalid")
+    if (
+        static["family_schema_version"]
+        == COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA
+    ):
+        _validate_compound_rows_against_fixture_and_requests(
+            static,
+            live,
+            raw_rows=raw_rows,
+            tables=tables,
+            compound_spec=spec.get("compound"),
+        )
+        return
     source_paths = {item["key"]: item["path"] for item in live["input_files"] if item["category"] == "wav"}
     table_paths = {item["key"]: item["path"] for item in live["input_files"] if item["category"] == "tsv"}
     if {str(row.get("source_key")) for row in raw_rows} != set(source_paths):
@@ -460,6 +816,745 @@ def _expected_audio_import_row(raw: Mapping[str, Any], source_paths: Mapping[str
     return value
 
 
+def _validate_compound_rows_against_fixture_and_requests(
+    static: Mapping[str, Any],
+    live: Mapping[str, Any],
+    *,
+    raw_rows: Sequence[Any],
+    tables: Sequence[Any],
+    compound_spec: Any,
+) -> None:
+    """Close a compound archive without re-running live metadata discovery."""
+
+    try:
+        layout = get_codex_version_layout_v3(str(static["version"]))
+    except CodexVersionLayoutError as exc:
+        raise ImportBusinessPlanError(str(exc)) from exc
+    source_paths = {
+        item["key"]: item["path"]
+        for item in live["input_files"]
+        if item["category"] == "wav"
+    }
+    table_paths = {
+        item["key"]: item["path"]
+        for item in live["input_files"]
+        if item["category"] == "tsv"
+    }
+    if {str(row.get("source_key")) for row in raw_rows if isinstance(row, Mapping)} != set(source_paths):
+        raise ImportBusinessPlanError(
+            "archived compound source manifest does not close fixture rows"
+        )
+    raw_by_key = {
+        str(row.get("row_key")): row
+        for row in raw_rows
+        if isinstance(row, Mapping)
+    }
+    contracts = static["row_contracts"]
+    if set(raw_by_key) != {
+        str(row.get("row_key"))
+        for row in contracts
+        if isinstance(row, Mapping)
+    }:
+        raise ImportBusinessPlanError(
+            "archived compound row keys differ from the reviewed fixture"
+        )
+    if not isinstance(compound_spec, Mapping):
+        raise ImportBusinessPlanError(
+            "archived compound scenario lacks its dynamic-field case spec"
+        )
+    try:
+        dynamic_modes = compound_dynamic_modes_by_row(
+            compound_spec,
+            tuple(raw_by_key.values()),
+        )
+    except ImportAssetMaterializationError as exc:
+        raise ImportBusinessPlanError(
+            f"archived compound dynamic-row case spec is invalid: {exc}"
+        ) from exc
+    for contract in contracts:
+        raw = raw_by_key[contract["row_key"]]
+        expected_target = layout.translate_2022_path(
+            str(raw.get("target_path") or "")
+        )
+        event = raw.get("event")
+        expected_event = (
+            None
+            if event is None
+            else {
+                "path": event.get("path"),
+                "action": event.get("action"),
+            }
+        )
+        if (
+            contract["target_path"] != expected_target
+            or contract["object_type"] != raw.get("object_type")
+            or contract["source_key"] != raw.get("source_key")
+            or contract["guid_policy"] != raw.get("guid_policy")
+            or contract["event"] != expected_event
+            or contract["pre_state_existence"]
+            != (
+                raw.get("pre_state", {}).get("existence")
+                if isinstance(raw.get("pre_state"), Mapping)
+                else None
+            )
+            or contract["dynamic_mode"]
+            != dynamic_modes[contract["row_key"]]
+        ):
+            raise ImportBusinessPlanError(
+                "archived compound row contract differs from fixture truth"
+            )
+
+    requests = static["operation_requests"]
+    if len(requests) != 1 or not isinstance(requests[0], Mapping):
+        raise ImportBusinessPlanError(
+            "compound import archive requires one exact operation request"
+        )
+    request = requests[0]
+    if (
+        request.get("contract") != "waapi-skill.operation-request/v1"
+        or request.get("version") != static["version"]
+    ):
+        raise ImportBusinessPlanError(
+            "compound import request contract/version drifted"
+        )
+    arguments = request.get("arguments")
+    if not isinstance(arguments, Mapping):
+        raise ImportBusinessPlanError("compound import request arguments are invalid")
+    if static["api"] == "ak.wwise.core.audio.import":
+        if request.get("operation") != "audio.import":
+            raise ImportBusinessPlanError("compound direct import route drifted")
+        imports = arguments.get("imports")
+        if not isinstance(imports, list) or len(imports) != len(contracts):
+            raise ImportBusinessPlanError(
+                "compound direct import rows are incomplete"
+            )
+        targets = {
+            _normalize_typed_wwise_path(str(row.get("object_path") or ""))
+            for row in imports
+            if isinstance(row, Mapping)
+        }
+        if targets != {row["target_path"] for row in contracts}:
+            raise ImportBusinessPlanError(
+                "compound direct import target paths differ from row contracts"
+            )
+    else:
+        if (
+            request.get("operation") != "audio.importTabDelimited"
+            or set(table_paths)
+            != {
+                str(table.get("name"))
+                for table in tables
+                if isinstance(table, Mapping)
+            }
+            or arguments.get("import_file") not in set(table_paths.values())
+        ):
+            raise ImportBusinessPlanError(
+                "compound tab import request/table binding drifted"
+            )
+        location = arguments.get("import_location")
+        if (
+            not isinstance(location, Mapping)
+            or set(location) != {"kind", "value"}
+            or location.get("kind") != "path"
+            or not isinstance(location.get("value"), str)
+            or not str(location["value"]).startswith(
+                layout.actor_default_work_unit + "\\"
+            )
+        ):
+            raise ImportBusinessPlanError(
+                "compound tab import location differs from the versioned hierarchy"
+            )
+
+    _validate_compound_request_dynamic_fields(
+        arguments,
+        dynamic_tokens=static["dynamic_tokens"],
+        reference_fixtures=live["reference_fixtures"],
+    )
+
+
+def _validate_compound_request_dynamic_fields(
+    arguments: Mapping[str, Any],
+    *,
+    dynamic_tokens: Sequence[Any],
+    reference_fixtures: Any,
+) -> None:
+    token_set = {
+        str(value)
+        for value in dynamic_tokens
+        if isinstance(value, str) and value
+    }
+    if len(token_set) != len(dynamic_tokens):
+        raise ImportBusinessPlanError("compound dynamic token list is invalid")
+    fixture_paths = _reference_fixture_path_map(reference_fixtures)
+    observed_names: set[str] = set()
+
+    def visit(value: Any) -> None:
+        if isinstance(value, Mapping):
+            if set(value) == {"name", "value"}:
+                name = value.get("name")
+                if not isinstance(name, str) or name not in token_set:
+                    raise ImportBusinessPlanError(
+                        "compound request property uses an unbound live name"
+                    )
+                observed_names.add(name)
+            elif set(value) == {"name", "target"}:
+                name = value.get("name")
+                target = value.get("target")
+                if (
+                    not isinstance(name, str)
+                    or name not in token_set
+                    or not isinstance(target, Mapping)
+                    or target.get("kind") != "path"
+                    or target.get("value") not in set(fixture_paths.values())
+                ):
+                    raise ImportBusinessPlanError(
+                        "compound request reference is not bound to a reviewed fixture path"
+                    )
+                observed_names.add(name)
+            for child in value.values():
+                visit(child)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child)
+
+    visit(arguments)
+    if not observed_names:
+        # Tab-delimited dynamic tokens live in the sealed TSV rather than the
+        # small operation request.  The archive still binds those exact names
+        # through the metadata digest, row expectations, and TSV file hash.
+        if "import_file" not in arguments:
+            raise ImportBusinessPlanError(
+                "compound request contains no bound dynamic field evidence"
+            )
+
+
+def _normalize_typed_wwise_path(value: str) -> str:
+    if not value.startswith("\\"):
+        raise ImportBusinessPlanError(
+            "compound direct import object_path must be absolute"
+        )
+    parts: list[str] = []
+    for part in value.split("\\")[1:]:
+        if part.startswith("<") and ">" in part:
+            part = part.split(">", 1)[1]
+        if not part:
+            raise ImportBusinessPlanError(
+                "compound direct import object_path is malformed"
+            )
+        parts.append(part)
+    return "\\" + "\\".join(parts)
+
+
+def _reference_fixture_id_map(value: Any) -> dict[str, str]:
+    if not isinstance(value, Mapping) or set(value) != {"main_bus", "targets"}:
+        raise ImportBusinessPlanError(
+            "compound reference fixture archive is not closed"
+        )
+    main = value.get("main_bus")
+    targets = value.get("targets")
+    if (
+        not isinstance(main, Mapping)
+        or set(main) != {"key", "path", "id", "type", "parent_id"}
+        or main.get("key") != "__default_main_bus__"
+        or not isinstance(main.get("id"), str)
+        or _GUID_RE.fullmatch(str(main["id"])) is None
+        or not isinstance(targets, list)
+        or not targets
+    ):
+        raise ImportBusinessPlanError(
+            "compound main/reference Bus evidence is invalid"
+        )
+    result: dict[str, str] = {}
+    for row in targets:
+        if (
+            not isinstance(row, Mapping)
+            or set(row) != {"key", "path", "id", "type", "parent_id"}
+            or not isinstance(row.get("key"), str)
+            or not isinstance(row.get("path"), str)
+            or not isinstance(row.get("id"), str)
+            or _GUID_RE.fullmatch(str(row["id"])) is None
+            or not _object_type_matches(row.get("type"), "Bus")
+            or row["id"].casefold() == str(main["id"]).casefold()
+        ):
+            raise ImportBusinessPlanError(
+                "compound reference Bus target evidence is invalid"
+            )
+        if row["key"] in result:
+            raise ImportBusinessPlanError(
+                "compound reference Bus keys are duplicated"
+            )
+        result[str(row["key"])] = str(row["id"])
+    if len({item.casefold() for item in result.values()}) != len(result):
+        raise ImportBusinessPlanError(
+            "compound reference Bus GUIDs are duplicated"
+        )
+    return result
+
+
+def _reference_fixture_path_map(value: Any) -> dict[str, str]:
+    """Return reviewed target paths after reusing the full fixture proof."""
+
+    _reference_fixture_id_map(value)
+    assert isinstance(value, Mapping)
+    targets = value["targets"]
+    assert isinstance(targets, list)
+    result = {
+        str(row["key"]): str(row["path"])
+        for row in targets
+        if isinstance(row, Mapping)
+    }
+    if (
+        len(result) != len(targets)
+        or any(not path.startswith("\\") for path in result.values())
+    ):
+        raise ImportBusinessPlanError(
+            "compound reference Bus target paths are invalid"
+        )
+    return result
+
+
+def _metadata_projection_from_binding(
+    binding: Any,
+    *,
+    required_tokens: Sequence[Any],
+) -> tuple[MetadataTokenProjection, ...]:
+    """Derive the broker's trusted stable-token projection from sealed binding."""
+
+    if not isinstance(binding, Mapping):
+        raise ImportBusinessPlanError(
+            "compound metadata projection requires one sealed binding"
+        )
+    selected = binding.get("selected")
+    if not isinstance(selected, Mapping) or not selected:
+        raise ImportBusinessPlanError(
+            "compound metadata projection has no selected live metadata"
+        )
+    projection_by_name: dict[str, MetadataTokenProjection] = {}
+    for value in selected.values():
+        if not isinstance(value, Mapping):
+            raise ImportBusinessPlanError(
+                "compound selected metadata row is malformed"
+            )
+        rows = [(value, value.get("kind"))]
+        dependencies = value.get("same_object_dependencies")
+        if isinstance(dependencies, (str, bytes)) or not isinstance(
+            dependencies,
+            Sequence,
+        ):
+            raise ImportBusinessPlanError(
+                "compound selected metadata dependencies are malformed"
+            )
+        rows.extend((dependency, "property") for dependency in dependencies)
+        for row, expected_kind in rows:
+            metadata = row.get("metadata") if isinstance(row, Mapping) else None
+            name = row.get("name") if isinstance(row, Mapping) else None
+            kind = row.get("kind") if isinstance(row, Mapping) else None
+            metadata_type = (
+                metadata.get("type") if isinstance(metadata, Mapping) else None
+            )
+            if (
+                not isinstance(name, str)
+                or kind != expected_kind
+                or not isinstance(metadata_type, str)
+                or expected_kind == "property"
+                and not metadata_type
+            ):
+                raise ImportBusinessPlanError(
+                    "compound metadata projection row is incomplete"
+                )
+            try:
+                projection = MetadataTokenProjection(
+                    name=name,
+                    kind=str(kind),
+                    metadata_type=metadata_type,
+                )
+            except ValueError as exc:
+                raise ImportBusinessPlanError(
+                    "compound metadata projection row is invalid"
+                ) from exc
+            folded = projection.name.casefold()
+            previous = projection_by_name.get(folded)
+            if previous is None:
+                projection_by_name[folded] = projection
+            elif previous != projection:
+                raise ImportBusinessPlanError(
+                    "compound metadata projection repeats one live name "
+                    "with conflicting kind or type"
+                )
+    tokens = tuple(required_tokens)
+    if (
+        not tokens
+        or any(
+            not isinstance(value, str)
+            or not value
+            or value.startswith("@")
+            for value in tokens
+        )
+    ):
+        raise ImportBusinessPlanError(
+            "compound metadata projection differs from exact dynamic token order"
+        )
+    token_names_by_folded = {value.casefold(): value for value in tokens}
+    projection_names_by_folded = {
+        folded: projection.name
+        for folded, projection in projection_by_name.items()
+    }
+    if (
+        len(token_names_by_folded) != len(tokens)
+        or token_names_by_folded != projection_names_by_folded
+    ):
+        raise ImportBusinessPlanError(
+            "compound metadata projection differs from exact dynamic token order"
+        )
+    return tuple(projection_by_name[value.casefold()] for value in tokens)
+
+
+def _validate_archived_metadata_binding(
+    binding: Mapping[str, Any],
+    *,
+    dynamic_tokens: Sequence[Any],
+    reference_fixtures: Any,
+) -> None:
+    if set(binding) != {
+        "contract",
+        "object_type",
+        "discovery_sha256",
+        "selected",
+        "reference_targets",
+    } or (
+        binding.get("contract") != "waapi-skill.bound-import-metadata/v1"
+        or binding.get("object_type") != "Sound"
+        or not _sha(binding.get("discovery_sha256"))
+    ):
+        raise ImportBusinessPlanError(
+            "archived compound metadata binding schema is invalid"
+        )
+    selected = binding.get("selected")
+    targets = binding.get("reference_targets")
+    if not isinstance(selected, Mapping) or not selected or not isinstance(targets, Mapping):
+        raise ImportBusinessPlanError(
+            "archived compound selected metadata/targets are invalid"
+        )
+    names_by_folded: dict[str, str] = {}
+
+    def append_name(value: str) -> None:
+        if not value or value.startswith("@"):
+            raise ImportBusinessPlanError(
+                "archived compound metadata contains an invalid live name"
+            )
+        folded = value.casefold()
+        previous = names_by_folded.get(folded)
+        if previous is None:
+            names_by_folded[folded] = value
+        elif previous != value:
+            raise ImportBusinessPlanError(
+                "archived compound metadata repeats one live name "
+                "with conflicting casing"
+            )
+
+    for row in selected.values():
+        if (
+            not isinstance(row, Mapping)
+            or set(row) != {
+                "name",
+                "kind",
+                "metadata",
+                "same_object_dependencies",
+            }
+            or row.get("kind") not in {"property", "reference"}
+            or not isinstance(row.get("name"), str)
+            or not isinstance(row.get("same_object_dependencies"), list)
+        ):
+            raise ImportBusinessPlanError(
+                "archived compound selected metadata row is malformed"
+            )
+        append_name(str(row["name"]))
+        for dependency in row["same_object_dependencies"]:
+            if not isinstance(dependency, Mapping) or not isinstance(
+                dependency.get("name"),
+                str,
+            ):
+                raise ImportBusinessPlanError(
+                    "archived compound metadata dependency is malformed"
+                )
+            append_name(str(dependency["name"]))
+    if (
+        not dynamic_tokens
+        or any(
+            not isinstance(value, str)
+            or not value
+            or value.startswith("@")
+            for value in dynamic_tokens
+        )
+    ):
+        raise ImportBusinessPlanError(
+            "archived compound dynamic tokens differ from metadata binding"
+        )
+    dynamic_names_by_folded = {
+        value.casefold(): value for value in dynamic_tokens
+    }
+    if (
+        len(dynamic_names_by_folded) != len(dynamic_tokens)
+        or dynamic_names_by_folded != names_by_folded
+    ):
+        raise ImportBusinessPlanError(
+            "archived compound dynamic tokens differ from metadata binding"
+        )
+    fixture_paths = _reference_fixture_path_map(reference_fixtures)
+    if set(targets) != set(fixture_paths):
+        raise ImportBusinessPlanError(
+            "archived metadata reference targets differ from Bus fixtures"
+        )
+    for key, object_ref in targets.items():
+        if (
+            not isinstance(object_ref, Mapping)
+            or set(object_ref) != {"kind", "value"}
+            or object_ref.get("kind") != "path"
+            or object_ref.get("value") != fixture_paths[str(key)]
+        ):
+            raise ImportBusinessPlanError(
+                "archived metadata reference target path drifted"
+            )
+
+
+def _validate_archived_dynamic_row(
+    row: Mapping[str, Any],
+    *,
+    api: str,
+    binding: Any,
+    reference_fixtures: Any,
+) -> None:
+    if not isinstance(binding, Mapping):
+        raise ImportBusinessPlanError("compound metadata binding is unavailable")
+    property_names = {
+        str(value.get("name"))
+        for value in binding.get("selected", {}).values()
+        if isinstance(value, Mapping) and value.get("kind") == "property"
+    }
+    reference_names = {
+        str(value.get("name"))
+        for value in binding.get("selected", {}).values()
+        if isinstance(value, Mapping) and value.get("kind") == "reference"
+    }
+    dependency_names = {
+        str(dependency.get("name"))
+        for value in binding.get("selected", {}).values()
+        if isinstance(value, Mapping)
+        for dependency in value.get("same_object_dependencies", [])
+        if isinstance(dependency, Mapping)
+    }
+    properties = row.get("dynamic_properties")
+    references = row.get("dynamic_references")
+    preserve_property_tokens = row.get("preserve_property_tokens")
+    preserve_reference_tokens = row.get("preserve_reference_tokens")
+    dynamic_mode = row.get("dynamic_mode")
+    if (
+        not isinstance(properties, list)
+        or not isinstance(references, list)
+        or not isinstance(preserve_property_tokens, list)
+        or not isinstance(preserve_reference_tokens, list)
+        or row.get("media_kind") not in {"regular_file", "inline_base64"}
+        or dynamic_mode not in {"mutate", "preserve"}
+    ):
+        raise ImportBusinessPlanError(
+            "archived compound row dynamic expectations are invalid"
+        )
+    if bool(properties) != bool(references):
+        raise ImportBusinessPlanError(
+            "archived compound row must bind dynamic properties and references "
+            "together or omit both"
+        )
+    if dynamic_mode == "mutate" and not properties:
+        raise ImportBusinessPlanError(
+            "archived compound mutate row requires dynamic expectations"
+        )
+    if dynamic_mode == "mutate":
+        if preserve_property_tokens or preserve_reference_tokens:
+            raise ImportBusinessPlanError(
+                "archived compound mutate row contains preservation tokens"
+            )
+    else:
+        if (
+            properties
+            or references
+            or api != "ak.wwise.core.audio.importTabDelimited"
+            or row.get("import_operation") != "useExisting"
+            or row.get("pre_state_existence") != "existing"
+            or row.get("guid_policy") != "preserve_existing_guid"
+        ):
+            raise ImportBusinessPlanError(
+                "archived compound preserve row violates the closed "
+                "useExisting tab-import boundary"
+            )
+        (
+            expected_property_tokens,
+            expected_reference_tokens,
+        ) = _archived_preservation_tokens(binding)
+        if (
+            not _same_exact_token_set(
+                preserve_property_tokens,
+                expected_property_tokens,
+            )
+            or not _same_exact_token_set(
+                preserve_reference_tokens,
+                expected_reference_tokens,
+            )
+        ):
+            raise ImportBusinessPlanError(
+                "archived compound preservation tokens differ from live metadata"
+            )
+        return
+    property_by_name: dict[str, Mapping[str, Any]] = {}
+    for item in properties:
+        if (
+            not isinstance(item, Mapping)
+            or set(item) != {"name", "value", "metadata_type", "source"}
+            or not isinstance(item.get("name"), str)
+            or item.get("source") not in {"request", "reference_dependency"}
+        ):
+            raise ImportBusinessPlanError(
+                "archived compound property expectation is malformed"
+            )
+        name = str(item["name"])
+        expected_names = (
+            dependency_names
+            if item["source"] == "reference_dependency"
+            else property_names
+        )
+        if name not in expected_names or name in property_by_name:
+            raise ImportBusinessPlanError(
+                "archived compound property expectation is not live-bound"
+            )
+        if item["source"] == "reference_dependency" and item.get("value") is not True:
+            raise ImportBusinessPlanError(
+                "archived reference activation property is not exactly true"
+            )
+        property_by_name[name] = item
+    fixture_ids = _reference_fixture_id_map(reference_fixtures)
+    seen_references: set[str] = set()
+    for item in references:
+        if (
+            not isinstance(item, Mapping)
+            or set(item) != {
+                "name",
+                "target_id",
+                "target_fixture",
+                "activation_properties",
+            }
+            or not isinstance(item.get("name"), str)
+            or item["name"] not in reference_names
+            or item["name"] in seen_references
+            or item.get("target_fixture") not in fixture_ids
+            or str(item.get("target_id", "")).casefold()
+            != fixture_ids[str(item["target_fixture"])].casefold()
+            or not isinstance(item.get("activation_properties"), list)
+            or not item["activation_properties"]
+        ):
+            raise ImportBusinessPlanError(
+                "archived compound reference expectation is malformed"
+            )
+        seen_references.add(str(item["name"]))
+        for activation in item["activation_properties"]:
+            name = activation.get("name") if isinstance(activation, Mapping) else None
+            if (
+                not isinstance(name, str)
+                or name not in property_by_name
+                or property_by_name[name].get("value") is not True
+                or activation != property_by_name[name]
+            ):
+                raise ImportBusinessPlanError(
+                    "archived compound reference activation expectation drifted"
+                )
+
+
+def _archived_preservation_tokens(
+    binding: Mapping[str, Any],
+) -> tuple[list[str], list[str]]:
+    """Independently rebuild the exact preserve surface from archived metadata."""
+
+    selected = binding.get("selected")
+    if not isinstance(selected, Mapping) or not selected:
+        raise ImportBusinessPlanError(
+            "archived compound preserve metadata selection is unavailable"
+        )
+    property_names: list[str] = []
+    reference_names: list[str] = []
+    seen_properties: dict[str, str] = {}
+    seen_references: dict[str, str] = {}
+
+    def append(destination: list[str], seen: dict[str, str], value: Any) -> None:
+        if (
+            not isinstance(value, str)
+            or not value
+            or value.startswith("@")
+        ):
+            raise ImportBusinessPlanError(
+                "archived compound preservation token is invalid"
+            )
+        folded = value.casefold()
+        previous = seen.get(folded)
+        if previous is None:
+            seen[folded] = value
+            destination.append(value)
+        elif previous != value:
+            raise ImportBusinessPlanError(
+                "archived compound preservation token casing is ambiguous"
+            )
+
+    for value in selected.values():
+        if not isinstance(value, Mapping):
+            raise ImportBusinessPlanError(
+                "archived compound preserve metadata row is malformed"
+            )
+        if value.get("kind") == "property":
+            append(property_names, seen_properties, value.get("name"))
+        elif value.get("kind") == "reference":
+            append(reference_names, seen_references, value.get("name"))
+        else:
+            raise ImportBusinessPlanError(
+                "archived compound preserve metadata kind is unsupported"
+            )
+        dependencies = value.get("same_object_dependencies")
+        if not isinstance(dependencies, list):
+            raise ImportBusinessPlanError(
+                "archived compound preserve dependencies are malformed"
+            )
+        for dependency in dependencies:
+            if (
+                not isinstance(dependency, Mapping)
+                or dependency.get("kind") != "property"
+            ):
+                raise ImportBusinessPlanError(
+                    "archived compound preserve dependency is not a property"
+                )
+            append(
+                property_names,
+                seen_properties,
+                dependency.get("name"),
+            )
+    if (
+        not property_names
+        or not reference_names
+        or set(seen_properties) & set(seen_references)
+    ):
+        raise ImportBusinessPlanError(
+            "archived compound preservation tokens are incomplete or ambiguous"
+        )
+    return property_names, reference_names
+
+
+def _same_exact_token_set(left: Sequence[Any], right: Sequence[Any]) -> bool:
+    if any(not isinstance(value, str) for value in left):
+        return False
+    left_by_folded = {str(value).casefold(): str(value) for value in left}
+    right_by_folded = {str(value).casefold(): str(value) for value in right}
+    return (
+        len(left_by_folded) == len(left)
+        and len(right_by_folded) == len(right)
+        and left_by_folded == right_by_folded
+    )
+
+
 def _validate_live_archive(live: Mapping[str, Any], static: Mapping[str, Any], *, verify_files: bool) -> None:
     snapshot = live["before_snapshot"]
     if live["before_snapshot_sha256"] != _hash(snapshot) or live["input_files_sha256"] != _hash(live["input_files"]):
@@ -467,6 +1562,68 @@ def _validate_live_archive(live: Mapping[str, Any], static: Mapping[str, Any], *
     _validate_files(live["input_files"], verify_files=verify_files)
     if not isinstance(live["owned_paths"], Mapping) or set(live["owned_paths"]) != {"asset_root", "parents", "events"}:
         raise ImportBusinessPlanError("archived import owned paths are invalid")
+    compound = (
+        static["family_schema_version"]
+        == COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA
+    )
+    if compound:
+        reference_fixtures = live["reference_fixtures"]
+        if live["reference_fixtures_sha256"] != _hash(reference_fixtures):
+            raise ImportBusinessPlanError(
+                "archived reference Bus fixture digest is invalid"
+            )
+        fixture_ids = _reference_fixture_id_map(reference_fixtures)
+        cleanup = live["cleanup_boundaries"]
+        if (
+            not isinstance(cleanup, Mapping)
+            or set(cleanup)
+            != {
+                "order",
+                "import_root_paths",
+                "reference_bus_paths",
+                "asset_root",
+            }
+            or cleanup.get("order")
+            != ["import_roots", "reference_busses", "asset_root"]
+            or cleanup.get("asset_root") != live["owned_paths"].get("asset_root")
+            or set(cleanup.get("reference_bus_paths", []))
+            != {
+                row["path"]
+                for row in reference_fixtures["targets"]
+                if isinstance(row, Mapping)
+            }
+            or len(cleanup.get("reference_bus_paths", [])) != len(fixture_ids)
+        ):
+            raise ImportBusinessPlanError(
+                "archived compound cleanup boundaries are invalid"
+            )
+        if (
+            not isinstance(snapshot, Mapping)
+            or set(snapshot)
+            != {
+                "scenario_id",
+                "business",
+                "rows",
+                "reference_fixtures",
+                "main_bus",
+            }
+            or snapshot.get("scenario_id") != static["scenario_id"]
+            or {
+                "main_bus": snapshot.get("main_bus"),
+                "targets": snapshot.get("reference_fixtures"),
+            }
+            != reference_fixtures
+        ):
+            raise ImportBusinessPlanError(
+                "archived compound before snapshot schema is invalid"
+            )
+        _validate_compound_snapshot_rows(
+            snapshot,
+            static=static,
+            reference_fixtures=reference_fixtures,
+            after=False,
+        )
+        snapshot = snapshot["business"]
     if not isinstance(snapshot, Mapping) or set(snapshot) != {"scenario_id", "rows", "events", "project_xml_files", "originals_files", "input_files", "xml_identities"} or snapshot.get("scenario_id") != static["scenario_id"]:
         raise ImportBusinessPlanError("archived import before snapshot schema is invalid")
     _validate_snapshot_evidence(snapshot)
@@ -491,6 +1648,146 @@ def _validate_live_archive(live: Mapping[str, Any], static: Mapping[str, Any], *
                 originals_files=snapshot["originals_files"],
                 label=f"archived import before {value['row_key']}",
             )
+
+
+def _validate_compound_snapshot_rows(
+    snapshot: Mapping[str, Any],
+    *,
+    static: Mapping[str, Any],
+    reference_fixtures: Any,
+    after: bool,
+) -> None:
+    rows = snapshot.get("rows")
+    contracts = {
+        row["row_key"]: row
+        for row in static["row_contracts"]
+        if isinstance(row, Mapping)
+    }
+    if (
+        not isinstance(rows, list)
+        or {row.get("row_key") for row in rows if isinstance(row, Mapping)}
+        != set(contracts)
+    ):
+        raise ImportBusinessPlanError(
+            "compound dynamic snapshot rows are incomplete"
+        )
+    fixture_ids = _reference_fixture_id_map(reference_fixtures)
+    main_bus = reference_fixtures["main_bus"]["id"]
+    for row in rows:
+        if (
+            not isinstance(row, Mapping)
+            or set(row)
+            != {"row_key", "target_path", "properties", "references"}
+        ):
+            raise ImportBusinessPlanError(
+                "compound dynamic snapshot row schema is invalid"
+            )
+        contract = contracts[row["row_key"]]
+        if row["target_path"] != contract["target_path"]:
+            raise ImportBusinessPlanError(
+                "compound dynamic snapshot target path drifted"
+            )
+        properties = row["properties"]
+        references = row["references"]
+        if not isinstance(properties, list) or not isinstance(references, list):
+            raise ImportBusinessPlanError(
+                "compound dynamic snapshot values are not arrays"
+            )
+        property_values: dict[str, Any] = {}
+        for item in properties:
+            if (
+                not isinstance(item, Mapping)
+                or set(item) != {"name", "value"}
+                or not isinstance(item.get("name"), str)
+                or item["name"] in property_values
+                or not _archive_json_scalar(item.get("value"))
+            ):
+                raise ImportBusinessPlanError(
+                    "compound dynamic property readback is malformed"
+                )
+            property_values[str(item["name"])] = item.get("value")
+        reference_values: dict[str, Any] = {}
+        for item in references:
+            if (
+                not isinstance(item, Mapping)
+                or set(item) != {"name", "target_id"}
+                or not isinstance(item.get("name"), str)
+                or item["name"] in reference_values
+                or not (
+                    item.get("target_id") is None
+                    or (
+                        isinstance(item.get("target_id"), str)
+                        and _GUID_RE.fullmatch(str(item["target_id"])) is not None
+                    )
+                )
+            ):
+                raise ImportBusinessPlanError(
+                    "compound dynamic reference readback is malformed"
+                )
+            reference_values[str(item["name"])] = item.get("target_id")
+        expected_properties = {
+            item["name"]: item["value"]
+            for item in contract["dynamic_properties"]
+        }
+        expected_references = {
+            item["name"]: item
+            for item in contract["dynamic_references"]
+        }
+        if contract["dynamic_mode"] == "preserve":
+            if (
+                set(property_values)
+                != set(contract["preserve_property_tokens"])
+                or set(reference_values)
+                != set(contract["preserve_reference_tokens"])
+                or len(property_values)
+                != len(contract["preserve_property_tokens"])
+                or len(reference_values)
+                != len(contract["preserve_reference_tokens"])
+            ):
+                raise ImportBusinessPlanError(
+                    "compound preservation snapshot token set is incomplete"
+                )
+            continue
+        if after:
+            if property_values != expected_properties:
+                raise ImportBusinessPlanError(
+                    "compound dynamic property values differ after import"
+                )
+            if set(reference_values) != set(expected_references):
+                raise ImportBusinessPlanError(
+                    "compound dynamic reference names differ after import"
+                )
+            for name, expectation in expected_references.items():
+                fixture_key = expectation["target_fixture"]
+                expected_id = fixture_ids.get(fixture_key)
+                actual_id = reference_values[name]
+                if (
+                    expected_id is None
+                    or not isinstance(actual_id, str)
+                    or actual_id.casefold() != expected_id.casefold()
+                    or actual_id.casefold() == str(main_bus).casefold()
+                ):
+                    raise ImportBusinessPlanError(
+                        "compound dynamic reference GUID is not its non-default Bus"
+                    )
+                for activation in expectation["activation_properties"]:
+                    if property_values.get(activation["name"]) is not True:
+                        raise ImportBusinessPlanError(
+                            "compound reference lacks its local activation property"
+                        )
+        else:
+            allowed_properties = set(expected_properties)
+            allowed_references = set(expected_references)
+            if not set(property_values).issubset(allowed_properties) or not set(
+                reference_values
+            ).issubset(allowed_references):
+                raise ImportBusinessPlanError(
+                    "compound before snapshot contains an unbound dynamic token"
+                )
+
+
+def _archive_json_scalar(value: Any) -> bool:
+    return value is None or type(value) in {str, int, float, bool}
 
 
 def _validate_files(files: Any, *, verify_files: bool) -> None:
@@ -547,7 +1844,115 @@ def _validate_snapshot_evidence(snapshot: Mapping[str, Any]) -> None:
             raise ImportBusinessPlanError("import snapshot XML identity proof is invalid")
 
 
+def _validate_archived_preservation_unchanged(
+    static: Mapping[str, Any],
+    before: Mapping[str, Any],
+    after: Mapping[str, Any],
+) -> None:
+    """Compare sealed preserve-only values without trusting runtime pass flags."""
+
+    before_rows = {
+        row["row_key"]: row
+        for row in before["rows"]
+        if isinstance(row, Mapping)
+    }
+    after_rows = {
+        row["row_key"]: row
+        for row in after["rows"]
+        if isinstance(row, Mapping)
+    }
+    for contract in static["row_contracts"]:
+        if contract.get("dynamic_mode") != "preserve":
+            continue
+        row_key = contract["row_key"]
+        old = before_rows[row_key]
+        new = after_rows[row_key]
+        old_properties = {
+            item["name"]: item["value"] for item in old["properties"]
+        }
+        new_properties = {
+            item["name"]: item["value"] for item in new["properties"]
+        }
+        if set(old_properties) != set(new_properties):
+            raise ImportBusinessPlanError(
+                "compound preserved property token set changed after import"
+            )
+        for name, old_value in old_properties.items():
+            new_value = new_properties[name]
+            if type(old_value) is not type(new_value) or old_value != new_value:
+                raise ImportBusinessPlanError(
+                    f"compound preserved property @{name} changed after import"
+                )
+
+        old_references = {
+            item["name"]: item["target_id"] for item in old["references"]
+        }
+        new_references = {
+            item["name"]: item["target_id"] for item in new["references"]
+        }
+        if set(old_references) != set(new_references):
+            raise ImportBusinessPlanError(
+                "compound preserved reference token set changed after import"
+            )
+        for name, old_value in old_references.items():
+            new_value = new_references[name]
+            if not (
+                old_value is None
+                and new_value is None
+                or isinstance(old_value, str)
+                and isinstance(new_value, str)
+                and old_value.casefold() == new_value.casefold()
+            ):
+                raise ImportBusinessPlanError(
+                    f"compound preserved reference @{name} changed after import"
+                )
+
+
 def _validate_after(static: Mapping[str, Any], live: Mapping[str, Any], after: Any) -> None:
+    compound = (
+        static["family_schema_version"]
+        == COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA
+    )
+    before_snapshot = live["before_snapshot"]
+    if compound:
+        before_compound = before_snapshot
+        if (
+            not isinstance(after, Mapping)
+            or set(after)
+            != {
+                "scenario_id",
+                "business",
+                "rows",
+                "reference_fixtures",
+                "main_bus",
+            }
+            or after.get("scenario_id") != static["scenario_id"]
+            or {
+                "main_bus": after.get("main_bus"),
+                "targets": after.get("reference_fixtures"),
+            }
+            != live["reference_fixtures"]
+        ):
+            raise ImportBusinessPlanError(
+                "compound import after snapshot schema/Bus fixtures drifted"
+            )
+        _validate_compound_snapshot_rows(
+            after,
+            static=static,
+            reference_fixtures=live["reference_fixtures"],
+            after=True,
+        )
+        if not isinstance(before_compound, Mapping):
+            raise ImportBusinessPlanError(
+                "compound import before snapshot is invalid"
+            )
+        _validate_archived_preservation_unchanged(
+            static,
+            before_compound,
+            after,
+        )
+        before_snapshot = before_compound["business"]
+        after = after["business"]
     if not isinstance(after, Mapping) or set(after) != {"scenario_id", "rows", "events", "project_xml_files", "originals_files", "input_files", "xml_identities"} or after.get("scenario_id") != static["scenario_id"]:
         raise ImportBusinessPlanError("import after snapshot schema is invalid")
     contracts = {row["row_key"] for row in static["row_contracts"]}
@@ -556,7 +1961,7 @@ def _validate_after(static: Mapping[str, Any], live: Mapping[str, Any], after: A
     for row in after["rows"]:
         if not isinstance(row, Mapping) or set(row) != {"row_key", "target_path", "language", "object"}:
             raise ImportBusinessPlanError("import after row schema is invalid")
-    before_by_key = {row["row_key"]: row for row in live["before_snapshot"]["rows"]}
+    before_by_key = {row["row_key"]: row for row in before_snapshot["rows"]}
     after_by_key = {row["row_key"]: row for row in after["rows"]}
     ids_by_target: dict[str, str] = {}
     before_ids = {
@@ -609,7 +2014,7 @@ def _validate_after(static: Mapping[str, Any], live: Mapping[str, Any], after: A
             raise ImportBusinessPlanError("localized rows lost shared target GUID")
     if len(set(ids_by_target.values())) != len(ids_by_target):
         raise ImportBusinessPlanError("distinct import targets share one GUID")
-    if after["input_files"] != live["before_snapshot"]["input_files"]:
+    if after["input_files"] != before_snapshot["input_files"]:
         raise ImportBusinessPlanError("immutable input fingerprint changed after import")
     events = {item.get("path"): item for item in after["events"] if isinstance(item, Mapping)}
     for contract in static["row_contracts"]:
@@ -775,7 +2180,15 @@ def _plain(value: Any) -> Any:
 
 
 __all__ = [
-    "IMPORT_BUSINESS_PLAN_SCHEMA", "IMPORT_FIXTURE_KIND", "ImportBusinessPlanError", "ImportBusinessPlanSections",
-    "compile_import_business_plan", "parse_import_business_plan_sections", "validate_import_business_plan",
-    "validate_import_business_plan_archive", "validate_import_archived_verification",
+    "COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA",
+    "COMPOUND_IMPORT_FIXTURE_KIND",
+    "IMPORT_BUSINESS_PLAN_SCHEMA",
+    "IMPORT_FIXTURE_KIND",
+    "ImportBusinessPlanError",
+    "ImportBusinessPlanSections",
+    "compile_import_business_plan",
+    "parse_import_business_plan_sections",
+    "validate_import_archived_verification",
+    "validate_import_business_plan",
+    "validate_import_business_plan_archive",
 ]

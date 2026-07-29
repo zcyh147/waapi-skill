@@ -56,6 +56,8 @@ from .operation_import import (
     AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS,
     ImportContractError,
     MAX_AUDIO_IMPORT_BASE64_ENCODED_CHARS,
+    MAX_NATIVE_AUDIO_IMPORT_ROWS,
+    allowed_import_hierarchy_roots,
     build_audio_import_plan,
     expected_audio_file_source_result_path,
     language_requires_live_project_validation,
@@ -109,7 +111,23 @@ from .operation_plugin import (
 from .operation_ui_commands import (
     EXECUTE_URI as UI_COMMAND_EXECUTE_URI,
     GET_COMMANDS_URI as UI_COMMAND_GET_COMMANDS_URI,
+    LUA_COMMAND_VERSIONS as UI_COMMAND_LUA_VERSIONS,
+    MAX_ARGUMENT_TOKEN_CHARS as UI_COMMAND_MAX_ARGUMENT_TOKEN_CHARS,
+    MAX_ARGUMENT_TOKENS as UI_COMMAND_MAX_ARGUMENT_TOKENS,
+    MAX_COMMAND_ID_CHARS as UI_COMMAND_MAX_ID_CHARS,
+    MAX_COMMANDS_PER_PLAN as UI_COMMAND_MAX_COMMANDS,
+    MAX_DEFAULT_SHORTCUT_CHARS as UI_COMMAND_MAX_DEFAULT_SHORTCUT_CHARS,
+    MAX_DISPLAY_NAME_CHARS as UI_COMMAND_MAX_DISPLAY_NAME_CHARS,
+    MAX_LUA_MODULE_DIRECTORIES as UI_COMMAND_MAX_LUA_MODULE_DIRECTORIES,
+    MAX_LUA_SELECTED_RETURN_CHARS as UI_COMMAND_MAX_LUA_RETURN_CHARS,
+    MAX_LUA_SELECTED_RETURN_FIELDS as UI_COMMAND_MAX_LUA_RETURN_FIELDS,
+    MAX_MENU_SEGMENT_CHARS as UI_COMMAND_MAX_MENU_SEGMENT_CHARS,
+    MAX_MENU_SEGMENTS as UI_COMMAND_MAX_MENU_SEGMENTS,
+    MAX_OBJECT_TYPE_CHARS as UI_COMMAND_MAX_OBJECT_TYPE_CHARS,
+    MAX_OBJECT_TYPES as UI_COMMAND_MAX_OBJECT_TYPES,
+    MAX_PATH_CHARS as UI_COMMAND_MAX_PATH_CHARS,
     REGISTER_URI as UI_COMMAND_REGISTER_URI,
+    START_MODES as UI_COMMAND_START_MODES,
     UNREGISTER_EXISTING_ACKNOWLEDGEMENT,
     UNREGISTER_URI as UI_COMMAND_UNREGISTER_URI,
     USER_SUPPLIED_SOURCE_AUTHORITY as UI_COMMAND_SOURCE_AUTHORITY,
@@ -134,6 +152,7 @@ from .operation_soundbank import (
     parse_wwise_2021_language_inventory,
     verify_file_proof as verify_soundbank_file_proof,
 )
+from .platform_paths import WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT
 from .transaction_cleanup import build_transaction_cleanup_spec
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 
@@ -343,12 +362,8 @@ OBJECT_CREATE_WRITABLE_PARENT_TYPES = frozenset(
         "MusicSegment",
     }
 )
-IMPORT_ROOTS_BY_VERSION: Mapping[str, frozenset[str]] = {
-    "2021.1": frozenset({"Actor-Mixer Hierarchy", "Interactive Music Hierarchy"}),
-    "2022.1": frozenset({"Actor-Mixer Hierarchy", "Interactive Music Hierarchy"}),
-    "2023.1": frozenset({"Actor-Mixer Hierarchy", "Interactive Music Hierarchy"}),
-    "2024.1": frozenset({"Actor-Mixer Hierarchy", "Interactive Music Hierarchy"}),
-    "2025.1": frozenset({"Containers", "Interactive Music Hierarchy"}),
+OBJECT_CREATE_REFLECTED_PARENT_TYPES_BY_VERSION: Mapping[str, frozenset[str]] = {
+    "2025.1": frozenset({"PropertyContainer"}),
 }
 IMPORT_ITEM_REQUIRED_FIELDS: tuple[str, ...] = ()
 IMPORT_ITEM_OPTIONAL_FIELDS = (
@@ -555,14 +570,51 @@ _OBJECT_REFERENCE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     },
 }
 _OBJECT_CREATE_TYPE_TOKEN_DESCRIPTION = (
-    "Exact Wwise metadata token. Natural mappings: Actor Mixer -> ActorMixer; "
+    "Exact Wwise request token. Natural mappings: Actor Mixer -> ActorMixer; "
     "Random Container / 随机容器 -> RandomSequenceContainer (never RandomContainer); "
-    "Blend Container / 混合容器 -> BlendContainer; Sound -> Sound."
+    "Blend Container / 混合容器 -> BlendContainer; Sound -> Sound. "
+    "Wwise 2025.1 reflects an Actor Mixer as PropertyContainer, but its "
+    "object.create request token remains ActorMixer."
 )
 _OBJECT_CREATE_TYPE_TOKEN_SCHEMA: Mapping[str, Any] = {
     "type": "string",
     "minLength": 1,
     "description": _OBJECT_CREATE_TYPE_TOKEN_DESCRIPTION,
+}
+_AUDIO_FILE_BASE64_VERBATIM_CONTRACT: Mapping[str, Any] = {
+    "contract": "waapi-skill.audio-file-base64-verbatim/v1",
+    "opaque_segment": "characters_after_first_vertical_bar",
+    "caller_provided_complete_value": "copy_character_for_character",
+    "forbidden_transformations": [
+        "reconstruct",
+        "re-encode",
+        "repair",
+        "truncate",
+        "splice",
+    ],
+    "on_unreliable_preservation": "stop_before_preview",
+}
+_SHELL_SINGLE_QUOTED_WWISE_PATH_CONTRACT: Mapping[str, Any] = {
+    "contract": "waapi-skill.shell-single-quoted-wwise-path/v1",
+    "source_value": "decoded_gateway_json_string",
+    "shell_quoting": "single_quotes",
+    "literal_backslashes_per_path_separator": 1,
+    "json_serialized_backslashes_per_path_separator": 2,
+    "copy_json_escape_backslashes_as_literal_characters": False,
+}
+_DEFAULT_CONTAINER_WORK_UNIT_PATH_BY_VERSION: Mapping[str, str] = {
+    "2021.1": r"\Actor-Mixer Hierarchy\Default Work Unit",
+    "2022.1": r"\Actor-Mixer Hierarchy\Default Work Unit",
+    "2023.1": r"\Actor-Mixer Hierarchy\Default Work Unit",
+    "2024.1": r"\Actor-Mixer Hierarchy\Default Work Unit",
+    "2025.1": r"\Containers\Default Work Unit",
+}
+_ACTOR_MIXER_METADATA_TYPE_BY_VERSION: Mapping[str, str] = {
+    "2021.1": "ActorMixer",
+    "2022.1": "ActorMixer",
+    "2023.1": "ActorMixer",
+    "2024.1": "ActorMixer",
+    "2025.1": "PropertyContainer",
 }
 _OBJECT_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     "type": "object",
@@ -604,8 +656,12 @@ _OBJECT_SET_IMPORT_FILE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
             "maxLength": 256 * 1024,
             "description": (
                 "A relative .wav path below Project Originals, a vertical bar, "
-                "and bounded canonical RIFF/WAVE base64 data."
+                "and bounded canonical RIFF/WAVE base64 data. Treat caller-"
+                "provided inline data as opaque: copy the complete value "
+                "character-for-character and stop before preview if exact "
+                "preservation is uncertain."
             ),
+            "verbatim_contract": _AUDIO_FILE_BASE64_VERBATIM_CONTRACT,
         },
         "originals_subfolder": {
             "type": "string",
@@ -733,8 +789,11 @@ _IMPORT_COMMON_ARGUMENT_PROPERTIES: Mapping[str, Any] = {
         "maxLength": 256 * 1024,
         "description": (
             "A relative .wav path below Project Originals, a vertical bar, and "
-            "canonical RIFF/WAVE base64 data."
+            "canonical RIFF/WAVE base64 data. Treat caller-provided inline data "
+            "as opaque: copy the complete value character-for-character and "
+            "stop before preview if exact preservation is uncertain."
         ),
+        "verbatim_contract": _AUDIO_FILE_BASE64_VERBATIM_CONTRACT,
     },
     "import_language": {"type": "string", "minLength": 1},
     "import_location": IDENTITY_ARGUMENT_SCHEMA,
@@ -771,6 +830,165 @@ _IMPORT_DEFAULT_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     "optional": list(_IMPORT_COMMON_ARGUMENT_PROPERTIES),
     "additionalProperties": False,
     "properties": dict(_IMPORT_COMMON_ARGUMENT_PROPERTIES),
+    "description": (
+        "For a multi-row batch, put each supported fixed field and each property/"
+        "reference here once when the user explicitly states it as the batch/default/"
+        "common baseline (including natural wording such as 默认/统一/共同), with "
+        "exceptional rows carrying exact overrides, or when the same effective value "
+        "applies to every row. A value merely repeated by a subset without baseline "
+        "intent stays in those rows; keep imports[] to row-specific fields and exact "
+        "overrides so the request stays compact."
+    ),
+}
+_IMPORT_OPERATION_DESCRIPTION = (
+    "Batch-level import mode at $.arguments.import_operation. Map the user's "
+    "meaning rather than requiring literal tokens: create/new/createNew/新建/创建 "
+    "requires createNew; reuse/useExisting/使用现有/复用 requires useExisting; "
+    "replace/replaceExisting/替换/覆盖现有 requires replaceExisting. Omit it only "
+    "when the user leaves the mode unstated, where omission means createNew. "
+    "Never place it inside an imports[] row or TSV content."
+)
+_IMPORT_OPERATION_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    "type": "string",
+    "enum": ["createNew", "useExisting", "replaceExisting"],
+    "default": "createNew",
+    "description": _IMPORT_OPERATION_DESCRIPTION,
+}
+_IMPORT_OPERATION_INTENT_CONTRACT: Mapping[str, Any] = {
+    "contract": "waapi-skill.import-operation-intent/v1",
+    "path": "$.arguments.import_operation",
+    "matching": "semantic_user_intent_not_literal_token",
+    "required_when_user_intent_is_explicit": True,
+    "omission_value_when_user_intent_is_unstated": "createNew",
+    "explicit_intent_values": [
+        {
+            "intent": "create_or_new",
+            "semantic_examples": [
+                "create",
+                "new",
+                "createNew",
+                "新建",
+                "创建",
+            ],
+            "value": "createNew",
+        },
+        {
+            "intent": "reuse_existing",
+            "semantic_examples": [
+                "reuse",
+                "use existing",
+                "useExisting",
+                "使用现有",
+                "复用",
+            ],
+            "value": "useExisting",
+        },
+        {
+            "intent": "replace_existing",
+            "semantic_examples": [
+                "replace",
+                "replace existing",
+                "replaceExisting",
+                "替换",
+                "覆盖现有",
+            ],
+            "value": "replaceExisting",
+        },
+    ],
+}
+_LIVE_METADATA_DEPENDENCY_CLOSURE_CONTRACT: Mapping[str, Any] = {
+    "contract": "waapi-skill.live-metadata-dependency-closure/v1",
+    "selection": {
+        "source": "current_operation_request",
+        "kinds": ["property", "reference"],
+        "selected_fields_only": True,
+    },
+    "metadata_source": {
+        "command": "metadata discover",
+        "authority": "live-waapi",
+        "same_result_required": True,
+        "candidate_collections": [
+            "$.agent_result.candidates",
+            "$.agent_result.dependency_candidates",
+        ],
+        "requirements_field": "dependency_requirements",
+        "unresolved_dependencies_path": (
+            "$.agent_result.unresolved_dependencies"
+        ),
+    },
+    "traversal": {
+        "recursive": True,
+        "dependency_identity": "exact_returned_property_name",
+    },
+    "materialization": {
+        "required_values_count": 1,
+        "kind": "property",
+        "copy_name_from": "dependency_requirements[].property",
+        "copy_value_from": "dependency_requirements[].required_values[0]",
+        "scope": {
+            "inherit_selected_owner_scope": True,
+            "defaults": "$.arguments.defaults.properties",
+            "row": "$.arguments.imports[owner_row_index].properties",
+        },
+    },
+    "failure_policy": {
+        "phase": "before_preview",
+        "action": "stop",
+        "conditions": [
+            "required_values_missing",
+            "required_values_multiple",
+            "dependency_candidate_missing",
+            "dependency_unresolved",
+        ],
+        "guessing_allowed": False,
+    },
+}
+_AUDIO_IMPORT_REQUEST_COMPOSITION_CONTRACT: Mapping[str, Any] = {
+    "contract": "waapi-skill.audio-import-request-composition/v1",
+    "shared_values": {
+        "placement": "$.arguments.defaults",
+        "occurrences": "once",
+        "promotion_conditions": [
+            {
+                "kind": "explicit_batch_baseline",
+                "source": "explicit_user_semantics",
+                "matching": "semantic_intent_not_literal_token",
+                "semantic_examples": [
+                    "default",
+                    "common",
+                    "默认",
+                    "统一",
+                    "共同",
+                ],
+                "row_overrides": {
+                    "allowed": True,
+                    "fixed_fields_match": "field_name",
+                    "properties_references_match": "exact_name",
+                },
+            },
+            {
+                "kind": "identical_effective_value",
+                "coverage": "all_import_rows",
+                "applies_identically_to_every_import_row": True,
+                "row_overrides": {"allowed": False},
+            },
+        ],
+        "subset_shared_without_explicit_baseline": (
+            "keep_in_each_applicable_import_row"
+        ),
+        "fixed_fields": [
+            name
+            for name in _IMPORT_COMMON_ARGUMENT_PROPERTIES
+            if name not in {"properties", "references"}
+        ],
+        "named_fields": ["properties", "references"],
+        "imports_row_policy": "row_specific_fields_and_exact_overrides_only",
+        "named_override_key": "name",
+    },
+    "metadata_dependency_closure": (
+        _LIVE_METADATA_DEPENDENCY_CLOSURE_CONTRACT
+    ),
+    "import_operation": _IMPORT_OPERATION_INTENT_CONTRACT,
 }
 
 _SOUNDBANK_GENERATE_ITEM_SCHEMA: Mapping[str, Any] = {
@@ -792,7 +1010,15 @@ _SOUNDBANK_GENERATE_ITEM_SCHEMA: Mapping[str, Any] = {
             "uniqueItems": True,
             "items": {"type": "string", "enum": ["event", "structure", "media"]},
         },
-        "rebuild": {"type": "boolean"},
+        "rebuild": {
+            "type": "boolean",
+            "default": False,
+            "description": (
+                "Per-SoundBank rebuild control. Preserve an explicitly supplied "
+                "value on each row; rebuild_soundbanks is a separate batch-level "
+                "control and never replaces this field."
+            ),
+        },
     },
 }
 
@@ -857,6 +1083,202 @@ def _object_contract(
     }
 
 
+def _ui_command_descriptor_contract() -> Mapping[str, Any]:
+    """Return the closed item shape shared by register and unregister."""
+
+    start_mode = {
+        "type": "string",
+        "enum": sorted(UI_COMMAND_START_MODES),
+    }
+    token_array = {
+        "type": "array",
+        "maxItems": UI_COMMAND_MAX_ARGUMENT_TOKENS,
+        "items": {
+            "type": "string",
+            "maxLength": UI_COMMAND_MAX_ARGUMENT_TOKEN_CHARS,
+        },
+    }
+    menu_path = {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": UI_COMMAND_MAX_MENU_SEGMENTS,
+        "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": UI_COMMAND_MAX_MENU_SEGMENT_CHARS,
+            "pattern": r"^[^/\\]+$",
+        },
+    }
+    object_types = {
+        "type": "array",
+        "maxItems": UI_COMMAND_MAX_OBJECT_TYPES,
+        "uniqueItems": True,
+        "caseInsensitiveUniqueItems": True,
+        "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": UI_COMMAND_MAX_OBJECT_TYPE_CHARS,
+            "pattern": r"^[^,]+$",
+        },
+    }
+    handler = {
+        "type": "object",
+        "discriminator": {"propertyName": "kind"},
+        "oneOf": [
+            _object_contract(
+                ("kind",),
+                {"kind": {"const": "notification"}},
+            ),
+            _object_contract(
+                ("kind", "program_path"),
+                {
+                    "kind": {"const": "program"},
+                    "program_path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": UI_COMMAND_MAX_PATH_CHARS,
+                        "absoluteRegularFile": True,
+                        "executable": True,
+                    },
+                    "argument_tokens": {
+                        **token_array,
+                        "maxItems": 0,
+                    },
+                    "redirect_outputs": {"type": "boolean"},
+                    "start_mode": start_mode,
+                    "working_directory": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": UI_COMMAND_MAX_PATH_CHARS,
+                        "absoluteDirectory": True,
+                    },
+                },
+                optional=(
+                    "argument_tokens",
+                    "redirect_outputs",
+                    "start_mode",
+                    "working_directory",
+                ),
+            ),
+            {
+                **_object_contract(
+                    ("kind", "lua_script_path"),
+                    {
+                        "kind": {"const": "lua_script"},
+                        "lua_script_path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": UI_COMMAND_MAX_PATH_CHARS,
+                            "absoluteRegularFile": True,
+                        },
+                        "argument_tokens": token_array,
+                        "lua_module_directories": {
+                            "type": "array",
+                            "maxItems": UI_COMMAND_MAX_LUA_MODULE_DIRECTORIES,
+                            "uniqueItems": True,
+                            "caseInsensitiveUniqueItems": True,
+                            "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": UI_COMMAND_MAX_PATH_CHARS,
+                                "absoluteDirectory": True,
+                            },
+                        },
+                        "lua_selected_return": {
+                            "type": "array",
+                            "maxItems": UI_COMMAND_MAX_LUA_RETURN_FIELDS,
+                            "uniqueItems": True,
+                            "caseInsensitiveUniqueItems": True,
+                            "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": UI_COMMAND_MAX_LUA_RETURN_CHARS,
+                            },
+                        },
+                        "start_mode": start_mode,
+                        "working_directory": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": UI_COMMAND_MAX_PATH_CHARS,
+                            "absoluteDirectory": True,
+                        },
+                    },
+                    optional=(
+                        "argument_tokens",
+                        "lua_module_directories",
+                        "lua_selected_return",
+                        "start_mode",
+                        "working_directory",
+                    ),
+                ),
+                "supported_versions": sorted(UI_COMMAND_LUA_VERSIONS),
+            },
+        ],
+    }
+    return _object_contract(
+        ("id", "display_name", "handler"),
+        {
+            "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": UI_COMMAND_MAX_ID_CHARS,
+            },
+            "display_name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": UI_COMMAND_MAX_DISPLAY_NAME_CHARS,
+            },
+            "handler": handler,
+            "context_menu": _object_contract(
+                (),
+                {
+                    "base_path": {**menu_path, "minItems": 0},
+                    "enabled_for": object_types,
+                    "visible_for": object_types,
+                },
+                optional=("base_path", "enabled_for", "visible_for"),
+            ),
+            "default_shortcut": {
+                "type": "string",
+                "maxLength": UI_COMMAND_MAX_DEFAULT_SHORTCUT_CHARS,
+            },
+            "main_menu": _object_contract(
+                ("base_path",),
+                {"base_path": menu_path},
+            ),
+        },
+        optional=("context_menu", "default_shortcut", "main_menu"),
+    )
+
+
+def _ui_command_source_authority_condition() -> Mapping[str, Any]:
+    """Require the fixed assertion when any descriptor names a local path."""
+
+    return {
+        "if": {
+            "properties": {
+                "commands": {
+                    "contains": {
+                        "properties": {
+                            "handler": {
+                                "properties": {
+                                    "kind": {
+                                        "enum": ["program", "lua_script"]
+                                    }
+                                },
+                                "required": ["kind"],
+                            }
+                        },
+                        "required": ["handler"],
+                    }
+                }
+            },
+            "required": ["commands"],
+        },
+        "then": {"required": ["source_authority"]},
+    }
+
+
 class OperationContractError(ValueError):
     """A closed operation request cannot be accepted safely."""
 
@@ -900,6 +1322,9 @@ class OperationSpec:
     boundary: str | None = None
     supported_versions: tuple[str, ...] = SUPPORTED_WWISE_VERSION_KEYS
     selection_guidance: Mapping[str, Any] = field(default_factory=dict)
+    file_read_policy: str | None = None
+    next_step: str | None = None
+    preview_owns: tuple[str, ...] = ()
 
     def as_compact_dict(self) -> dict[str, Any]:
         """Return the stable public inventory row without nested schemas."""
@@ -916,7 +1341,7 @@ class OperationSpec:
             "optional_arguments": list(self.optional_arguments),
         }
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self, *, version: str | None = None) -> dict[str, Any]:
         result = {
             "name": self.name,
             "uri": self.uri,
@@ -929,9 +1354,19 @@ class OperationSpec:
             "implemented": self.implemented,
             "boundary": self.boundary,
             "supported_versions": list(self.supported_versions),
-            "argument_contract": _json_mapping(self.argument_contract),
+            "argument_contract": _operation_argument_contract(
+                self.name,
+                self.argument_contract,
+                version=version,
+            ),
             "constraints": list(self.constraints),
         }
+        if self.file_read_policy is not None:
+            result["file_read_policy"] = self.file_read_policy
+        if self.next_step is not None:
+            result["next_step"] = self.next_step
+        if self.preview_owns:
+            result["preview_owns"] = list(self.preview_owns)
         if self.selection_guidance:
             result["selection_guidance"] = _json_mapping(self.selection_guidance)
         if self.identity_arguments:
@@ -1243,10 +1678,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                         ),
                     },
                     "defaults": _IMPORT_DEFAULT_ARGUMENT_SCHEMA,
-                    "import_operation": {
-                        "type": "string",
-                        "enum": ["createNew", "useExisting", "replaceExisting"],
-                    },
+                    "import_operation": _IMPORT_OPERATION_ARGUMENT_SCHEMA,
                     "auto_add_to_source_control": {"type": "boolean", "default": False},
                     "auto_check_out_to_source_control": _IMPORT_AUTO_CHECK_OUT_SCHEMA,
                 },
@@ -1259,6 +1691,9 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             ),
             "maximumEffectiveAudioFileBase64EncodedCharacters": (
                 MAX_AUDIO_IMPORT_BASE64_ENCODED_CHARS
+            ),
+            "request_composition_contract": (
+                _AUDIO_IMPORT_REQUEST_COMPOSITION_CONTRACT
             ),
         },
         constraints=(
@@ -1330,25 +1765,33 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "auto_add_to_source_control",
             "auto_check_out_to_source_control",
         ),
-        argument_contract=_object_contract(
-            ("import_file", "import_location", "import_language"),
-            {
-                "import_file": {"type": "string", "absoluteRegularFile": True},
-                "import_location": IDENTITY_ARGUMENT_SCHEMA,
-                "import_language": {"type": "string", "minLength": 1},
-                "import_operation": {
-                    "type": "string",
-                    "enum": ["createNew", "useExisting", "replaceExisting"],
+        argument_contract={
+            **_object_contract(
+                ("import_file", "import_location", "import_language"),
+                {
+                    "import_file": {
+                        "type": "string",
+                        "absoluteRegularFile": True,
+                    },
+                    "import_location": IDENTITY_ARGUMENT_SCHEMA,
+                    "import_language": {"type": "string", "minLength": 1},
+                    "import_operation": _IMPORT_OPERATION_ARGUMENT_SCHEMA,
+                    "auto_add_to_source_control": {
+                        "type": "boolean",
+                        "default": False,
+                    },
+                    "auto_check_out_to_source_control": (
+                        _IMPORT_AUTO_CHECK_OUT_SCHEMA
+                    ),
                 },
-                "auto_add_to_source_control": {"type": "boolean", "default": False},
-                "auto_check_out_to_source_control": _IMPORT_AUTO_CHECK_OUT_SCHEMA,
-            },
-            optional=(
-                "import_operation",
-                "auto_add_to_source_control",
-                "auto_check_out_to_source_control",
+                optional=(
+                    "import_operation",
+                    "auto_add_to_source_control",
+                    "auto_check_out_to_source_control",
+                ),
             ),
-        ),
+            "import_operation_contract": _IMPORT_OPERATION_INTENT_CONTRACT,
+        },
         identity_arguments=("import_location",),
         constraints=(
             "fixed and dynamic native headers are parsed under bounded grammar; importLanguage remains a call argument",
@@ -1376,6 +1819,15 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     "the user explicitly requests WwiseConsole or CLI tab-delimited import rather than the connected Authoring project",
                 ),
             ),
+        ),
+        file_read_policy="pass_path_without_reading",
+        next_step="preview",
+        preview_owns=(
+            "tsv_parsing",
+            "tsv_hash_validation",
+            "inline_base64_validation",
+            "media_validation",
+            "exact_path_conflict_validation",
         ),
     ),
     "object.create": OperationSpec(
@@ -1447,6 +1899,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         constraints=(
             "maximum depth 8, 128 nodes, and 32 children per parent",
             "one existing named root that only receives a recursive descendant merge remains an object.create request: identify its existing parent, repeat the root type/name, and use on_name_conflict=merge",
+            "when that existing merge root's exact type was not stated or already proven, operation-schema must be followed by one exact-path query-object returning id, name, type, and path before preview; Wwise 2025.1 PropertyContainer readback maps to the ActorMixer request token",
             "ordinary child creation requires one reviewed writable hierarchy parent; list creation requires a non-protected live owner and a canonical list token",
             "replace_owned_root is an explicit reviewed authorization boundary, not independently proven ownership; replace requires the collision strictly below that non-protected live root and a complete pre-state snapshot of at most 128 old subtree GUID/path rows",
             "list insertion supports fail, rename, and merge but not replace; raw @ fields, classId, plug-ins, and RTPC rows are not exposed",
@@ -1461,7 +1914,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "The request replaces one exact same-name subtree through the guarded on_name_conflict=replace contract.",
             ),
             avoid_when=(
-                "The request changes fields or references on an existing root, targets multiple existing roots, or appends below an explicitly existing nested container.",
+                "The request changes fields or references on an existing root, targets multiple existing roots, or appends children directly to an explicitly existing descendant container below the named request root; the named request root itself is not that descendant insertion target.",
                 "Media import is the primary requested outcome.",
                 "The Agent would otherwise emulate copy, move, or delete-plus-create behavior.",
             ),
@@ -1478,7 +1931,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             choose_instead=(
                 (
                     "object.set",
-                    "any existing-root exclusion applies or several existing roots must change atomically",
+                    "an existing root changes fields or references, several existing roots change atomically, or an explicitly existing descendant below the named request root is the direct insertion target",
                 ),
                 (
                     "audio.import",
@@ -1853,11 +2306,12 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     "on_name_conflict": {
                         "type": "string",
                         "enum": ["fail", "rename", "merge"],
+                        "default": "fail",
                         "description": (
                             "Applies only to genuinely new children, never to existing objects[] "
-                            "targets. Use fail for children requested as new or absent; use merge "
-                            "only when the user explicitly requests collision merging for a new "
-                            "child name."
+                            "targets. Omission defaults to fail. Use fail for children requested "
+                            "as new or absent; use merge only when the user explicitly requests "
+                            "collision merging for a new child name."
                         ),
                     },
                     "auto_add_to_source_control": {"type": "boolean", "default": False},
@@ -1888,8 +2342,9 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
         selection_guidance=_selection_guidance(
             use_when=(
-                "One atomic request changes fields, references, children, or lists on existing targets.",
+                "One atomic request changes fields, references, or lists on existing targets.",
                 "The request targets multiple existing objects.",
+                "Children are appended directly to an explicitly existing descendant container below the named request root; the named request root itself is not that descendant insertion target.",
                 "In Wwise 2023.1 or later, media import is subordinate to a broader mutation of existing targets.",
             ),
             avoid_when=(
@@ -1906,7 +2361,10 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 ("audio.import", "Wwise is 2023.1 or later and import is subordinate to the same broader existing-object mutation"),
             ),
             choose_instead=(
-                ("object.create", "the request is a new root or permitted pure descendant-tree merge"),
+                (
+                    "object.create",
+                    "the request is a new root or only merges descendants below one unchanged same-name existing request root",
+                ),
                 ("audio.import", "the request is primarily media import"),
                 ("object.createPlugin", "the request creates a Source or Effect plug-in"),
                 ("object.setRTPC", "the request adds or updates an RTPC curve"),
@@ -2194,32 +2652,29 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "Register bounded Wwise Authoring UI commands from closed descriptors and verify their IDs appear.",
         ("commands",),
         ("source_authority",),
-        argument_contract=_object_contract(
-            ("commands",),
-            {
-                "commands": {
-                    "type": "array",
-                    "minItems": 1,
-                    "maxItems": 32,
-                    "items": {
-                        "type": "object",
+        argument_contract={
+            **_object_contract(
+                ("commands",),
+                {
+                    "commands": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": UI_COMMAND_MAX_COMMANDS,
+                        "caseInsensitiveUniqueBy": "$.id",
+                        "items": _ui_command_descriptor_contract(),
+                    },
+                    "source_authority": {
+                        "const": UI_COMMAND_SOURCE_AUTHORITY,
                         "description": (
-                            "Closed descriptor with id, display_name, handler, and optional "
-                            "context_menu/main_menu/default_shortcut fields; raw native "
-                            "program/args/luaScript payload fields are rejected."
+                            "Required only for exact existing program or Lua paths supplied "
+                            "verbatim by the user."
                         ),
                     },
                 },
-                "source_authority": {
-                    "const": UI_COMMAND_SOURCE_AUTHORITY,
-                    "description": (
-                        "Required only for exact existing program or Lua paths supplied "
-                        "verbatim by the user."
-                    ),
-                },
-            },
-            optional=("source_authority",),
-        ),
+                optional=("source_authority",),
+            ),
+            "allOf": [_ui_command_source_authority_condition()],
+        },
         constraints=(
             "available only when live getInfo.isCommandLine is false",
             "host platform is derived only from live getInfo.platform; callers cannot supply it",
@@ -2243,20 +2698,22 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "commands": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 32,
-                    "items": {
-                        "type": "object",
-                        "description": (
-                            "The same closed descriptor accepted by ui.commands.register."
-                        ),
-                    },
+                    "maxItems": UI_COMMAND_MAX_COMMANDS,
+                    "caseInsensitiveUniqueBy": "$.id",
+                    "items": _ui_command_descriptor_contract(),
                 },
                 "source_authority": {"const": UI_COMMAND_SOURCE_AUTHORITY},
                 "command_ids": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 32,
-                    "items": {"type": "string", "minLength": 1, "maxLength": 512},
+                    "maxItems": UI_COMMAND_MAX_COMMANDS,
+                    "uniqueItems": True,
+                    "caseInsensitiveUniqueItems": True,
+                    "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": UI_COMMAND_MAX_ID_CHARS,
+                    },
                 },
                 "acknowledgement": {
                     "const": UNREGISTER_EXISTING_ACKNOWLEDGEMENT,
@@ -2272,6 +2729,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     "forbidden": ["commands", "source_authority"],
                 },
             ],
+            "allOf": [_ui_command_source_authority_condition()],
         },
         constraints=(
             "available only when live getInfo.isCommandLine is false",
@@ -2423,9 +2881,23 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "languages": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
                 "skip_languages": {"type": "boolean"},
                 "write_to_disk": {"const": True},
-                "rebuild_soundbanks": {"type": "boolean"},
-                "clear_audio_file_cache": {"type": "boolean"},
-                "rebuild_init_bank": {"type": "boolean"},
+                "rebuild_soundbanks": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": (
+                        "Batch-level native rebuildSoundBanks control. It is "
+                        "independent from soundbanks[].rebuild and never "
+                        "substitutes for an explicitly supplied per-Bank value."
+                    ),
+                },
+                "clear_audio_file_cache": {
+                    "type": "boolean",
+                    "default": False,
+                },
+                "rebuild_init_bank": {
+                    "type": "boolean",
+                    "default": False,
+                },
                 "io_root": {"type": "string", "minLength": 1},
             },
             optional=(
@@ -2438,6 +2910,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         identity_arguments=("soundbanks[].events[]", "soundbanks[].aux_busses[]"),
         constraints=(
             "the user SoundBank, platform, and language scope is explicit; Init is an automatic by-product and cannot be requested",
+            "batch-level rebuild_soundbanks and per-Bank soundbanks[].rebuild are independent; preserve every explicitly supplied value at its original level",
             "Event and AuxBus descriptors resolve live to one GUID before preview",
             "Wwise 2021.1 derives project paths from the live Project filePath plus a hashed strict WPROJ parse; later versions use live core.getProjectInfo",
             "execution replays project/file/artifact guards; verification requires each requested Bank artifact to be created or changed and non-empty",
@@ -3142,7 +3615,7 @@ def _prepare_object_create(
         )
     parent = _resolve_identity(arguments.get("parent"), role="parent", read=read)
     if list_name is None:
-        _require_object_create_writable_parent(parent)
+        _require_object_create_writable_parent(parent, version=request.version)
     else:
         _require_object_list_owner(parent)
         if requested_conflict == "replace":
@@ -3179,6 +3652,7 @@ def _prepare_object_create(
     derived_properties: dict[str, dict[str, Any]] = {}
     node_specs = _prepare_object_node_specs(
         normalized.nodes,
+        version=request.version,
         type_catalog=type_catalog,
         read=read,
         roles=roles,
@@ -4075,7 +4549,10 @@ def _prepare_object_set(
             allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS,
         )
         if children.roots:
-            _require_object_create_writable_parent(target)
+            _require_object_create_writable_parent(
+                target,
+                version=request.version,
+            )
         if lists:
             _require_object_list_owner(target)
         target_spec: dict[str, Any] = {
@@ -4210,6 +4687,7 @@ def _prepare_object_set(
         derived_child_properties: dict[str, dict[str, Any]] = {}
         child_specs = _prepare_object_node_specs(
             children.nodes,
+            version=request.version,
             type_catalog=type_catalog,
             read=read,
             roles=roles,
@@ -4440,6 +4918,7 @@ def _prepare_object_set(
 
             prepared_specs = _prepare_object_node_specs(
                 descriptor.nodes,
+                version=request.version,
                 type_catalog=type_catalog,
                 read=read,
                 roles=roles,
@@ -5119,6 +5598,7 @@ def _resolve_object_set_import_type(
 def _prepare_object_node_specs(
     nodes: Sequence[ObjectNodeDescriptor],
     *,
+    version: str,
     type_catalog: Sequence[ObjectTypeMetadataRecord],
     read: ReadCall,
     roles: dict[str, ResolvedObject],
@@ -5128,19 +5608,45 @@ def _prepare_object_node_specs(
 ) -> list[dict[str, Any]]:
     specs: list[dict[str, Any]] = []
     for node in nodes:
-        type_info = _resolve_object_type(node.type, catalog=type_catalog)
+        requested_type_token = _object_type_token(node.type)
+        uses_2025_actor_mixer_alias = (
+            version == "2025.1" and requested_type_token == "actormixer"
+        )
+        metadata_type = (
+            "PropertyContainer"
+            if uses_2025_actor_mixer_alias
+            else node.type
+        )
+        type_info = _resolve_object_type(metadata_type, catalog=type_catalog)
+        if (
+            uses_2025_actor_mixer_alias
+            and _object_type_token(type_info.name) != "propertycontainer"
+        ):
+            raise OperationContractError(
+                "INVALID_OBJECT_TYPE",
+                "Wwise 2025.1 ActorMixer must resolve through the live PropertyContainer metadata row.",
+                details={
+                    "requested": node.type,
+                    "resolved": type_info.as_dict(),
+                },
+            )
         # ``object.getTypes`` reports a broad base class in ``type`` (for
         # example, 2022.1 reports ``WObject`` for Sound, ActorMixer, and
         # RandomSequenceContainer).  ``object.create`` instead requires the
         # concrete creation token in the uniquely resolved metadata ``name``.
-        canonical_types[node.request_path] = type_info.name
+        canonical_type = (
+            "ActorMixer"
+            if uses_2025_actor_mixer_alias
+            else type_info.name
+        )
+        canonical_types[node.request_path] = canonical_type
         spec: dict[str, Any] = {
             "request_path": node.request_path,
             "parent_request_path": node.parent_request_path,
             "existing_target": False,
             "requested_name": node.name,
             "requested_type": node.type,
-            "canonical_type": type_info.name,
+            "canonical_type": canonical_type,
             "class_id": type_info.class_id,
             "notes_supplied": node.notes is not None,
             "requested_notes": node.notes,
@@ -7827,14 +8333,7 @@ def _prepare_import_dynamic_fields(
                 )
             reference_specs.append(reference_spec)
 
-        if source_operation == "audio.import":
-            wire_row = dispatch_rows[index]
-            for spec in property_specs:
-                wire_row[f"@{spec['name']}"] = spec["value"]
-            for spec in reference_specs:
-                wire_row[f"@{spec['name']}"] = spec["target_id"]
-            dispatch_rows[index] = wire_row
-        else:
+        if source_operation == "audio.importTabDelimited":
             explicitly_supplied = {
                 str(item.get("name")).casefold()
                 for item in property_requests
@@ -7865,6 +8364,262 @@ def _prepare_import_dynamic_fields(
     if source_operation == "audio.import":
         trusted_dispatch["imports"] = dispatch_rows
     return targets, trusted_dispatch, roles
+
+
+def _materialize_audio_import_dynamic_rows(
+    *,
+    dispatch_args: Mapping[str, Any],
+    targets: Sequence[Mapping[str, Any]],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Materialize validated dynamic Sound fields onto their native owner.
+
+    A native import row whose final object is an implicitly created
+    ``AudioFileSource`` applies ``@Property`` and ``@Reference`` fields to that
+    source, not to the requested Sound.  The public contract remains one
+    logical row per Sound.  Internally, a media row with dynamic Sound fields
+    is therefore expanded into an ordered structure row followed by an
+    explicit ``AudioFileSource`` media row, while the WAAPI call count remains
+    exactly one.
+    """
+
+    raw_rows = dispatch_args.get("imports")
+    if (
+        not isinstance(raw_rows, list)
+        or len(raw_rows) != len(targets)
+        or not all(isinstance(row, Mapping) for row in raw_rows)
+    ):
+        raise OperationContractError(
+            "INVALID_PREVIEW",
+            "Closed audio.import rows must remain bound one-to-one to logical targets before native materialization.",
+        )
+
+    target_paths = {
+        str(target.get("canonical_target_path")).casefold()
+        for target in targets
+        if isinstance(target.get("canonical_target_path"), str)
+    }
+    claimed_source_paths: set[str] = set()
+    native_rows: list[dict[str, Any]] = []
+    mapping: list[dict[str, Any]] = []
+
+    for index, (raw_row, raw_target) in enumerate(
+        zip(raw_rows, targets, strict=True)
+    ):
+        row = dict(raw_row)
+        target = dict(raw_target)
+        properties = target.get("validated_properties", [])
+        references = target.get("validated_references", [])
+        if not isinstance(properties, list) or not all(
+            isinstance(item, Mapping) for item in properties
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "Validated audio.import properties are malformed.",
+                details={"index": index},
+            )
+        if not isinstance(references, list) or not all(
+            isinstance(item, Mapping) for item in references
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "Validated audio.import references are malformed.",
+                details={"index": index},
+            )
+
+        dynamic_fields: dict[str, Any] = {}
+        for spec in properties:
+            name = spec.get("name")
+            if not isinstance(name, str) or not name:
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "A validated audio.import property lacks its canonical name.",
+                    details={"index": index, "property": dict(spec)},
+                )
+            dynamic_fields[f"@{name}"] = spec.get("value")
+        for spec in references:
+            name = spec.get("name")
+            target_id = spec.get("target_id")
+            if (
+                not isinstance(name, str)
+                or not name
+                or not _valid_object_id(target_id)
+            ):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "A validated audio.import reference lacks its canonical name or target GUID.",
+                    details={"index": index, "reference": dict(spec)},
+                )
+            dynamic_fields[f"@{name}"] = target_id
+
+        media_expected = target.get("media_expected")
+        if type(media_expected) is not bool:
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "An audio.import target lacks its explicit media expectation.",
+                details={"index": index},
+            )
+        if not dynamic_fields or not media_expected:
+            row.update(dynamic_fields)
+            native_index = len(native_rows)
+            native_rows.append(row)
+            mapping.append(
+                {
+                    "logical_index": index,
+                    "native_rows": [
+                        {
+                            "native_index": native_index,
+                            "kind": "single",
+                            "object_path": row.get("objectPath"),
+                        }
+                    ],
+                }
+            )
+            continue
+
+        metadata_type = target.get("metadata_object_type")
+        expected_source_path = target.get(
+            "expected_audio_file_source_result_path"
+        )
+        if _object_type_token(metadata_type) != "sound":
+            raise OperationContractError(
+                "IMPORT_DYNAMIC_MEDIA_TOPOLOGY_UNSUPPORTED",
+                "Dynamic fields with media are currently materialized only for a live-validated Sound target.",
+                details={
+                    "index": index,
+                    "metadata_object_type": metadata_type,
+                },
+            )
+        if not isinstance(expected_source_path, str):
+            raise OperationContractError(
+                "IMPORT_DYNAMIC_MEDIA_TOPOLOGY_UNSUPPORTED",
+                "This media type has no sealed AudioFileSource topology for dynamic Sound fields.",
+                details={"index": index, "target": target.get("canonical_target_path")},
+            )
+        source_key = expected_source_path.casefold()
+        if source_key in target_paths or source_key in claimed_source_paths:
+            raise OperationContractError(
+                "DUPLICATE_TARGET",
+                "An expanded AudioFileSource path collides with another logical import target.",
+                details={"index": index, "source_path": expected_source_path},
+            )
+        claimed_source_paths.add(source_key)
+
+        object_path = row.get("objectPath")
+        source_name = expected_source_path.rpartition("\\")[2]
+        if (
+            not isinstance(object_path, str)
+            or not object_path
+            or object_path.endswith("\\")
+            or not source_name
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "The logical import row cannot derive one explicit AudioFileSource wire path.",
+                details={
+                    "index": index,
+                    "object_path": object_path,
+                    "expected_source_path": expected_source_path,
+                },
+            )
+
+        supported_fields = {
+            "objectPath",
+            "importLocation",
+            "objectType",
+            "audioFile",
+            "audioFileBase64",
+            "importLanguage",
+            "originalsSubFolder",
+            "notes",
+            "audioSourceNotes",
+            "event",
+            "dialogueEvent",
+            "switchAssignation",
+        }
+        unexpected_fields = sorted(str(key) for key in set(row) - supported_fields)
+        if unexpected_fields:
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "The logical audio.import row contains fields without a reviewed native owner.",
+                details={"index": index, "fields": unexpected_fields},
+            )
+
+        structure_row: dict[str, Any] = {
+            key: row[key]
+            for key in (
+                "objectPath",
+                "importLocation",
+                "objectType",
+                "event",
+                "dialogueEvent",
+                "switchAssignation",
+            )
+            if key in row
+        }
+        if target.get("requested_notes_destination") == "target_object" and "notes" in row:
+            structure_row["notes"] = row["notes"]
+        structure_row.update(dynamic_fields)
+
+        media_row: dict[str, Any] = {
+            "objectPath": f"{object_path}\\<AudioFileSource>{source_name}",
+        }
+        for key in (
+            "importLocation",
+            "audioFile",
+            "audioFileBase64",
+            "importLanguage",
+            "originalsSubFolder",
+        ):
+            if key in row:
+                media_row[key] = row[key]
+        if "audioSourceNotes" in row:
+            media_row["notes"] = row["audioSourceNotes"]
+        elif (
+            target.get("requested_notes_destination") == "audio_file_source"
+            and "notes" in row
+        ):
+            media_row["notes"] = row["notes"]
+        if ("audioFile" in media_row) == ("audioFileBase64" in media_row):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "An expanded AudioFileSource row requires exactly one sealed media input.",
+                details={"index": index, "fields": sorted(media_row)},
+            )
+
+        structure_index = len(native_rows)
+        native_rows.append(structure_row)
+        media_index = len(native_rows)
+        native_rows.append(media_row)
+        mapping.append(
+            {
+                "logical_index": index,
+                "native_rows": [
+                    {
+                        "native_index": structure_index,
+                        "kind": "sound_structure",
+                        "object_path": structure_row["objectPath"],
+                    },
+                    {
+                        "native_index": media_index,
+                        "kind": "audio_file_source_media",
+                        "object_path": media_row["objectPath"],
+                        "canonical_result_path": expected_source_path,
+                    },
+                ],
+            }
+        )
+
+    if len(native_rows) > MAX_NATIVE_AUDIO_IMPORT_ROWS:
+        raise OperationContractError(
+            "LIMIT_EXCEEDED",
+            "audio.import native row expansion exceeds the closed internal limit.",
+            details={
+                "logical_rows": len(targets),
+                "native_rows": len(native_rows),
+                "limit": MAX_NATIVE_AUDIO_IMPORT_ROWS,
+            },
+        )
+    return {**dict(dispatch_args), "imports": native_rows}, mapping
 
 
 def _metadata_is_reference(info: PropertyInfoMetadataRecord) -> bool:
@@ -8335,6 +9090,110 @@ def _prepare_closed_import_plan(
                 },
             )
 
+    if source_operation == "audio.import":
+        logical_target_paths = {
+            str(target.get("canonical_target_path")).casefold()
+            for target in targets
+            if isinstance(target.get("canonical_target_path"), str)
+        }
+        seen_explicit_source_paths: set[str] = set()
+        for index, raw_target in enumerate(targets):
+            target = dict(raw_target)
+            dynamic_fields_present = bool(
+                target.get("validated_properties")
+                or target.get("validated_references")
+            )
+            if not dynamic_fields_present or target.get("media_expected") is not True:
+                continue
+            metadata_type = target.get("metadata_object_type")
+            expected_source_path = target.get(
+                "expected_audio_file_source_result_path"
+            )
+            if _object_type_token(metadata_type) != "sound":
+                raise OperationContractError(
+                    "IMPORT_DYNAMIC_MEDIA_TOPOLOGY_UNSUPPORTED",
+                    "Dynamic fields with media require a live-validated Sound target.",
+                    details={
+                        "index": index,
+                        "metadata_object_type": metadata_type,
+                    },
+                )
+            if not isinstance(expected_source_path, str):
+                raise OperationContractError(
+                    "IMPORT_DYNAMIC_MEDIA_TOPOLOGY_UNSUPPORTED",
+                    "This media type has no sealed AudioFileSource topology for dynamic Sound fields.",
+                    details={
+                        "index": index,
+                        "target_path": target.get("canonical_target_path"),
+                    },
+                )
+            source_key = expected_source_path.casefold()
+            if (
+                source_key in logical_target_paths
+                or source_key in seen_explicit_source_paths
+            ):
+                raise OperationContractError(
+                    "DUPLICATE_TARGET",
+                    "An explicit AudioFileSource path collides with another logical import target.",
+                    details={
+                        "index": index,
+                        "source_path": expected_source_path,
+                    },
+                )
+            seen_explicit_source_paths.add(source_key)
+            read_language = _localized_import_read_language(
+                target.get("requested_language")
+            )
+            source_fields = _import_audio_source_return_fields(
+                version=request.version
+            )
+            source_rows = _read_object_path_rows(
+                expected_source_path,
+                fields=source_fields,
+                read=read,
+                language=read_language,
+            )
+            if len(source_rows) > 1:
+                raise OperationContractError(
+                    "AMBIGUOUS_IDENTITY",
+                    "The explicit AudioFileSource path is ambiguous.",
+                    details={
+                        "index": index,
+                        "path": expected_source_path,
+                        "rows": source_rows,
+                    },
+                )
+            if source_rows:
+                source_row = source_rows[0]
+                if (
+                    not _valid_object_id(source_row.get("id"))
+                    or source_row.get("path") != expected_source_path
+                    or _object_type_token(source_row.get("type"))
+                    != "audiofilesource"
+                ):
+                    raise OperationContractError(
+                        "INVALID_READBACK",
+                        "The sealed media path did not return one exact canonical AudioFileSource identity.",
+                        details={
+                            "index": index,
+                            "path": expected_source_path,
+                            "row": source_row,
+                        },
+                    )
+            target["explicit_audio_file_source_pre_state_rows"] = source_rows
+            source_snapshot: dict[str, Any] = {
+                "path": expected_source_path,
+                "fields": source_fields,
+                "rows": source_rows,
+            }
+            if read_language is not None:
+                source_snapshot["options"] = _import_object_get_options(
+                    source_fields,
+                    language=read_language,
+                )
+            path_snapshots.append(source_snapshot)
+            targets[index] = target
+
     preflight_consumed_fields: list[dict[str, Any]] = []
     localized_existing_wire_normalizations: list[dict[str, Any]] = []
     if source_operation == "audio.import" and import_operation == "useExisting":
@@ -8474,6 +9333,14 @@ def _prepare_closed_import_plan(
         dispatch_args = {**dict(dispatch_args), "imports": trusted_dispatch_rows}
         plan = {**dict(plan), "dispatch_args": dispatch_args}
 
+    native_row_mapping: list[dict[str, Any]] = []
+    if source_operation == "audio.import":
+        dispatch_args, native_row_mapping = _materialize_audio_import_dynamic_rows(
+            dispatch_args=dispatch_args,
+            targets=targets,
+        )
+        plan = {**dict(plan), "dispatch_args": dispatch_args}
+
     requested_languages = sorted(
         {
             str(target["requested_language"])
@@ -8555,9 +9422,20 @@ def _prepare_closed_import_plan(
             "closed_import_plan": plan.get("contract"),
             "import_operation": import_operation,
             "target_count": len(targets),
+            "native_row_count": (
+                len(dispatch_args.get("imports", []))
+                if source_operation == "audio.import"
+                and isinstance(dispatch_args.get("imports"), list)
+                else 1
+            ),
             "caller_expected_rows_accepted": False,
             "source_control_policy": source_control_policy,
             "preflight_consumed_fields": preflight_consumed_fields,
+            **(
+                {"native_row_mapping": native_row_mapping}
+                if native_row_mapping
+                else {}
+            ),
             **(
                 {
                     "localized_existing_wire_normalizations": localized_existing_wire_normalizations,
@@ -8577,12 +9455,48 @@ def _prepare_closed_import_plan(
                 if isinstance(proof, Mapping):
                     label = f"{proof_key}[{len(file_proofs)}]"
                     file_proofs.append({"field": label, "proof": dict(proof)})
+    wire_path_input_audit: dict[str, Any] | None = None
+    if source_operation == "audio.importTabDelimited":
+        import_file_proof = plan.get("import_file_proof")
+        import_file_path = dispatch_args.get("importFile")
+        proven_path = (
+            import_file_proof.get("path")
+            if isinstance(import_file_proof, Mapping)
+            else None
+        )
+        if (
+            not isinstance(import_file_path, str)
+            or not isinstance(proven_path, str)
+            or not Path(proven_path).is_absolute()
+            or import_file_path != proven_path
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "Tab-delimited import wire-path input is not bound to its canonical file proof.",
+            )
+        wire_path_input_audit = {
+            "contract": WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT,
+            "uri": uri,
+            "scope": "transient_dispatch_read_paths_only",
+            "paths": [
+                {
+                    "section": "args",
+                    "json_path": "$.args.importFile",
+                    "field": "importFile",
+                    "role": "read",
+                    "raw_path": import_file_path,
+                    "resolved_path": proven_path,
+                }
+            ],
+        }
     guard = {
         "source_operation": source_operation,
         "file_proofs": file_proofs,
         "path_snapshots": path_snapshots,
         "language_inventory": _json_mapping(language_inventory) if language_inventory is not None else None,
     }
+    if wire_path_input_audit is not None:
+        guard["wire_path_input_audit"] = wire_path_input_audit
     guard["originals_context"] = (
         _json_mapping(originals_context)
         if originals_context is not None
@@ -14184,6 +15098,69 @@ def verify_prepared_operation(
                         "actual": expected_source_path,
                     },
                 )
+            explicit_source_pre_state = target.get(
+                "explicit_audio_file_source_pre_state_rows"
+            )
+            requires_explicit_source_pre_state = (
+                source_operation == "audio.import"
+                and media_expected
+                and bool(
+                    target.get("validated_properties")
+                    or target.get("validated_references")
+                )
+            )
+            if requires_explicit_source_pre_state != (
+                explicit_source_pre_state is not None
+            ):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "Explicit AudioFileSource pre-state evidence does not match the dynamic media topology.",
+                    details={
+                        "target_path": target_path,
+                        "required": requires_explicit_source_pre_state,
+                        "present": explicit_source_pre_state is not None,
+                    },
+                )
+            if explicit_source_pre_state is not None:
+                if (
+                    not isinstance(explicit_source_pre_state, list)
+                    or len(explicit_source_pre_state) > 1
+                    or not all(
+                        isinstance(row, Mapping)
+                        for row in explicit_source_pre_state
+                    )
+                ):
+                    raise OperationContractError(
+                        "INVALID_PREVIEW",
+                        "An explicit AudioFileSource pre-state is not bound to one dynamic media target.",
+                        details={"target_path": target_path},
+                    )
+                if explicit_source_pre_state:
+                    explicit_source_row = explicit_source_pre_state[0]
+                    if (
+                        not _valid_object_id(explicit_source_row.get("id"))
+                        or explicit_source_row.get("path") != expected_source_path
+                        or _object_type_token(explicit_source_row.get("type"))
+                        != "audiofilesource"
+                    ):
+                        raise OperationContractError(
+                            "INVALID_PREVIEW",
+                            "An explicit AudioFileSource pre-state lacks its exact path, type, or GUID.",
+                            details={
+                                "target_path": target_path,
+                                "source_path": expected_source_path,
+                                "source_pre_state": explicit_source_row,
+                            },
+                        )
+                    if import_operation == "createNew":
+                        raise OperationContractError(
+                            "INVALID_PREVIEW",
+                            "A closed createNew import cannot claim an existing explicit AudioFileSource.",
+                            details={
+                                "target_path": target_path,
+                                "source_path": expected_source_path,
+                            },
+                        )
             target_paths.append(target_path.casefold())
             expected_target_types[target_path.casefold()] = str(
                 target.get("requested_object_type", "Sound")
@@ -14445,6 +15422,16 @@ def verify_prepared_operation(
             expected_source_path = target.get(
                 "expected_audio_file_source_result_path"
             )
+            explicit_source_pre_state = target.get(
+                "explicit_audio_file_source_pre_state_rows"
+            )
+            explicit_source_preexisting_id = (
+                explicit_source_pre_state[0].get("id")
+                if isinstance(explicit_source_pre_state, list)
+                and len(explicit_source_pre_state) == 1
+                and isinstance(explicit_source_pre_state[0], Mapping)
+                else None
+            )
             returned_source_matches = (
                 [
                     row
@@ -14637,6 +15624,55 @@ def verify_prepared_operation(
                         False,
                         {"activeSource": _field_value(live_row, "activeSource")},
                     )
+
+                if explicit_source_preexisting_id is not None:
+                    live_source_id = (
+                        audio_source_row.get("id")
+                        if isinstance(audio_source_row, Mapping)
+                        else None
+                    )
+                    if import_operation == "useExisting":
+                        check(
+                            f"{label} useExisting preserved the explicit AudioFileSource GUID",
+                            _same_identity(
+                                live_source_id,
+                                explicit_source_preexisting_id,
+                            )
+                            and (
+                                returned_source_id is None
+                                or _same_identity(
+                                    returned_source_id,
+                                    explicit_source_preexisting_id,
+                                )
+                            ),
+                            {
+                                "expected": explicit_source_preexisting_id,
+                                "readback": live_source_id,
+                                "result": returned_source_id,
+                            },
+                        )
+                    elif import_operation == "replaceExisting":
+                        check(
+                            f"{label} replaceExisting returned a distinct AudioFileSource GUID",
+                            _valid_object_id(live_source_id)
+                            and not _same_identity(
+                                live_source_id,
+                                explicit_source_preexisting_id,
+                            ),
+                            {
+                                "old": explicit_source_preexisting_id,
+                                "new": live_source_id,
+                            },
+                        )
+                        old_source_rows = read_object(
+                            object_id=explicit_source_preexisting_id,
+                            fields=IDENTITY_RETURN_FIELDS,
+                        )
+                        check(
+                            f"{label} replaceExisting removed the old AudioFileSource GUID",
+                            len(old_source_rows) == 0,
+                            old_source_rows,
+                        )
 
                 expected_audio_source_notes: Any = None
                 verify_audio_source_notes = False
@@ -15395,12 +16431,13 @@ def _validate_nested_request_shape(
         raw_commands = arguments.get("commands")
         if (
             not isinstance(raw_commands, list)
-            or not 1 <= len(raw_commands) <= 32
+            or not 1 <= len(raw_commands) <= UI_COMMAND_MAX_COMMANDS
             or not all(isinstance(item, Mapping) for item in raw_commands)
         ):
             raise OperationContractError(
                 "INVALID_ARGUMENT",
-                f"{context_operation} commands must contain 1-32 JSON objects.",
+                f"{context_operation} commands must contain 1-"
+                f"{UI_COMMAND_MAX_COMMANDS} JSON objects.",
             )
         for index, raw_command in enumerate(raw_commands):
             command = dict(raw_command)
@@ -15464,9 +16501,13 @@ def _validate_nested_request_shape(
                 ),
                 context=f"{context_operation} commands[{index}].handler",
             )
-            for field_name, allowed in (
-                ("context_menu", ("base_path", "enabled_for", "visible_for")),
-                ("main_menu", ("base_path",)),
+            for field_name, required, optional in (
+                (
+                    "context_menu",
+                    (),
+                    ("base_path", "enabled_for", "visible_for"),
+                ),
+                ("main_menu", ("base_path",), ()),
             ):
                 value = command.get(field_name)
                 if value is None:
@@ -15478,10 +16519,8 @@ def _validate_nested_request_shape(
                     )
                 _require_exact_keys(
                     value,
-                    required=("base_path",),
-                    optional=tuple(
-                        name for name in allowed if name != "base_path"
-                    ),
+                    required=required,
+                    optional=optional,
                     context=(
                         f"{context_operation} commands[{index}].{field_name}"
                     ),
@@ -16033,12 +17072,23 @@ def _canonical_import_target_paths(object_path: str, *, version: str) -> tuple[s
             "Typed Wwise path segments must not normalize to empty, dot, or dot-dot names.",
             details={"object_path": object_path, "canonical_segments": canonical_segments},
         )
-    allowed_roots = IMPORT_ROOTS_BY_VERSION.get(version, frozenset())
+    try:
+        allowed_roots = allowed_import_hierarchy_roots(version)
+    except ImportContractError as exc:
+        raise OperationContractError(
+            exc.error_code,
+            str(exc),
+            details=exc.details,
+        ) from exc
     if canonical_segments[0] not in allowed_roots:
         raise OperationContractError(
             "INVALID_TARGET",
             f"The closed audio.import operation does not allow {canonical_segments[0]!r} in Wwise {version}.",
-            details={"version": version, "management_root": canonical_segments[0], "allowed_roots": sorted(allowed_roots)},
+            details={
+                "version": version,
+                "management_root": canonical_segments[0],
+                "allowed_roots": list(allowed_roots),
+            },
         )
     target_path = "\\" + "\\".join(canonical_segments)
     parent_path = "\\" + "\\".join(canonical_segments[:-1])
@@ -16572,7 +17622,11 @@ def _reject_protected_delete(target: ResolvedObject) -> None:
         )
 
 
-def _require_object_create_writable_parent(parent: ResolvedObject) -> None:
+def _require_object_create_writable_parent(
+    parent: ResolvedObject,
+    *,
+    version: str,
+) -> None:
     row = parent.row
     path = row.get("path")
     object_type = row.get("type")
@@ -16592,13 +17646,21 @@ def _require_object_create_writable_parent(parent: ResolvedObject) -> None:
             "object.create parent must expose an absolute live Wwise path.",
             details={"parent": parent.as_dict()},
         )
-    if object_type not in OBJECT_CREATE_WRITABLE_PARENT_TYPES:
+    allowed_types = (
+        OBJECT_CREATE_WRITABLE_PARENT_TYPES
+        | OBJECT_CREATE_REFLECTED_PARENT_TYPES_BY_VERSION.get(
+            version,
+            frozenset(),
+        )
+    )
+    if object_type not in allowed_types:
         raise OperationContractError(
             "INVALID_CREATE_PARENT_TYPE",
             "object.create parent is not one of the reviewed writable object types.",
             details={
                 "actual_type": object_type,
-                "allowed_types": sorted(OBJECT_CREATE_WRITABLE_PARENT_TYPES),
+                "allowed_types": sorted(allowed_types),
+                "version": version,
                 "parent": parent.as_dict(),
             },
         )
@@ -16750,6 +17812,240 @@ def _json_mapping(value: Any) -> Any:
     if isinstance(value, list):
         return [_json_mapping(item) for item in value]
     return value
+
+
+def _operation_argument_contract(
+    operation: str,
+    value: Mapping[str, Any],
+    *,
+    version: str | None,
+) -> dict[str, Any]:
+    contract = _json_mapping(value)
+    if operation == "waapi.undoGroup":
+        try:
+            api_contract = contract["properties"]["calls"]["items"][
+                "properties"
+            ]["api"]
+        except (KeyError, TypeError) as exc:
+            raise RuntimeError(
+                "waapi.undoGroup schema no longer exposes calls[].api"
+            ) from exc
+        if version is None:
+            api_contract["allowed_values_by_version"] = {
+                lane: sorted(uris)
+                for lane, uris in UNDO_GROUP_INNER_URIS_BY_VERSION.items()
+            }
+        else:
+            allowed = sorted(UNDO_GROUP_INNER_URIS_BY_VERSION[version])
+            api_contract.pop("pattern", None)
+            api_contract["enum"] = allowed
+            api_contract["value_contracts"] = [
+                {
+                    "const": uri,
+                    "schema_pointer": {
+                        "gateway_argv": [
+                            "--version",
+                            version,
+                            "describe",
+                            uri,
+                            "--full-schema",
+                        ],
+                        "result_path": (
+                            f"$.availability.{version}."
+                            "capability.schema.full"
+                        ),
+                    },
+                }
+                for uri in allowed
+            ]
+        return contract
+    if operation == "object.create":
+        contract["default_container_parent_contract"] = (
+            _object_create_default_container_parent_contract(version=version)
+        )
+        contract["same_name_merge_path_contract"] = (
+            _object_create_same_name_merge_path_contract(version=version)
+        )
+        return contract
+    if operation == "object.set":
+        contract["default_container_target_contract"] = (
+            _object_set_default_container_target_contract(version=version)
+        )
+        return contract
+    if operation != "audio.import":
+        return contract
+
+    path_contract = _audio_import_object_path_contract(version=version)
+    try:
+        properties = contract["properties"]
+        item_properties = properties["imports"]["items"]["properties"]
+        default_properties = properties["defaults"]["properties"]
+        item_properties["object_path"]["path_contract"] = _json_mapping(
+            path_contract
+        )
+        default_properties["object_path"]["path_contract"] = _json_mapping(
+            path_contract
+        )
+    except (KeyError, TypeError) as exc:
+        raise RuntimeError(
+            "audio.import operation schema no longer exposes both object_path fields"
+        ) from exc
+    return contract
+
+
+def _object_create_same_name_merge_path_contract(
+    *,
+    version: str | None,
+) -> dict[str, Any]:
+    return {
+        "contract": "waapi-skill.object-create-same-name-merge-path/v1",
+        "applies_when": (
+            "Exactly one unchanged same-name existing request root below the "
+            "current-version default container Work Unit receives only a "
+            "recursive descendant merge."
+        ),
+        "resolved_target": _default_container_work_unit_target(version=version),
+        "exact_path": {
+            "base_path_source": "resolved_target",
+            "separator": "\\",
+            "append_user_stated_descendant_segments": True,
+            "terminal_segment": "same_name_request_root",
+        },
+        "identity_query": {
+            "route": "query-object",
+            "must_follow_operation_schema_directly": True,
+            "path_mode": "exact",
+            "return_fields": ["id", "name", "type", "path"],
+            "path_argument_contract": (
+                _SHELL_SINGLE_QUOTED_WWISE_PATH_CONTRACT
+            ),
+        },
+        "forbidden_intermediate_routes": ["project-default-work-units"],
+    }
+
+
+def _object_create_default_container_parent_contract(
+    *,
+    version: str | None,
+) -> dict[str, Any]:
+    return {
+        "contract": "waapi-skill.object-create-default-container-parent/v1",
+        "applies_when": (
+            "The user anchors a new object.create parent relative to the "
+            "current-version default container Work Unit."
+        ),
+        "resolved_target": _default_container_work_unit_target(version=version),
+        "parent_path": {
+            "base_path_source": "resolved_target",
+            "separator": "\\",
+            "append_user_stated_parent_segments": True,
+        },
+        "dynamic_actor_mixer_metadata_scope": (
+            _actor_mixer_metadata_scope(version=version)
+        ),
+        "required_sequence": [
+            "operation-schema object.create",
+            "one metadata discover when a dynamic field token is unknown",
+            "preview",
+        ],
+        "forbidden_intermediate_routes": ["project-default-work-units"],
+    }
+
+
+def _object_set_default_container_target_contract(
+    *,
+    version: str | None,
+) -> dict[str, Any]:
+    return {
+        "contract": "waapi-skill.object-set-default-container-target/v1",
+        "applies_when": (
+            "The user names one or more existing targets relative to the "
+            "current-version default container Work Unit."
+        ),
+        "resolved_target": _default_container_work_unit_target(version=version),
+        "exact_path": {
+            "base_path_source": "resolved_target",
+            "separator": "\\",
+            "append_user_stated_descendant_segments": True,
+        },
+        "dynamic_actor_mixer_metadata_scope": (
+            _actor_mixer_metadata_scope(version=version)
+        ),
+        "required_sequence": [
+            "operation-schema object.set",
+            "one metadata discover when a dynamic field token is unknown",
+            "preview",
+        ],
+        "forbidden_intermediate_routes": ["project-default-work-units"],
+    }
+
+
+def _actor_mixer_metadata_scope(
+    *,
+    version: str | None,
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "kind": "object_type",
+        "one_discovery_for_same_type_targets": True,
+        "object_scope_is_for_one_existing_target_only": True,
+    }
+    if version is None:
+        result["actor_mixer_object_type_by_version"] = dict(
+            _ACTOR_MIXER_METADATA_TYPE_BY_VERSION
+        )
+    else:
+        result["wwise_version"] = version
+        result["actor_mixer_object_type"] = (
+            _ACTOR_MIXER_METADATA_TYPE_BY_VERSION[version]
+        )
+    return result
+
+
+def _default_container_work_unit_target(
+    *,
+    version: str | None,
+) -> dict[str, Any]:
+    if version is None:
+        return {
+            "default_container_work_unit_path_by_version": dict(
+                _DEFAULT_CONTAINER_WORK_UNIT_PATH_BY_VERSION
+            )
+        }
+    return {
+        "wwise_version": version,
+        "default_container_work_unit_path": (
+            _DEFAULT_CONTAINER_WORK_UNIT_PATH_BY_VERSION[version]
+        ),
+    }
+
+
+def _audio_import_object_path_contract(
+    *,
+    version: str | None,
+) -> dict[str, Any]:
+    resolved_target: dict[str, Any] = {
+        "minimum_segments": 3,
+        "hierarchy_root_case_sensitive": True,
+    }
+    if version is None:
+        resolved_target["allowed_hierarchy_roots_by_version"] = {
+            lane: list(allowed_import_hierarchy_roots(lane))
+            for lane in SUPPORTED_WWISE_VERSION_KEYS
+        }
+    else:
+        resolved_target["wwise_version"] = version
+        resolved_target["allowed_hierarchy_roots"] = list(
+            allowed_import_hierarchy_roots(version)
+        )
+    return {
+        "contract": "waapi-skill.audio-import-object-path/v1",
+        "resolved_target": resolved_target,
+        "absolute_form": True,
+        "relative_form": {
+            "allowed": True,
+            "requires_effective_import_location": True,
+        },
+    }
 
 
 __all__ = [

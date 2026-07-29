@@ -45,6 +45,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
     V3GatewayProtocol,
     build_direct_protocol,
+    build_metadata_transaction_protocol,
     build_modification_policy_protocol,
     build_transaction_protocol,
     call_step,
@@ -56,6 +57,7 @@ from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
     TrustedSubscriptionAckExpectation,
     TrustedSubscriptionAckSpec,
+    project_required_metadata_tokens,
 )
 from tests.semantic.support.codex_harness import (
     CodexHarnessError,
@@ -66,6 +68,9 @@ from tests.semantic.support.codex_harness import (
 )
 from tests.semantic.support.codex_import_assets_v3 import (
     CANONICAL_WWISE_LANGUAGE,
+    MaterializedImportCase,
+    bind_import_live_metadata,
+    bound_import_metadata_tokens,
     canonical_wwise_language,
     materialize_import_case,
 )
@@ -77,6 +82,7 @@ from tests.semantic.support.codex_import_business_plan_v3 import (
 from tests.semantic.support.codex_import_runtime_v3 import (
     ClosedDirectWaapiBackend,
     PreparedImportRuntime,
+    prepare_import_reference_fixtures,
     prepare_import_runtime,
 )
 from tests.semantic.support.codex_audio_conversion_runtime_v3 import (
@@ -137,11 +143,13 @@ from tests.semantic.support.codex_media_pool_runtime_v3 import (
     verify_reference_match_result,
 )
 from tests.semantic.support.codex_object_heavy_v3 import (
+    ObjectHeavyRecipe,
     OperationRequestSpec,
     build_object_heavy_v3_recipe,
 )
 from tests.semantic.support.codex_object_business_plan_v3 import (
     ObjectBusinessPlanSections,
+    build_object_merge_query_protocol,
     compile_object_business_plan,
     seal_object_input_file_manifest,
     validate_object_business_plan,
@@ -150,8 +158,12 @@ from tests.semantic.support.codex_object_runtime_v3 import (
     ClosedDirectObjectBackend,
     PreparedObjectRuntime,
 )
+from tests.semantic.support.codex_version_layout_v3 import (
+    get_codex_version_layout_v3,
+)
 from tests.semantic.support.codex_project_prelaunch_v3 import (
     ProjectPrelaunchRequest,
+    WWISE_2025_SOUNDBANK_AURO_PROFILE,
     make_project_prelaunch_hook,
 )
 from tests.semantic.support.codex_scenario_lifecycle_v3 import (
@@ -175,6 +187,10 @@ from tests.semantic.support.codex_soundbank_runtime_v3 import (
     ClosedDirectWaapiSoundBankBackend,
     PreparedSoundBankRuntime,
     prepare_soundbank_runtime,
+)
+from wwise_waapi.metadata_discovery import (
+    MAX_METADATA_DISCOVERY_LIMIT,
+    discover_metadata,
 )
 from tests.semantic.support.codex_task_runner_v3 import (
     V3TaskRun,
@@ -772,7 +788,11 @@ def run_heavy_project_unit(
         version=unit.version,
         scenario_root=root,
         live_environment=options.live_environment,
-        prelaunch_hook=_prelaunch_hook(unit.scenario, media_holder=media_holder),
+        prelaunch_hook=_prelaunch_hook(
+            unit.scenario,
+            version=unit.version,
+            media_holder=media_holder,
+        ),
         launch_environment_overrides=launch_environment_overrides,
         owned_wine_prefix=_owned_wine_prefix(
             unit.scenario,
@@ -3300,6 +3320,162 @@ def _media_requires_custom_database(scenario: OnlineScenario) -> bool:
     )
 
 
+def _bind_compound_import_metadata(
+    materialized: MaterializedImportCase,
+    *,
+    version: str,
+    direct: OwnedDirectWaapiCall,
+    reference_targets: Mapping[str, Mapping[str, Any]] | None = None,
+) -> tuple[MaterializedImportCase, Mapping[str, Any] | None]:
+    """Close one staged compound import with bounded live Sound metadata.
+
+    This runner-owned read occurs before Codex starts so the broker can seal
+    the exact request it will permit.  The evaluated agent must still perform
+    its own single packaged ``metadata discover`` step; the compound protocol
+    binds every dynamic request token to that visible result.
+    """
+
+    if not materialized.requires_metadata_binding:
+        return materialized, None
+    queries = tuple(materialized.metadata_queries)
+    if not 1 <= len(queries) <= 8:
+        raise HeavyProjectRunnerError(
+            "compound import has no bounded metadata query set"
+        )
+    result = discover_metadata(
+        read_call=direct,
+        queries=queries,
+        object_type="Sound",
+        limit=MAX_METADATA_DISCOVERY_LIMIT,
+    ).as_dict()
+    if result.get("scope", {}).get("resolved", {}).get("name") != "Sound":
+        raise HeavyProjectRunnerError(
+            "compound import metadata did not resolve the exact live Sound type"
+        )
+    envelope = MappingProxyType({"agent_result": result})
+    bound = bind_import_live_metadata(
+        materialized,
+        version=version,
+        discovery_payload=envelope,
+        reference_targets=reference_targets,
+    )
+    if (
+        bound.requires_metadata_binding
+        or len(bound.operation_requests)
+        != bound.expected_primary_dispatch_count
+    ):
+        raise HeavyProjectRunnerError(
+            "compound import metadata binding did not close one exact request"
+        )
+    return bound, MappingProxyType(result)
+
+
+def _compound_object_metadata_binding(
+    scenario: OnlineScenario,
+    *,
+    version: str,
+) -> tuple[str, tuple[str, ...], tuple[str, ...]] | None:
+    """Parse the profile-owned live-metadata requirement for object mutation.
+
+    Historical V3 object cases intentionally retain their original protocol.
+    Only the compound profile carries this closed hidden marker, so adding the
+    supporting read here cannot silently broaden an older campaign.
+    """
+
+    asset_spec = scenario.fixture.get("asset_spec")
+    if not isinstance(asset_spec, Mapping):
+        return None
+    value = asset_spec.get("metadata_binding")
+    if value is None:
+        return None
+    if (
+        scenario.id
+        not in {
+            "OBJ22-F-CREATE-03",
+            "OBJ22-F-SET-01",
+            "OBJ22-F-SET-02",
+        }
+        or scenario.api
+        not in {
+            "ak.wwise.core.object.create",
+            "ak.wwise.core.object.set",
+        }
+        or not isinstance(value, Mapping)
+        or set(value) != {"contract", "queries", "required_tokens"}
+        or value.get("contract") != "waapi-skill.compound-object-metadata/v1"
+    ):
+        raise HeavyProjectRunnerError(
+            "compound object metadata binding is outside the reviewed profile"
+        )
+    queries_value = value.get("queries")
+    tokens_value = value.get("required_tokens")
+    queries = (
+        tuple(queries_value)
+        if isinstance(queries_value, list)
+        else ()
+    )
+    tokens = (
+        tuple(tokens_value)
+        if isinstance(tokens_value, list)
+        else ()
+    )
+    if (
+        queries != ("volume",)
+        or tokens != ("Volume",)
+        or any(not isinstance(item, str) for item in (*queries, *tokens))
+    ):
+        raise HeavyProjectRunnerError(
+            "compound object metadata binding differs from the reviewed Volume lookup"
+        )
+    object_type = get_codex_version_layout_v3(version).reflected_type(
+        "ActorMixer"
+    )
+    return object_type, queries, tokens
+
+
+def _build_compound_object_metadata_protocol(
+    scenario: OnlineScenario,
+    *,
+    recipe: ObjectHeavyRecipe,
+    direct: OwnedDirectWaapiCall,
+    version: str,
+) -> V3GatewayProtocol | None:
+    """Seal one object mutation behind an agent-visible live metadata read."""
+
+    binding = _compound_object_metadata_binding(scenario, version=version)
+    if binding is None:
+        return None
+    if not isinstance(recipe.request, OperationRequestSpec):
+        raise HeavyProjectRunnerError(
+            "compound object metadata binding requires one operation request"
+        )
+    object_type, queries, tokens = binding
+    trusted_result = discover_metadata(
+        read_call=direct,
+        queries=queries,
+        object_type=object_type,
+        limit=MAX_METADATA_DISCOVERY_LIMIT,
+    ).as_dict()
+    projection = project_required_metadata_tokens(
+        trusted_result,
+        object_type=object_type,
+        required_tokens=tokens,
+    )
+    return build_metadata_transaction_protocol(
+        (recipe.request.as_dict(version=version),),
+        object_type=object_type,
+        metadata_queries=queries,
+        required_tokens=tokens,
+        expected_required_token_projection=projection,
+        equivalence=(
+            "object_set_v1"
+            if recipe.request.operation == "object.set"
+            else "wire_exact"
+        ),
+        schema_first=True,
+    )
+
+
 def _prepare_case(
     scenario: OnlineScenario,
     *,
@@ -3309,7 +3485,14 @@ def _prepare_case(
     project_modification_policy: str | None = None,
 ) -> _PreparedCase:
     if scenario.api in OBJECT_APIS:
-        recipe = build_object_heavy_v3_recipe(scenario.id)
+        recipe = build_object_heavy_v3_recipe(
+            scenario.id,
+            version=runtime.version,
+        )
+        if recipe.version != runtime.version:
+            raise HeavyProjectRunnerError(
+                "object recipe version differs from the active lifecycle"
+            )
         object_runtime = PreparedObjectRuntime(
             scenario=scenario,
             recipe=recipe,
@@ -3321,8 +3504,27 @@ def _prepare_case(
             raise HeavyProjectRunnerError(
                 "object runtime did not retain its sealed before snapshot"
             )
-        protocol = object_runtime.gateway_protocol()
+        protocol = _build_compound_object_metadata_protocol(
+            scenario,
+            recipe=recipe,
+            direct=direct,
+            version=runtime.version,
+        )
+        if protocol is None:
+            protocol = build_object_merge_query_protocol(
+                scenario,
+                recipe,
+            )
+        if protocol is None:
+            protocol = object_runtime.gateway_protocol()
         if project_modification_policy is not None:
+            if _compound_object_metadata_binding(
+                scenario,
+                version=runtime.version,
+            ) is not None:
+                raise HeavyProjectRunnerError(
+                    "compound object metadata cases do not run policy probes"
+                )
             protocol = build_modification_policy_protocol(
                 protocol,
                 policy=project_modification_policy,
@@ -3387,17 +3589,73 @@ def _prepare_case(
             version=runtime.version,
             asset_root=runtime.asset_root / "import-case",
         )
+        import_backend = ClosedDirectWaapiBackend(direct)
+        reference_fixtures = None
+        metadata_discovery = None
+        try:
+            if materialized.requires_metadata_binding:
+                reference_fixtures = prepare_import_reference_fixtures(
+                    scenario,
+                    materialized,
+                    version=runtime.version,
+                    backend=import_backend,
+                )
+            materialized, metadata_discovery = _bind_compound_import_metadata(
+                materialized,
+                version=runtime.version,
+                direct=direct,
+                reference_targets=(
+                    reference_fixtures.request_reference_targets
+                    if reference_fixtures is not None
+                    else None
+                ),
+            )
+        except Exception as setup_error:
+            if reference_fixtures is not None and not reference_fixtures.adopted:
+                try:
+                    reference_fixtures.cleanup_emergency()
+                except Exception as cleanup_error:
+                    raise HeavyProjectRunnerError(
+                        "compound import setup failed and reference-fixture "
+                        f"cleanup also failed: {cleanup_error}"
+                    ) from setup_error
+            raise
         import_runtime = prepare_import_runtime(
             scenario,
             materialized,
             sandbox_project=runtime.sandbox.sandbox_project,
-            backend=ClosedDirectWaapiBackend(direct),
+            backend=import_backend,
+            reference_fixtures=reference_fixtures,
         )
         refusal_code = _REFUSAL_CODES.get(scenario.id)
-        protocol = build_transaction_protocol(
-            materialized.operation_requests,
-            refusal=StructuredRefusal(refusal_code) if refusal_code else None,
-        )
+        if metadata_discovery is not None:
+            if refusal_code is not None:
+                raise HeavyProjectRunnerError(
+                    "compound import metadata cases cannot be preview refusals"
+                )
+            tokens = bound_import_metadata_tokens(materialized)
+            projection = project_required_metadata_tokens(
+                metadata_discovery,
+                object_type="Sound",
+                required_tokens=tokens,
+            )
+            protocol = build_metadata_transaction_protocol(
+                materialized.operation_requests,
+                object_type="Sound",
+                metadata_queries=materialized.metadata_queries,
+                required_tokens=tokens,
+                expected_required_token_projection=projection,
+                equivalence=(
+                    "audio_import_v1"
+                    if scenario.api == "ak.wwise.core.audio.import"
+                    else "audio_import_tab_v1"
+                ),
+            )
+        else:
+            protocol = build_transaction_protocol(
+                materialized.operation_requests,
+                refusal=StructuredRefusal(refusal_code) if refusal_code else None,
+            )
         before = import_runtime.hidden_before
         if before is None:
             raise HeavyProjectRunnerError(
@@ -3426,6 +3684,29 @@ def _prepare_case(
         def verify_refusal(_payload: Mapping[str, Any]) -> Any:
             return import_runtime.verify_zero_dispatch_unchanged()
 
+        import_prompt_sources: Mapping[str, Any] = MappingProxyType({})
+        if (
+            metadata_discovery is not None
+            and scenario.api == "ak.wwise.core.audio.import"
+        ):
+            try:
+                visible_rows = json.loads(
+                    materialized.visible_values["import_rows"]
+                )
+            except (KeyError, TypeError, json.JSONDecodeError) as exc:
+                raise HeavyProjectRunnerError(
+                    "compound import visible rows are not canonical JSON"
+                ) from exc
+            if not isinstance(visible_rows, list) or not visible_rows:
+                raise HeavyProjectRunnerError(
+                    "compound import visible rows must be a non-empty array"
+                )
+            import_prompt_sources = MappingProxyType(
+                {
+                    "compound_import_visible_rows": visible_rows,
+                }
+            )
+
         return _PreparedCase(
             prompt=import_runtime.render_prompt(),
             protocol=protocol,
@@ -3436,6 +3717,7 @@ def _prepare_case(
             verify_refusal=verify_refusal if refusal_code else None,
             cleanup_success=import_runtime.cleanup_success,
             visible_values=materialized.visible_values,
+            prompt_sources=import_prompt_sources,
         )
 
     if scenario.api == AUDIO_CONVERT_URI:
@@ -3631,6 +3913,7 @@ def _prelaunch_hook(
     scenario: OnlineScenario,
     *,
     media_holder: dict[str, Any],
+    version: str = "2022.1",
 ):
     if scenario.api == AUDIO_CONVERT_URI:
         return make_audio_conversion_prelaunch_hook(scenario)
@@ -3658,7 +3941,7 @@ def _prelaunch_hook(
         # fixture prose is intentionally natural and is not an executable
         # dependency manifest, so derive every required Wwise language from the
         # same immutable recipe that _prepare_case materializes after launch.
-        recipe = build_object_heavy_v3_recipe(scenario.id)
+        recipe = build_object_heavy_v3_recipe(scenario.id, version=version)
         recipe_languages = tuple(
             item.source_language
             for item in recipe.fixture.objects
@@ -3684,6 +3967,14 @@ def _prelaunch_hook(
             scenario_id=scenario.id,
             languages=languages,
             platforms=platforms,
+            auro_isolation_profile=(
+                WWISE_2025_SOUNDBANK_AURO_PROFILE
+                if (
+                    version == "2025.1"
+                    and scenario.api == "ak.wwise.core.soundbank.generate"
+                )
+                else None
+            ),
         )
     )
     if scenario.api != MEDIA_POOL_GET_URI:

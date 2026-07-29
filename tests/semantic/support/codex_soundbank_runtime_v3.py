@@ -49,6 +49,10 @@ from types import MappingProxyType
 from typing import Any, Literal, Protocol
 
 from .codex_eval_bundle_v3 import OnlineScenario
+from .codex_version_layout_v3 import (
+    CodexVersionLayoutV3,
+    get_codex_version_layout_v3,
+)
 from wwise_waapi.operation_soundbank import parse_soundbank_definition_file
 
 try:  # ``pwd`` is not available on Windows, where Wine drive mapping is unnecessary.
@@ -58,6 +62,7 @@ except ImportError:  # pragma: no cover - exercised only on native Windows hosts
 
 
 SUPPORTED_VERSION = "2022.1"
+SUPPORTED_VERSIONS = frozenset({"2022.1", "2025.1"})
 OPERATION_REQUEST_CONTRACT = "waapi-skill.operation-request/v1"
 SOUNDBANK_RUNTIME_CONTRACT = "waapi-skill.soundbank-eval-runtime/v3"
 SOUNDBANK_TOPIC = "ak.wwise.core.soundbank.generated"
@@ -68,6 +73,12 @@ SOUNDBANK_APIS = frozenset(
         SOUNDBANK_TOPIC,
         "ak.wwise.core.soundbank.processDefinitionFiles",
         "ak.wwise.core.soundbank.convertExternalSources",
+        "ak.wwise.core.soundbank.setInclusions",
+    }
+)
+COMPOUND_CROSS_VERSION_SOUNDBANK_APIS = frozenset(
+    {
+        "ak.wwise.core.soundbank.generate",
         "ak.wwise.core.soundbank.setInclusions",
     }
 )
@@ -922,10 +933,20 @@ def build_soundbank_blueprint(
 
     if scenario.api not in SOUNDBANK_APIS:
         raise SoundBankRuntimeError(f"unsupported SoundBank scenario API: {scenario.api}")
-    if version != SUPPORTED_VERSION or version not in scenario.versions:
+    if version not in SUPPORTED_VERSIONS or version not in scenario.versions:
         raise SoundBankRuntimeError(
-            f"{scenario.id} SoundBank runtime is pinned to Wwise {SUPPORTED_VERSION}"
+            f"{scenario.id} SoundBank runtime supports only "
+            f"{tuple(sorted(SUPPORTED_VERSIONS))!r}"
         )
+    if (
+        version != SUPPORTED_VERSION
+        and scenario.api not in COMPOUND_CROSS_VERSION_SOUNDBANK_APIS
+    ):
+        raise SoundBankRuntimeError(
+            f"{scenario.api} is not reviewed for the Wwise {version} "
+            "compound-heavy lane"
+        )
+    layout = get_codex_version_layout_v3(version)
     project_candidate = Path(sandbox_project).expanduser()
     if project_candidate.is_symlink():
         raise SoundBankRuntimeError("sandbox_project must not be a symlink")
@@ -984,6 +1005,7 @@ def build_soundbank_blueprint(
             scenario,
             spec,
             assets,
+            layout=layout,
             objects=objects,
             media=media,
             banks=banks,
@@ -1011,6 +1033,7 @@ def build_soundbank_blueprint(
         _compile_set_inclusions_fixture(
             scenario,
             spec,
+            layout=layout,
             objects=objects,
             banks=banks,
         )
@@ -1048,6 +1071,7 @@ def _compile_generation_fixture(
     spec: Mapping[str, Any],
     assets: Path,
     *,
+    layout: CodexVersionLayoutV3,
     objects: list[ObjectFixture],
     media: list[MediaFixture],
     banks: list[SoundBankFixture],
@@ -1069,13 +1093,13 @@ def _compile_generation_fixture(
     # can be independently checked from the profile; retain the historical
     # scenario-id parent for every nonlocalized fixture.
     actor_root_name = profile if has_explicit_logical_paths else prefix
-    actor_parent = f"{ACTOR_DWU}\\{actor_root_name}"
+    actor_parent = f"{layout.containers_dwu}\\{actor_root_name}"
     objects.append(
         ObjectFixture(
             "fixture.actor_root",
             actor_root_name,
             "ActorMixer",
-            ACTOR_DWU,
+            layout.containers_dwu,
             actor_parent,
         )
     )
@@ -1089,7 +1113,9 @@ def _compile_generation_fixture(
             raw_bank.get("dependencies"), f"{name}.dependencies"
         )
         output_busses = [
-            _wwise_path(row.get("object_path"), "dependency.object_path")
+            layout.translate_2022_path(
+                _wwise_path(row.get("object_path"), "dependency.object_path")
+            )
             for row in dependency_rows
             if row.get("type") == "Bus"
         ]
@@ -1197,10 +1223,12 @@ def _compile_generation_fixture(
             )
 
         for dependency in dependency_rows:
-            path = _wwise_path(dependency.get("object_path"), "dependency.object_path")
+            path = layout.translate_2022_path(
+                _wwise_path(dependency.get("object_path"), "dependency.object_path")
+            )
             dep_type = _text(dependency.get("type"), "dependency.type")
             dep_name = path.rsplit("\\", 1)[-1]
-            owned = path != MASTER_AUDIO_BUS
+            owned = path != layout.main_bus
             objects.append(
                 ObjectFixture(
                     f"dependency:{dep_type}:{dep_name}",
@@ -1419,6 +1447,7 @@ def _compile_set_inclusions_fixture(
     scenario: OnlineScenario,
     spec: Mapping[str, Any],
     *,
+    layout: CodexVersionLayoutV3,
     objects: list[ObjectFixture],
     banks: list[SoundBankFixture],
 ) -> None:
@@ -1435,7 +1464,7 @@ def _compile_set_inclusions_fixture(
         name = _segment(raw.get("object"), "inclusion.object")
         if name in fixture_by_name:
             continue
-        object_type, parent = _inclusion_object_type(name)
+        object_type, parent = _inclusion_object_type(name, layout=layout)
         fixture = ObjectFixture(
             f"inclusion:{name}",
             name,
@@ -1512,8 +1541,8 @@ class PreparedSoundBankRuntime:
     def prepare(self) -> MaterializedSoundBankCase:
         if self.materialized is not None or self.hidden_before is not None or self._closed:
             raise SoundBankRuntimeError("SoundBank runtime is single-use")
-        project_info = _validate_project_info(
-            self.backend.get_project_info(),
+        project_info = _normalize_fixture_project_info(
+            self.backend,
             blueprint=self.blueprint,
         )
         if self.blueprint.scenario_id == PROCESS_REFUSAL_ID:
@@ -1617,7 +1646,10 @@ class PreparedSoundBankRuntime:
                 raise SoundBankRuntimeError(
                     f"created fixture identity mismatch: {fixture.path}"
                 )
-            if str(rows[0].get("type")) != fixture.object_type:
+            expected_type = get_codex_version_layout_v3(
+                self.blueprint.version
+            ).reflected_type(fixture.object_type)
+            if str(rows[0].get("type")) != expected_type:
                 raise SoundBankRuntimeError(
                     f"created fixture type mismatch: {fixture.path}"
                 )
@@ -3115,7 +3147,9 @@ def _validate_before_state(
         state = next(row for row in before.objects if row.key == fixture.key)
         if state.id is None:
             failures.append(f"fixture object absent before prompt: {fixture.path}")
-        elif state.object_type != fixture.object_type:
+        elif state.object_type != get_codex_version_layout_v3(
+            case.blueprint.version
+        ).reflected_type(fixture.object_type):
             failures.append(f"fixture object type mismatch before prompt: {fixture.path}")
     for bank in case.blueprint.soundbanks:
         state = next(row for row in before.banks if row.name == bank.name)
@@ -3422,6 +3456,7 @@ def _validate_project_info(
     value: Mapping[str, Any],
     *,
     blueprint: SoundBankBlueprint,
+    require_clean: bool = True,
 ) -> Mapping[str, Any]:
     info = _mapping(value, "project_info")
     project_candidate = _localize_wwise_host_path(
@@ -3435,8 +3470,10 @@ def _validate_project_info(
         raise SoundBankRuntimeError(
             "getProjectInfo does not identify the scenario-owned project"
         )
-    if info.get("isDirty") is not False:
-        raise SoundBankRuntimeError("SoundBank fixture project must be saved and clean")
+    _require_under(project_path, blueprint.io_root, "project_info.path")
+    is_dirty = info.get("isDirty")
+    if is_dirty is not False and is_dirty is not True:
+        raise SoundBankRuntimeError("project_info.isDirty must be boolean")
     directories = _mapping(info.get("directories"), "project_info.directories")
     normalized_directories = dict(directories)
     for field in ("root", "cache", "soundBankOutputRoot"):
@@ -3475,7 +3512,37 @@ def _validate_project_info(
     normalized["path"] = str(project_path)
     normalized["directories"] = normalized_directories
     normalized["platforms"] = normalized_platforms
+    if require_clean and is_dirty:
+        raise SoundBankRuntimeError("SoundBank fixture project must be saved and clean")
     return normalized
+
+
+def _normalize_fixture_project_info(
+    backend: SoundBankRuntimeBackend,
+    *,
+    blueprint: SoundBankBlueprint,
+) -> Mapping[str, Any]:
+    """Normalize a patch-upgraded private fixture without touching user projects.
+
+    A newer Wwise patch may mark an older patch's project copy dirty immediately
+    after opening it.  Saving is permitted only after the live project path and
+    every reported project/output directory have been proven to belong to this
+    scenario's exact ``sandbox_project`` and ``io_root``.  The saved state is
+    then read and validated again; there is no retry or best-effort fallback.
+    """
+
+    initial = _validate_project_info(
+        backend.get_project_info(),
+        blueprint=blueprint,
+        require_clean=False,
+    )
+    if initial.get("isDirty") is False:
+        return initial
+    backend.save_project()
+    return _validate_project_info(
+        backend.get_project_info(),
+        blueprint=blueprint,
+    )
 
 
 def _localize_wwise_host_path(value: str, field: str) -> Path:
@@ -4054,11 +4121,16 @@ def _waapi_filters(values: Sequence[str]) -> tuple[str, ...]:
         raise SoundBankRuntimeError("Definition filter is not normalized") from exc
 
 
-def _inclusion_object_type(name: str) -> tuple[str, str]:
+def _inclusion_object_type(
+    name: str,
+    *,
+    layout: CodexVersionLayoutV3 | None = None,
+) -> tuple[str, str]:
+    selected = layout or get_codex_version_layout_v3(SUPPORTED_VERSION)
     if name.startswith("Master_"):
-        return "Bus", MASTER_DWU
+        return "Bus", selected.busses_dwu
     if name.endswith("_Aux") or name == "Review_Aux":
-        return "AuxBus", MASTER_AUDIO_BUS
+        return "AuxBus", selected.main_bus
     return "Event", EVENT_DWU
 
 

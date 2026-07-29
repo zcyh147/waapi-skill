@@ -17,8 +17,12 @@ from tests.semantic.support.codex_eval_bundle_v3 import (
     OnlineScenario,
     load_eval_bundle_v3,
 )
+from tests.semantic.support.codex_compound_heavy_v1 import (
+    load_compound_heavy_profile,
+)
 from tests.semantic.support.codex_import_assets_v3 import (
     MaterializedImportCase,
+    bind_import_live_metadata,
     materialize_import_case,
 )
 from tests.semantic.support.codex_import_runtime_v3 import (
@@ -26,20 +30,34 @@ from tests.semantic.support.codex_import_runtime_v3 import (
     ACTOR_DWU,
     AUDIO_SOURCE_FIELDS,
     ClosedDirectWaapiBackend,
+    EVENT_FIELDS,
     EVENTS_DWU,
     OBJECT_FIELDS,
     ImportRuntimeError,
     ImportRuntimePlan,
+    ImportCompoundRuntimeSnapshot,
     SetupImport,
     _copied_original_evidence,
     _validated_native_windows_original_path,
     build_import_runtime_plan,
+    prepare_import_reference_fixtures,
     prepare_import_runtime,
+)
+from tests.semantic.support.codex_version_layout_v3 import (
+    get_codex_version_layout_v3,
 )
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SUITE_V3 = REPO_ROOT / "skills" / "waapi-skill" / "evals" / "suite-v3.json"
+COMPOUND_PROFILE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "compound-heavy-v1"
+    / "profile.json"
+)
 IMPORT_APIS = {
     "ak.wwise.core.audio.import",
     "ak.wwise.core.audio.importTabDelimited",
@@ -64,19 +82,35 @@ class _FakeObject:
     language: str | None = None
     action_type: int | None = None
     target: Any = None
+    dynamic: dict[str, Any] = field(default_factory=dict)
 
 
 class _FakeImportBackend:
-    def __init__(self, sandbox_root: Path) -> None:
+    def __init__(self, sandbox_root: Path, *, version: str = "2022.1") -> None:
         self.sandbox_root = sandbox_root
+        self.version = version
+        self.layout = get_codex_version_layout_v3(version)
         self.objects: dict[str, _FakeObject] = {}
         self.by_path: dict[str, str] = {}
         self.sequence = 1
         self.setup_imports: list[SetupImport] = []
         self.applied_languages: list[str] = []
         self.deleted_ids: list[str] = []
-        self._add_root(ACTOR_DWU)
+        self._add_root(self.layout.actor_default_work_unit)
         self._add_root(EVENTS_DWU)
+        self._add_root(self.layout.busses_dwu)
+        busses = self._get_path(self.layout.busses_dwu)
+        assert busses is not None
+        main_name = self.layout.main_bus.rsplit("\\", 1)[1]
+        self._put(
+            _FakeObject(
+                self._next_guid(),
+                main_name,
+                "Bus",
+                self.layout.main_bus,
+                busses.id,
+            )
+        )
 
     def _next_guid(self) -> str:
         self.sequence += 1
@@ -148,6 +182,7 @@ class _FakeImportBackend:
         if value.action_type is not None:
             row["ActionType"] = value.action_type
             row["Target"] = value.target
+        row.update({f"@{name}": item for name, item in value.dynamic.items()})
         return row
 
     def setup_create_parent(
@@ -160,6 +195,32 @@ class _FakeImportBackend:
         object_id = self._next_guid()
         self._put(_FakeObject(object_id, name, object_type, path, parent.id))
         return object_id
+
+    def setup_create_reference_bus(self, *, parent_path: str, name: str) -> str:
+        parent = self._get_path(parent_path)
+        assert parent is not None
+        path = parent_path + "\\" + name
+        assert self._get_path(path) is None
+        object_id = self._next_guid()
+        self._put(_FakeObject(object_id, name, "Bus", path, parent.id))
+        return object_id
+
+    def read_bound_values(
+        self,
+        *,
+        path: str,
+        names: Sequence[str],
+    ) -> tuple[Mapping[str, Any], ...]:
+        value = self._get_path(path)
+        if value is None:
+            return ()
+        return (
+            {
+                "id": value.id,
+                "path": value.path,
+                **{f"@{name}": value.dynamic.get(name) for name in names},
+            },
+        )
 
     def setup_import(self, request: SetupImport) -> None:
         self.setup_imports.append(request)
@@ -190,8 +251,11 @@ class _FakeImportBackend:
             operation = spec["audio_import_operation"]
             if operation is None:
                 operation = tab_operations[raw["tsv_name"]]
+                location = plan.operation_requests[0]["arguments"]["import_location"][
+                    "value"
+                ]
                 self._ensure_tab_parents(
-                    import_location=str(spec["import_location"]),
+                    import_location=str(location),
                     object_path=str(raw["object_path"]),
                 )
             self.applied_languages.append(row.language)
@@ -207,6 +271,12 @@ class _FakeImportBackend:
             )
             if row.event_path is not None:
                 self._create_event(row.event_path, target)
+            for expectation in row.expected_properties:
+                target.dynamic[expectation.name] = expectation.value
+            for expectation in row.expected_references:
+                target.dynamic[expectation.name] = {
+                    "id": expectation.target_id,
+                }
 
     def _ensure_tab_parents(
         self,
@@ -409,6 +479,566 @@ def _prepared(
         backend=backend,
     )
     return scenario, materialized, backend, runtime
+
+
+def _metadata_record(name: str, metadata_type: str) -> dict[str, object]:
+    return {
+        "name": name,
+        "type": metadata_type,
+        "default": False,
+        "display": {},
+        "restriction": {},
+    }
+
+
+def _sound_discovery() -> dict[str, object]:
+    candidates = [
+        {
+            "name": name,
+            "kind": kind,
+            "matched_queries": [],
+            "same_object_dependencies": dependencies,
+            "dependency_requirements": [
+                {
+                    "type": "override",
+                    "action": "Enable",
+                    "context": "Self",
+                    "property": dependency,
+                    "required_values": [True],
+                }
+                for dependency in dependencies
+            ],
+            "metadata": _metadata_record(name, metadata_type),
+        }
+        for name, kind, metadata_type, dependencies in (
+            ("IsLoopingEnabled", "property", "bool", []),
+            ("IgnoreParentMaxSoundInstance", "property", "bool", []),
+            ("UseMaxSoundPerInstance", "property", "bool", []),
+            (
+                "MaxSoundPerInstance",
+                "property",
+                "int16",
+                ["UseMaxSoundPerInstance"],
+            ),
+            ("OutputBus", "reference", "", ["OverrideOutput"]),
+        )
+    ]
+    return {
+        "contract": "waapi-skill.metadata-discovery/v2",
+        "authority": "live-waapi",
+        "result_detail": "compact",
+        "scope": {
+            "kind": "object_type",
+            "requested": "Sound",
+            "resolved": {"classId": 65552, "name": "Sound", "type": "Sound"},
+        },
+        "queries": ["natural business phrases"],
+        "available_name_count": 100,
+        "candidate_count": len(candidates),
+        "query_results": [],
+        "candidates": candidates,
+        "dependency_candidates": [
+            {
+                "name": "OverrideOutput",
+                "kind": "property",
+                "required_by": ["OutputBus"],
+                "dependency_requirements": [],
+                "metadata": _metadata_record("OverrideOutput", "bool"),
+            }
+        ],
+        "dependency_closure_complete": True,
+        "unresolved_dependencies": [],
+        "fallback_detail_scan": {"status": "not_needed"},
+        "selection_required": True,
+        "exact_live_name_required_for_mutation": True,
+    }
+
+
+def _compound_prepared(
+    tmp_path: Path,
+    *,
+    unit_id: str,
+):
+    unit = load_compound_heavy_profile(
+        COMPOUND_PROFILE,
+        unit_ids=(unit_id,),
+    ).units[0]
+    sandbox_root = tmp_path / "sandbox"
+    sandbox_root.mkdir()
+    project = sandbox_root / "SampleProject.wproj"
+    project.write_text("<WwiseDocument/>", encoding="utf-8")
+    staged = materialize_import_case(
+        unit.scenario,
+        version=unit.version,
+        asset_root=tmp_path / "assets" / unit_id,
+    )
+    backend = _FakeImportBackend(sandbox_root, version=unit.version)
+    fixtures = prepare_import_reference_fixtures(
+        unit.scenario,
+        staged,
+        version=unit.version,
+        backend=backend,
+    )
+    bound = bind_import_live_metadata(
+        staged,
+        version=unit.version,
+        discovery_payload={"agent_result": _sound_discovery()},
+        reference_targets=fixtures.request_reference_targets,
+    )
+    runtime = prepare_import_runtime(
+        unit.scenario,
+        bound,
+        sandbox_project=project,
+        backend=backend,
+        reference_fixtures=fixtures,
+    )
+    return unit, bound, backend, fixtures, runtime
+
+
+@pytest.mark.parametrize(
+    "unit_id",
+    [
+        f"CMP{year}-{scenario_id}"
+        for year in ("22", "25")
+        for scenario_id in (
+            "O22-AUDIO-IMPORT-02",
+            "O22-AUDIO-IMPORT-03",
+            "O22-AUDIO-TAB-03",
+            "O22-AUDIO-TAB-04",
+        )
+    ],
+)
+def test_compound_import_runtime_proves_dynamic_fields_and_reference_bus_guids(
+    tmp_path: Path,
+    unit_id: str,
+) -> None:
+    unit, materialized, backend, fixtures, runtime = _compound_prepared(
+        tmp_path,
+        unit_id=unit_id,
+    )
+    before = runtime.hidden_before
+
+    assert isinstance(before, ImportCompoundRuntimeSnapshot)
+    assert runtime.plan.version == unit.version
+    assert runtime.plan.actor_dwu == get_codex_version_layout_v3(
+        unit.version
+    ).actor_default_work_unit
+    assert fixtures.adopted
+    assert len(fixtures.fixtures) == len(fixtures.reference_targets)
+    assert set(fixtures.request_reference_targets) == set(
+        fixtures.reference_targets
+    )
+    binding_targets = materialized.metadata_binding["reference_targets"]
+    request_values: set[str] = set()
+
+    def collect_request_values(value: Any) -> None:
+        if isinstance(value, Mapping):
+            for child in value.values():
+                collect_request_values(child)
+        elif isinstance(value, (list, tuple)):
+            for child in value:
+                collect_request_values(child)
+        elif isinstance(value, str):
+            request_values.add(value)
+
+    collect_request_values(materialized.operation_requests)
+    table_surface = "".join(
+        item.path.read_text(encoding="utf-8") for item in materialized.tab_files
+    )
+    oracle_reference_ids = {
+        reference.target_id
+        for row in runtime.plan.rows
+        for reference in row.expected_references
+    }
+    for item in fixtures.fixtures:
+        request_target = fixtures.request_reference_targets[item.key]
+        oracle_target = fixtures.reference_targets[item.key]
+        assert request_target == {"kind": "path", "value": item.path}
+        assert oracle_target == {"kind": "id", "value": item.id}
+        assert binding_targets[item.key] == request_target
+        assert item.path in request_values or item.path in table_surface
+        assert item.id not in request_values
+        assert item.id not in table_surface
+        assert item.id in oracle_reference_ids
+    assert all(
+        item.id.casefold() != fixtures.main_bus.id.casefold()
+        for item in fixtures.fixtures
+    )
+    assert runtime.verify_preview_unchanged().passed
+
+    backend.apply_case(unit.scenario, runtime.plan)
+    verification = runtime.verify_after_execution()
+
+    assert verification.passed, verification.failures
+    assert isinstance(verification.after, ImportCompoundRuntimeSnapshot)
+    for row_plan in runtime.plan.rows:
+        state = verification.after.row(row_plan.row_key)
+        if (
+            row_plan.preserve_property_tokens
+            or row_plan.preserve_reference_tokens
+        ):
+            before_state = before.row(row_plan.row_key)
+            assert tuple(item.name for item in state.properties) == (
+                row_plan.preserve_property_tokens
+            )
+            assert tuple(item.name for item in state.references) == (
+                row_plan.preserve_reference_tokens
+            )
+            assert state.properties == before_state.properties
+            assert state.references == before_state.references
+        else:
+            assert {item.name: item.value for item in state.properties} == {
+                item.name: item.value for item in row_plan.expected_properties
+            }
+            assert {
+                item.name: item.target_id for item in state.references
+            } == {
+                item.name: item.target_id for item in row_plan.expected_references
+            }
+        assert all(
+            item.target_id is None
+            or item.target_id.casefold() != fixtures.main_bus.id.casefold()
+            for item in state.references
+        )
+
+    cleanup = runtime.cleanup_success()
+    assert cleanup.paths_absent
+    assert cleanup.assets_removed
+    assert fixtures.cleaned
+    assert all(
+        not backend.read_objects(path=path, fields=EVENT_FIELDS)
+        for path in fixtures.paths
+    )
+
+
+def test_compound_use_existing_rows_may_omit_dynamic_expectations_but_not_half_bind(
+    tmp_path: Path,
+) -> None:
+    unit, materialized, backend, fixtures, runtime = _compound_prepared(
+        tmp_path,
+        unit_id="CMP22-O22-AUDIO-TAB-04",
+    )
+
+    assert all(
+        not row.expected_properties and not row.expected_references
+        for row in runtime.plan.rows[:3]
+    )
+    expected_property_tokens = (
+        "IsLoopingEnabled",
+        "IgnoreParentMaxSoundInstance",
+        "UseMaxSoundPerInstance",
+        "MaxSoundPerInstance",
+        "OverrideOutput",
+    )
+    assert all(
+        row.preserve_property_tokens == expected_property_tokens
+        and row.preserve_reference_tokens == ("OutputBus",)
+        and row.pre_state_file is not None
+        and row.pre_state_file.sha256 != row.source_file.sha256
+        for row in runtime.plan.rows[:3]
+    )
+    assert all(
+        row["compound_dynamic_mode"] == "preserve"
+        for row in materialized.expected_rows[:3]
+    )
+    assert all(
+        row.expected_properties and row.expected_references
+        for row in runtime.plan.rows[3:]
+    )
+    assert all(
+        row["compound_dynamic_mode"] == "mutate"
+        for row in materialized.expected_rows[3:]
+    )
+
+    rows = [dict(row) for row in materialized.expected_rows]
+    dynamic_index = next(
+        index
+        for index, row in enumerate(rows)
+        if row["compound_effective_properties"]
+        and row["compound_effective_references"]
+    )
+    rows[dynamic_index]["compound_effective_references"] = []
+    malformed = replace(materialized, expected_rows=tuple(rows))
+
+    with pytest.raises(
+        ImportRuntimeError,
+        match="property and reference expectations together or omit both",
+    ):
+        prepare_import_runtime(
+            unit.scenario,
+            malformed,
+            sandbox_project=runtime.plan.sandbox_project,
+            backend=backend,
+            reference_fixtures=fixtures,
+        )
+
+    rows = [dict(row) for row in materialized.expected_rows]
+    rows[dynamic_index]["compound_effective_properties"] = []
+    rows[dynamic_index]["compound_effective_references"] = []
+    missing_both = replace(materialized, expected_rows=tuple(rows))
+
+    with pytest.raises(
+        ImportRuntimeError,
+        match="mutate row requires dynamic expectations",
+    ):
+        prepare_import_runtime(
+            unit.scenario,
+            missing_both,
+            sandbox_project=runtime.plan.sandbox_project,
+            backend=backend,
+            reference_fixtures=fixtures,
+        )
+
+    rows = [dict(row) for row in materialized.expected_rows]
+    rows[0]["compound_dynamic_mode"] = "mutate"
+    relabeled_preserve = replace(materialized, expected_rows=tuple(rows))
+
+    with pytest.raises(
+        ImportRuntimeError,
+        match="dynamic mode differs from the reviewed case spec",
+    ):
+        prepare_import_runtime(
+            unit.scenario,
+            relabeled_preserve,
+            sandbox_project=runtime.plan.sandbox_project,
+            backend=backend,
+            reference_fixtures=fixtures,
+        )
+
+
+@pytest.mark.parametrize("drift_kind", ("property", "reference"))
+def test_compound_preserve_row_rejects_any_dynamic_value_drift(
+    tmp_path: Path,
+    drift_kind: str,
+) -> None:
+    unit, _materialized, backend, fixtures, runtime = _compound_prepared(
+        tmp_path,
+        unit_id="CMP22-O22-AUDIO-TAB-04",
+    )
+    preserve = runtime.plan.rows[0]
+    backend.apply_case(unit.scenario, runtime.plan)
+    target = backend._get_path(preserve.target_path)
+    assert target is not None
+    if drift_kind == "property":
+        target.dynamic[preserve.preserve_property_tokens[0]] = True
+    else:
+        target.dynamic[preserve.preserve_reference_tokens[0]] = {
+            "id": fixtures.fixtures[0].id,
+        }
+
+    verification = runtime.verify_after_execution()
+
+    assert not verification.passed
+    assert any(
+        "changed during media replacement" in failure
+        for failure in verification.failures
+    )
+
+
+def test_compound_preserve_oracle_does_not_change_mutate_row_semantics(
+    tmp_path: Path,
+) -> None:
+    unit, _materialized, backend, _fixtures, runtime = _compound_prepared(
+        tmp_path,
+        unit_id="CMP25-O22-AUDIO-TAB-04",
+    )
+    mutate_rows = [
+        row
+        for row in runtime.plan.rows
+        if row.expected_properties or row.expected_references
+    ]
+    assert mutate_rows
+    assert all(
+        not row.preserve_property_tokens and not row.preserve_reference_tokens
+        for row in mutate_rows
+    )
+
+    backend.apply_case(unit.scenario, runtime.plan)
+    verification = runtime.verify_after_execution()
+
+    verification.assert_passed()
+    assert isinstance(verification.after, ImportCompoundRuntimeSnapshot)
+    for row in mutate_rows:
+        state = verification.after.row(row.row_key)
+        assert {item.name: item.value for item in state.properties} == {
+            item.name: item.value for item in row.expected_properties
+        }
+        assert {
+            item.name: item.target_id for item in state.references
+        } == {
+            item.name: item.target_id for item in row.expected_references
+        }
+
+
+def test_compound_preserve_mode_rejects_wrong_boundary_and_equal_media(
+    tmp_path: Path,
+) -> None:
+    unit, materialized, _backend, fixtures, runtime = _compound_prepared(
+        tmp_path,
+        unit_id="CMP22-O22-AUDIO-TAB-04",
+    )
+    rows = [dict(row) for row in materialized.expected_rows]
+    rows[0]["guid_policy"] = "preserve_shared_existing_guid"
+    wrong_boundary = replace(materialized, expected_rows=tuple(rows))
+    with pytest.raises(ImportRuntimeError, match="preserve mode is only valid"):
+        build_import_runtime_plan(
+            unit.scenario,
+            wrong_boundary,
+            sandbox_project=runtime.plan.sandbox_project,
+            reference_fixtures=fixtures,
+        )
+
+    staged = materialize_import_case(
+        unit.scenario,
+        version=unit.version,
+        asset_root=tmp_path / "equal-media-assets",
+    )
+    preserve_raw = staged.expected_rows[0]
+    pre_key = preserve_raw["pre_state"]["media_sha256_key"]
+    source_key = preserve_raw["source_key"]
+    source_sha256 = next(
+        item.sha256 for item in staged.source_files if item.key == source_key
+    )
+    pre_files = tuple(
+        replace(item, sha256=source_sha256)
+        if item.key == pre_key
+        else item
+        for item in staged.pre_state_files
+    )
+    equal_media = replace(staged, pre_state_files=pre_files)
+    equal_sandbox = tmp_path / "equal-media-sandbox"
+    equal_sandbox.mkdir()
+    equal_project = equal_sandbox / "SampleProject.wproj"
+    equal_project.write_text("<WwiseDocument/>", encoding="utf-8")
+    equal_backend = _FakeImportBackend(equal_sandbox)
+    equal_fixtures = prepare_import_reference_fixtures(
+        unit.scenario,
+        equal_media,
+        version=unit.version,
+        backend=equal_backend,
+    )
+    equal_media = bind_import_live_metadata(
+        equal_media,
+        version=unit.version,
+        discovery_payload={"agent_result": _sound_discovery()},
+        reference_targets=equal_fixtures.request_reference_targets,
+    )
+    with pytest.raises(ImportRuntimeError, match="media hashes are equal"):
+        build_import_runtime_plan(
+            unit.scenario,
+            equal_media,
+            sandbox_project=equal_project,
+            reference_fixtures=equal_fixtures,
+        )
+
+
+def test_compound_reference_fixture_handle_emergency_cleanup_is_idempotent(
+    tmp_path: Path,
+) -> None:
+    unit = load_compound_heavy_profile(
+        COMPOUND_PROFILE,
+        unit_ids=("CMP22-O22-AUDIO-IMPORT-02",),
+    ).units[0]
+    sandbox = tmp_path / "sandbox"
+    sandbox.mkdir()
+    staged = materialize_import_case(
+        unit.scenario,
+        version=unit.version,
+        asset_root=tmp_path / "assets",
+    )
+    backend = _FakeImportBackend(sandbox)
+    fixtures = prepare_import_reference_fixtures(
+        unit.scenario,
+        staged,
+        version=unit.version,
+        backend=backend,
+    )
+
+    first = fixtures.cleanup_emergency()
+    second = fixtures.cleanup_emergency()
+
+    assert first.paths_absent and not first.already_clean
+    assert second.paths_absent and second.already_clean
+
+
+def test_compound_prepare_failure_rolls_back_adopted_reference_fixtures(
+    tmp_path: Path,
+) -> None:
+    unit = load_compound_heavy_profile(
+        COMPOUND_PROFILE,
+        unit_ids=("CMP22-O22-AUDIO-IMPORT-02",),
+    ).units[0]
+    sandbox = tmp_path / "sandbox"
+    sandbox.mkdir()
+    project = sandbox / "SampleProject.wproj"
+    project.write_text("<WwiseDocument/>", encoding="utf-8")
+    asset_root = tmp_path / "assets"
+    staged = materialize_import_case(
+        unit.scenario,
+        version=unit.version,
+        asset_root=asset_root,
+    )
+    backend = _FakeImportBackend(sandbox)
+    fixtures = prepare_import_reference_fixtures(
+        unit.scenario,
+        staged,
+        version=unit.version,
+        backend=backend,
+    )
+    bound = bind_import_live_metadata(
+        staged,
+        version=unit.version,
+        discovery_payload={"agent_result": _sound_discovery()},
+        reference_targets=fixtures.request_reference_targets,
+    )
+    actor_root = backend._get_path(
+        get_codex_version_layout_v3(unit.version).actor_default_work_unit
+    )
+    assert actor_root is not None
+    backend.cleanup_delete(actor_root.id)
+
+    with pytest.raises(
+        ImportRuntimeError,
+        match="required Wwise fixture root is unavailable",
+    ):
+        prepare_import_runtime(
+            unit.scenario,
+            bound,
+            sandbox_project=project,
+            backend=backend,
+            reference_fixtures=fixtures,
+        )
+
+    assert fixtures.adopted and fixtures.cleaned
+    assert not asset_root.exists()
+    assert all(
+        not backend.read_objects(path=path, fields=EVENT_FIELDS)
+        for path in fixtures.paths
+    )
+
+
+def test_compound_runtime_rejects_reference_target_or_dynamic_readback_drift(
+    tmp_path: Path,
+) -> None:
+    unit, _, backend, fixtures, runtime = _compound_prepared(
+        tmp_path,
+        unit_id="CMP25-O22-AUDIO-IMPORT-02",
+    )
+    backend.apply_case(unit.scenario, runtime.plan)
+    first = runtime.plan.rows[0]
+    target = backend._get_path(first.target_path)
+    assert target is not None
+    target.dynamic[first.expected_references[0].name] = {
+        "id": fixtures.main_bus.id,
+    }
+    dependency = first.expected_references[0].activation_properties[0]
+    target.dynamic[dependency.name] = False
+
+    verification = runtime.verify_after_execution()
+
+    assert not verification.passed
+    assert any("target GUID mismatch" in item for item in verification.failures)
+    assert any("local @" in item for item in verification.failures)
 
 
 def test_all_ten_import_cases_build_and_prepare_with_hidden_live_state(tmp_path) -> None:

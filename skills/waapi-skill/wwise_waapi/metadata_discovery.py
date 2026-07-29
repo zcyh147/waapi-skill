@@ -13,6 +13,7 @@ by transaction previews.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Sequence
@@ -31,7 +32,8 @@ from .builders.metadata import (
 from .canonical import canonical_json_bytes
 
 
-METADATA_DISCOVERY_CONTRACT = "waapi-skill.metadata-discovery/v1"
+METADATA_DISCOVERY_CONTRACT = "waapi-skill.metadata-discovery/v2"
+METADATA_DISCOVERY_DETAIL_CONTRACT = "waapi-skill.metadata-discovery/v1"
 
 MAX_METADATA_DISCOVERY_QUERIES = 8
 MAX_METADATA_DISCOVERY_QUERY_CHARS = 160
@@ -47,6 +49,7 @@ MAX_METADATA_DISCOVERY_FALLBACK_DETAIL_SCAN = 256
 MAX_METADATA_DISCOVERY_DEPENDENCIES = 16
 MAX_METADATA_DISCOVERY_DEPENDENCY_DEPTH = 2
 MAX_METADATA_DISCOVERY_INFO_BYTES = 32 * 1024
+MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES = 28 * 1024
 MAX_METADATA_DISCOVERY_RESULT_BYTES = 512 * 1024
 MAX_METADATA_DISCOVERY_ERROR_DETAILS_BYTES = 8 * 1024
 
@@ -105,18 +108,37 @@ class MetadataDiscoveryResult:
     unresolved_dependencies: tuple[Mapping[str, Any], ...]
     fallback_detail_scan: Mapping[str, Any]
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self, *, detail: bool = False) -> dict[str, Any]:
+        """Return the compact agent contract or the reviewed full audit view."""
+
         payload = {
-            "contract": METADATA_DISCOVERY_CONTRACT,
+            "contract": (
+                METADATA_DISCOVERY_DETAIL_CONTRACT
+                if detail
+                else METADATA_DISCOVERY_CONTRACT
+            ),
             "authority": "live-waapi",
+            **({} if detail else {"result_detail": "compact"}),
             "scope": dict(self.scope),
             "queries": list(self.queries),
             "available_name_count": self.available_name_count,
             "candidate_count": len(self.candidates),
             "query_results": [dict(item) for item in self.query_results],
-            "candidates": [dict(item) for item in self.candidates],
+            "candidates": [
+                (
+                    dict(item)
+                    if detail
+                    else _compact_candidate_payload(item)
+                )
+                for item in self.candidates
+            ],
             "dependency_candidates": [
-                dict(item) for item in self.dependency_candidates
+                (
+                    dict(item)
+                    if detail
+                    else _compact_dependency_candidate_payload(item)
+                )
+                for item in self.dependency_candidates
             ],
             "dependency_closure_complete": self.dependency_closure_complete,
             "unresolved_dependencies": [
@@ -126,7 +148,15 @@ class MetadataDiscoveryResult:
             "selection_required": True,
             "exact_live_name_required_for_mutation": True,
         }
-        _require_result_size(payload)
+        _require_result_size(
+            payload,
+            maximum_bytes=(
+                MAX_METADATA_DISCOVERY_RESULT_BYTES
+                if detail
+                else MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES
+            ),
+            pretty=not detail,
+        )
         return payload
 
 
@@ -747,6 +777,13 @@ def _resolve_dependency_closure(
             continue
         expanded.add(expansion_key)
         for index, dependency in enumerate(info.dependencies):
+            if _is_terminal_structural_dependency(dependency):
+                # Wwise 2024+ may expose a visibility predicate such as
+                # ``isMasterBus == false``.  It describes the current object
+                # shape and names no further property to retrieve.  Preserve
+                # it in the candidate's original metadata, but do not invent
+                # a dependency token or mark the property closure incomplete.
+                continue
             context = dependency.get("context")
             property_name = dependency.get("property")
             if (
@@ -853,6 +890,19 @@ def _resolve_dependency_closure(
     )
 
 
+def _is_terminal_structural_dependency(dependency: Mapping[str, Any]) -> bool:
+    """Recognize one schema-defined predicate that has no property edge."""
+
+    return (
+        set(dependency) == {"type", "action", "context", "value"}
+        and dependency.get("type") == "isMasterBus"
+        and isinstance(dependency.get("action"), str)
+        and bool(dependency["action"].strip())
+        and dependency.get("context", "").casefold() == "self"
+        and isinstance(dependency.get("value"), bool)
+    )
+
+
 def _candidate_payload(
     candidate: _Candidate,
     *,
@@ -878,6 +928,161 @@ def _candidate_payload(
         "same_object_dependencies": list(same_object_dependencies),
         "metadata": candidate.info.as_dict(),
     }
+
+
+def _compact_candidate_payload(candidate: Mapping[str, Any]) -> dict[str, Any]:
+    """Project one live candidate to the fields needed for safe selection."""
+
+    name = str(candidate["name"])
+    metadata = candidate["metadata"]
+    assert isinstance(metadata, Mapping)
+    return {
+        "name": name,
+        "kind": candidate["kind"],
+        "matched_queries": list(candidate["matched_queries"]),
+        "same_object_dependencies": list(
+            candidate["same_object_dependencies"]
+        ),
+        "dependency_requirements": _compact_dependency_requirements(
+            metadata,
+            owner_name=name,
+        ),
+        "metadata": _compact_metadata(metadata),
+    }
+
+
+def _compact_dependency_candidate_payload(
+    candidate: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Project dependency detail without repeating bulky UI-only metadata."""
+
+    name = str(candidate["name"])
+    metadata = candidate["metadata"]
+    assert isinstance(metadata, Mapping)
+    return {
+        "name": name,
+        "kind": candidate["kind"],
+        "required_by": list(candidate["required_by"]),
+        "dependency_requirements": _compact_dependency_requirements(
+            metadata,
+            owner_name=name,
+        ),
+        "metadata": _compact_metadata(metadata),
+    }
+
+
+def _compact_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
+    """Keep mutation-relevant metadata and omit redundant presentation bulk."""
+
+    display = metadata.get("display")
+    compact_display = (
+        {
+            key: display[key]
+            for key in ("name", "group")
+            if key in display
+        }
+        if isinstance(display, Mapping)
+        else {}
+    )
+    restriction = metadata.get("restriction")
+    compact_restriction = (
+        dict(restriction) if isinstance(restriction, Mapping) else {}
+    )
+    payload = {
+        "name": metadata["name"],
+        "type": metadata["type"],
+        "default": metadata.get("default"),
+        "display": compact_display,
+        "restriction": compact_restriction,
+    }
+    if (
+        str(compact_restriction.get("type", "")).casefold() == "range"
+        and (
+            "min" in compact_restriction
+            or "max" in compact_restriction
+        )
+    ):
+        payload["range"] = {
+            key: compact_restriction[key]
+            for key in ("min", "max")
+            if key in compact_restriction
+        }
+    return payload
+
+
+def _compact_dependency_requirements(
+    metadata: Mapping[str, Any],
+    *,
+    owner_name: str,
+) -> list[dict[str, Any]]:
+    """Expose direct same-object dependency names and live-required values."""
+
+    dependencies = metadata.get("dependencies")
+    if not isinstance(dependencies, list | tuple):
+        return []
+    requirements: list[dict[str, Any]] = []
+    for dependency in dependencies:
+        if not isinstance(dependency, Mapping):
+            continue
+        context = dependency.get("context")
+        name = dependency.get("property")
+        if (
+            not isinstance(context, str)
+            or context.casefold() != "self"
+            or not isinstance(name, str)
+            or not name
+            or name.casefold() == owner_name.casefold()
+        ):
+            continue
+        requirement = dict(dependency)
+        requirement["required_values"] = _dependency_required_values(
+            dependency
+        )
+        requirements.append(requirement)
+    return requirements
+
+
+def _dependency_required_values(
+    dependency: Mapping[str, Any],
+) -> list[Any]:
+    """Return exact condition values, plus the reviewed Boolean override case."""
+
+    values: list[Any] = []
+    seen: set[bytes] = set()
+    conditions = dependency.get("conditions")
+    if isinstance(conditions, list | tuple):
+        for condition in conditions:
+            restriction = (
+                condition.get("restriction")
+                if isinstance(condition, Mapping)
+                else None
+            )
+            rows = (
+                restriction.get("values")
+                if isinstance(restriction, Mapping)
+                else None
+            )
+            if not isinstance(rows, list | tuple):
+                continue
+            for row in rows:
+                if not isinstance(row, Mapping) or "value" not in row:
+                    continue
+                value = row["value"]
+                try:
+                    canonical = canonical_json_bytes(value)
+                except (TypeError, ValueError):
+                    continue
+                if canonical not in seen:
+                    seen.add(canonical)
+                    values.append(value)
+    if values:
+        return values
+    if (
+        dependency.get("type") == "override"
+        and dependency.get("action") == "Enable"
+    ):
+        return [True]
+    return []
 
 
 def _query_status(
@@ -1067,28 +1272,48 @@ def _bounded_text(value: str, maximum: int) -> str:
     return value[: maximum - 1] + "…"
 
 
-def _require_result_size(payload: Mapping[str, Any]) -> None:
+def _require_result_size(
+    payload: Mapping[str, Any],
+    *,
+    maximum_bytes: int = MAX_METADATA_DISCOVERY_RESULT_BYTES,
+    pretty: bool = False,
+) -> None:
     try:
-        size = len(canonical_json_bytes(payload))
+        size = (
+            len(
+                json.dumps(
+                    payload,
+                    ensure_ascii=False,
+                    indent=2,
+                    sort_keys=False,
+                    allow_nan=False,
+                ).encode("utf-8")
+            )
+            + 1
+            if pretty
+            else len(canonical_json_bytes(payload))
+        )
     except (TypeError, ValueError) as exc:
         raise MetadataDiscoveryError(
             "INVALID_LIVE_METADATA",
             "Metadata discovery result contains non-JSON live metadata.",
             details={"cause_type": type(exc).__name__},
         ) from exc
-    if size > MAX_METADATA_DISCOVERY_RESULT_BYTES:
+    if size > maximum_bytes:
         raise MetadataDiscoveryError(
             "DISCOVERY_RESULT_LIMIT_EXCEEDED",
             "Metadata discovery result exceeds the public size limit.",
             details={
                 "size_bytes": size,
-                "limit_bytes": MAX_METADATA_DISCOVERY_RESULT_BYTES,
+                "limit_bytes": maximum_bytes,
+                "result_detail": payload.get("result_detail"),
             },
         )
 
 
 __all__ = [
     "DEFAULT_METADATA_DISCOVERY_LIMIT",
+    "MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES",
     "MAX_METADATA_DISCOVERY_FALLBACK_DETAIL_SCAN",
     "MAX_METADATA_DISCOVERY_LIMIT",
     "MAX_METADATA_DISCOVERY_NAME_CHARS",
@@ -1096,6 +1321,7 @@ __all__ = [
     "MAX_METADATA_DISCOVERY_QUERY_CHARS",
     "MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS",
     "METADATA_DISCOVERY_CONTRACT",
+    "METADATA_DISCOVERY_DETAIL_CONTRACT",
     "MetadataDiscoveryError",
     "MetadataDiscoveryResult",
     "discover_metadata",

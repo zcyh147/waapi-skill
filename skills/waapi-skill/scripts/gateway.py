@@ -149,6 +149,7 @@ from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[re
     verify_prepared_operation,
 )
 from wwise_waapi.platform_paths import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT,
     WwiseWirePathError,
     adapt_cli_dispatch_paths,
     requires_wwise_wire_path_adaptation,
@@ -247,6 +248,7 @@ ORIGINAL_FILE_REFERENCE_MATCH_CONTRACT = (
 )
 SUBSCRIPTION_CLEANUP_AFTER_RETRY = "unsubscribed_after_retry"
 NAMED_OPERATION_WIRE_PATH_URIS: Mapping[str, str] = {
+    "audio.importTabDelimited": "ak.wwise.core.audio.importTabDelimited",
     "lua.executeCliFile": "ak.wwise.cli.executeLuaScript",
     "soundbank.convertExternalSources": (
         "ak.wwise.core.soundbank.convertExternalSources"
@@ -258,6 +260,7 @@ NAMED_OPERATION_WIRE_PATH_URIS: Mapping[str, str] = {
 PROJECT_IDENTITY_FIELDS = ("id", "name", "path")
 EXPANDING_QUERY_SELECTS = frozenset({"descendants", "ancestors", "referencesTo", "children"})
 MAX_GATEWAY_RESULT_JSON_BYTES = 1024 * 1024
+MAX_METADATA_DISCOVERY_GATEWAY_RESULT_BYTES = 32 * 1024
 TOPIC_STREAM_POLL_SECONDS = 0.05
 TOPIC_STREAM_HEALTH_INTERVAL_SECONDS = 5.0
 MAX_GATEWAY_JSON_INPUT_BYTES = 256 * 1024
@@ -281,6 +284,9 @@ TRANSACTION_SHOW_SUMMARY_FIXED_BUDGET_BYTES = 6 * 1024
 TRANSACTION_SHOW_SUMMARY_TARGET_BYTES = 4 * 1024
 TRANSACTION_SHOW_SUMMARY_CONTRACT = "waapi-skill.transaction-show-summary/v1"
 TRANSACTION_NEXT_COMMAND_CONTRACT = "waapi-skill.gateway-next-command/v1"
+TRANSACTION_COMMAND_COPY_INSTRUCTION_CONTRACT = (
+    "waapi-skill.gateway-command-copy-instruction/v1"
+)
 TRANSACTION_CONFIRMATION_BINDING_CONTRACT = (
     "waapi-skill.confirmation-binding/v1"
 )
@@ -1120,6 +1126,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     metadata.add_argument(
+        "--detail",
+        action="store_true",
+        help=(
+            "For metadata discover only, opt into the larger legacy-v1 full "
+            "live-metadata audit view; ordinary mutation selection uses the "
+            "compact v2 default"
+        ),
+    )
+    metadata.add_argument(
         "--summary-only",
         action="store_true",
         help=(
@@ -1398,7 +1413,19 @@ def execute_gateway(
     )
     if payload.get("command") in OFFLINE_COMMANDS:
         return exit_code, payload
-    return constrain_live_gateway_result(exit_code, payload)
+    result_limit = (
+        MAX_METADATA_DISCOVERY_GATEWAY_RESULT_BYTES
+        if payload.get("command") == "metadata"
+        and payload.get("operation") == "discover"
+        and isinstance(payload.get("agent_result"), Mapping)
+        and payload["agent_result"].get("result_detail") == "compact"
+        else MAX_GATEWAY_RESULT_JSON_BYTES
+    )
+    return constrain_live_gateway_result(
+        exit_code,
+        payload,
+        limit_bytes=result_limit,
+    )
 
 
 def _execute_gateway_unconstrained(
@@ -1628,10 +1655,12 @@ def _execute_gateway_unconstrained(
 def constrain_live_gateway_result(
     exit_code: int,
     payload: dict[str, Any],
+    *,
+    limit_bytes: int = MAX_GATEWAY_RESULT_JSON_BYTES,
 ) -> tuple[int, dict[str, Any]]:
     """Bound the complete live gateway document, including its outer envelope."""
 
-    probe = probe_gateway_json_document_size(payload, MAX_GATEWAY_RESULT_JSON_BYTES)
+    probe = probe_gateway_json_document_size(payload, limit_bytes)
     if probe == "ok":
         return exit_code, payload
     error_code = "RESULT_TOO_LARGE" if probe == "too_large" else "RESULT_NOT_JSON"
@@ -1648,8 +1677,8 @@ def constrain_live_gateway_result(
     if probe == "too_large":
         details.update(
             {
-                "limit_bytes": MAX_GATEWAY_RESULT_JSON_BYTES,
-                "observed_at_least_bytes": MAX_GATEWAY_RESULT_JSON_BYTES + 1,
+                "limit_bytes": limit_bytes,
+                "observed_at_least_bytes": limit_bytes + 1,
             }
         )
     result: dict[str, Any] = {
@@ -1680,7 +1709,7 @@ def constrain_live_gateway_result(
 
 
 def probe_gateway_json_document_size(value: Any, limit_bytes: int) -> str:
-    """Return ok/too_large/not_json for the exact pretty stdout document."""
+    """Return ok/too_large/not_json for the exact terminal stdout document."""
 
     try:
         observed = gateway_json_document_size(value, stop_after_bytes=limit_bytes)
@@ -1701,7 +1730,7 @@ def gateway_json_document_size(
     for every caller that supplied a ceiling.
     """
 
-    encoder = gateway_stdout_json_encoder()
+    encoder = gateway_stdout_json_encoder(value)
     observed = 0
     for chunk in encoder.iterencode(value):
         observed += len(chunk.encode("utf-8"))
@@ -1710,16 +1739,25 @@ def gateway_json_document_size(
     return observed + 1  # print() appends one newline
 
 
-def gateway_stdout_json_encoder() -> json.JSONEncoder:
-    """Build the strict, insertion-ordered encoder used for gateway stdout."""
+def gateway_stdout_json_encoder(value: Any | None = None) -> json.JSONEncoder:
+    """Build the strict, insertion-ordered encoder used for gateway stdout.
 
-    return json.JSONEncoder(
-        ensure_ascii=False,
-        indent=2,
-        sort_keys=False,
-        allow_nan=False,
-        check_circular=True,
-    )
+    Named operation schemas retain their complete payload but use compact JSON
+    so the terminal document stays visible within bounded agent tool output.
+    Other gateway documents retain the existing pretty representation.
+    """
+
+    options: dict[str, Any] = {
+        "ensure_ascii": False,
+        "sort_keys": False,
+        "allow_nan": False,
+        "check_circular": True,
+    }
+    if isinstance(value, Mapping) and value.get("command") == "operation-schema":
+        options["separators"] = (",", ":")
+    else:
+        options["indent"] = 2
+    return json.JSONEncoder(**options)
 
 
 def bounded_gateway_label(value: Any, maximum_bytes: int) -> str | None:
@@ -2501,12 +2539,13 @@ def preflight_metadata_input(args: argparse.Namespace) -> None:
         args.object_type is not None
         or args.queries is not None
         or args.limit is not None
+        or args.detail
     )
     if args.operation != "discover":
         if discovery_only_supplied:
             raise GatewayInputError(
-                "metadata --object-type, --query, and --limit are supported only "
-                "for the discover operation"
+                "metadata --object-type, --query, --limit, and --detail are "
+                "supported only for the discover operation"
             )
         return
 
@@ -2957,7 +2996,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "status": "ok" if spec.implemented else "unsupported_boundary",
             "command": "operation-schema",
             "offline": True,
-            "operation": spec.as_dict(),
+            "operation": spec.as_dict(version=request_version),
             "request_envelope": request_envelope,
             "request_envelope_policy": {
                 "status": request_envelope_status,
@@ -4493,7 +4532,7 @@ def dispatch_command(
                 "operation": args.operation,
                 "metadata_authority": "live-waapi",
             }
-            payload["agent_result"] = discovery.as_dict()
+            payload["agent_result"] = discovery.as_dict(detail=args.detail)
             return payload
         preview = build_metadata_command_preview(args, version=detected_version)
         envelope = preview.envelope
@@ -5143,6 +5182,97 @@ def emit_topic_stream_record(
         sink(record)
 
 
+def _validated_tab_import_wire_path_input_audit(
+    *,
+    call_uri: str,
+    prepared: Mapping[str, Any],
+    import_guard: Mapping[str, Any],
+    io_audit: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    """Bind the one reviewed tab-import read path to dispatch and file proof."""
+
+    if (
+        io_audit.get("contract") != WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT
+        or io_audit.get("uri") != call_uri
+        or io_audit.get("scope") != "transient_dispatch_read_paths_only"
+    ):
+        raise WwiseWirePathError(
+            "WIRE_PATH_AUDIT_MISMATCH",
+            "The tab-delimited import path audit has an unsupported contract, URI, or scope.",
+        )
+    audit_paths = io_audit.get("paths")
+    if not isinstance(audit_paths, list) or len(audit_paths) != 1:
+        raise WwiseWirePathError(
+            "WIRE_PATH_AUDIT_MISMATCH",
+            "The tab-delimited import path audit must contain exactly one path.",
+        )
+    audit_path = audit_paths[0]
+    expected_path_keys = {
+        "section",
+        "json_path",
+        "field",
+        "role",
+        "raw_path",
+        "resolved_path",
+    }
+    if (
+        not isinstance(audit_path, Mapping)
+        or set(audit_path) != expected_path_keys
+        or audit_path.get("section") != "args"
+        or audit_path.get("json_path") != "$.args.importFile"
+        or audit_path.get("field") != "importFile"
+        or audit_path.get("role") != "read"
+    ):
+        raise WwiseWirePathError(
+            "WIRE_PATH_AUDIT_MISMATCH",
+            "The tab-delimited import path audit does not name the reviewed importFile input.",
+        )
+
+    dispatch = prepared.get("dispatch")
+    dispatch_args = dispatch.get("args") if isinstance(dispatch, Mapping) else None
+    import_file = (
+        dispatch_args.get("importFile")
+        if isinstance(dispatch_args, Mapping)
+        else None
+    )
+    file_proofs = import_guard.get("file_proofs")
+    if (
+        import_guard.get("source_operation") != "audio.importTabDelimited"
+        or not isinstance(dispatch, Mapping)
+        or dispatch.get("uri") != call_uri
+        or not isinstance(import_file, str)
+        or not isinstance(file_proofs, list)
+    ):
+        raise WwiseWirePathError(
+            "WIRE_PATH_AUDIT_MISMATCH",
+            "The tab-delimited import path audit is not bound to one prepared importFile proof.",
+        )
+    import_file_proof_rows = [
+        row
+        for row in file_proofs
+        if isinstance(row, Mapping) and row.get("field") == "import_file"
+    ]
+    if len(import_file_proof_rows) != 1:
+        raise WwiseWirePathError(
+            "WIRE_PATH_AUDIT_MISMATCH",
+            "The tab-delimited import path audit requires one unique importFile proof.",
+        )
+    file_proof = import_file_proof_rows[0].get("proof")
+    proven_path = file_proof.get("path") if isinstance(file_proof, Mapping) else None
+    if (
+        not isinstance(proven_path, str)
+        or not Path(proven_path).is_absolute()
+        or audit_path.get("raw_path") != import_file
+        or audit_path.get("resolved_path") != proven_path
+        or import_file != proven_path
+    ):
+        raise WwiseWirePathError(
+            "WIRE_PATH_AUDIT_MISMATCH",
+            "The tab-delimited import dispatch, path audit, and canonical file proof differ.",
+        )
+    return io_audit
+
+
 def prepared_wire_path_io_audit(
     *,
     operation: str,
@@ -5157,6 +5287,7 @@ def prepared_wire_path_io_audit(
             "WIRE_PATH_AUDIT_MISSING",
             "The authorized preview lacks sealed execution state for path adaptation.",
         )
+    import_guard: Mapping[str, Any] | None = None
     if operation == "waapi.call" and call_uri.startswith("ak.wwise.cli."):
         execution_contract = pre_state.get("execution_contract")
         io_audit = (
@@ -5180,6 +5311,14 @@ def prepared_wire_path_io_audit(
         if operation == "lua.executeCliFile":
             io_audit = pre_state.get("lua_io_audit")
             context = "Lua"
+        elif operation == "audio.importTabDelimited":
+            import_guard = pre_state.get("import_guard")
+            io_audit = (
+                import_guard.get("wire_path_input_audit")
+                if isinstance(import_guard, Mapping)
+                else None
+            )
+            context = "tab-delimited import"
         else:
             soundbank_guard = pre_state.get("soundbank_guard")
             io_audit = (
@@ -5189,9 +5328,26 @@ def prepared_wire_path_io_audit(
             )
             context = "SoundBank"
     if not isinstance(io_audit, Mapping):
+        audit_name = (
+            "path audit"
+            if operation == "audio.importTabDelimited"
+            else "isolated-I/O audit"
+        )
         raise WwiseWirePathError(
             "WIRE_PATH_AUDIT_MISSING",
-            f"The authorized {context} preview lacks its sealed isolated-I/O audit.",
+            f"The authorized {context} preview lacks its sealed {audit_name}.",
+        )
+    if operation == "audio.importTabDelimited":
+        if not isinstance(import_guard, Mapping):
+            raise WwiseWirePathError(
+                "WIRE_PATH_AUDIT_MISSING",
+                "The authorized tab-delimited import preview lacks its sealed import guard.",
+            )
+        return _validated_tab_import_wire_path_input_audit(
+            call_uri=call_uri,
+            prepared=prepared,
+            import_guard=import_guard,
+            io_audit=io_audit,
         )
     if io_audit.get("uri") != call_uri:
         raise WwiseWirePathError(
@@ -8352,10 +8508,22 @@ def transaction_next_command(
         payload["requires_later_user_message"] = True
     if os.name == "nt":
         payload["shell_family"] = "windows-cmd"
-        payload["shell_command"] = subprocess.list2cmdline(full_argv)
+        shell_command = subprocess.list2cmdline(full_argv)
     else:
         payload["shell_family"] = "posix-sh"
-        payload["shell_command"] = shlex.join(full_argv)
+        shell_command = shlex.join(full_argv)
+    payload["copy_instruction"] = {
+        "contract": TRANSACTION_COMMAND_COPY_INSTRUCTION_CONTRACT,
+        "source_field": "shell_command",
+        "action": "execute_verbatim_as_one_shell_tool_call",
+        "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+        ],
+    }
+    payload["shell_command"] = shell_command
     return payload
 
 
@@ -10273,7 +10441,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if payload.get("contract") == TOPIC_STREAM_RECORD_CONTRACT:
         print(topic_stream_stdout_json_encoder().encode(payload), flush=True)
     else:
-        print(gateway_stdout_json_encoder().encode(payload))
+        print(gateway_stdout_json_encoder(payload).encode(payload))
     return exit_code
 
 

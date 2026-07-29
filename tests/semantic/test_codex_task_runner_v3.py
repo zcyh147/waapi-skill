@@ -12,17 +12,24 @@ from tests.semantic.support.codex_business_oracle_plan_v3 import (
     write_business_oracle_plan,
 )
 from tests.semantic.support import codex_task_runner_v3 as task_runner
-from tests.semantic.support.codex_eval_protocol_v3 import V3GatewayProtocol
+from tests.semantic.support.codex_eval_protocol_v3 import (
+    V3GatewayProtocol,
+    build_transaction_protocol,
+)
 from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
     GatewayBrokerReconciliation,
 )
 from tests.semantic.support.codex_harness import (
+    CodexCommandRecord,
     CodexInfrastructureError,
     CodexInfrastructureFailure,
 )
 from tests.semantic.support.codex_task_runner_v3 import _grade_common_turn
-from tests.semantic.support.codex_prompt_provenance_v3 import write_prompt_provenance
+from tests.semantic.support.codex_prompt_provenance_v3 import (
+    PromptProvenanceEvidence,
+    write_prompt_provenance,
+)
 
 
 def _result(*, turn: int, gateway_count: int):
@@ -150,6 +157,178 @@ def test_common_grade_does_not_hide_unproven_or_non_gateway_unexpected_commands(
     )
 
     assert "no_unexpected_commands" in errors
+
+
+def _sealed_asset_grade_fixture(
+    tmp_path: Path,
+) -> tuple[PromptProvenanceEvidence, CodexCommandRecord]:
+    root = tmp_path / "scenario"
+    owned = root / "owned"
+    asset = owned / "assets" / "import.tsv"
+    content = "Object Path\t@Volume\n<Sound>A\t-3\n"
+    encoded = content.encode("utf-8")
+    provenance = PromptProvenanceEvidence(
+        path=root / "evidence" / "prompt-provenance.json",
+        sha256="a" * 64,
+        payload={
+            "scenario_root": str(root),
+            "owned_root": str(owned),
+            "request": {
+                "rendered_prompt": f"导入表是 {asset}",
+                "inputs": [
+                    {
+                        "name": "import_file",
+                        "kind": "absolute_file_path",
+                        "value": str(asset),
+                        "leaf_bindings": [
+                            {
+                                "pointer": "",
+                                "origin_kind": "owned_path",
+                                "path_kind": "file",
+                                "owned_relative_path": "assets/import.tsv",
+                                "size": len(encoded),
+                                "sha256": hashlib.sha256(encoded).hexdigest(),
+                                "mtime_ns": 1,
+                            }
+                        ],
+                    }
+                ],
+            },
+        },
+        prompts=(f"导入表是 {asset}",),
+        visible_values={"import_file": str(asset)},
+        protocol=None,  # type: ignore[arg-type]
+    )
+    record = CodexCommandRecord(
+        command=f"/bin/bash -lc 'cat {asset}'",
+        exit_code=0,
+        status="completed",
+        aggregated_output=content,
+        argv=("cat", str(asset)),
+        has_shell_operators=False,
+    )
+    return provenance, record
+
+
+def test_common_grade_allows_one_exact_sealed_prompt_asset_cat(
+    tmp_path: Path,
+) -> None:
+    provenance, asset_read = _sealed_asset_grade_fixture(tmp_path)
+    result = _result(turn=1, gateway_count=2)
+    records = result.command_facts.command_records
+    result.command_facts.command_records = (
+        *records[:2],
+        asset_read,
+        *records[2:],
+    )
+    result.command_facts.unexpected_commands = (asset_read.command,)
+    result.command_facts.non_gateway_unexpected_commands = (
+        asset_read.command,
+    )
+
+    errors, gates = _grade_common_turn(
+        result,
+        turn_index=1,
+        required_reference="references/waapi-operate.md",
+        expected_gateway_count=2,
+        prompt_provenance=provenance,
+    )
+
+    assert errors == ()
+    assert gates["no_other_commands"] is True
+    assert gates["no_unexpected_commands"] is True
+
+
+def test_common_grade_keeps_tab_import_asset_cat_unexpected(
+    tmp_path: Path,
+) -> None:
+    provenance, asset_read = _sealed_asset_grade_fixture(tmp_path)
+    provenance = replace(
+        provenance,
+        protocol=build_transaction_protocol(
+            (
+                {
+                    "contract": "waapi-skill.operation-request/v1",
+                    "version": "2025.1",
+                    "operation": "audio.importTabDelimited",
+                    "arguments": {
+                        "import_file": str(
+                            provenance.payload["request"]["inputs"][0]["value"]
+                        ),
+                        "import_location": {
+                            "kind": "path",
+                            "value": r"\Containers\Default Work Unit",
+                        },
+                        "import_language": "SFX",
+                        "import_operation": "createNew",
+                    },
+                },
+            )
+        ),
+    )
+    result = _result(turn=1, gateway_count=2)
+    records = result.command_facts.command_records
+    result.command_facts.command_records = (
+        *records[:2],
+        asset_read,
+        *records[2:],
+    )
+    result.command_facts.unexpected_commands = (asset_read.command,)
+    result.command_facts.non_gateway_unexpected_commands = (
+        asset_read.command,
+    )
+
+    errors, gates = _grade_common_turn(
+        result,
+        turn_index=1,
+        required_reference="references/waapi-operate.md",
+        expected_gateway_count=2,
+        prompt_provenance=provenance,
+    )
+
+    assert "no_other_commands" in errors
+    assert "no_unexpected_commands" in errors
+    assert gates["no_other_commands"] is False
+    assert gates["no_unexpected_commands"] is False
+
+
+@pytest.mark.parametrize("turn_index", (1, 2))
+def test_common_grade_rejects_duplicate_or_later_prompt_asset_cat(
+    tmp_path: Path,
+    turn_index: int,
+) -> None:
+    provenance, asset_read = _sealed_asset_grade_fixture(tmp_path)
+    result = _result(turn=turn_index, gateway_count=2)
+    records = result.command_facts.command_records
+    inserted = (
+        (asset_read, asset_read)
+        if turn_index == 1
+        else (asset_read,)
+    )
+    result.command_facts.command_records = (
+        *records[: len(result.command_facts.allowed_read_commands)],
+        *inserted,
+        *records[len(result.command_facts.allowed_read_commands) :],
+    )
+    result.command_facts.unexpected_commands = tuple(
+        item.command for item in inserted
+    )
+    result.command_facts.non_gateway_unexpected_commands = tuple(
+        item.command for item in inserted
+    )
+
+    errors, gates = _grade_common_turn(
+        result,
+        turn_index=turn_index,
+        required_reference="references/waapi-operate.md",
+        expected_gateway_count=2,
+        prompt_provenance=provenance,
+    )
+
+    assert "no_other_commands" in errors
+    assert "no_unexpected_commands" in errors
+    assert gates["no_other_commands"] is False
+    assert gates["no_unexpected_commands"] is False
 
 
 class _FakeBrokerEvidence:

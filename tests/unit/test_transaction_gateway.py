@@ -24,6 +24,7 @@ from wwise_waapi.execution_contracts import (  # pyright: ignore[reportMissingIm
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     OPERATION_REQUEST_CONTRACT,
+    UNDO_GROUP_INNER_URIS_BY_VERSION,
     parse_operation_request,
 )
 from wwise_waapi.transactions import TransactionState, TransactionStore
@@ -49,6 +50,13 @@ COMPACT_TRANSACTION_ID_RE = re.compile(
 CONFIRMATION_TOKEN_RE = re.compile(
     r"^ct1-[0123456789abcdefghjkmnpqrstvwxyz]{24}$"
 )
+EXPECTED_IMPORT_HIERARCHY_ROOTS = {
+    "2021.1": ["Actor-Mixer Hierarchy", "Interactive Music Hierarchy"],
+    "2022.1": ["Actor-Mixer Hierarchy", "Interactive Music Hierarchy"],
+    "2023.1": ["Actor-Mixer Hierarchy", "Interactive Music Hierarchy"],
+    "2024.1": ["Actor-Mixer Hierarchy", "Interactive Music Hierarchy"],
+    "2025.1": ["Containers", "Interactive Music Hierarchy"],
+}
 
 
 def expected_transaction_next_command(
@@ -78,10 +86,22 @@ def expected_transaction_next_command(
         expected["requires_later_user_message"] = True
     if os.name == "nt":
         expected["shell_family"] = "windows-cmd"
-        expected["shell_command"] = subprocess.list2cmdline(full_argv)
+        shell_command = subprocess.list2cmdline(full_argv)
     else:
         expected["shell_family"] = "posix-sh"
-        expected["shell_command"] = shlex.join(full_argv)
+        shell_command = shlex.join(full_argv)
+    expected["copy_instruction"] = {
+        "contract": "waapi-skill.gateway-command-copy-instruction/v1",
+        "source_field": "shell_command",
+        "action": "execute_verbatim_as_one_shell_tool_call",
+        "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+        ],
+    }
+    expected["shell_command"] = shell_command
     return expected
 
 
@@ -1145,6 +1165,328 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     assert unsupported["request_envelope_policy"]["status"] == "unsupported_version"
 
 
+def test_operation_schema_exposes_tab_import_path_only_progression(
+    tmp_path: Path,
+) -> None:
+    exit_code, payload = execute(
+        ["operation-schema", "audio.importTabDelimited"],
+        tmp_path=tmp_path,
+        version="2025.1",
+    )
+
+    assert exit_code == 0
+    assert payload["offline"] is True
+    assert payload["request_envelope"] == {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2025.1",
+        "operation": "audio.importTabDelimited",
+        "arguments": {},
+    }
+    operation = payload["operation"]
+    assert operation["file_read_policy"] == "pass_path_without_reading"
+    assert operation["next_step"] == "preview"
+    assert operation["preview_owns"] == [
+        "tsv_parsing",
+        "tsv_hash_validation",
+        "inline_base64_validation",
+        "media_validation",
+        "exact_path_conflict_validation",
+    ]
+
+
+@pytest.mark.parametrize("version", tuple(UNDO_GROUP_INNER_URIS_BY_VERSION))
+def test_operation_schema_discloses_exact_undo_inner_contracts_offline(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    exit_code, payload = execute(
+        ["operation-schema", "waapi.undoGroup"],
+        tmp_path=tmp_path,
+        version=version,
+    )
+
+    assert exit_code == 0
+    api_schema = payload["operation"]["argument_contract"]["properties"][
+        "calls"
+    ]["items"]["properties"]["api"]
+    expected = sorted(UNDO_GROUP_INNER_URIS_BY_VERSION[version])
+    assert api_schema["enum"] == expected
+    assert [row["const"] for row in api_schema["value_contracts"]] == expected
+    assert all(
+        row["schema_pointer"]["gateway_argv"]
+        == ["--version", version, "describe", row["const"], "--full-schema"]
+        for row in api_schema["value_contracts"]
+    )
+
+
+@pytest.mark.parametrize(
+    "operation",
+    ("ui.commands.register", "ui.commands.unregister"),
+)
+def test_operation_schema_exposes_closed_ui_command_items(
+    tmp_path: Path,
+    operation: str,
+) -> None:
+    exit_code, payload = execute(
+        ["operation-schema", operation],
+        tmp_path=tmp_path,
+        version="2024.1",
+    )
+
+    assert exit_code == 0
+    item = payload["operation"]["argument_contract"]["properties"]["commands"][
+        "items"
+    ]
+    assert item["additionalProperties"] is False
+    assert item["required"] == ["id", "display_name", "handler"]
+    handlers = {
+        branch["properties"]["kind"]["const"]: branch
+        for branch in item["properties"]["handler"]["oneOf"]
+    }
+    assert set(handlers) == {"notification", "program", "lua_script"}
+    assert all(
+        branch["additionalProperties"] is False
+        for branch in handlers.values()
+    )
+    assert item["properties"]["context_menu"]["required"] == []
+    assert item["properties"]["context_menu"]["optional"] == [
+        "base_path",
+        "enabled_for",
+        "visible_for",
+    ]
+    assert item["properties"]["main_menu"]["required"] == ["base_path"]
+
+
+@pytest.mark.parametrize(
+    ("version", "expected_roots"),
+    EXPECTED_IMPORT_HIERARCHY_ROOTS.items(),
+)
+def test_audio_import_operation_schema_discloses_versioned_hierarchy_roots(
+    tmp_path: Path,
+    version: str,
+    expected_roots: list[str],
+) -> None:
+    exit_code, payload = execute(
+        ["operation-schema", "audio.import"],
+        tmp_path=tmp_path,
+        version=version,
+    )
+
+    assert exit_code == 0
+    assert payload["offline"] is True
+    assert payload["request_envelope"]["version"] == version
+    properties = payload["operation"]["argument_contract"]["properties"]
+    row_path_contract = properties["imports"]["items"]["properties"][
+        "object_path"
+    ]["path_contract"]
+    default_path_contract = properties["defaults"]["properties"]["object_path"][
+        "path_contract"
+    ]
+    assert row_path_contract["contract"] == (
+        "waapi-skill.audio-import-object-path/v1"
+    )
+    assert row_path_contract["resolved_target"] == {
+        "minimum_segments": 3,
+        "hierarchy_root_case_sensitive": True,
+        "wwise_version": version,
+        "allowed_hierarchy_roots": expected_roots,
+    }
+    assert default_path_contract == row_path_contract
+    inline_audio = properties["imports"]["items"]["properties"][
+        "audio_file_base64"
+    ]
+    assert inline_audio["verbatim_contract"]["contract"] == (
+        "waapi-skill.audio-file-base64-verbatim/v1"
+    )
+    assert inline_audio["verbatim_contract"][
+        "caller_provided_complete_value"
+    ] == "copy_character_for_character"
+    assert inline_audio["verbatim_contract"][
+        "on_unreliable_preservation"
+    ] == "stop_before_preview"
+    import_operation = properties["import_operation"]
+    assert import_operation["default"] == "createNew"
+    assert "$.arguments.import_operation" in import_operation["description"]
+    assert "Never place it inside an imports[] row" in import_operation["description"]
+
+
+@pytest.mark.parametrize(
+    ("version", "default_work_unit_path", "actor_mixer_type"),
+    (
+        (
+            "2021.1",
+            r"\Actor-Mixer Hierarchy\Default Work Unit",
+            "ActorMixer",
+        ),
+        (
+            "2022.1",
+            r"\Actor-Mixer Hierarchy\Default Work Unit",
+            "ActorMixer",
+        ),
+        (
+            "2023.1",
+            r"\Actor-Mixer Hierarchy\Default Work Unit",
+            "ActorMixer",
+        ),
+        (
+            "2024.1",
+            r"\Actor-Mixer Hierarchy\Default Work Unit",
+            "ActorMixer",
+        ),
+        ("2025.1", r"\Containers\Default Work Unit", "PropertyContainer"),
+    ),
+)
+def test_object_create_operation_schema_discloses_versioned_parent_and_merge_contracts(
+    tmp_path: Path,
+    version: str,
+    default_work_unit_path: str,
+    actor_mixer_type: str,
+) -> None:
+    exit_code, payload = execute(
+        ["operation-schema", "object.create"],
+        tmp_path=tmp_path,
+        version=version,
+    )
+
+    assert exit_code == 0
+    contract = payload["operation"]["argument_contract"][
+        "same_name_merge_path_contract"
+    ]
+    assert contract["resolved_target"] == {
+        "wwise_version": version,
+        "default_container_work_unit_path": default_work_unit_path,
+    }
+    assert contract["identity_query"] == {
+        "route": "query-object",
+        "must_follow_operation_schema_directly": True,
+        "path_mode": "exact",
+        "return_fields": ["id", "name", "type", "path"],
+        "path_argument_contract": {
+            "contract": "waapi-skill.shell-single-quoted-wwise-path/v1",
+            "source_value": "decoded_gateway_json_string",
+            "shell_quoting": "single_quotes",
+            "literal_backslashes_per_path_separator": 1,
+            "json_serialized_backslashes_per_path_separator": 2,
+            "copy_json_escape_backslashes_as_literal_characters": False,
+        },
+    }
+    assert contract["forbidden_intermediate_routes"] == [
+        "project-default-work-units"
+    ]
+    parent_contract = payload["operation"]["argument_contract"][
+        "default_container_parent_contract"
+    ]
+    assert parent_contract["resolved_target"] == {
+        "wwise_version": version,
+        "default_container_work_unit_path": default_work_unit_path,
+    }
+    assert parent_contract["dynamic_actor_mixer_metadata_scope"] == {
+        "kind": "object_type",
+        "one_discovery_for_same_type_targets": True,
+        "object_scope_is_for_one_existing_target_only": True,
+        "wwise_version": version,
+        "actor_mixer_object_type": actor_mixer_type,
+    }
+    assert parent_contract["required_sequence"] == [
+        "operation-schema object.create",
+        "one metadata discover when a dynamic field token is unknown",
+        "preview",
+    ]
+    assert parent_contract["forbidden_intermediate_routes"] == [
+        "project-default-work-units"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("version", "default_work_unit_path", "actor_mixer_type"),
+    (
+        (
+            "2021.1",
+            r"\Actor-Mixer Hierarchy\Default Work Unit",
+            "ActorMixer",
+        ),
+        (
+            "2022.1",
+            r"\Actor-Mixer Hierarchy\Default Work Unit",
+            "ActorMixer",
+        ),
+        (
+            "2023.1",
+            r"\Actor-Mixer Hierarchy\Default Work Unit",
+            "ActorMixer",
+        ),
+        (
+            "2024.1",
+            r"\Actor-Mixer Hierarchy\Default Work Unit",
+            "ActorMixer",
+        ),
+        ("2025.1", r"\Containers\Default Work Unit", "PropertyContainer"),
+    ),
+)
+def test_object_set_operation_schema_discloses_versioned_target_and_metadata_scope(
+    tmp_path: Path,
+    version: str,
+    default_work_unit_path: str,
+    actor_mixer_type: str,
+) -> None:
+    exit_code, payload = execute(
+        ["operation-schema", "object.set"],
+        tmp_path=tmp_path,
+        version=version,
+    )
+
+    assert exit_code == 0
+    contract = payload["operation"]["argument_contract"][
+        "default_container_target_contract"
+    ]
+    assert contract["resolved_target"] == {
+        "wwise_version": version,
+        "default_container_work_unit_path": default_work_unit_path,
+    }
+    assert contract["dynamic_actor_mixer_metadata_scope"][
+        "actor_mixer_object_type"
+    ] == actor_mixer_type
+    assert contract["dynamic_actor_mixer_metadata_scope"]["kind"] == "object_type"
+    assert contract["forbidden_intermediate_routes"] == [
+        "project-default-work-units"
+    ]
+    on_name_conflict = payload["operation"]["argument_contract"]["properties"][
+        "on_name_conflict"
+    ]
+    assert on_name_conflict["default"] == "fail"
+    assert "Omission defaults to fail" in on_name_conflict["description"]
+
+
+def test_soundbank_generate_operation_schema_keeps_rebuild_levels_independent(
+    tmp_path: Path,
+) -> None:
+    exit_code, payload = execute(
+        ["operation-schema", "soundbank.generate"],
+        tmp_path=tmp_path,
+        version="2025.1",
+    )
+
+    assert exit_code == 0
+    properties = payload["operation"]["argument_contract"]["properties"]
+    row_rebuild = properties["soundbanks"]["items"]["properties"]["rebuild"]
+    batch_rebuild = properties["rebuild_soundbanks"]
+
+    assert row_rebuild["default"] is False
+    assert batch_rebuild["default"] is False
+    assert properties["clear_audio_file_cache"]["default"] is False
+    assert properties["rebuild_init_bank"]["default"] is False
+    assert "Per-SoundBank rebuild control" in row_rebuild["description"]
+    assert "separate batch-level control" in row_rebuild["description"]
+    assert "independent from soundbanks[].rebuild" in batch_rebuild[
+        "description"
+    ]
+    assert any(
+        "batch-level rebuild_soundbanks and per-Bank soundbanks[].rebuild are independent"
+        in constraint
+        for constraint in payload["operation"]["constraints"]
+    )
+
+
 @pytest.mark.parametrize("version", ["2024.1", "2025.1"])
 def test_operation_schema_owns_exact_audio_convert_fast_route_contract(
     tmp_path: Path,
@@ -1497,6 +1839,39 @@ def test_transaction_next_command_quotes_posix_shell_arguments_without_reconstru
         f"'tx with space' --confirmation-token ct1-{'0' * 24}"
     )
     assert shlex.split(payload["shell_command"]) == payload["full_argv"]
+    assert payload["copy_instruction"]["source_field"] == "shell_command"
+    assert tuple(payload)[-2:] == ("copy_instruction", "shell_command")
+
+
+def test_transaction_next_command_keeps_one_copy_source_on_windows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(waapi_gateway, "os", type("WindowsOS", (), {"name": "nt"})())
+    monkeypatch.setattr(
+        waapi_gateway,
+        "GATEWAY_RUNNER_PATH",
+        Path(r"C:\WAAPI Skill\scripts\run.py"),
+    )
+
+    payload = waapi_gateway.transaction_next_command(
+        "execute",
+        ["execute", "tx1-windows"],
+    )
+
+    assert payload["shell_family"] == "windows-cmd"
+    assert payload["shell_command"] == subprocess.list2cmdline(payload["full_argv"])
+    assert payload["copy_instruction"] == {
+        "contract": "waapi-skill.gateway-command-copy-instruction/v1",
+        "source_field": "shell_command",
+        "action": "execute_verbatim_as_one_shell_tool_call",
+        "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+        ],
+    }
+    assert tuple(payload)[-2:] == ("copy_instruction", "shell_command")
 
 
 def test_transaction_show_summary_compacts_large_graph_without_losing_exact_request() -> None:
@@ -5450,6 +5825,132 @@ def test_soundbank_wire_path_selection_fails_closed_without_exact_sealed_audit()
             },
         )
     assert mismatched.value.error_code == "WIRE_PATH_OPERATION_MISMATCH"
+
+
+def _prepared_tab_import_wire_path_fixture(import_file: Path) -> dict[str, Any]:
+    uri = "ak.wwise.core.audio.importTabDelimited"
+    canonical_import_file = str(import_file.resolve())
+    audit = {
+        "contract": waapi_gateway.WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT,
+        "uri": uri,
+        "scope": "transient_dispatch_read_paths_only",
+        "paths": [
+            {
+                "section": "args",
+                "json_path": "$.args.importFile",
+                "field": "importFile",
+                "role": "read",
+                "raw_path": canonical_import_file,
+                "resolved_path": canonical_import_file,
+            }
+        ],
+    }
+    return {
+        "dispatch": {
+            "uri": uri,
+            "args": {"importFile": canonical_import_file},
+            "options": {},
+        },
+        "pre_state": {
+            "import_guard": {
+                "source_operation": "audio.importTabDelimited",
+                "file_proofs": [
+                    {
+                        "field": "import_file",
+                        "proof": {"path": canonical_import_file},
+                    },
+                    {
+                        "field": "source_file_proofs[1]",
+                        "proof": {"path": str(import_file.with_suffix(".wav").resolve())},
+                    },
+                ],
+                "wire_path_input_audit": audit,
+            }
+        },
+    }
+
+
+def test_tab_import_wire_path_selection_accepts_one_import_file_among_source_proofs(
+    tmp_path: Path,
+) -> None:
+    import_file = tmp_path / "compound.tsv"
+    prepared = _prepared_tab_import_wire_path_fixture(import_file)
+
+    audit = waapi_gateway.prepared_wire_path_io_audit(
+        operation="audio.importTabDelimited",
+        call_uri="ak.wwise.core.audio.importTabDelimited",
+        prepared=prepared,
+    )
+
+    assert audit == prepared["pre_state"]["import_guard"]["wire_path_input_audit"]
+    assert audit["paths"][0]["json_path"] == "$.args.importFile"
+
+
+def test_tab_import_wire_path_selection_rejects_missing_or_duplicate_import_file_proof(
+    tmp_path: Path,
+) -> None:
+    import_file = tmp_path / "compound.tsv"
+    missing = _prepared_tab_import_wire_path_fixture(import_file)
+    del missing["pre_state"]["import_guard"]["wire_path_input_audit"]
+    with pytest.raises(waapi_gateway.WwiseWirePathError) as missing_error:
+        waapi_gateway.prepared_wire_path_io_audit(
+            operation="audio.importTabDelimited",
+            call_uri="ak.wwise.core.audio.importTabDelimited",
+            prepared=missing,
+        )
+    assert missing_error.value.error_code == "WIRE_PATH_AUDIT_MISSING"
+
+    duplicate = _prepared_tab_import_wire_path_fixture(import_file)
+    duplicate["pre_state"]["import_guard"]["file_proofs"].append(
+        {
+            "field": "import_file",
+            "proof": {"path": str(import_file.resolve())},
+        }
+    )
+    with pytest.raises(waapi_gateway.WwiseWirePathError) as duplicate_error:
+        waapi_gateway.prepared_wire_path_io_audit(
+            operation="audio.importTabDelimited",
+            call_uri="ak.wwise.core.audio.importTabDelimited",
+            prepared=duplicate,
+        )
+    assert duplicate_error.value.error_code == "WIRE_PATH_AUDIT_MISMATCH"
+
+
+@pytest.mark.parametrize(
+    ("tamper_target", "tamper_value"),
+    [
+        ("contract", "waapi-skill.wwise-wire-path-input-audit/v0"),
+        ("scope", "all_dispatch_paths"),
+        ("raw_path", "/different/compound.tsv"),
+        ("resolved_path", "/different/compound.tsv"),
+        ("dispatch_uri", "ak.wwise.core.audio.import"),
+    ],
+)
+def test_tab_import_wire_path_selection_rejects_audit_or_dispatch_drift(
+    tamper_target: str,
+    tamper_value: str,
+    tmp_path: Path,
+) -> None:
+    prepared = _prepared_tab_import_wire_path_fixture(tmp_path / "compound.tsv")
+    if tamper_target in {"contract", "scope"}:
+        prepared["pre_state"]["import_guard"]["wire_path_input_audit"][
+            tamper_target
+        ] = tamper_value
+    elif tamper_target == "dispatch_uri":
+        prepared["dispatch"]["uri"] = tamper_value
+    else:
+        prepared["pre_state"]["import_guard"]["wire_path_input_audit"]["paths"][
+            0
+        ][tamper_target] = tamper_value
+
+    with pytest.raises(waapi_gateway.WwiseWirePathError) as error:
+        waapi_gateway.prepared_wire_path_io_audit(
+            operation="audio.importTabDelimited",
+            call_uri="ak.wwise.core.audio.importTabDelimited",
+            prepared=prepared,
+        )
+
+    assert error.value.error_code == "WIRE_PATH_AUDIT_MISMATCH"
 
 
 def test_local_wine_cli_mapping_failure_requires_repreview_before_execution_start(

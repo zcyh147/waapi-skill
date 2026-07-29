@@ -1,20 +1,26 @@
 from __future__ import annotations
 
+import hashlib
 import shutil
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
 
+from tests.semantic.support import codex_project_prelaunch_v3 as prelaunch
 from tests.semantic.support.codex_project_prelaunch_v3 import (
     ProjectPrelaunchError,
     ProjectPrelaunchRequest,
+    WWISE_2025_SOUNDBANK_AURO_PROFILE,
     normalize_project_copy,
 )
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_PROJECT = REPO_ROOT / "tests" / "_org" / "2022.1" / "SampleProject.wproj"
+SOURCE_PROJECT_2025 = (
+    REPO_ROOT / "tests" / "_org" / "2025.1" / "SampleProject.wproj"
+)
 
 
 def test_normalizes_only_copy_with_case_owned_paths(tmp_path: Path) -> None:
@@ -161,6 +167,163 @@ def test_isolates_only_closed_optional_plugins_from_copy(
     assert not (project_root / "Effects" / "Factory McDSP Effects.wwu").exists()
     disabled = io_root / "disabled-fixture-work-units"
     assert (disabled / "Effects" / "Factory McDSP Effects.wwu").is_file()
+
+
+def test_isolates_only_pinned_auro_nodes_for_2025_soundbank_copy(
+    tmp_path: Path,
+) -> None:
+    source_root = SOURCE_PROJECT_2025.parent
+    source_before = {
+        path.relative_to(source_root): path.read_bytes()
+        for path in source_root.rglob("*")
+        if path.is_file()
+    }
+    project_root = tmp_path / "sandbox"
+    shutil.copytree(source_root, project_root)
+    io_root = tmp_path / "owned" / "io"
+    io_root.mkdir(parents=True)
+
+    report = normalize_project_copy(
+        project_root / SOURCE_PROJECT_2025.name,
+        io_root=io_root,
+        owned_root=tmp_path,
+        request=ProjectPrelaunchRequest(
+            scenario_id="CMP25-O22-SB-GENERATE-01",
+            auro_isolation_profile=WWISE_2025_SOUNDBANK_AURO_PROFILE,
+        ),
+    )
+
+    assert source_before == {
+        path.relative_to(source_root): path.read_bytes()
+        for path in source_root.rglob("*")
+        if path.is_file()
+    }
+    assert report.optional_plugin_isolation is None
+    isolation = report.auro_soundbank_isolation
+    assert isolation is not None
+    assert isolation.profile == WWISE_2025_SOUNDBANK_AURO_PROFILE
+    assert isolation.remaining_auro_plugin_instances == 0
+    assert isolation.remaining_auro_object_references == 0
+    assert isolation.removed_bus_reference_object_ids == (
+        "{21E40BE7-7B3A-4DE4-BC78-FA8EB81736CD}",
+    )
+    assert isolation.removed_effect_definition_ids == (
+        "{21E40BE7-7B3A-4DE4-BC78-FA8EB81736CD}",
+    )
+    proofs = {row.relative_path: row for row in isolation.work_units}
+    assert {
+        relative: row.input_sha256
+        for relative, row in proofs.items()
+    } == {
+        "Busses/Default Work Unit.wwu": (
+            "abaefb80d17cb9f2f3f64b8d786eb02fface5e13066eaeaaac204cf2a3b4da06"
+        ),
+        "Effects/Ambisonics.wwu": (
+            "66ef565e7b4e28ed39b189284700d44f67cdb8c4f9035fa5a04842d2c050e29a"
+        ),
+    }
+    for relative, proof in proofs.items():
+        content = (project_root / relative).read_bytes()
+        assert hashlib.sha256(content).hexdigest() == proof.output_sha256
+        assert len(content) == proof.output_size
+
+    bus_root = ET.parse(
+        project_root / "Busses" / "Default Work Unit.wwu"
+    ).getroot()
+    assert bus_root.find(
+        ".//Reference[@PluginName='Auro Headphone']"
+    ) is None
+    effect_root = ET.parse(
+        project_root / "Effects" / "Ambisonics.wwu"
+    ).getroot()
+    assert effect_root.find(
+        ".//Effect[@ID='{21E40BE7-7B3A-4DE4-BC78-FA8EB81736CD}']"
+    ) is None
+    assert {
+        row.get("ID")
+        for row in effect_root.findall(
+            ".//Effect[@PluginName='Wwise Parametric EQ']"
+        )
+    } == {
+        "{0D70F925-AB3C-477A-A7CA-D0571B293302}",
+        "{F9627628-0B10-4272-BC30-D4C20423CB38}",
+    }
+    assert (
+        project_root / "Effects" / "Factory McDSP Effects.wwu"
+    ).is_file()
+    assert ET.parse(
+        project_root / "Effects" / "Factory McDSP Effects.wwu"
+    ).find(".//*[@PluginName='McDSP FutzBox']") is not None
+
+
+def test_2025_auro_work_unit_hash_drift_fails_before_any_project_write(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "sandbox"
+    shutil.copytree(SOURCE_PROJECT_2025.parent, project_root)
+    project = project_root / SOURCE_PROJECT_2025.name
+    bus = project_root / "Busses" / "Default Work Unit.wwu"
+    effect = project_root / "Effects" / "Ambisonics.wwu"
+    bus.write_bytes(bus.read_bytes() + b"\n")
+    before = {path: path.read_bytes() for path in (project, bus, effect)}
+    io_root = tmp_path / "io"
+    io_root.mkdir()
+
+    with pytest.raises(
+        ProjectPrelaunchError,
+        match=r"content drifted: Busses/Default Work Unit\.wwu",
+    ):
+        normalize_project_copy(
+            project,
+            io_root=io_root,
+            owned_root=tmp_path,
+            request=ProjectPrelaunchRequest(
+                scenario_id="CMP25-O22-SB-GENERATE-01",
+                auro_isolation_profile=WWISE_2025_SOUNDBANK_AURO_PROFILE,
+            ),
+        )
+
+    assert before == {path: path.read_bytes() for path in before}
+
+
+def test_2025_auro_identity_drift_fails_before_any_project_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_root = tmp_path / "sandbox"
+    shutil.copytree(SOURCE_PROJECT_2025.parent, project_root)
+    project = project_root / SOURCE_PROJECT_2025.name
+    bus = project_root / "Busses" / "Default Work Unit.wwu"
+    effect = project_root / "Effects" / "Ambisonics.wwu"
+    tree = ET.parse(effect)
+    auro = tree.find(".//Effect[@PluginName='Auro Headphone']")
+    assert auro is not None
+    auro.set("Name", "Drifted_Auro_Effect")
+    tree.write(effect, encoding="utf-8", xml_declaration=True)
+    monkeypatch.setitem(
+        prelaunch._WWISE_2025_AURO_WORK_UNIT_SHA256,
+        Path("Effects") / "Ambisonics.wwu",
+        hashlib.sha256(effect.read_bytes()).hexdigest(),
+    )
+    before = {path: path.read_bytes() for path in (project, bus, effect)}
+    io_root = tmp_path / "io"
+    io_root.mkdir()
+
+    with pytest.raises(
+        ProjectPrelaunchError,
+        match="Auro effect definition identity drifted",
+    ):
+        normalize_project_copy(
+            project,
+            io_root=io_root,
+            owned_root=tmp_path,
+            request=ProjectPrelaunchRequest(
+                scenario_id="CMP25-O22-SB-GENERATE-01",
+                auro_isolation_profile=WWISE_2025_SOUNDBANK_AURO_PROFILE,
+            ),
+        )
+
+    assert before == {path: path.read_bytes() for path in before}
 
 
 def test_added_guids_are_deterministic(tmp_path: Path) -> None:

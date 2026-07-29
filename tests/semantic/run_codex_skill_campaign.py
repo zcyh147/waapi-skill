@@ -106,6 +106,10 @@ from tests.semantic.support.codex_media_pool_runtime_v3 import (  # noqa: E402
     media_near_classification,
 )
 from tests.semantic.support.codex_import_business_plan_v3 import (  # noqa: E402
+    COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA,
+    COMPOUND_IMPORT_FIXTURE_KIND,
+    IMPORT_BUSINESS_PLAN_SCHEMA,
+    IMPORT_FIXTURE_KIND,
     ImportBusinessPlanError,
     ImportBusinessPlanSections,
     parse_import_business_plan_sections,
@@ -159,6 +163,14 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (  # noqa: E402
     read_prompt_provenance,
     serialize_protocol,
 )
+from tests.semantic.support.codex_eval_protocol_v3 import (  # noqa: E402
+    operation_request_equivalence,
+)
+from tests.semantic.support.codex_prompt_asset_reads_v3 import (  # noqa: E402
+    PromptAssetReadError,
+    remove_validated_command_occurrences,
+    validated_prompt_asset_cat_commands,
+)
 from tests.semantic.support.codex_harness import (  # noqa: E402
     CodexGatewayErrorExpectation,
     CodexHarnessConfig,
@@ -204,7 +216,11 @@ EXIT_PENDING = 75
 EXIT_INTERRUPTED = 130
 HEAVY_V3_PROFILE_ID = matrix.HEAVY_V3_PROFILE_ID
 MODIFICATION_POLICY_V3_PROFILE_ID = matrix.MODIFICATION_POLICY_V3_PROFILE_ID
+COMPOUND_HEAVY_V1_PROFILE_ID = matrix.COMPOUND_HEAVY_V1_PROFILE_ID
 EXECUTABLE_V3_PROFILE_IDS = matrix.EXECUTABLE_V3_PROFILE_IDS
+TERRA_LOCKED_V3_PROFILE_IDS = frozenset(
+    {MODIFICATION_POLICY_V3_PROFILE_ID, COMPOUND_HEAVY_V1_PROFILE_ID}
+)
 HEAVY_V3_EFFECTIVE_CONTRACT = "waapi-skill.codex-semantic-campaign-effective/v3"
 HEAVY_V3_PHASE = "scenario"
 HEAVY_V3_GROUP_ID = "heavy-v3"
@@ -1000,7 +1016,7 @@ def heavy_v3_child_request(
             "memory": "disabled",
             **(
                 {"approval_policy": "never"}
-                if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID
+                if options.profile in TERRA_LOCKED_V3_PROFILE_IDS
                 else {}
             ),
             "sequential": True,
@@ -1289,7 +1305,7 @@ def build_heavy_v3_effective_config(
                         ),
                     ),
                 }
-                if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID
+                if options.profile in TERRA_LOCKED_V3_PROFILE_IDS
                 else {}
             ),
         },
@@ -1327,7 +1343,7 @@ def build_heavy_v3_effective_config(
             "fresh_process_thread_and_task_per_scenario": True,
             **(
                 {"approval_policy": "never"}
-                if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID
+                if options.profile in TERRA_LOCKED_V3_PROFILE_IDS
                 else {}
             ),
         },
@@ -1529,6 +1545,13 @@ def heavy_v3_unit_row(unit: Any, *, sequence: int) -> dict[str, Any]:
         "api": api,
         "runner": "cli" if api.startswith("ak.wwise.cli.") else "project",
     }
+    base_scenario_id = getattr(unit, "base_scenario_id", None)
+    if base_scenario_id is not None:
+        if not isinstance(base_scenario_id, str) or not base_scenario_id:
+            raise CampaignEvidenceError(
+                "heavy unit has an invalid base-scenario identity"
+            )
+        row["base_scenario_id"] = base_scenario_id
     policy_metadata = _policy_unit_metadata(unit)
     for key in (
         "base_scenario_id",
@@ -1588,7 +1611,7 @@ def assert_heavy_v3_effective_inputs_frozen(
     effective: Mapping[str, Any],
 ) -> None:
     assert_effective_inputs_frozen(options, effective=effective)
-    if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID:
+    if options.profile in TERRA_LOCKED_V3_PROFILE_IDS:
         suite = effective.get("suite")
         dependency_root = options.suite_path.parent
         if (
@@ -1605,7 +1628,7 @@ def assert_heavy_v3_effective_inputs_frozen(
             )
         ):
             raise CampaignEvidenceError(
-                "modification-policy transitive suite inputs drifted"
+                f"{options.profile} transitive suite inputs drifted"
             )
     runner = effective.get("runner")
     if not isinstance(runner, Mapping):
@@ -2695,6 +2718,7 @@ def _validate_heavy_v3_retryable_task_failure(
             expected_steps=protocol.steps[previous_validated_prefix:expected_prefix],
             version=str(getattr(expected_unit, "version", "")),
             required_reference=required_reference,
+            prompt_provenance=prompt_evidence.provenance,
         )
         prior_gateway_records.extend(turn_gateway_records)
         if len(prior_gateway_records) != expected_prefix:
@@ -3776,6 +3800,7 @@ def _validate_heavy_v3_task_result(
             expected_steps=protocol.steps[previous_prefix:expected_prefix],
             version=str(getattr(expected_unit, "version", "")),
             required_reference=required_reference,
+            prompt_provenance=prompt_evidence.provenance,
         )
         gateway_records.extend(turn_gateway_records)
         if len(gateway_records) != expected_prefix:
@@ -4324,6 +4349,7 @@ def _validate_heavy_v3_turn_grade(
     expected_steps: Sequence[Any],
     version: str,
     required_reference: str,
+    prompt_provenance: PromptProvenanceEvidence,
 ) -> tuple[Mapping[str, Any], ...]:
     if not isinstance(value, Mapping) or set(value) != {
         "index",
@@ -4399,6 +4425,7 @@ def _validate_heavy_v3_turn_grade(
         version=version,
         required_reference=required_reference,
         archived_common_gates=common_gates,
+        prompt_provenance=prompt_provenance,
     )
     expected_delta = expected_broker_prefix - previous_broker_prefix
     if expected_delta < 0 or len(gateway_records) != expected_delta:
@@ -4421,6 +4448,7 @@ def _validate_heavy_v3_codex_facts(
     version: str,
     required_reference: str,
     archived_common_gates: Mapping[str, Any],
+    prompt_provenance: PromptProvenanceEvidence,
 ) -> tuple[Mapping[str, Any], ...]:
     required_keys = {
         "command",
@@ -4591,7 +4619,24 @@ def _validate_heavy_v3_codex_facts(
             strict=False,
         )
     )
-    terminal_unexpected = tuple(classified.unexpected_commands)
+    try:
+        prompt_asset_reads = validated_prompt_asset_cat_commands(
+            records,
+            provenance=prompt_provenance,
+            turn_index=turn_index,
+        )
+    except PromptAssetReadError as exc:
+        raise CampaignEvidenceError(
+            f"passing heavy prompt-asset read proof is invalid: {exc}"
+        ) from exc
+    terminal_unexpected = remove_validated_command_occurrences(
+        classified.unexpected_commands,
+        prompt_asset_reads,
+    )
+    non_gateway_unexpected = remove_validated_command_occurrences(
+        classified.non_gateway_unexpected_commands,
+        prompt_asset_reads,
+    )
     expected_terminal_unexpected = (
         len(terminal_unexpected) == terminal_exit2_count
         and all(
@@ -4623,14 +4668,17 @@ def _validate_heavy_v3_codex_facts(
             len(classified.gateway_attempt_commands) == len(expected_steps)
         ),
         "no_other_commands": (
-            len(records) == len(allowed_reads) + len(expected_steps)
+            len(records)
+            == len(allowed_reads)
+            + len(prompt_asset_reads)
+            + len(expected_steps)
         ),
         "no_discovery": not classified.discovery_commands,
         "no_direct_waapi": not classified.direct_waapi_client_commands,
         "no_write_like": not classified.write_like_commands,
         "no_unexpected_commands": (
             expected_terminal_unexpected
-            and not classified.non_gateway_unexpected_commands
+            and not non_gateway_unexpected
         ),
         "no_files_changed": (
             not value.get("created_files")
@@ -4752,10 +4800,12 @@ def _heavy_v3_business_plan_fixture_spec(
         "ak.wwise.core.object.get": "object_materialized_v1",
         "ak.wwise.core.object.create": "object_materialized_v1",
         "ak.wwise.core.object.set": "object_materialized_v1",
-        "ak.wwise.core.audio.import": "import_materialized_runtime_v1",
-        "ak.wwise.core.audio.importTabDelimited": "import_materialized_runtime_v1",
         "ak.wwise.core.audio.convert": "audio_conversion_materialized_v1",
         "ak.wwise.core.mediaPool.get": "media_pool_materialized_v1",
+    }
+    import_apis = {
+        "ak.wwise.core.audio.import",
+        "ak.wwise.core.audio.importTabDelimited",
     }
     soundbank_apis = {
         "ak.wwise.core.soundbank.generate",
@@ -4770,7 +4820,23 @@ def _heavy_v3_business_plan_fixture_spec(
         "ak.wwise.cli.convertExternalSource",
         HEAVY_V3_MIGRATION_API,
     }
-    if api in soundbank_apis:
+    if api in import_apis:
+        static_expectation = plan_value.get("static_expectation")
+        schema_version = (
+            static_expectation.get("family_schema_version")
+            if isinstance(static_expectation, Mapping)
+            else None
+        )
+        if schema_version == IMPORT_BUSINESS_PLAN_SCHEMA:
+            expected_kind = IMPORT_FIXTURE_KIND
+        elif schema_version == COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA:
+            expected_kind = COMPOUND_IMPORT_FIXTURE_KIND
+        else:
+            raise CampaignEvidenceError(
+                "heavy typed import business-oracle fixture identity is invalid"
+            )
+        typed_kinds[api] = expected_kind
+    elif api in soundbank_apis:
         count = _heavy_v3_primary_dispatch_count(expected_unit)
         typed_kinds[api] = (
             "soundbank_topic_materialized_v1"
@@ -4794,7 +4860,8 @@ def _heavy_v3_business_plan_fixture_spec(
     if kind == "object_recipe":
         fixture_value = _heavy_v3_plan_json_value(
             build_object_heavy_v3_recipe(
-                _heavy_v3_base_scenario_id(expected_unit)
+                _heavy_v3_base_scenario_id(expected_unit),
+                version=str(getattr(expected_unit, "version", "")),
             )
         )
     elif kind == "scenario_fixture":
@@ -4841,7 +4908,8 @@ def _validate_heavy_v3_typed_business_plan(
     }:
         parsed = parse_object_business_plan_sections(plan_value)
         recipe = build_object_heavy_v3_recipe(
-            _heavy_v3_base_scenario_id(expected_unit)
+            _heavy_v3_base_scenario_id(expected_unit),
+            version=str(getattr(expected_unit, "version", "")),
         )
         sections = validate_archived_object_business_plan(
             plan_value,
@@ -5367,8 +5435,20 @@ def _validate_heavy_v3_archived_verification(
         "ak.wwise.core.audio.import",
         "ak.wwise.core.audio.importTabDelimited",
     }:
+        legacy_verification = verification
+        if (
+            isinstance(prompt_evidence.typed_sections, ImportBusinessPlanSections)
+            and prompt_evidence.typed_sections.static_expectation.get(
+                "family_schema_version"
+            )
+            == COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA
+        ):
+            legacy_verification = _compound_import_legacy_verification(
+                verification,
+                label=label,
+            )
         _validate_heavy_v3_import_oracle(
-            verification,
+            legacy_verification,
             scenario_id=scenario_id,
             zero_dispatch=primary_count == 0,
             label=label,
@@ -5684,6 +5764,7 @@ def _heavy_v3_protocol_operation_request(
             and arguments[2].get("kind") in {
                 "semantic_json",
                 "semantic_json_object_operation_v1",
+                "semantic_json_soundbank_generate_v1",
             }
             and isinstance(arguments[2].get("value"), Mapping)
         ):
@@ -5753,11 +5834,7 @@ def _validate_heavy_v3_completed_transaction_protocol(
         or not isinstance(steps[1].arguments[2], SemanticJsonArgument)
         or steps[1].arguments[2].expected != expected_operation_request
         or steps[1].arguments[2].equivalence
-        != (
-            "object_operation_v1"
-            if operation in {"object.create", "object.set"}
-            else "wire_exact"
-        )
+        != operation_request_equivalence(str(operation))
         or steps[2].arguments != (preview_transaction_id, "--summary-only")
         or steps[3].arguments
         != (
@@ -7974,6 +8051,39 @@ def _validate_heavy_v3_import_oracle(
             for item in after["events"]
         ):
             raise CampaignEvidenceError(f"{label} import Event/Action proof is invalid")
+
+
+def _compound_import_legacy_verification(
+    value: Any,
+    *,
+    label: str,
+) -> Mapping[str, Any]:
+    """Project an already typed-validated compound snapshot to its business view."""
+
+    row = _closed_oracle_mapping(
+        value,
+        {"scenario_id", "phase", "passed", "failures", "before", "after"},
+        label=label,
+    )
+    projected = dict(row)
+    for phase in ("before", "after"):
+        snapshot = _closed_oracle_mapping(
+            row.get(phase),
+            {
+                "scenario_id",
+                "business",
+                "rows",
+                "reference_fixtures",
+                "main_bus",
+            },
+            label=f"{label} compound {phase}",
+        )
+        if snapshot.get("scenario_id") != row.get("scenario_id"):
+            raise CampaignEvidenceError(
+                f"{label} compound {phase} scenario identity is misbound"
+            )
+        projected[phase] = snapshot.get("business")
+    return projected
 
 
 def _validate_heavy_v3_audio_conversion_oracle(
@@ -10791,6 +10901,8 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     args = parser.parse_args(argv)
     is_executable_v3 = args.profile in EXECUTABLE_V3_PROFILE_IDS
     is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
+    is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
+    is_terra_v3 = args.profile in TERRA_LOCKED_V3_PROFILE_IDS
     if args.verify_only and not args.resume:
         parser.error("--verify-only requires --resume")
     if args.timeout <= 0 or args.lock_timeout <= 0:
@@ -10814,24 +10926,35 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
             parser.error(
                 "unknown v2 --case-id values: " + ", ".join(unknown_case_ids)
             )
+    if is_compound_v1 and any(
+        version not in {"2022.1", "2025.1"} for version in args.version
+    ):
+        parser.error(
+            f"{COMPOUND_HEAVY_V1_PROFILE_ID} supports only "
+            "--version 2022.1 and 2025.1"
+        )
     model = args.model or (
-        "gpt-5.6-terra" if is_policy_v3 else "gpt-5.6-sol"
+        "gpt-5.6-terra" if is_terra_v3 else "gpt-5.6-sol"
     )
     service_tier = args.service_tier or (
-        "default" if is_policy_v3 else "priority"
+        "default" if is_terra_v3 else "priority"
     )
-    if is_policy_v3 and (
+    if is_terra_v3 and (
         model != "gpt-5.6-terra"
         or args.reasoning_effort != "medium"
         or service_tier != "default"
     ):
         parser.error(
-            f"{MODIFICATION_POLICY_V3_PROFILE_ID} requires "
+            f"{args.profile} requires "
             "gpt-5.6-terra / medium / default"
         )
     suite = args.suite or str(
-        matrix.DEFAULT_MODIFICATION_POLICY_V3_SUITE
-        if is_policy_v3
+        (
+            matrix.DEFAULT_MODIFICATION_POLICY_V3_SUITE
+            if is_policy_v3
+            else matrix.DEFAULT_COMPOUND_HEAVY_V1_SUITE
+        )
+        if is_terra_v3
         else (matrix.DEFAULT_V3_SUITE if is_executable_v3 else matrix.DEFAULT_SUITE)
     )
     try:

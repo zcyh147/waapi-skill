@@ -14,6 +14,9 @@ from typing import Any, Mapping, Sequence
 
 from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
+    MetadataBoundJsonArgument,
+    MetadataQueryArgument,
+    MetadataTokenProjection,
     ResponseBinding,
     SemanticJsonArgument,
 )
@@ -24,6 +27,16 @@ OPERATION_REQUEST_CONTRACT = "waapi-skill.operation-request/v1"
 
 class V3ProtocolError(ValueError):
     """A materialized scenario cannot form an exact broker allow-list."""
+
+
+def operation_request_equivalence(operation: str) -> str:
+    """Return the one reviewed JSON equivalence for an operation request."""
+
+    if operation in {"object.create", "object.set"}:
+        return "object_operation_v1"
+    if operation == "soundbank.generate":
+        return "soundbank_generate_v1"
+    return "wire_exact"
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,11 +187,7 @@ def build_transaction_protocol(
                     "--request-json",
                     SemanticJsonArgument(
                         request,
-                        equivalence=(
-                            "object_operation_v1"
-                            if operation in {"object.create", "object.set"}
-                            else "wire_exact"
-                        ),
+                        equivalence=operation_request_equivalence(operation),
                     ),
                 ),
                 allowed_exit_codes=(2,) if refusal is not None else (0,),
@@ -261,6 +270,252 @@ def build_transaction_protocol(
                 consumed += 2
             prefixes.append(consumed)
     return V3GatewayProtocol(tuple(steps), tuple(prefixes))
+
+
+def build_metadata_transaction_protocol(
+    requests: Sequence[Mapping[str, Any]],
+    *,
+    object_type: str,
+    metadata_queries: Sequence[str],
+    required_tokens: Sequence[str],
+    expected_required_token_projection: (
+        Sequence[MetadataTokenProjection] | None
+    ) = None,
+    equivalence: str = "wire_exact",
+    schema_first: bool = False,
+) -> V3GatewayProtocol:
+    """Add one live object-type discovery to immutable transactions.
+
+    Suggested query phrases define the fixed number of bounded query slots,
+    while the broker accepts natural rephrasing.  Every dynamic token must
+    occur in that exact brokered discovery payload.  Requests remain wire-exact
+    unless the caller selects one explicitly reviewed metadata-bound
+    equivalence.  The default keeps discovery first.  ``schema_first`` is the
+    closed object-mutation variant: it exposes the configured adapter version
+    before the exact reflected object-type scope must be selected.
+    """
+
+    if not requests:
+        raise V3ProtocolError(
+            "metadata-bound transaction protocol requires at least one operation request"
+        )
+    if not isinstance(schema_first, bool):
+        raise V3ProtocolError("schema_first must be a Boolean")
+    if equivalence not in {
+        "wire_exact",
+        "audio_import_v1",
+        "audio_import_tab_v1",
+        "object_set_v1",
+    }:
+        raise V3ProtocolError(
+            "metadata-bound equivalence must be wire_exact, "
+            "audio_import_v1, audio_import_tab_v1, or object_set_v1"
+        )
+    if equivalence == "audio_import_v1" and any(
+        request.get("operation") != "audio.import"
+        for request in requests
+    ):
+        raise V3ProtocolError(
+            "audio_import_v1 is valid only for audio.import requests"
+        )
+    if equivalence == "audio_import_tab_v1" and any(
+        request.get("operation") != "audio.importTabDelimited"
+        for request in requests
+    ):
+        raise V3ProtocolError(
+            "audio_import_tab_v1 is valid only for "
+            "audio.importTabDelimited requests"
+        )
+    if equivalence == "object_set_v1" and any(
+        request.get("operation") != "object.set"
+        for request in requests
+    ):
+        raise V3ProtocolError(
+            "object_set_v1 is valid only for object.set requests"
+        )
+    if (
+        not isinstance(object_type, str)
+        or not object_type
+        or object_type != object_type.strip()
+        or len(object_type) > 256
+        or any(
+            ord(character) < 32 or ord(character) == 127
+            for character in object_type
+        )
+    ):
+        raise V3ProtocolError(
+            "metadata-bound transaction protocol requires one bounded exact object type"
+        )
+    if isinstance(metadata_queries, (str, bytes)):
+        queries: tuple[Any, ...] = ()
+    else:
+        queries = tuple(metadata_queries)
+    if (
+        not 1 <= len(queries) <= 8
+        or any(
+            not isinstance(value, str)
+            or not value
+            or value != value.strip()
+            or len(value) > 160
+            or any(
+                ord(character) < 32 or ord(character) == 127
+                for character in value
+            )
+            for value in queries
+        )
+        or len({" ".join(value.split()).casefold() for value in queries})
+        != len(queries)
+        or sum(len(value) for value in queries) > 640
+    ):
+        raise V3ProtocolError(
+            "metadata-bound transaction requires 1..8 distinct bounded query suggestions"
+        )
+    if isinstance(required_tokens, (str, bytes)):
+        tokens: tuple[Any, ...] = ()
+    else:
+        tokens = tuple(required_tokens)
+    if (
+        not tokens
+        or any(
+            not isinstance(value, str)
+            or not value
+            or value != value.strip()
+            or value.startswith("@")
+            or len(value) > 256
+            or any(
+                ord(character) < 32 or ord(character) == 127
+                for character in value
+            )
+            for value in tokens
+        )
+        or len(tokens) != len({value.casefold() for value in tokens})
+    ):
+        raise V3ProtocolError(
+            "metadata-bound transaction requires unique exact live tokens"
+        )
+    projection = (
+        None
+        if expected_required_token_projection is None
+        else tuple(expected_required_token_projection)
+    )
+    if projection is not None and (
+        any(
+            not isinstance(item, MetadataTokenProjection)
+            for item in projection
+        )
+        or tuple(item.name for item in projection) != tokens
+    ):
+        raise V3ProtocolError(
+            "expected required-token projection must match required_tokens in order"
+        )
+
+    base = build_transaction_protocol(requests)
+    metadata_step_name = "metadata.discover"
+    metadata_arguments: list[Any] = [
+        "discover",
+        "--object-type",
+        object_type,
+    ]
+    for query in queries:
+        metadata_arguments.extend(
+            (
+                "--query",
+                MetadataQueryArgument(query),
+            )
+        )
+    metadata_arguments.extend(("--limit", "8"))
+    metadata_step = ExpectedGatewayStep(
+        name=metadata_step_name,
+        subcommand="metadata",
+        arguments=tuple(metadata_arguments),
+    )
+    if schema_first:
+        if (
+            len(base.steps) < 2
+            or base.steps[0].subcommand != "operation-schema"
+            or base.steps[1].subcommand != "preview"
+        ):
+            raise V3ProtocolError(
+                "schema-first metadata requires one ordinary transaction prefix"
+            )
+        steps = [base.steps[0], metadata_step, *base.steps[1:]]
+    else:
+        steps = [metadata_step, *base.steps]
+    for index, step in enumerate(steps):
+        if step.subcommand != "preview":
+            continue
+        if (
+            len(step.arguments) != 3
+            or step.arguments[:2] != ("--apply", "--request-json")
+            or not isinstance(step.arguments[2], SemanticJsonArgument)
+        ):
+            raise V3ProtocolError(
+                "base transaction preview differs from the reviewed shape"
+            )
+        try:
+            bound_argument = MetadataBoundJsonArgument(
+                expected=step.arguments[2].expected,
+                metadata_step=metadata_step_name,
+                object_type=object_type,
+                required_tokens=tokens,
+                expected_required_token_projection=projection,
+                equivalence=equivalence,
+            )
+        except (TypeError, ValueError) as exc:
+            raise V3ProtocolError(
+                f"metadata-bound request equivalence is invalid: {exc}"
+            ) from exc
+        steps[index] = replace(
+            step,
+            arguments=(
+                "--apply",
+                "--request-json",
+                bound_argument,
+            ),
+        )
+    return V3GatewayProtocol(
+        steps=tuple(steps),
+        turn_prefix_counts=tuple(value + 1 for value in base.turn_prefix_counts),
+    )
+
+
+def build_schema_query_transaction_protocol(
+    requests: Sequence[Mapping[str, Any]],
+    *,
+    query_step: ExpectedGatewayStep,
+) -> V3GatewayProtocol:
+    """Require one exact object lookup between schema and preview.
+
+    This narrow form is for a same-name merge whose natural request does not
+    state the existing root's exact Wwise type.  The lookup remains a required,
+    auditable broker step; it is not an optional discovery allowance.
+    """
+
+    if len(requests) != 1:
+        raise V3ProtocolError(
+            "schema-query transaction requires exactly one operation request"
+        )
+    if (
+        not isinstance(query_step, ExpectedGatewayStep)
+        or query_step.subcommand != "query-object"
+        or not query_step.name
+    ):
+        raise V3ProtocolError(
+            "schema-query transaction requires one exact query-object step"
+        )
+    base = build_transaction_protocol(requests)
+    if (
+        len(base.steps) < 2
+        or base.steps[0].subcommand != "operation-schema"
+        or base.steps[1].subcommand != "preview"
+    ):
+        raise V3ProtocolError(
+            "schema-query transaction requires one ordinary transaction prefix"
+        )
+    return V3GatewayProtocol(
+        steps=(base.steps[0], query_step, *base.steps[1:]),
+        turn_prefix_counts=tuple(value + 1 for value in base.turn_prefix_counts),
+    )
 
 
 def build_direct_protocol(
@@ -559,8 +814,11 @@ __all__ = [
     "V3ProtocolError",
     "build_direct_protocol",
     "build_modification_policy_protocol",
+    "build_metadata_transaction_protocol",
+    "build_schema_query_transaction_protocol",
     "build_transaction_protocol",
     "call_step",
+    "operation_request_equivalence",
     "query_object_step",
     "wait_topic_step",
 ]

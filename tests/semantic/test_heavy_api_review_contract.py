@@ -101,7 +101,7 @@ def test_heavy_review_renderer_exposes_prompts_assets_oracles_and_cleanup() -> N
     assert "Covered APIs: 16" in summary
 
 
-def test_audio_convert_raw_request_is_reconstructible_from_prompt_and_reference() -> None:
+def test_audio_convert_request_is_reconstructible_from_prompt_and_progressive_schema() -> None:
     bundle = load_eval_bundle_v3(SUITE_V3)
     cases = tuple(
         case
@@ -123,15 +123,16 @@ def test_audio_convert_raw_request_is_reconstructible_from_prompt_and_reference(
             assert platform in case.prompt
         for language in request["languages"]:
             assert language in case.prompt
-    assert "`ak.wwise.core.audio.convert` (`2024.1` / `2025.1`)" in reference
-    assert '"version":"2024.1"' in reference
-    assert '"version":"2025.1"' in reference
+    assert "### Reviewed Authoring audio-convert fast route" in reference
+    assert "`ak.wwise.core.audio.convert`" in reference
+    assert "`2024.1`/`2025.1`" in reference
+    assert "`operation-schema waapi.call`" in reference
+    assert "`direct_fast_route_contract.canonical_request_template`" in reference
     for token in (
-        "`args.objects`",
-        "`args.platforms`",
-        "`args.languages`",
-        "`options:{}`",
-        "exactly as `io_root`",
+        "exact object paths",
+        "platforms",
+        "languages",
+        "absolute `io_root` unchanged",
     ):
         assert token in reference
 

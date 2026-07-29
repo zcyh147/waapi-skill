@@ -4,7 +4,7 @@ The formal agent-behavior gate is the resumable fresh Codex campaign in
 `tests/semantic/run_codex_skill_campaign.py`. It delegates execution to the
 existing matrix runner in `tests/semantic/run_codex_skill_matrix.py`, tests the
 installed `waapi-skill` through its packaged gateway, and supports both the
-frozen v2 profiles and the reviewed V3 heavy profile described below.
+frozen v2 profiles and the reviewed V3 profiles described below.
 
 Mocked pytest is CI-safe contract coverage. It is not a replacement for a
 fresh Codex conversation or real WwiseConsole semantic validation.
@@ -115,6 +115,14 @@ four reviewed `ak.wwise.cli` APIs. Its representative distribution is 70 cases
 on 2022.1, five on 2024.1, and five on 2025.1. Each case receives a fresh
 project/process/task and the matrix runs them sequentially.
 
+The focused `compound_heavy_cross_version_24` profile is defined by
+`tests/semantic/data/compound-heavy-v1/profile.json`. It runs 12 complex batch
+mutation scenarios once on Wwise 2022.1 and once on Wwise 2025.1: two each for
+direct import, table import, object create/set, SoundBank generation, and
+SoundBank inclusions. Its 24 fresh tasks require 48 user turns when every
+preview reaches confirmation. This is a regression profile for request
+composition and business assertions, not additional API-coverage credit.
+
 The focused `modification_policy_9` profile reuses the existing
 `OBJ22-F-CREATE-01` fixture, runner, broker, lifecycle, and business oracle. It
 runs `read_only`, `ask_before_changes`, and `allow_changes` three times each:
@@ -148,8 +156,8 @@ This executable profile does not make the other V3 definitions runnable. The
 remaining catalog still contains specification-only adapters, unresolved
 request mappings, UI/runtime/profiler lifecycle requirements, and unapproved
 execution surfaces. Do not describe all 444 V3 scenarios or all 198 reflected
-URIs as implemented or tested. V2 remains the default suite unless
-`--profile heavy_cross_version_80` is selected explicitly.
+URIs as implemented or tested. V2 remains the default suite unless an approved
+V3 profile and its reviewed suite are selected explicitly.
 
 ## Memory-off isolation contract
 
@@ -177,11 +185,12 @@ The profile names and session totals are part of the v2 suite contract:
 | `formal_98` | 98 | Repeated formal sample; every unsupported boundary runs three times |
 | `full_cross_version_168` | 168 | Full five-version transaction, query, and fixed-read matrix plus one pass per boundary |
 
-The separately approved V3 executable profile is:
+The separately approved V3 executable profiles are:
 
 | Profile | Fresh tasks | User turns | Intended use |
 | --- | ---: | ---: | --- |
 | `heavy_cross_version_80` | 80 | 145 | Real sandboxed business-oracle coverage for the 16 implemented heavy APIs |
+| `compound_heavy_cross_version_24` | 24 | 48 | Complex batch composition and real business assertions on Wwise 2022.1 and 2025.1 |
 | `modification_policy_9` | 9 | 15 | Three isolated repetitions of each canonical project-modification policy on one reviewed object.create business case |
 
 From the repository root, run each profile into a distinct campaign directory.
@@ -200,6 +209,7 @@ settings, or start with one pilot case:
 ```bash
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile heavy_cross_version_80 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-heavy-v3-terra
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile heavy_cross_version_80 --case-id OBJ22-F-GET-01 --version 2022.1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-heavy-v3-pilot-object-get
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile compound_heavy_cross_version_24 --suite tests/semantic/data/compound-heavy-v1/profile.json --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-compound-heavy-v1
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile modification_policy_9 --campaign-root skills/waapi-skill-workspace/campaign-modification-policy-9
 ```
 

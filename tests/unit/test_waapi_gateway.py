@@ -842,10 +842,169 @@ def test_main_keeps_non_transaction_output_strict_json(
         stdout,
         parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)),
     ) == payload
+    assert stdout.startswith('{\n  "contract":')
+    assert '\n  "details": {\n    "message": "中文"\n  }\n}\n' in stdout
+    assert waapi_gateway.gateway_json_document_size(payload) == len(
+        stdout.encode("utf-8")
+    )
     assert waapi_gateway.probe_gateway_json_document_size(
         payload,
         len(stdout.encode("utf-8")),
     ) == "ok"
+
+
+def test_main_prints_object_set_operation_schema_as_bounded_compact_json(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: Any,
+) -> None:
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2025.1"
+    expected_exit_code, payload = waapi_gateway.execute_gateway(
+        ["operation-schema", "object.set"],
+        env=env,
+    )
+    monkeypatch.setattr(
+        waapi_gateway,
+        "execute_gateway",
+        lambda argv: (expected_exit_code, payload),
+    )
+
+    exit_code = waapi_gateway.main(["operation-schema", "object.set"])
+    stdout = capsys.readouterr().out
+    stdout_size = len(stdout.encode("utf-8"))
+    parsed = json.loads(
+        stdout,
+        parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)),
+    )
+
+    assert exit_code == 0
+    assert parsed == payload
+    assert list(parsed) == list(payload)
+    assert stdout.count("\n") == 1
+    assert stdout == (
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=False,
+            allow_nan=False,
+        )
+        + "\n"
+    )
+    assert stdout_size < 32 * 1024
+    assert waapi_gateway.gateway_json_document_size(payload) == stdout_size
+    assert (
+        waapi_gateway.probe_gateway_json_document_size(payload, stdout_size)
+        == "ok"
+    )
+    assert (
+        waapi_gateway.probe_gateway_json_document_size(payload, stdout_size - 1)
+        == "too_large"
+    )
+
+
+def test_gateway_import_schemas_share_semantic_import_operation_contract(
+    tmp_path: Path,
+) -> None:
+    env = gateway_env(tmp_path)
+    direct_exit_code, direct_payload = waapi_gateway.execute_gateway(
+        ["--version", "2022.1", "operation-schema", "audio.import"],
+        env=env,
+    )
+    tab_exit_code, tab_payload = waapi_gateway.execute_gateway(
+        [
+            "--version",
+            "2022.1",
+            "operation-schema",
+            "audio.importTabDelimited",
+        ],
+        env=env,
+    )
+
+    assert direct_exit_code == 0
+    assert tab_exit_code == 0
+    direct_operation = direct_payload["operation"]
+    tab_operation = tab_payload["operation"]
+    direct_contract = direct_operation["argument_contract"][
+        "request_composition_contract"
+    ]["import_operation"]
+    dependency_contract = direct_operation["argument_contract"][
+        "request_composition_contract"
+    ]["metadata_dependency_closure"]
+    tab_argument_contract = tab_operation["argument_contract"]
+
+    assert tab_operation["file_read_policy"] == "pass_path_without_reading"
+    assert "import_operation" in tab_operation["optional_arguments"]
+    assert tab_argument_contract["properties"]["import_operation"][
+        "default"
+    ] == "createNew"
+    assert tab_argument_contract["import_operation_contract"] == direct_contract
+    assert direct_contract["contract"] == (
+        "waapi-skill.import-operation-intent/v1"
+    )
+    assert direct_contract["required_when_user_intent_is_explicit"] is True
+    assert direct_contract["omission_value_when_user_intent_is_unstated"] == (
+        "createNew"
+    )
+    assert dependency_contract["contract"] == (
+        "waapi-skill.live-metadata-dependency-closure/v1"
+    )
+    assert dependency_contract["selection"]["selected_fields_only"] is True
+    assert dependency_contract["metadata_source"]["same_result_required"] is True
+    assert dependency_contract["traversal"]["recursive"] is True
+    assert dependency_contract["materialization"]["required_values_count"] == 1
+    assert dependency_contract["materialization"]["scope"] == {
+        "inherit_selected_owner_scope": True,
+        "defaults": "$.arguments.defaults.properties",
+        "row": "$.arguments.imports[owner_row_index].properties",
+    }
+    assert dependency_contract["failure_policy"]["action"] == "stop"
+    assert dependency_contract["failure_policy"]["guessing_allowed"] is False
+    encoded_contract = json.dumps(
+        dependency_contract,
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    assert "OutputBus" not in encoded_contract
+    assert "OverrideOutput" not in encoded_contract
+
+
+def test_all_versioned_operation_schemas_fit_complete_compact_output_budget(
+    tmp_path: Path,
+) -> None:
+    operations = tuple(waapi_gateway.list_operation_specs())
+    assert operations
+
+    for version in SUPPORTED_WWISE_VERSION_KEYS:
+        env = gateway_env(tmp_path / version.replace(".", "-"))
+        for operation in operations:
+            exit_code, payload = waapi_gateway.execute_gateway(
+                [
+                    "--version",
+                    version,
+                    "operation-schema",
+                    operation.name,
+                ],
+                env=env,
+            )
+            encoded = (
+                waapi_gateway.gateway_stdout_json_encoder(payload).encode(payload)
+                + "\n"
+            )
+            encoded_size = len(encoded.encode("utf-8"))
+
+            assert exit_code == 0, (version, operation.name)
+            assert encoded.count("\n") == 1, (version, operation.name)
+            assert json.loads(encoded) == payload, (version, operation.name)
+            assert encoded_size < 32 * 1024, (
+                version,
+                operation.name,
+                encoded_size,
+            )
+            assert (
+                waapi_gateway.gateway_json_document_size(payload) == encoded_size
+            ), (version, operation.name)
 
 
 def test_main_prints_stream_records_as_compact_json_lines(

@@ -23,9 +23,14 @@ from typing import Any, Mapping, Sequence
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     build_direct_protocol,
+    build_metadata_transaction_protocol,
     build_modification_policy_protocol,
+    build_schema_query_transaction_protocol,
     build_transaction_protocol,
     query_object_step,
+)
+from tests.semantic.support.codex_gateway_broker import (
+    MetadataBoundJsonArgument,
 )
 from tests.semantic.support.codex_object_heavy_v3 import (
     ObjectHeavyRecipe,
@@ -34,6 +39,9 @@ from tests.semantic.support.codex_object_heavy_v3 import (
 )
 from tests.semantic.support.codex_object_runtime_v3 import ObjectRuntimeSnapshot
 from tests.semantic.support.codex_prompt_provenance_v3 import serialize_protocol
+from tests.semantic.support.codex_version_layout_v3 import (
+    get_codex_version_layout_v3,
+)
 
 
 OBJECT_BUSINESS_PLAN_SCHEMA = "waapi-skill.object-business-plan/v1"
@@ -51,7 +59,7 @@ _GUID_RE = re.compile(
     r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}$"
 )
 _OUTPUT_BUS_OVERRIDE_TYPES = frozenset(
-    {"ActorMixer", "RandomSequenceContainer", "Sound"}
+    {"ActorMixer", "PropertyContainer", "RandomSequenceContainer", "Sound"}
 )
 
 
@@ -130,7 +138,7 @@ def compile_object_business_plan(
     """Compile one exact object plan from reviewed and live runner inputs."""
 
     _validate_identity(scenario, recipe)
-    _validate_protocol(recipe, protocol)
+    _validate_protocol(recipe, protocol, scenario=scenario)
     before_value = _validate_before_snapshot(recipe, before)
     file_rows = _validate_input_manifest(
         input_file_manifest,
@@ -249,7 +257,7 @@ def validate_archived_object_business_plan(
     """Validate an archived plan after scenario-owned state may be removed."""
 
     _validate_identity(scenario, recipe)
-    _validate_protocol(recipe, protocol)
+    _validate_protocol(recipe, protocol, scenario=scenario)
     sections = parse_object_business_plan_sections(plan_payload)
     static = _static_expectation(recipe, protocol)
     if sections.static_expectation != static:
@@ -1512,23 +1520,169 @@ def _validate_identity(scenario: Any, recipe: ObjectHeavyRecipe) -> None:
         raise ObjectBusinessPlanError("object scenario and reviewed recipe are misbound")
 
 
-def _validate_protocol(recipe: ObjectHeavyRecipe, protocol: V3GatewayProtocol) -> None:
+def _compound_metadata_protocol(
+    scenario: Any,
+    recipe: ObjectHeavyRecipe,
+    protocol: V3GatewayProtocol,
+) -> V3GatewayProtocol | None:
+    fixture = getattr(scenario, "fixture", {})
+    asset_spec = fixture.get("asset_spec") if isinstance(fixture, Mapping) else None
+    value = (
+        asset_spec.get("metadata_binding")
+        if isinstance(asset_spec, Mapping)
+        else None
+    )
+    if value is None:
+        return None
+    if (
+        recipe.scenario_id
+        not in {
+            "OBJ22-F-CREATE-03",
+            "OBJ22-F-SET-01",
+            "OBJ22-F-SET-02",
+        }
+        or not isinstance(value, Mapping)
+        or set(value) != {"contract", "queries", "required_tokens"}
+        or value.get("contract") != "waapi-skill.compound-object-metadata/v1"
+        or value.get("queries") != ["volume"]
+        or value.get("required_tokens") != ["Volume"]
+    ):
+        raise ObjectBusinessPlanError(
+            "compound object metadata binding differs from the reviewed profile"
+        )
+    metadata_arguments = tuple(
+        argument
+        for step in protocol.steps
+        if step.subcommand == "preview"
+        for argument in step.arguments
+        if isinstance(argument, MetadataBoundJsonArgument)
+    )
+    if (
+        len(metadata_arguments) != 1
+        or metadata_arguments[0].expected_required_token_projection is None
+    ):
+        raise ObjectBusinessPlanError(
+            "compound object protocol omits its trusted live metadata projection"
+        )
+    object_type = get_codex_version_layout_v3(recipe.version).reflected_type(
+        "ActorMixer"
+    )
+    return build_metadata_transaction_protocol(
+        (recipe.request.as_dict(version=recipe.version),),
+        object_type=object_type,
+        metadata_queries=("volume",),
+        required_tokens=("Volume",),
+        expected_required_token_projection=(
+            metadata_arguments[0].expected_required_token_projection
+        ),
+        equivalence=(
+            "object_set_v1"
+            if recipe.request.operation == "object.set"
+            else "wire_exact"
+        ),
+        schema_first=True,
+    )
+
+
+def build_object_merge_query_protocol(
+    scenario: Any,
+    recipe: ObjectHeavyRecipe,
+) -> V3GatewayProtocol | None:
+    """Require exact live type evidence for the compound same-name merge."""
+
+    fixture = getattr(scenario, "fixture", {})
+    asset_spec = fixture.get("asset_spec") if isinstance(fixture, Mapping) else None
+    binding = (
+        asset_spec.get("identity_binding")
+        if isinstance(asset_spec, Mapping)
+        else None
+    )
+    if binding is None:
+        return None
+    if (
+        recipe.scenario_id != "OBJ22-F-CREATE-02"
+        or not isinstance(binding, Mapping)
+        or dict(binding)
+        != {
+            "contract": "waapi-skill.compound-object-identity/v1",
+            "fixture_key": "robot",
+        }
+        or not isinstance(recipe.request, OperationRequestSpec)
+    ):
+        raise ObjectBusinessPlanError(
+            "compound object merge identity binding differs from the reviewed profile"
+        )
+    roots = tuple(
+        item
+        for item in recipe.fixture.objects
+        if item.key == "robot"
+    )
+    if len(roots) != 1:
+        raise ObjectBusinessPlanError(
+            "compound object merge must identify one existing request root"
+        )
+    root = roots[0]
+    return build_schema_query_transaction_protocol(
+        (recipe.request.as_dict(version=recipe.version),),
+        query_step=query_object_step(
+            "object.merge-root",
+            (
+                "query-object",
+                "--path",
+                root.path,
+                "--return-field",
+                "id",
+                "--return-field",
+                "name",
+                "--return-field",
+                "type",
+                "--return-field",
+                "path",
+            ),
+        ),
+    )
+
+
+def _validate_protocol(
+    recipe: ObjectHeavyRecipe,
+    protocol: V3GatewayProtocol,
+    *,
+    scenario: Any,
+) -> None:
     if not isinstance(protocol, V3GatewayProtocol):
         raise ObjectBusinessPlanError("object protocol must be V3GatewayProtocol")
     request = recipe.request
     if isinstance(request, OperationRequestSpec):
-        base = build_transaction_protocol([request.as_dict()])
-        expected_protocols = (
-            base,
-            *(
-                build_modification_policy_protocol(base, policy=policy)
-                for policy in (
-                    "read_only",
-                    "ask_before_changes",
-                    "allow_changes",
-                )
-            ),
+        metadata_protocol = _compound_metadata_protocol(
+            scenario,
+            recipe,
+            protocol,
         )
+        if metadata_protocol is not None:
+            expected_protocols = (metadata_protocol,)
+        else:
+            base = build_transaction_protocol(
+                [request.as_dict(version=recipe.version)]
+            )
+            merge_protocol = build_object_merge_query_protocol(
+                scenario,
+                recipe,
+            )
+            expected_protocols = (
+                (merge_protocol,)
+                if merge_protocol is not None
+                else (
+                    base,
+                    *(
+                        build_modification_policy_protocol(base, policy=policy)
+                        for policy in (
+                            "read_only",
+                            "ask_before_changes",
+                            "allow_changes",
+                        )
+                    ),
+                )
+            )
     elif isinstance(request, QueryObjectRequestSpec):
         expected_protocols = (
             build_direct_protocol(
@@ -1867,7 +2021,10 @@ def _static_expectation(
 def _request_value(recipe: ObjectHeavyRecipe) -> dict[str, Any]:
     request = recipe.request
     if isinstance(request, OperationRequestSpec):
-        return {"kind": "operation_request", "value": _json_value(request.as_dict())}
+        return {
+            "kind": "operation_request",
+            "value": _json_value(request.as_dict(version=recipe.version)),
+        }
     if isinstance(request, QueryObjectRequestSpec):
         return {"kind": "query_object", "value": _json_value(request)}
     raise ObjectBusinessPlanError("object recipe request type is unsupported")
@@ -2073,6 +2230,7 @@ __all__ = [
     "OBJECT_FIXTURE_KIND",
     "ObjectBusinessPlanError",
     "ObjectBusinessPlanSections",
+    "build_object_merge_query_protocol",
     "compile_object_business_plan",
     "parse_object_business_plan_sections",
     "seal_object_input_file_manifest",

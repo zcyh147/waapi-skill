@@ -114,10 +114,14 @@ def _arguments() -> dict[str, Any]:
     }
 
 
-def _request(arguments: Mapping[str, Any]) -> dict[str, Any]:
+def _request(
+    arguments: Mapping[str, Any],
+    *,
+    version: str = "2022.1",
+) -> dict[str, Any]:
     return {
         "contract": OPERATION_REQUEST_CONTRACT,
-        "version": "2022.1",
+        "version": version,
         "operation": "object.create",
         "arguments": dict(arguments),
     }
@@ -244,6 +248,29 @@ def test_public_replace_contract_is_conditional_and_closed() -> None:
     assert parsed.arguments["replace_owned_root"] == {"kind": "id", "value": OWNED_ROOT_ID}
 
 
+def test_public_create_schema_exposes_merge_query_and_2025_type_alias() -> None:
+    spec = {item.name: item.as_dict() for item in list_operation_specs()}[
+        "object.create"
+    ]
+    type_description = spec["argument_contract"]["properties"]["type"][
+        "description"
+    ]
+    constraints = " ".join(spec["constraints"])
+
+    assert "Wwise 2025.1 reflects an Actor Mixer as PropertyContainer" in (
+        type_description
+    )
+    assert "object.create request token remains ActorMixer" in type_description
+    assert "operation-schema must be followed by one exact-path query-object" in (
+        constraints
+    )
+    assert "returning id, name, type, and path before preview" in constraints
+    assert (
+        "Wwise 2025.1 PropertyContainer readback maps to the ActorMixer request token"
+        in constraints
+    )
+
+
 @pytest.mark.parametrize(
     ("parent_type", "parent_path", "parent_name"),
     [
@@ -295,6 +322,103 @@ def test_create_accepts_only_reviewed_writable_parent_categories(
 
     assert prepared["resolved_roles"]["parent"]["row"]["type"] == parent_type
     assert prepared["dispatch"]["args"]["parent"] == PARENT_ID
+
+
+def test_create_accepts_2025_property_container_parent_but_dispatches_actor_mixer() -> None:
+    parent_path = r"\Containers\Default Work Unit\SemanticLab\Weapons"
+    parent = _row(
+        PARENT_ID,
+        "Weapons",
+        "PropertyContainer",
+        parent_path,
+        "{default-work-unit}",
+    )
+    arguments = {
+        "parent": {"kind": "id", "value": PARENT_ID},
+        "type": "ActorMixer",
+        "name": "Impact_Library",
+    }
+
+    prepared = prepare_operation(
+        parse_operation_request(_request(arguments, version="2025.1")),
+        read_call=ScriptedReader(
+            {
+                "ak.wwise.core.object.get": [
+                    {"return": [parent]},
+                    {"return": []},
+                    {"return": []},
+                ],
+                "ak.wwise.core.object.getTypes": [
+                    {
+                        "return": [
+                            {
+                                "classId": 524304,
+                                "name": "PropertyContainer",
+                                "type": "WObject",
+                            }
+                        ]
+                    }
+                ],
+            }
+        ),
+    ).as_dict()
+
+    assert prepared["resolved_roles"]["parent"]["row"]["type"] == (
+        "PropertyContainer"
+    )
+    assert prepared["dispatch"]["args"]["type"] == "ActorMixer"
+    assert prepared["verification_plan"]["nodes"][0]["requested_type"] == (
+        "ActorMixer"
+    )
+    assert prepared["verification_plan"]["nodes"][0]["canonical_type"] == (
+        "ActorMixer"
+    )
+    assert prepared["verification_plan"]["nodes"][0]["class_id"] == 524304
+
+
+@pytest.mark.parametrize(
+    ("version", "parent_type"),
+    [
+        ("2022.1", "PropertyContainer"),
+        ("2025.1", "FutureContainer"),
+    ],
+)
+def test_create_reflected_parent_alias_is_version_bound_and_unknown_types_fail(
+    version: str,
+    parent_type: str,
+) -> None:
+    parent_root = (
+        r"\Containers"
+        if version == "2025.1"
+        else r"\Actor-Mixer Hierarchy"
+    )
+    parent = _row(
+        PARENT_ID,
+        "Parent",
+        parent_type,
+        parent_root + r"\Default Work Unit\Parent",
+        "{default-work-unit}",
+    )
+    arguments = {
+        "parent": {"kind": "id", "value": PARENT_ID},
+        "type": "ActorMixer",
+        "name": "ClosedCreate",
+    }
+
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(
+            parse_operation_request(_request(arguments, version=version)),
+            read_call=ScriptedReader(
+                {"ak.wwise.core.object.get": [{"return": [parent]}]}
+            ),
+        )
+
+    assert rejected.value.error_code == "INVALID_CREATE_PARENT_TYPE"
+    assert rejected.value.details["actual_type"] == parent_type
+    assert rejected.value.details["version"] == version
+    assert (
+        "PropertyContainer" in rejected.value.details["allowed_types"]
+    ) is (version == "2025.1")
 
 
 @pytest.mark.parametrize(

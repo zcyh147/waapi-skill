@@ -50,6 +50,7 @@ MAX_TEXT_CHARS = 16 * 1024
 MAX_INLINE_AUDIO_BYTES = 180 * 1024
 MAX_AUDIO_IMPORT_BASE64_ENCODED_CHARS = 256 * 1024
 MAX_IMPORT_FIELDS_PER_ROW = 64
+MAX_NATIVE_AUDIO_IMPORT_ROWS = MAX_IMPORT_ITEMS * 2
 
 _AUDIO_IMPORT_REQUIRED_FIELDS = frozenset()
 _AUDIO_IMPORT_OPTIONAL_FIELDS = frozenset(
@@ -78,6 +79,21 @@ _PROPERTY_HEADER = re.compile(r"^Property\[([:_a-zA-Z0-9]+)\]$")
 _REFERENCE_HEADER = re.compile(r"^Reference\[([:_a-zA-Z0-9]+)\]$")
 _AT_HEADER = re.compile(r"^@([:_a-zA-Z0-9]+)$")
 _WINDOWS_DRIVE = re.compile(r"^[A-Za-z]:")
+
+# These pairs describe reviewed import-syntax aliases, not reflected-class
+# equivalence. In particular, Sound SFX/Sound Voice and Random/Sequence
+# Container remain distinct even though Wwise reflects each pair through one
+# underlying object class.
+_IMPORT_OBJECT_TYPE_ALIAS_PAIRS = frozenset(
+    {
+        frozenset({"sound", "soundsfx"}),
+        frozenset({"sound", "soundvoice"}),
+        frozenset({"actormixer", "propertycontainer"}),
+        frozenset({"randomsequencecontainer", "randomcontainer"}),
+        frozenset({"randomsequencecontainer", "sequencecontainer"}),
+        frozenset({"musicplaylistcontainer", "musicranseqcntr"}),
+    }
+)
 
 IMPORT_ROOTS_BY_VERSION: Mapping[str, frozenset[str]] = {
     "2021.1": frozenset({"Actor-Mixer Hierarchy", "Interactive Music Hierarchy"}),
@@ -129,6 +145,13 @@ class ImportContractError(ValueError):
             "message": self.message,
             "details": dict(self.details),
         }
+
+
+def allowed_import_hierarchy_roots(version: str) -> tuple[str, ...]:
+    """Return the closed, deterministic hierarchy-root contract for one lane."""
+
+    lane = _require_version(version)
+    return tuple(sorted(IMPORT_ROOTS_BY_VERSION[lane]))
 
 
 def normalize_auto_check_out_to_source_control(
@@ -463,13 +486,30 @@ def build_audio_import_plan(
             if expected_source_path is not None:
                 oracle_row["expected_audio_file_source_result_path"] = expected_source_path
 
-        requested_type = effective.get("object_type")
-        if requested_type is None:
-            requested_type = _typed_leaf_object_type(object_path)
-        if requested_type is not None:
+        explicit_type = effective.get("object_type")
+        inferred_type = _typed_leaf_object_type(object_path)
+        if explicit_type is not None:
             object_type = _require_object_type(
-                requested_type,
+                explicit_type,
                 field=f"imports[{index}].object_type",
+            )
+            if inferred_type is not None:
+                typed_object_type = _require_object_type(
+                    inferred_type,
+                    field=f"imports[{index}].object_path",
+                )
+                _require_compatible_import_object_types(
+                    typed_object_type,
+                    object_type,
+                    typed_field=f"imports[{index}].object_path",
+                    explicit_field=f"imports[{index}].object_type",
+                )
+            dispatch["objectType"] = object_type
+            oracle_row["requested_object_type"] = object_type
+        elif inferred_type is not None:
+            object_type = _require_object_type(
+                inferred_type,
+                field=f"imports[{index}].object_path",
             )
             dispatch["objectType"] = object_type
             oracle_row["requested_object_type"] = object_type
@@ -779,6 +819,17 @@ def parse_tab_delimited_import_file(
                 object_type_value,
                 field=f"row[{offset}].Object Type",
             )
+            if inferred_type is not None:
+                typed_object_type = _require_object_type(
+                    inferred_type,
+                    field=f"row[{offset}].Object Path",
+                )
+                _require_compatible_import_object_types(
+                    typed_object_type,
+                    object_type,
+                    typed_field=f"row[{offset}].Object Path",
+                    explicit_field=f"row[{offset}].Object Type",
+                )
             row_plan["object_type"] = object_type
             oracle_row["requested_object_type"] = object_type
         elif inferred_type is not None:
@@ -1296,6 +1347,37 @@ def _typed_leaf_object_type(object_path: str) -> str | None:
     return match.group(1).strip() if match is not None else None
 
 
+def _require_compatible_import_object_types(
+    typed_object_type: str,
+    explicit_object_type: str,
+    *,
+    typed_field: str,
+    explicit_field: str,
+) -> None:
+    typed_token = _import_object_type_token(typed_object_type)
+    explicit_token = _import_object_type_token(explicit_object_type)
+    if (
+        typed_token == explicit_token
+        or frozenset({typed_token, explicit_token})
+        in _IMPORT_OBJECT_TYPE_ALIAS_PAIRS
+    ):
+        return
+    raise ImportContractError(
+        "INVALID_TARGET_TYPE",
+        "The typed Object Path leaf conflicts with the explicit Object Type.",
+        details={
+            "typed_field": typed_field,
+            "typed_object_type": typed_object_type,
+            "explicit_field": explicit_field,
+            "explicit_object_type": explicit_object_type,
+        },
+    )
+
+
+def _import_object_type_token(value: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", value.casefold())
+
+
 def _parse_dynamic_tab_header(header: str) -> dict[str, str] | None:
     for kind, pattern in (
         ("property", _PROPERTY_HEADER),
@@ -1536,12 +1618,12 @@ def _canonical_wwise_segments(value: Any, *, field: str, absolute: bool) -> list
 
 
 def _require_import_root(root: str, *, version: str, field: str) -> None:
-    allowed = IMPORT_ROOTS_BY_VERSION[version]
+    allowed = allowed_import_hierarchy_roots(version)
     if root not in allowed:
         raise ImportContractError(
             "INVALID_TARGET",
             f"{field} uses an unsupported hierarchy root for Wwise {version}.",
-            details={"root": root, "allowed": sorted(allowed)},
+            details={"root": root, "allowed": list(allowed)},
         )
 
 
@@ -1790,6 +1872,7 @@ __all__ = [
     "SUPPORTED_WWISE_VERSIONS",
     "TAB_HEADERS_BY_VERSION",
     "TAB_IMPORT_PLAN_CONTRACT",
+    "allowed_import_hierarchy_roots",
     "build_audio_import_plan",
     "canonical_import_location",
     "canonical_import_target",

@@ -10,12 +10,18 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
     V3ProtocolError,
     build_direct_protocol,
+    build_metadata_transaction_protocol,
+    build_schema_query_transaction_protocol,
     build_transaction_protocol,
     call_step,
+    query_object_step,
     wait_topic_step,
 )
 from tests.semantic.support.codex_gateway_broker import (
     CodexGatewayBroker,
+    MetadataBoundJsonArgument,
+    MetadataQueryArgument,
+    MetadataTokenProjection,
     ResponseBinding,
     SemanticJsonArgument,
     resolve_gateway_invocation,
@@ -80,6 +86,387 @@ def test_non_object_transaction_request_keeps_wire_exact_json() -> None:
     request_argument = protocol.steps[1].arguments[2]
     assert isinstance(request_argument, SemanticJsonArgument)
     assert request_argument.equivalence == "wire_exact"
+
+
+def test_soundbank_generate_transaction_uses_narrow_default_equivalence() -> None:
+    request = {
+        **_request(),
+        "operation": "soundbank.generate",
+        "arguments": {
+            "soundbanks": [
+                {
+                    "name": "Main_UI",
+                    "artifact_expectation": "nonlocalized",
+                    "rebuild": False,
+                }
+            ],
+            "platforms": ["Windows"],
+            "skip_languages": True,
+            "write_to_disk": True,
+            "io_root": "/owned",
+            "rebuild_soundbanks": False,
+            "clear_audio_file_cache": False,
+            "rebuild_init_bank": False,
+        },
+    }
+
+    protocol = build_transaction_protocol([request])
+
+    request_argument = protocol.steps[1].arguments[2]
+    assert isinstance(request_argument, SemanticJsonArgument)
+    assert request_argument.equivalence == "soundbank_generate_v1"
+
+
+def test_metadata_transaction_protocol_is_generic_and_binds_every_preview() -> None:
+    first = _request(1)
+    first["arguments"] = {
+        "object": {"kind": "path", "value": r"\Root\One"},
+        "properties": [{"name": "Volume", "value": -1.5}],
+    }
+    second = _request(2)
+    second["arguments"] = {
+        "object": {"kind": "path", "value": r"\Root\Two"},
+        "properties": [{"name": "Volume", "value": -3}],
+    }
+
+    protocol = build_metadata_transaction_protocol(
+        (first, second),
+        object_type="ActorMixer",
+        metadata_queries=("output volume", "voice gain"),
+        required_tokens=("Volume",),
+        expected_required_token_projection=(
+            MetadataTokenProjection("Volume", "property", "Real32"),
+        ),
+    )
+
+    assert protocol.turn_prefix_counts == (3, 9, 13)
+    assert protocol.steps[0].name == "metadata.discover"
+    assert protocol.steps[0].subcommand == "metadata"
+    assert protocol.steps[0].arguments[:3] == (
+        "discover",
+        "--object-type",
+        "ActorMixer",
+    )
+    query_arguments = tuple(
+        item
+        for item in protocol.steps[0].arguments
+        if isinstance(item, MetadataQueryArgument)
+    )
+    assert tuple(item.label for item in query_arguments) == (
+        "output volume",
+        "voice gain",
+    )
+    previews = tuple(
+        step for step in protocol.steps if step.subcommand == "preview"
+    )
+    assert len(previews) == 2
+    for preview, request in zip(previews, (first, second), strict=True):
+        argument = preview.arguments[2]
+        assert isinstance(argument, MetadataBoundJsonArgument)
+        assert argument.expected == request
+        assert argument.metadata_step == "metadata.discover"
+        assert argument.object_type == "ActorMixer"
+        assert argument.required_tokens == ("Volume",)
+        assert argument.equivalence == "wire_exact"
+        assert argument.expected_required_token_projection == (
+            MetadataTokenProjection("Volume", "property", "Real32"),
+        )
+
+
+def test_schema_first_metadata_protocol_exposes_version_before_exact_scope() -> None:
+    protocol = build_metadata_transaction_protocol(
+        (_request(),),
+        object_type="PropertyContainer",
+        metadata_queries=("output volume",),
+        required_tokens=("Volume",),
+        expected_required_token_projection=(
+            MetadataTokenProjection("Volume", "property", "Real32"),
+        ),
+        schema_first=True,
+    )
+
+    assert protocol.turn_prefix_counts == (3, 7)
+    assert tuple(step.subcommand for step in protocol.steps[:3]) == (
+        "operation-schema",
+        "metadata",
+        "preview",
+    )
+    assert protocol.steps[1].arguments[:3] == (
+        "discover",
+        "--object-type",
+        "PropertyContainer",
+    )
+    argument = protocol.steps[2].arguments[2]
+    assert isinstance(argument, MetadataBoundJsonArgument)
+    assert argument.metadata_step == "metadata.discover"
+    assert argument.object_type == "PropertyContainer"
+
+
+def test_schema_query_protocol_requires_one_exact_auditable_object_lookup() -> None:
+    query = query_object_step(
+        "object.merge-root",
+        (
+            "query-object",
+            "--path",
+            r"\Containers\Default Work Unit\SemanticLab\NPC\Robot_VO",
+            "--return-field",
+            "id",
+            "--return-field",
+            "name",
+            "--return-field",
+            "type",
+            "--return-field",
+            "path",
+        ),
+    )
+
+    protocol = build_schema_query_transaction_protocol(
+        (_request(),),
+        query_step=query,
+    )
+
+    assert protocol.turn_prefix_counts == (3, 7)
+    assert tuple(step.subcommand for step in protocol.steps[:3]) == (
+        "operation-schema",
+        "query-object",
+        "preview",
+    )
+    assert protocol.steps[1] == query
+
+
+def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": r"\Actor-Mixer Hierarchy\Target",
+                    "audio_file": "/owned/source.wav",
+                }
+            ],
+            "defaults": {
+                "properties": [
+                    {"name": "IsLoopingEnabled", "value": True}
+                ]
+            },
+        },
+    }
+
+    protocol = build_metadata_transaction_protocol(
+        (request,),
+        object_type="Sound",
+        metadata_queries=("looping enabled",),
+        required_tokens=("IsLoopingEnabled",),
+        equivalence="audio_import_v1",
+    )
+    argument = protocol.steps[2].arguments[2]
+
+    assert isinstance(argument, MetadataBoundJsonArgument)
+    assert argument.expected == request
+    assert argument.equivalence == "audio_import_v1"
+
+
+def test_metadata_transaction_protocol_selects_closed_tab_import_equivalence() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2025.1",
+        "operation": "audio.importTabDelimited",
+        "arguments": {
+            "import_file": "/owned/import.tsv",
+            "import_location": {
+                "kind": "path",
+                "value": r"\Actor-Mixer Hierarchy\Default Work Unit",
+            },
+            "import_language": "SFX",
+        },
+    }
+
+    protocol = build_metadata_transaction_protocol(
+        (request,),
+        object_type="Sound",
+        metadata_queries=("looping enabled",),
+        required_tokens=("IsLoopingEnabled",),
+        equivalence="audio_import_tab_v1",
+    )
+    argument = protocol.steps[2].arguments[2]
+
+    assert isinstance(argument, MetadataBoundJsonArgument)
+    assert argument.expected == request
+    assert argument.equivalence == "audio_import_tab_v1"
+
+
+def test_metadata_transaction_protocol_selects_closed_object_set_equivalence() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": {
+                        "kind": "path",
+                        "value": r"\Actor-Mixer Hierarchy\Target",
+                    },
+                    "properties": [{"name": "Volume", "value": -3}],
+                }
+            ]
+        },
+    }
+
+    protocol = build_metadata_transaction_protocol(
+        (request,),
+        object_type="ActorMixer",
+        metadata_queries=("volume",),
+        required_tokens=("Volume",),
+        equivalence="object_set_v1",
+    )
+    argument = protocol.steps[2].arguments[2]
+
+    assert isinstance(argument, MetadataBoundJsonArgument)
+    assert argument.expected == request
+    assert argument.equivalence == "object_set_v1"
+
+
+@pytest.mark.parametrize(
+    "arguments,match",
+    (
+        (
+            {
+                "requests": (),
+                "object_type": "Sound",
+                "metadata_queries": ("looping",),
+                "required_tokens": ("IsLoopingEnabled",),
+            },
+            "at least one",
+        ),
+        (
+            {
+                "requests": (_request(),),
+                "object_type": " Sound ",
+                "metadata_queries": ("looping",),
+                "required_tokens": ("IsLoopingEnabled",),
+            },
+            "object type",
+        ),
+        (
+            {
+                "requests": (_request(),),
+                "object_type": "Sound",
+                "metadata_queries": ("looping", " LOOPING "),
+                "required_tokens": ("IsLoopingEnabled",),
+            },
+            "query suggestions",
+        ),
+        (
+            {
+                "requests": (_request(),),
+                "object_type": "Sound",
+                "metadata_queries": ("looping",),
+                "required_tokens": ("Volume", "volume"),
+            },
+            "live tokens",
+        ),
+        (
+            {
+                "requests": (_request(),),
+                "object_type": "Sound",
+                "metadata_queries": ("looping",),
+                "required_tokens": ("Volume",),
+                "expected_required_token_projection": (
+                    MetadataTokenProjection("Pitch", "property", "Real32"),
+                ),
+            },
+            "projection",
+        ),
+        (
+            {
+                "requests": (_request(),),
+                "object_type": "Sound",
+                "metadata_queries": ("looping",),
+                "required_tokens": ("Volume",),
+                "equivalence": "audio_import_v1",
+            },
+            "only for audio.import",
+        ),
+        (
+            {
+                "requests": (_request(),),
+                "object_type": "Sound",
+                "metadata_queries": ("looping",),
+                "required_tokens": ("Volume",),
+                "equivalence": "audio_import_tab_v1",
+            },
+            "only for audio.importTabDelimited",
+        ),
+        (
+            {
+                "requests": (_request(),),
+                "object_type": "ActorMixer",
+                "metadata_queries": ("volume",),
+                "required_tokens": ("Volume",),
+                "equivalence": "object_set_v1",
+            },
+            "only for object.set",
+        ),
+        (
+            {
+                "requests": (_request(),),
+                "object_type": "Sound",
+                "metadata_queries": ("looping",),
+                "required_tokens": ("Volume",),
+                "equivalence": "open",
+            },
+            "wire_exact",
+        ),
+        (
+            {
+                "requests": (_request(),),
+                "object_type": "Sound",
+                "metadata_queries": ("looping",),
+                "required_tokens": ("Volume",),
+                "schema_first": "yes",
+            },
+            "schema_first",
+        ),
+    ),
+)
+def test_metadata_transaction_protocol_rejects_open_scope_inputs(
+    arguments: dict[str, object],
+    match: str,
+) -> None:
+    with pytest.raises(V3ProtocolError, match=match):
+        build_metadata_transaction_protocol(**arguments)  # type: ignore[arg-type]
+
+
+def test_audio_import_metadata_equivalence_rejects_duplicate_expected_names() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": r"\Actor-Mixer Hierarchy\Target",
+                    "audio_file": "/owned/source.wav",
+                    "properties": [
+                        {"name": "Volume", "value": -1},
+                        {"name": "Volume", "value": -2},
+                    ],
+                }
+            ]
+        },
+    }
+
+    with pytest.raises(V3ProtocolError, match="valid audio.import"):
+        build_metadata_transaction_protocol(
+            (request,),
+            object_type="Sound",
+            metadata_queries=("volume",),
+            required_tokens=("Volume",),
+            equivalence="audio_import_v1",
+        )
 
 
 def test_three_transactions_preserve_four_natural_turn_boundaries() -> None:

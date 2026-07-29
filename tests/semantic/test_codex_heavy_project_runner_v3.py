@@ -19,9 +19,13 @@ from tests.destructive.support.sandbox_fixture import (
 )
 from tests.semantic.support import codex_heavy_project_runner_v3 as runner
 from tests.semantic.support import codex_scenario_lifecycle_v3 as lifecycle_v3
+from tests.semantic.support.codex_compound_heavy_v1 import (
+    load_compound_heavy_profile,
+)
 from tests.semantic.support.codex_eval_bundle_v3 import load_eval_bundle_v3
 from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
+    build_transaction_protocol,
     call_step,
     wait_topic_step,
 )
@@ -29,6 +33,13 @@ from tests.semantic.support.codex_harness import (
     CodexHarnessError,
     CodexInfrastructureError,
     CodexInfrastructureFailure,
+)
+from tests.semantic.support.codex_gateway_broker import (
+    MetadataBoundJsonArgument,
+    MetadataTokenProjection,
+)
+from tests.semantic.support.codex_object_heavy_v3 import (
+    build_object_heavy_v3_recipe,
 )
 
 
@@ -815,6 +826,534 @@ def test_prepare_case_fails_closed_instead_of_falling_through_to_soundbank(
         )
 
 
+def test_prepare_case_binds_2025_object_recipe_to_active_lifecycle(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    profile_path = (
+        Path(__file__).resolve().parent
+        / "data"
+        / "compound-heavy-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in load_compound_heavy_profile(profile_path).units
+        if row.unit_id == "CMP25-OBJ22-F-CREATE-02"
+    )
+    protocol = build_transaction_protocol(
+        (
+            {
+                "contract": "waapi-skill.operation-request/v1",
+                "version": "2025.1",
+                "operation": "object.create",
+                "arguments": {
+                    "parent": {
+                        "kind": "path",
+                        "value": r"\Containers\Default Work Unit",
+                    },
+                    "type": "ActorMixer",
+                    "name": "Robot_VO",
+                    "on_name_conflict": "merge",
+                },
+            },
+        )
+    )
+    object_runtime = SimpleNamespace(
+        before=SimpleNamespace(snapshot="sealed-before"),
+        gateway_protocol=lambda: protocol,
+        render_prompt=lambda: "sealed 2025 object prompt",
+        snapshot=lambda: ("sealed",),
+        verify_after_execution=lambda: _Verification(),
+    )
+    object_runtime.prepare = lambda: object_runtime
+    captured: dict[str, object] = {}
+
+    def prepared_runtime(*, scenario, recipe, backend, asset_root):
+        captured.update(
+            scenario=scenario,
+            recipe=recipe,
+            backend=backend,
+            asset_root=asset_root,
+        )
+        return object_runtime
+
+    sections = SimpleNamespace(writer_kwargs=lambda: {})
+    monkeypatch.setattr(runner, "PreparedObjectRuntime", prepared_runtime)
+    monkeypatch.setattr(
+        runner,
+        "ClosedDirectObjectBackend",
+        lambda direct: SimpleNamespace(direct=direct),
+    )
+    monkeypatch.setattr(
+        runner,
+        "seal_object_input_file_manifest",
+        lambda _paths: MappingProxyType({}),
+    )
+    monkeypatch.setattr(
+        runner,
+        "compile_object_business_plan",
+        lambda *_args, **_kwargs: sections,
+    )
+    monkeypatch.setattr(
+        runner,
+        "validate_object_business_plan",
+        lambda *_args, **_kwargs: None,
+    )
+
+    prepared = runner._prepare_case(
+        unit.scenario,
+        runtime=SimpleNamespace(
+            version=unit.version,
+            sandbox=SimpleNamespace(
+                sandbox_project=tmp_path / "SampleProject.wproj",
+            ),
+            asset_root=tmp_path / "assets",
+        ),
+        direct=SimpleNamespace(),
+        media_holder={},
+    )
+
+    recipe = captured["recipe"]
+    assert recipe.version == "2025.1"
+    assert recipe.fixture.objects[0].path.startswith(r"\Containers")
+    assert prepared.typed_sections is sections
+
+
+@pytest.mark.parametrize(
+    ("unit_id", "object_type"),
+    (
+        ("CMP22-OBJ22-F-CREATE-03", "ActorMixer"),
+        ("CMP25-OBJ22-F-CREATE-03", "PropertyContainer"),
+        ("CMP22-OBJ22-F-SET-01", "ActorMixer"),
+        ("CMP25-OBJ22-F-SET-02", "PropertyContainer"),
+    ),
+)
+def test_compound_object_protocol_binds_volume_to_trusted_live_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+    unit_id: str,
+    object_type: str,
+) -> None:
+    profile_path = (
+        Path(__file__).resolve().parent
+        / "data"
+        / "compound-heavy-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in load_compound_heavy_profile(profile_path).units
+        if row.unit_id == unit_id
+    )
+    observed: dict[str, object] = {}
+    payload = {
+        "contract": "waapi-skill.metadata-discovery/v2",
+        "authority": "live-waapi",
+        "result_detail": "compact",
+        "selection_required": True,
+        "exact_live_name_required_for_mutation": True,
+        "dependency_closure_complete": True,
+        "unresolved_dependencies": [],
+        "scope": {
+            "kind": "object_type",
+            "requested": object_type,
+            "resolved": {"name": object_type},
+        },
+        "candidates": [
+            {
+                "name": "Volume",
+                "kind": "property",
+                "metadata": {"type": "Real32"},
+            }
+        ],
+        "dependency_candidates": [],
+    }
+
+    def discover(**kwargs):
+        observed.update(kwargs)
+        return SimpleNamespace(as_dict=lambda: payload)
+
+    monkeypatch.setattr(runner, "discover_metadata", discover)
+    recipe = build_object_heavy_v3_recipe(unit.base_scenario_id, unit.version)
+    protocol = runner._build_compound_object_metadata_protocol(
+        unit.scenario,
+        recipe=recipe,
+        direct=SimpleNamespace(),
+        version=unit.version,
+    )
+
+    assert protocol is not None
+    assert protocol.turn_prefix_counts == (3, 7)
+    assert tuple(step.subcommand for step in protocol.steps[:3]) == (
+        "operation-schema",
+        "metadata",
+        "preview",
+    )
+    assert observed["object_type"] == object_type
+    assert observed["queries"] == ("volume",)
+    assert observed["limit"] == 8
+    preview = next(
+        step for step in protocol.steps if step.subcommand == "preview"
+    )
+    argument = preview.arguments[2]
+    assert isinstance(argument, MetadataBoundJsonArgument)
+    assert argument.object_type == object_type
+    assert argument.required_tokens == ("Volume",)
+    assert argument.expected_required_token_projection == (
+        MetadataTokenProjection("Volume", "property", "Real32"),
+    )
+    assert argument.expected["version"] == unit.version
+    assert argument.equivalence == (
+        "object_set_v1"
+        if recipe.request.operation == "object.set"
+        else "wire_exact"
+    )
+
+
+def test_compound_object_without_dynamic_property_keeps_original_protocol() -> None:
+    profile_path = (
+        Path(__file__).resolve().parent
+        / "data"
+        / "compound-heavy-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in load_compound_heavy_profile(profile_path).units
+        if row.unit_id == "CMP25-OBJ22-F-CREATE-02"
+    )
+    recipe = build_object_heavy_v3_recipe(unit.base_scenario_id, unit.version)
+
+    assert (
+        runner._build_compound_object_metadata_protocol(
+            unit.scenario,
+            recipe=recipe,
+            direct=SimpleNamespace(),
+            version=unit.version,
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    ("unit_id", "expected_path"),
+    (
+        (
+            "CMP22-OBJ22-F-CREATE-02",
+            (
+                r"\Actor-Mixer Hierarchy\Default Work Unit"
+                r"\SemanticLab\NPC\Robot_VO"
+            ),
+        ),
+        (
+            "CMP25-OBJ22-F-CREATE-02",
+            r"\Containers\Default Work Unit\SemanticLab\NPC\Robot_VO",
+        ),
+    ),
+)
+def test_compound_merge_requires_exact_existing_root_type_query(
+    unit_id: str,
+    expected_path: str,
+) -> None:
+    profile_path = (
+        Path(__file__).resolve().parent
+        / "data"
+        / "compound-heavy-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in load_compound_heavy_profile(profile_path).units
+        if row.unit_id == unit_id
+    )
+    recipe = build_object_heavy_v3_recipe(
+        unit.base_scenario_id,
+        unit.version,
+    )
+
+    protocol = runner.build_object_merge_query_protocol(
+        unit.scenario,
+        recipe,
+    )
+
+    assert protocol is not None
+    assert protocol.turn_prefix_counts == (3, 7)
+    assert tuple(step.subcommand for step in protocol.steps[:3]) == (
+        "operation-schema",
+        "query-object",
+        "preview",
+    )
+    assert protocol.steps[1].arguments == (
+        "--path",
+        expected_path,
+        "--return-field",
+        "id",
+        "--return-field",
+        "name",
+        "--return-field",
+        "type",
+        "--return-field",
+        "path",
+    )
+
+
+def test_prepare_compound_import_uses_two_stage_reference_and_metadata_binding(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    profile_path = (
+        Path(__file__).resolve().parent
+        / "data"
+        / "compound-heavy-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in load_compound_heavy_profile(profile_path).units
+        if row.unit_id == "CMP25-O22-AUDIO-IMPORT-02"
+    )
+    calls: list[str] = []
+    staged = SimpleNamespace(requires_metadata_binding=True)
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2025.1",
+        "operation": "audio.import",
+        "arguments": {"imports": [{"object_path": "<Sound>Bound"}]},
+    }
+    bound = SimpleNamespace(
+        operation_requests=(request,),
+        metadata_queries=("looping",),
+        visible_values=MappingProxyType(
+            {
+                "import_rows": json.dumps(
+                    [{"audio_file": "/tmp/input.wav"}],
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            }
+        ),
+    )
+    handle = SimpleNamespace(
+        reference_targets=MappingProxyType(
+            {
+                "output_bus": MappingProxyType(
+                    {
+                        "kind": "id",
+                        "value": "{00000000-0000-0000-0000-000000000123}",
+                    }
+                )
+            }
+        ),
+        request_reference_targets=MappingProxyType(
+            {
+                "output_bus": MappingProxyType(
+                    {
+                        "kind": "path",
+                        "value": r"\Busses\Default Work Unit\Codex_Output_Bus",
+                    }
+                )
+            }
+        ),
+        adopted=False,
+        cleanup_emergency=lambda: calls.append("emergency-cleanup"),
+    )
+    backend_sentinel = SimpleNamespace()
+    before = SimpleNamespace(snapshot="sealed")
+    import_runtime = SimpleNamespace(
+        hidden_before=before,
+        plan=SimpleNamespace(metadata_binding={"bound": True}),
+        render_prompt=lambda: "sealed compound import prompt",
+        snapshot=lambda: ("sealed",),
+        verify_after_execution=lambda: _Verification(),
+        verify_zero_dispatch_unchanged=lambda: _Verification(),
+        cleanup_success=lambda: (),
+    )
+    sections = SimpleNamespace(writer_kwargs=lambda: {})
+
+    monkeypatch.setattr(
+        runner,
+        "materialize_import_case",
+        lambda *_args, **_kwargs: staged,
+    )
+    monkeypatch.setattr(
+        runner,
+        "ClosedDirectWaapiBackend",
+        lambda _direct: backend_sentinel,
+    )
+
+    def prepare_references(scenario, materialized, *, version, backend):
+        calls.append("references")
+        assert scenario is unit.scenario
+        assert materialized is staged
+        assert version == "2025.1"
+        assert backend is backend_sentinel
+        return handle
+
+    monkeypatch.setattr(
+        runner,
+        "prepare_import_reference_fixtures",
+        prepare_references,
+    )
+
+    def bind(materialized, *, version, direct, reference_targets):
+        calls.append("metadata-bind")
+        assert materialized is staged
+        assert version == "2025.1"
+        assert reference_targets is handle.request_reference_targets
+        assert reference_targets["output_bus"]["kind"] == "path"
+        assert handle.reference_targets["output_bus"]["kind"] == "id"
+        assert (
+            reference_targets["output_bus"]["value"]
+            != handle.reference_targets["output_bus"]["value"]
+        )
+        return bound, MappingProxyType({"trusted": True})
+
+    monkeypatch.setattr(runner, "_bind_compound_import_metadata", bind)
+
+    def prepare_runtime(
+        scenario,
+        materialized,
+        *,
+        sandbox_project,
+        backend,
+        reference_fixtures,
+    ):
+        calls.append("runtime")
+        assert scenario is unit.scenario
+        assert materialized is bound
+        assert backend is backend_sentinel
+        assert reference_fixtures is handle
+        assert sandbox_project == tmp_path / "SampleProject.wproj"
+        handle.adopted = True
+        return import_runtime
+
+    monkeypatch.setattr(runner, "prepare_import_runtime", prepare_runtime)
+    monkeypatch.setattr(
+        runner,
+        "bound_import_metadata_tokens",
+        lambda materialized: (
+            ("IsLoopingEnabled",)
+            if materialized is bound
+            else pytest.fail("wrong bound import")
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "project_required_metadata_tokens",
+        lambda *_args, **_kwargs: (
+            MetadataTokenProjection(
+                "IsLoopingEnabled",
+                "property",
+                "Boolean",
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "compile_import_business_plan",
+        lambda *_args, **_kwargs: sections,
+    )
+    monkeypatch.setattr(
+        runner,
+        "validate_import_business_plan",
+        lambda *_args, **_kwargs: None,
+    )
+
+    prepared = runner._prepare_case(
+        unit.scenario,
+        runtime=SimpleNamespace(
+            version=unit.version,
+            sandbox=SimpleNamespace(
+                sandbox_project=tmp_path / "SampleProject.wproj",
+            ),
+            asset_root=tmp_path / "assets",
+        ),
+        direct=SimpleNamespace(),
+        media_holder={},
+    )
+
+    assert calls == ["references", "metadata-bind", "runtime"]
+    assert prepared.protocol.turn_prefix_counts == (3, 7)
+    assert prepared.prompt == "sealed compound import prompt"
+    assert prepared.cleanup_success is import_runtime.cleanup_success
+    assert prepared.prompt_sources == {
+        "compound_import_visible_rows": [
+            {"audio_file": "/tmp/input.wav"}
+        ]
+    }
+
+
+def test_prepare_compound_import_cleans_unadopted_bus_after_binding_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    profile_path = (
+        Path(__file__).resolve().parent
+        / "data"
+        / "compound-heavy-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in load_compound_heavy_profile(profile_path).units
+        if row.unit_id == "CMP22-O22-AUDIO-IMPORT-03"
+    )
+    staged = SimpleNamespace(requires_metadata_binding=True)
+    cleanup_calls: list[str] = []
+    handle = SimpleNamespace(
+        reference_targets=MappingProxyType({}),
+        request_reference_targets=MappingProxyType({}),
+        adopted=False,
+        cleanup_emergency=lambda: cleanup_calls.append("cleaned"),
+    )
+    monkeypatch.setattr(
+        runner,
+        "materialize_import_case",
+        lambda *_args, **_kwargs: staged,
+    )
+    monkeypatch.setattr(
+        runner,
+        "ClosedDirectWaapiBackend",
+        lambda _direct: SimpleNamespace(),
+    )
+    monkeypatch.setattr(
+        runner,
+        "prepare_import_reference_fixtures",
+        lambda *_args, **_kwargs: handle,
+    )
+    monkeypatch.setattr(
+        runner,
+        "_bind_compound_import_metadata",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("metadata binding failed")
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "prepare_import_runtime",
+        lambda *_args, **_kwargs: pytest.fail(
+            "runtime must not start after metadata binding failure"
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="metadata binding failed"):
+        runner._prepare_case(
+            unit.scenario,
+            runtime=SimpleNamespace(
+                version=unit.version,
+                sandbox=SimpleNamespace(
+                    sandbox_project=tmp_path / "SampleProject.wproj",
+                ),
+                asset_root=tmp_path / "assets",
+            ),
+            direct=SimpleNamespace(),
+            media_holder={},
+        )
+
+    assert cleanup_calls == ["cleaned"]
+
+
 def _soundbank_request(api: str) -> dict:
     return {
         "contract": "waapi-skill.operation-request/v1",
@@ -1079,6 +1618,52 @@ def test_soundbank_prelaunch_canonicalizes_reviewed_media_language_aliases(
     assert request.platforms == ("Windows",)
 
 
+@pytest.mark.parametrize(
+    "version,scenario_id,expected_profile",
+    (
+        (
+            "2025.1",
+            "O22-SB-GENERATE-01",
+            runner.WWISE_2025_SOUNDBANK_AURO_PROFILE,
+        ),
+        ("2022.1", "O22-SB-GENERATE-01", None),
+        ("2025.1", "O22-SB-SET-INCLUSIONS-01", None),
+        ("2025.1", "O22-SB-GENERATED-01", None),
+    ),
+)
+def test_2025_auro_prelaunch_profile_is_scoped_only_to_soundbank_generate(
+    monkeypatch: pytest.MonkeyPatch,
+    version: str,
+    scenario_id: str,
+    expected_profile: str | None,
+) -> None:
+    suite = (
+        Path(__file__).resolve().parents[2]
+        / "skills"
+        / "waapi-skill"
+        / "evals"
+        / "suite-v3.json"
+    )
+    scenario = load_eval_bundle_v3(suite).scenario(scenario_id)
+    sentinel = object()
+    received: list[object] = []
+    monkeypatch.setattr(
+        runner,
+        "make_project_prelaunch_hook",
+        lambda request: received.append(request) or sentinel,
+    )
+
+    hook = runner._prelaunch_hook(
+        scenario,
+        version=version,
+        media_holder={},
+    )
+
+    assert hook is sentinel
+    assert len(received) == 1
+    assert received[0].auro_isolation_profile == expected_profile
+
+
 def test_object_prelaunch_rejects_unknown_closed_recipe_language(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1089,7 +1674,8 @@ def test_object_prelaunch_rejects_unknown_closed_recipe_language(
     monkeypatch.setattr(
         runner,
         "build_object_heavy_v3_recipe",
-        lambda _scenario_id: SimpleNamespace(
+        lambda _scenario_id, *, version: SimpleNamespace(
+            version=version,
             fixture=SimpleNamespace(
                 objects=(SimpleNamespace(source_language="Unreviewed"),)
             )

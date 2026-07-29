@@ -23,6 +23,9 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
     validate_prepared_roles,
     verify_prepared_operation,
 )
+from wwise_waapi.platform_paths import (  # pyright: ignore[reportMissingImports]
+    WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT,
+)
 
 
 OLD_GUID = "{11111111-1111-1111-1111-111111111111}"
@@ -392,6 +395,102 @@ def test_create_new_accepts_bound_sound_and_audio_file_source_rows(
     }
 
 
+@pytest.mark.parametrize(
+    ("post_source_id", "expected_status", "expected_preserved"),
+    [
+        (SOURCE_GUID, "verified", True),
+        (SECOND_GUID, "verification_failed", False),
+    ],
+)
+def test_use_existing_binds_explicit_audio_file_source_identity(
+    tmp_path: Path,
+    post_source_id: str,
+    expected_status: str,
+    expected_preserved: bool,
+) -> None:
+    source = _media(tmp_path, "existing-source.wav", b"RIFF-existing-WAVE")
+    copied = _media(
+        tmp_path,
+        "Originals/SFX/Existing/existing-source.wav",
+        b"RIFF-existing-WAVE",
+    )
+    path = OLD_ROOT + r"\Existing"
+    expected_source_path = path + r"\existing-source"
+    target = _target(
+        source,
+        path,
+        pre_state_rows=[
+            {
+                "id": OLD_GUID,
+                "name": "Existing",
+                "type": "Sound",
+                "path": path,
+                "notes": "before",
+            }
+        ],
+        requested_object_type="Sound SFX",
+        validated_properties=[
+            {
+                "name": "Volume",
+                "value": -6.0,
+                "metadata_type": "Real32",
+                "source": "request",
+            }
+        ],
+        explicit_audio_file_source_pre_state_rows=[
+            {
+                "id": SOURCE_GUID,
+                "name": "existing-source",
+                "type": "AudioFileSource",
+                "path": expected_source_path,
+                "notes": "before source",
+            }
+        ],
+    )
+    live = _object_row(
+        path,
+        copied,
+        object_id=OLD_GUID,
+        notes="before",
+        activeSource={"id": post_source_id},
+        **{"@Volume": -6.0},
+    )
+    audio_source = {
+        "id": post_source_id,
+        "name": "existing-source",
+        "type": "AudioFileSource",
+        "path": expected_source_path,
+        "parent": {"id": OLD_GUID, "name": "Existing"},
+        "notes": "",
+        "originalFilePath": str(copied.resolve()),
+    }
+
+    verified = verify_prepared_operation(
+        _prepared(
+            version="2022.1",
+            targets=[target],
+            import_operation="useExisting",
+        ),
+        execution_result=_result(
+            "2022.1",
+            [audio_source, live],
+            [copied],
+        ),
+        read_call=ScriptedReader(
+            [{"return": [live]}, {"return": [audio_source]}]
+        ),
+    )
+
+    assertion = next(
+        item
+        for item in verified.assertions
+        if item["name"]
+        == "import target 0 useExisting preserved the explicit AudioFileSource GUID"
+    )
+    assert verified.status == expected_status
+    assert assertion["passed"] is expected_preserved
+
+
 def test_closed_audio_import_rejects_unsealed_audio_file_source_result(
     tmp_path: Path,
 ) -> None:
@@ -633,6 +732,26 @@ def test_tab_delimited_prepare_and_verify_share_the_closed_oracle(
     assert prepared["verification_plan"]["kind"] == "closed-audio-import"
     assert prepared["verification_plan"]["result_contract"] == "objects_only"
     assert prepared["dispatch"]["args"]["importLocation"] == PARENT_GUID
+    assert prepared["pre_state"]["import_guard"]["wire_path_input_audit"] == {
+        "contract": WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT,
+        "uri": "ak.wwise.core.audio.importTabDelimited",
+        "scope": "transient_dispatch_read_paths_only",
+        "paths": [
+            {
+                "section": "args",
+                "json_path": "$.args.importFile",
+                "field": "importFile",
+                "role": "read",
+                "raw_path": str(import_file.resolve()),
+                "resolved_path": str(import_file.resolve()),
+            }
+        ],
+    }
+    assert [
+        row["field"]
+        for row in prepared["pre_state"]["import_guard"]["file_proofs"]
+    ] == ["import_file", "source_file_proofs[1]"]
+    assert "io_root" not in prepared["request"]["arguments"]
     auto_check_out_supported = version == "2023.1"
     assert (
         "autoCheckOutToSourceControl" in prepared["dispatch"]["args"]

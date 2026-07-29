@@ -30,6 +30,7 @@ from tests.semantic.support.codex_object_heavy_v3 import (
     OperationRequestSpec,
     QueryObjectRequestSpec,
 )
+from tests.semantic.support.codex_version_layout_v3 import get_version_layout
 
 
 OBJECT_RUNTIME_CONTRACT = "waapi-skill.codex-object-runtime/v3"
@@ -46,7 +47,7 @@ _READ_FIELDS = (
     "isIncluded",
 )
 _OUTPUT_BUS_OVERRIDE_TYPES = frozenset(
-    {"ActorMixer", "RandomSequenceContainer", "Sound"}
+    {"ActorMixer", "PropertyContainer", "RandomSequenceContainer", "Sound"}
 )
 _FIXTURE_PLATFORM = "Windows"
 _FIXTURE_LANGUAGES = frozenset({"SFX", "English(US)", "Japanese"})
@@ -316,6 +317,8 @@ class PreparedObjectRuntime:
     ) -> None:
         if scenario.id != recipe.scenario_id or scenario.api != recipe.api:
             raise ObjectRuntimeError("scenario and object recipe identity do not match")
+        if recipe.version not in scenario.versions:
+            raise ObjectRuntimeError("scenario and object recipe versions do not match")
         self.scenario = scenario
         self.recipe = recipe
         self.backend = backend
@@ -334,7 +337,9 @@ class PreparedObjectRuntime:
     def gateway_protocol(self) -> V3GatewayProtocol:
         request = self.recipe.request
         if isinstance(request, OperationRequestSpec):
-            return build_transaction_protocol([request.as_dict()])
+            return build_transaction_protocol(
+                [request.as_dict(version=self.recipe.version)]
+            )
         if isinstance(request, QueryObjectRequestSpec):
             return build_direct_protocol(
                 [query_object_step("query-object", request.argv[3:])]
@@ -370,9 +375,12 @@ class PreparedObjectRuntime:
                     audio_file=audio_file,
                 )
             else:
+                requested_type = get_version_layout(
+                    self.recipe.version
+                ).requested_type(item.object_type)
                 object_id = self.backend.create(
                     parent=parent_path,
-                    object_type=item.object_type,
+                    object_type=requested_type,
                     name=item.name,
                 )
             rows = self.backend.read_path(item.path, language=language) if language else self.backend.read_path(item.path)
@@ -442,6 +450,11 @@ class PreparedObjectRuntime:
                 if key != "audioSource:language"
             }
         materialized = _materialize(item.key, materialized_row)
+        if materialized.type != item.object_type:
+            raise ObjectRuntimeError(
+                f"{item.key}: fixture type {materialized.type!r} "
+                f"!= reviewed reflected type {item.object_type!r}"
+            )
         if language_context is None:
             return materialized
         active_source_id = _reference_id(row.get("activeSource"))

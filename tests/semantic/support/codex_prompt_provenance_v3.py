@@ -26,9 +26,13 @@ from tests.semantic.support.codex_eval_protocol_v3 import V3GatewayProtocol
 from tests.semantic.support.codex_eval_protocol_v3 import (
     build_modification_policy_protocol,
     build_transaction_protocol,
+    operation_request_equivalence,
 )
 from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
+    MetadataBoundJsonArgument,
+    MetadataQueryArgument,
+    MetadataTokenProjection,
     ResponseBinding,
     SemanticJsonArgument,
 )
@@ -46,6 +50,15 @@ PROMPT_MATERIALIZATION_RECEIPT_FILE = "prompt-materialization.json"
 MAX_PROVENANCE_BYTES = 8 * 1024 * 1024
 MAX_PROOF_FILES = 8192
 MAX_PROOF_BYTES = 512 * 1024 * 1024
+_SEMANTIC_JSON_KIND_BY_EQUIVALENCE = {
+    "wire_exact": "semantic_json",
+    "object_operation_v1": "semantic_json_object_operation_v1",
+    "soundbank_generate_v1": "semantic_json_soundbank_generate_v1",
+}
+_SEMANTIC_JSON_EQUIVALENCE_BY_KIND = {
+    kind: equivalence
+    for equivalence, kind in _SEMANTIC_JSON_KIND_BY_EQUIVALENCE.items()
+}
 
 HEAVY_APIS = frozenset(
     {
@@ -440,13 +453,40 @@ def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
             cloned = _json_clone(item.expected)
             arguments.append(
                 {
-                    "kind": (
-                        "semantic_json"
-                        if item.equivalence == "wire_exact"
-                        else "semantic_json_object_operation_v1"
-                    ),
+                    "kind": _SEMANTIC_JSON_KIND_BY_EQUIVALENCE[
+                        item.equivalence
+                    ],
                     "value": cloned,
                     "sha256": _sha256_json(cloned),
+                }
+            )
+        elif isinstance(item, MetadataQueryArgument):
+            arguments.append(
+                {
+                    "kind": "metadata_query",
+                    "label": item.label,
+                    "maximum_chars": item.maximum_chars,
+                }
+            )
+        elif isinstance(item, MetadataBoundJsonArgument):
+            cloned = _json_clone(item.expected)
+            arguments.append(
+                {
+                    "kind": "metadata_bound_json",
+                    "value": cloned,
+                    "sha256": _sha256_json(cloned),
+                    "equivalence": item.equivalence,
+                    "metadata_step": item.metadata_step,
+                    "object_type": item.object_type,
+                    "required_tokens": list(item.required_tokens),
+                    "expected_required_token_projection": (
+                        [
+                            value.as_dict()
+                            for value in item.expected_required_token_projection
+                        ]
+                        if item.expected_required_token_projection is not None
+                        else None
+                    ),
                 }
             )
         elif isinstance(item, ResponseBinding):
@@ -513,20 +553,107 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
             if not isinstance(row.get("value"), str):
                 raise PromptProvenanceError("literal protocol argument is invalid")
             arguments.append(row["value"])
-        elif kind in {
-            "semantic_json",
-            "semantic_json_object_operation_v1",
-        } and set(row) == {"kind", "value", "sha256"}:
+        elif (
+            kind in _SEMANTIC_JSON_EQUIVALENCE_BY_KIND
+            and set(row) == {"kind", "value", "sha256"}
+        ):
             if row.get("sha256") != _sha256_json(row.get("value")):
                 raise PromptProvenanceError("semantic protocol argument digest is invalid")
             arguments.append(
                 SemanticJsonArgument(
                     _json_clone(row.get("value")),
-                    equivalence=(
-                        "wire_exact"
-                        if kind == "semantic_json"
-                        else "object_operation_v1"
+                    equivalence=_SEMANTIC_JSON_EQUIVALENCE_BY_KIND[str(kind)],
+                )
+            )
+        elif kind == "metadata_query" and set(row) == {
+            "kind",
+            "label",
+            "maximum_chars",
+        }:
+            if (
+                not isinstance(row.get("label"), str)
+                or not row.get("label")
+                or type(row.get("maximum_chars")) is not int
+            ):
+                raise PromptProvenanceError(
+                    "metadata-query protocol argument is invalid"
+                )
+            arguments.append(
+                MetadataQueryArgument(
+                    str(row["label"]),
+                    int(row["maximum_chars"]),
+                )
+            )
+        elif kind == "metadata_bound_json" and set(row) == {
+            "kind",
+            "value",
+            "sha256",
+            "equivalence",
+            "metadata_step",
+            "object_type",
+            "required_tokens",
+            "expected_required_token_projection",
+        }:
+            raw_tokens = row.get("required_tokens")
+            raw_projection = row.get(
+                "expected_required_token_projection"
+            )
+            if (
+                row.get("sha256") != _sha256_json(row.get("value"))
+                or row.get("equivalence")
+                not in {
+                    "wire_exact",
+                    "audio_import_v1",
+                    "audio_import_tab_v1",
+                    "object_set_v1",
+                }
+                or not isinstance(row.get("metadata_step"), str)
+                or not isinstance(row.get("object_type"), str)
+                or not isinstance(raw_tokens, list)
+                or any(not isinstance(item, str) for item in raw_tokens)
+                or (
+                    raw_projection is not None
+                    and (
+                        not isinstance(raw_projection, list)
+                        or any(
+                            not isinstance(item, Mapping)
+                            or set(item)
+                            != {"name", "kind", "metadata_type"}
+                            or any(
+                                not isinstance(item.get(field), str)
+                                for field in (
+                                    "name",
+                                    "kind",
+                                    "metadata_type",
+                                )
+                            )
+                            for item in raw_projection
+                        )
+                    )
+                )
+            ):
+                raise PromptProvenanceError(
+                    "metadata-bound JSON protocol argument is invalid"
+                )
+            arguments.append(
+                MetadataBoundJsonArgument(
+                    expected=_json_clone(row.get("value")),
+                    metadata_step=str(row["metadata_step"]),
+                    object_type=str(row["object_type"]),
+                    required_tokens=tuple(raw_tokens),
+                    expected_required_token_projection=(
+                        tuple(
+                            MetadataTokenProjection(
+                                name=str(item["name"]),
+                                kind=str(item["kind"]),
+                                metadata_type=str(item["metadata_type"]),
+                            )
+                            for item in raw_projection
+                        )
+                        if isinstance(raw_projection, list)
+                        else None
                     ),
+                    equivalence=str(row["equivalence"]),
                 )
             )
         elif kind == "response_binding" and set(row) == {"kind", "step", "pointer"}:
@@ -731,6 +858,12 @@ def _leaf_binding(
         "sha256": "",
         "mtime_ns": None,
     }
+    trusted_origin = bool(
+        reviewed_origin
+        and reviewed_origin.startswith(
+            "/compound_import_visible_rows/"
+        )
+    )
     if scenario.api == "ak.wwise.core.soundbank.generate" and input_name == "build_locations":
         source_pointer = _build_location_source_pointer(pointer)
         source_leaf = _json_pointer(trusted_sources, source_pointer)
@@ -774,7 +907,10 @@ def _leaf_binding(
             require_exists=require_paths,
         )
         if reviewed_origin:
-            source_leaf = _json_pointer(protocol_value, reviewed_origin)
+            source_leaf = _json_pointer(
+                trusted_sources if trusted_origin else protocol_value,
+                reviewed_origin,
+            )
             if not _json_equal(source_leaf, leaf):
                 projection_exception = (
                     scenario.api == "ak.wwise.cli.generateSoundbank"
@@ -799,14 +935,19 @@ def _leaf_binding(
         )
         return base
     if reviewed_origin:
-        source_leaf = _json_pointer(protocol_value, reviewed_origin)
+        source_leaf = _json_pointer(
+            trusted_sources if trusted_origin else protocol_value,
+            reviewed_origin,
+        )
         if not _json_equal(source_leaf, leaf):
             raise PromptProvenanceError(
                 f"reviewed protocol mapping differs at {reviewed_origin}"
             )
         base.update(
             {
-                "origin_kind": "protocol",
+                "origin_kind": (
+                    "trusted_source" if trusted_origin else "protocol"
+                ),
                 "origin_pointer": reviewed_origin,
             }
         )
@@ -848,6 +989,27 @@ def _derive_input(
                 {"": ""},
             )
         if input_name == "import_rows":
+            source = trusted_sources.get("compound_import_visible_rows")
+            source_value = (
+                source.get("value")
+                if isinstance(source, Mapping)
+                else None
+            )
+            if source_value is not None:
+                if not isinstance(source_value, list):
+                    raise PromptProvenanceError(
+                        "compound import visible-row source is invalid"
+                    )
+                return _DerivedInput(
+                    _canonical_json_bytes(source_value).decode("utf-8"),
+                    {
+                        pointer: (
+                            "/compound_import_visible_rows/value"
+                            + pointer
+                        )
+                        for pointer, _ in _walk_leaves(source_value)
+                    },
+                )
             value = arguments.get("imports")
             pointer = base + "/arguments/imports"
             return _structured_derived(value, pointer)
@@ -1075,30 +1237,92 @@ def _protocol_requests(
         else:
             raise PromptProvenanceError("preview request flag drifted")
         semantic = arguments[semantic_index]
-        if (
-            not isinstance(semantic, Mapping)
-            or semantic.get("kind") not in {
-                "semantic_json",
-                "semantic_json_object_operation_v1",
+        if not isinstance(semantic, Mapping):
+            raise PromptProvenanceError("preview request manifest is invalid")
+        semantic_kind = semantic.get("kind")
+        if semantic_kind == "metadata_bound_json":
+            expected_keys = {
+                "kind",
+                "value",
+                "sha256",
+                "equivalence",
+                "metadata_step",
+                "object_type",
+                "required_tokens",
+                "expected_required_token_projection",
             }
+            projection = semantic.get("expected_required_token_projection")
+            if (
+                set(semantic) != expected_keys
+                or semantic.get("equivalence")
+                not in {
+                    "wire_exact",
+                    "audio_import_v1",
+                    "audio_import_tab_v1",
+                    "object_set_v1",
+                }
+                or not isinstance(semantic.get("metadata_step"), str)
+                or not semantic.get("metadata_step")
+                or not isinstance(semantic.get("object_type"), str)
+                or not semantic.get("object_type")
+                or not isinstance(semantic.get("required_tokens"), list)
+                or not semantic.get("required_tokens")
+                or projection is not None
+                and not isinstance(projection, list)
+            ):
+                raise PromptProvenanceError(
+                    "metadata-bound preview request manifest is invalid"
+                )
+        elif (
+            semantic_kind not in _SEMANTIC_JSON_EQUIVALENCE_BY_KIND
             or set(semantic) != {"kind", "value", "sha256"}
-            or semantic.get("sha256") != _sha256_json(semantic.get("value"))
+        ):
+            raise PromptProvenanceError("preview request manifest is invalid")
+        if (
+            semantic.get("sha256") != _sha256_json(semantic.get("value"))
             or not isinstance(semantic.get("value"), Mapping)
         ):
             raise PromptProvenanceError("preview request manifest is invalid")
         request = semantic["value"]
         if set(request) != {"contract", "version", "operation", "arguments"}:
             raise PromptProvenanceError("operation request envelope is not closed")
-        object_operation = request.get("operation") in {
-            "object.create",
-            "object.set",
-        }
-        if (
-            semantic.get("kind") == "semantic_json_object_operation_v1"
-        ) != object_operation:
-            raise PromptProvenanceError(
-                "operation request JSON equivalence contract is invalid"
-            )
+        request_operation = request.get("operation")
+        if semantic_kind == "metadata_bound_json":
+            equivalence = semantic.get("equivalence")
+            if (
+                equivalence == "audio_import_v1"
+                and request.get("operation") != "audio.import"
+            ):
+                raise PromptProvenanceError(
+                    "metadata-bound request JSON equivalence contract is invalid"
+                )
+            if (
+                equivalence == "audio_import_tab_v1"
+                and request.get("operation")
+                != "audio.importTabDelimited"
+            ):
+                raise PromptProvenanceError(
+                    "metadata-bound request JSON equivalence contract is invalid"
+                )
+            if (
+                equivalence == "object_set_v1"
+                and request.get("operation") != "object.set"
+            ):
+                raise PromptProvenanceError(
+                    "metadata-bound request JSON equivalence contract is invalid"
+                )
+        else:
+            equivalence = _SEMANTIC_JSON_EQUIVALENCE_BY_KIND[
+                str(semantic_kind)
+            ]
+            if (
+                equivalence != "wire_exact"
+                and equivalence
+                != operation_request_equivalence(str(request_operation))
+            ):
+                raise PromptProvenanceError(
+                    "operation request JSON equivalence contract is invalid"
+                )
         result.append(
             (
                 f"/steps/{step_index}/arguments/{semantic_index}/value",
@@ -1240,6 +1464,25 @@ def _trusted_sources(
     serialized: bool = False,
 ) -> dict[str, Any]:
     del protocol_value
+    asset_spec = (
+        scenario.fixture.get("asset_spec")
+        if isinstance(scenario.fixture, Mapping)
+        else None
+    )
+    is_compound_import = (
+        scenario.api == "ak.wwise.core.audio.import"
+        and isinstance(asset_spec, Mapping)
+        and isinstance(asset_spec.get("compound"), Mapping)
+    )
+    if is_compound_import:
+        return _compound_import_trusted_source(
+            scenario,
+            root=root,
+            values=values,
+            supplied=supplied,
+            require_paths=require_paths,
+            serialized=serialized,
+        )
     if scenario.api != "ak.wwise.core.soundbank.generate":
         if supplied:
             raise PromptProvenanceError("unexpected trusted prompt source")
@@ -1353,6 +1596,119 @@ def _trusted_sources(
     }
     if serialized and supplied != result:
         raise PromptProvenanceError("SoundBank project-info proof was rewrapped")
+    return result
+
+
+def _compound_import_trusted_source(
+    scenario: OnlineScenario,
+    *,
+    root: Path,
+    values: Mapping[str, str],
+    supplied: Mapping[str, Any],
+    require_paths: bool,
+    serialized: bool,
+) -> dict[str, Any]:
+    key = "compound_import_visible_rows"
+    if set(supplied) != {key}:
+        raise PromptProvenanceError(
+            "compound import visible-row source is missing"
+        )
+    source = supplied[key]
+    if serialized:
+        if not isinstance(source, Mapping) or set(source) != {
+            "value",
+            "sha256",
+            "path_proofs",
+        }:
+            raise PromptProvenanceError(
+                "compound import visible-row source schema is invalid"
+            )
+        value = source.get("value")
+    else:
+        value = source
+    if (
+        not isinstance(value, list)
+        or not 1 <= len(value) <= 64
+        or any(not isinstance(row, Mapping) for row in value)
+        or _canonical_json_bytes(value).decode("utf-8")
+        != values.get("import_rows")
+    ):
+        raise PromptProvenanceError(
+            "compound import visible rows differ from the rendered prompt"
+        )
+    paths = [
+        (pointer, leaf)
+        for pointer, leaf in _walk_leaves(value)
+        if isinstance(leaf, str) and os.path.isabs(leaf)
+    ]
+    if serialized and not require_paths:
+        raw_proofs = source.get("path_proofs")
+        if not isinstance(raw_proofs, list) or len(raw_proofs) != len(paths):
+            raise PromptProvenanceError(
+                "compound import visible-row path proofs are incomplete"
+            )
+        proofs: list[dict[str, Any]] = []
+        for actual, (pointer, path) in zip(raw_proofs, paths, strict=True):
+            expected = {
+                "pointer": f"/value{pointer}",
+                **_path_proof(
+                    path,
+                    root=root,
+                    expected_kind=_expected_leaf_path_kind(
+                        scenario,
+                        input_name="import_rows",
+                        input_kind="structured_array",
+                        pointer=pointer,
+                    ),
+                    require_exists=False,
+                ),
+            }
+            if not isinstance(actual, Mapping) or set(actual) != set(expected):
+                raise PromptProvenanceError(
+                    "compound import visible-row path proof is invalid"
+                )
+            _validate_archived_path_proof(
+                actual,
+                expected_kind=expected["path_kind"],
+            )
+            if (
+                actual.get("pointer") != expected["pointer"]
+                or actual.get("owned_relative_path")
+                != expected["owned_relative_path"]
+            ):
+                raise PromptProvenanceError(
+                    "compound import visible-row path proof is misbound"
+                )
+            proofs.append(dict(actual))
+    else:
+        proofs = [
+            {
+                "pointer": f"/value{pointer}",
+                **_path_proof(
+                    path,
+                    root=root,
+                    expected_kind=_expected_leaf_path_kind(
+                        scenario,
+                        input_name="import_rows",
+                        input_kind="structured_array",
+                        pointer=pointer,
+                    ),
+                    require_exists=require_paths,
+                ),
+            }
+            for pointer, path in paths
+        ]
+    result = {
+        key: {
+            "value": _json_clone(value),
+            "sha256": _sha256_json(value),
+            "path_proofs": proofs,
+        }
+    }
+    if serialized and supplied != result:
+        raise PromptProvenanceError(
+            "compound import visible-row source was rewrapped"
+        )
     return result
 
 
@@ -1659,6 +2015,15 @@ def _modification_policy_for_protocol(
     if len(previews) != 1 or previews[0].arguments[:1] != ("--apply",):
         return None
     preview = previews[0]
+    if (
+        len(preview.arguments) == 3
+        and preview.arguments[1] == "--request-json"
+        and isinstance(preview.arguments[2], MetadataBoundJsonArgument)
+    ):
+        # A metadata-bound transaction is an ordinary ask-before-changes
+        # protocol with one supporting read.  It is not one of the special
+        # modification-policy topologies rederived below.
+        return None
     if (
         len(preview.arguments) != 3
         or preview.arguments[1] != "--request-json"

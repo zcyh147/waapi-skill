@@ -12,6 +12,9 @@ from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic import run_codex_skill_matrix as matrix
 from tests.semantic import test_run_codex_skill_campaign_heavy_v3 as fixture
 from tests.semantic.support.codex_campaign import CampaignEvidenceError
+from tests.semantic.support.codex_prompt_provenance_v3 import (
+    PromptProvenanceEvidence,
+)
 
 
 def _passing_case(
@@ -100,6 +103,196 @@ def _raise_untrusted_case(validation: campaign.ChildValidation) -> None:
             "untrusted heavy "
         ):
             raise CampaignEvidenceError(verdict.reason)
+
+
+def _campaign_prompt_asset_read_fixture(
+    tmp_path: Path,
+    *,
+    asset_read_count: int = 1,
+    asset_output: str | None = None,
+    sealed_digest: str | None = None,
+) -> tuple[
+    dict[str, Any],
+    dict[str, Any],
+    campaign.CampaignOptions,
+    Any,
+    Path,
+    Path,
+    PromptProvenanceEvidence,
+]:
+    options = fixture._options(tmp_path)
+    unit = fixture._unit(1)
+    scenario_root = tmp_path / "scenario"
+    task_root = scenario_root / "evidence" / "codex-task"
+    turn_root = task_root / "turns" / "turn-01"
+    turn_root.mkdir(parents=True)
+    (task_root / "agent-workspace").mkdir()
+    asset = scenario_root / "owned" / "inputs" / "import.tsv"
+    asset.parent.mkdir(parents=True)
+    content = "Object Path\t@Volume\n<Sound>City_A\t-3\n"
+    asset.write_text(content, encoding="utf-8")
+    encoded = content.encode("utf-8")
+    protocol = fixture._synthetic_protocol(
+        unit,
+        scenario_root=scenario_root,
+        visible_values={},
+    )
+    broker_records = fixture._synthetic_gateway_records(
+        options=options,
+        task_root=task_root,
+        protocol=protocol,
+        version=unit.version,
+    )
+    prompt = f"请使用输入表 {asset} 完成这个任务。"
+    events_text = fixture._synthetic_events(
+        thread_id="thread-prompt-asset",
+        records=broker_records,
+        final_response="waapi-skill 已加载，操作完成。",
+        read_paths=(
+            *fixture._synthetic_first_turn_reads(options, unit),
+            *((asset,) * asset_read_count),
+        ),
+    )
+    if asset_output is not None:
+        event_rows = [json.loads(line) for line in events_text.splitlines()]
+        asset_command = f"cat {asset}"
+        for row in event_rows:
+            item = row.get("item")
+            if (
+                isinstance(item, dict)
+                and item.get("type") == "command_execution"
+                and item.get("command") == asset_command
+            ):
+                item["aggregated_output"] = asset_output
+        events_text = "".join(
+            json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n"
+            for row in event_rows
+        )
+    (turn_root / "events.jsonl").write_text(events_text, encoding="utf-8")
+    facts = fixture._synthetic_codex_facts(
+        options=options,
+        task_root=task_root,
+        turn_root=turn_root,
+        turn_index=1,
+        prompt=prompt,
+        thread_id="thread-prompt-asset",
+        events_text=events_text,
+        protocol=protocol,
+        version=unit.version,
+    )
+    facts = json.loads(json.dumps(facts, ensure_ascii=False))
+    provenance = PromptProvenanceEvidence(
+        path=scenario_root / "evidence" / "prompt-provenance.json",
+        sha256="a" * 64,
+        payload={
+            "scenario_root": str(scenario_root),
+            "owned_root": str(scenario_root / "owned"),
+            "request": {
+                "rendered_prompt": prompt,
+                "inputs": [
+                    {
+                        "name": "tab_file",
+                        "kind": "absolute_file_path",
+                        "value": str(asset),
+                        "leaf_bindings": [
+                            {
+                                "pointer": "",
+                                "origin_kind": "owned_path",
+                                "path_kind": "file",
+                                "owned_relative_path": "inputs/import.tsv",
+                                "size": len(encoded),
+                                "sha256": (
+                                    sealed_digest
+                                    or hashlib.sha256(encoded).hexdigest()
+                                ),
+                                "mtime_ns": 1,
+                            }
+                        ],
+                    }
+                ],
+            },
+        },
+        prompts=(prompt,),
+        visible_values={"tab_file": str(asset)},
+        protocol=protocol,
+    )
+    return (
+        facts,
+        {key: True for key in campaign._HEAVY_V3_REQUIRED_COMMON_GATES},
+        options,
+        unit,
+        task_root,
+        turn_root,
+        provenance,
+    )
+
+
+def _validate_campaign_prompt_asset_read(
+    fixture_value: tuple[
+        dict[str, Any],
+        dict[str, Any],
+        campaign.CampaignOptions,
+        Any,
+        Path,
+        Path,
+        PromptProvenanceEvidence,
+    ],
+) -> tuple[Mapping[str, Any], ...]:
+    (
+        facts,
+        archived_gates,
+        options,
+        unit,
+        task_root,
+        turn_root,
+        provenance,
+    ) = fixture_value
+    return campaign._validate_heavy_v3_codex_facts(
+        facts,
+        turn_index=1,
+        expected_prompt=provenance.prompts[0],
+        expected_thread_id="thread-prompt-asset",
+        turn_root=turn_root,
+        task_root=task_root,
+        options=options,
+        expected_steps=provenance.protocol.steps,
+        version=unit.version,
+        required_reference=fixture._synthetic_required_reference(unit),
+        archived_common_gates=archived_gates,
+        prompt_provenance=provenance,
+    )
+
+
+def test_campaign_revalidates_one_sealed_prompt_asset_cat_from_archive(
+    tmp_path: Path,
+) -> None:
+    fixture_value = _campaign_prompt_asset_read_fixture(tmp_path)
+
+    gateway_records = _validate_campaign_prompt_asset_read(fixture_value)
+
+    assert len(gateway_records) == len(fixture_value[-1].protocol.steps)
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    ("output", "sealed_digest", "duplicate"),
+)
+def test_campaign_rejects_prompt_asset_cat_archive_tamper(
+    tmp_path: Path,
+    tamper: str,
+) -> None:
+    fixture_value = _campaign_prompt_asset_read_fixture(
+        tmp_path,
+        asset_output=("tampered\n" if tamper == "output" else None),
+        sealed_digest=("0" * 64 if tamper == "sealed_digest" else None),
+        asset_read_count=(2 if tamper == "duplicate" else 1),
+    )
+
+    with pytest.raises(
+        CampaignEvidenceError,
+        match="common gates cannot be recomputed",
+    ):
+        _validate_campaign_prompt_asset_read(fixture_value)
 
 
 def _replace_config(command: list[str], prefix: str, replacement: str) -> None:

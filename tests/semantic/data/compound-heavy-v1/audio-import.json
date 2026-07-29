@@ -1,0 +1,692 @@
+{
+  "contract": "waapi-skill.codex-compound-heavy-cases/v1",
+  "cases": [
+    {
+      "base_scenario_id": "O22-AUDIO-IMPORT-02",
+      "api": "ak.wwise.core.audio.import",
+      "versions": [
+        "2022.1",
+        "2025.1"
+      ],
+      "prompt": "素材目录是 {media_directory}，导入清单是 {import_rows}。请把 Rifle 和 Shotgun 的 Close、Tail、Mechanical 三层素材批量放进 Weapons 下各自的 Random Container，使用现有对象模式；已有 Rifle_Close 只换源音频并保留 GUID，其余缺少的层级和声音补齐。六个声音都要启用循环、忽略父级播放数量限制，并在每个 Sound 上单独开启声音实例上限，然后输出到清单标明的武器总线；默认最多同时播放 5 个实例，Rifle_Close 单独限制为 2 个实例并走近景总线。请把这些设置包含在同一次批量导入中，完成后核对六个目标的类型、父级、媒体和声音设置。",
+      "confirmation_prompt": "确认，按预览一次导入六行武器素材和对应的循环、实例限制及输出总线设置。",
+      "fixture_patch": {
+        "asset_spec": {
+          "compound": {
+            "contract": "waapi-skill.compound-import-fields/v1",
+            "object_type": "Sound",
+            "metadata_queries": [
+              {
+                "id": "looping_enabled",
+                "query": "looping enabled",
+                "kind": "property",
+                "metadata_types": [
+                  "bool",
+                  "boolean"
+                ],
+                "name_tokens": [
+                  "is",
+                  "looping",
+                  "enabled"
+                ]
+              },
+              {
+                "id": "ignore_parent_playback_limit",
+                "query": "ignore parent playback limit",
+                "kind": "property",
+                "metadata_types": [
+                  "bool",
+                  "boolean"
+                ],
+                "name_tokens": [
+                  "ignore",
+                  "parent",
+                  "max",
+                  "sound",
+                  "instance"
+                ]
+              },
+              {
+                "id": "enable_sound_instance_limit",
+                "query": "enable limit sound instances",
+                "kind": "property",
+                "metadata_types": [
+                  "bool",
+                  "boolean"
+                ],
+                "name_tokens": [
+                  "use",
+                  "max",
+                  "sound",
+                  "per",
+                  "instance"
+                ]
+              },
+              {
+                "id": "maximum_playback_instances",
+                "query": "sound instance limit value",
+                "kind": "property",
+                "metadata_types": [
+                  "int8",
+                  "int16",
+                  "int32",
+                  "int64",
+                  "uint8",
+                  "uint16",
+                  "uint32",
+                  "uint64",
+                  "integer"
+                ],
+                "name_tokens": [
+                  "max",
+                  "sound",
+                  "per",
+                  "instance"
+                ]
+              },
+              {
+                "id": "output_bus",
+                "query": "output bus routing",
+                "kind": "reference",
+                "metadata_types": [
+                  "reference",
+                  "objectreference"
+                ],
+                "name_tokens": [
+                  "output",
+                  "bus"
+                ]
+              }
+            ],
+            "reference_fixtures": [
+              {
+                "key": "weapon_bus",
+                "name": "__WAAPI_Skill_Compound_Weapon_Bus"
+              },
+              {
+                "key": "weapon_close_bus",
+                "name": "__WAAPI_Skill_Compound_Weapon_Close_Bus"
+              }
+            ],
+            "defaults": {
+              "properties": [
+                {
+                  "intent": "looping_enabled",
+                  "value": true
+                },
+                {
+                  "intent": "ignore_parent_playback_limit",
+                  "value": true
+                },
+                {
+                  "intent": "enable_sound_instance_limit",
+                  "value": true
+                },
+                {
+                  "intent": "maximum_playback_instances",
+                  "value": 5
+                }
+              ],
+              "references": [
+                {
+                  "intent": "output_bus",
+                  "target_fixture": "weapon_bus"
+                }
+              ]
+            },
+            "row_overrides": [
+              {
+                "row_key": "rifle_close",
+                "properties": [
+                  {
+                    "intent": "maximum_playback_instances",
+                    "value": 2
+                  }
+                ],
+                "references": [
+                  {
+                    "intent": "output_bus",
+                    "target_fixture": "weapon_close_bus"
+                  }
+                ]
+              }
+            ],
+            "inline_base64_rows": [],
+            "tsv_dynamic_headers": []
+          }
+        }
+      }
+    },
+    {
+      "base_scenario_id": "O22-AUDIO-IMPORT-03",
+      "api": "ak.wwise.core.audio.import",
+      "versions": [
+        "2022.1",
+        "2025.1"
+      ],
+      "prompt": "提示音素材在 {media_directory}，导入清单是 {import_rows}。请新建四个任务完成提示音，按 Missions/Completion/章节整理，素材放进清单指定的 Originals 子目录，并按每行的结构化事件路径创建播放事件。四个声音都启用循环、忽略父级播放数量限制，并在每个 Sound 上单独开启声音实例上限，然后输出到任务提示总线；默认最多同时播放 4 个实例，Chapter08 两项改为 2 个。清单标为内嵌 WAV 的两项直接以内嵌音频导入，其余使用文件；所有媒体、属性、总线和事件都放在同一次批量导入里，若精确路径已存在就先停下说明。",
+      "confirmation_prompt": "可以，按预览一次创建四个声音、媒体、循环与实例设置、输出总线和播放事件。",
+      "fixture_patch": {
+        "asset_spec": {
+          "sources": [
+            {
+              "source_key": "chapter07_alpha",
+              "relative_path": "mission_complete_chapter07_alpha.wav",
+              "presence": "present",
+              "duration_ms": 1,
+              "frequency_hz": 659,
+              "sha256_key": "source_chapter07_alpha_sha256"
+            },
+            {
+              "source_key": "chapter07_beta",
+              "relative_path": "mission_complete_chapter07_beta.wav",
+              "presence": "present",
+              "duration_ms": 21,
+              "frequency_hz": 701,
+              "sha256_key": "source_chapter07_beta_sha256"
+            },
+            {
+              "source_key": "chapter08_alpha",
+              "relative_path": "mission_complete_chapter08_alpha.wav",
+              "presence": "present",
+              "duration_ms": 1,
+              "frequency_hz": 743,
+              "sha256_key": "source_chapter08_alpha_sha256"
+            },
+            {
+              "source_key": "chapter08_beta",
+              "relative_path": "mission_complete_chapter08_beta.wav",
+              "presence": "present",
+              "duration_ms": 23,
+              "frequency_hz": 787,
+              "sha256_key": "source_chapter08_beta_sha256"
+            }
+          ],
+          "compound": {
+            "contract": "waapi-skill.compound-import-fields/v1",
+            "object_type": "Sound",
+            "metadata_queries": [
+              {
+                "id": "looping_enabled",
+                "query": "looping enabled",
+                "kind": "property",
+                "metadata_types": [
+                  "bool",
+                  "boolean"
+                ],
+                "name_tokens": [
+                  "is",
+                  "looping",
+                  "enabled"
+                ]
+              },
+              {
+                "id": "ignore_parent_playback_limit",
+                "query": "ignore parent playback limit",
+                "kind": "property",
+                "metadata_types": [
+                  "bool",
+                  "boolean"
+                ],
+                "name_tokens": [
+                  "ignore",
+                  "parent",
+                  "max",
+                  "sound",
+                  "instance"
+                ]
+              },
+              {
+                "id": "enable_sound_instance_limit",
+                "query": "enable limit sound instances",
+                "kind": "property",
+                "metadata_types": [
+                  "bool",
+                  "boolean"
+                ],
+                "name_tokens": [
+                  "use",
+                  "max",
+                  "sound",
+                  "per",
+                  "instance"
+                ]
+              },
+              {
+                "id": "maximum_playback_instances",
+                "query": "sound instance limit value",
+                "kind": "property",
+                "metadata_types": [
+                  "int8",
+                  "int16",
+                  "int32",
+                  "int64",
+                  "uint8",
+                  "uint16",
+                  "uint32",
+                  "uint64",
+                  "integer"
+                ],
+                "name_tokens": [
+                  "max",
+                  "sound",
+                  "per",
+                  "instance"
+                ]
+              },
+              {
+                "id": "output_bus",
+                "query": "output bus routing",
+                "kind": "reference",
+                "metadata_types": [
+                  "reference",
+                  "objectreference"
+                ],
+                "name_tokens": [
+                  "output",
+                  "bus"
+                ]
+              }
+            ],
+            "reference_fixtures": [
+              {
+                "key": "mission_bus",
+                "name": "__WAAPI_Skill_Compound_Mission_Bus"
+              }
+            ],
+            "defaults": {
+              "properties": [
+                {
+                  "intent": "looping_enabled",
+                  "value": true
+                },
+                {
+                  "intent": "ignore_parent_playback_limit",
+                  "value": true
+                },
+                {
+                  "intent": "enable_sound_instance_limit",
+                  "value": true
+                },
+                {
+                  "intent": "maximum_playback_instances",
+                  "value": 4
+                }
+              ],
+              "references": [
+                {
+                  "intent": "output_bus",
+                  "target_fixture": "mission_bus"
+                }
+              ]
+            },
+            "row_overrides": [
+              {
+                "row_key": "chapter08_alpha",
+                "properties": [
+                  {
+                    "intent": "maximum_playback_instances",
+                    "value": 2
+                  }
+                ],
+                "references": []
+              },
+              {
+                "row_key": "chapter08_beta",
+                "properties": [
+                  {
+                    "intent": "maximum_playback_instances",
+                    "value": 2
+                  }
+                ],
+                "references": []
+              }
+            ],
+            "inline_base64_rows": [
+              {
+                "row_key": "chapter07_alpha",
+                "relative_path": "Missions/Chapter07/mission_complete_chapter07_alpha.wav"
+              },
+              {
+                "row_key": "chapter08_alpha",
+                "relative_path": "Missions/Chapter08/mission_complete_chapter08_alpha.wav"
+              }
+            ],
+            "tsv_dynamic_headers": []
+          }
+        }
+      }
+    },
+    {
+      "base_scenario_id": "O22-AUDIO-TAB-03",
+      "api": "ak.wwise.core.audio.importTabDelimited",
+      "versions": [
+        "2022.1",
+        "2025.1"
+      ],
+      "prompt": "SFX 导入表是 {import_file}，目标位置是 {import_location}。表里有中文和日文对象名、多层相对路径、Notes、Audio Source Notes，以及循环、播放实例限制和输出总线设置；其中两行使用内嵌 WAV。请先按当前 Wwise 的 Sound 元数据核对这些声音设置，再把八条城市环境音作为新对象一次导入，按 District/时段建立层级并放进指定的 Originals 子目录。完成后核对媒体、属性和总线，任何精确路径已存在都先停下。",
+      "confirmation_prompt": "确认，按预览一次导入八行 Unicode 层级、两项内嵌 WAV 及表中的声音设置。",
+      "fixture_patch": {
+        "asset_spec": {
+          "compound": {
+            "contract": "waapi-skill.compound-import-fields/v1",
+            "object_type": "Sound",
+            "metadata_queries": [
+              {
+                "id": "looping_enabled",
+                "query": "looping enabled",
+                "kind": "property",
+                "metadata_types": [
+                  "bool",
+                  "boolean"
+                ],
+                "name_tokens": [
+                  "is",
+                  "looping",
+                  "enabled"
+                ]
+              },
+              {
+                "id": "ignore_parent_playback_limit",
+                "query": "ignore parent playback limit",
+                "kind": "property",
+                "metadata_types": [
+                  "bool",
+                  "boolean"
+                ],
+                "name_tokens": [
+                  "ignore",
+                  "parent",
+                  "max",
+                  "sound",
+                  "instance"
+                ]
+              },
+              {
+                "id": "enable_sound_instance_limit",
+                "query": "enable limit sound instances",
+                "kind": "property",
+                "metadata_types": [
+                  "bool",
+                  "boolean"
+                ],
+                "name_tokens": [
+                  "use",
+                  "max",
+                  "sound",
+                  "per",
+                  "instance"
+                ]
+              },
+              {
+                "id": "maximum_playback_instances",
+                "query": "sound instance limit value",
+                "kind": "property",
+                "metadata_types": [
+                  "int8",
+                  "int16",
+                  "int32",
+                  "int64",
+                  "uint8",
+                  "uint16",
+                  "uint32",
+                  "uint64",
+                  "integer"
+                ],
+                "name_tokens": [
+                  "max",
+                  "sound",
+                  "per",
+                  "instance"
+                ]
+              },
+              {
+                "id": "output_bus",
+                "query": "output bus routing",
+                "kind": "reference",
+                "metadata_types": [
+                  "reference",
+                  "objectreference"
+                ],
+                "name_tokens": [
+                  "output",
+                  "bus"
+                ]
+              }
+            ],
+            "reference_fixtures": [
+              {
+                "key": "city_bus",
+                "name": "__WAAPI_Skill_Compound_City_Bus"
+              }
+            ],
+            "defaults": {
+              "properties": [],
+              "references": []
+            },
+            "row_overrides": [],
+            "inline_base64_rows": [
+              {
+                "row_key": "central_dawn_birds",
+                "relative_path": "Ambience/City/central_dawn_birds.wav"
+              },
+              {
+                "row_key": "shinjuku_night_rain",
+                "relative_path": "Ambience/City/shinjuku_night_rain.wav"
+              }
+            ],
+            "tsv_dynamic_headers": [
+              {
+                "kind": "property",
+                "intent": "looping_enabled",
+                "values": {
+                  "*": true
+                }
+              },
+              {
+                "kind": "property",
+                "intent": "ignore_parent_playback_limit",
+                "values": {
+                  "*": true
+                }
+              },
+              {
+                "kind": "property",
+                "intent": "enable_sound_instance_limit",
+                "values": {
+                  "*": true
+                }
+              },
+              {
+                "kind": "property",
+                "intent": "maximum_playback_instances",
+                "values": {
+                  "*": 6,
+                  "central_night_crowd": 3,
+                  "central_night_train": 3,
+                  "shinjuku_night_rain": 3,
+                  "shinjuku_night_neon": 3
+                }
+              },
+              {
+                "kind": "reference",
+                "intent": "output_bus",
+                "values": {
+                  "*": {
+                    "target_fixture": "city_bus"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "base_scenario_id": "O22-AUDIO-TAB-04",
+      "api": "ak.wwise.core.audio.importTabDelimited",
+      "versions": [
+        "2022.1",
+        "2025.1"
+      ],
+      "prompt": "SFX 导入表是 {import_file}，目标位置是 {import_location}。请用“使用现有对象”模式更新 Vehicle/Cockpit 下六条提示音：三个同名对象保留 GUID 但换成表里的新源文件，另外三个缺少的对象创建出来。表里还要求三个新建提示音启用循环、忽略父级播放数量限制、在各自 Sound 上开启声音实例上限并输出到 Cockpit 总线；NavigationAlert 最多同时播放 4 个实例，EngineOverheat 与 ParkingBrake 限制为 2 个。请先按当前 Wwise 的 Sound 元数据核对这些列，再一次执行整张表，完成后核对路径、GUID、媒体以及三个新对象的属性和总线，不能产生带编号的重复对象。",
+      "confirmation_prompt": "可以，按预览一次更新三个旧提示音，并创建带声音设置和输出总线的三个新提示音。",
+      "fixture_patch": {
+        "asset_spec": {
+          "compound": {
+            "contract": "waapi-skill.compound-import-fields/v1",
+            "object_type": "Sound",
+            "metadata_queries": [
+              {
+                "id": "looping_enabled",
+                "query": "looping enabled",
+                "kind": "property",
+                "metadata_types": [
+                  "bool",
+                  "boolean"
+                ],
+                "name_tokens": [
+                  "is",
+                  "looping",
+                  "enabled"
+                ]
+              },
+              {
+                "id": "ignore_parent_playback_limit",
+                "query": "ignore parent playback limit",
+                "kind": "property",
+                "metadata_types": [
+                  "bool",
+                  "boolean"
+                ],
+                "name_tokens": [
+                  "ignore",
+                  "parent",
+                  "max",
+                  "sound",
+                  "instance"
+                ]
+              },
+              {
+                "id": "enable_sound_instance_limit",
+                "query": "enable limit sound instances",
+                "kind": "property",
+                "metadata_types": [
+                  "bool",
+                  "boolean"
+                ],
+                "name_tokens": [
+                  "use",
+                  "max",
+                  "sound",
+                  "per",
+                  "instance"
+                ]
+              },
+              {
+                "id": "maximum_playback_instances",
+                "query": "sound instance limit value",
+                "kind": "property",
+                "metadata_types": [
+                  "int8",
+                  "int16",
+                  "int32",
+                  "int64",
+                  "uint8",
+                  "uint16",
+                  "uint32",
+                  "uint64",
+                  "integer"
+                ],
+                "name_tokens": [
+                  "max",
+                  "sound",
+                  "per",
+                  "instance"
+                ]
+              },
+              {
+                "id": "output_bus",
+                "query": "output bus routing",
+                "kind": "reference",
+                "metadata_types": [
+                  "reference",
+                  "objectreference"
+                ],
+                "name_tokens": [
+                  "output",
+                  "bus"
+                ]
+              }
+            ],
+            "reference_fixtures": [
+              {
+                "key": "cockpit_bus",
+                "name": "__WAAPI_Skill_Compound_Cockpit_Bus"
+              }
+            ],
+            "defaults": {
+              "properties": [],
+              "references": []
+            },
+            "row_overrides": [],
+            "inline_base64_rows": [],
+            "tsv_dynamic_headers": [
+              {
+                "kind": "property",
+                "intent": "looping_enabled",
+                "values": {
+                  "cockpit_engine_overheat": true,
+                  "cockpit_navigation_alert": true,
+                  "cockpit_parking_brake": true
+                }
+              },
+              {
+                "kind": "property",
+                "intent": "ignore_parent_playback_limit",
+                "values": {
+                  "cockpit_engine_overheat": true,
+                  "cockpit_navigation_alert": true,
+                  "cockpit_parking_brake": true
+                }
+              },
+              {
+                "kind": "property",
+                "intent": "enable_sound_instance_limit",
+                "values": {
+                  "cockpit_engine_overheat": true,
+                  "cockpit_navigation_alert": true,
+                  "cockpit_parking_brake": true
+                }
+              },
+              {
+                "kind": "property",
+                "intent": "maximum_playback_instances",
+                "values": {
+                  "cockpit_engine_overheat": 2,
+                  "cockpit_navigation_alert": 4,
+                  "cockpit_parking_brake": 2
+                }
+              },
+              {
+                "kind": "reference",
+                "intent": "output_bus",
+                "values": {
+                  "cockpit_engine_overheat": {
+                    "target_fixture": "cockpit_bus"
+                  },
+                  "cockpit_navigation_alert": {
+                    "target_fixture": "cockpit_bus"
+                  },
+                  "cockpit_parking_brake": {
+                    "target_fixture": "cockpit_bus"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

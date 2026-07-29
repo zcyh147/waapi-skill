@@ -45,6 +45,11 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (
     prompt_materialization_receipt,
     read_prompt_provenance,
 )
+from tests.semantic.support.codex_prompt_asset_reads_v3 import (
+    PromptAssetReadError,
+    remove_validated_command_occurrences,
+    validated_prompt_asset_cat_commands,
+)
 
 
 TASK_RESULT_CONTRACT = "waapi-skill.codex-semantic-task-result/v5"
@@ -433,6 +438,7 @@ def run_v3_codex_task(
                         expected_terminal_execute_exit2_count=(
                             terminal_execute_exit2_count
                         ),
+                        prompt_provenance=provenance,
                     )
                     grade = V3TurnGrade(
                         index=turn_index,
@@ -565,6 +571,7 @@ def _grade_common_turn(
     required_reference: str,
     expected_gateway_count: int,
     expected_terminal_execute_exit2_count: int = 0,
+    prompt_provenance: Any | None = None,
 ) -> tuple[tuple[str, ...], dict[str, bool]]:
     facts = result.command_facts
     allowed_reads = tuple(facts.allowed_read_commands)
@@ -572,7 +579,22 @@ def _grade_common_turn(
     expected_reads = ("SKILL.md", required_reference) if turn_index == 1 else ()
     records = facts.command_records
     gateway_count = len(facts.gateway_attempt_commands)
-    terminal_unexpected = tuple(facts.unexpected_commands)
+    try:
+        prompt_asset_reads = validated_prompt_asset_cat_commands(
+            records,
+            provenance=prompt_provenance,
+            turn_index=turn_index,
+        )
+    except PromptAssetReadError:
+        prompt_asset_reads = ()
+    terminal_unexpected = remove_validated_command_occurrences(
+        facts.unexpected_commands,
+        prompt_asset_reads,
+    )
+    non_gateway_unexpected = remove_validated_command_occurrences(
+        facts.non_gateway_unexpected_commands,
+        prompt_asset_reads,
+    )
     expected_terminal_unexpected = (
         len(terminal_unexpected) == expected_terminal_execute_exit2_count
         and all(
@@ -593,13 +615,18 @@ def _grade_common_turn(
         "skill_reads_exact": read_files == expected_reads and len(allowed_reads) == len(read_files),
         "read_prefix_exact": tuple(record.command for record in records[: len(allowed_reads)]) == allowed_reads,
         "gateway_count_exact": gateway_count == expected_gateway_count,
-        "no_other_commands": len(records) == len(allowed_reads) + expected_gateway_count,
+        "no_other_commands": (
+            len(records)
+            == len(allowed_reads)
+            + len(prompt_asset_reads)
+            + expected_gateway_count
+        ),
         "no_discovery": not facts.discovery_commands,
         "no_direct_waapi": not facts.direct_waapi_client_commands,
         "no_write_like": not facts.write_like_commands,
         "no_unexpected_commands": (
             expected_terminal_unexpected
-            and not facts.non_gateway_unexpected_commands
+            and not non_gateway_unexpected
         ),
         "no_files_changed": (
             not result.created_files

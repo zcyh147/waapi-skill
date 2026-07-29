@@ -116,9 +116,11 @@ def test_locality_contract_covers_every_closed_operation_schema_with_local_paths
         "lua.executeCoreInline",
         "object.set",
         "soundbank.convertExternalSources",
-        "soundbank.processDefinitionFiles",
-        "ui.commands.execute",
-    }
+            "soundbank.processDefinitionFiles",
+            "ui.commands.execute",
+            "ui.commands.register",
+            "ui.commands.unregister",
+        }
 
     # These schemas intentionally describe the path-bearing branch in prose or
     # use live project/output paths rather than an absolute-path schema marker.

@@ -235,6 +235,110 @@ def test_audio_import_plan_normalizes_structured_fields_and_provenance(tmp_path:
     assert plan["oracle"]["language_requires_live_project_validation"] is True
 
 
+def test_audio_import_accepts_matching_typed_leaf_and_explicit_object_type(
+    tmp_path: Path,
+) -> None:
+    media = _write_media(tmp_path, "matching-type.wav")
+
+    plan = build_audio_import_plan(
+        [
+            {
+                "object_path": OLD_ROOT + r"\<Sound Voice>MatchingType",
+                "object_type": "Sound Voice",
+                "audio_file": str(media),
+                "import_language": "English(US)",
+            }
+        ],
+        version="2022.1",
+        import_operation="useExisting",
+    )
+
+    assert plan["dispatch_args"]["imports"][0]["objectType"] == "Sound Voice"
+    assert plan["oracle"]["targets"][0]["requested_object_type"] == "Sound Voice"
+
+
+@pytest.mark.parametrize(
+    ("typed_object_type", "explicit_object_type"),
+    [
+        ("Sound SFX", "Sound"),
+        ("Property Container", "ActorMixer"),
+        ("Random Container", "RandomSequenceContainer"),
+    ],
+)
+def test_audio_import_accepts_reviewed_typed_leaf_object_type_aliases(
+    tmp_path: Path,
+    typed_object_type: str,
+    explicit_object_type: str,
+) -> None:
+    media = _write_media(
+        tmp_path,
+        f"{typed_object_type.replace(' ', '-')}.wav",
+    )
+
+    plan = build_audio_import_plan(
+        [
+            {
+                "object_path": OLD_ROOT
+                + rf"\<{typed_object_type}>AliasCompatible",
+                "object_type": explicit_object_type,
+                "audio_file": str(media),
+            }
+        ],
+        version="2022.1",
+        import_operation="createNew",
+    )
+
+    assert (
+        plan["dispatch_args"]["imports"][0]["objectType"]
+        == explicit_object_type
+    )
+    assert (
+        plan["oracle"]["targets"][0]["requested_object_type"]
+        == explicit_object_type
+    )
+
+
+@pytest.mark.parametrize(
+    ("typed_object_type", "explicit_object_type"),
+    [
+        ("Random Container", "Sound"),
+        ("Sound Voice", "Sound SFX"),
+        ("Random Container", "Sequence Container"),
+    ],
+)
+def test_audio_import_rejects_conflicting_typed_leaf_and_explicit_object_type(
+    tmp_path: Path,
+    typed_object_type: str,
+    explicit_object_type: str,
+) -> None:
+    media = _write_media(
+        tmp_path,
+        f"{typed_object_type.replace(' ', '-')}-conflict.wav",
+    )
+
+    with pytest.raises(ImportContractError) as caught:
+        build_audio_import_plan(
+            [
+                {
+                    "object_path": OLD_ROOT
+                    + rf"\<{typed_object_type}>ConflictingType",
+                    "object_type": explicit_object_type,
+                    "audio_file": str(media),
+                }
+            ],
+            version="2022.1",
+            import_operation="createNew",
+        )
+
+    assert caught.value.error_code == "INVALID_TARGET_TYPE"
+    assert caught.value.details == {
+        "typed_field": "imports[0].object_path",
+        "typed_object_type": typed_object_type,
+        "explicit_field": "imports[0].object_type",
+        "explicit_object_type": explicit_object_type,
+    }
+
+
 def test_audio_import_language_validation_exempts_sfx_but_not_mixed_localized_rows(
     tmp_path: Path,
 ) -> None:

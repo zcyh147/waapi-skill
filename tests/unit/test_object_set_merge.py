@@ -581,6 +581,64 @@ def test_set_rejects_children_under_project_management_or_leaf_targets(
     assert rejected.value.error_code == error_code
 
 
+def test_set_accepts_2025_property_container_target_for_new_sound_child() -> None:
+    target_path = r"\Containers\Default Work Unit\SemanticLab\UI\Error"
+    target = _target_row(
+        object_type="PropertyContainer",
+        path=target_path,
+    )
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2025.1",
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": {"kind": "id", "value": TARGET_ID},
+                    "children": [{"type": "Sound", "name": "Error_Layer"}],
+                }
+            ],
+            "on_name_conflict": "fail",
+        },
+    }
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.getTypes": [
+                {
+                    "return": [
+                        {
+                            "classId": 524304,
+                            "name": "PropertyContainer",
+                            "type": "WObject",
+                        },
+                        {"classId": 65552, "name": "Sound", "type": "WObject"},
+                    ]
+                }
+            ],
+            "ak.wwise.core.object.get": [
+                {"return": [target]},
+                {"return": []},
+                {"return": [target]},
+                {"return": []},
+            ],
+        }
+    )
+
+    prepared = prepare_operation(
+        parse_operation_request(request),
+        read_call=reader,
+    ).as_dict()
+
+    assert prepared["resolved_roles"]["objects[0].object"]["row"]["type"] == (
+        "PropertyContainer"
+    )
+    child_dispatch = prepared["dispatch"]["args"]["objects"][0]["children"][0]
+    assert child_dispatch == {"type": "Sound", "name": "Error_Layer"}
+    child_plan = prepared["verification_plan"]["nodes"][1]
+    assert child_plan["requested_type"] == "Sound"
+    assert child_plan["canonical_type"] == "Sound"
+
+
 def test_set_merge_snapshots_every_nested_collision_and_verifies_the_confirmed_result() -> None:
     prepared, preview_reader = _prepare_merge()
 

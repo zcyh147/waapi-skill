@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import copy
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any, Mapping
@@ -8,10 +9,15 @@ from typing import Any, Mapping
 import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.builders.common import SemanticValidationError  # pyright: ignore[reportMissingImports]
+from wwise_waapi.operation_import import (  # pyright: ignore[reportMissingImports]
+    allowed_import_hierarchy_roots,
+)
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     OPERATION_REQUEST_CONTRACT,
     UNDO_GROUP_INNER_URIS_BY_VERSION,
     OperationContractError,
+    _materialize_audio_import_dynamic_rows,
+    describe_operation,
     list_operation_specs,
     parse_operation_request,
     prepare_operation,
@@ -31,6 +37,27 @@ SOUND_TYPE_RESULT = {
             "type": "WObject",
         }
     ]
+}
+EXPECTED_IMPORT_HIERARCHY_ROOTS = {
+    "2021.1": ["Actor-Mixer Hierarchy", "Interactive Music Hierarchy"],
+    "2022.1": ["Actor-Mixer Hierarchy", "Interactive Music Hierarchy"],
+    "2023.1": ["Actor-Mixer Hierarchy", "Interactive Music Hierarchy"],
+    "2024.1": ["Actor-Mixer Hierarchy", "Interactive Music Hierarchy"],
+    "2025.1": ["Containers", "Interactive Music Hierarchy"],
+}
+EXPECTED_DEFAULT_CONTAINER_WORK_UNIT_PATHS = {
+    "2021.1": r"\Actor-Mixer Hierarchy\Default Work Unit",
+    "2022.1": r"\Actor-Mixer Hierarchy\Default Work Unit",
+    "2023.1": r"\Actor-Mixer Hierarchy\Default Work Unit",
+    "2024.1": r"\Actor-Mixer Hierarchy\Default Work Unit",
+    "2025.1": r"\Containers\Default Work Unit",
+}
+EXPECTED_ACTOR_MIXER_METADATA_TYPES = {
+    "2021.1": "ActorMixer",
+    "2022.1": "ActorMixer",
+    "2023.1": "ActorMixer",
+    "2024.1": "ActorMixer",
+    "2025.1": "PropertyContainer",
 }
 
 
@@ -193,9 +220,11 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     child_type = specs["object.create"]["argument_contract"]["properties"]["children"]["items"]["properties"]["type"]
     for schema in (object_create_type, child_type):
         assert schema["description"] == (
-            "Exact Wwise metadata token. Natural mappings: Actor Mixer -> ActorMixer; "
+            "Exact Wwise request token. Natural mappings: Actor Mixer -> ActorMixer; "
             "Random Container / 随机容器 -> RandomSequenceContainer (never RandomContainer); "
-            "Blend Container / 混合容器 -> BlendContainer; Sound -> Sound."
+            "Blend Container / 混合容器 -> BlendContainer; Sound -> Sound. "
+            "Wwise 2025.1 reflects an Actor Mixer as PropertyContainer, but its "
+            "object.create request token remains ActorMixer."
         )
     assert specs["object.create"]["summary"].startswith("Create or merge one bounded recursive object tree")
     assert any(
@@ -216,9 +245,43 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
         "switch_assignment",
     } <= set(import_items["optional"])
     assert import_items["additionalProperties"] is False
+    assert "import_operation" not in import_items["properties"]
+    inline_audio = import_items["properties"]["audio_file_base64"]
+    assert inline_audio["verbatim_contract"] == {
+        "contract": "waapi-skill.audio-file-base64-verbatim/v1",
+        "opaque_segment": "characters_after_first_vertical_bar",
+        "caller_provided_complete_value": "copy_character_for_character",
+        "forbidden_transformations": [
+            "reconstruct",
+            "re-encode",
+            "repair",
+            "truncate",
+            "splice",
+        ],
+        "on_unreliable_preservation": "stop_before_preview",
+    }
+    assert "character-for-character" in inline_audio["description"]
+    assert (
+        "import_operation"
+        not in specs["audio.import"]["argument_contract"]["properties"]["defaults"][
+            "properties"
+        ]
+    )
     assert specs["audio.import"]["argument_contract"][
         "maximumEffectiveAudioFileBase64EncodedCharacters"
     ] == 256 * 1024
+    import_operation = specs["audio.import"]["argument_contract"]["properties"][
+        "import_operation"
+    ]
+    assert import_operation["enum"] == [
+        "createNew",
+        "useExisting",
+        "replaceExisting",
+    ]
+    assert import_operation["default"] == "createNew"
+    assert "$.arguments.import_operation" in import_operation["description"]
+    assert "omission means createNew" in import_operation["description"]
+    assert "Never place it inside an imports[] row" in import_operation["description"]
     assert specs["object.set"]["argument_contract"][
         "maximumCanonicalRequestBytes"
     ] == 256 * 1024
@@ -289,6 +352,8 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     object_set_conflict = specs["object.set"]["argument_contract"]["properties"]["on_name_conflict"]
     assert "Each existing object" in object_set_rows["description"]
     assert "Only genuinely new direct children" in object_set_children["description"]
+    assert object_set_conflict["default"] == "fail"
+    assert "Omission defaults to fail" in object_set_conflict["description"]
     assert "never to existing objects[] targets" in object_set_conflict["description"]
     assert "Use fail for children requested as new or absent" in object_set_conflict["description"]
     assert any(
@@ -327,6 +392,521 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     assert "attested_project_layout" not in generate["optional_arguments"]
     assert "attested_project_layout" not in generate["argument_contract"]["properties"]
     assert any("filePath" in constraint and "WPROJ" in constraint for constraint in generate["constraints"])
+
+
+def test_soundbank_generate_schema_discloses_independent_false_rebuild_defaults() -> None:
+    operation = describe_operation("soundbank.generate").as_dict(
+        version="2025.1"
+    )
+    properties = operation["argument_contract"]["properties"]
+    row_rebuild = properties["soundbanks"]["items"]["properties"]["rebuild"]
+    batch_rebuild = properties["rebuild_soundbanks"]
+
+    assert row_rebuild["default"] is False
+    assert batch_rebuild["default"] is False
+    assert properties["clear_audio_file_cache"]["default"] is False
+    assert properties["rebuild_init_bank"]["default"] is False
+    assert "Per-SoundBank rebuild control" in row_rebuild["description"]
+    assert "separate batch-level control" in row_rebuild["description"]
+    assert "Batch-level native rebuildSoundBanks control" in batch_rebuild[
+        "description"
+    ]
+    assert "independent from soundbanks[].rebuild" in batch_rebuild[
+        "description"
+    ]
+    assert any(
+        "batch-level rebuild_soundbanks and per-Bank soundbanks[].rebuild are independent"
+        in constraint
+        for constraint in operation["constraints"]
+    )
+
+
+def test_tab_import_schema_discloses_path_only_preview_progression() -> None:
+    spec = describe_operation("audio.importTabDelimited")
+    operation = spec.as_dict(version="2025.1")
+
+    assert operation["file_read_policy"] == "pass_path_without_reading"
+    assert operation["next_step"] == "preview"
+    assert operation["preview_owns"] == [
+        "tsv_parsing",
+        "tsv_hash_validation",
+        "inline_base64_validation",
+        "media_validation",
+        "exact_path_conflict_validation",
+    ]
+    assert {
+        "file_read_policy",
+        "next_step",
+        "preview_owns",
+    }.isdisjoint(spec.as_compact_dict())
+    assert "file_read_policy" not in describe_operation("audio.import").as_dict(
+        version="2025.1"
+    )
+
+
+def test_audio_import_operation_schema_discloses_compact_batch_composition_contract() -> None:
+    operation = describe_operation("audio.import").as_dict(version="2022.1")
+    argument_contract = operation["argument_contract"]
+    defaults = argument_contract["properties"]["defaults"]
+    composition = argument_contract["request_composition_contract"]
+
+    assert "batch/default/common baseline" in (
+        defaults["description"]
+    )
+    assert "exceptional rows carrying exact overrides" in defaults[
+        "description"
+    ]
+    assert "merely repeated by a subset without baseline intent" in defaults[
+        "description"
+    ]
+    assert composition == {
+        "contract": "waapi-skill.audio-import-request-composition/v1",
+        "shared_values": {
+            "placement": "$.arguments.defaults",
+            "occurrences": "once",
+            "promotion_conditions": [
+                {
+                    "kind": "explicit_batch_baseline",
+                    "source": "explicit_user_semantics",
+                    "matching": "semantic_intent_not_literal_token",
+                    "semantic_examples": [
+                        "default",
+                        "common",
+                        "默认",
+                        "统一",
+                        "共同",
+                    ],
+                    "row_overrides": {
+                        "allowed": True,
+                        "fixed_fields_match": "field_name",
+                        "properties_references_match": "exact_name",
+                    },
+                },
+                {
+                    "kind": "identical_effective_value",
+                    "coverage": "all_import_rows",
+                    "applies_identically_to_every_import_row": True,
+                    "row_overrides": {"allowed": False},
+                },
+            ],
+            "subset_shared_without_explicit_baseline": (
+                "keep_in_each_applicable_import_row"
+            ),
+            "fixed_fields": [
+                "object_path",
+                "object_type",
+                "audio_file",
+                "audio_file_base64",
+                "import_language",
+                "import_location",
+                "originals_subfolder",
+                "notes",
+                "audio_source_notes",
+                "event",
+                "dialogue_event",
+                "switch_assignment",
+            ],
+            "named_fields": ["properties", "references"],
+            "imports_row_policy": (
+                "row_specific_fields_and_exact_overrides_only"
+            ),
+            "named_override_key": "name",
+        },
+        "metadata_dependency_closure": {
+            "contract": "waapi-skill.live-metadata-dependency-closure/v1",
+            "selection": {
+                "source": "current_operation_request",
+                "kinds": ["property", "reference"],
+                "selected_fields_only": True,
+            },
+            "metadata_source": {
+                "command": "metadata discover",
+                "authority": "live-waapi",
+                "same_result_required": True,
+                "candidate_collections": [
+                    "$.agent_result.candidates",
+                    "$.agent_result.dependency_candidates",
+                ],
+                "requirements_field": "dependency_requirements",
+                "unresolved_dependencies_path": (
+                    "$.agent_result.unresolved_dependencies"
+                ),
+            },
+            "traversal": {
+                "recursive": True,
+                "dependency_identity": "exact_returned_property_name",
+            },
+            "materialization": {
+                "required_values_count": 1,
+                "kind": "property",
+                "copy_name_from": "dependency_requirements[].property",
+                "copy_value_from": (
+                    "dependency_requirements[].required_values[0]"
+                ),
+                "scope": {
+                    "inherit_selected_owner_scope": True,
+                    "defaults": "$.arguments.defaults.properties",
+                    "row": (
+                        "$.arguments.imports[owner_row_index].properties"
+                    ),
+                },
+            },
+            "failure_policy": {
+                "phase": "before_preview",
+                "action": "stop",
+                "conditions": [
+                    "required_values_missing",
+                    "required_values_multiple",
+                    "dependency_candidate_missing",
+                    "dependency_unresolved",
+                ],
+                "guessing_allowed": False,
+            },
+        },
+        "import_operation": {
+            "contract": "waapi-skill.import-operation-intent/v1",
+            "path": "$.arguments.import_operation",
+            "matching": "semantic_user_intent_not_literal_token",
+            "required_when_user_intent_is_explicit": True,
+            "omission_value_when_user_intent_is_unstated": "createNew",
+            "explicit_intent_values": [
+                {
+                    "intent": "create_or_new",
+                    "semantic_examples": [
+                        "create",
+                        "new",
+                        "createNew",
+                        "新建",
+                        "创建",
+                    ],
+                    "value": "createNew",
+                },
+                {
+                    "intent": "reuse_existing",
+                    "semantic_examples": [
+                        "reuse",
+                        "use existing",
+                        "useExisting",
+                        "使用现有",
+                        "复用",
+                    ],
+                    "value": "useExisting",
+                },
+                {
+                    "intent": "replace_existing",
+                    "semantic_examples": [
+                        "replace",
+                        "replace existing",
+                        "replaceExisting",
+                        "替换",
+                        "覆盖现有",
+                    ],
+                    "value": "replaceExisting",
+                },
+            ],
+        },
+    }
+
+
+def test_audio_import_schema_discloses_generic_live_dependency_closure() -> None:
+    operation = describe_operation("audio.import").as_dict(version="2022.1")
+    dependency = operation["argument_contract"][
+        "request_composition_contract"
+    ]["metadata_dependency_closure"]
+
+    assert dependency["selection"] == {
+        "source": "current_operation_request",
+        "kinds": ["property", "reference"],
+        "selected_fields_only": True,
+    }
+    assert dependency["metadata_source"]["authority"] == "live-waapi"
+    assert dependency["metadata_source"]["same_result_required"] is True
+    assert dependency["traversal"]["recursive"] is True
+    assert dependency["materialization"]["required_values_count"] == 1
+    assert dependency["materialization"]["scope"] == {
+        "inherit_selected_owner_scope": True,
+        "defaults": "$.arguments.defaults.properties",
+        "row": "$.arguments.imports[owner_row_index].properties",
+    }
+    assert dependency["failure_policy"]["phase"] == "before_preview"
+    assert dependency["failure_policy"]["action"] == "stop"
+    assert dependency["failure_policy"]["guessing_allowed"] is False
+    assert "OutputBus" not in repr(dependency)
+    assert "OverrideOutput" not in repr(dependency)
+
+
+def test_import_operation_schemas_share_explicit_import_mode_mapping() -> None:
+    operation = describe_operation("audio.import").as_dict(version="2025.1")
+    properties = operation["argument_contract"]["properties"]
+    import_operation = properties["import_operation"]
+    intent_contract = operation["argument_contract"][
+        "request_composition_contract"
+    ]["import_operation"]
+    tab_operation = describe_operation("audio.importTabDelimited").as_dict(
+        version="2025.1"
+    )
+    tab_argument_contract = tab_operation["argument_contract"]
+
+    assert "import_operation" in tab_operation["optional_arguments"]
+    assert tab_argument_contract["properties"]["import_operation"] == (
+        import_operation
+    )
+    assert tab_argument_contract["import_operation_contract"] == intent_contract
+    assert tab_operation["file_read_policy"] == "pass_path_without_reading"
+    assert intent_contract["contract"] == (
+        "waapi-skill.import-operation-intent/v1"
+    )
+    assert import_operation["default"] == "createNew"
+    assert "meaning rather than requiring literal tokens" in (
+        import_operation["description"]
+    )
+    assert "create/new/createNew/新建/创建 requires createNew" in import_operation[
+        "description"
+    ]
+    assert "Omit it only when the user leaves the mode unstated" in (
+        import_operation["description"]
+    )
+    assert intent_contract["matching"] == (
+        "semantic_user_intent_not_literal_token"
+    )
+    assert intent_contract["required_when_user_intent_is_explicit"] is True
+    assert {
+        row["intent"]: row["value"]
+        for row in intent_contract["explicit_intent_values"]
+    } == {
+        "create_or_new": "createNew",
+        "reuse_existing": "useExisting",
+        "replace_existing": "replaceExisting",
+    }
+    assert {
+        row["intent"]: row["semantic_examples"][-2:]
+        for row in intent_contract["explicit_intent_values"]
+    } == {
+        "create_or_new": ["新建", "创建"],
+        "reuse_existing": ["使用现有", "复用"],
+        "replace_existing": ["替换", "覆盖现有"],
+    }
+
+
+@pytest.mark.parametrize(
+    ("version", "expected_roots"),
+    EXPECTED_IMPORT_HIERARCHY_ROOTS.items(),
+)
+def test_audio_import_operation_schema_discloses_runtime_hierarchy_roots(
+    version: str,
+    expected_roots: list[str],
+) -> None:
+    operation = describe_operation("audio.import").as_dict(version=version)
+    properties = operation["argument_contract"]["properties"]
+    row_path = properties["imports"]["items"]["properties"]["object_path"]
+    default_path = properties["defaults"]["properties"]["object_path"]
+    expected_path_contract = {
+        "contract": "waapi-skill.audio-import-object-path/v1",
+        "resolved_target": {
+            "minimum_segments": 3,
+            "hierarchy_root_case_sensitive": True,
+            "wwise_version": version,
+            "allowed_hierarchy_roots": expected_roots,
+        },
+        "absolute_form": True,
+        "relative_form": {
+            "allowed": True,
+            "requires_effective_import_location": True,
+        },
+    }
+
+    assert list(allowed_import_hierarchy_roots(version)) == expected_roots
+    assert row_path["path_contract"] == expected_path_contract
+    assert default_path["path_contract"] == expected_path_contract
+
+
+def test_audio_import_unversioned_detail_schema_discloses_complete_root_matrix() -> None:
+    operation = describe_operation("audio.import").as_dict()
+    path_contract = operation["argument_contract"]["properties"]["imports"][
+        "items"
+    ]["properties"]["object_path"]["path_contract"]
+
+    assert path_contract["resolved_target"][
+        "allowed_hierarchy_roots_by_version"
+    ] == EXPECTED_IMPORT_HIERARCHY_ROOTS
+
+
+@pytest.mark.parametrize(
+    ("version", "default_work_unit_path"),
+    EXPECTED_DEFAULT_CONTAINER_WORK_UNIT_PATHS.items(),
+)
+def test_object_create_versioned_schema_discloses_same_name_merge_path_contract(
+    version: str,
+    default_work_unit_path: str,
+) -> None:
+    operation = describe_operation("object.create").as_dict(version=version)
+    merge_contract = operation["argument_contract"][
+        "same_name_merge_path_contract"
+    ]
+
+    assert merge_contract == {
+        "contract": "waapi-skill.object-create-same-name-merge-path/v1",
+        "applies_when": (
+            "Exactly one unchanged same-name existing request root below the "
+            "current-version default container Work Unit receives only a "
+            "recursive descendant merge."
+        ),
+        "resolved_target": {
+            "wwise_version": version,
+            "default_container_work_unit_path": default_work_unit_path,
+        },
+        "exact_path": {
+            "base_path_source": "resolved_target",
+            "separator": "\\",
+            "append_user_stated_descendant_segments": True,
+            "terminal_segment": "same_name_request_root",
+        },
+        "identity_query": {
+            "route": "query-object",
+            "must_follow_operation_schema_directly": True,
+            "path_mode": "exact",
+            "return_fields": ["id", "name", "type", "path"],
+            "path_argument_contract": {
+                "contract": (
+                    "waapi-skill.shell-single-quoted-wwise-path/v1"
+                ),
+                "source_value": "decoded_gateway_json_string",
+                "shell_quoting": "single_quotes",
+                "literal_backslashes_per_path_separator": 1,
+                "json_serialized_backslashes_per_path_separator": 2,
+                "copy_json_escape_backslashes_as_literal_characters": False,
+            },
+        },
+        "forbidden_intermediate_routes": ["project-default-work-units"],
+    }
+
+
+def test_object_create_unversioned_schema_discloses_complete_merge_path_matrix() -> None:
+    operation = describe_operation("object.create").as_dict()
+    merge_contract = operation["argument_contract"][
+        "same_name_merge_path_contract"
+    ]
+
+    assert merge_contract["resolved_target"] == {
+        "default_container_work_unit_path_by_version": (
+            EXPECTED_DEFAULT_CONTAINER_WORK_UNIT_PATHS
+        )
+    }
+    assert merge_contract["identity_query"] == {
+        "route": "query-object",
+        "must_follow_operation_schema_directly": True,
+        "path_mode": "exact",
+        "return_fields": ["id", "name", "type", "path"],
+        "path_argument_contract": {
+            "contract": "waapi-skill.shell-single-quoted-wwise-path/v1",
+            "source_value": "decoded_gateway_json_string",
+            "shell_quoting": "single_quotes",
+            "literal_backslashes_per_path_separator": 1,
+            "json_serialized_backslashes_per_path_separator": 2,
+            "copy_json_escape_backslashes_as_literal_characters": False,
+        },
+    }
+    assert merge_contract["forbidden_intermediate_routes"] == [
+        "project-default-work-units"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("version", "default_work_unit_path"),
+    EXPECTED_DEFAULT_CONTAINER_WORK_UNIT_PATHS.items(),
+)
+def test_object_create_versioned_schema_discloses_default_parent_and_metadata_scope(
+    version: str,
+    default_work_unit_path: str,
+) -> None:
+    operation = describe_operation("object.create").as_dict(version=version)
+    parent_contract = operation["argument_contract"][
+        "default_container_parent_contract"
+    ]
+
+    assert parent_contract["contract"] == (
+        "waapi-skill.object-create-default-container-parent/v1"
+    )
+    assert parent_contract["resolved_target"] == {
+        "wwise_version": version,
+        "default_container_work_unit_path": default_work_unit_path,
+    }
+    assert parent_contract["parent_path"] == {
+        "base_path_source": "resolved_target",
+        "separator": "\\",
+        "append_user_stated_parent_segments": True,
+    }
+    assert parent_contract["dynamic_actor_mixer_metadata_scope"] == {
+        "kind": "object_type",
+        "one_discovery_for_same_type_targets": True,
+        "object_scope_is_for_one_existing_target_only": True,
+        "wwise_version": version,
+        "actor_mixer_object_type": EXPECTED_ACTOR_MIXER_METADATA_TYPES[version],
+    }
+    assert parent_contract["required_sequence"] == [
+        "operation-schema object.create",
+        "one metadata discover when a dynamic field token is unknown",
+        "preview",
+    ]
+    assert parent_contract["forbidden_intermediate_routes"] == [
+        "project-default-work-units"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("version", "default_work_unit_path"),
+    EXPECTED_DEFAULT_CONTAINER_WORK_UNIT_PATHS.items(),
+)
+def test_object_set_versioned_schema_discloses_default_target_and_metadata_scope(
+    version: str,
+    default_work_unit_path: str,
+) -> None:
+    operation = describe_operation("object.set").as_dict(version=version)
+    target_contract = operation["argument_contract"][
+        "default_container_target_contract"
+    ]
+
+    assert target_contract["contract"] == (
+        "waapi-skill.object-set-default-container-target/v1"
+    )
+    assert target_contract["resolved_target"] == {
+        "wwise_version": version,
+        "default_container_work_unit_path": default_work_unit_path,
+    }
+    assert target_contract["dynamic_actor_mixer_metadata_scope"] == {
+        "kind": "object_type",
+        "one_discovery_for_same_type_targets": True,
+        "object_scope_is_for_one_existing_target_only": True,
+        "wwise_version": version,
+        "actor_mixer_object_type": EXPECTED_ACTOR_MIXER_METADATA_TYPES[version],
+    }
+    assert target_contract["required_sequence"] == [
+        "operation-schema object.set",
+        "one metadata discover when a dynamic field token is unknown",
+        "preview",
+    ]
+    assert target_contract["forbidden_intermediate_routes"] == [
+        "project-default-work-units"
+    ]
+
+
+def test_object_set_unversioned_schema_discloses_complete_target_matrix() -> None:
+    operation = describe_operation("object.set").as_dict()
+    target_contract = operation["argument_contract"][
+        "default_container_target_contract"
+    ]
+
+    assert target_contract["resolved_target"] == {
+        "default_container_work_unit_path_by_version": (
+            EXPECTED_DEFAULT_CONTAINER_WORK_UNIT_PATHS
+        )
+    }
+    assert target_contract["dynamic_actor_mixer_metadata_scope"] == {
+        "kind": "object_type",
+        "one_discovery_for_same_type_targets": True,
+        "object_scope_is_for_one_existing_target_only": True,
+        "actor_mixer_object_type_by_version": EXPECTED_ACTOR_MIXER_METADATA_TYPES,
+    }
 
 
 def test_operation_catalog_exposes_business_intent_selection_guidance() -> None:
@@ -405,6 +985,50 @@ def test_operation_catalog_exposes_business_intent_selection_guidance() -> None:
         and "subordinate" in item["when"]
         for item in object_set["preferred_over"]
     )
+
+    object_create = specs["object.create"]["selection_guidance"]
+    assert (
+        "Exactly one same-name existing root remains unchanged while only a "
+        "descendant tree is merged below it."
+    ) in object_create["use_when"]
+    create_set_boundary = next(
+        item["when"]
+        for item in object_create["choose_instead"]
+        if item["target"] == "object.set"
+    )
+    assert "descendant below the named request root" in create_set_boundary
+    assert "direct insertion target" in create_set_boundary
+    assert any(
+        "named request root itself is not that descendant insertion target"
+        in item
+        for item in object_create["avoid_when"]
+    )
+
+    assert (
+        "One atomic request changes fields, references, or lists on existing targets."
+        in object_set["use_when"]
+    )
+    assert not any(
+        "fields, references, children, or lists" in item
+        for item in object_set["use_when"]
+    )
+    descendant_insertion_rule = next(
+        item
+        for item in object_set["use_when"]
+        if "directly to an explicitly existing descendant container" in item
+    )
+    assert "below the named request root" in descendant_insertion_rule
+    assert (
+        "named request root itself is not that descendant insertion target"
+        in descendant_insertion_rule
+    )
+    object_create_fallback = next(
+        item["when"]
+        for item in object_set["choose_instead"]
+        if item["target"] == "object.create"
+    )
+    assert "one unchanged same-name existing request root" in object_create_fallback
+    assert "only merges descendants" in object_create_fallback
 
     inclusions = specs["soundbank.setInclusions"]["selection_guidance"]
     definitions = specs["soundbank.processDefinitionFiles"]["selection_guidance"]
@@ -620,6 +1244,188 @@ def test_undo_group_version_allowlist_is_exact_and_only_grows_at_reviewed_bounda
     assert "ak.wwise.core.blendContainer.addTrack" not in UNDO_GROUP_INNER_URIS_BY_VERSION["2023.1"]
     assert "ak.wwise.core.blendContainer.addTrack" in UNDO_GROUP_INNER_URIS_BY_VERSION["2024.1"]
     assert UNDO_GROUP_INNER_URIS_BY_VERSION["2024.1"] == UNDO_GROUP_INNER_URIS_BY_VERSION["2025.1"]
+
+
+@pytest.mark.parametrize("version", tuple(UNDO_GROUP_INNER_URIS_BY_VERSION))
+def test_undo_group_public_schema_uses_the_runtime_version_allowlist(
+    version: str,
+) -> None:
+    spec = next(
+        item for item in list_operation_specs() if item.name == "waapi.undoGroup"
+    ).as_dict(version=version)
+    api_schema = spec["argument_contract"]["properties"]["calls"]["items"][
+        "properties"
+    ]["api"]
+    expected = sorted(UNDO_GROUP_INNER_URIS_BY_VERSION[version])
+
+    assert api_schema["enum"] == expected
+    assert "pattern" not in api_schema
+    assert [row["const"] for row in api_schema["value_contracts"]] == expected
+    for row in api_schema["value_contracts"]:
+        assert row["schema_pointer"] == {
+            "gateway_argv": [
+                "--version",
+                version,
+                "describe",
+                row["const"],
+                "--full-schema",
+            ],
+            "result_path": (
+                f"$.availability.{version}.capability.schema.full"
+            ),
+        }
+
+
+def test_ui_command_descriptor_schema_is_closed_and_shared_by_both_operations() -> None:
+    specs = {spec.name: spec.as_dict() for spec in list_operation_specs()}
+    register_item = specs["ui.commands.register"]["argument_contract"][
+        "properties"
+    ]["commands"]["items"]
+    unregister_item = specs["ui.commands.unregister"]["argument_contract"][
+        "properties"
+    ]["commands"]["items"]
+    register_commands = specs["ui.commands.register"]["argument_contract"][
+        "properties"
+    ]["commands"]
+    unregister_commands = specs["ui.commands.unregister"]["argument_contract"][
+        "properties"
+    ]["commands"]
+
+    assert unregister_item == register_item
+    assert register_commands["caseInsensitiveUniqueBy"] == "$.id"
+    assert unregister_commands["caseInsensitiveUniqueBy"] == "$.id"
+    assert register_item["required"] == ["id", "display_name", "handler"]
+    assert register_item["optional"] == [
+        "context_menu",
+        "default_shortcut",
+        "main_menu",
+    ]
+    assert register_item["additionalProperties"] is False
+
+    handlers = {
+        branch["properties"]["kind"]["const"]: branch
+        for branch in register_item["properties"]["handler"]["oneOf"]
+    }
+    assert set(handlers) == {"notification", "program", "lua_script"}
+    assert handlers["notification"]["required"] == ["kind"]
+    assert handlers["notification"]["optional"] == []
+    assert handlers["program"]["required"] == ["kind", "program_path"]
+    assert handlers["program"]["optional"] == [
+        "argument_tokens",
+        "redirect_outputs",
+        "start_mode",
+        "working_directory",
+    ]
+    assert handlers["program"]["properties"]["argument_tokens"]["maxItems"] == 0
+    assert handlers["lua_script"]["required"] == ["kind", "lua_script_path"]
+    assert handlers["lua_script"]["optional"] == [
+        "argument_tokens",
+        "lua_module_directories",
+        "lua_selected_return",
+        "start_mode",
+        "working_directory",
+    ]
+    assert handlers["lua_script"]["supported_versions"] == [
+        "2023.1",
+        "2024.1",
+        "2025.1",
+    ]
+
+    context_menu = register_item["properties"]["context_menu"]
+    assert context_menu["required"] == []
+    assert context_menu["optional"] == [
+        "base_path",
+        "enabled_for",
+        "visible_for",
+    ]
+    assert context_menu["additionalProperties"] is False
+    assert set(context_menu["properties"]) == {
+        "base_path",
+        "enabled_for",
+        "visible_for",
+    }
+    assert context_menu["properties"]["base_path"]["items"]["pattern"] == (
+        r"^[^/\\]+$"
+    )
+    for field_name in ("enabled_for", "visible_for"):
+        field = context_menu["properties"][field_name]
+        assert field["uniqueItems"] is True
+        assert field["caseInsensitiveUniqueItems"] is True
+        assert field["items"]["pattern"] == r"^[^,]+$"
+    main_menu = register_item["properties"]["main_menu"]
+    assert main_menu["required"] == ["base_path"]
+    assert main_menu["optional"] == []
+    assert main_menu["additionalProperties"] is False
+    lua_properties = handlers["lua_script"]["properties"]
+    for field_name in ("lua_module_directories", "lua_selected_return"):
+        assert lua_properties[field_name]["uniqueItems"] is True
+        assert lua_properties[field_name]["caseInsensitiveUniqueItems"] is True
+
+
+@pytest.mark.parametrize(
+    "handler",
+    (
+        {"kind": "notification"},
+        {
+            "kind": "program",
+            "program_path": "/tmp/example-program",
+            "argument_tokens": [],
+            "redirect_outputs": False,
+            "start_mode": "SingleSelectionSingleProcess",
+            "working_directory": "/tmp",
+        },
+        {
+            "kind": "lua_script",
+            "lua_script_path": "/tmp/example.lua",
+            "argument_tokens": ["--selection", "${id}"],
+            "lua_module_directories": ["/tmp/lua"],
+            "lua_selected_return": ["return"],
+            "start_mode": "MultipleSelectionSingleProcessSpaceSeparated",
+            "working_directory": "/tmp",
+        },
+    ),
+)
+def test_ui_command_descriptor_schema_fields_match_request_shape_validator(
+    handler: Mapping[str, Any],
+) -> None:
+    arguments = {
+        "commands": [
+            {
+                "id": "example.command",
+                "display_name": "Example command",
+                "handler": dict(handler),
+                "context_menu": {
+                    "base_path": [],
+                    "enabled_for": ["Sound"],
+                    "visible_for": ["Sound"],
+                },
+                "default_shortcut": "",
+                "main_menu": {"base_path": ["WAAPI Skill"]},
+            }
+        ],
+        "source_authority": "user_supplied_verbatim",
+    }
+    parsed = parse_operation_request(
+        request("ui.commands.register", arguments, version="2024.1")
+    )
+    assert parsed.arguments == arguments
+    arguments["commands"][0]["context_menu"] = {}
+    parsed_empty_context = parse_operation_request(
+        request("ui.commands.register", arguments, version="2024.1")
+    )
+    assert parsed_empty_context.arguments["commands"][0]["context_menu"] == {}
+
+    invalid_arguments = copy.deepcopy(arguments)
+    invalid_arguments["commands"][0]["handler"]["raw_native_field"] = True
+    with pytest.raises(OperationContractError) as error:
+        parse_operation_request(
+            request(
+                "ui.commands.register",
+                invalid_arguments,
+                version="2024.1",
+            )
+        )
+    assert error.value.error_code == "INVALID_REQUEST"
 
 
 def test_compact_operation_inventory_is_stable_and_keeps_boundary_text() -> None:
@@ -1730,12 +2536,13 @@ def test_audio_import_materializes_defaults_base64_properties_references_and_row
     inline_source = "SFX/inline.wav|" + base64.b64encode(inline_wav).decode("ascii")
     reader = ScriptedReader(
         {
-            "ak.wwise.core.object.get": [
-                {"return": [import_parent]},
-                {"return": [output_bus]},
-                {"return": [import_parent]},
-                {"return": []},
-            ],
+                "ak.wwise.core.object.get": [
+                    {"return": [import_parent]},
+                    {"return": [output_bus]},
+                    {"return": [import_parent]},
+                    {"return": []},
+                    {"return": []},
+                ],
             "ak.wwise.core.object.getPropertyInfo": [
                 {
                     "name": "Volume",
@@ -1797,20 +2604,28 @@ def test_audio_import_materializes_defaults_base64_properties_references_and_row
         {
             "objectPath": r"<Sound>Inline",
             "importLocation": import_path,
-            "audioFileBase64": (
-                "SFX\\inline.wav|" + base64.b64encode(inline_wav).decode("ascii")
-            ),
             "objectType": "Sound",
             "@Volume": -6.0,
             "@OutputBus": TARGET_GUID,
-        }
+        },
+        {
+            "objectPath": r"<Sound>Inline\<AudioFileSource>inline",
+            "importLocation": import_path,
+            "audioFileBase64": (
+                "SFX\\inline.wav|" + base64.b64encode(inline_wav).decode("ascii")
+            ),
+        },
     ]
+    preview_metadata = prepared["semantic_preview"]["envelope"]["metadata"]
+    assert preview_metadata["target_count"] == 1
+    assert preview_metadata["native_row_count"] == 2
     assert "@Volume" in dispatch["options"]["return"]
     assert "@OutputBus" in dispatch["options"]["return"]
     target = prepared["verification_plan"]["targets"][0]
     assert target["canonical_target_path"] == target_path
     assert target["metadata_object_type"] == "Sound"
     assert target["metadata_class_id"] == 65552
+    assert target["explicit_audio_file_source_pre_state_rows"] == []
     assert target["validated_properties"] == [
         {
             "name": "Volume",
@@ -1848,6 +2663,285 @@ def test_audio_import_materializes_defaults_base64_properties_references_and_row
         for uri, args, options in reader.calls
         if uri == "ak.wwise.core.object.getTypes"
     ] == [({}, {})]
+
+
+def test_audio_import_native_materializer_partitions_sound_and_source_fields() -> None:
+    sound_path = (
+        r"\Actor-Mixer Hierarchy\Default Work Unit"
+        r"\<Random Container>Weapons\<Sound SFX>Rifle_Close"
+    )
+    source_path = (
+        r"\Actor-Mixer Hierarchy\Default Work Unit"
+        r"\Weapons\Rifle\Rifle_Close\weapon_rifle_close"
+    )
+
+    dispatch, mapping = _materialize_audio_import_dynamic_rows(
+        dispatch_args={
+            "importOperation": "createNew",
+            "imports": [
+                {
+                    "objectPath": sound_path,
+                    "objectType": "Sound SFX",
+                    "audioFile": "/fixtures/weapon_rifle_close.wav",
+                    "importLanguage": "SFX",
+                    "originalsSubFolder": "Weapons/Rifle",
+                    "notes": "Sound notes",
+                    "audioSourceNotes": "Source notes",
+                    "event": r"\Events\Default Work Unit\Play_Rifle_Close",
+                    "dialogueEvent": "Dialogue directive",
+                    "switchAssignation": "Switch directive",
+                }
+            ],
+        },
+        targets=[
+            {
+                "canonical_target_path": (
+                    r"\Actor-Mixer Hierarchy\Default Work Unit"
+                    r"\Weapons\Rifle\Rifle_Close"
+                ),
+                "metadata_object_type": "Sound",
+                "media_expected": True,
+                "expected_audio_file_source_result_path": source_path,
+                "requested_notes_destination": "target_object",
+                "validated_properties": [
+                    {
+                        "name": "IsLoopingEnabled",
+                        "value": True,
+                        "metadata_type": "bool",
+                    },
+                    {
+                        "name": "MaxSoundPerInstance",
+                        "value": 5,
+                        "metadata_type": "int16",
+                    },
+                ],
+                "validated_references": [
+                    {"name": "OutputBus", "target_id": TARGET_GUID}
+                ],
+            }
+        ],
+    )
+
+    assert dispatch["imports"] == [
+        {
+            "objectPath": sound_path,
+            "objectType": "Sound SFX",
+            "notes": "Sound notes",
+            "event": r"\Events\Default Work Unit\Play_Rifle_Close",
+            "dialogueEvent": "Dialogue directive",
+            "switchAssignation": "Switch directive",
+            "@IsLoopingEnabled": True,
+            "@MaxSoundPerInstance": 5,
+            "@OutputBus": TARGET_GUID,
+        },
+        {
+            "objectPath": sound_path
+            + r"\<AudioFileSource>weapon_rifle_close",
+            "audioFile": "/fixtures/weapon_rifle_close.wav",
+            "importLanguage": "SFX",
+            "originalsSubFolder": "Weapons/Rifle",
+            "notes": "Source notes",
+        },
+    ]
+    assert mapping == [
+        {
+            "logical_index": 0,
+            "native_rows": [
+                {
+                    "native_index": 0,
+                    "kind": "sound_structure",
+                    "object_path": sound_path,
+                },
+                {
+                    "native_index": 1,
+                    "kind": "audio_file_source_media",
+                    "object_path": sound_path
+                    + r"\<AudioFileSource>weapon_rifle_close",
+                    "canonical_result_path": source_path,
+                },
+            ],
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    ("notes_destination", "expected_structure_notes", "expected_source_notes"),
+    [
+        ("target_object", "Logical notes", None),
+        ("audio_file_source", None, "Logical notes"),
+    ],
+)
+def test_audio_import_native_materializer_routes_notes_from_preflight(
+    notes_destination: str,
+    expected_structure_notes: str | None,
+    expected_source_notes: str | None,
+) -> None:
+    target_path = (
+        r"\Actor-Mixer Hierarchy\Default Work Unit\Imported\NotesTarget"
+    )
+    object_path = (
+        r"\Actor-Mixer Hierarchy\Default Work Unit\Imported"
+        r"\<Sound SFX>NotesTarget"
+    )
+
+    dispatch, _ = _materialize_audio_import_dynamic_rows(
+        dispatch_args={
+            "imports": [
+                {
+                    "objectPath": object_path,
+                    "audioFile": "/fixtures/notes.wav",
+                    "notes": "Logical notes",
+                }
+            ]
+        },
+        targets=[
+            {
+                "canonical_target_path": target_path,
+                "metadata_object_type": "Sound",
+                "media_expected": True,
+                "expected_audio_file_source_result_path": target_path
+                + r"\notes",
+                "requested_notes_destination": notes_destination,
+                "validated_properties": [
+                    {
+                        "name": "IsLoopingEnabled",
+                        "value": True,
+                        "metadata_type": "bool",
+                    }
+                ],
+                "validated_references": [],
+            }
+        ],
+    )
+
+    structure, source = dispatch["imports"]
+    assert structure.get("notes") == expected_structure_notes
+    assert source.get("notes") == expected_source_notes
+    assert "audioSourceNotes" not in structure
+    assert "audioSourceNotes" not in source
+
+
+def test_audio_import_native_materializer_keeps_structure_only_dynamic_row_single() -> None:
+    object_path = (
+        r"\Actor-Mixer Hierarchy\Default Work Unit\<Sound SFX>Silent"
+    )
+    dispatch, mapping = _materialize_audio_import_dynamic_rows(
+        dispatch_args={"imports": [{"objectPath": object_path}]},
+        targets=[
+            {
+                "canonical_target_path": (
+                    r"\Actor-Mixer Hierarchy\Default Work Unit\Silent"
+                ),
+                "metadata_object_type": "Sound",
+                "media_expected": False,
+                "validated_properties": [
+                    {"name": "Volume", "value": -6.0, "metadata_type": "Real32"}
+                ],
+                "validated_references": [],
+            }
+        ],
+    )
+
+    assert dispatch["imports"] == [
+        {"objectPath": object_path, "@Volume": -6.0}
+    ]
+    assert mapping[0]["native_rows"][0]["kind"] == "single"
+
+
+@pytest.mark.parametrize(
+    ("metadata_type", "source_path"),
+    [
+        ("MusicTrack", r"\Interactive Music Hierarchy\Default Work Unit\Track\clip"),
+        ("Sound", None),
+    ],
+)
+def test_audio_import_native_materializer_rejects_unsealed_media_topology(
+    metadata_type: str,
+    source_path: str | None,
+) -> None:
+    with pytest.raises(OperationContractError) as rejected:
+        _materialize_audio_import_dynamic_rows(
+            dispatch_args={
+                "imports": [
+                    {
+                        "objectPath": (
+                            r"\Actor-Mixer Hierarchy\Default Work Unit"
+                            r"\<Sound SFX>Unsafe"
+                        ),
+                        "audioFile": "/fixtures/unsafe.mid",
+                    }
+                ]
+            },
+            targets=[
+                {
+                    "canonical_target_path": (
+                        r"\Actor-Mixer Hierarchy\Default Work Unit\Unsafe"
+                    ),
+                    "metadata_object_type": metadata_type,
+                    "media_expected": True,
+                    "expected_audio_file_source_result_path": source_path,
+                    "validated_properties": [
+                        {
+                            "name": "Volume",
+                            "value": -6.0,
+                            "metadata_type": "Real32",
+                        }
+                    ],
+                    "validated_references": [],
+                }
+            ],
+        )
+
+    assert rejected.value.error_code == "IMPORT_DYNAMIC_MEDIA_TOPOLOGY_UNSUPPORTED"
+
+
+def test_audio_import_native_materializer_preserves_logical_order_for_two_rows() -> None:
+    base = r"\Actor-Mixer Hierarchy\Default Work Unit\Batch"
+    logical_rows = []
+    targets = []
+    for ordinal in (1, 2):
+        logical_rows.append(
+            {
+                "objectPath": f"{base}\\<Sound SFX>Sound_{ordinal}",
+                "audioFile": f"/fixtures/source_{ordinal}.wav",
+            }
+        )
+        targets.append(
+            {
+                "canonical_target_path": f"{base}\\Sound_{ordinal}",
+                "metadata_object_type": "Sound",
+                "media_expected": True,
+                "expected_audio_file_source_result_path": (
+                    f"{base}\\Sound_{ordinal}\\source_{ordinal}"
+                ),
+                "requested_notes_destination": "target_object",
+                "validated_properties": [
+                    {
+                        "name": "IsLoopingEnabled",
+                        "value": True,
+                        "metadata_type": "bool",
+                    }
+                ],
+                "validated_references": [],
+            }
+        )
+
+    dispatch, mapping = _materialize_audio_import_dynamic_rows(
+        dispatch_args={"imports": logical_rows},
+        targets=targets,
+    )
+
+    assert [row["objectPath"] for row in dispatch["imports"]] == [
+        f"{base}\\<Sound SFX>Sound_1",
+        f"{base}\\<Sound SFX>Sound_1\\<AudioFileSource>source_1",
+        f"{base}\\<Sound SFX>Sound_2",
+        f"{base}\\<Sound SFX>Sound_2\\<AudioFileSource>source_2",
+    ]
+    assert [
+        row["native_index"]
+        for item in mapping
+        for row in item["native_rows"]
+    ] == [0, 1, 2, 3]
 
 
 def test_audio_import_unknown_type_fails_from_live_type_catalog() -> None:

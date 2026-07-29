@@ -1,0 +1,28 @@
+{
+  "contract": "waapi-skill.codex-compound-heavy-profile/v1",
+  "profile_id": "compound_heavy_cross_version_24",
+  "base_suite": "skills/waapi-skill/evals/suite-v3.json",
+  "data_files": [
+    "audio-import.json",
+    "object-create-set.json",
+    "soundbank.json"
+  ],
+  "versions": [
+    "2022.1",
+    "2025.1"
+  ],
+  "apis": [
+    "ak.wwise.core.audio.import",
+    "ak.wwise.core.audio.importTabDelimited",
+    "ak.wwise.core.object.create",
+    "ak.wwise.core.object.set",
+    "ak.wwise.core.soundbank.generate",
+    "ak.wwise.core.soundbank.setInclusions"
+  ],
+  "totals": {
+    "logical_case_count": 12,
+    "task_count": 24,
+    "user_turn_count": 48,
+    "transaction_count": 24
+  }
+}

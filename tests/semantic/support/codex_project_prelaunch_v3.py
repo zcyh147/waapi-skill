@@ -10,6 +10,7 @@ Wwise starts; callers never write the immutable source tree.
 from __future__ import annotations
 
 import hashlib
+import io
 import os
 import uuid
 import xml.etree.ElementTree as ET
@@ -21,6 +22,9 @@ from tests.destructive.support.sandbox_fixture import SandboxProject
 
 
 PROJECT_PRELAUNCH_CONTRACT = "waapi-skill.codex-project-prelaunch/v3"
+WWISE_2025_SOUNDBANK_AURO_PROFILE = (
+    "wwise-2025.1-soundbank-generate-auro/v1"
+)
 SUPPORTED_LANGUAGES = frozenset(
     {"SFX", "English(US)", "Chinese(PRC)", "Japanese", "External", "Mixed"}
 )
@@ -81,6 +85,20 @@ _PRESERVED_ANCHOR_IDS = frozenset(
         "{F9627628-0B10-4272-BC30-D4C20423CB38}",
     }
 )
+_WWISE_2025_AURO_PLUGIN_IDENTITY = ("263", "1100", "3")
+_WWISE_2025_AURO_EFFECT_NAME = "SLS_Big_Church_AHP_02"
+_WWISE_2025_AURO_EFFECT_ID = "{21E40BE7-7B3A-4DE4-BC78-FA8EB81736CD}"
+_WWISE_2025_AURO_WORK_UNIT_ID = "{ED91ED98-A343-4DF4-9DE7-CFCB469C3EDC}"
+_WWISE_2025_AURO_BUS_WORK_UNIT = Path("Busses") / "Default Work Unit.wwu"
+_WWISE_2025_AURO_EFFECT_WORK_UNIT = Path("Effects") / "Ambisonics.wwu"
+_WWISE_2025_AURO_WORK_UNIT_SHA256 = {
+    _WWISE_2025_AURO_BUS_WORK_UNIT: (
+        "abaefb80d17cb9f2f3f64b8d786eb02fface5e13066eaeaaac204cf2a3b4da06"
+    ),
+    _WWISE_2025_AURO_EFFECT_WORK_UNIT: (
+        "66ef565e7b4e28ed39b189284700d44f67cdb8c4f9035fa5a04842d2c050e29a"
+    ),
+}
 
 
 class ProjectPrelaunchError(RuntimeError):
@@ -103,6 +121,26 @@ class OptionalPluginIsolationReport:
 
 
 @dataclass(frozen=True, slots=True)
+class WorkUnitMutationProof:
+    relative_path: str
+    input_sha256: str
+    input_size: int
+    output_sha256: str
+    output_size: int
+
+
+@dataclass(frozen=True, slots=True)
+class AuroSoundBankIsolationReport:
+    profile: str
+    work_units: tuple[WorkUnitMutationProof, ...]
+    removed_bus_reference_object_ids: tuple[str, ...]
+    removed_effect_definition_ids: tuple[str, ...]
+    remaining_auro_plugin_instances: int
+    remaining_auro_object_references: int
+    preserved_anchor_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class ProjectPrelaunchReport:
     contract: str
     scenario_id: str
@@ -112,6 +150,7 @@ class ProjectPrelaunchReport:
     languages: tuple[str, ...]
     platforms: tuple[str, ...]
     optional_plugin_isolation: OptionalPluginIsolationReport | None
+    auro_soundbank_isolation: AuroSoundBankIsolationReport | None
 
     def as_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -124,6 +163,7 @@ class ProjectPrelaunchRequest:
     platforms: tuple[str, ...] = ()
     clear_soundbank_hooks: bool = True
     isolate_optional_sample_plugins: bool = False
+    auro_isolation_profile: str | None = None
 
     def __post_init__(self) -> None:
         if not self.scenario_id or not self.scenario_id.strip():
@@ -142,6 +182,22 @@ class ProjectPrelaunchRequest:
             raise ValueError("clear_soundbank_hooks must be a boolean")
         if type(self.isolate_optional_sample_plugins) is not bool:
             raise ValueError("isolate_optional_sample_plugins must be a boolean")
+        if self.auro_isolation_profile not in {
+            None,
+            WWISE_2025_SOUNDBANK_AURO_PROFILE,
+        }:
+            raise ValueError(
+                "auro_isolation_profile must be the reviewed Wwise 2025 "
+                "SoundBank Auro profile or None"
+            )
+        if (
+            self.isolate_optional_sample_plugins
+            and self.auro_isolation_profile is not None
+        ):
+            raise ValueError(
+                "broad optional plug-in isolation and the narrow Auro profile "
+                "cannot be combined"
+            )
 
 
 def make_project_prelaunch_hook(request: ProjectPrelaunchRequest):
@@ -266,7 +322,22 @@ def normalize_project_copy(
         )
     cache_rows[0].text = _wwise_relative_path(project_root, cache_root)
 
-    _write_tree_atomically(project, tree)
+    auro_preparation: _PreparedAuroSoundBankIsolation | None = None
+    if request.auro_isolation_profile == WWISE_2025_SOUNDBANK_AURO_PROFILE:
+        auro_preparation = _prepare_2025_soundbank_auro_isolation(project_root)
+
+    auro_soundbank_isolation: AuroSoundBankIsolationReport | None = None
+    if auro_preparation is None:
+        _write_tree_atomically(project, tree)
+    else:
+        auro_soundbank_isolation = _commit_2025_soundbank_auro_isolation(
+            auro_preparation,
+            project_mutation=(
+                project,
+                project.read_bytes(),
+                _serialize_tree(tree),
+            ),
+        )
     optional_plugin_isolation: OptionalPluginIsolationReport | None = None
     if request.isolate_optional_sample_plugins:
         optional_plugin_isolation = _remove_optional_sample_effect_references(
@@ -282,7 +353,424 @@ def normalize_project_copy(
         languages=requested_languages,
         platforms=requested_platforms,
         optional_plugin_isolation=optional_plugin_isolation,
+        auro_soundbank_isolation=auro_soundbank_isolation,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class _PreparedWorkUnitMutation:
+    relative_path: Path
+    path: Path
+    input_bytes: bytes
+    output_bytes: bytes
+
+
+@dataclass(frozen=True, slots=True)
+class _PreparedAuroSoundBankIsolation:
+    project_root: Path
+    work_units: tuple[_PreparedWorkUnitMutation, ...]
+
+
+def _prepare_2025_soundbank_auro_isolation(
+    project_root: Path,
+) -> _PreparedAuroSoundBankIsolation:
+    """Preflight the exact 2025 Auro nodes before any project file is written."""
+
+    parsed: dict[Path, tuple[Path, bytes, ET.ElementTree]] = {}
+    for relative_path, expected_sha256 in _WWISE_2025_AURO_WORK_UNIT_SHA256.items():
+        parsed[relative_path] = _read_pinned_work_unit(
+            project_root,
+            relative_path=relative_path,
+            expected_sha256=expected_sha256,
+        )
+
+    bus_path, bus_bytes, bus_tree = parsed[_WWISE_2025_AURO_BUS_WORK_UNIT]
+    effect_path, effect_bytes, effect_tree = parsed[
+        _WWISE_2025_AURO_EFFECT_WORK_UNIT
+    ]
+    bus_parent, bus_reference = _require_exact_2025_auro_bus_reference(
+        bus_tree.getroot()
+    )
+    effect_parent, effect = _require_exact_2025_auro_effect_definition(
+        effect_tree.getroot()
+    )
+    _require_2025_auro_inventory(
+        project_root,
+        expected_plugin_instances=2,
+        expected_object_references=2,
+    )
+
+    bus_parent.remove(bus_reference)
+    effect_parent.remove(effect)
+    output_roots = {
+        bus_path: bus_tree.getroot(),
+        effect_path: effect_tree.getroot(),
+    }
+    remaining_plugins, remaining_references, preserved = _scan_2025_auro_postcondition(
+        project_root,
+        root_overrides=output_roots,
+    )
+    if remaining_plugins or remaining_references:
+        raise ProjectPrelaunchError(
+            "Wwise 2025 Auro isolation did not close its in-memory postcondition"
+        )
+    if preserved != tuple(sorted(_PRESERVED_ANCHOR_IDS)):
+        raise ProjectPrelaunchError(
+            "Wwise 2025 Auro isolation lost a preserved built-in anchor"
+        )
+
+    return _PreparedAuroSoundBankIsolation(
+        project_root=project_root,
+        work_units=(
+            _PreparedWorkUnitMutation(
+                relative_path=_WWISE_2025_AURO_BUS_WORK_UNIT,
+                path=bus_path,
+                input_bytes=bus_bytes,
+                output_bytes=_serialize_tree(bus_tree),
+            ),
+            _PreparedWorkUnitMutation(
+                relative_path=_WWISE_2025_AURO_EFFECT_WORK_UNIT,
+                path=effect_path,
+                input_bytes=effect_bytes,
+                output_bytes=_serialize_tree(effect_tree),
+            ),
+        ),
+    )
+
+
+def _commit_2025_soundbank_auro_isolation(
+    preparation: _PreparedAuroSoundBankIsolation,
+    *,
+    project_mutation: tuple[Path, bytes, bytes],
+) -> AuroSoundBankIsolationReport:
+    """Write one reviewed project mutation batch and prove the live copy."""
+
+    mutations = (
+        project_mutation,
+        *(
+            (item.path, item.input_bytes, item.output_bytes)
+            for item in preparation.work_units
+        ),
+    )
+    _replace_closed_file_batch(mutations)
+    try:
+        remaining_plugins, remaining_references, preserved = (
+            _scan_2025_auro_postcondition(preparation.project_root)
+        )
+        if remaining_plugins or remaining_references:
+            raise ProjectPrelaunchError(
+                "Wwise 2025 Auro isolation postcondition found remaining instances"
+            )
+        if preserved != tuple(sorted(_PRESERVED_ANCHOR_IDS)):
+            raise ProjectPrelaunchError(
+                "Wwise 2025 Auro isolation lost a preserved built-in anchor"
+            )
+    except Exception:
+        _replace_closed_file_batch(
+            (
+                (path, output_bytes, input_bytes)
+                for path, input_bytes, output_bytes in mutations
+            )
+        )
+        raise
+
+    return AuroSoundBankIsolationReport(
+        profile=WWISE_2025_SOUNDBANK_AURO_PROFILE,
+        work_units=tuple(
+            WorkUnitMutationProof(
+                relative_path=item.relative_path.as_posix(),
+                input_sha256=hashlib.sha256(item.input_bytes).hexdigest(),
+                input_size=len(item.input_bytes),
+                output_sha256=hashlib.sha256(item.output_bytes).hexdigest(),
+                output_size=len(item.output_bytes),
+            )
+            for item in preparation.work_units
+        ),
+        removed_bus_reference_object_ids=(_WWISE_2025_AURO_EFFECT_ID,),
+        removed_effect_definition_ids=(_WWISE_2025_AURO_EFFECT_ID,),
+        remaining_auro_plugin_instances=remaining_plugins,
+        remaining_auro_object_references=remaining_references,
+        preserved_anchor_ids=preserved,
+    )
+
+
+def _read_pinned_work_unit(
+    project_root: Path,
+    *,
+    relative_path: Path,
+    expected_sha256: str,
+) -> tuple[Path, bytes, ET.ElementTree]:
+    input_path = project_root / relative_path
+    if input_path.is_symlink():
+        raise ProjectPrelaunchError(
+            f"Wwise 2025 Auro isolation work unit must not be a symlink: "
+            f"{relative_path.as_posix()}"
+        )
+    try:
+        path = input_path.resolve(strict=True)
+    except FileNotFoundError as exc:
+        raise ProjectPrelaunchError(
+            f"Wwise 2025 Auro isolation work unit is missing: "
+            f"{relative_path.as_posix()}"
+        ) from exc
+    project = project_root.resolve(strict=True)
+    if project not in path.parents or not path.is_file():
+        raise ProjectPrelaunchError(
+            f"Wwise 2025 Auro isolation work unit escapes the copied project: "
+            f"{relative_path.as_posix()}"
+        )
+    content = path.read_bytes()
+    actual_sha256 = hashlib.sha256(content).hexdigest()
+    if actual_sha256 != expected_sha256:
+        raise ProjectPrelaunchError(
+            f"Wwise 2025 Auro isolation work unit content drifted: "
+            f"{relative_path.as_posix()}"
+        )
+    try:
+        tree = ET.ElementTree(ET.fromstring(content))
+    except ET.ParseError as exc:
+        raise ProjectPrelaunchError(
+            f"Wwise 2025 Auro isolation work unit is not valid XML: "
+            f"{relative_path.as_posix()}"
+        ) from exc
+    return path, content, tree
+
+
+def _require_exact_2025_auro_bus_reference(
+    root: ET.Element,
+) -> tuple[ET.Element, ET.Element]:
+    candidates: list[tuple[ET.Element, ET.Element]] = []
+    for reference_list in root.findall(".//ReferenceList"):
+        for reference in reference_list.findall("./Reference"):
+            object_refs = reference.findall("./ObjectRef")
+            identity = (
+                reference.get("CompanyID"),
+                reference.get("PluginID"),
+                reference.get("PluginType"),
+            )
+            if (
+                reference.get("PluginName") == "Auro Headphone"
+                or identity == _WWISE_2025_AURO_PLUGIN_IDENTITY
+                or any(
+                    row.get("Name") == _WWISE_2025_AURO_EFFECT_NAME
+                    or row.get("ID") == _WWISE_2025_AURO_EFFECT_ID
+                    for row in object_refs
+                )
+            ):
+                candidates.append((reference_list, reference))
+    if len(candidates) != 1:
+        raise ProjectPrelaunchError(
+            "Wwise 2025 Auro bus reference identity drifted: "
+            f"found {len(candidates)} candidates"
+        )
+    parent, reference = candidates[0]
+    expected_reference = {
+        "Name": "Effect",
+        "PluginName": "Auro Headphone",
+        "CompanyID": "263",
+        "PluginID": "1100",
+        "PluginType": "3",
+    }
+    object_refs = reference.findall("./ObjectRef")
+    if (
+        reference.attrib != expected_reference
+        or len(list(reference)) != 1
+        or len(object_refs) != 1
+        or object_refs[0].attrib
+        != {
+            "Name": _WWISE_2025_AURO_EFFECT_NAME,
+            "ID": _WWISE_2025_AURO_EFFECT_ID,
+            "WorkUnitID": _WWISE_2025_AURO_WORK_UNIT_ID,
+        }
+    ):
+        raise ProjectPrelaunchError(
+            "Wwise 2025 Auro bus reference identity drifted"
+        )
+    return parent, reference
+
+
+def _require_exact_2025_auro_effect_definition(
+    root: ET.Element,
+) -> tuple[ET.Element, ET.Element]:
+    work_units = root.findall("./Effects/WorkUnit")
+    if (
+        len(work_units) != 1
+        or work_units[0].get("Name") != "Ambisonics"
+        or work_units[0].get("ID") != _WWISE_2025_AURO_WORK_UNIT_ID
+    ):
+        raise ProjectPrelaunchError(
+            "Wwise 2025 Auro effect Work Unit identity drifted"
+        )
+    candidates: list[tuple[ET.Element, ET.Element]] = []
+    for children in root.findall(".//ChildrenList"):
+        for effect in children.findall("./Effect"):
+            identity = (
+                effect.get("CompanyID"),
+                effect.get("PluginID"),
+                effect.get("PluginType"),
+            )
+            if (
+                effect.get("PluginName") == "Auro Headphone"
+                or identity == _WWISE_2025_AURO_PLUGIN_IDENTITY
+                or effect.get("Name") == _WWISE_2025_AURO_EFFECT_NAME
+                or effect.get("ID") == _WWISE_2025_AURO_EFFECT_ID
+            ):
+                candidates.append((children, effect))
+    if len(candidates) != 1:
+        raise ProjectPrelaunchError(
+            "Wwise 2025 Auro effect definition identity drifted: "
+            f"found {len(candidates)} candidates"
+        )
+    parent, effect = candidates[0]
+    if effect.attrib != {
+        "Name": _WWISE_2025_AURO_EFFECT_NAME,
+        "ID": _WWISE_2025_AURO_EFFECT_ID,
+        "PluginName": "Auro Headphone",
+        "CompanyID": "263",
+        "PluginID": "1100",
+        "PluginType": "3",
+    }:
+        raise ProjectPrelaunchError(
+            "Wwise 2025 Auro effect definition identity drifted"
+        )
+    return parent, effect
+
+
+def _require_2025_auro_inventory(
+    project_root: Path,
+    *,
+    expected_plugin_instances: int,
+    expected_object_references: int,
+) -> None:
+    plugin_instances, object_references, _preserved = (
+        _scan_2025_auro_postcondition(project_root)
+    )
+    if (
+        plugin_instances != expected_plugin_instances
+        or object_references != expected_object_references
+    ):
+        raise ProjectPrelaunchError(
+            "Wwise 2025 Auro project inventory drifted: "
+            f"plugin_instances={plugin_instances}, "
+            f"object_references={object_references}"
+        )
+
+
+def _scan_2025_auro_postcondition(
+    project_root: Path,
+    *,
+    root_overrides: dict[Path, ET.Element] | None = None,
+) -> tuple[int, int, tuple[str, ...]]:
+    overrides = {
+        path.resolve(strict=True): root
+        for path, root in (root_overrides or {}).items()
+    }
+    plugin_instances = 0
+    object_references = 0
+    preserved_ids: set[str] = set()
+    for input_path in sorted(
+        project_root.rglob("*.wwu"),
+        key=lambda item: item.as_posix(),
+    ):
+        if input_path.is_symlink():
+            raise ProjectPrelaunchError(
+                "Wwise 2025 Auro isolation scan found a symlink: "
+                f"{input_path.relative_to(project_root)}"
+            )
+        path = input_path.resolve(strict=True)
+        root = overrides.get(path)
+        if root is None:
+            root = ET.parse(path).getroot()
+        for element in root.iter():
+            identity = (
+                element.get("CompanyID"),
+                element.get("PluginID"),
+                element.get("PluginType"),
+            )
+            if (
+                element.get("PluginName") == "Auro Headphone"
+                or identity == _WWISE_2025_AURO_PLUGIN_IDENTITY
+            ):
+                plugin_instances += 1
+            if (
+                element.get("ID") == _WWISE_2025_AURO_EFFECT_ID
+                or element.get("Name") == _WWISE_2025_AURO_EFFECT_NAME
+            ):
+                object_references += 1
+            if (object_id := element.get("ID")) in _PRESERVED_ANCHOR_IDS:
+                preserved_ids.add(object_id)
+    return (
+        plugin_instances,
+        object_references,
+        tuple(sorted(preserved_ids)),
+    )
+
+
+def _serialize_tree(tree: ET.ElementTree) -> bytes:
+    output = io.BytesIO()
+    tree.write(output, encoding="utf-8", xml_declaration=True)
+    return output.getvalue()
+
+
+def _replace_closed_file_batch(
+    mutations: Iterable[tuple[Path, bytes, bytes]],
+) -> None:
+    rows = tuple(mutations)
+    paths = tuple(path for path, _before, _after in rows)
+    if not rows or len(paths) != len(set(paths)):
+        raise ProjectPrelaunchError(
+            "closed prelaunch file batch must contain unique paths"
+        )
+    temporary_paths: list[Path] = []
+    replaced: list[tuple[Path, bytes]] = []
+    try:
+        for index, (path, before, after) in enumerate(rows):
+            if path.is_symlink() or path.read_bytes() != before:
+                raise ProjectPrelaunchError(
+                    f"closed prelaunch file changed after preflight: {path}"
+                )
+            temporary = path.with_name(
+                f".{path.name}.{os.getpid()}.{index}.prelaunch-batch.tmp"
+            )
+            if temporary.exists() or temporary.is_symlink():
+                raise ProjectPrelaunchError(
+                    f"closed prelaunch temporary path already exists: {temporary}"
+                )
+            with temporary.open("xb") as handle:
+                handle.write(after)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.chmod(temporary, path.stat().st_mode & 0o777)
+            temporary_paths.append(temporary)
+        for (path, before, _after), temporary in zip(rows, temporary_paths):
+            os.replace(temporary, path)
+            replaced.append((path, before))
+    except Exception as exc:
+        for path, before in reversed(replaced):
+            rollback = path.with_name(
+                f".{path.name}.{os.getpid()}.prelaunch-rollback.tmp"
+            )
+            try:
+                if rollback.exists() or rollback.is_symlink():
+                    rollback.unlink()
+                with rollback.open("xb") as handle:
+                    handle.write(before)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.chmod(rollback, path.stat().st_mode & 0o777)
+                os.replace(rollback, path)
+            finally:
+                if rollback.exists():
+                    rollback.unlink()
+        if isinstance(exc, ProjectPrelaunchError):
+            raise
+        raise ProjectPrelaunchError(
+            "closed prelaunch file batch could not be committed"
+        ) from exc
+    finally:
+        for temporary in temporary_paths:
+            if temporary.exists():
+                temporary.unlink()
 
 
 def _remove_optional_sample_effect_references(
@@ -774,11 +1262,14 @@ def _clear_property_values(element: ET.Element) -> None:
 
 __all__ = [
     "ArchivedWorkUnitProof",
+    "AuroSoundBankIsolationReport",
     "OptionalPluginIsolationReport",
     "PROJECT_PRELAUNCH_CONTRACT",
     "ProjectPrelaunchReport",
     "ProjectPrelaunchError",
     "ProjectPrelaunchRequest",
+    "WWISE_2025_SOUNDBANK_AURO_PROFILE",
+    "WorkUnitMutationProof",
     "make_project_prelaunch_hook",
     "normalize_project_copy",
 ]

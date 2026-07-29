@@ -37,6 +37,11 @@ from .codex_import_assets_v3 import (
     MaterializedFile,
     MaterializedImportCase,
     canonical_wwise_language,
+    compound_dynamic_modes_by_row,
+)
+from .codex_version_layout_v3 import (
+    CodexVersionLayoutError,
+    get_codex_version_layout_v3,
 )
 
 try:  # ``pwd`` is unavailable on native Windows, where Wine mapping is unused.
@@ -49,6 +54,7 @@ IMPORT_APIS = frozenset(
     {"ak.wwise.core.audio.import", "ak.wwise.core.audio.importTabDelimited"}
 )
 SUPPORTED_VERSION = "2022.1"
+COMPOUND_SUPPORTED_VERSIONS = ("2022.1", "2025.1")
 ACTOR_DWU = r"\Actor-Mixer Hierarchy\Default Work Unit"
 EVENTS_DWU = r"\Events\Default Work Unit"
 GUID_RE = re.compile(
@@ -60,6 +66,9 @@ MAX_OBJECT_ROWS = 256
 MAX_PROJECT_XML_FILES = 512
 MAX_TREE_FILES = 4096
 MAX_FILE_BYTES = 256 * 1024 * 1024
+MAX_DYNAMIC_FIELDS = 32
+MAX_REFERENCE_FIXTURES = 8
+LIVE_METADATA_TOKEN_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_.:-]{0,127}$")
 OBJECT_FIELDS = (
     "id",
     "name",
@@ -123,6 +132,43 @@ class ImportRowPlan:
     audio_source_notes: str | None
     event_path: str | None
     event_action: str | None
+    expected_properties: tuple["ImportPropertyExpectation", ...] = ()
+    expected_references: tuple["ImportReferenceExpectation", ...] = ()
+    preserve_property_tokens: tuple[str, ...] = ()
+    preserve_reference_tokens: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ImportPropertyExpectation:
+    name: str
+    value: Any
+    metadata_type: str
+    source: str
+
+
+@dataclass(frozen=True, slots=True)
+class ImportReferenceExpectation:
+    name: str
+    target_id: str
+    target_fixture: str
+    activation_properties: tuple[ImportPropertyExpectation, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ImportReferenceFixtureState:
+    key: str
+    path: str
+    id: str
+    type: str
+    parent_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ImportReferenceFixtureCleanup:
+    scenario_id: str
+    deleted_paths: tuple[str, ...]
+    paths_absent: bool
+    already_clean: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +185,12 @@ class ImportRuntimePlan:
     operation_requests: tuple[Mapping[str, Any], ...]
     visible_values: Mapping[str, str]
     expected_primary_dispatch_count: int
+    actor_dwu: str = ACTOR_DWU
+    events_dwu: str = EVENTS_DWU
+    main_bus_path: str | None = None
+    main_bus_id: str | None = None
+    reference_fixtures: tuple[ImportReferenceFixtureState, ...] = ()
+    metadata_binding: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,13 +267,52 @@ class ImportRuntimeSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class ImportPropertyState:
+    name: str
+    value: Any
+
+
+@dataclass(frozen=True, slots=True)
+class ImportReferenceState:
+    name: str
+    target_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ImportCompoundRowState:
+    row_key: str
+    target_path: str
+    properties: tuple[ImportPropertyState, ...]
+    references: tuple[ImportReferenceState, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ImportCompoundRuntimeSnapshot:
+    """Independent dynamic-field evidence layered over the legacy snapshot."""
+
+    scenario_id: str
+    business: ImportRuntimeSnapshot
+    rows: tuple[ImportCompoundRowState, ...]
+    reference_fixtures: tuple[ImportReferenceFixtureState, ...]
+    main_bus: ImportReferenceFixtureState
+
+    def row(self, row_key: str) -> ImportCompoundRowState:
+        matches = tuple(item for item in self.rows if item.row_key == row_key)
+        if len(matches) != 1:
+            raise ImportRuntimeError(
+                f"compound snapshot row {row_key!r} did not resolve exactly once"
+            )
+        return matches[0]
+
+
+@dataclass(frozen=True, slots=True)
 class ImportRuntimeVerification:
     scenario_id: str
     phase: str
     passed: bool
     failures: tuple[str, ...]
-    before: ImportRuntimeSnapshot
-    after: ImportRuntimeSnapshot
+    before: ImportRuntimeSnapshot | ImportCompoundRuntimeSnapshot
+    after: ImportRuntimeSnapshot | ImportCompoundRuntimeSnapshot
 
     def assert_passed(self) -> None:
         if not self.passed:
@@ -273,6 +364,15 @@ class ImportRuntimeBackend(Protocol):
     def setup_create_parent(
         self, *, parent_path: str, object_type: str, name: str
     ) -> str: ...
+
+    def setup_create_reference_bus(self, *, parent_path: str, name: str) -> str: ...
+
+    def read_bound_values(
+        self,
+        *,
+        path: str,
+        names: Sequence[str],
+    ) -> tuple[Mapping[str, Any], ...]: ...
 
     def setup_import(self, request: SetupImport) -> None: ...
 
@@ -352,6 +452,43 @@ class ClosedDirectWaapiBackend:
             raise ImportRuntimeError("object.create setup result must be an object")
         return _required_guid(result.get("id"), "object.create result id")
 
+    def setup_create_reference_bus(self, *, parent_path: str, name: str) -> str:
+        result = self._call(
+            "ak.wwise.core.object.create",
+            {
+                "parent": _required_wwise_path(parent_path, "parent_path"),
+                "type": "Bus",
+                "name": _required_text(name, "name"),
+                "onNameConflict": "fail",
+            },
+            {},
+        )
+        if not isinstance(result, Mapping):
+            raise ImportRuntimeError(
+                "reference Bus object.create result must be an object"
+            )
+        return _required_guid(result.get("id"), "reference Bus result id")
+
+    def read_bound_values(
+        self,
+        *,
+        path: str,
+        names: Sequence[str],
+    ) -> tuple[Mapping[str, Any], ...]:
+        tokens = _validated_dynamic_tokens(names)
+        result = self._call(
+            "ak.wwise.core.object.get",
+            {"from": {"path": [_required_wwise_path(path, "path")]}},
+            {
+                "return": [
+                    "id",
+                    "path",
+                    *[f"@{name}" for name in tokens],
+                ]
+            },
+        )
+        return _result_rows(result, context="object.get bound values")
+
     def setup_import(self, request: SetupImport) -> None:
         source = _regular_file_proof(request.audio_file, relative_to=None)
         if request.import_operation not in {"createNew", "useExisting"}:
@@ -416,6 +553,259 @@ class ClosedDirectWaapiBackend:
             raise ImportRuntimeError("object.delete cleanup result must be an object or null")
 
 
+class PreparedImportReferenceFixtures:
+    """Two-phase owner for compound import Bus fixtures.
+
+    The fixture must exist before live metadata is bound.  The Agent-facing
+    request uses its exact reviewed Bus path, while the independent oracle
+    retains the resolved GUID.  Once adopted by ``PreparedImportRuntime``,
+    cleanup ownership moves to that runtime.  Before adoption, callers may use
+    ``cleanup_emergency`` on any failure path.
+    """
+
+    def __init__(
+        self,
+        *,
+        scenario_id: str,
+        version: str,
+        materialized_fingerprint: tuple[tuple[str, str, bool, int | None, str | None], ...],
+        expected_paths: Mapping[str, str],
+        fixtures: Sequence[ImportReferenceFixtureState],
+        main_bus: ImportReferenceFixtureState,
+        backend: ImportRuntimeBackend,
+    ) -> None:
+        self.scenario_id = scenario_id
+        self.version = version
+        self._materialized_fingerprint = materialized_fingerprint
+        self.expected_paths = MappingProxyType(dict(expected_paths))
+        self.fixtures = tuple(fixtures)
+        self.main_bus = main_bus
+        self.reference_targets = MappingProxyType(
+            {
+                item.key: MappingProxyType({"kind": "id", "value": item.id})
+                for item in self.fixtures
+            }
+        )
+        self.request_reference_targets = MappingProxyType(
+            {
+                item.key: MappingProxyType({"kind": "path", "value": item.path})
+                for item in self.fixtures
+            }
+        )
+        self._backend = backend
+        self._adopted = False
+        self._cleaned = False
+
+    @property
+    def adopted(self) -> bool:
+        return self._adopted
+
+    @property
+    def cleaned(self) -> bool:
+        return self._cleaned
+
+    @property
+    def paths(self) -> tuple[str, ...]:
+        return tuple(item.path for item in self.fixtures)
+
+    @property
+    def ids(self) -> tuple[str, ...]:
+        return tuple(item.id for item in self.fixtures)
+
+    def adopt(
+        self,
+        *,
+        scenario: OnlineScenario,
+        materialized: MaterializedImportCase,
+    ) -> None:
+        if self._cleaned:
+            raise ImportRuntimeError("cleaned import reference fixtures cannot be adopted")
+        if self._adopted:
+            raise ImportRuntimeError("import reference fixtures are already adopted")
+        _validate_reference_fixture_handle(
+            self,
+            scenario=scenario,
+            materialized=materialized,
+        )
+        self._adopted = True
+
+    def cleanup_emergency(self) -> ImportReferenceFixtureCleanup:
+        """Idempotently remove unadopted fixtures after a setup/binding error."""
+
+        if self._adopted:
+            raise ImportRuntimeError(
+                "adopted import reference fixtures are owned by the import runtime"
+            )
+        return self._cleanup(already_clean=self._cleaned)
+
+    def _cleanup_adopted(self) -> ImportReferenceFixtureCleanup:
+        if not self._adopted:
+            raise ImportRuntimeError(
+                "import runtime cannot clean reference fixtures it did not adopt"
+            )
+        return self._cleanup(already_clean=self._cleaned)
+
+    def _cleanup(self, *, already_clean: bool) -> ImportReferenceFixtureCleanup:
+        if not self._cleaned:
+            for item in reversed(self.fixtures):
+                if self._backend.read_objects(path=item.path, fields=EVENT_FIELDS):
+                    self._backend.cleanup_delete(item.id)
+            self._backend.save_project()
+            self._cleaned = True
+        absent = all(
+            not self._backend.read_objects(path=item.path, fields=EVENT_FIELDS)
+            for item in self.fixtures
+        )
+        if not absent:
+            raise ImportRuntimeError("compound import reference fixture cleanup failed")
+        return ImportReferenceFixtureCleanup(
+            scenario_id=self.scenario_id,
+            deleted_paths=self.paths,
+            paths_absent=True,
+            already_clean=already_clean,
+        )
+
+
+def prepare_import_reference_fixtures(
+    scenario: OnlineScenario,
+    staged: MaterializedImportCase,
+    *,
+    version: str,
+    backend: ImportRuntimeBackend,
+) -> PreparedImportReferenceFixtures:
+    """Create and independently prove the unique Bus targets for one case."""
+
+    if (
+        staged.compound_spec is None
+        or not staged.requires_metadata_binding
+        or staged.operation_requests
+        or staged.metadata_binding is not None
+    ):
+        raise ImportRuntimeError(
+            "reference fixtures require one unbound compound import case"
+        )
+    if scenario.id != staged.scenario_id or scenario.versions != (version,):
+        raise ImportRuntimeError(
+            "compound reference fixture scenario/version identity is misbound"
+        )
+    if version not in COMPOUND_SUPPORTED_VERSIONS:
+        raise ImportRuntimeError(
+            f"compound import reference fixtures do not support Wwise {version}"
+        )
+    paths = dict(staged.reference_fixture_paths)
+    if (
+        not 1 <= len(paths) <= MAX_REFERENCE_FIXTURES
+        or len(paths) != len(set(paths.values()))
+    ):
+        raise ImportRuntimeError(
+            "compound import requires 1..8 unique reference fixture paths"
+        )
+    try:
+        layout = get_codex_version_layout_v3(version)
+    except CodexVersionLayoutError as exc:
+        raise ImportRuntimeError(str(exc)) from exc
+
+    busses_dwu_rows = backend.read_objects(
+        path=layout.busses_dwu,
+        fields=EVENT_FIELDS,
+    )
+    main_bus_rows = backend.read_objects(
+        path=layout.main_bus,
+        fields=EVENT_FIELDS,
+    )
+    if len(busses_dwu_rows) != 1 or busses_dwu_rows[0].get("path") != layout.busses_dwu:
+        raise ImportRuntimeError(
+            f"required Busses work unit is unavailable: {layout.busses_dwu}"
+        )
+    if len(main_bus_rows) != 1 or main_bus_rows[0].get("path") != layout.main_bus:
+        raise ImportRuntimeError(
+            f"required default main Bus is unavailable: {layout.main_bus}"
+        )
+    busses_dwu_id = _required_guid(
+        busses_dwu_rows[0].get("id"),
+        "Busses work unit id",
+    )
+    main_bus = _reference_fixture_state(
+        "__default_main_bus__",
+        layout.main_bus,
+        main_bus_rows[0],
+        expected_type="Bus",
+    )
+    if not _same_guid(main_bus.parent_id, busses_dwu_id):
+        raise ImportRuntimeError("default main Bus parent differs from the Busses work unit")
+
+    created: list[ImportReferenceFixtureState] = []
+    try:
+        for key, path in sorted(paths.items()):
+            path = _required_wwise_path(path, f"reference fixture {key} path")
+            parent_path, name = path.rsplit("\\", 1)
+            if parent_path != layout.busses_dwu:
+                raise ImportRuntimeError(
+                    f"reference fixture {key!r} is outside the reviewed Busses work unit"
+                )
+            if backend.read_objects(path=path, fields=EVENT_FIELDS):
+                raise ImportRuntimeError(
+                    f"compound reference fixture path already exists: {path}"
+                )
+            object_id = backend.setup_create_reference_bus(
+                parent_path=parent_path,
+                name=name,
+            )
+            rows = backend.read_objects(path=path, fields=EVENT_FIELDS)
+            if len(rows) != 1:
+                raise ImportRuntimeError(
+                    f"reference Bus did not resolve exactly once: {path}"
+                )
+            state = _reference_fixture_state(
+                key,
+                path,
+                rows[0],
+                expected_type="Bus",
+            )
+            if (
+                not _same_guid(state.id, object_id)
+                or not _same_guid(state.parent_id, busses_dwu_id)
+            ):
+                raise ImportRuntimeError(
+                    f"reference Bus identity/parent readback drifted: {path}"
+                )
+            if _same_guid(state.id, main_bus.id):
+                raise ImportRuntimeError(
+                    f"reference Bus unexpectedly aliases the default main Bus: {path}"
+                )
+            created.append(state)
+        if len({item.id.casefold() for item in created}) != len(created):
+            raise ImportRuntimeError("reference Bus fixtures do not have unique GUIDs")
+        backend.save_project()
+    except Exception as exc:
+        cleanup_errors: list[str] = []
+        for item in reversed(created):
+            try:
+                backend.cleanup_delete(item.id)
+            except Exception as cleanup_exc:  # pragma: no cover - real failure quarantine
+                cleanup_errors.append(str(cleanup_exc))
+        try:
+            backend.save_project()
+        except Exception as cleanup_exc:  # pragma: no cover - real failure quarantine
+            cleanup_errors.append(str(cleanup_exc))
+        if cleanup_errors:
+            raise ImportRuntimeError(
+                f"reference Bus setup failed ({exc}); rollback failed: "
+                + "; ".join(cleanup_errors)
+            ) from exc
+        raise
+
+    return PreparedImportReferenceFixtures(
+        scenario_id=scenario.id,
+        version=version,
+        materialized_fingerprint=_materialized_handle_fingerprint(staged),
+        expected_paths=paths,
+        fixtures=created,
+        main_bus=main_bus,
+        backend=backend,
+    )
+
+
 class PreparedImportRuntime:
     """Single-use trusted fixture/oracle bound to one scenario project copy."""
 
@@ -426,12 +816,16 @@ class PreparedImportRuntime:
         materialized: MaterializedImportCase,
         plan: ImportRuntimePlan,
         backend: ImportRuntimeBackend,
+        reference_fixtures: PreparedImportReferenceFixtures | None = None,
     ) -> None:
         self.scenario = scenario
         self.materialized = materialized
         self.plan = plan
         self.backend = backend
-        self.hidden_before: ImportRuntimeSnapshot | None = None
+        self.reference_fixtures = reference_fixtures
+        self.hidden_before: (
+            ImportRuntimeSnapshot | ImportCompoundRuntimeSnapshot | None
+        ) = None
         self._created_parent_ids: dict[str, str] = {}
         self._closed = False
 
@@ -444,13 +838,27 @@ class PreparedImportRuntime:
         if self.hidden_before is not None or self._closed:
             raise ImportRuntimeError("import runtime is single-use")
         _assert_materialized_inputs(self.materialized)
-        roots = {ACTOR_DWU}
+        roots = {self.plan.actor_dwu}
         if self.plan.event_paths:
-            roots.add(EVENTS_DWU)
+            roots.add(self.plan.events_dwu)
         for root in sorted(roots):
             rows = self.backend.read_objects(path=root, fields=EVENT_FIELDS)
             if len(rows) != 1 or rows[0].get("path") != root:
                 raise ImportRuntimeError(f"required Wwise fixture root is unavailable: {root}")
+
+        if self.plan.metadata_binding is not None:
+            if self.reference_fixtures is None or not self.reference_fixtures.adopted:
+                raise ImportRuntimeError(
+                    "compound import runtime lacks adopted reference fixtures"
+                )
+            failures = _validate_reference_fixture_snapshot(
+                self.plan,
+                self._snapshot_reference_fixtures(),
+            )
+            if failures:
+                raise ImportRuntimeError(
+                    "compound reference fixture proof failed: " + "; ".join(failures)
+                )
 
         reserved_paths = [parent.path for parent in self.plan.parents]
         reserved_paths.extend(row.target_path for row in self.plan.rows)
@@ -512,8 +920,18 @@ class PreparedImportRuntime:
 
         self.backend.save_project()
         before = self.snapshot()
-        failures = _validate_before(self.plan, before)
-        failures.extend(_validate_saved_xml(self.plan, before, before=True))
+        before_business = _business_snapshot(before)
+        failures = _validate_before(self.plan, before_business)
+        failures.extend(
+            _validate_saved_xml(self.plan, before_business, before=True)
+        )
+        if isinstance(before, ImportCompoundRuntimeSnapshot):
+            failures.extend(
+                _validate_reference_fixture_snapshot(
+                    self.plan,
+                    (before.reference_fixtures, before.main_bus),
+                )
+            )
         if failures:
             raise ImportRuntimeError(
                 f"{self.plan.scenario_id} fixture setup proof failed: "
@@ -522,11 +940,32 @@ class PreparedImportRuntime:
         self.hidden_before = before
         return self
 
-    def snapshot(self, *, save: bool = False) -> ImportRuntimeSnapshot:
+    def snapshot(
+        self, *, save: bool = False
+    ) -> ImportRuntimeSnapshot | ImportCompoundRuntimeSnapshot:
         if self._closed:
             raise ImportRuntimeError("import runtime is closed")
         if save:
             self.backend.save_project()
+        business = self._snapshot_business()
+        if self.plan.metadata_binding is None:
+            return business
+        fixtures, main_bus = self._snapshot_reference_fixtures()
+        return ImportCompoundRuntimeSnapshot(
+            scenario_id=self.plan.scenario_id,
+            business=business,
+            rows=tuple(
+                self._snapshot_compound_row(
+                    row,
+                    business.row(row.row_key),
+                )
+                for row in self.plan.rows
+            ),
+            reference_fixtures=fixtures,
+            main_bus=main_bus,
+        )
+
+    def _snapshot_business(self) -> ImportRuntimeSnapshot:
         rows = tuple(self._snapshot_row(row) for row in self.plan.rows)
         events = tuple(self._snapshot_event(path) for path in self.plan.event_paths)
         xml_files = _tree_proofs(
@@ -590,9 +1029,31 @@ class PreparedImportRuntime:
             )
         before = self._require_before()
         after = self.snapshot(save=True)
-        failures = _validate_after(self.plan, before, after, self.backend)
-        failures.extend(_validate_saved_xml(self.plan, after, before=False, old=before))
-        failures.extend(_validate_inputs_unchanged(before, after))
+        before_business = _business_snapshot(before)
+        after_business = _business_snapshot(after)
+        failures = _validate_after(
+            self.plan,
+            before_business,
+            after_business,
+            self.backend,
+        )
+        failures.extend(
+            _validate_saved_xml(
+                self.plan,
+                after_business,
+                before=False,
+                old=before_business,
+            )
+        )
+        failures.extend(_validate_inputs_unchanged(before_business, after_business))
+        if self.plan.metadata_binding is not None:
+            if (
+                not isinstance(before, ImportCompoundRuntimeSnapshot)
+                or not isinstance(after, ImportCompoundRuntimeSnapshot)
+            ):
+                failures.append("compound import lost its dynamic-field snapshot")
+            else:
+                failures.extend(_validate_compound_after(self.plan, before, after))
         return ImportRuntimeVerification(
             scenario_id=self.plan.scenario_id,
             phase="after_execution",
@@ -608,7 +1069,7 @@ class PreparedImportRuntime:
         root_paths = tuple(
             parent.path
             for parent in self.plan.parents
-            if parent.parent_path in {ACTOR_DWU, EVENTS_DWU}
+            if parent.parent_path in {self.plan.actor_dwu, self.plan.events_dwu}
         )
         for path in sorted(root_paths, key=_path_depth, reverse=True):
             object_id = self._created_parent_ids.get(path)
@@ -622,6 +1083,13 @@ class PreparedImportRuntime:
         )
         if not absent:
             raise ImportRuntimeError("import fixture cleanup left owned object roots")
+
+        if self.reference_fixtures is not None:
+            reference_cleanup = self.reference_fixtures._cleanup_adopted()
+            if not reference_cleanup.paths_absent:
+                raise ImportRuntimeError(
+                    "import fixture cleanup left owned reference Bus fixtures"
+                )
 
         assets_removed = not self.plan.asset_root.exists()
         if remove_assets and self.plan.asset_root.exists():
@@ -638,10 +1106,189 @@ class PreparedImportRuntime:
             paths_absent=absent,
         )
 
-    def _require_before(self) -> ImportRuntimeSnapshot:
+    def _cleanup_failed_prepare(self) -> tuple[str, ...]:
+        """Best-effort rollback after fixture ownership has transferred.
+
+        ``prepare_import_runtime`` adopts compound Bus fixtures immediately
+        before calling ``prepare``.  A failure inside ``prepare`` therefore
+        cannot be delegated back to the pre-adoption emergency cleanup lane.
+        Keep rollback internal so callers never receive a handle whose cleanup
+        ownership is stranded between the two phases.
+        """
+
+        failures: list[str] = []
+        root_paths = tuple(
+            parent.path
+            for parent in self.plan.parents
+            if parent.parent_path in {self.plan.actor_dwu, self.plan.events_dwu}
+        )
+        for path in sorted(root_paths, key=_path_depth, reverse=True):
+            object_id = self._created_parent_ids.get(path)
+            if object_id is None:
+                continue
+            try:
+                if self.backend.read_objects(path=path, fields=EVENT_FIELDS):
+                    self.backend.cleanup_delete(object_id)
+            except Exception as exc:  # pragma: no cover - real failure quarantine
+                failures.append(f"owned root {path}: {exc}")
+        try:
+            self.backend.save_project()
+        except Exception as exc:  # pragma: no cover - real failure quarantine
+            failures.append(f"project save after owned-root cleanup: {exc}")
+
+        if self.reference_fixtures is not None:
+            try:
+                self.reference_fixtures._cleanup_adopted()
+            except Exception as exc:  # pragma: no cover - real failure quarantine
+                failures.append(f"reference Bus cleanup: {exc}")
+
+        if self.plan.asset_root.exists():
+            try:
+                _assert_safe_asset_cleanup_root(
+                    self.plan.asset_root,
+                    self.plan.sandbox_root,
+                )
+                shutil.rmtree(self.plan.asset_root)
+            except Exception as exc:  # pragma: no cover - real failure quarantine
+                failures.append(f"asset cleanup: {exc}")
+        self._closed = True
+        return tuple(failures)
+
+    def _require_before(
+        self,
+    ) -> ImportRuntimeSnapshot | ImportCompoundRuntimeSnapshot:
         if self.hidden_before is None:
             raise ImportRuntimeError("import runtime fixture has not been prepared")
         return self.hidden_before
+
+    def _snapshot_reference_fixtures(
+        self,
+    ) -> tuple[
+        tuple[ImportReferenceFixtureState, ...],
+        ImportReferenceFixtureState,
+    ]:
+        if self.reference_fixtures is None:
+            raise ImportRuntimeError("compound reference fixtures are unavailable")
+        fixtures: list[ImportReferenceFixtureState] = []
+        for expected in self.reference_fixtures.fixtures:
+            rows = self.backend.read_objects(path=expected.path, fields=EVENT_FIELDS)
+            if len(rows) != 1:
+                raise ImportRuntimeError(
+                    f"reference Bus did not resolve exactly once: {expected.path}"
+                )
+            fixtures.append(
+                _reference_fixture_state(
+                    expected.key,
+                    expected.path,
+                    rows[0],
+                    expected_type="Bus",
+                )
+            )
+        main = self.reference_fixtures.main_bus
+        main_rows = self.backend.read_objects(path=main.path, fields=EVENT_FIELDS)
+        if len(main_rows) != 1:
+            raise ImportRuntimeError(
+                f"default main Bus did not resolve exactly once: {main.path}"
+            )
+        return tuple(fixtures), _reference_fixture_state(
+            main.key,
+            main.path,
+            main_rows[0],
+            expected_type="Bus",
+        )
+
+    def _snapshot_compound_row(
+        self,
+        plan: ImportRowPlan,
+        business_row: ImportRowState,
+    ) -> ImportCompoundRowState:
+        property_tokens = (
+            tuple(item.name for item in plan.expected_properties)
+            or plan.preserve_property_tokens
+        )
+        reference_tokens = (
+            tuple(item.name for item in plan.expected_references)
+            or plan.preserve_reference_tokens
+        )
+        names = _unique(
+            property_tokens + reference_tokens
+        )
+        if not names:
+            return ImportCompoundRowState(
+                row_key=plan.row_key,
+                target_path=plan.target_path,
+                properties=(),
+                references=(),
+            )
+        rows = self.backend.read_bound_values(path=plan.target_path, names=names)
+        if len(rows) > 1:
+            raise ImportRuntimeError(
+                f"compound target resolved more than once: {plan.target_path}"
+            )
+        if not rows:
+            if plan.preserve_property_tokens or plan.preserve_reference_tokens:
+                raise ImportRuntimeError(
+                    f"preserved compound target is absent: {plan.target_path}"
+                )
+            return ImportCompoundRowState(
+                row_key=plan.row_key,
+                target_path=plan.target_path,
+                properties=(),
+                references=(),
+            )
+        raw = rows[0]
+        raw_id = _identity_value(raw.get("id"))
+        raw_path = raw.get("path")
+        business_object = business_row.object
+        if (
+            business_object is None
+            or raw_path != plan.target_path
+            or not _same_guid(raw_id, business_object.id)
+        ):
+            raise ImportRuntimeError(
+                f"compound bound-value identity/path differs from business row: "
+                f"{plan.target_path}"
+            )
+        missing_tokens = [
+            name
+            for name in names
+            if name not in raw and f"@{name}" not in raw
+        ]
+        if missing_tokens:
+            raise ImportRuntimeError(
+                f"compound bound-value read omitted tokens: {missing_tokens}"
+            )
+        properties = tuple(
+            ImportPropertyState(name, _field_value(raw, name))
+            for name in property_tokens
+        )
+        if plan.preserve_property_tokens and any(
+            not _is_json_scalar(item.value) for item in properties
+        ):
+            raise ImportRuntimeError(
+                f"preserved compound property readback is not JSON-scalar: "
+                f"{plan.target_path}"
+            )
+        references: list[ImportReferenceState] = []
+        for name in reference_tokens:
+            raw_value = _field_value(raw, name)
+            target_id = _identity_value(raw_value)
+            if (
+                plan.preserve_reference_tokens
+                and raw_value is not None
+                and target_id is None
+            ):
+                raise ImportRuntimeError(
+                    f"preserved compound reference readback is not a GUID/null: "
+                    f"{plan.target_path} @{name}"
+                )
+            references.append(ImportReferenceState(name, target_id))
+        return ImportCompoundRowState(
+            row_key=plan.row_key,
+            target_path=plan.target_path,
+            properties=properties,
+            references=tuple(references),
+        )
 
     def _snapshot_row(self, plan: ImportRowPlan) -> ImportRowState:
         rows = self.backend.read_objects(
@@ -745,14 +1392,41 @@ def build_import_runtime_plan(
     materialized: MaterializedImportCase,
     *,
     sandbox_project: str | Path,
+    reference_fixtures: PreparedImportReferenceFixtures | None = None,
 ) -> ImportRuntimePlan:
     """Bind reviewed rows and immutable files without making a live call."""
 
     if scenario.api not in IMPORT_APIS:
         raise ImportRuntimeError(f"unsupported import runtime API: {scenario.api}")
-    if scenario.versions != (SUPPORTED_VERSION,):
+    if len(scenario.versions) != 1:
+        raise ImportRuntimeError("import runtime requires one exact Wwise version")
+    version = scenario.versions[0]
+    compound = materialized.compound_spec is not None
+    if not compound and version != SUPPORTED_VERSION:
         raise ImportRuntimeError(
             f"core import runtime is pinned to Wwise {SUPPORTED_VERSION}"
+        )
+    if compound and version not in COMPOUND_SUPPORTED_VERSIONS:
+        raise ImportRuntimeError(
+            f"compound import runtime does not support Wwise {version}"
+        )
+    if compound:
+        if materialized.requires_metadata_binding or materialized.metadata_binding is None:
+            raise ImportRuntimeError(
+                "compound import runtime requires a completed live metadata binding"
+            )
+        if reference_fixtures is None:
+            raise ImportRuntimeError(
+                "compound import runtime requires prepared reference Bus fixtures"
+            )
+        _validate_reference_fixture_handle(
+            reference_fixtures,
+            scenario=scenario,
+            materialized=materialized,
+        )
+    elif reference_fixtures is not None:
+        raise ImportRuntimeError(
+            "ordinary 2022 import cases cannot adopt reference Bus fixtures"
         )
     if scenario.id != materialized.scenario_id:
         raise ImportRuntimeError("scenario/materialized import identity mismatch")
@@ -772,14 +1446,25 @@ def build_import_runtime_plan(
         raise ImportRuntimeError("materialized source keys are not unique")
     if len(pre_by_key) != len(materialized.pre_state_files):
         raise ImportRuntimeError("materialized pre-state keys are not unique")
+    try:
+        layout = get_codex_version_layout_v3(version)
+    except CodexVersionLayoutError as exc:
+        raise ImportRuntimeError(str(exc)) from exc
 
     asset_spec = scenario.fixture.get("asset_spec")
     if not isinstance(asset_spec, Mapping):
         raise ImportRuntimeError("scenario import asset specification is missing")
     if scenario.api == "ak.wwise.core.audio.import":
+        if len(materialized.operation_requests) != 1:
+            raise ImportRuntimeError(
+                "audio.import runtime requires one sealed operation request"
+            )
+        arguments = materialized.operation_requests[0].get("arguments")
+        if not isinstance(arguments, Mapping):
+            raise ImportRuntimeError("audio.import request arguments are missing")
         direct_operation = _required_text(
-            asset_spec.get("audio_import_operation"),
-            "audio_import_operation",
+            arguments.get("import_operation"),
+            "audio.import request import_operation",
         )
         operation_by_table = {"__audio_import__": direct_operation}
         tab_import_location = None
@@ -787,10 +1472,7 @@ def build_import_runtime_plan(
         raw_tables = asset_spec.get("tsv")
         if not isinstance(raw_tables, list):
             raise ImportRuntimeError("tab import table specification is missing")
-        tab_import_location = _required_wwise_path(
-            asset_spec.get("import_location"),
-            "import_location",
-        )
+        tab_import_location = _tab_import_location(materialized)
         operation_by_table = {}
         for index, table in enumerate(raw_tables):
             if not isinstance(table, Mapping):
@@ -819,7 +1501,7 @@ def build_import_runtime_plan(
         # baselines add their deeper parents below.
         _collect_parent_types(
             tab_import_location + "\\__waapi_skill_import_leaf__",
-            root=ACTOR_DWU,
+            root=layout.actor_default_work_unit,
             typed={},
             destination=parent_types,
         )
@@ -843,7 +1525,7 @@ def build_import_runtime_plan(
         if tab_import_location is None:
             _collect_parent_types(
                 target_path,
-                root=ACTOR_DWU,
+                root=layout.actor_default_work_unit,
                 typed=typed,
                 destination=parent_types,
             )
@@ -863,7 +1545,7 @@ def build_import_runtime_plan(
         if tab_import_location is not None and existence == "existing":
             _collect_parent_types(
                 target_path,
-                root=ACTOR_DWU,
+                root=layout.actor_default_work_unit,
                 typed=typed,
                 destination=parent_types,
             )
@@ -930,6 +1612,48 @@ def build_import_runtime_plan(
         requested_audio_source_notes = _optional_text(
             raw.get("audio_source_notes")
         )
+        expected_properties, expected_references = _row_dynamic_expectations(
+            materialized,
+            raw,
+            reference_fixtures=reference_fixtures,
+        )
+        guid_policy = _required_text(
+            raw.get("guid_policy"),
+            f"{row_key}.guid_policy",
+        )
+        preserve_property_tokens: tuple[str, ...] = ()
+        preserve_reference_tokens: tuple[str, ...] = ()
+        if raw.get("compound_dynamic_mode") == "preserve":
+            if (
+                scenario.api != "ak.wwise.core.audio.importTabDelimited"
+                or import_operation != "useExisting"
+                or existence != "existing"
+                or guid_policy != "preserve_existing_guid"
+                or expected_properties
+                or expected_references
+            ):
+                raise ImportRuntimeError(
+                    f"{row_key} compound preserve mode is only valid for an "
+                    "existing useExisting tab-import row with a preserved GUID"
+                )
+            if (
+                pre_file is None
+                or not pre_file.present
+                or not isinstance(pre_file.sha256, str)
+                or not source_file.present
+                or not isinstance(source_file.sha256, str)
+            ):
+                raise ImportRuntimeError(
+                    f"{row_key} compound preserve row lacks sealed old/new media"
+                )
+            if pre_file.sha256 == source_file.sha256:
+                raise ImportRuntimeError(
+                    f"{row_key} compound preserve row old/new media hashes are equal"
+                )
+            (
+                preserve_property_tokens,
+                preserve_reference_tokens,
+            ) = _live_bound_preservation_tokens(materialized.metadata_binding)
         if (
             existence == "existing"
             and import_operation == "useExisting"
@@ -957,12 +1681,16 @@ def build_import_runtime_plan(
                 ),
                 pre_state_notes=_optional_text(pre_state.get("notes")),
                 import_operation=import_operation,
-                guid_policy=_required_text(raw.get("guid_policy"), f"{row_key}.guid_policy"),
+                guid_policy=guid_policy,
                 originals_subfolder=originals_subfolder,
                 notes=requested_notes,
                 audio_source_notes=requested_audio_source_notes,
                 event_path=event_path,
                 event_action=event_action,
+                expected_properties=expected_properties,
+                expected_references=expected_references,
+                preserve_property_tokens=preserve_property_tokens,
+                preserve_reference_tokens=preserve_reference_tokens,
             )
         )
 
@@ -978,7 +1706,7 @@ def build_import_runtime_plan(
     return ImportRuntimePlan(
         scenario_id=scenario.id,
         api=scenario.api,
-        version=SUPPORTED_VERSION,
+        version=version,
         sandbox_project=project,
         sandbox_root=sandbox_root,
         asset_root=asset_root,
@@ -990,6 +1718,28 @@ def build_import_runtime_plan(
         ),
         visible_values=MappingProxyType(dict(materialized.visible_values)),
         expected_primary_dispatch_count=materialized.expected_primary_dispatch_count,
+        actor_dwu=layout.actor_default_work_unit,
+        events_dwu=EVENTS_DWU,
+        main_bus_path=(
+            reference_fixtures.main_bus.path
+            if reference_fixtures is not None
+            else None
+        ),
+        main_bus_id=(
+            reference_fixtures.main_bus.id
+            if reference_fixtures is not None
+            else None
+        ),
+        reference_fixtures=(
+            reference_fixtures.fixtures
+            if reference_fixtures is not None
+            else ()
+        ),
+        metadata_binding=(
+            _freeze_mapping(materialized.metadata_binding)
+            if materialized.metadata_binding is not None
+            else None
+        ),
     )
 
 
@@ -999,6 +1749,7 @@ def prepare_import_runtime(
     *,
     sandbox_project: str | Path,
     backend: ImportRuntimeBackend,
+    reference_fixtures: PreparedImportReferenceFixtures | None = None,
 ) -> PreparedImportRuntime:
     """Set up and seal one import fixture on an already-running Wwise copy."""
 
@@ -1006,13 +1757,437 @@ def prepare_import_runtime(
         scenario,
         materialized,
         sandbox_project=sandbox_project,
+        reference_fixtures=reference_fixtures,
     )
-    return PreparedImportRuntime(
+    runtime = PreparedImportRuntime(
         scenario=scenario,
         materialized=materialized,
         plan=plan,
         backend=backend,
-    ).prepare()
+        reference_fixtures=reference_fixtures,
+    )
+    if reference_fixtures is not None:
+        reference_fixtures.adopt(
+            scenario=scenario,
+            materialized=materialized,
+        )
+    try:
+        return runtime.prepare()
+    except Exception as setup_error:
+        cleanup_failures = runtime._cleanup_failed_prepare()
+        if cleanup_failures:
+            raise ImportRuntimeError(
+                "import fixture setup failed "
+                f"({setup_error}); adopted fixture rollback failed: "
+                + "; ".join(cleanup_failures)
+            ) from setup_error
+        raise
+
+
+def _tab_import_location(materialized: MaterializedImportCase) -> str:
+    locations: set[str] = set()
+    for request in materialized.operation_requests:
+        arguments = request.get("arguments")
+        location = arguments.get("import_location") if isinstance(arguments, Mapping) else None
+        if (
+            not isinstance(location, Mapping)
+            or set(location) != {"kind", "value"}
+            or location.get("kind") != "path"
+        ):
+            raise ImportRuntimeError(
+                "tab import request lacks one closed path import_location"
+            )
+        locations.add(
+            _required_wwise_path(
+                location.get("value"),
+                "tab import request import_location",
+            )
+        )
+    if len(locations) != 1:
+        raise ImportRuntimeError(
+            "tab import requests do not share one exact import_location"
+        )
+    return locations.pop()
+
+
+def _row_dynamic_expectations(
+    materialized: MaterializedImportCase,
+    row: Mapping[str, Any],
+    *,
+    reference_fixtures: PreparedImportReferenceFixtures | None,
+) -> tuple[
+    tuple[ImportPropertyExpectation, ...],
+    tuple[ImportReferenceExpectation, ...],
+]:
+    if materialized.compound_spec is None:
+        if any(
+            key in row
+            for key in (
+                "compound_effective_properties",
+                "compound_effective_references",
+                "compound_media_kind",
+                "compound_dynamic_mode",
+            )
+        ):
+            raise ImportRuntimeError(
+                "ordinary import row unexpectedly contains compound expectations"
+            )
+        return (), ()
+    if reference_fixtures is None:
+        raise ImportRuntimeError(
+            "compound dynamic expectations require reference fixtures"
+        )
+    binding = materialized.metadata_binding
+    if not isinstance(binding, Mapping):
+        raise ImportRuntimeError("compound metadata binding is unavailable")
+    selected = binding.get("selected")
+    bound_targets = binding.get("reference_targets")
+    if not isinstance(selected, Mapping) or not isinstance(bound_targets, Mapping):
+        raise ImportRuntimeError("compound metadata binding is malformed")
+
+    selected_property_names: set[str] = set()
+    selected_reference_names: set[str] = set()
+    dependency_names: set[str] = set()
+    for value in selected.values():
+        if not isinstance(value, Mapping):
+            raise ImportRuntimeError("compound selected metadata row is malformed")
+        name = _validated_dynamic_token(value.get("name"))
+        kind = value.get("kind")
+        if kind == "property":
+            selected_property_names.add(name)
+        elif kind == "reference":
+            selected_reference_names.add(name)
+        else:
+            raise ImportRuntimeError("compound selected metadata kind is unsupported")
+        dependencies = value.get("same_object_dependencies")
+        if not isinstance(dependencies, list):
+            raise ImportRuntimeError("compound dependency metadata is malformed")
+        for dependency in dependencies:
+            if not isinstance(dependency, Mapping):
+                raise ImportRuntimeError("compound dependency row is malformed")
+            dependency_names.add(_validated_dynamic_token(dependency.get("name")))
+
+    raw_properties = row.get("compound_effective_properties")
+    raw_references = row.get("compound_effective_references")
+    row_key = _required_text(row.get("row_key"), "compound row_key")
+    dynamic_modes = compound_dynamic_modes_by_row(
+        materialized.compound_spec,
+        materialized.expected_rows,
+    )
+    sealed_mode = row.get("compound_dynamic_mode")
+    expected_mode = dynamic_modes.get(row_key)
+    if (
+        sealed_mode not in {"mutate", "preserve"}
+        or sealed_mode != expected_mode
+    ):
+        raise ImportRuntimeError(
+            f"{row_key} compound dynamic mode differs from the reviewed case spec"
+        )
+    if not isinstance(raw_properties, list) or not isinstance(raw_references, list):
+        raise ImportRuntimeError(
+            "bound compound row lacks dynamic property/reference expectations"
+        )
+    properties: list[ImportPropertyExpectation] = []
+    seen_properties: set[str] = set()
+    for raw in raw_properties:
+        if not isinstance(raw, Mapping) or set(raw) != {
+            "name",
+            "value",
+            "metadata_type",
+            "source",
+        }:
+            raise ImportRuntimeError("compound property expectation is not closed")
+        name = _validated_dynamic_token(raw.get("name"))
+        source = _required_text(raw.get("source"), f"{name}.source")
+        allowed_names = (
+            dependency_names
+            if source == "reference_dependency"
+            else selected_property_names
+        )
+        if name not in allowed_names:
+            raise ImportRuntimeError(
+                f"compound property {name!r} is absent from live metadata binding"
+            )
+        value = raw.get("value")
+        if not _is_json_scalar(value):
+            raise ImportRuntimeError(
+                f"compound property {name!r} has a non-scalar expected value"
+            )
+        if source == "reference_dependency" and value is not True:
+            raise ImportRuntimeError(
+                f"compound activation property {name!r} must be exactly true"
+            )
+        metadata_type = _required_text(
+            raw.get("metadata_type"),
+            f"{name}.metadata_type",
+        )
+        key = name.casefold()
+        if key in seen_properties:
+            raise ImportRuntimeError(
+                f"compound row repeats property expectation {name!r}"
+            )
+        seen_properties.add(key)
+        properties.append(
+            ImportPropertyExpectation(
+                name=name,
+                value=value,
+                metadata_type=metadata_type,
+                source=source,
+            )
+        )
+
+    fixtures_by_key = {item.key: item for item in reference_fixtures.fixtures}
+    references: list[ImportReferenceExpectation] = []
+    seen_references: set[str] = set()
+    for raw in raw_references:
+        if not isinstance(raw, Mapping) or set(raw) != {
+            "name",
+            "target",
+            "target_fixture",
+            "activation_properties",
+        }:
+            raise ImportRuntimeError("compound reference expectation is not closed")
+        name = _validated_dynamic_token(raw.get("name"))
+        if name not in selected_reference_names:
+            raise ImportRuntimeError(
+                f"compound reference {name!r} is absent from live metadata binding"
+            )
+        fixture_key = _required_text(
+            raw.get("target_fixture"),
+            f"{name}.target_fixture",
+        )
+        fixture = fixtures_by_key.get(fixture_key)
+        target = raw.get("target")
+        if (
+            fixture is None
+            or not isinstance(target, Mapping)
+            or set(target) != {"kind", "value"}
+            or target.get("kind") != "path"
+            or target.get("value") != fixture.path
+        ):
+            raise ImportRuntimeError(
+                f"compound reference {name!r} target is not its reviewed Bus path"
+            )
+        bound_target = bound_targets.get(fixture_key)
+        if (
+            not isinstance(bound_target, Mapping)
+            or set(bound_target) != {"kind", "value"}
+            or bound_target.get("kind") != "path"
+            or bound_target.get("value") != fixture.path
+        ):
+            raise ImportRuntimeError(
+                f"compound reference fixture {fixture_key!r} differs from metadata binding"
+            )
+        activation_names: list[str] = []
+        activation = raw.get("activation_properties")
+        if not isinstance(activation, list) or not activation:
+            raise ImportRuntimeError(
+                f"compound reference {name!r} lacks activation-property evidence"
+            )
+        for value in activation:
+            if not isinstance(value, Mapping):
+                raise ImportRuntimeError(
+                    f"compound reference {name!r} activation row is malformed"
+                )
+            activation_name = _validated_dynamic_token(value.get("name"))
+            if activation_name not in dependency_names or value.get("value") is not True:
+                raise ImportRuntimeError(
+                    f"compound reference {name!r} activation property is not live-bound"
+                )
+            activation_names.append(activation_name)
+        property_by_name = {item.name.casefold(): item for item in properties}
+        activation_expectations: list[ImportPropertyExpectation] = []
+        for activation_name in activation_names:
+            expected = property_by_name.get(activation_name.casefold())
+            if expected is None or expected.value is not True:
+                raise ImportRuntimeError(
+                    f"compound reference {name!r} activation property is not expected"
+                )
+            activation_expectations.append(expected)
+        key = name.casefold()
+        if key in seen_references:
+            raise ImportRuntimeError(
+                f"compound row repeats reference expectation {name!r}"
+            )
+        seen_references.add(key)
+        references.append(
+            ImportReferenceExpectation(
+                name=name,
+                target_id=fixture.id,
+                target_fixture=fixture.key,
+                activation_properties=tuple(activation_expectations),
+            )
+        )
+    if bool(properties) != bool(references):
+        raise ImportRuntimeError(
+            "compound import row must seal property and reference expectations "
+            "together or omit both"
+        )
+    if sealed_mode == "mutate" and not properties:
+        raise ImportRuntimeError(
+            f"{row_key} compound mutate row requires dynamic expectations"
+        )
+    if sealed_mode == "preserve" and properties:
+        raise ImportRuntimeError(
+            f"{row_key} compound preserve row must omit dynamic expectations"
+        )
+    return tuple(properties), tuple(references)
+
+
+def _live_bound_preservation_tokens(
+    binding: Mapping[str, Any] | None,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Derive the exact preserve oracle surface from one live metadata binding."""
+
+    if not isinstance(binding, Mapping):
+        raise ImportRuntimeError(
+            "compound preserve mode requires a live metadata binding"
+        )
+    selected = binding.get("selected")
+    if not isinstance(selected, Mapping) or not selected:
+        raise ImportRuntimeError(
+            "compound preserve metadata selection is unavailable"
+        )
+
+    property_names: list[str] = []
+    reference_names: list[str] = []
+    for value in selected.values():
+        if not isinstance(value, Mapping):
+            raise ImportRuntimeError(
+                "compound preserve selected metadata row is malformed"
+            )
+        name = _validated_dynamic_token(value.get("name"))
+        kind = value.get("kind")
+        if kind == "property":
+            property_names.append(name)
+        elif kind == "reference":
+            reference_names.append(name)
+        else:
+            raise ImportRuntimeError(
+                "compound preserve selected metadata kind is unsupported"
+            )
+        dependencies = value.get("same_object_dependencies")
+        if not isinstance(dependencies, list):
+            raise ImportRuntimeError(
+                "compound preserve dependency metadata is malformed"
+            )
+        for dependency in dependencies:
+            if (
+                not isinstance(dependency, Mapping)
+                or dependency.get("kind") != "property"
+            ):
+                raise ImportRuntimeError(
+                    "compound preserve dependency is not a property"
+                )
+            property_names.append(
+                _validated_dynamic_token(dependency.get("name"))
+            )
+
+    properties = _unique(property_names)
+    references = _unique(reference_names)
+    if (
+        not properties
+        or not references
+        or len(properties) + len(references) > MAX_DYNAMIC_FIELDS
+        or set(name.casefold() for name in properties)
+        & set(name.casefold() for name in references)
+    ):
+        raise ImportRuntimeError(
+            "compound preserve metadata tokens are incomplete or ambiguous"
+        )
+    return properties, references
+
+
+def _validate_reference_fixture_handle(
+    handle: PreparedImportReferenceFixtures,
+    *,
+    scenario: OnlineScenario,
+    materialized: MaterializedImportCase,
+) -> None:
+    if not isinstance(handle, PreparedImportReferenceFixtures):
+        raise ImportRuntimeError("reference fixture handle has the wrong type")
+    if handle.cleaned:
+        raise ImportRuntimeError("reference fixture handle is already cleaned")
+    if (
+        handle.scenario_id != scenario.id
+        or handle.version not in COMPOUND_SUPPORTED_VERSIONS
+        or scenario.versions != (handle.version,)
+        or materialized.scenario_id != handle.scenario_id
+    ):
+        raise ImportRuntimeError("reference fixture handle identity/version is misbound")
+    if dict(materialized.reference_fixture_paths) != dict(handle.expected_paths):
+        raise ImportRuntimeError("reference fixture paths differ from the staged case")
+    if (
+        _materialized_handle_fingerprint(materialized)
+        != handle._materialized_fingerprint
+    ):
+        raise ImportRuntimeError(
+            "reference fixture handle belongs to a different materialized asset set"
+        )
+    binding = materialized.metadata_binding
+    if not isinstance(binding, Mapping):
+        raise ImportRuntimeError("reference fixtures require a bound compound import")
+    targets = binding.get("reference_targets")
+    if (
+        not isinstance(targets, Mapping)
+        or set(targets) != set(handle.request_reference_targets)
+    ):
+        raise ImportRuntimeError("reference fixture target keys differ from metadata binding")
+    for key, expected in handle.request_reference_targets.items():
+        actual = targets.get(key)
+        if (
+            not isinstance(actual, Mapping)
+            or set(actual) != {"kind", "value"}
+            or actual.get("kind") != "path"
+            or actual.get("value") != expected.get("value")
+        ):
+            raise ImportRuntimeError(
+                f"reference fixture {key!r} path differs from metadata binding"
+            )
+    if (
+        any(_same_guid(item.id, handle.main_bus.id) for item in handle.fixtures)
+        or len({item.id.casefold() for item in handle.fixtures}) != len(handle.fixtures)
+    ):
+        raise ImportRuntimeError(
+            "reference fixture GUIDs are not unique from the default main Bus"
+        )
+
+
+def _freeze_mapping(value: Mapping[str, Any]) -> Mapping[str, Any]:
+    def freeze(item: Any) -> Any:
+        if isinstance(item, Mapping):
+            return MappingProxyType({str(key): freeze(child) for key, child in item.items()})
+        if isinstance(item, list):
+            return tuple(freeze(child) for child in item)
+        if item is None or type(item) in {str, int, float, bool}:
+            return item
+        raise ImportRuntimeError(
+            f"metadata binding contains non-JSON value {type(item).__name__}"
+        )
+
+    result = freeze(value)
+    assert isinstance(result, Mapping)
+    return result
+
+
+def _materialized_handle_fingerprint(
+    materialized: MaterializedImportCase,
+) -> tuple[tuple[str, str, bool, int | None, str | None], ...]:
+    return tuple(
+        sorted(
+            (
+                item.key,
+                str(item.path),
+                item.present,
+                item.size,
+                item.sha256,
+            )
+            for item in (
+                *materialized.source_files,
+                *materialized.pre_state_files,
+            )
+        )
+    )
 
 
 def _validate_before(
@@ -1188,6 +2363,176 @@ def _validate_after(
     return failures
 
 
+def _business_snapshot(
+    value: ImportRuntimeSnapshot | ImportCompoundRuntimeSnapshot,
+) -> ImportRuntimeSnapshot:
+    if isinstance(value, ImportRuntimeSnapshot):
+        return value
+    if isinstance(value, ImportCompoundRuntimeSnapshot):
+        return value.business
+    raise ImportRuntimeError("import snapshot has an unsupported type")
+
+
+def _validate_reference_fixture_snapshot(
+    plan: ImportRuntimePlan,
+    value: tuple[
+        tuple[ImportReferenceFixtureState, ...],
+        ImportReferenceFixtureState,
+    ],
+) -> list[str]:
+    fixtures, main_bus = value
+    failures: list[str] = []
+    if plan.main_bus_id is None or plan.main_bus_path is None:
+        return ["compound plan lacks the default main Bus identity"]
+    if (
+        main_bus.path != plan.main_bus_path
+        or not _same_guid(main_bus.id, plan.main_bus_id)
+        or not _object_type_matches(main_bus.type, "Bus")
+    ):
+        failures.append("default main Bus identity/type/path drifted")
+    expected = {item.key: item for item in plan.reference_fixtures}
+    actual = {item.key: item for item in fixtures}
+    if set(actual) != set(expected):
+        failures.append("reference Bus fixture keys drifted")
+        return failures
+    seen_ids: set[str] = set()
+    for key, sealed in expected.items():
+        observed = actual[key]
+        if (
+            observed.path != sealed.path
+            or not _same_guid(observed.id, sealed.id)
+            or observed.parent_id is None
+            or not _same_guid(observed.parent_id, sealed.parent_id)
+            or not _object_type_matches(observed.type, "Bus")
+        ):
+            failures.append(f"reference Bus fixture {key!r} identity/type/path drifted")
+        if _same_guid(observed.id, main_bus.id):
+            failures.append(f"reference Bus fixture {key!r} aliases the default main Bus")
+        folded = observed.id.casefold()
+        if folded in seen_ids:
+            failures.append("reference Bus fixture GUIDs are not unique")
+        seen_ids.add(folded)
+    return failures
+
+
+def _validate_compound_after(
+    plan: ImportRuntimePlan,
+    before: ImportCompoundRuntimeSnapshot,
+    after: ImportCompoundRuntimeSnapshot,
+) -> list[str]:
+    failures = _validate_reference_fixture_snapshot(
+        plan,
+        (after.reference_fixtures, after.main_bus),
+    )
+    if (
+        before.reference_fixtures != after.reference_fixtures
+        or before.main_bus != after.main_bus
+    ):
+        failures.append("reference Bus fixture state changed during import")
+    expected_fixture_ids = {
+        item.key: item.id for item in plan.reference_fixtures
+    }
+    for row_plan in plan.rows:
+        before_state = before.row(row_plan.row_key)
+        state = after.row(row_plan.row_key)
+        if state.target_path != row_plan.target_path:
+            failures.append(f"{row_plan.row_key} compound target path drifted")
+            continue
+        actual_properties = {item.name: item.value for item in state.properties}
+        if len(actual_properties) != len(state.properties):
+            failures.append(f"{row_plan.row_key} repeats dynamic property readback")
+        actual_references = {
+            item.name: item.target_id for item in state.references
+        }
+        if len(actual_references) != len(state.references):
+            failures.append(f"{row_plan.row_key} repeats dynamic reference readback")
+
+        if (
+            row_plan.preserve_property_tokens
+            or row_plan.preserve_reference_tokens
+        ):
+            before_properties = {
+                item.name: item.value for item in before_state.properties
+            }
+            before_references = {
+                item.name: item.target_id for item in before_state.references
+            }
+            expected_property_names = set(row_plan.preserve_property_tokens)
+            expected_reference_names = set(row_plan.preserve_reference_tokens)
+            if (
+                len(before_properties) != len(before_state.properties)
+                or set(before_properties) != expected_property_names
+                or set(actual_properties) != expected_property_names
+            ):
+                failures.append(
+                    f"{row_plan.row_key} preserved property token set is incomplete"
+                )
+            else:
+                for name, old_value in before_properties.items():
+                    new_value = actual_properties[name]
+                    if (
+                        type(old_value) is not type(new_value)
+                        or old_value != new_value
+                    ):
+                        failures.append(
+                            f"{row_plan.row_key} @{name} changed during media replacement"
+                        )
+            if (
+                len(before_references) != len(before_state.references)
+                or set(before_references) != expected_reference_names
+                or set(actual_references) != expected_reference_names
+            ):
+                failures.append(
+                    f"{row_plan.row_key} preserved reference token set is incomplete"
+                )
+            else:
+                for name, old_value in before_references.items():
+                    new_value = actual_references[name]
+                    if not (
+                        old_value is None
+                        and new_value is None
+                        or _same_guid(old_value, new_value)
+                    ):
+                        failures.append(
+                            f"{row_plan.row_key} @{name} changed during media replacement"
+                        )
+            continue
+
+        for expected in row_plan.expected_properties:
+            if expected.name not in actual_properties:
+                failures.append(
+                    f"{row_plan.row_key} lacks @{expected.name} readback"
+                )
+                continue
+            if actual_properties[expected.name] != expected.value:
+                failures.append(
+                    f"{row_plan.row_key} @{expected.name} value mismatch"
+                )
+
+        for expected in row_plan.expected_references:
+            actual_id = actual_references.get(expected.name)
+            fixture_id = expected_fixture_ids.get(expected.target_fixture)
+            if (
+                fixture_id is None
+                or not _same_guid(expected.target_id, fixture_id)
+                or not _same_guid(actual_id, fixture_id)
+            ):
+                failures.append(
+                    f"{row_plan.row_key} @{expected.name} target GUID mismatch"
+                )
+            if plan.main_bus_id is None or _same_guid(actual_id, plan.main_bus_id):
+                failures.append(
+                    f"{row_plan.row_key} @{expected.name} still uses the default main Bus"
+                )
+            for activation in expected.activation_properties:
+                if actual_properties.get(activation.name) is not True:
+                    failures.append(
+                        f"{row_plan.row_key} @{activation.name} does not prove "
+                        f"a local @{expected.name} override"
+                    )
+    return failures
+
+
 def _validate_saved_xml(
     plan: ImportRuntimePlan,
     snapshot: ImportRuntimeSnapshot,
@@ -1258,8 +2603,28 @@ def _validate_saved_xml(
 
 
 def _snapshot_drift(
-    before: ImportRuntimeSnapshot, after: ImportRuntimeSnapshot
+    before: ImportRuntimeSnapshot | ImportCompoundRuntimeSnapshot,
+    after: ImportRuntimeSnapshot | ImportCompoundRuntimeSnapshot,
 ) -> list[str]:
+    if isinstance(before, ImportCompoundRuntimeSnapshot) or isinstance(
+        after,
+        ImportCompoundRuntimeSnapshot,
+    ):
+        if not isinstance(before, ImportCompoundRuntimeSnapshot) or not isinstance(
+            after,
+            ImportCompoundRuntimeSnapshot,
+        ):
+            return ["compound snapshot type changed before confirmation"]
+        failures: list[str] = []
+        if before.business != after.business:
+            failures.append("business state changed before confirmation")
+        if before.rows != after.rows:
+            failures.append("dynamic property/reference state changed before confirmation")
+        if before.reference_fixtures != after.reference_fixtures:
+            failures.append("reference Bus fixtures changed before confirmation")
+        if before.main_bus != after.main_bus:
+            failures.append("default main Bus changed before confirmation")
+        return failures
     failures: list[str] = []
     for field in (
         "rows",
@@ -1704,6 +3069,52 @@ def _validated_fields(fields: Sequence[str]) -> tuple[str, ...]:
     return values
 
 
+def _validated_dynamic_token(value: Any) -> str:
+    if (
+        not isinstance(value, str)
+        or LIVE_METADATA_TOKEN_RE.fullmatch(value) is None
+        or value.startswith("@")
+    ):
+        raise ImportRuntimeError("live metadata token is invalid")
+    return value
+
+
+def _validated_dynamic_tokens(names: Sequence[str]) -> tuple[str, ...]:
+    if isinstance(names, (str, bytes)):
+        raise ImportRuntimeError("dynamic field names must be a sequence")
+    values = tuple(_validated_dynamic_token(value) for value in names)
+    if (
+        not values
+        or len(values) > MAX_DYNAMIC_FIELDS
+        or len({value.casefold() for value in values}) != len(values)
+    ):
+        raise ImportRuntimeError(
+            "dynamic field names must contain 1..32 unique live tokens"
+        )
+    return values
+
+
+def _reference_fixture_state(
+    key: str,
+    path: str,
+    value: Mapping[str, Any],
+    *,
+    expected_type: str,
+) -> ImportReferenceFixtureState:
+    state = ImportReferenceFixtureState(
+        key=_required_text(key, "reference fixture key"),
+        path=_required_wwise_path(value.get("path"), "reference fixture path"),
+        id=_required_guid(value.get("id"), "reference fixture id"),
+        type=_required_text(value.get("type"), "reference fixture type"),
+        parent_id=_identity_value(value.get("parent")),
+    )
+    if state.path != path or not _object_type_matches(state.type, expected_type):
+        raise ImportRuntimeError(
+            f"reference fixture {key!r} path/type readback drifted"
+        )
+    return state
+
+
 def _object_type_matches(actual: Any, requested: str) -> bool:
     if not isinstance(actual, str):
         return False
@@ -1715,13 +3126,19 @@ def _object_type_matches(actual: Any, requested: str) -> bool:
         "soundvoice": {"sound", "soundvoice"},
         "virtualfolder": {"folder", "virtualfolder"},
         "folder": {"folder", "virtualfolder"},
-        "actormixer": {"actormixer"},
+        "actormixer": {"actormixer", "propertycontainer"},
+        "bus": {"bus", "audiobus"},
+        "auxbus": {"auxbus"},
         "randomsequencecontainer": {
             "randomcontainer",
             "randomsequencecontainer",
         },
     }
     return actual_token in aliases.get(requested_token, {requested_token})
+
+
+def _is_json_scalar(value: Any) -> bool:
+    return value is None or type(value) in {str, int, float, bool}
 
 
 def _subfolder_matches(actual: str | None, expected: str | None) -> bool:
@@ -1877,12 +3294,21 @@ def _sha256(path: Path) -> str:
 
 
 __all__ = [
+    "COMPOUND_SUPPORTED_VERSIONS",
     "ClosedDirectWaapiBackend",
     "FileProof",
     "ImportAudioSourceState",
+    "ImportCompoundRowState",
+    "ImportCompoundRuntimeSnapshot",
     "ImportEventState",
     "ImportObjectState",
     "ImportParentPlan",
+    "ImportPropertyExpectation",
+    "ImportPropertyState",
+    "ImportReferenceExpectation",
+    "ImportReferenceFixtureCleanup",
+    "ImportReferenceFixtureState",
+    "ImportReferenceState",
     "ImportRowPlan",
     "ImportRowState",
     "ImportRuntimeBackend",
@@ -1891,9 +3317,11 @@ __all__ = [
     "ImportRuntimePlan",
     "ImportRuntimeSnapshot",
     "ImportRuntimeVerification",
+    "PreparedImportReferenceFixtures",
     "PreparedImportRuntime",
     "SetupImport",
     "XmlIdentityEvidence",
     "build_import_runtime_plan",
+    "prepare_import_reference_fixtures",
     "prepare_import_runtime",
 ]

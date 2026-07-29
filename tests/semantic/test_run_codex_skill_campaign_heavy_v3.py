@@ -1656,6 +1656,27 @@ def _synthetic_gateway_records(
                         "full_argv": full_argv,
                         "copy_exactly": True,
                         "requires_explicit_user_confirmation": True,
+                        "shell_family": (
+                            "windows-cmd" if os.name == "nt" else "posix-sh"
+                        ),
+                        "copy_instruction": {
+                            "contract": (
+                                "waapi-skill.gateway-command-copy-instruction/v1"
+                            ),
+                            "source_field": "shell_command",
+                            "action": "execute_verbatim_as_one_shell_tool_call",
+                            "forbidden_transformations": [
+                                "reconstruct",
+                                "shorten",
+                                "normalize",
+                                "substitute_path_segments",
+                            ],
+                        },
+                        "shell_command": (
+                            subprocess.list2cmdline(full_argv)
+                            if os.name == "nt"
+                            else shlex.join(full_argv)
+                        ),
                     },
                 }
             )
@@ -1750,6 +1771,47 @@ def _synthetic_audio_transaction_request() -> dict[str, Any]:
             "io_root": "/private/synthetic-io",
         },
     }
+
+
+def _synthetic_soundbank_generate_request() -> dict[str, Any]:
+    return {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2025.1",
+        "operation": "soundbank.generate",
+        "arguments": {
+            "soundbanks": [
+                {
+                    "name": "Main_UI",
+                    "artifact_expectation": "nonlocalized",
+                    "rebuild": False,
+                }
+            ],
+            "platforms": ["Windows"],
+            "skip_languages": True,
+            "write_to_disk": True,
+            "io_root": "/private/synthetic-io",
+            "rebuild_soundbanks": False,
+            "clear_audio_file_cache": False,
+            "rebuild_init_bank": False,
+        },
+    }
+
+
+def test_campaign_accepts_soundbank_generate_semantic_protocol_kind() -> None:
+    request = _synthetic_soundbank_generate_request()
+    protocol = build_transaction_protocol((request,))
+    evidence = SimpleNamespace(
+        provenance=SimpleNamespace(protocol=protocol),
+    )
+    preview_argument = protocol.steps[1].arguments[2]
+
+    assert isinstance(preview_argument, SemanticJsonArgument)
+    assert preview_argument.equivalence == "soundbank_generate_v1"
+    assert campaign._heavy_v3_protocol_operation_request(evidence) == request
+    campaign._validate_heavy_v3_completed_transaction_protocol(
+        evidence,
+        expected_operation_request=request,
+    )
 
 
 def test_campaign_transaction_validator_accepts_only_the_show_token_response_chain() -> None:
@@ -5816,6 +5878,403 @@ def test_campaign_typed_import_plan_and_archived_oracle_join(
         task_root=tmp_path,
         label="synthetic import oracle",
     )
+
+
+def test_campaign_typed_compound_import_plan_accepts_canonical_archive_order(
+    tmp_path: Path,
+) -> None:
+    from tests.semantic.support.codex_eval_protocol_v3 import (
+        build_metadata_transaction_protocol,
+    )
+    from tests.semantic.support.codex_gateway_broker import (
+        project_required_metadata_tokens,
+    )
+    from tests.semantic.support.codex_import_assets_v3 import (
+        bound_import_metadata_tokens,
+    )
+    from tests.semantic.support.codex_import_business_plan_v3 import (
+        compile_import_business_plan,
+    )
+    from tests.semantic.test_codex_import_runtime_v3 import (
+        _compound_prepared,
+        _sound_discovery,
+    )
+
+    unit, materialized, _backend, _fixtures, runtime = _compound_prepared(
+        tmp_path,
+        unit_id="CMP25-O22-AUDIO-IMPORT-02",
+    )
+    tokens = bound_import_metadata_tokens(materialized)
+    projection = project_required_metadata_tokens(
+        _sound_discovery(),
+        object_type="Sound",
+        required_tokens=tokens,
+    )
+    protocol = build_metadata_transaction_protocol(
+        materialized.operation_requests,
+        object_type="Sound",
+        metadata_queries=materialized.metadata_queries,
+        required_tokens=tokens,
+        expected_required_token_projection=projection,
+        equivalence="audio_import_v1",
+    )
+    before = runtime.hidden_before
+    assert before is not None
+    sections = compile_import_business_plan(
+        unit.scenario,
+        materialized,
+        runtime.plan,
+        before,
+        protocol,
+    )
+    archived = json.loads(
+        json.dumps(
+            sections.writer_kwargs(),
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+        )
+    )
+    selected_names = [
+        row["name"]
+        for row in archived["static_expectation"]["metadata_binding"][
+            "selected"
+        ].values()
+    ]
+    assert selected_names[:3] != list(tokens[:3])
+
+    parsed = campaign._validate_heavy_v3_typed_business_plan(
+        archived,
+        expected_unit=unit,
+        provenance=SimpleNamespace(protocol=protocol),
+    )
+    assert parsed is not None
+    assert parsed.static_expectation["dynamic_tokens"] == list(tokens)
+
+
+@pytest.mark.parametrize(
+    "unit_id",
+    [
+        "CMP22-O22-AUDIO-IMPORT-03",
+        "CMP25-O22-AUDIO-IMPORT-03",
+    ],
+)
+def test_campaign_compound_import_oracle_projects_only_after_typed_validation(
+    tmp_path: Path,
+    unit_id: str,
+) -> None:
+    from tests.semantic.support.codex_eval_protocol_v3 import (
+        build_metadata_transaction_protocol,
+    )
+    from tests.semantic.support.codex_gateway_broker import (
+        project_required_metadata_tokens,
+    )
+    from tests.semantic.support.codex_import_assets_v3 import (
+        bound_import_metadata_tokens,
+    )
+    from tests.semantic.support.codex_import_business_plan_v3 import (
+        compile_import_business_plan,
+    )
+    from tests.semantic.test_codex_import_runtime_v3 import (
+        _compound_prepared,
+        _sound_discovery,
+    )
+
+    unit, materialized, backend, _fixtures, runtime = _compound_prepared(
+        tmp_path,
+        unit_id=unit_id,
+    )
+    tokens = bound_import_metadata_tokens(materialized)
+    projection = project_required_metadata_tokens(
+        _sound_discovery(),
+        object_type="Sound",
+        required_tokens=tokens,
+    )
+    protocol = build_metadata_transaction_protocol(
+        materialized.operation_requests,
+        object_type="Sound",
+        metadata_queries=materialized.metadata_queries,
+        required_tokens=tokens,
+        expected_required_token_projection=projection,
+        equivalence="audio_import_v1",
+    )
+    before = runtime.hidden_before
+    assert before is not None
+    sections = compile_import_business_plan(
+        unit.scenario,
+        materialized,
+        runtime.plan,
+        before,
+        protocol,
+    )
+    backend.apply_case(unit.scenario, runtime.plan)
+    verification = json.loads(
+        json.dumps(
+            asdict(runtime.verify_after_execution()),
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+    )
+    plan_sha256 = "a" * 64
+    prompt_evidence = SimpleNamespace(
+        business_oracle_plan=SimpleNamespace(sha256=plan_sha256),
+        typed_sections=sections,
+        protocol=protocol,
+    )
+    envelope = {
+        "contract": campaign.HEAVY_V3_ORACLE_CONTRACT,
+        "scenario_id": unit.scenario.id,
+        "version": unit.version,
+        "api": unit.scenario.api,
+        "runner": "project",
+        "business_oracle_plan_sha256": plan_sha256,
+        "verification": verification,
+    }
+
+    campaign._validate_heavy_v3_archived_verification(
+        envelope,
+        api=unit.scenario.api,
+        scenario_id=unit.scenario.id,
+        version=unit.version,
+        runner="project",
+        primary_count=1,
+        task_root=tmp_path,
+        prompt_evidence=prompt_evidence,
+        scenario_fixture=unit.scenario.fixture,
+        label="synthetic compound import oracle",
+    )
+
+    tampered = copy.deepcopy(envelope)
+    tampered["verification"]["after"]["rows"][0]["properties"][0][
+        "value"
+    ] = "__tampered__"
+    with pytest.raises(
+        campaign.CampaignEvidenceError,
+        match="typed plan/evidence binding is invalid",
+    ):
+        campaign._validate_heavy_v3_archived_verification(
+            tampered,
+            api=unit.scenario.api,
+            scenario_id=unit.scenario.id,
+            version=unit.version,
+            runner="project",
+            primary_count=1,
+            task_root=tmp_path,
+            prompt_evidence=prompt_evidence,
+            scenario_fixture=unit.scenario.fixture,
+            label="synthetic compound import oracle",
+        )
+
+
+def test_campaign_typed_compound_object_plan_binds_2025_recipe_lane() -> None:
+    from tests.semantic.support.codex_compound_heavy_v1 import (
+        load_compound_heavy_profile,
+    )
+    from tests.semantic.support.codex_object_business_plan_v3 import (
+        ObjectBusinessPlanError,
+        build_object_merge_query_protocol,
+    )
+
+    profile = load_compound_heavy_profile(
+        Path(__file__).resolve().parent
+        / "data"
+        / "compound-heavy-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in profile.units
+        if row.unit_id == "CMP25-OBJ22-F-CREATE-02"
+    )
+    recipe = build_object_heavy_v3_recipe(
+        unit.base_scenario_id,
+        version=unit.version,
+    )
+    protocol = build_object_merge_query_protocol(unit.scenario, recipe)
+    assert protocol is not None
+    sections = compile_object_business_plan(
+        unit.scenario,
+        recipe,
+        protocol,
+        _synthetic_object_before(recipe),
+        (),
+    )
+
+    parsed = campaign._validate_heavy_v3_typed_business_plan(
+        sections.writer_kwargs(),
+        expected_unit=unit,
+        provenance=SimpleNamespace(protocol=protocol),
+    )
+
+    assert parsed is not None
+    assert parsed.static_expectation["version"] == "2025.1"
+    assert (
+        parsed.static_expectation["request"]["value"]["arguments"]["parent"]["value"]
+        == r"\Containers\Default Work Unit\SemanticLab\NPC"
+    )
+
+    with pytest.raises(
+        ObjectBusinessPlanError,
+        match="scenario and reviewed recipe are misbound",
+    ):
+        campaign._validate_heavy_v3_typed_business_plan(
+            sections.writer_kwargs(),
+            expected_unit=replace(unit, version="2022.1"),
+            provenance=SimpleNamespace(protocol=protocol),
+        )
+
+
+def test_campaign_object_recipe_fixture_fallback_binds_2025_lane() -> None:
+    from tests.semantic.support.codex_compound_heavy_v1 import (
+        load_compound_heavy_profile,
+    )
+
+    profile = load_compound_heavy_profile(
+        Path(__file__).resolve().parent
+        / "data"
+        / "compound-heavy-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in profile.units
+        if row.unit_id == "CMP25-OBJ22-F-CREATE-02"
+    )
+    recipe = build_object_heavy_v3_recipe(
+        unit.base_scenario_id,
+        version=unit.version,
+    )
+    expected = {
+        "kind": "object_recipe",
+        "sha256": campaign._canonical_sha256(
+            campaign._heavy_v3_plan_json_value(recipe)
+        ),
+    }
+    fallback_unit = SimpleNamespace(
+        scenario=SimpleNamespace(api="ak.wwise.core.unknown"),
+        base_scenario_id=unit.base_scenario_id,
+        version=unit.version,
+    )
+
+    assert campaign._heavy_v3_business_plan_fixture_spec(
+        {"fixture_spec": expected},
+        expected_unit=fallback_unit,
+    ) == expected
+
+    stale_2022 = build_object_heavy_v3_recipe(unit.base_scenario_id)
+    stale_digest = campaign._canonical_sha256(
+        campaign._heavy_v3_plan_json_value(stale_2022)
+    )
+    assert expected["sha256"] != stale_digest
+    assert campaign._heavy_v3_business_plan_fixture_spec(
+        {
+            "fixture_spec": {
+                "kind": "object_recipe",
+                "sha256": stale_digest,
+            }
+        },
+        expected_unit=fallback_unit,
+    ) == expected
+
+
+@pytest.mark.parametrize(
+    ("api", "schema_version", "fixture_kind"),
+    (
+        (
+            "ak.wwise.core.audio.import",
+            "waapi-skill.import-business-plan/v1",
+            "import_materialized_runtime_v1",
+        ),
+        (
+            "ak.wwise.core.audio.import",
+            "waapi-skill.import-business-plan/v2",
+            "import_compound_materialized_runtime_v2",
+        ),
+        (
+            "ak.wwise.core.audio.importTabDelimited",
+            "waapi-skill.import-business-plan/v2",
+            "import_compound_materialized_runtime_v2",
+        ),
+    ),
+)
+def test_campaign_import_fixture_spec_accepts_only_schema_bound_kinds(
+    api: str,
+    schema_version: str,
+    fixture_kind: str,
+) -> None:
+    digest = "a" * 64
+    unit = _Unit(
+        unit_id="O22-IMPORT-FIXTURE-SPEC",
+        version="2022.1",
+        scenario=_Scenario(
+            "O22-IMPORT-FIXTURE-SPEC",
+            api,
+            "synthetic natural import request",
+        ),
+    )
+    assert campaign._heavy_v3_business_plan_fixture_spec(
+        {
+            "fixture_spec": {
+                "kind": fixture_kind,
+                "sha256": digest,
+            },
+            "static_expectation": {
+                "family_schema_version": schema_version,
+            },
+        },
+        expected_unit=unit,
+    ) == {
+        "kind": fixture_kind,
+        "sha256": digest,
+    }
+
+
+@pytest.mark.parametrize(
+    ("schema_version", "fixture_kind"),
+    (
+        (
+            "waapi-skill.import-business-plan/v2",
+            "import_materialized_runtime_v1",
+        ),
+        (
+            "waapi-skill.import-business-plan/v2",
+            "import_compound_materialized_runtime_v3",
+        ),
+        (
+            "waapi-skill.import-business-plan/v3",
+            "import_compound_materialized_runtime_v2",
+        ),
+    ),
+)
+def test_campaign_import_fixture_spec_rejects_mismatched_or_unknown_kind(
+    schema_version: str,
+    fixture_kind: str,
+) -> None:
+    unit = _Unit(
+        unit_id="O22-IMPORT-FIXTURE-SPEC",
+        version="2022.1",
+        scenario=_Scenario(
+            "O22-IMPORT-FIXTURE-SPEC",
+            "ak.wwise.core.audio.import",
+            "synthetic natural import request",
+        ),
+    )
+    with pytest.raises(
+        campaign.CampaignEvidenceError,
+        match="typed (?:import )?business-oracle fixture identity is invalid",
+    ):
+        campaign._heavy_v3_business_plan_fixture_spec(
+            {
+                "fixture_spec": {
+                    "kind": fixture_kind,
+                    "sha256": "a" * 64,
+                },
+                "static_expectation": {
+                    "family_schema_version": schema_version,
+                },
+            },
+            expected_unit=unit,
+        )
 
 
 def test_campaign_import_snapshot_rejects_legacy_and_escaping_relative_evidence(

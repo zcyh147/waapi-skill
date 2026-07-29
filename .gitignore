@@ -42,6 +42,9 @@ tests/_org/**/*.validationcache
 tests/_org/**/*.wsettings
 # Skill-local runtime data and generated artifacts
 data/
+!tests/semantic/data/
+!tests/semantic/data/compound-heavy-v1/
+!tests/semantic/data/compound-heavy-v1/*.json
 logs/
 artifacts/
 tmp/
