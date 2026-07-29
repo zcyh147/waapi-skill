@@ -115,10 +115,15 @@ def test_lookup_shapes_are_closed() -> None:
     assert MetadataCacheLookup.names(class_id=65552).class_id == 65552
     assert (
         MetadataCacheLookup.property_info(
-            object_id="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+            object_id="{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}",
             property_name="Volume",
-        ).property_name
-        == "Volume"
+        ).as_dict()
+        == {
+            "class_id": None,
+            "object_id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+            "property_name": "Volume",
+            "uri": "ak.wwise.core.object.getPropertyInfo",
+        }
     )
     with pytest.raises(MetadataCacheError, match="exactly one"):
         MetadataCacheLookup.names()
@@ -201,6 +206,25 @@ def test_durable_cache_misses_when_identity_changes_and_never_persists_object_sc
     )
     assert cache.put(_identity(), object_lookup, {"return": ["Volume"]}) is False
     assert cache.get(_identity(), object_lookup) is None
+
+
+def test_durable_cache_persists_only_canonical_guid_object_scope(
+    tmp_path: Path,
+) -> None:
+    cache = DurableMetadataCache(state_dir=tmp_path)
+    lookup = MetadataCacheLookup.property_info(
+        object_id="{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}",
+        property_name="Volume",
+    )
+    value = {"name": "Volume", "type": "Real32"}
+
+    assert lookup.durable_safe is True
+    assert cache.put(_identity(), lookup, value) is True
+    equivalent_case = MetadataCacheLookup.property_info(
+        object_id="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+        property_name="Volume",
+    )
+    assert cache.get(_identity(), equivalent_case) == value
 
 
 def test_durable_cache_corruption_and_unsafe_directory_are_best_effort_misses(

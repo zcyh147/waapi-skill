@@ -74,6 +74,15 @@ from wwise_waapi.metadata_cache import (  # noqa: E402  # pyright: ignore[report
     MetadataSessionIdentity,
     SessionMetadataCache,
 )
+from wwise_waapi.metadata_discovery import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    DEFAULT_METADATA_DISCOVERY_LIMIT,
+    MAX_METADATA_DISCOVERY_LIMIT,
+    MAX_METADATA_DISCOVERY_NAME_CHARS,
+    MAX_METADATA_DISCOVERY_QUERIES,
+    MAX_METADATA_DISCOVERY_QUERY_CHARS,
+    MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS,
+    discover_metadata,
+)
 from wwise_waapi.builders.query import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_QUERY_TAKE,
     SUPPORTED_SELECTS,
@@ -193,6 +202,7 @@ from wwise_waapi.versions import (  # noqa: E402  # pyright: ignore[reportMissin
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_TIMEOUT = 10.0
+DEFAULT_METADATA_DISCOVERY_TIMEOUT = 30.0
 DEFAULT_TRANSACTION_TIMEOUT = 150.0
 TRANSPORT_CLEANUP_GRACE_SECONDS = 0.05
 UNBOUNDED_TOPIC_CLEANUP_TIMEOUT_SECONDS = 1.0
@@ -921,7 +931,8 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         help=(
-            f"Whole-command deadline in seconds; defaults to {DEFAULT_TIMEOUT:g} for reads/bounded topics, "
+            f"Whole-command deadline in seconds; defaults to {DEFAULT_TIMEOUT:g} for ordinary reads/bounded topics, "
+            f"{DEFAULT_METADATA_DISCOVERY_TIMEOUT:g} for live metadata discovery, "
             f"{DEFAULT_TRANSACTION_TIMEOUT:g} for preview/execute/verify transactions, "
             "and no time limit for stream-topic"
         ),
@@ -1068,13 +1079,46 @@ def build_parser() -> argparse.ArgumentParser:
     )
     metadata.add_argument(
         "operation",
-        choices=("types", "names", "property-info", "property-enabled", "attenuation-curve"),
+        choices=(
+            "types",
+            "names",
+            "property-info",
+            "property-enabled",
+            "attenuation-curve",
+            "discover",
+        ),
     )
     metadata.add_argument("--object")
     metadata.add_argument("--class-id", type=int)
+    metadata.add_argument(
+        "--object-type",
+        help=(
+            "Exact live Wwise object type name for metadata discover; resolved "
+            "through getTypes before class-scoped discovery"
+        ),
+    )
     metadata.add_argument("--property")
     metadata.add_argument("--platform")
     metadata.add_argument("--curve-type")
+    metadata.add_argument(
+        "--query",
+        action="append",
+        dest="queries",
+        metavar="SEARCH_PHRASE",
+        help=(
+            "Repeat 1..8 natural-language search phrases for metadata discover; "
+            "the gateway returns live lexical candidates without selecting one"
+        ),
+    )
+    metadata.add_argument(
+        "--limit",
+        type=int,
+        metavar=f"1..{MAX_METADATA_DISCOVERY_LIMIT}",
+        help=(
+            "Maximum candidates returned per discovery phrase; defaults to "
+            f"{DEFAULT_METADATA_DISCOVERY_LIMIT}"
+        ),
+    )
     metadata.add_argument(
         "--summary-only",
         action="store_true",
@@ -2453,6 +2497,106 @@ def preflight_metadata_input(args: argparse.Namespace) -> None:
 
     if args.summary_only and args.operation != "types":
         raise GatewayInputError("metadata --summary-only is supported only for the types operation")
+    discovery_only_supplied = (
+        args.object_type is not None
+        or args.queries is not None
+        or args.limit is not None
+    )
+    if args.operation != "discover":
+        if discovery_only_supplied:
+            raise GatewayInputError(
+                "metadata --object-type, --query, and --limit are supported only "
+                "for the discover operation"
+            )
+        return
+
+    if any(
+        value is not None
+        for value in (args.property, args.platform, args.curve_type)
+    ):
+        raise GatewayInputError(
+            "metadata discover does not accept --property, --platform, or --curve-type"
+        )
+    supplied_scopes = sum(
+        value is not None
+        for value in (args.object_type, args.class_id, args.object)
+    )
+    if supplied_scopes != 1:
+        raise GatewayInputError(
+            "metadata discover requires exactly one of --object-type, --class-id, "
+            "or --object"
+        )
+    if args.object_type is not None and (
+        not args.object_type.strip()
+        or args.object_type != args.object_type.strip()
+        or len(args.object_type) > MAX_METADATA_DISCOVERY_NAME_CHARS
+    ):
+        raise GatewayInputError(
+            "metadata discover --object-type must be non-empty, have no outer "
+            "whitespace, and contain at most "
+            f"{MAX_METADATA_DISCOVERY_NAME_CHARS} characters"
+        )
+    if args.class_id is not None and not 0 <= args.class_id <= 0xFFFFFFFF:
+        raise GatewayInputError(
+            "metadata discover --class-id must be a uint32 integer"
+        )
+    if args.object is not None and (
+        not args.object.strip()
+        or args.object != args.object.strip()
+        or len(args.object) > MAX_METADATA_DISCOVERY_NAME_CHARS * 8
+    ):
+        raise GatewayInputError(
+            "metadata discover --object must be non-empty, have no outer "
+            "whitespace, and remain within the bounded identifier length"
+        )
+    queries = args.queries
+    if not isinstance(queries, list) or not (
+        1 <= len(queries) <= MAX_METADATA_DISCOVERY_QUERIES
+    ):
+        raise GatewayInputError(
+            "metadata discover requires 1.."
+            f"{MAX_METADATA_DISCOVERY_QUERIES} --query values"
+        )
+    total_query_chars = 0
+    seen_queries: set[str] = set()
+    for query in queries:
+        if (
+            not isinstance(query, str)
+            or not query.strip()
+            or query != query.strip()
+            or len(query) > MAX_METADATA_DISCOVERY_QUERY_CHARS
+        ):
+            raise GatewayInputError(
+                "each metadata discover --query must be non-empty, have no outer "
+                "whitespace, and contain at most "
+                f"{MAX_METADATA_DISCOVERY_QUERY_CHARS} characters"
+            )
+        total_query_chars += len(query)
+        folded_query = " ".join(query.split()).casefold()
+        if folded_query in seen_queries:
+            raise GatewayInputError(
+                "metadata discover --query values must be distinct"
+            )
+        seen_queries.add(folded_query)
+    if total_query_chars > MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS:
+        raise GatewayInputError(
+            "metadata discover query text exceeds the combined "
+            f"{MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS}-character limit"
+        )
+    limit = (
+        DEFAULT_METADATA_DISCOVERY_LIMIT
+        if args.limit is None
+        else args.limit
+    )
+    if (
+        isinstance(limit, bool)
+        or not isinstance(limit, int)
+        or not 1 <= limit <= MAX_METADATA_DISCOVERY_LIMIT
+    ):
+        raise GatewayInputError(
+            "metadata discover --limit must be between 1 and "
+            f"{MAX_METADATA_DISCOVERY_LIMIT}"
+        )
 
 
 def preflight_stable_read_input(
@@ -3621,6 +3765,8 @@ def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> G
             else (
                 DEFAULT_TRANSACTION_TIMEOUT
                 if args.command in {"preview", "execute", "verify"}
+                else DEFAULT_METADATA_DISCOVERY_TIMEOUT
+                if args.command == "metadata" and args.operation == "discover"
                 else DEFAULT_TIMEOUT
             )
         )
@@ -4292,6 +4438,63 @@ def dispatch_command(
             "objects": rows if result.get("ok") else None,
         }
     if args.command == "metadata":
+        if args.operation == "discover":
+            read_call = transaction_read_call(
+                dispatcher,
+                connection=connection,
+                version=detected_version,
+            )
+            project: Mapping[str, Any] | None
+            try:
+                project, _project_call = current_project(
+                    dispatcher,
+                    connection=connection,
+                    version=detected_version,
+                    allow_none=True,
+                )
+            except (
+                GatewayInputError,
+                GatewayResultShapeError,
+                OperationContractError,
+            ):
+                # Project/session binding is a cache optimization for this
+                # read-only command.  A failed probe must not prevent the
+                # authoritative live metadata reads below.
+                project = None
+            state_dir = prepare_read_only_metadata_cache_state_directory(
+                args,
+                env=env,
+                project=project,
+            )
+            read_call = metadata_cached_read_call(
+                read_call,
+                connection=connection,
+                version=detected_version,
+                live_info=live_info,
+                project=project,
+                state_dir=state_dir,
+            )
+            discovery = discover_metadata(
+                read_call=read_call,
+                queries=tuple(args.queries),
+                object_type=args.object_type,
+                class_id=args.class_id,
+                object=args.object,
+                limit=(
+                    DEFAULT_METADATA_DISCOVERY_LIMIT
+                    if args.limit is None
+                    else args.limit
+                ),
+            )
+            payload = {
+                "ok": True,
+                "status": "ok",
+                **common,
+                "operation": args.operation,
+                "metadata_authority": "live-waapi",
+            }
+            payload["agent_result"] = discovery.as_dict()
+            return payload
         preview = build_metadata_command_preview(args, version=detected_version)
         envelope = preview.envelope
         result = dispatch(
@@ -5059,7 +5262,7 @@ def dispatch_transaction_command(
             project_guard_mode=project_guard_mode,
             target_project_path=target_project_path,
         )
-        read_call = metadata_cached_transaction_read_call(
+        read_call = metadata_cached_read_call(
             read_call,
             connection=connection,
             version=detected_version,
@@ -8043,6 +8246,41 @@ def resolve_transaction_state_directory(
     )
 
 
+def prepare_read_only_metadata_cache_state_directory(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    project: Mapping[str, Any] | None,
+) -> Path | None:
+    """Best-effort durable-cache root for a read-only metadata command.
+
+    Metadata discovery must remain usable when local state is unavailable.  It
+    therefore creates only the external state root needed by
+    :class:`DurableMetadataCache`; it never constructs a transaction store or
+    turns a cache/configuration problem into a discovery failure.
+    """
+
+    if project is None:
+        return None
+    try:
+        state_dir = resolve_transaction_state_directory(args, env=env)
+        require_runtime_directory_outside_project(state_dir, project=project)
+        state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        state_stat = state_dir.lstat()
+    except (GatewayInputError, OSError):
+        return None
+    if (
+        stat.S_ISLNK(state_stat.st_mode)
+        or not stat.S_ISDIR(state_stat.st_mode)
+        or (
+            os.name != "nt"
+            and bool(state_stat.st_mode & (stat.S_IWGRP | stat.S_IWOTH))
+        )
+    ):
+        return None
+    return state_dir
+
+
 def resolve_external_runtime_directory(value: str, *, label: str) -> Path:
     """Resolve one explicit runtime directory without ambient-home expansion."""
 
@@ -9016,7 +9254,7 @@ def transaction_read_call(
     return read
 
 
-def metadata_cached_transaction_read_call(
+def metadata_cached_read_call(
     read_call: Callable[
         [str, Mapping[str, Any], Mapping[str, Any]],
         Mapping[str, Any],
@@ -9026,7 +9264,7 @@ def metadata_cached_transaction_read_call(
     version: str,
     live_info: Mapping[str, Any],
     project: Mapping[str, Any] | None,
-    state_dir: Path,
+    state_dir: Path | None,
 ) -> Callable[
     [str, Mapping[str, Any], Mapping[str, Any]],
     Mapping[str, Any],
@@ -9036,7 +9274,9 @@ def metadata_cached_transaction_read_call(
     The cache is never an authority for dynamic values.  Its identity binds the
     endpoint, Wwise build/schema/session/process, project, and packaged
     object-type catalog digest.  If any identity fact is unavailable, the
-    gateway safely retains the uncached read path.
+    gateway safely retains the uncached read path.  This wrapper is shared by
+    read-only metadata discovery and mutation preview so a discovery result can
+    be reused without weakening preview's live validation.
     """
 
     if project is None or not isinstance(state_dir, Path) or not state_dir.is_absolute():
@@ -9115,6 +9355,33 @@ def metadata_cached_transaction_read_call(
         return result
 
     return cached_read
+
+
+def metadata_cached_transaction_read_call(
+    read_call: Callable[
+        [str, Mapping[str, Any], Mapping[str, Any]],
+        Mapping[str, Any],
+    ],
+    *,
+    connection: GatewayConnection,
+    version: str,
+    live_info: Mapping[str, Any],
+    project: Mapping[str, Any] | None,
+    state_dir: Path,
+) -> Callable[
+    [str, Mapping[str, Any], Mapping[str, Any]],
+    Mapping[str, Any],
+]:
+    """Compatibility alias for callers that still use the old narrow name."""
+
+    return metadata_cached_read_call(
+        read_call,
+        connection=connection,
+        version=version,
+        live_info=live_info,
+        project=project,
+        state_dir=state_dir,
+    )
 
 
 def valid_metadata_cache_result(

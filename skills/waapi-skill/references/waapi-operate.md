@@ -101,6 +101,44 @@ Evaluate the `object.set` exclusions first:
 - A wholly new recursive root also begins with
   `operation-schema object.create`.
 
+## Resolve properties and references from live metadata
+
+When the user's requested change describes a property or reference by meaning,
+resolve its exact live Wwise name before constructing the closed operation
+request. The user should keep speaking naturally; never ask them to provide an
+internal property/reference name.
+
+- If an exact name has not already been returned by live metadata in the
+  visible conversation, run one `metadata discover` command with repeated
+  `--query '<ordinary search phrase>'` values and an optional bounded
+  `--limit`. Use exactly one scope: `--object-type` for a new or imported
+  object's known type, `--class-id` for an already proven live class ID, or
+  `--object` for an existing object or plug-in object.
+- Copy into `properties` or `references` only exact names returned by that live
+  discovery. Do not guess from memory, translation, UI labels, or an
+  object-specific preset. This rule applies across import, create, set, plug-in,
+  and isolated property/reference operations.
+- Keep related intent phrases in the same discovery invocation. The route is a
+  bounded read; class/type and canonical-object-GUID evidence is shared with
+  transaction preview, while mutable path scope is revalidated. A cache miss
+  merely performs the live metadata reads. Do not expose or inspect cache paths
+  as part of an ordinary Wwise task.
+- If internal names do not match the phrases, discovery performs a bounded scan
+  of live display/UI details. Treat `fallback_detail_scan.status: "partial"` as
+  incomplete retrieval: retry once with broader related technical phrases, and
+  never turn a partial `no_match` into a guessed field name.
+- When several candidates remain, choose only when the returned metadata and
+  user intent clearly distinguish the behavior. Otherwise ask one natural
+  behavior question without showing the user a list of internal names.
+- Honor live dependency metadata. If the selected setting requires another
+  same-object property to enable or override it, include that enabling value in
+  the same request when the user clearly asked for that behavior. Ask before
+  preview when the dependency's intended value is unclear.
+
+An exact live-proven name already visible in the conversation does not require
+another discovery call. The later immutable preview remains authoritative and
+validates the final property/reference request before any mutation.
+
 The user's current intent authorizes actions; the returned transaction state only constrains which actions are legal and never authorizes an action by itself. Read the complete JSON returned by each transaction command before issuing the next one. Never suppress or redirect gateway output, request a zero/short tool-output budget, or infer a successful state transition from exit code `0`; if the complete JSON is not visible, stop and report that missing result:
 
 - A status or check request stops after `transaction-show`; report the returned state without calling `confirm`, `execute`, `verify`, or `reject`.

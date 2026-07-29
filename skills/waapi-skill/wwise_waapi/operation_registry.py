@@ -25,6 +25,7 @@ from xml.etree import ElementTree as ET
 from .canonical import canonical_json_bytes
 from .builders.identity import ObjectIdentity, ResolvedObject, plan_object_resolution
 from .builders.metadata import (
+    GET_PROPERTY_AND_REFERENCE_NAMES_URI,
     GET_PROPERTY_INFO_URI,
     ObjectTypeMetadataRecord,
     PropertyInfoMetadataRecord,
@@ -208,6 +209,7 @@ PACKAGED_TRANSACTION_READBACK_URIS = frozenset(
         OBJECT_IS_PROPERTY_ENABLED_URI,
         GET_INFO_URI,
         GET_PROJECT_INFO_URI,
+        GET_PROPERTY_AND_REFERENCE_NAMES_URI,
         GET_PROPERTY_INFO_URI,
         SOUNDBANK_GET_INCLUSIONS_URI,
         SWITCHCONTAINER_GET_ASSIGNMENTS_URI,

@@ -58,6 +58,10 @@ _DURABLE_ENTRY_NAME = re.compile(r"^[0-9a-f]{64}\.json$")
 _DURABLE_TEMP_NAME = re.compile(
     r"^\.[0-9a-f]{64}\.[0-9a-f]{32}\.tmp$"
 )
+_CANONICAL_GUID = re.compile(
+    r"^\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
+    r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}$"
+)
 
 
 class MetadataCacheError(ValueError):
@@ -216,6 +220,8 @@ class MetadataCacheLookup:
                     self.object_id,
                     field_name="object_id",
                 )
+                if _CANONICAL_GUID.fullmatch(normalized):
+                    normalized = normalized.upper()
                 object.__setattr__(self, "object_id", normalized)
             elif not _is_uint32(self.object_id):
                 raise MetadataCacheError(
@@ -247,13 +253,21 @@ class MetadataCacheLookup:
     def durable_safe(self) -> bool:
         """Whether this lookup is immutable enough for cross-process reuse.
 
-        Object-scoped calls can be addressed by a mutable name/path and can
-        change after an object is replaced during the same Authoring session.
-        Keep those in the single-preview memory layer.  Type and class-scoped
-        metadata are safe to persist under the exact live-session identity.
+        Object-scoped calls addressed by a mutable name/path can change after
+        replacement during the same Authoring session, so those stay in one
+        wrapper's memory layer.  A canonical GUID binds one immutable object
+        type within the exact live-session/project identity and is safe to
+        share with a later preview.  Type and class-scoped metadata are also
+        safe to persist.
         """
 
-        return self.object_id is None
+        return (
+            self.object_id is None
+            or (
+                isinstance(self.object_id, str)
+                and _CANONICAL_GUID.fullmatch(self.object_id) is not None
+            )
+        )
 
     @classmethod
     def types(cls) -> MetadataCacheLookup:
@@ -440,8 +454,8 @@ class DurableMetadataCache:
     Each exact key owns one atomic JSON file.  No cache failure is surfaced to
     callers: an unsafe directory, symlink, malformed entry, concurrent removal,
     or I/O error simply behaves as a miss so the transaction performs a fresh
-    WAAPI read.  Only class-scoped metadata is durable; object-scoped results
-    remain in the in-memory hot layer.
+    WAAPI read.  Class-scoped metadata and canonical-GUID object metadata are
+    durable; mutable path/name scopes remain in the in-memory hot layer.
     """
 
     state_dir: Path

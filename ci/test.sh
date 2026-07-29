@@ -421,6 +421,8 @@ run_program() {
     tests/unit/test_waapi_gateway.py::test_wait_topic_no_timeout_keeps_transport_connect_finitely_bounded
     tests/unit/test_waapi_gateway.py::test_object_types_searches_packaged_catalog_without_connecting
     tests/unit/test_waapi_gateway.py::test_metadata_transaction_cache_is_bound_to_exact_live_session
+    tests/unit/test_metadata_discovery.py
+    tests/unit/test_metadata_discovery_gateway.py
     tests/unit/test_script_helpers.py::test_run_main_returns_standard_interrupt_code_without_wrapper_traceback
     tests/unit/test_io_policy.py
     tests/unit/test_transaction_locality.py

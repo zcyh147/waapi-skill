@@ -156,6 +156,9 @@ Conditional read for a query not fully covered by the fixed commands, exact-iden
 
 Use operate for project-changing work: create, move, copy, delete, property/reference edits, imports, soundbanks, switch assignments, and design previews.
 
+For property/reference changes without an exact live name already visible, use
+`metadata discover`; never infer names. See the operate reference.
+
 Apply the canonical policy from the latest gateway `session_context`:
 
 - `read_only`: do not carry out a project change. For an actual change request, explain that the current mode blocks changes, state that this request left the project unchanged, and stop after the required `operation-schema` result exposes that policy; do not create an executable preview. A design-only preview remains read-only and may be created without `--apply`.

@@ -71,6 +71,9 @@ python scripts/run.py gateway.py --version 2025.1 query-object --type AudioFileS
 python scripts/run.py gateway.py --version 2022.1 object-types --query 'audio source' --object-type WObject --limit 20
 python scripts/run.py gateway.py --version 2022.1 object-types --summary-only
 python scripts/run.py gateway.py metadata types --summary-only
+python scripts/run.py gateway.py metadata discover --object-type Sound --query 'looping' --query 'playback limit' --limit 5
+python scripts/run.py gateway.py metadata discover --class-id 65552 --query 'maximum instances' --limit 8
+python scripts/run.py gateway.py metadata discover --object '{GUID}' --query 'output bus' --query 'conversion settings' --limit 5
 python scripts/run.py gateway.py metadata property-info --object '{GUID}' --property Volume
 python scripts/run.py gateway.py project-default-work-units
 python scripts/run.py gateway.py --version 2022.1 profiler-game-objects --time capture
@@ -232,6 +235,57 @@ the requested result envelope and stop. Do not derive a replacement from
 `normalized`, alter its keys or values, or repeat the metadata command after success.
 This fixed-read projection follows the same terminal `agent_result`
 rule as a successful transaction payload.
+
+### Live property and reference discovery
+
+Use `metadata discover` when the user describes a property or reference by
+meaning but the exact live Wwise name is not already proven in the visible
+conversation. The user should continue speaking naturally. Translate that
+intent into one or more short, ordinary search phrases and pass each phrase as
+a repeated `--query`; do not ask the user to supply Wwise's internal names.
+
+Each invocation accepts exactly one scope:
+
+- `--object-type <type>` for a new or imported object's known Wwise type;
+- `--class-id <integer>` when that exact live class ID is already available;
+- `--object <GUID-or-absolute-path>` for an existing object, including an
+  existing plug-in object whose concrete live class matters.
+
+`--limit` is optional and bounds candidates per search phrase (default 5,
+maximum 8); the combined detail set remains bounded. Keep related phrases in
+one Gateway invocation instead of issuing one metadata command per requested
+setting. The Gateway resolves the scope, searches the live property/reference
+inventory, and returns bounded candidate details. A cache hit reuses compatible
+live evidence; a cache miss simply performs the same bounded live reads. The
+same durable cache is available to the later transaction preview for class/type
+scope and canonical object GUID scope; mutable object paths remain an uncached
+lookup and are revalidated. Do not inspect, edit, or explain cache storage to
+the user.
+
+When a phrase has no lexical overlap with any internal live name, the same
+command performs a bounded second-stage scan of live property details so
+display labels and UI metadata can still match without a static alias table. It
+scans at most 256 names and reports `fallback_detail_scan.status`. A `no_match`
+from a `complete` scan is a real bounded miss. A `partial` scan is not proof
+that the setting is unavailable: retry once with broader related technical
+phrases in the same command shape, then ask a natural behavior question if
+selection still cannot be grounded. Never guess a name.
+
+Only an exact name returned by current live discovery may be copied into a
+closed operation's `properties` or `references`. Memory, translation, UI labels,
+and object-specific presets are search hints at most; they are never evidence
+for a mutation field. If several candidates remain, use the user's business
+intent to distinguish them when the result makes that distinction clear.
+Otherwise ask one natural question about the intended behavior, without dumping
+internal names on the user.
+
+Honor live dependency metadata returned with the selected candidate. When a
+setting requires another property on the same object to enable or override it,
+include that enabling value in the same closed request when the user's intent
+clearly authorizes it. If the required behavior or value is ambiguous, ask in
+ordinary language before previewing. An exact name already returned by live
+metadata in the current visible conversation does not need another discovery
+call; transaction preview still performs its own authoritative validation.
 
 Use the three version-stable fixed reads instead of composing their reflected
 payloads. `profiler-game-objects` accepts only a non-negative millisecond time

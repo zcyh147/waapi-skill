@@ -331,7 +331,10 @@ def test_all_semantic_read_records_resolve_to_public_gateway_routes() -> None:
     imported = catalog.describe("2022.1", "ak.wwise.core.audio.imported")
     inclusions = catalog.describe("2022.1", "ak.wwise.core.soundbank.getInclusions")
     assert object_get.gateway_commands == ("query-object", "buses")
-    assert property_info.gateway_commands == ("metadata property-info",)
+    assert property_info.gateway_commands == (
+        "metadata property-info",
+        "metadata discover",
+    )
     assert imported.gateway_commands == ("wait-topic", "stream-topic")
     assert inclusions.gateway_commands == ("preview", "confirm", "execute", "verify")
     assert inclusions.preferred_route == "transaction_operation"

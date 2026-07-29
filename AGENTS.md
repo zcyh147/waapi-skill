@@ -53,7 +53,8 @@ for Wwise Authoring. Read this file before changing the Skill or running tests.
   - implementation library. Important seams include `capabilities.py`,
     `execution_contracts.py`, `operation_registry.py`, `transactions.py`,
     `transaction_runtime.py`, `transaction_cleanup.py`, `io_policy.py`,
-    `dispatcher.py`, `subscriptions.py`, and the semantic builders.
+    `dispatcher.py`, `subscriptions.py`, `metadata_discovery.py`,
+    `metadata_cache.py`, and the semantic builders.
 - `skills/waapi-skill/resources/manifest/<version>/`
   - reflected Console functions, topics, schemas, immutable inventory
     metadata, and the narrow `authoring-ui-commands-supplement.json` and
@@ -62,7 +63,7 @@ for Wwise Authoring. Read this file before changing the Skill or running tests.
   - category and deferred-route classification.
 - `skills/waapi-skill/resources/metadata/<version>/object-types.json`
   - compact, reflected object-type discovery index; live property/reference
-    metadata remains authoritative for mutation validation.
+    metadata remains authoritative for discovery and mutation validation.
 - `skills/waapi-skill/resources/native_surface_policy.json`
   - complete function-route partition plus detailed selector mapping for the
     high-risk reflected request surfaces that differ from their public closed
