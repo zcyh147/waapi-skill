@@ -142,6 +142,94 @@ def test_broker_projection_rejects_legacy_full_contract_as_compact() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "identity",
+    (
+        {"kind": "id", "value": "{11111111-1111-1111-1111-111111111111}"},
+        {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Default Work Unit"},
+        {
+            "kind": "exact-type-name",
+            "type": "AuxBus",
+            "name": "Gameplay Bus",
+        },
+        {
+            "kind": "direct-child",
+            "parent": {
+                "kind": "path",
+                "value": r"\Events\Default Work Unit\Play_Weather",
+            },
+            "type": "Action",
+        },
+        {
+            "kind": "scoped-name",
+            "name": "Outdoor",
+            "type": "Attenuation",
+            "parent": {
+                "kind": "path",
+                "value": r"\Attenuations\Default Work Unit",
+            },
+        },
+    ),
+)
+def test_audio_import_semantic_broker_accepts_all_closed_identity_selectors(
+    identity: dict[str, object],
+) -> None:
+    assert broker_module._is_audio_import_identity(identity) is True  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        {"kind": "waql", "value": "from type AuxBus take 2"},
+        {
+            "kind": "exact-type-name",
+            "type": 'AuxBus where name = "Other"',
+            "name": "Gameplay Bus",
+        },
+        {
+            "kind": "exact-type-name",
+            "type": "AuxBus",
+            "name": 'Gameplay "Bus"',
+        },
+        {
+            "kind": "direct-child",
+            "parent": {"kind": "waql", "value": "from type Event take 2"},
+            "type": "Action",
+        },
+        {
+            "kind": "direct-child",
+            "parent": {
+                "kind": "path",
+                "value": r"\Events\Default Work Unit\Play_Weather",
+            },
+            "type": 'Action" or type = "Event',
+        },
+        {
+            "kind": "scoped-name",
+            "name": "x" * 256,
+            "type": "Attenuation",
+            "parent": {
+                "kind": "path",
+                "value": r"\Attenuations\Default Work Unit",
+            },
+        },
+        {
+            "kind": "scoped-name",
+            "name": "Outdoor",
+            "type": "Attenuation",
+            "parent": {
+                "kind": "path",
+                "value": '\\Attenuations\\Bad"Parent',
+            },
+        },
+    ),
+)
+def test_audio_import_semantic_broker_rejects_raw_or_open_identity_selectors(
+    identity: dict[str, object],
+) -> None:
+    assert broker_module._is_audio_import_identity(identity) is False  # noqa: SLF001
+
+
 def fake_confirmation_token(transaction_id: str) -> str:
     return confirmation_token_for(
         transaction_id=transaction_id,

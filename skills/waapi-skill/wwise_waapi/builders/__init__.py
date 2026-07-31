@@ -63,7 +63,16 @@ from .properties import (  # pyright: ignore[reportMissingImports]
     build_set_randomizer_preview,
     build_set_reference_preview,
 )
-from .query import QueryPredicate, build_object_get_query, build_query_preview, object_get_query  # pyright: ignore[reportMissingImports]
+from .query import (  # pyright: ignore[reportMissingImports]
+    QueryPredicate,
+    STRUCTURED_QUERY_CONTRACT,
+    WaqlQueryBuilder,
+    build_object_get_query,
+    build_query_preview,
+    build_structured_object_get_query,
+    object_get_query,
+    structured_query_schema,
+)
 from .schema import (  # pyright: ignore[reportMissingImports]
     SEMANTIC_CONSTRAINT_FACTS_SIZE_LIMIT,
     SchemaValidationResult,
@@ -146,6 +155,7 @@ __all__ = [
     "SemanticSourceNoteChecker",
     "SemanticSourceNoteResource",
     "SemanticValidationError",
+    "STRUCTURED_QUERY_CONTRACT",
     "SourceNoteCheck",
     "SourceNoteChecker",
     "SoundBankBuilder",
@@ -157,6 +167,7 @@ __all__ = [
     "SwitchContainerOperation",
     "TopicExpectation",
     "TopicExpectationPlan",
+    "WaqlQueryBuilder",
     "build_add_assignment_preview",
     "assess_writable_container_suitability",
     "build_assignment_added_expectation",
@@ -172,6 +183,7 @@ __all__ = [
     "build_object_mutation_preview",
     "build_process_definition_files_preview",
     "build_query_preview",
+    "build_structured_object_get_query",
     "build_remove_assignment_preview",
     "build_set_attenuation_curve_preview",
     "build_set_inclusions_preview",
@@ -194,6 +206,7 @@ __all__ = [
     "resolve_object_identity",
     "resolve_resolution_plan",
     "source_note_uri_inventory",
+    "structured_query_schema",
     "validate_semantic_event",
     "validate_semantic_payload",
     "validate_semantic_result",

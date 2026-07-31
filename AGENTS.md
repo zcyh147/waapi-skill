@@ -47,14 +47,15 @@ for Wwise Authoring. Read this file before changing the Skill or running tests.
     virtual environment.
 - `skills/waapi-skill/scripts/gateway.py`
   - the public CLI contract: offline catalog/config commands, bounded live
-    reads, subscriptions, transaction phases, result ceilings, and
-    `session_context`.
+    reads, the offline `query-schema` plus structured `query-object` contract,
+    subscriptions, transaction phases, result ceilings, and `session_context`.
 - `skills/waapi-skill/wwise_waapi/`
   - implementation library. Important seams include `capabilities.py`,
     `execution_contracts.py`, `operation_registry.py`, `transactions.py`,
     `transaction_runtime.py`, `transaction_cleanup.py`, `io_policy.py`,
     `dispatcher.py`, `subscriptions.py`, `metadata_discovery.py`,
-    `metadata_cache.py`, and the semantic builders.
+    `metadata_cache.py`, `builders/query.py`, and the remaining semantic
+    builders.
   - `operation_registry.py` is the authoritative Gateway entrypoint for
     structured operation contracts. Builder or dispatcher support alone does
     not expose an operation: its public request shape, version scope, safety
@@ -111,7 +112,10 @@ it supported without proving the reflected and executable surfaces:
    scope.
 2. Add the versioned manifest inventory and required deferred, metadata,
    semantic, and WAQL resources, with immutable counts and digests derived from
-   the new reflection.
+   the new reflection. Review the versioned structured-query schema and extend
+   the closed query Builder, compiler goldens, and negative grammar matrix when
+   the new version changes any supported source, transform, predicate,
+   accessor, literal, or result-bound rule.
 3. Classify every new or changed route in its execution lane and update the
    capability, execution-contract, operation registry, adapter registry,
    request-mapping registry, and native-surface policy entries that actually
@@ -155,6 +159,14 @@ user's approval.
   Operation-specific fields, nested shapes, and version deltas belong in the
   version-aware `operation-schema` or `describe` result; do not add per-API
   Markdown merely to repeat structured gateway contracts.
+- Keep every public query and mutation identity free of caller- or
+  model-authored raw WAQL. Simple reads use the closed `query-object` flags;
+  complex reads obtain the versioned `waapi-skill.object-query/v1` contract
+  from offline `query-schema` and pass it through
+  `query-object --request-json`. Mutation identities are limited to `id`,
+  `path`, `exact-type-name`, `direct-child`, and `scoped-name`; a complex
+  filter must first resolve through structured `query-object` to exactly one
+  verified GUID.
 - Keep `agent_result` exact for machine-readable replies. Do not rebuild it from
   summaries, and preserve its final insertion-order position in gateway payloads.
 - All live results and structured failures must stay bounded. Cleanup failures,
@@ -201,7 +213,10 @@ ci/test.sh --mode program -- -q -ra
 This gate uses fake clients and must not start Codex, WwiseConsole, or
 a network client. For ordinary API-surface expansion, this is the required main
 gate; do not spend tokens on a full semantic matrix merely because rows were
-added to the same established mechanism.
+added to the same established mechanism. For the structured query Builder,
+five-version Python validation, compiler goldens, gateway fake-dispatch tests,
+and fail-closed negatives prove the compilation contract. They do not prove
+that a newly added WAQL construct has been accepted by a real Wwise process.
 
 ### 2. Broad non-live regression
 
@@ -327,7 +342,9 @@ profile units have passing evidence across those roots; do not report that
 `a12` itself passed 6/6 or that all six were rerun after the final repair.
 Every passing sandbox was removed, failed sandboxes were sealed and
 quarantined, and both source SampleProjects retained identical full hashes and
-mtimes.
+mtimes. This evidence belongs to the candidate before the structured-query
+request and closed mutation-selector migration; it must not be cited as fresh
+semantic validation of those later routing changes.
 
 For harness-only CI checks that start neither Codex nor Wwise, use the focused
 pytest commands in `tests/semantic/README.md`.

@@ -75,9 +75,10 @@ RTPC_POINT_SHAPES = frozenset(
     }
 )
 IDENTITY_KINDS = frozenset(
-    {"id", "path", "waql", "direct-child", "scoped-name"}
+    {"id", "path", "exact-type-name", "direct-child", "scoped-name"}
 )
 _DYNAMIC_FIELD_NAME = re.compile(r"^[:_a-zA-Z0-9]+$")
+_EXACT_TYPE_NAME_TYPE_TOKEN = re.compile(r"^[A-Za-z0-9_.]+$")
 
 
 class ObjectOperationContractError(ValueError):
@@ -171,6 +172,13 @@ class ObjectIdentityDescriptor:
     parent: ObjectIdentityDescriptor | None = None
 
     def as_dict(self) -> dict[str, Any]:
+        if self.kind == "exact-type-name":
+            assert self.name is not None and self.type is not None
+            return {
+                "kind": self.kind,
+                "type": self.type,
+                "name": self.name,
+            }
         if self.kind == "direct-child":
             assert self.type is not None and self.parent is not None
             return {
@@ -1411,10 +1419,10 @@ def _normalize_identity(
     if kind not in IDENTITY_KINDS:
         raise ObjectOperationContractError(
             "INVALID_IDENTITY",
-            f"{path}.kind must be id, path, waql, direct-child, or scoped-name.",
+            f"{path}.kind must be id, path, exact-type-name, direct-child, or scoped-name.",
             details={"path": path, "kind": kind},
         )
-    if kind in {"id", "path", "waql"}:
+    if kind in {"id", "path"}:
         _exact_fields(mapping, required={"kind", "value"}, optional=frozenset(), path=path)
         value = mapping.get("value")
         if kind == "id":
@@ -1433,6 +1441,55 @@ def _normalize_identity(
                     details={"path": f"{path}.value", "kind": kind},
                 )
         return ObjectIdentityDescriptor(kind=kind, value=value)
+    if kind == "exact-type-name":
+        _exact_fields(
+            mapping,
+            required={"kind", "type", "name"},
+            optional=frozenset(),
+            path=path,
+        )
+        object_type = _bounded_token(
+            mapping.get("type"),
+            path=f"{path}.type",
+            max_length=limits.max_type_length,
+            disallow_path_separator=True,
+        )
+        if _EXACT_TYPE_NAME_TYPE_TOKEN.fullmatch(object_type) is None:
+            raise ObjectOperationContractError(
+                "INVALID_IDENTITY",
+                f"{path}.type must be one canonical Wwise type token.",
+                details={
+                    "path": f"{path}.type",
+                    "accepted": _EXACT_TYPE_NAME_TYPE_TOKEN.pattern,
+                },
+            )
+        name = _bounded_token(
+            mapping.get("name"),
+            path=f"{path}.name",
+            max_length=limits.max_name_length,
+            disallow_path_separator=True,
+        )
+        if (
+            '"' in name
+            or any(
+                ord(character) == 127
+                or character in {"\u2028", "\u2029"}
+                for character in name
+            )
+        ):
+            raise ObjectOperationContractError(
+                "INVALID_IDENTITY",
+                f"{path}.name is outside the packaged WAQL literal boundary.",
+                details={
+                    "path": f"{path}.name",
+                    "boundary": "packaged-waql-literal-evidence",
+                },
+            )
+        return ObjectIdentityDescriptor(
+            kind=kind,
+            name=name,
+            type=object_type,
+        )
     if kind == "direct-child":
         _exact_fields(
             mapping,
@@ -1503,12 +1560,59 @@ def _normalize_identity(
         max_length=limits.max_type_length,
         disallow_path_separator=False,
     )
+    if _EXACT_TYPE_NAME_TYPE_TOKEN.fullmatch(object_type) is None:
+        raise ObjectOperationContractError(
+            "INVALID_IDENTITY",
+            f"{path}.type must be one canonical Wwise type token.",
+            details={
+                "path": f"{path}.type",
+                "accepted": _EXACT_TYPE_NAME_TYPE_TOKEN.pattern,
+            },
+        )
+    if (
+        '"' in name
+        or any(
+            ord(character) == 127
+            or character in {"\u2028", "\u2029"}
+            for character in name
+        )
+    ):
+        raise ObjectOperationContractError(
+            "INVALID_IDENTITY",
+            f"{path}.name is outside the packaged WAQL literal boundary.",
+            details={
+                "path": f"{path}.name",
+                "boundary": "packaged-waql-literal-evidence",
+            },
+        )
     parent = _normalize_identity(mapping.get("parent"), path=f"{path}.parent", limits=limits)
     if parent.kind not in {"id", "path"}:
         raise ObjectOperationContractError(
             "INVALID_IDENTITY",
             "A scoped-name identity parent must use a closed id or path identity.",
             details={"path": f"{path}.parent", "kind": parent.kind},
+        )
+    parent_value = parent.value
+    if (
+        isinstance(parent_value, str)
+        and (
+            len(parent_value) > DEFAULT_MAX_IDENTITY_PARENT_LITERAL_LENGTH
+            or '"' in parent_value
+            or any(
+                ord(character) < 32
+                or ord(character) == 127
+                or character in {"\u2028", "\u2029"}
+                for character in parent_value
+            )
+        )
+    ):
+        raise ObjectOperationContractError(
+            "INVALID_IDENTITY",
+            f"{path}.parent exceeds the packaged WAQL literal boundary.",
+            details={
+                "path": f"{path}.parent",
+                "limit": DEFAULT_MAX_IDENTITY_PARENT_LITERAL_LENGTH,
+            },
         )
     return ObjectIdentityDescriptor(kind=kind, name=name, type=object_type, parent=parent)
 

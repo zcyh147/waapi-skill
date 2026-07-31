@@ -103,21 +103,24 @@ def test_query_reference_has_no_raw_client_fallback() -> None:
     assert "gateway.py wait-topic" in query_reference
     assert "gateway.py stream-topic" in query_reference
     assert "`--query` means an existing Wwise Query Editor object" in query_reference
-    assert "It never accepts raw WAQL" in query_reference
-    assert "`this` and `owner` remain outside the packaged boundary" in query_reference
-    assert "requires either `--take N`" in query_reference
+    assert "model-authored raw WAQL" in query_reference
+    assert "`owner` remain outside the packaged boundary" in query_reference
+    assert "existing `--take N` or explicit user-requested `--all-results` rule" in query_reference
     assert "`--all-results`" in query_reference
     assert "between `0` and `1000`" in query_reference
     assert "`QUERY_OBJECT_REQUIRED`" in query_reference
-    assert "fixed `buses` command uses `take 1000`" in query_reference
-    assert "invalid response shape is a structured error" in query_reference
+    assert "`buses` response above 1000 is protocol drift" in query_reference
+    assert "gateway.py --version <supported-version> query-schema" in query_reference
+    assert "query-object --request-json" in query_reference
+    assert "response shape is a structured error" in query_reference
     assert "Add `--full-schema` only when" in query_reference
     assert "at most 50 compact rows by default" in query_reference
     assert "Use `--limit 0` only when" in query_reference
     assert "--path '\\Events\\Default Work Unit'" in query_reference
     assert "--path '\\\\Events\\\\Default Work Unit'" not in query_reference
     assert "--search 'ExactName' --where-json '{\"field\":\"name\",\"operator\":\"=\",\"value\":\"ExactName\"}' --take 1" in query_reference
-    assert "`=` is exact equality and `:` is a contains/match predicate" in query_reference
+    assert "`=` is exact equality" in query_reference
+    assert "`:` is" in query_reference and "a contains/match predicate" in query_reference
     assert "run that one `call` directly without `describe` or `capabilities`" in query_reference
     assert "only when `describe` reports" not in query_reference
     assert "metadata types --summary-only" in query_reference
@@ -296,7 +299,7 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
         assert "**656**" in readme
         assert "**152**" in readme
         assert "**6**" in readme
-        assert "2087" in readme
+        assert "2307" in readme
         assert "./skills/waapi-skill/references/waapi-coverage.md" in readme
 
     assert "198 unique routed WAAPI URIs" in english

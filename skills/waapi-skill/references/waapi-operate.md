@@ -41,9 +41,26 @@ Use `operations` only for a broad inventory question, never as preparation for a
 
 After the required discovery/schema sequence, construct only the closed request returned by the schema and preview it. There is deliberately no unconditional schema-to-preview shortcut: missing metadata, version, identity, file, or user input must be resolved by the branch that owns it. Conversely, do not add metadata discovery when an exact property/reference token is already visible in a successful live query from this conversation. For example, an isolated `object.setReference` that follows a query returning the exact `OutputBus` accessor uses its operation schema and then previews with that returned token.
 
-When that schema explicitly accepts a selector identity such as `waql`, `direct-child`, or `scoped-name`, and the user's supplied name and scope are already sufficient to form one unique selector, put that selector directly in the preview and let the Gateway perform live resolution. Do not add `query-object` merely to translate the same supplied identity into an id or path. This applies only to selector kinds returned by the schema and never permits guessing an absent hierarchy, name, or scope.
-For an exact SoundBank name that is already unique in the user's supplied scope, the canonical selector is `{"kind":"waql","value":"from type SoundBank where name = \"<exact name>\""}`. Do not add a leading `$` or a separate name lookup.
-When an exact existing Event path is already known and the requested target is its one direct Action, use `{"kind":"direct-child","parent":{"kind":"path","value":"<absolute Event path>"},"type":"Action"}`. The Gateway owns WAQL quoting, the two-row ambiguity ceiling, exact type validation, and the direct-parent check; do not replace this closed identity with caller-authored WAQL or a descendant search.
+Public mutation identities are closed to `id`, `path`, `exact-type-name`,
+`direct-child`, and `scoped-name`. When the user's supplied identity and scope
+already fit one selector returned by the operation schema, put that selector
+directly in the preview and let the Gateway perform live resolution. Do not add
+`query-object` merely to translate the same exact identity into an id or path,
+and never place caller- or model-authored raw WAQL in an operation request.
+
+For an exact SoundBank name that is intended to be globally unique by type, use
+`{"kind":"exact-type-name","type":"SoundBank","name":"<exact name>"}`. For an
+exact existing Event path whose requested target is its one direct Action, use
+`{"kind":"direct-child","parent":{"kind":"path","value":"<absolute Event path>"},"type":"Action"}`.
+The Gateway owns quoting, the two-row ambiguity ceiling, exact type validation,
+and the applicable parent or name checks.
+
+If the target can be described only by a complex filter, first follow the query
+lane's offline `query-schema` plus structured
+`query-object --request-json '<waapi-skill.object-query/v1-json>'` flow. Proceed
+to a mutation only when that read returns exactly one verified GUID, then use
+`{"kind":"id","value":"<returned GUID>"}`. Zero, multiple, truncated, or
+otherwise incomplete query results do not identify a mutation target.
 
 ## Choose by business outcome
 
@@ -162,7 +179,7 @@ For an unambiguous actual change use one standalone:
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py preview --apply --request-json '<closed-request-json>'
 ```
 
-Single-quote the whole compact request at the shell layer and serialize every JSON string exactly once. After JSON decoding, a WAQL value contains ordinary `"` characters with no preceding backslash, and each Wwise path separator is one `\`; never leave JSON escape backslashes inside the decoded value. Invalid JSON stops before preview and is not repaired or retried in the same turn.
+Single-quote the whole compact request at the shell layer and serialize every JSON string exactly once. After JSON decoding, each Wwise path separator is one `\`; never leave JSON escape backslashes inside the decoded value. Public operation requests contain only the closed selector objects above, never raw WAQL text. Invalid JSON stops before preview and is not repaired or retried in the same turn.
 
 Under `ask_before_changes`, a user asking to see the preview before confirming an intended change still uses `preview --apply`: that flag creates the durable confirmation-bound preview and does not execute the change. Omit `--apply` only for a hypothetical, design-only, or explicitly non-executable preview.
 In ordinary use omit `--state-dir`: the Gateway owns the external transaction store. Pass it only when a trusted caller explicitly supplied an absolute override, then reuse that path unchanged.

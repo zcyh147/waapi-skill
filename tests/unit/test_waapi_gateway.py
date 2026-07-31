@@ -3665,6 +3665,417 @@ def test_query_object_uses_semantic_builder_and_returns_normalized_rows(tmp_path
     )
 
 
+def test_query_schema_returns_five_version_closed_contract_without_connecting(
+    tmp_path: Path,
+) -> None:
+    called = False
+
+    def client_factory(url: str) -> FakeClient:
+        nonlocal called
+        called = True
+        raise AssertionError(f"offline query-schema must not connect to {url}")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-schema", "--all-versions"],
+        env=gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 0
+    assert called is False
+    assert payload["query_contract"] == "waapi-skill.object-query/v1"
+    assert tuple(payload["versions"]) == tuple(SUPPORTED_WWISE_VERSION_KEYS)
+    assert set(payload["schemas"]) == set(SUPPORTED_WWISE_VERSION_KEYS)
+    assert {
+        schema["x-wwise-version"]
+        for schema in payload["schemas"].values()
+    } == set(SUPPORTED_WWISE_VERSION_KEYS)
+    serialized = json.dumps(payload["schemas"], sort_keys=True)
+    assert '"waql"' not in serialized
+    assert '"raw"' not in serialized
+    assert payload["boundary"]["raw_waql_accepted"] is False
+
+
+def test_query_object_structured_request_compiles_and_dispatches_once(
+    tmp_path: Path,
+) -> None:
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {
+                "return": [
+                    {
+                        "id": "{sound}",
+                        "name": "UI_Click",
+                        "type": "Sound",
+                        "path": r"\Actor-Mixer Hierarchy\UI_Click",
+                    }
+                ]
+            },
+        }
+    )
+    request = {
+        "contract": "waapi-skill.object-query/v1",
+        "source": {"kind": "type", "types": ["Event"]},
+        "transforms": [
+            {"kind": "select", "expressions": [["children"]]},
+            {
+                "kind": "where",
+                "predicate": {
+                    "kind": "all",
+                    "operands": [
+                        {
+                            "kind": "compare",
+                            "path": ["type"],
+                            "operator": "=",
+                            "value": "Action",
+                        },
+                        {
+                            "kind": "any",
+                            "operands": [
+                                {
+                                    "kind": "compare",
+                                    "path": ["name"],
+                                    "operator": ":",
+                                    "value": "Play",
+                                },
+                                {
+                                    "kind": "not",
+                                    "operand": {
+                                        "kind": "truthy",
+                                        "path": ["isIncluded"],
+                                    },
+                                },
+                            ],
+                        },
+                    ],
+                },
+            },
+            {
+                "kind": "select",
+                "expressions": [["Target"], ["this"], ["descendants"]],
+            },
+            {"kind": "take", "value": 25},
+        ],
+        "return": ["id", "name", "type", "path", "@Volume"],
+    }
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--request-json",
+            json.dumps(request, separators=(",", ":")),
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["query_contract"] == "waapi-skill.object-query/v1"
+    assert payload["query_bound"] == {"mode": "take", "value": 25}
+    assert payload["count"] == 1
+    assert client.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {
+            "waql": (
+                "from type Event select children where type = \"Action\" and "
+                "(name : \"Play\" or ! (isIncluded)) "
+                "select Target, this, descendants take 25"
+            )
+        },
+        {"return": ["id", "name", "type", "path", "@Volume"]},
+    )
+
+
+@pytest.mark.parametrize(
+    "query_request",
+    (
+        {
+            "contract": "waapi-skill.object-query/v1",
+            "source": {"kind": "type", "types": ["Sound"]},
+            "transforms": [],
+            "return": ["id"],
+            "waql": "from type Sound",
+        },
+        {
+            "contract": "waapi-skill.object-query/v1",
+            "source": {"kind": "type", "types": ["Sound"]},
+            "transforms": [
+                {
+                    "kind": "where",
+                    "predicate": {
+                        "kind": "raw",
+                        "value": "name = \"Dummy\"",
+                    },
+                },
+                {"kind": "take", "value": 1},
+            ],
+            "return": ["id"],
+        },
+    ),
+)
+def test_query_object_structured_raw_fragments_fail_before_connection(
+    tmp_path: Path,
+    query_request: Mapping[str, Any],
+) -> None:
+    called = False
+
+    def client_factory(url: str) -> FakeClient:
+        nonlocal called
+        called = True
+        raise AssertionError(f"invalid structured query must not connect to {url}")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-object", "--request-json", json.dumps(query_request)],
+        env=gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "SemanticValidationError"
+    assert called is False
+
+
+def test_query_object_structured_request_rejects_split_option_ownership(
+    tmp_path: Path,
+) -> None:
+    request = {
+        "contract": "waapi-skill.object-query/v1",
+        "source": {
+            "kind": "object",
+            "objects": [
+                {
+                    "kind": "id",
+                    "value": "{11111111-1111-1111-1111-111111111111}",
+                }
+            ],
+        },
+        "transforms": [],
+        "return": ["id"],
+    }
+    called = False
+
+    def client_factory(url: str) -> FakeClient:
+        nonlocal called
+        called = True
+        raise AssertionError(f"conflicting structured query must not connect to {url}")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--request-json",
+            json.dumps(request),
+            "--return-field",
+            "name",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert "--return-field" in payload["message"]
+    assert called is False
+
+
+def test_query_object_structured_exact_identity_requires_and_verifies_return_field(
+    tmp_path: Path,
+) -> None:
+    object_id = "{11111111-1111-1111-1111-111111111111}"
+    request = {
+        "contract": "waapi-skill.object-query/v1",
+        "source": {
+            "kind": "object",
+            "objects": [{"kind": "id", "value": object_id}],
+        },
+        "transforms": [],
+        "return": ["name"],
+    }
+    called = False
+
+    def client_factory(url: str) -> FakeClient:
+        nonlocal called
+        called = True
+        raise AssertionError(f"unverifiable exact query must not connect to {url}")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-object", "--request-json", json.dumps(request)],
+        env=gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert "'id'" in payload["message"]
+    assert called is False
+
+    request["return"] = ["id", "name"]
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {
+                "return": [
+                    {
+                        "id": "{22222222-2222-2222-2222-222222222222}",
+                        "name": "Wrong",
+                    }
+                ]
+            },
+        }
+    )
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-object", "--request-json", json.dumps(request)],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+    assert exit_code == 2
+    assert payload["error_code"] == "INVALID_QUERY_RESULT"
+    assert payload["details"]["identity_field"] == "id"
+
+
+def test_query_object_structured_rejects_rows_above_compiled_take(
+    tmp_path: Path,
+) -> None:
+    request = {
+        "contract": "waapi-skill.object-query/v1",
+        "source": {"kind": "type", "types": ["Sound"]},
+        "transforms": [{"kind": "take", "value": 1}],
+        "return": ["id"],
+    }
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {
+                "return": [
+                    {"id": "{11111111-1111-1111-1111-111111111111}"},
+                    {"id": "{22222222-2222-2222-2222-222222222222}"},
+                ]
+            },
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-object", "--request-json", json.dumps(request)],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "INVALID_QUERY_RESULT"
+    assert payload["details"]["maximum_rows"] == 1
+    assert payload["details"]["actual_count"] == 2
+
+
+def test_query_object_structured_exact_path_success_uses_identity_bound(
+    tmp_path: Path,
+) -> None:
+    path = r"\Events\Default Work Unit\Play_UI"
+    request = {
+        "contract": "waapi-skill.object-query/v1",
+        "source": {
+            "kind": "object",
+            "objects": [{"kind": "path", "value": path}],
+        },
+        "transforms": [],
+        "return": ["path", "name"],
+    }
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {
+                "return": [{"path": path, "name": "Play_UI"}]
+            },
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-object", "--request-json", json.dumps(request)],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["query_bound"] == {"mode": "exact-object", "value": 1}
+    assert payload["objects"] == [{"path": path, "name": "Play_UI"}]
+    assert client.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {"waql": f'from object "{path}"'},
+        {"return": ["path", "name"]},
+    )
+
+
+def test_query_object_structured_exact_path_rejects_identity_drift(
+    tmp_path: Path,
+) -> None:
+    expected_path = r"\Events\Default Work Unit\Play_UI"
+    request = {
+        "contract": "waapi-skill.object-query/v1",
+        "source": {
+            "kind": "object",
+            "objects": [{"kind": "path", "value": expected_path}],
+        },
+        "transforms": [],
+        "return": ["path"],
+    }
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {
+                "return": [{"path": r"\Events\Default Work Unit\Play_Other"}]
+            },
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-object", "--request-json", json.dumps(request)],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "INVALID_QUERY_RESULT"
+    assert payload["details"]["identity_field"] == "path"
+    assert payload["details"]["expected"] == expected_path
+
+
+def test_query_object_structured_exact_missing_object_is_normalized(
+    tmp_path: Path,
+) -> None:
+    missing_id = "{99999999-9999-9999-9999-999999999999}"
+    request = {
+        "contract": "waapi-skill.object-query/v1",
+        "source": {
+            "kind": "object",
+            "objects": [{"kind": "id", "value": missing_id}],
+        },
+        "transforms": [],
+        "return": ["id"],
+    }
+    client = FakeClient(
+        {"ak.wwise.core.getInfo": live_info()},
+        errors={
+            "ak.wwise.core.object.get": WaapiRequestFailed(
+                "ak.wwise.query.unknown_object",
+                {"message": "Object not found (13)"},
+            )
+        },
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-object", "--request-json", json.dumps(request)],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["count"] == 0
+    assert payload["objects"] == []
+    assert payload["query_bound"] == {"mode": "exact-object", "value": 1}
+    assert payload["call"]["normalization"]["kind"] == "exact-object-absence"
+    assert payload["call"]["normalization"]["source"] == (
+        "ak.wwise.query.unknown_object"
+    )
+
+
 def test_query_object_original_file_reference_match_returns_closed_candidate_records(
     tmp_path: Path,
 ) -> None:

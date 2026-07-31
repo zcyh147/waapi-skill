@@ -22,6 +22,12 @@ The program gate forces `WWISE_LIVE=0`, `WWISE_DESTRUCTIVE=0`, and `WWISE_STRICT
 
 Extra arguments after `--` may be pytest flags or filters such as `-q`, `-ra`, `--collect-only`, or `-k expression`. Additional test paths, node ids, `.py` files, and `--pyargs` are rejected so the fixed program-only collection cannot be widened accidentally.
 
+For the structured object-query lane, this gate proves the versioned
+`waapi-skill.object-query/v1` request/schema contract, deterministic Python
+compilation, exact fake dispatch, and fail-closed rejection. It does not prove
+that a newly added WAQL construct executes successfully in Wwise; record that
+only from the matching real read-only lane.
+
 ## New Wwise version checklist
 
 For a new supported Wwise lane, validate the whole path rather than only adding
@@ -38,10 +44,14 @@ a version string:
    operations, `skills/waapi-skill/wwise_waapi/operation_registry.py` is
    authoritative; a builder implementation by itself is not a public operation
    contract.
-4. Run focused tests and extend `ci/test.sh --mode program` to prove the new
+4. Review `query-schema` and the closed query Builder against the new
+   reflection. Extend five-version source/transform/predicate compiler goldens,
+   schema parity, request ceilings, and negative raw-WAQL tests whenever that
+   supported core subset changes.
+5. Run focused tests and extend `ci/test.sh --mode program` to prove the new
    supported-version matrix. Then run the matching smoke/live and destructive
    sandbox lanes sequentially.
-5. Update README inventories and `tests/TEST_INVENTORY.md` only after the
+6. Update README inventories and `tests/TEST_INVENTORY.md` only after the
    corresponding generation or run. Use a targeted fresh-Codex semantic case
    for changed routing or agent behavior; do not spend a broad semantic matrix
    on a schema-only addition.
@@ -104,16 +114,17 @@ suite. A partial, quota-blocked, prerequisite-blocked, or interrupted campaign
 is incomplete even if its selected profile is named `formal_98` or
 `full_cross_version_168`.
 
-The focused current-candidate `modification_policy_9` campaign is separate
-from those historical v2 totals. Its sealed
+The focused `modification_policy_9` campaign is separate from those historical
+v2 totals. Its sealed
 `campaign-modification-policy-9-c7` run passed 9/9 Wwise 2022.1 tasks and all
 15 turns using nine unique memory-isolated Codex Terra threads. It covered
 three repetitions each of `read_only`, question-style `ask_before_changes`,
 and same-turn `allow_changes`; all source-project hashes remained unchanged
 and every sandbox was cleaned. The six authorized writes each verified seven
 created objects through 46 passing business assertions. Preserve this exact
-scope: it is policy-interaction evidence, not broad API or cross-version
-semantic coverage.
+scope: it is policy-interaction evidence for that frozen c7 candidate, not
+broad API, cross-version semantic coverage, or fresh evidence for later
+structured-query and closed-selector changes.
 
 The `integration_workflows_cross_version_6` profile is a separate integration
 acceptance contract, not a per-API coverage profile. It contains three
@@ -132,7 +143,11 @@ fresh `a20-int22-weather` and `a24-int25-weather` roots passed the repaired
 Weather units. This is passing evidence for all six unique units across roots,
 not one single-candidate 6/6 campaign. Passing sandboxes were cleaned, failed
 sandboxes remain quarantined, and every lifecycle record reports unchanged
-source-project full hash and mtime.
+source-project full hash and mtime. Those campaigns predate the structured
+`query-schema`/`query-object --request-json` migration and the removal of raw
+WAQL mutation selectors. No fresh Codex semantic campaign has validated that
+new routing contract; keep the historical integration result attached only to
+its migration-before candidate.
 
 The review-oriented v3 bundle is rooted at
 `skills/waapi-skill/evals/suite-v3.json` and deliberately separates:

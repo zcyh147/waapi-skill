@@ -170,7 +170,7 @@ restart/assert/crash 会以生命周期不确定状态终止。
 
 命名操作层还为对象创建与修改、插件创建、RTPC/平台 link、音频导入、SoundBank 工作流、Lua/debug、截图，以及 Authoring UI command 的执行、注册和注销提供闭合、按版本约束的业务合同。直接 `audio.import` 现已支持 defaults、逐行导入位置、文件或有界 WAV base64、只建结构、属性、引用、Event/Dialogue Event/Switch 指令及源代码管理选项；Tab Delimited 路径也识别对应的原生列和重复 Event 列。用户用自然语言描述设置时，Skill 会通过一次有界的实时 metadata discovery 查询精确的属性/引用候选和依赖关系，不依赖对象专用预设；与当前 Wwise 会话和工程绑定的 class 元数据及规范 GUID 对象元数据会供后续不可变 preview 复用。选定的实时名称会在同一个导入事务里继续校验并物化，从而避免模型猜字段，也不需要拆成第二次修改。`object.create` 与 `object.set` 通过闭合描述符开放经过审核的平台、列表、重命名、源代码管理、递归 child、属性、引用、插件和 RTPC 形式，并做漂移感知读回。其中递归 `object.set` 的 platform/language 字段从 `2022.1` 起可用；逐对象音频导入描述（文件/Base64、Originals 子目录、语言及实时解析的 source type）从 `2023.1` 起可用，与反射出的版本边界一致。`object.createPlugin` 只接受明确的 class ID 和闭合的 Source/Effect 描述；`2022.1` 使用固定 Effect 引用，后续版本追加 EffectSlot，并通过实时读回验证新建插件。UI command execute 只能验证反射出的空结果结构，不能声称任意 GUI 或工程效果已经验证；register/unregister 还会验证实时命令 ID 的存在状态。Wwise `2021.1` 的 SoundBank 生成只从实时 Project 的 `filePath`、`workunitIsDirty` 和受约束、带哈希、严格解析的 `.wproj` 获取工程上下文；后续版本绑定实时 `core.getProjectInfo`。这些路由把不可变 preview 绑定到显式确认或持久化的 `allow_changes` 策略授权，并使用各操作能提供的最强读回，而不是只相信 WAAPI 返回成功。一旦 URI 已有实现完成的命名操作，generic `waapi.call` 会以 `DEDICATED_OPERATION_REQUIRED` 拒绝该 URI，避免原始 payload 绕过专用合同。
 
-当前固定的纯程序 gate 包含 **2087 项程序测试**，其中每一个已覆盖的默认 profile 版本/API 行都有一项已封装路由合同用例，并另外覆盖 Authoring overlay/UI command、有界的实时元数据发现与缓存合同、功能重叠时的业务意图选择指引、可配置和显式不限时的 Topic wait 生命周期、三种修改策略分支（包括 `read_only` 下由目录合同证明的只读 transaction）、gateway 会话提示上下文和上述命名操作的合同/验证矩阵。它验证 packaged 路由、schema、安全边界、I/O 约束、transaction 行为、fake dispatch 执行和确定性的 onboarding 信息；这不等于已经在真实 Wwise 进程中逐一运行了全部 808 行。对于当前修改策略候选版本，关闭 memory 的 `modification_policy_9-c7` campaign 已通过全部 9 个 Wwise 2022.1 任务：`read_only`、提问式 `ask_before_changes` 和同回合执行的 `allow_changes` 各独立重复 3 次。6 个获准写入的任务都创建并验证了 7 个对象和 46 项业务断言，所有源工程哈希保持不变，sandbox 也全部清理。更早的 `h80-release-c38` 真实 Wwise campaign 另行通过了全部 80 个获批重型 API 场景（2022.1 为 70 个，2024.1 和 2025.1 各 5 个）；这份历史证据只覆盖那些场景及其封存候选版本，不代表整个接口或当前修改策略候选版本都做过真实语义测试。完整口径见[五版本覆盖契约](./skills/waapi-skill/references/waapi-coverage.md)。
+当前固定的纯程序 gate 包含 **2307 项程序测试**，其中每一个已覆盖的默认 profile 版本/API 行都有一项已封装路由合同用例，并另外覆盖 Authoring overlay/UI command、五版本结构化查询编译与 raw WAQL 拒绝矩阵、有界的实时元数据发现与缓存合同、功能重叠时的业务意图选择指引、可配置和显式不限时的 Topic wait 生命周期、三种修改策略分支（包括 `read_only` 下由目录合同证明的只读 transaction）、gateway 会话提示上下文和上述命名操作的合同/验证矩阵。它验证 packaged 路由、schema、安全边界、I/O 约束、transaction 行为、fake dispatch 执行和确定性的 onboarding 信息；这不等于已经在真实 Wwise 进程中逐一运行了全部 808 行。关闭 memory 的 `modification_policy_9-c7` campaign 曾在其精确冻结候选上通过全部 9 个 Wwise 2022.1 任务：`read_only`、提问式 `ask_before_changes` 和同回合执行的 `allow_changes` 各独立重复 3 次。6 个获准写入的任务都创建并验证了 7 个对象和 46 项业务断言，所有源工程哈希保持不变，sandbox 也全部清理。更早的 `h80-release-c38` 真实 Wwise campaign 另行通过了全部 80 个获批重型 API 场景（2022.1 为 70 个，2024.1 和 2025.1 各 5 个）。这些历史证据只覆盖各自封存候选及其场景，均不是对当前结构化查询/闭合 selector 候选的新鲜语义验证。完整口径见[五版本覆盖契约](./skills/waapi-skill/references/waapi-coverage.md)。
 
 ---
 
@@ -303,6 +303,12 @@ python scripts/run.py gateway.py query-object \
   --path '\Events\Default Work Unit' \
   --return-field id --return-field name --return-field type --return-field path
 ```
+
+简单查询继续使用上面的紧凑参数。只有这些参数无法表达所需的嵌套布尔条件
+或有顺序的关系链时，才读取 `query-schema`，按它返回的 JSON Schema
+构造闭合的 `waapi-skill.object-query/v1` 请求，再传给
+`query-object --request-json`。Python Builder 会把结构稳定地编译成有结果
+上限的 WAQL；只读入口和修改对象选择器都不接受模型手写的原始 WAQL。
 
 ### 4. 工程修改必须走 closed transaction lane
 

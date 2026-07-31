@@ -134,11 +134,11 @@ def _public_request(tmp_path: Path, index: int, *, ixml: bool = False):
 
 
 def _assert_public_media_mapping_is_documented() -> None:
-    text = QUERY_REFERENCE.read_text(encoding="utf-8")
+    text = " ".join(QUERY_REFERENCE.read_text(encoding="utf-8").split())
     for required in (
-        "do not run `describe` or `capabilities`",
+        "Do not run `describe` or `capabilities`",
         '`{"type":"field","field":<bound field>,"operator":<operator>,"value":<value>}`',
-        "Preserve the user's predicate order",
+        "Preserve database and predicate order",
         "add `--post-filter-json`",
         "Between/from A to B",
         "Path`, `FileId`, `Db`, `Filename`, `WAV/Duration`, `WAV/Sample Rate`, `WAV/Bit Depth`, `WAV/Channels",

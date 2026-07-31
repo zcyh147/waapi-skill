@@ -12,6 +12,16 @@ OPERATE = (SKILL_ROOT / "references" / "waapi-operate.md").read_text(encoding="u
 COVERAGE = (SKILL_ROOT / "references" / "waapi-coverage.md").read_text(encoding="utf-8")
 
 
+def _structured_query_example_request() -> dict[str, object]:
+    section = QUERY.split(
+        "When the request instead contains nested OR/NOT logic", 1
+    )[1].split("```bash", 1)[1].split("```", 1)[0]
+    request_json = section.split("--request-json '", 1)[1].rsplit("'", 1)[0]
+    payload = json.loads(request_json)
+    assert isinstance(payload, dict)
+    return payload
+
+
 def test_common_reads_use_closed_gateway_before_optional_references() -> None:
     assert SKILL.index("## Fixed gateway commands") < SKILL.index("## Routing")
     assert "Treat gateway JSON as authoritative" in SKILL
@@ -133,7 +143,7 @@ def test_complex_query_guidance_preserves_tokens_pushdown_and_user_bounds() -> N
         "Do not report the language as missing when this exact child-source evidence exists",
         "do not associate by row position, similar names, or path prefixes",
         "A predicate array means AND only",
-        "For `A and (B or C)`, push the common `A`",
+        "For `A and (B or C)` or another nested boolean, switch to the structured route",
         "copy that exact number to `--take`",
         "ask for a limit instead of inventing one",
     ):
@@ -165,6 +175,30 @@ def test_pure_and_query_pushes_every_supported_conjunct_in_canonical_order() -> 
         "--return-field audioSource:language --return-field OutputBus "
         "--return-field isIncluded"
     ) in query_flat
+
+
+def test_nested_boolean_query_uses_the_closed_structured_contract() -> None:
+    query_flat = " ".join(QUERY.split())
+    for phrase in (
+        "offline, version-aware schema command",
+        "`waapi-skill.object-query/v1` JSON Schema",
+        "nested `all`/`any`, or `not`",
+        "Do not add `waql`, `raw`, `expression`",
+        "structured route: use one `where` transform with `all`, `any`, and `not`",
+    ):
+        assert phrase in query_flat
+    request = _structured_query_example_request()
+    assert request["contract"] == "waapi-skill.object-query/v1"
+    assert request["transforms"][-1] == {"kind": "take", "value": 12}
+    where = request["transforms"][1]
+    assert where["kind"] == "where"
+    predicate = where["predicate"]
+    assert predicate["kind"] == "all"
+    assert [item["path"] for item in predicate["operands"][:2]] == [
+        ["type"],
+        ["@Volume"],
+    ]
+    assert predicate["operands"][2]["kind"] == "any"
 
 
 def test_reverse_direct_parent_query_uses_the_parent_transform() -> None:
@@ -437,7 +471,8 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "copy `request_envelope` exactly" in compact
     assert "Unknown fields fail" in OPERATE
     assert "serialize every JSON string exactly once" in OPERATE
-    assert "WAQL value contains ordinary `\"` characters" in OPERATE
+    assert "Public operation requests contain only the closed selector objects above, never raw WAQL text" in OPERATE
+    assert "`exact-type-name`" in OPERATE
     assert "never leave JSON escape backslashes" in OPERATE
     assert (
         "Each later intended-change preview still uses `preview --apply`"

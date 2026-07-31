@@ -101,6 +101,17 @@ def object_row(
     }
 
 
+def _schema_contains_const(value: Any, expected: str) -> bool:
+    if isinstance(value, Mapping):
+        return value.get("const") == expected or any(
+            _schema_contains_const(item, expected)
+            for item in value.values()
+        )
+    if isinstance(value, list | tuple):
+        return any(_schema_contains_const(item, expected) for item in value)
+    return False
+
+
 def project_info_row(project_root: Path) -> dict[str, Any]:
     project_root.mkdir(parents=True, exist_ok=True)
     originals = project_root / "Originals"
@@ -378,9 +389,24 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     assert specs["object.setProperty"]["identity_contract"]["one_of"] == [
         "id",
         "path",
-        "waql",
+        "exact-type-name",
         "direct-child",
         "scoped-name",
+    ]
+    exact_type_name_identity = specs["object.setNotes"]["argument_contract"][
+        "properties"
+    ]["object"]["oneOf"][2]
+    assert exact_type_name_identity["required"] == ["kind", "type", "name"]
+    assert exact_type_name_identity["additionalProperties"] is False
+    assert exact_type_name_identity["properties"]["kind"] == {
+        "const": "exact-type-name"
+    }
+    assert exact_type_name_identity["properties"]["type"]["pattern"] == (
+        r"^[A-Za-z0-9_.]+$"
+    )
+    assert exact_type_name_identity["properties"]["name"]["maxLength"] == 255
+    assert "caller-authored WAQL is not accepted" in exact_type_name_identity[
+        "description"
     ]
     direct_child_identity = specs["object.setNotes"]["argument_contract"][
         "properties"
@@ -394,6 +420,22 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     assert direct_child_identity["properties"]["parent"]["oneOf"][1][
         "properties"
     ]["value"]["maxLength"] == 4096
+    scoped_name_identity = specs["object.setNotes"]["argument_contract"][
+        "properties"
+    ]["object"]["oneOf"][4]
+    assert scoped_name_identity["required"] == ["kind", "name", "type", "parent"]
+    assert scoped_name_identity["additionalProperties"] is False
+    assert scoped_name_identity["properties"]["name"]["maxLength"] == 255
+    assert scoped_name_identity["properties"]["type"]["maxLength"] == 128
+    assert scoped_name_identity["properties"]["type"]["pattern"] == (
+        r"^[A-Za-z0-9_.]+$"
+    )
+    assert scoped_name_identity["properties"]["parent"]["oneOf"][0][
+        "properties"
+    ]["value"]["oneOf"][0]["maxLength"] == 4096
+    assert "caller-authored WAQL is not accepted" in scoped_name_identity[
+        "description"
+    ]
     assert "No caller-authored WAQL" in direct_child_identity["description"]
     assert specs["soundbank.convertExternalSources"]["supported_versions"] == [
         "2022.1",
@@ -412,6 +454,12 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     assert "attested_project_layout" not in generate["optional_arguments"]
     assert "attested_project_layout" not in generate["argument_contract"]["properties"]
     assert any("filePath" in constraint and "WPROJ" in constraint for constraint in generate["constraints"])
+
+
+def test_all_public_operation_schemas_exclude_caller_authored_waql_identities() -> None:
+    for spec in list_operation_specs():
+        contract = spec.as_dict()["argument_contract"]
+        assert not _schema_contains_const(contract, "waql"), spec.name
 
 
 def test_soundbank_generate_schema_discloses_independent_false_rebuild_defaults() -> None:
@@ -2274,7 +2322,16 @@ def test_all_identities_are_live_resolved_and_ambiguous_or_protected_targets_fai
         {"ak.wwise.core.object.get": [{"return": [object_row(), object_row(object_id=TARGET_GUID)]}]}
     )
     parsed = parse_operation_request(
-        request("object.delete", {"object": {"kind": "waql", "value": "from type Sound"}})
+        request(
+            "object.delete",
+            {
+                "object": {
+                    "kind": "exact-type-name",
+                    "type": "Sound",
+                    "name": "OldName",
+                }
+            },
+        )
     )
     with pytest.raises(OperationContractError) as ambiguity:
         prepare_operation(parsed, read_call=ambiguous)
@@ -2302,6 +2359,307 @@ def test_all_identities_are_live_resolved_and_ambiguous_or_protected_targets_fai
     with pytest.raises(OperationContractError) as target:
         prepare_operation(project_delete, read_call=protected)
     assert target.value.error_code == "PROTECTED_TARGET"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    (
+        request(
+            "object.setNotes",
+            {
+                "object": {
+                    "kind": "waql",
+                    "value": "from type Sound take 2",
+                },
+                "value": "reviewed",
+            },
+        ),
+        request(
+            "object.create",
+            {
+                "parent": {
+                    "kind": "path",
+                    "value": r"\Actor-Mixer Hierarchy\Default Work Unit",
+                },
+                "type": "ActorMixer",
+                "name": "ClosedRoot",
+                "references": [
+                    {
+                        "name": "OutputBus",
+                        "target": {
+                            "kind": "waql",
+                            "value": "from type AuxBus take 2",
+                        },
+                    }
+                ],
+            },
+        ),
+        request(
+            "object.set",
+            {
+                "objects": [
+                    {
+                        "object": {
+                            "kind": "path",
+                            "value": (
+                                r"\Actor-Mixer Hierarchy\Default Work Unit"
+                                r"\ClosedRoot"
+                            ),
+                        },
+                        "references": [
+                            {
+                                "name": "OutputBus",
+                                "target": {
+                                    "kind": "waql",
+                                    "value": "from type AuxBus take 2",
+                                },
+                            }
+                        ],
+                    }
+                ]
+            },
+            version="2022.1",
+        ),
+    ),
+)
+def test_raw_waql_identity_is_rejected_during_request_parse_before_any_live_read(
+    payload: Mapping[str, Any],
+) -> None:
+    with pytest.raises(OperationContractError) as rejected:
+        parse_operation_request(payload)
+
+    assert rejected.value.error_code == "INVALID_IDENTITY"
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        {
+            "kind": "exact-type-name",
+            "type": 'Sound where name = "Other"',
+            "name": "OldName",
+        },
+        {
+            "kind": "exact-type-name",
+            "type": "Sound",
+            "name": 'Old"Name',
+        },
+        {
+            "kind": "exact-type-name",
+            "type": "Sound",
+            "name": "OldName",
+            "value": "from type Sound",
+        },
+        {
+            "kind": "exact-type-name",
+            "type": "Sound",
+            "name": "x" * 256,
+        },
+    ),
+)
+def test_exact_type_name_identity_rejects_open_or_unbounded_shapes_before_read(
+    identity: Mapping[str, Any],
+) -> None:
+    with pytest.raises(OperationContractError) as rejected:
+        parse_operation_request(
+            request(
+                "object.setNotes",
+                {"object": identity, "value": "reviewed"},
+            )
+        )
+
+    assert rejected.value.error_code in {"INVALID_IDENTITY", "INVALID_REQUEST"}
+
+
+def test_exact_type_name_identity_requires_one_exact_live_name_and_type() -> None:
+    identity = {
+        "kind": "exact-type-name",
+        "type": "Sound",
+        "name": "OldName",
+    }
+    for rows, error_code in (
+        ([], "AMBIGUOUS_IDENTITY"),
+        (
+            [
+                object_row(),
+                object_row(object_id=TARGET_GUID),
+            ],
+            "AMBIGUOUS_IDENTITY",
+        ),
+        (
+            [object_row(name="DifferentName")],
+            "IDENTITY_MISMATCH",
+        ),
+        (
+            [object_row(object_type="ActorMixer")],
+            "IDENTITY_MISMATCH",
+        ),
+    ):
+        reader = ScriptedReader(
+            {"ak.wwise.core.object.get": [{"return": rows}]}
+        )
+        with pytest.raises(OperationContractError) as rejected:
+            prepare_operation(
+                parse_operation_request(
+                    request(
+                        "object.setNotes",
+                        {"object": identity, "value": "reviewed"},
+                    )
+                ),
+                read_call=reader,
+            )
+
+        assert rejected.value.error_code == error_code
+        assert reader.calls == [
+            (
+                "ak.wwise.core.object.get",
+                {
+                    "waql": (
+                        'from type Sound where name = "OldName" take 2'
+                    )
+                },
+                {
+                    "return": [
+                        "id",
+                        "name",
+                        "type",
+                        "path",
+                        "parent",
+                        "notes",
+                    ]
+                },
+            )
+        ]
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        {
+            "kind": "scoped-name",
+            "type": 'Sound where name = "Other"',
+            "name": "OldName",
+            "parent": {"kind": "id", "value": PARENT_GUID},
+        },
+        {
+            "kind": "scoped-name",
+            "type": "Sound",
+            "name": 'Old"Name',
+            "parent": {"kind": "id", "value": PARENT_GUID},
+        },
+        {
+            "kind": "scoped-name",
+            "type": "Sound",
+            "name": "x" * 256,
+            "parent": {"kind": "id", "value": PARENT_GUID},
+        },
+        {
+            "kind": "scoped-name",
+            "type": "Sound",
+            "name": "OldName",
+            "parent": {"kind": "id", "value": "x" * 4097},
+        },
+        {
+            "kind": "scoped-name",
+            "type": "Sound",
+            "name": "OldName",
+            "parent": {
+                "kind": "path",
+                "value": '\\Actor-Mixer Hierarchy\\Bad"Parent',
+            },
+        },
+    ),
+)
+def test_scoped_name_identity_rejects_open_or_unbounded_shapes_before_read(
+    identity: Mapping[str, Any],
+) -> None:
+    with pytest.raises(OperationContractError) as rejected:
+        parse_operation_request(
+            request(
+                "object.setNotes",
+                {"object": identity, "value": "reviewed"},
+            )
+        )
+
+    assert rejected.value.error_code in {"INVALID_IDENTITY", "INVALID_REQUEST"}
+
+
+@pytest.mark.parametrize(
+    ("target_rows", "error_code"),
+    (
+        ([], "AMBIGUOUS_IDENTITY"),
+        (
+            [
+                object_row(),
+                object_row(object_id=TARGET_GUID),
+            ],
+            "AMBIGUOUS_IDENTITY",
+        ),
+        ([object_row(name="DifferentName")], "IDENTITY_MISMATCH"),
+        ([object_row(object_type="ActorMixer")], "IDENTITY_MISMATCH"),
+        (
+            [object_row(parent="{99999999-9999-9999-9999-999999999999}")],
+            "IDENTITY_MISMATCH",
+        ),
+        (
+            [
+                {
+                    key: (
+                        r"\Actor-Mixer Hierarchy\Other Work Unit\OldName"
+                        if key == "path"
+                        else value
+                    )
+                    for key, value in object_row().items()
+                    if key != "parent"
+                }
+            ],
+            "IDENTITY_MISMATCH",
+        ),
+    ),
+)
+def test_scoped_name_identity_requires_one_exact_live_child(
+    target_rows: list[dict[str, Any]],
+    error_code: str,
+) -> None:
+    parent_row = object_row(
+        object_id=PARENT_GUID,
+        name="Default Work Unit",
+        object_type="WorkUnit",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit",
+    )
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.get": [
+                {"return": [parent_row]},
+                {"return": target_rows},
+            ]
+        }
+    )
+    identity = {
+        "kind": "scoped-name",
+        "type": "Sound",
+        "name": "OldName",
+        "parent": {"kind": "id", "value": PARENT_GUID},
+    }
+
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(
+            parse_operation_request(
+                request(
+                    "object.setNotes",
+                    {"object": identity, "value": "reviewed"},
+                )
+            ),
+            read_call=reader,
+        )
+
+    assert rejected.value.error_code == error_code
+    assert reader.calls[1][1] == {
+        "waql": (
+            f'from object "{PARENT_GUID}" select children '
+            'where type = "Sound" and name = "OldName" take 2'
+        )
+    }
 
 
 def test_direct_child_identity_builds_one_bounded_gateway_owned_selector() -> None:
@@ -2591,9 +2949,19 @@ def test_existing_identity_resolution_shapes_keep_their_original_queries() -> No
             [{"from": {"path": [object_path]}}],
         ),
         (
-            {"kind": "waql", "value": "from type Sound take 2"},
+            {
+                "kind": "exact-type-name",
+                "type": "Sound",
+                "name": "OldName",
+            },
             [{"return": [object_row()]}],
-            [{"waql": "from type Sound take 2"}],
+            [
+                {
+                    "waql": (
+                        'from type Sound where name = "OldName" take 2'
+                    )
+                }
+            ],
         ),
         (
             {
@@ -2620,7 +2988,7 @@ def test_existing_identity_resolution_shapes_keep_their_original_queries() -> No
                 {
                     "waql": (
                         f'from object "{PARENT_GUID}" select children '
-                        'where type = "Sound" and name = "OldName"'
+                        'where type = "Sound" and name = "OldName" take 2'
                     )
                 },
             ],

@@ -768,11 +768,9 @@ def _set_inclusions_request(
         "operation": "soundbank.setInclusions",
         "arguments": {
             "soundbank": {
-                "kind": "waql",
-                "value": (
-                    'from type SoundBank where name = '
-                    f'"{HARBOR_RELEASE_BANK}"'
-                ),
+                "kind": "exact-type-name",
+                "type": "SoundBank",
+                "name": HARBOR_RELEASE_BANK,
             },
             "mode": "replace",
             "inclusions": [

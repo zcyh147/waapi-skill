@@ -171,6 +171,10 @@ _AUDIO_IMPORT_SCALAR_ROW_FIELD_LIMITS = MappingProxyType(
 _AUDIO_IMPORT_EVENT_ACTIONS = frozenset(
     {"Play", "Stop", "Pause", "Resume", "Break", "Seek"}
 )
+_AUDIO_IMPORT_IDENTITY_MAX_NAME_LENGTH = 255
+_AUDIO_IMPORT_IDENTITY_MAX_TYPE_LENGTH = 128
+_AUDIO_IMPORT_IDENTITY_MAX_PARENT_LENGTH = 4096
+_AUDIO_IMPORT_IDENTITY_TYPE_TOKEN_RE = re.compile(r"^[A-Za-z0-9_.]+$")
 _AUDIO_IMPORT_TAB_REQUIRED_ARGUMENT_FIELDS = frozenset(
     {"import_file", "import_location", "import_language"}
 )
@@ -2386,12 +2390,36 @@ def _is_audio_import_identity(value: Any) -> bool:
     if kind == "id" and set(value) == {"kind", "value"}:
         identity = value.get("value")
         return (
-            isinstance(identity, str) and bool(identity)
+            isinstance(identity, str) and bool(identity.strip())
         ) or (
             isinstance(identity, int) and not isinstance(identity, bool)
         )
-    if kind in {"path", "waql"} and set(value) == {"kind", "value"}:
-        return isinstance(value.get("value"), str) and bool(value["value"])
+    if kind == "path" and set(value) == {"kind", "value"}:
+        path = value.get("value")
+        return isinstance(path, str) and path.startswith("\\")
+    if kind == "exact-type-name" and set(value) == {
+        "kind",
+        "type",
+        "name",
+    }:
+        return _is_audio_import_exact_type(value.get("type")) and (
+            _is_audio_import_exact_name(value.get("name"))
+        )
+    if kind == "direct-child" and set(value) == {
+        "kind",
+        "parent",
+        "type",
+    }:
+        parent = value.get("parent")
+        object_type = value.get("type")
+        return (
+            _is_audio_import_parent_identity(parent)
+            and isinstance(object_type, str)
+            and bool(object_type)
+            and object_type == object_type.strip()
+            and len(object_type) <= _AUDIO_IMPORT_IDENTITY_MAX_TYPE_LENGTH
+            and _is_audio_import_waql_literal(object_type)
+        )
     if kind == "scoped-name" and set(value) == {
         "kind",
         "name",
@@ -2400,15 +2428,71 @@ def _is_audio_import_identity(value: Any) -> bool:
     }:
         parent = value.get("parent")
         return (
-            isinstance(value.get("name"), str)
-            and bool(value["name"])
-            and isinstance(value.get("type"), str)
-            and bool(value["type"])
-            and isinstance(parent, Mapping)
-            and parent.get("kind") in {"id", "path"}
-            and _is_audio_import_identity(parent)
+            _is_audio_import_exact_name(value.get("name"))
+            and _is_audio_import_exact_type(value.get("type"))
+            and _is_audio_import_parent_identity(parent)
         )
     return False
+
+
+def _is_audio_import_exact_type(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and bool(value)
+        and value == value.strip()
+        and len(value) <= _AUDIO_IMPORT_IDENTITY_MAX_TYPE_LENGTH
+        and _AUDIO_IMPORT_IDENTITY_TYPE_TOKEN_RE.fullmatch(value) is not None
+    )
+
+
+def _is_audio_import_exact_name(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and bool(value)
+        and value == value.strip()
+        and len(value) <= _AUDIO_IMPORT_IDENTITY_MAX_NAME_LENGTH
+        and "\\" not in value
+        and _is_audio_import_waql_literal(value)
+    )
+
+
+def _is_audio_import_parent_identity(value: Any) -> bool:
+    if (
+        not isinstance(value, Mapping)
+        or not all(isinstance(key, str) for key in value)
+        or set(value) != {"kind", "value"}
+        or value.get("kind") not in {"id", "path"}
+    ):
+        return False
+    identity = value.get("value")
+    if value.get("kind") == "id":
+        if isinstance(identity, int) and not isinstance(identity, bool):
+            return True
+        return (
+            isinstance(identity, str)
+            and bool(identity.strip())
+            and len(identity) <= _AUDIO_IMPORT_IDENTITY_MAX_PARENT_LENGTH
+            and _is_audio_import_waql_literal(identity)
+        )
+    return (
+        isinstance(identity, str)
+        and identity.startswith("\\")
+        and len(identity) <= _AUDIO_IMPORT_IDENTITY_MAX_PARENT_LENGTH
+        and _is_audio_import_waql_literal(identity)
+    )
+
+
+def _is_audio_import_waql_literal(value: str) -> bool:
+    return (
+        bool(value)
+        and '"' not in value
+        and not any(
+            ord(character) < 32
+            or ord(character) == 127
+            or character in {"\u2028", "\u2029"}
+            for character in value
+        )
+    )
 
 
 def _audio_import_field_names(

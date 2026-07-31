@@ -38,7 +38,10 @@ from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissi
     canonical_json_bytes,
     canonical_sha256,
 )
-from wwise_waapi.builders.common import SemanticValidationError  # noqa: E402  # pyright: ignore[reportMissingImports]
+from wwise_waapi.builders.common import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    SemanticPreview,
+    SemanticValidationError,
+)
 from wwise_waapi.builders.cli_request_templates import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     CLI_REQUEST_TEMPLATE_URIS,
     build_cli_request_template,
@@ -85,8 +88,11 @@ from wwise_waapi.metadata_discovery import (  # noqa: E402  # pyright: ignore[re
 )
 from wwise_waapi.builders.query import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_QUERY_TAKE,
+    STRUCTURED_QUERY_CONTRACT,
     SUPPORTED_SELECTS,
     build_object_get_query,
+    build_structured_object_get_query,
+    structured_query_schema,
 )
 from wwise_waapi.builders.stable_reads import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_BUS_PIPELINE_IDS,
@@ -224,6 +230,7 @@ OFFLINE_COMMANDS = frozenset(
         "describe",
         "operations",
         "operation-schema",
+        "query-schema",
         "object-types",
         "config-show",
         "config-set",
@@ -1048,6 +1055,14 @@ def build_parser() -> argparse.ArgumentParser:
             r"\Queries\... path; raw WAQL is not accepted"
         ),
     )
+    query_source.add_argument(
+        "--request-json",
+        metavar="OBJECT_QUERY_JSON",
+        help=(
+            "Closed waapi-skill.object-query/v1 document obtained from "
+            "query-schema; raw WAQL and expression strings are not accepted"
+        ),
+    )
     query_object.add_argument("--where-json")
     query_object.add_argument(
         "--match-original-file-path",
@@ -1262,6 +1277,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Describe one closed operation request shape, versioned CLI templates when applicable, and its execution boundary offline",
     )
     operation_schema.add_argument("operation")
+
+    query_schema = subparsers.add_parser(
+        "query-schema",
+        help=(
+            "Describe the closed structured object-query contract offline; "
+            "use it only when the simple query-object flags are insufficient"
+        ),
+    )
+    query_schema.add_argument("--all-versions", action="store_true")
 
     object_types = subparsers.add_parser(
         "object-types",
@@ -1753,7 +1777,10 @@ def gateway_stdout_json_encoder(value: Any | None = None) -> json.JSONEncoder:
         "allow_nan": False,
         "check_circular": True,
     }
-    if isinstance(value, Mapping) and value.get("command") == "operation-schema":
+    if (
+        isinstance(value, Mapping)
+        and value.get("command") in {"operation-schema", "query-schema"}
+    ):
         options["separators"] = (",", ":")
     else:
         options["indent"] = 2
@@ -2360,6 +2387,17 @@ def preflight_public_route(
 def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, str]) -> None:
     """Reject closed query input errors before opening a WAAPI transport."""
 
+    if structured_query_requested(args):
+        _require_structured_query_option_exclusivity(args)
+        request = parse_json_object(args.request_json, "--request-json")
+        (preflight_version,) = resolve_catalog_versions(args, env=env)
+        preview = build_structured_object_get_query(
+            request,
+            version=preflight_version,
+        )
+        _require_structured_exact_identity_return_field(preview)
+        return
+
     if original_file_reference_match_requested(args):
         (preflight_version,) = resolve_catalog_versions(args, env=env)
         validate_original_file_reference_match_input(
@@ -2947,6 +2985,37 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "returned_count": total_returned,
             "match_count_in_bounded_pages": total_matches,
             "catalogs": catalogs,
+        }
+    if args.command == "query-schema":
+        versions = resolve_catalog_versions(args, env=env)
+        return {
+            "contract": GATEWAY_RESULT_CONTRACT,
+            "ok": True,
+            "status": "ok",
+            "command": "query-schema",
+            "offline": True,
+            "query_contract": STRUCTURED_QUERY_CONTRACT,
+            "versions": list(versions),
+            "schemas": {
+                version: structured_query_schema(version=version)
+                for version in versions
+            },
+            "boundary": {
+                "raw_waql_accepted": False,
+                "raw_expression_accepted": False,
+                "result_limit_required_for": [
+                    "broad sources",
+                    "multiple object sources",
+                    "select transforms",
+                ],
+                "deferred_syntax": [
+                    "skip",
+                    "orderby",
+                    "distinct",
+                    "regular-expression literals",
+                    "WAQL 2.0 list functions",
+                ],
+            },
         }
     if args.command == "operations":
         operations = [
@@ -4461,6 +4530,54 @@ def dispatch_command(
                 dispatcher=dispatcher,
                 common=common,
             )
+        if structured_query_requested(args):
+            _require_structured_query_option_exclusivity(args)
+            request = parse_json_object(args.request_json, "--request-json")
+            preview = build_structured_object_get_query(
+                request,
+                version=detected_version,
+            )
+            _require_structured_exact_identity_return_field(preview)
+            envelope = preview.envelope
+            exact_identity = _structured_query_exact_identity(preview)
+            query_bound = _structured_query_bound(preview)
+            result = dispatch(
+                dispatcher,
+                envelope.uri,
+                connection=connection,
+                version=detected_version,
+                args=envelope.args,
+                options=envelope.options,
+                exact_object_lookup=exact_identity is not None,
+            )
+            rows = (
+                strict_object_get_rows(
+                    result,
+                    command="query-object",
+                    maximum_rows=_structured_query_result_maximum(
+                        query_bound,
+                        exact_identity=exact_identity,
+                    ),
+                )
+                if result.get("ok")
+                else []
+            )
+            if result.get("ok"):
+                validate_structured_exact_query_identity(
+                    exact_identity,
+                    rows,
+                )
+            return {
+                "ok": bool(result.get("ok")),
+                "status": "ok" if result.get("ok") else "error",
+                **common,
+                "query_contract": STRUCTURED_QUERY_CONTRACT,
+                "semantic_preview": preview.as_dict(),
+                "query_bound": query_bound,
+                "call": dispatch_call_summary(result),
+                "count": len(rows) if result.get("ok") else None,
+                "objects": rows if result.get("ok") else None,
+            }
         where = parse_optional_json(args.where_json, "--where-json")
         return_fields = tuple(args.return_fields or ("id", "name", "type", "path"))
         _require_exact_identity_return_field(args, return_fields)
@@ -7021,6 +7138,176 @@ def _single_exact_lookup(args: Mapping[str, Any] | None) -> bool:
     if "id" in source:
         return _canonical_guid(value)
     return _canonical_wwise_path(value)
+
+
+def structured_query_requested(args: argparse.Namespace) -> bool:
+    """Return whether query-object uses the closed structured request lane."""
+
+    return getattr(args, "request_json", None) is not None
+
+
+def _require_structured_query_option_exclusivity(
+    args: argparse.Namespace,
+) -> None:
+    """Keep one structured document authoritative for the complete query."""
+
+    conflicting: list[str] = []
+    if args.where_json is not None:
+        conflicting.append("--where-json")
+    if args.match_original_file_paths:
+        conflicting.append("--match-original-file-path")
+    if args.select:
+        conflicting.append("--select")
+    if args.take is not None:
+        conflicting.append("--take")
+    if args.all_results:
+        conflicting.append("--all-results")
+    if args.return_fields:
+        conflicting.append("--return-field")
+    if conflicting:
+        raise GatewayInputError(
+            "query-object --request-json owns the source, transforms, return "
+            "fields, and result bound; it cannot be combined with "
+            + ", ".join(conflicting)
+            + "."
+        )
+
+
+def _structured_query_exact_identity(
+    preview: SemanticPreview,
+) -> dict[str, str] | None:
+    """Read the builder-owned exact identity without reparsing generated WAQL."""
+
+    metadata = preview.envelope.metadata
+    identity = metadata.get("exact_identity")
+    if identity is None:
+        return None
+    if not isinstance(identity, Mapping) or set(identity) != {"kind", "value"}:
+        raise GatewayResultShapeError(
+            "Structured query builder returned an invalid exact-identity contract.",
+            details={"command": "query-object"},
+            error_code="INVALID_STRUCTURED_QUERY_PLAN",
+        )
+    kind = identity.get("kind")
+    value = identity.get("value")
+    if kind == "id":
+        valid = _canonical_guid(value)
+    elif kind == "path":
+        valid = _canonical_wwise_path(value)
+    else:
+        valid = False
+    if not valid:
+        raise GatewayResultShapeError(
+            "Structured query builder returned an invalid exact-identity value.",
+            details={
+                "command": "query-object",
+                "identity_kind": kind,
+            },
+            error_code="INVALID_STRUCTURED_QUERY_PLAN",
+        )
+    assert isinstance(kind, str) and isinstance(value, str)
+    return {"kind": kind, "value": value}
+
+
+def _structured_query_bound(preview: SemanticPreview) -> dict[str, Any]:
+    """Read and validate the strongest builder-owned public result bound."""
+
+    bound = preview.envelope.metadata.get("query_bound")
+    if not isinstance(bound, Mapping) or set(bound) != {"mode", "value"}:
+        raise GatewayResultShapeError(
+            "Structured query builder returned an invalid result-bound contract.",
+            details={"command": "query-object"},
+            error_code="INVALID_STRUCTURED_QUERY_PLAN",
+        )
+    mode = bound.get("mode")
+    value = bound.get("value")
+    valid = (
+        mode == "take"
+        and isinstance(value, int)
+        and not isinstance(value, bool)
+        and 0 <= value <= MAX_QUERY_TAKE
+    ) or (mode == "exact-object" and value == 1)
+    if not valid:
+        raise GatewayResultShapeError(
+            "Structured query builder returned an invalid result bound.",
+            details={
+                "command": "query-object",
+                "mode": mode,
+                "value": value,
+            },
+            error_code="INVALID_STRUCTURED_QUERY_PLAN",
+        )
+    return {"mode": mode, "value": value}
+
+
+def _structured_query_result_maximum(
+    query_bound: Mapping[str, Any],
+    *,
+    exact_identity: Mapping[str, str] | None,
+) -> int:
+    value = query_bound["value"]
+    assert isinstance(value, int) and not isinstance(value, bool)
+    return min(value, 1) if exact_identity is not None else value
+
+
+def _require_structured_exact_identity_return_field(
+    preview: SemanticPreview,
+) -> None:
+    """Keep exact structured lookups independently identity-verifiable."""
+
+    identity = _structured_query_exact_identity(preview)
+    if identity is None:
+        return
+    return_fields = preview.envelope.options.get("return")
+    required = "id" if identity["kind"] == "id" else "path"
+    if (
+        not isinstance(return_fields, list)
+        or required not in return_fields
+    ):
+        raise GatewayInputError(
+            "An exact structured object query must include "
+            f"{required!r} in its return array so the packaged Gateway can "
+            "verify the returned identity."
+        )
+
+
+def validate_structured_exact_query_identity(
+    identity: Mapping[str, str] | None,
+    rows: Sequence[Mapping[str, Any]],
+) -> None:
+    """Reject successful structured exact lookups whose identity drifted."""
+
+    if identity is None:
+        return
+    kind = identity["kind"]
+    value = identity["value"]
+    field = "id" if kind == "id" else "path"
+    if kind == "id":
+        expected = value.casefold()
+        mismatches = [
+            {"index": index, "actual": row.get(field)}
+            for index, row in enumerate(rows)
+            if not isinstance(row.get(field), str)
+            or not _canonical_guid(row.get(field))
+            or str(row.get(field)).casefold() != expected
+        ]
+    else:
+        expected = _normalize_wwise_identity_path(value)
+        mismatches = [
+            {"index": index, "actual": row.get(field)}
+            for index, row in enumerate(rows)
+            if _normalize_wwise_identity_path(row.get(field)) != expected
+        ]
+    if mismatches:
+        raise GatewayResultShapeError(
+            "Structured query-object exact lookup returned a different identity.",
+            details={
+                "command": "query-object",
+                "identity_field": field,
+                "expected": value,
+                "mismatches": mismatches,
+            },
+        )
 
 
 def _canonical_exact_query_request(args: argparse.Namespace) -> bool:

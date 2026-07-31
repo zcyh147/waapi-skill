@@ -229,11 +229,28 @@ def test_property_and_reference_descriptors_are_closed_and_typed() -> None:
                     "type": "Action",
                 },
             },
+            {
+                "name": "TargetBus",
+                "target": {
+                    "kind": "exact-type-name",
+                    "type": "AuxBus",
+                    "name": "Gameplay Bus",
+                },
+            },
         ]
     )
     assert references[0].target.as_dict() == {"kind": "id", "value": "{BUS}"}
     assert references[1].target.parent is not None
     assert references[1].target.parent.kind == "path"
+    assert references[1].target.as_dict() == {
+        "kind": "scoped-name",
+        "name": "Outdoor",
+        "type": "Attenuation",
+        "parent": {
+            "kind": "path",
+            "value": "\\Attenuations\\Default Work Unit",
+        },
+    }
     assert references[2].target.as_dict() == {
         "kind": "direct-child",
         "parent": {
@@ -241,6 +258,11 @@ def test_property_and_reference_descriptors_are_closed_and_typed() -> None:
             "value": "\\Events\\Default Work Unit\\Play_Weather",
         },
         "type": "Action",
+    }
+    assert references[3].target.as_dict() == {
+        "kind": "exact-type-name",
+        "type": "AuxBus",
+        "name": "Gameplay Bus",
     }
 
     for invalid_value in (None, [1, 2], {"value": 1}, math.nan, math.inf):
@@ -255,6 +277,79 @@ def test_property_and_reference_descriptors_are_closed_and_typed() -> None:
     with pytest.raises(ObjectOperationContractError) as missing_target:
         normalize_reference_descriptors([{"name": "OutputBus", "target": None}])
     assert missing_target.value.error_code == "INVALID_OBJECT"
+
+
+@pytest.mark.parametrize(
+    ("target", "error_code"),
+    (
+        (
+            {"kind": "waql", "value": "from type AuxBus take 2"},
+            "INVALID_IDENTITY",
+        ),
+        (
+            {
+                "kind": "exact-type-name",
+                "type": 'AuxBus where name = "Other"',
+                "name": "Gameplay Bus",
+            },
+            "INVALID_IDENTITY",
+        ),
+        (
+            {
+                "kind": "exact-type-name",
+                "type": "AuxBus",
+                "name": 'Gameplay "Bus"',
+            },
+            "INVALID_IDENTITY",
+        ),
+        (
+            {
+                "kind": "scoped-name",
+                "type": 'AuxBus where name = "Other"',
+                "name": "Gameplay Bus",
+                "parent": {"kind": "path", "value": "\\Busses\\Default Work Unit"},
+            },
+            "INVALID_IDENTITY",
+        ),
+        (
+            {
+                "kind": "scoped-name",
+                "type": "AuxBus",
+                "name": 'Gameplay "Bus"',
+                "parent": {"kind": "path", "value": "\\Busses\\Default Work Unit"},
+            },
+            "INVALID_IDENTITY",
+        ),
+        (
+            {
+                "kind": "scoped-name",
+                "type": "AuxBus",
+                "name": "Gameplay Bus",
+                "parent": {"kind": "id", "value": "x" * 4097},
+            },
+            "INVALID_IDENTITY",
+        ),
+        (
+            {
+                "kind": "scoped-name",
+                "type": "AuxBus",
+                "name": "x" * 256,
+                "parent": {"kind": "path", "value": "\\Busses\\Default Work Unit"},
+            },
+            "STRING_LIMIT_EXCEEDED",
+        ),
+    ),
+)
+def test_nested_reference_identity_rejects_raw_waql_and_open_type_name_shapes(
+    target: dict[str, object],
+    error_code: str,
+) -> None:
+    with pytest.raises(ObjectOperationContractError) as rejected:
+        normalize_reference_descriptors(
+            [{"name": "OutputBus", "target": target}]
+        )
+
+    assert rejected.value.error_code == error_code
 
 
 def test_duplicate_fields_and_sibling_names_are_rejected_case_insensitively() -> None:

@@ -430,6 +430,8 @@ FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS: Mapping[str, frozenset[str]] = {
 
 DIRECT_CHILD_MAX_PARENT_LITERAL_LENGTH = 4096
 DIRECT_CHILD_MAX_TYPE_LENGTH = 128
+EXACT_TYPE_NAME_MAX_NAME_LENGTH = 255
+_EXACT_TYPE_NAME_TYPE_TOKEN = re.compile(r"^[A-Za-z0-9_.]+$")
 
 
 _ID_IDENTITY_SCHEMA: Mapping[str, Any] = {
@@ -444,11 +446,30 @@ _PATH_IDENTITY_SCHEMA: Mapping[str, Any] = {
     "additionalProperties": False,
     "properties": {"kind": {"const": "path"}, "value": {"type": "string", "pattern": r"^\\"}},
 }
-_WAQL_IDENTITY_SCHEMA: Mapping[str, Any] = {
+_EXACT_TYPE_NAME_IDENTITY_SCHEMA: Mapping[str, Any] = {
     "type": "object",
-    "required": ["kind", "value"],
+    "required": ["kind", "type", "name"],
     "additionalProperties": False,
-    "properties": {"kind": {"const": "waql"}, "value": {"type": "string", "minLength": 1}},
+    "properties": {
+        "kind": {"const": "exact-type-name"},
+        "type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": DIRECT_CHILD_MAX_TYPE_LENGTH,
+            "pattern": _EXACT_TYPE_NAME_TYPE_TOKEN.pattern,
+            "description": "Exact Wwise type token used in a Gateway-owned WAQL source.",
+        },
+        "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": EXACT_TYPE_NAME_MAX_NAME_LENGTH,
+            "description": "Exact global object name; live resolution must return exactly one row.",
+        },
+    },
+    "description": (
+        "Resolve exactly one globally named object of one exact type. "
+        "The Gateway constructs the bounded WAQL selector; caller-authored WAQL is not accepted."
+    ),
 }
 _DIRECT_CHILD_PARENT_ID_SCHEMA: Mapping[str, Any] = {
     "type": "object",
@@ -513,7 +534,7 @@ IDENTITY_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     "oneOf": [
         _ID_IDENTITY_SCHEMA,
         _PATH_IDENTITY_SCHEMA,
-        _WAQL_IDENTITY_SCHEMA,
+        _EXACT_TYPE_NAME_IDENTITY_SCHEMA,
         _DIRECT_CHILD_IDENTITY_SCHEMA,
         {
             "type": "object",
@@ -521,13 +542,31 @@ IDENTITY_ARGUMENT_SCHEMA: Mapping[str, Any] = {
             "additionalProperties": False,
             "properties": {
                 "kind": {"const": "scoped-name"},
-                "name": {"type": "string", "minLength": 1},
-                "type": {"type": "string", "minLength": 1},
+                "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": EXACT_TYPE_NAME_MAX_NAME_LENGTH,
+                    "description": "Exact object name below the one closed parent.",
+                },
+                "type": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": DIRECT_CHILD_MAX_TYPE_LENGTH,
+                    "pattern": _EXACT_TYPE_NAME_TYPE_TOKEN.pattern,
+                    "description": "Exact Wwise type token below the one closed parent.",
+                },
                 "parent": {
                     "description": "Closed id or path identity; live-resolved before preview.",
-                    "oneOf": [_ID_IDENTITY_SCHEMA, _PATH_IDENTITY_SCHEMA],
+                    "oneOf": [
+                        _DIRECT_CHILD_PARENT_ID_SCHEMA,
+                        _DIRECT_CHILD_PARENT_PATH_SCHEMA,
+                    ],
                 },
             },
+            "description": (
+                "Resolve exactly one direct child by exact type and name below one closed parent. "
+                "The Gateway constructs the bounded selector; caller-authored WAQL is not accepted."
+            ),
         },
     ]
 }
@@ -1495,7 +1534,7 @@ class OperationSpec:
                 "one_of": [
                     "id",
                     "path",
-                    "waql",
+                    "exact-type-name",
                     "direct-child",
                     "scoped-name",
                 ],
@@ -16621,6 +16660,7 @@ def _resolve_identity(payload: Any, *, role: str, read: ReadCall) -> ResolvedObj
     kind = payload.get("kind")
     direct_child_parent: ResolvedObject | None = None
     direct_child_type: str | None = None
+    scoped_name_parent: ResolvedObject | None = None
     if kind == "id":
         _require_exact_keys(payload, required=("kind", "value"), context=f"{role} identity")
         value = payload.get("value")
@@ -16635,13 +16675,16 @@ def _resolve_identity(payload: Any, *, role: str, read: ReadCall) -> ResolvedObj
             raise OperationContractError("INVALID_IDENTITY", f"{role} path must start with a backslash.")
         identity = ObjectIdentity(path=value)
         args = {"from": {"path": [value]}}
-    elif kind == "waql":
-        _require_exact_keys(payload, required=("kind", "value"), context=f"{role} identity")
-        value = payload.get("value")
-        if not isinstance(value, str) or not value.strip():
-            raise OperationContractError("INVALID_IDENTITY", f"{role} WAQL must be a non-empty string.")
-        identity = ObjectIdentity(waql=value)
-        args = {"waql": value}
+    elif kind == "exact-type-name":
+        _validate_exact_type_name_identity_payload(payload, role=role)
+        object_type = str(payload["type"])
+        name = str(payload["name"])
+        query = (
+            f"from type {object_type} where name = "
+            f"{quote_waql_literal(name)} take 2"
+        )
+        identity = ObjectIdentity(waql=query)
+        args = {"waql": query}
     elif kind == "direct-child":
         _validate_direct_child_identity_payload(payload, role=role)
         parent_payload = payload["parent"]
@@ -16671,20 +16714,34 @@ def _resolve_identity(payload: Any, *, role: str, read: ReadCall) -> ResolvedObj
         identity = ObjectIdentity(waql=query)
         args = {"waql": query}
     elif kind == "scoped-name":
-        _require_exact_keys(payload, required=("kind", "name", "type", "parent"), context=f"{role} identity")
-        parent_payload = payload.get("parent")
-        if not isinstance(parent_payload, Mapping) or parent_payload.get("kind") not in {"id", "path"}:
-            raise OperationContractError("INVALID_IDENTITY", f"{role} scoped-name parent must be an id or path identity.")
-        parent = _resolve_identity(parent_payload, role=f"{role}.parent", read=read)
-        name = _non_empty_string(payload.get("name"), field=f"{role}.name")
-        object_type = _non_empty_string(payload.get("type"), field=f"{role}.type")
-        identity = ObjectIdentity(name=name, type=object_type, parent=str(parent.object))
+        _validate_scoped_name_identity_payload(payload, role=role)
+        parent_payload = payload["parent"]
+        assert isinstance(parent_payload, Mapping)
+        scoped_name_parent = _resolve_identity(
+            parent_payload,
+            role=f"{role}.parent",
+            read=read,
+        )
+        name = str(payload["name"])
+        object_type = str(payload["type"])
+        identity = ObjectIdentity(
+            name=name,
+            type=object_type,
+            parent=str(scoped_name_parent.object),
+        )
         planned = plan_object_resolution(identity, destructive_use=True)
         args = dict(planned.readback_plan.args)  # type: ignore[union-attr]
+        scoped_query = args.get("waql")
+        if not isinstance(scoped_query, str) or not scoped_query:
+            raise OperationContractError(
+                "INVALID_IDENTITY",
+                f"{role} scoped-name identity did not produce a bounded selector.",
+            )
+        args["waql"] = f"{scoped_query} take 2"
     else:
         raise OperationContractError(
             "INVALID_IDENTITY",
-            f"{role} identity kind must be id, path, waql, direct-child, or scoped-name.",
+            f"{role} identity kind must be id, path, exact-type-name, direct-child, or scoped-name.",
             details={"kind": kind},
         )
     result = read(OBJECT_GET_URI, args, {"return": list(IDENTITY_RETURN_FIELDS)})
@@ -16703,6 +16760,52 @@ def _resolve_identity(payload: Any, *, role: str, read: ReadCall) -> ResolvedObj
         raise OperationContractError("IDENTITY_MISMATCH", f"{role} live GUID does not match the request.", details={"row": row})
     if kind == "path" and row.get("path") != payload.get("value"):
         raise OperationContractError("IDENTITY_MISMATCH", f"{role} live path does not match the request.", details={"row": row})
+    if kind == "exact-type-name" and (
+        row.get("name") != payload.get("name")
+        or row.get("type") != payload.get("type")
+    ):
+        raise OperationContractError(
+            "IDENTITY_MISMATCH",
+            f"{role} live name/type does not exactly match the request.",
+            details={
+                "expected_name": payload.get("name"),
+                "expected_type": payload.get("type"),
+                "actual_name": row.get("name"),
+                "actual_type": row.get("type"),
+                "row": row,
+            },
+        )
+    if kind == "scoped-name":
+        assert scoped_name_parent is not None
+        if (
+            row.get("name") != payload.get("name")
+            or row.get("type") != payload.get("type")
+        ):
+            raise OperationContractError(
+                "IDENTITY_MISMATCH",
+                f"{role} live scoped name/type does not exactly match the request.",
+                details={
+                    "expected_name": payload.get("name"),
+                    "expected_type": payload.get("type"),
+                    "actual_name": row.get("name"),
+                    "actual_type": row.get("type"),
+                    "row": row,
+                },
+            )
+        parent_match = _direct_child_parent_relationship_matches(
+            row,
+            scoped_name_parent,
+        )
+        if parent_match is not True:
+            raise OperationContractError(
+                "IDENTITY_MISMATCH",
+                f"{role} live scoped object is not proven to be a direct child of the resolved parent.",
+                details={
+                    "expected_parent": scoped_name_parent.as_dict(),
+                    "actual_parent": row.get("parent"),
+                    "row": row,
+                },
+            )
     if kind == "direct-child":
         assert direct_child_type is not None and direct_child_parent is not None
         if row.get("type") != direct_child_type:
@@ -17465,24 +17568,175 @@ def _validate_identity_payload_shape(payload: Any, *, role: str) -> None:
     if not isinstance(payload, Mapping):
         raise OperationContractError("INVALID_IDENTITY", f"{role} identity must be a JSON object.")
     kind = payload.get("kind")
-    if kind in {"id", "path", "waql"}:
+    if kind in {"id", "path"}:
         _require_exact_keys(payload, required=("kind", "value"), context=f"{role} identity")
+        return
+    if kind == "exact-type-name":
+        _validate_exact_type_name_identity_payload(payload, role=role)
         return
     if kind == "direct-child":
         _validate_direct_child_identity_payload(payload, role=role)
         return
     if kind == "scoped-name":
-        _require_exact_keys(payload, required=("kind", "name", "type", "parent"), context=f"{role} identity")
-        parent = payload.get("parent")
-        if not isinstance(parent, Mapping) or parent.get("kind") not in {"id", "path"}:
-            raise OperationContractError("INVALID_IDENTITY", f"{role} scoped-name parent must be an id or path identity.")
-        _validate_identity_payload_shape(parent, role=f"{role}.parent")
+        _validate_scoped_name_identity_payload(payload, role=role)
         return
     raise OperationContractError(
         "INVALID_IDENTITY",
-        f"{role} identity kind must be id, path, waql, direct-child, or scoped-name.",
+        f"{role} identity kind must be id, path, exact-type-name, direct-child, or scoped-name.",
         details={"kind": kind},
     )
+
+
+def _validate_exact_type_name_identity_payload(
+    payload: Mapping[str, Any],
+    *,
+    role: str,
+) -> None:
+    _require_exact_keys(
+        payload,
+        required=("kind", "type", "name"),
+        context=f"{role} identity",
+    )
+    object_type = payload.get("type")
+    if (
+        not isinstance(object_type, str)
+        or not object_type
+        or object_type != object_type.strip()
+        or len(object_type) > DIRECT_CHILD_MAX_TYPE_LENGTH
+        or _EXACT_TYPE_NAME_TYPE_TOKEN.fullmatch(object_type) is None
+    ):
+        raise OperationContractError(
+            "INVALID_IDENTITY",
+            f"{role} exact-type-name type must be one bounded Wwise type token.",
+            details={
+                "role": role,
+                "limit": DIRECT_CHILD_MAX_TYPE_LENGTH,
+                "accepted": _EXACT_TYPE_NAME_TYPE_TOKEN.pattern,
+            },
+        )
+    name = payload.get("name")
+    if (
+        not isinstance(name, str)
+        or not name
+        or name != name.strip()
+        or len(name) > EXACT_TYPE_NAME_MAX_NAME_LENGTH
+        or "\\" in name
+    ):
+        raise OperationContractError(
+            "INVALID_IDENTITY",
+            f"{role} exact-type-name name must be one bounded exact object name.",
+            details={
+                "role": role,
+                "limit": EXACT_TYPE_NAME_MAX_NAME_LENGTH,
+            },
+        )
+    try:
+        quote_waql_literal(name)
+    except ValueError as exc:
+        raise OperationContractError(
+            "INVALID_IDENTITY",
+            f"{role} exact-type-name name is outside the packaged WAQL literal boundary.",
+            details={
+                "role": role,
+                "boundary": "packaged-waql-literal-evidence",
+            },
+        ) from exc
+
+
+def _validate_scoped_name_identity_payload(
+    payload: Mapping[str, Any],
+    *,
+    role: str,
+) -> None:
+    _require_exact_keys(
+        payload,
+        required=("kind", "name", "type", "parent"),
+        context=f"{role} identity",
+    )
+    object_type = payload.get("type")
+    if (
+        not isinstance(object_type, str)
+        or not object_type
+        or object_type != object_type.strip()
+        or len(object_type) > DIRECT_CHILD_MAX_TYPE_LENGTH
+        or _EXACT_TYPE_NAME_TYPE_TOKEN.fullmatch(object_type) is None
+    ):
+        raise OperationContractError(
+            "INVALID_IDENTITY",
+            f"{role} scoped-name type must be one bounded Wwise type token.",
+            details={
+                "role": role,
+                "limit": DIRECT_CHILD_MAX_TYPE_LENGTH,
+                "accepted": _EXACT_TYPE_NAME_TYPE_TOKEN.pattern,
+            },
+        )
+    name = payload.get("name")
+    if (
+        not isinstance(name, str)
+        or not name
+        or name != name.strip()
+        or len(name) > EXACT_TYPE_NAME_MAX_NAME_LENGTH
+        or "\\" in name
+    ):
+        raise OperationContractError(
+            "INVALID_IDENTITY",
+            f"{role} scoped-name name must be one bounded exact object name.",
+            details={
+                "role": role,
+                "limit": EXACT_TYPE_NAME_MAX_NAME_LENGTH,
+            },
+        )
+    parent = payload.get("parent")
+    if not isinstance(parent, Mapping) or parent.get("kind") not in {"id", "path"}:
+        raise OperationContractError(
+            "INVALID_IDENTITY",
+            f"{role} scoped-name parent must be an id or path identity.",
+        )
+    _require_exact_keys(
+        parent,
+        required=("kind", "value"),
+        context=f"{role}.parent identity",
+    )
+    parent_value = parent.get("value")
+    if parent.get("kind") == "id":
+        if (
+            isinstance(parent_value, bool)
+            or not isinstance(parent_value, (str, int))
+            or (
+                isinstance(parent_value, str)
+                and (
+                    not parent_value.strip()
+                    or len(parent_value) > DIRECT_CHILD_MAX_PARENT_LITERAL_LENGTH
+                )
+            )
+        ):
+            raise OperationContractError(
+                "INVALID_IDENTITY",
+                f"{role} scoped-name parent id must be a bounded non-empty string or integer.",
+                details={"limit": DIRECT_CHILD_MAX_PARENT_LITERAL_LENGTH},
+            )
+    elif (
+        not isinstance(parent_value, str)
+        or not parent_value.startswith("\\")
+        or len(parent_value) > DIRECT_CHILD_MAX_PARENT_LITERAL_LENGTH
+    ):
+        raise OperationContractError(
+            "INVALID_IDENTITY",
+            f"{role} scoped-name parent path must be a bounded absolute Wwise path.",
+            details={"limit": DIRECT_CHILD_MAX_PARENT_LITERAL_LENGTH},
+        )
+    try:
+        quote_waql_literal(name)
+        quote_waql_literal(str(parent_value))
+    except ValueError as exc:
+        raise OperationContractError(
+            "INVALID_IDENTITY",
+            f"{role} scoped-name identity contains an unsupported WAQL literal.",
+            details={
+                "role": role,
+                "boundary": "packaged-waql-literal-evidence",
+            },
+        ) from exc
 
 
 def _validate_direct_child_identity_payload(

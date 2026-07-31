@@ -13,9 +13,11 @@ invoke the Gateway.
 
 - Use only the Skill-local Gateway. Return its structured evidence or a clear
   blocker; never use direct `WaapiClient`, inline Python, or a generated helper.
-- Use the entry file's fixed `status`, `buses`, `selected`, `query-object`,
-  `object-types`, `metadata`, `wait-topic`, and `stream-topic` commands directly.
-  Public command shapes include `gateway.py query-object`,
+- Use the entry file's fixed `status`, `buses`, `selected`, `query-schema`,
+  `query-object`, `object-types`, `metadata`, `wait-topic`, and `stream-topic`
+  commands directly. Public command shapes include offline
+  `gateway.py query-schema`, simple `gateway.py query-object` flags, structured
+  `gateway.py query-object --request-json`,
   `gateway.py wait-topic`, and `gateway.py stream-topic`.
   Observing a Topic is read-only and never authorizes the change that publishes it.
 - For a broad catalog question start with
@@ -142,35 +144,64 @@ This is a Wwise `2025.1`-only follow-up to a successful Media Pool read.
 
 ## Object queries
 
-`query-object` accepts exactly one source: `--path`, `--object-id`, `--type`,
+Public object discovery has two closed forms. Neither accepts caller- or
+model-authored raw WAQL.
+
+Use the existing flags for a simple lookup with one source and the flat
+conditions/transforms those flags expose: `--path`, `--object-id`, `--type`,
 `--search`, or `--query`; `--query` means an existing Wwise Query Editor object
-identified by canonical GUID or absolute `\Queries\...` path. It never accepts raw WAQL.
-Selects are `descendants`, `ancestors`, `referencesTo`, `children`, and
-`parent`; `this` and `owner` remain outside the packaged boundary.
-`=` is exact equality and `:` is a contains/match predicate.
+identified by canonical GUID or absolute `\Queries\...` path. Selects are
+`descendants`, `ancestors`, `referencesTo`, `children`, and `parent`; `this` and
+`owner` remain outside the packaged boundary. `=` is exact equality and `:` is
+a contains/match predicate.
 
-Every broad source and every select requires either `--take N` between `0` and `1000`,
-or explicit `--all-results`; the flags are exclusive. Exact path/GUID
-without a transform needs neither. A bounded response above its take, an exact
-lookup returning multiple rows, or a fixed `buses` response above 1000 is
-protocol drift. The fixed `buses` command uses `take 1000` and marks exactly
-1000 rows as possibly truncated. Successful query rows and selection rows must
-be objects in their documented arrays; only an explicit empty array is empty.
-An invalid response shape is a structured error, never an empty result.
+For a complex query, first run the offline, version-aware schema command:
 
-Explicit `--return-field` replaces defaults, so repeat every needed field.
-Exact path lookup must return `path`, exact id lookup must return `id`, and
-identity mismatch is rejected. For exact identity, keep those four fields explicit for an exact path/GUID identity lookup:
+```bash
+python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version <supported-version> query-schema
+```
+
+Use its `waapi-skill.object-query/v1` JSON Schema to construct only the
+structured fields it exposes, and then invoke:
+
+```bash
+python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version <supported-version> query-object --request-json '<waapi-skill.object-query/v1-json>'
+```
+
+The strict request contains `contract`, one structured `source`, ordered
+`transforms`, and an explicit `return` projection. Sources cover the schema's
+closed `all`, `project`, `type`, exact `object`, `search`, and Query Editor
+`query` shapes. Transforms cover only structured `select`, `where`, and `take`.
+A predicate is a closed `compare`, `truthy`, nested `all`/`any`, or `not`
+object. Do not add `waql`, `raw`, `expression`, or another escape field, and do
+not infer grammar that is absent from the returned schema.
+
+Every broad structured source and every structured select must end with exactly
+one `take` transform between `0` and `1000`. Only a single exact object source
+without an expanding select may omit it. The simple flag route keeps its
+existing `--take N` or explicit user-requested `--all-results` rule. A bounded
+response above its take, an exact lookup returning multiple rows, or a fixed
+`buses` response above 1000 is protocol drift. Successful rows must be objects
+in the documented array; only an explicit empty array is empty. An invalid
+response shape is a structured error, never an empty result.
+
+Explicit `--return-field` on the simple route and `return` in the structured
+request replace defaults, so include every needed field. An exact path lookup
+must return `path`, an exact id lookup must return `id`, and identity mismatch
+is rejected; keep those four fields explicit for an exact path/GUID identity lookup:
 
 ```bash
 python scripts/run.py gateway.py query-object --path '\Events\Default Work Unit' --return-field id --return-field name --return-field type --return-field path
 python scripts/run.py gateway.py query-object --search 'ExactName' --where-json '{"field":"name","operator":"=","value":"ExactName"}' --take 1 --return-field id --return-field name --return-field type --return-field path
 ```
 
-### Bounded complex inventories
+### Bounded inventories
 
-Plan one bounded query; apply unsupported relationship or presentation logic
-only to that complete result.
+Use the simple flags when one source, their fixed selects, and a flat AND cover
+the request. Use the schema-driven structured form only when the query needs a
+nested boolean predicate or ordered transform combination that those flags
+cannot express. Plan one bounded request and apply unsupported presentation
+logic only to that complete result.
 
 - Field tokens are case-sensitive. Mappings include Volume -> `@Volume`, Pitch
   -> `@Pitch`, notes -> `notes`, Output Bus -> `OutputBus` (never `@OutputBus`),
@@ -184,14 +215,14 @@ only to that complete result.
   Volume, notes” is exactly
   `id`, `name`, `type`, `path`, `parent`, `audioSource:language`, `@Volume`,
   `notes`.
-- Push every supported condition shared by all final rows into `--where-json`.
-  A predicate array means AND only. For `A and (B or C)`, push the common `A`
-  and post-filter the OR; never invent WAQL for OR, depth, relations, sorting,
-  or aggregation. Words such as "simultaneously", "all of the following
-  conditions", or “同时满足” introduce a pure AND. Put every supported conjunct
-  into one `--where-json` array, preserving the user's condition order. Do not
-  submit only the type predicate when Volume, notes, inclusion, child-count, or
-  path is also a shared conjunct.
+- A predicate array means AND only on the simple route. Words such as
+  "simultaneously", "all of the following conditions", or “同时满足” introduce
+  a pure AND. Put every supported conjunct into one `--where-json` array,
+  preserving the user's condition order. Do not submit only the type predicate
+  when Volume, notes, inclusion, child-count, or path is also a requested
+  condition. For `A and (B or C)` or another nested boolean, switch to the
+  structured route: use one `where` transform with `all`, `any`, and `not` only
+  in the shapes returned by `query-schema`.
 - “Shared” applies to the complete final row set. For parent containers together
   with their direct child Sounds, omit a `type=Sound` or container-only
   predicate, fetch one bounded mixed-type descendant set, request `parent`, and
@@ -204,9 +235,10 @@ only to that complete result.
   row position, similar names, or path prefixes. Missing or disagreeing exact
   sources mean unresolved.
 - For "from the Sounds, find their direct parents", use
-  `--type Sound --select parent`. Predicates then describe the selected parent
-  rows; include a returned-parent `path` predicate before type, child-count,
-  and notes. Do not replace this with a descendant inventory.
+  `--type Sound --select parent`.
+  Predicates then describe the selected parent rows; include a returned-parent
+  `path` predicate before type, child-count, and notes. Do not replace this with
+  a descendant inventory.
   The result contains one returned parent row for each matching source object:
   Count those rows before deduplicating. Treat `childrenCount` only as the
   number of all direct child objects; never relabel its value or a sum of it as
@@ -220,12 +252,15 @@ only to that complete result.
   root's direct children as relative depth 1; do not add `parent` solely to
   calculate relative depth. Request `parent` only when the user needs a parent
   identity or a direct parent-child relationship.
-- When the user supplies a numeric maximum, copy that exact number to `--take`.
-  Use `--all-results` only when explicitly requested. When a transform has no
-  bound, ask for a limit instead of inventing one. Reaching the bound makes the
-  rows and every derived count/group/list potentially incomplete.
+- When the user supplies a numeric maximum, copy that exact number to `--take`
+  on the simple route or to the terminal structured `take` transform. Use
+  simple `--all-results` only when explicitly requested. When a broad or
+  expanding query has no bound, ask for a limit instead of inventing one.
+  Reaching the bound makes the rows and every derived count/group/list
+  potentially incomplete.
 
-For example, a bounded descendant inventory of Sound candidates:
+For example, a bounded descendant inventory of Sound candidates remains a
+simple flag query:
 
 ```bash
 python scripts/run.py gateway.py query-object --path '\Actor-Mixer Hierarchy\Default Work Unit\Combat' --select descendants --where-json '{"field":"type","operator":"=","value":"Sound"}' --take 24 --return-field id --return-field name --return-field type --return-field path --return-field @Volume --return-field notes --return-field OutputBus
@@ -248,6 +283,20 @@ Eight-level non-Project ownership:
 ```bash
 python scripts/run.py gateway.py query-object --path '\Actor-Mixer Hierarchy\Default Work Unit\Player\Movement\Footstep_Run' --select ancestors --where-json '{"field":"type","operator":"!=","value":"Project"}' --take 8 --return-field id --return-field name --return-field type --return-field path --return-field childrenCount --return-field notes
 ```
+
+When the request instead contains nested OR/NOT logic, run the offline schema
+call and use the structured request:
+
+```bash
+python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2022.1 query-object --request-json '{"contract":"waapi-skill.object-query/v1","source":{"kind":"object","objects":[{"kind":"path","value":"\\Actor-Mixer Hierarchy\\Default Work Unit\\CombatMix"}]},"transforms":[{"kind":"select","expressions":[["descendants"]]},{"kind":"where","predicate":{"kind":"all","operands":[{"kind":"compare","path":["type"],"operator":"=","value":"Sound"},{"kind":"compare","path":["@Volume"],"operator":"<=","value":-6.0},{"kind":"any","operands":[{"kind":"compare","path":["notes"],"operator":":","value":"mix-review"},{"kind":"not","operand":{"kind":"truthy","path":["isIncluded"]}}]}]}},{"kind":"take","value":12}],"return":["id","name","type","path","@Volume","notes","audioSource:language","OutputBus","isIncluded"]}'
+```
+
+This is a versioned core subset, not a complete WAQL implementation. Python
+program tests can prove that a valid request compiles deterministically and an
+invalid request fails before transport; they do not prove that a newly added
+construct has run successfully in real Wwise. Sort, aggregation, regex, or
+another construct absent from `query-schema` remains unsupported rather than a
+reason to write raw WAQL.
 
 ## Object types, live metadata, and fixed reads
 

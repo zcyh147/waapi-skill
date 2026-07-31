@@ -53,6 +53,8 @@ python scripts/run.py gateway.py --version <supported-version> call ak.wwise.waa
 python scripts/run.py gateway.py --version <supported-version> call <bounded-read-uri> --args-json '<object>' --options-json '<object>'
 python scripts/run.py gateway.py query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path
 python scripts/run.py gateway.py query-object --type Event --take 100
+python scripts/run.py gateway.py --version <supported-version> query-schema
+python scripts/run.py gateway.py --version <supported-version> query-object --request-json '<object-query-v1-json>'
 python scripts/run.py gateway.py --version <supported-version> object-types --query '<type keywords>' --limit 20
 python scripts/run.py gateway.py metadata types --summary-only
 python scripts/run.py gateway.py wait-topic <topic-uri>
@@ -83,7 +85,7 @@ Use exactly one command for the corresponding intent:
 | ask a Debug Wwise build to validate one reflected call shape without executing it | `debug-validate-call` |
 | inspect packaged API support, schema, route, or boundary | `capabilities` / `describe` |
 | call a capability whose catalog route is `manifest_dispatch` | `call` with reflected args/options |
-| object lookup by path, id, type, search, or query object | `query-object` |
+| object lookup: simple or complex | `query-object`; complex first uses `query-schema` |
 | packaged object-type discovery without Wwise | `object-types` |
 | live object type/property/reference metadata | `metadata` |
 | wait for one or a fixed bounded count of topic events | `wait-topic` |
@@ -120,7 +122,7 @@ For capability discovery, start with `capabilities --all-versions --summary-only
 
 When the user explicitly asks for the five-version coverage numbers, exclusions, or what the program matrix proves, read `references/waapi-coverage.md` once and combine it with the current offline catalog. Do not claim that program-tested coverage is live-Wwise verification.
 
-Broad `query-object` sources and every `--select` require `--take N` with `0 <= N <= 1000`; use `--all-results` only when the user explicitly asks for an unbounded result. The fixed `buses` command is bounded to 1000 rows and reports that bound plus whether truncation is possible. Never route `ak.wwise.core.object.get` through the generic `call` command: the gateway returns `QUERY_OBJECT_REQUIRED` so all object discovery stays inside `query-object`. Other fixed-command URIs return `FIXED_COMMAND_REQUIRED`, and topic URIs return `WAIT_TOPIC_REQUIRED`; use the command named by that boundary instead of retrying `call`.
+Simple queries use `query-object` flags. Complex queries use `query-schema` and `query-object --request-json` with its `waapi-skill.object-query/v1` fields; raw WAQL is forbidden. Structured broad/select queries need final `take`; simple flags allow `--all-results` only when the user requests every result. Never send `ak.wwise.core.object.get` through generic `call`; obey `QUERY_OBJECT_REQUIRED`, `FIXED_COMMAND_REQUIRED`, and `WAIT_TOPIC_REQUIRED`.
 
 When the requested answer is machine-readable and any successful gateway payload contains `agent_result`, compact-serialize exactly that object as the result body and stop. This rule applies to fixed reads as well as transactions. Do not reconstruct its fields from the prompt, `normalized`, summaries, or verification evidence; do not alter JSON escaping or add/remove keys; and do not run another command after receiving it. If the required envelope is `WAAPI_RESULT_JSON=<json>`, append the compact serialization of `agent_result` directly after the prefix. Failed, deferred, indeterminate, or boundary payloads intentionally have no successful `agent_result`; report their actual state instead of inventing one. The one-time introduction belongs in a separate progress update when needed and never changes the exact machine-readable result body. For a normal natural-language answer, use the complete gateway evidence rather than only the compact projection.
 
@@ -134,7 +136,7 @@ Read: `references/waapi-setup.md`
 
 ### Query lane
 
-Use query for read-only inspection: selection, object lookup, hierarchy browsing, property reads, WAQL-shaped discovery, project facts, topic waits/streams, and other non-mutating inspection.
+Use query for read-only inspection: selection, object lookup, hierarchy browsing, property reads, structured object discovery, project facts, topic waits/streams, and other non-mutating inspection.
 
 Classify the requested action, not background wording. A request to listen for, wait for, or report a SoundBank generation notification is a query-only topic task even when it says that a Bank is being generated or rebuilt and even when an old output file already exists. It never authorizes `soundbank.generate`, an operation-schema lookup, or another mutation.
 

@@ -194,8 +194,9 @@ def test_harbor_runtime_materializes_closed_dual_platform_workflow_and_cleans(
     assert previews[0]["operation"] == "soundbank.setInclusions"
     assert previews[0]["arguments"]["mode"] == "replace"
     assert previews[0]["arguments"]["soundbank"] == {
-        "kind": "waql",
-        "value": 'from type SoundBank where name = "Harbor_Release"',
+        "kind": "exact-type-name",
+        "type": "SoundBank",
+        "name": "Harbor_Release",
     }
     assert previews[0]["arguments"]["inclusions"] == [
         {
