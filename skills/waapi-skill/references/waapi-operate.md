@@ -39,7 +39,11 @@ Choose exactly one of these first-command branches:
 
 Use `operations` only for a broad inventory question, never as preparation for a named change. An implemented dedicated operation owns its URI; `waapi.call` is a hard-rejected bypass unless the catalog explicitly lists it as that URI's transaction operation. The three Undo Group member URIs use only `waapi.undoGroup`.
 
-After the required discovery/schema sequence, construct only the closed request returned by the schema and preview it. There is deliberately no unconditional schema-to-preview shortcut: missing metadata, version, identity, file, or user input must be resolved by the branch that owns it.
+After the required discovery/schema sequence, construct only the closed request returned by the schema and preview it. There is deliberately no unconditional schema-to-preview shortcut: missing metadata, version, identity, file, or user input must be resolved by the branch that owns it. Conversely, do not add metadata discovery when an exact property/reference token is already visible in a successful live query from this conversation. For example, an isolated `object.setReference` that follows a query returning the exact `OutputBus` accessor uses its operation schema and then previews with that returned token.
+
+When that schema explicitly accepts a selector identity such as `waql`, `direct-child`, or `scoped-name`, and the user's supplied name and scope are already sufficient to form one unique selector, put that selector directly in the preview and let the Gateway perform live resolution. Do not add `query-object` merely to translate the same supplied identity into an id or path. This applies only to selector kinds returned by the schema and never permits guessing an absent hierarchy, name, or scope.
+For an exact SoundBank name that is already unique in the user's supplied scope, the canonical selector is `{"kind":"waql","value":"from type SoundBank where name = \"<exact name>\""}`. Do not add a leading `$` or a separate name lookup.
+When an exact existing Event path is already known and the requested target is its one direct Action, use `{"kind":"direct-child","parent":{"kind":"path","value":"<absolute Event path>"},"type":"Action"}`. The Gateway owns WAQL quoting, the two-row ambiguity ceiling, exact type validation, and the direct-parent check; do not replace this closed identity with caller-authored WAQL or a descendant search.
 
 ## Choose by business outcome
 
@@ -60,6 +64,10 @@ A named root that already exists and receives any notes, property, reference, or
 | Generate Bank artifacts | `soundbank.generate` | persistent inclusion editing |
 | One Wwise Undo step containing heterogeneous allowlisted calls | `waapi.undoGroup` | wrapping work already owned by one batch operation |
 | Known installed GUI command with no semantic operation | `ui.commands.execute` | a shortcut around a dedicated route |
+
+When the user gives one Bank's complete desired final inclusion set, use one `soundbank.setInclusions` `replace` transaction: omitted existing rows such as Debug rows are removed without being named individually, and every other Bank remains outside that transaction. Do not split that final-state request into `add` and `remove` transactions.
+
+When one workflow first saves exact inclusions and then generates that same Bank, the verified saved Bank is the generation input. The later `soundbank.generate` item names the Bank and its artifact expectation; do not repeat the earlier Event identities or inclusion filters inside it. Preserve the requested platforms/languages. For connected-Authoring generation, `io_root` is the caller-trusted absolute ancestor that contains the active project, its cache, and every requested platform Bank/media destination. A narrower release-output directory is not automatically that root. Use an explicitly supplied trusted root unchanged; when none is available, ask for one instead of guessing or silently broadening confinement.
 
 Batch size alone never establishes file-workflow intent. If a table workflow is explicit but no caller-owned TSV exists, ask for it instead of creating one. Keep an import's requested Event or Switch side effect inside that same `audio.import` transaction. If saved inclusions and artifact generation are both requested, use two ordered transactions under the current policy.
 
@@ -84,7 +92,9 @@ For example, `object.setRTPC` authors a curve while `ak.soundengine.setRTPCValue
 
 Users speak naturally; never ask them for internal property/reference names. When an exact token is not already visible from live metadata:
 
-1. Run one `metadata discover` with one repeated `--query '<ordinary phrase>'` per requested setting and `--limit 8`. Translate localized user wording into short English Wwise UI or technical behavior phrases for this search; do not copy CJK wording into the live lexical matcher. Keep independent enable switches and numeric values as separate queries.
+For `object.create` and `object.set`, complete the named `operation-schema` call before the metadata discovery below, including when this is a later item in an ordered multi-transaction request. Other metadata-bound operations keep the first-command order in the New transaction table above.
+
+1. Run `metadata discover` with one repeated `--query '<ordinary phrase>'` per requested setting. Use the smallest useful candidate budget so compound results stay compact: `--limit 8` for one or two phrases, `--limit 3` for three or four, and `--limit 2` for five through eight. Translate localized user wording into short English Wwise UI or technical behavior phrases for this search; do not copy CJK wording into the live lexical matcher. Keep independent enable switches and numeric values as separate queries. If one compound result still reaches a structured dependency/result-size boundary, split it into related phrase groups and do not repeat a phrase that already returned an exact token.
 2. Use exactly one scope: `--object-type` for a known new/imported type or several existing targets of one proven type, `--class-id` for a proven class id, or `--object` for one existing object.
 3. For Sound SFX imports use `--object-type Sound`. For Actor Mixer roots use `ActorMixer` in `2021.1`–`2024.1` and reflected `PropertyContainer` in `2025.1`; the operation request token remains `ActorMixer`.
 4. Copy only exact returned names and only settings the user requested, plus dependencies whose returned `required_values` prove an exact enabling value. Do not treat candidates/defaults as a preset.
@@ -92,15 +102,16 @@ Users speak naturally; never ask them for internal property/reference names. Whe
 
 The operation preview performs final live typed validation and remains authoritative. Do not add a separate property-info check for a token already proved in the visible conversation, and never inspect metadata-cache files.
 
-For import tables, discover only dynamic property/reference behavior. `Notes` and `Audio Source Notes` are fixed import columns owned by the import schema/parser, not Sound metadata queries. Useful search concepts include `looping`, `ignore parent playback limit`, `sound instance limit enabled`, `maximum sound instances`, and `output bus`; these are search phrases, never permission to guess the returned internal token.
+For import tables, discover only dynamic property/reference behavior. `Notes` and `Audio Source Notes` are fixed import columns owned by the import schema/parser, not Sound metadata queries. Keep “looping enabled” and “looping infinite” as separate phrases when the user requests infinite looping. A per-object instance limit likewise needs separate “ignore parent playback limit”, “sound instance limit enabled”, and “maximum sound instances” phrases. `volume` and `output bus` are other useful concepts. These are search phrases, never permission to guess the returned internal token.
 
 ### Compact import and value rules
 
 - For an ordinary `audio.importTabDelimited` import, do not `cat` or otherwise read the caller's TSV. Pass its supplied absolute path unchanged to `preview`; that preview owns bounded TSV parsing and hashing, inline base64 and media validation, and exact-path conflict checks. A user request to view the file is a separate read-only task, never an import prerequisite.
 - `SFX` is the built-in nonlocalized import token. Preserve it literally and do not query the Project language inventory for it; validate only explicit non-SFX languages.
 - `arguments.import_operation` is the explicit batch-level mode: write `createNew`, `useExisting`, or `replaceExisting` when the user asks for that behavior; omission means `createNew`, and the field never belongs inside an `imports[]` row. Under `useExisting`, behavior is still resolved per row: an existing localized non-SFX target keeps only `audio_file`, `object_path`, `import_language`, and the live-preflighted `object_type`; omit notes, source notes, Originals subfolder, and Event. Existing SFX rows retain every user-supplied optional field, and missing targets retain creation fields.
+- When one direct import request explicitly includes a new container hierarchy, represent each requested container once as a typed structure-only row, then use full logical `object_path` values for the media rows below it. A structure-only row contains its path/type and only fields the user actually assigned to that container; never inherit Sound-only language, properties, references, media, or Event fields onto it through `defaults`. Keep those Sound fields on the media rows when the batch mixes structures and Sounds. Do not also encode the same containers as typed path segments.
 - `originals_subfolder` is relative to Wwise's normal destination for that language. For SFX, `Foley/Footsteps` means `Originals/SFX/Foley/Footsteps`; never silently add or remove an `SFX/` prefix.
-- Every requested import Event uses an absolute path below `\Events`, is absent before preview, and is unique across rows. Do not append an Action to an existing Event.
+- Every requested import Event belongs in the matching media row of that same `audio.import` preview, with the exact absolute path below `\Events` and the requested Action. It must be absent before preview and unique across rows. Do not omit it for a later transaction or append an Action to an existing Event.
 - Wwise `Pitch` values are cents. Convert requested semitones before preview (`1 semitone = 100 cents`); do not pass the semitone number as the property value.
 
 ## CLI versus connected Authoring
@@ -151,7 +162,10 @@ For an unambiguous actual change use one standalone:
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py preview --apply --request-json '<closed-request-json>'
 ```
 
-For design/preview-only intent omit `--apply`; it never authorizes execution. In ordinary use omit `--state-dir`: the Gateway owns the external transaction store. Pass it only when a trusted caller explicitly supplied an absolute override, then reuse that path unchanged.
+Single-quote the whole compact request at the shell layer and serialize every JSON string exactly once. After JSON decoding, a WAQL value contains ordinary `"` characters with no preceding backslash, and each Wwise path separator is one `\`; never leave JSON escape backslashes inside the decoded value. Invalid JSON stops before preview and is not repaired or retried in the same turn.
+
+Under `ask_before_changes`, a user asking to see the preview before confirming an intended change still uses `preview --apply`: that flag creates the durable confirmation-bound preview and does not execute the change. Omit `--apply` only for a hypothetical, design-only, or explicitly non-executable preview.
+In ordinary use omit `--state-dir`: the Gateway owns the external transaction store. Pass it only when a trusted caller explicitly supplied an absolute override, then reuse that path unchanged.
 
 A rejected or incomplete preview is a hard same-turn boundary. Do not repair JSON, change an operation, or retry preview in that turn. A changed target/value requires a new preview.
 
@@ -184,44 +198,21 @@ Treat every phase as separately gated and inspect its complete JSON before the n
 The show result's confirmation token binds the stored id, full artifact hash, state, and event chain. Never reconstruct or substitute it, use the artifact hash as a token, or run `confirm --help`. If confirm output is incomplete, stop before execute/verify. Risks already disclosed by the immutable preview are decision information, not a second Agent veto after the user clearly confirms that same request. A changed project/path/scope requires a fresh preview.
 
 For an original ordered multi-transaction request, apply the current policy to each item independently after the prior item reaches terminal verification. Never infer, add, combine, or reorder an item.
+Each later intended-change preview still uses `preview --apply`; completing the prior transaction does not turn the next one into a design-only preview.
 
 ## Terminal states and reporting
 
-- `verified`: report the completed business outcome and actual readback, then
-  stop without an extra query.
-- `result_schema_checked`: report explicitly that only the reflected result
-  shape was proved; do not claim business-state verification.
-- `verification_deferred`: a later user-requested verify is safe; never
-  re-execute.
-- `verification_failed`, `repreview_required`, `execution_cancelled`, or a
-  structured boundary: report the actual failure/next decision without claiming
-  completion or retrying mutation.
-- `execution_succeeded_persistence_failed`: WAAPI reported execution but the
-  journal failed; preserve the uncertainty and never replay automatically.
-- `indeterminate`: execution may have reached Wwise. Stop immediately after the
-  complete execute JSON. Do not verify, retry, call another Gateway route,
-  inspect files/evidence, or perform any follow-up tool action. A later
-  diagnosis needs a new user request and a packaged read-only route.
+- `verified`: report the completed business outcome and actual readback, then stop without an extra query.
+- `result_schema_checked`: report explicitly that only the reflected result shape was proved; do not claim business-state verification.
+- `verification_deferred`: a later user-requested verify is safe; never re-execute.
+- `verification_failed`, `repreview_required`, `execution_cancelled`, or a structured boundary: report the actual failure/next decision without claiming completion or retrying mutation.
+- `execution_succeeded_persistence_failed`: WAAPI reported execution but the journal failed; preserve the uncertainty and never replay automatically.
+- `indeterminate`: execution may have reached Wwise. Stop immediately after the complete execute JSON. Do not verify, retry, call another Gateway route, inspect files/evidence, or perform any follow-up tool action. A later diagnosis needs a new user request and a packaged read-only route.
 
-`ak.wwise.cli.migrate` is the narrow exception to normal verify flow. Its one
-complete `execute` JSON is the terminal Skill boundary even when state says
-`executed_unverified`. Run no more Agent tools: do not reopen/query the project
-or inspect `.wproj`, `.wwu`, broker/lifecycle/log/oracle artifacts. Only the
-caller-owned harness outside the Skill sequence may close Wwise, reopen the
-migrated project, and establish final business proof.
+`ak.wwise.cli.migrate` is the narrow exception to normal verify flow. Its one complete `execute` JSON is the terminal Skill boundary even when state says `executed_unverified`. Run no more Agent tools: do not reopen/query the project or inspect `.wproj`, `.wwu`, broker/lifecycle/log/oracle artifacts. Only the caller-owned harness outside the Skill sequence may close Wwise, reopen the migrated project, and establish final business proof.
 
-Managed openers may return a pending or unknown cleanup companion (for example
-Bank load, Game Object registration, Profiler capture, meter/remote/transport,
-or UI command registration). Do not hide that obligation or uncertainty.
-Explain the business cleanup naturally and use only a later packaged
-transaction when the user authorizes it. Never synthesize cleanup code.
-Work Unit load/unload is an available reversal, not automatic cleanup; Undo
-Group cleanup remains inside its same-connection composite.
+Managed openers may return a pending or unknown cleanup companion (for example Bank load, Game Object registration, Profiler capture, meter/remote/transport, or UI command registration). Do not hide that obligation or uncertainty. Explain the business cleanup naturally and use only a later packaged transaction when the user authorizes it. Never synthesize cleanup code. Work Unit load/unload is an available reversal, not automatic cleanup; Undo Group cleanup remains inside its same-connection composite.
 
-For ordinary prose, hide internal ids, hashes, tokens, raw commands, and state
-labels unless the user requests diagnostics. For an exact machine-readable
-answer, serialize the successful Gateway `agent_result` verbatim; do not rebuild
-it from summaries. Failed/deferred/indeterminate payloads have no successful
-projection and must not be fabricated.
+For ordinary prose, hide internal ids, hashes, tokens, raw commands, and state labels unless the user requests diagnostics. For an exact machine-readable answer, serialize the successful Gateway `agent_result` verbatim; do not rebuild it from summaries. Failed/deferred/indeterminate payloads have no successful projection and must not be fabricated.
 
 <!-- WAAPI_OPERATE_REFERENCE_END -->

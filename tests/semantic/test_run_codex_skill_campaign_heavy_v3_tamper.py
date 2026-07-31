@@ -257,7 +257,10 @@ def _validate_campaign_prompt_asset_read(
         options=options,
         expected_steps=provenance.protocol.steps,
         version=unit.version,
-        required_reference=fixture._synthetic_required_reference(unit),
+        expected_skill_reads=(
+            "SKILL.md",
+            fixture._synthetic_required_reference(unit),
+        ),
         archived_common_gates=archived_gates,
         prompt_provenance=provenance,
     )

@@ -10,8 +10,10 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
     OPERATION_REQUEST_CONTRACT,
     OperationContractError,
     _is_rtpc_control_input,
+    _read_rtpc_rows_with_evidence,
     parse_operation_request,
     prepare_operation,
+    validate_prepared_roles,
     verify_prepared_operation,
 )
 
@@ -103,6 +105,21 @@ def _nonmatching_rtpc_rows(count: int) -> list[dict[str, Any]]:
         row["@PropertyName"] = "Pitch"
         rows.append(row)
     return rows
+
+
+def _rtpc_owner_result(*rows: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "return": [
+            {
+                "id": OBJECT_ID,
+                "@RTPC": [{"id": row["id"]} for row in rows],
+            }
+        ]
+    }
+
+
+def _missing_rtpc_owner_result() -> dict[str, Any]:
+    return {"return": [{"id": OBJECT_ID}]}
 
 
 @pytest.mark.parametrize(
@@ -261,33 +278,31 @@ def test_rtpc_add_materializes_only_the_closed_append_shape_and_verifies_full_li
             version="2022.1",
         )
     )
-    prepared = prepare_operation(
-        parsed,
-        read_call=ScriptedReader(
-            {
-                "ak.wwise.core.object.get": [
-                    {"return": [_object_row()]},
-                    {
-                        "return": [
-                            _object_row(
-                                CONTROL_ID,
-                                name="Distance",
-                                object_type="GameParameter",
-                            )
-                        ]
-                    },
-                    {"return": []},
-                ],
-                "ak.wwise.core.object.getPropertyInfo": [
-                    {
-                        "name": "Volume",
-                        "type": "Real32",
-                        "supports": {"randomizer": True, "rtpc": "Additive", "unlink": True},
-                    }
-                ],
-            }
-        ),
-    ).as_dict()
+    prepare_reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.get": [
+                {"return": [_object_row()]},
+                {
+                    "return": [
+                        _object_row(
+                            CONTROL_ID,
+                            name="Distance",
+                            object_type="GameParameter",
+                        )
+                    ]
+                },
+                _rtpc_owner_result(),
+            ],
+            "ak.wwise.core.object.getPropertyInfo": [
+                {
+                    "name": "Volume",
+                    "type": "Real32",
+                    "supports": {"randomizer": True, "rtpc": "Additive", "unlink": True},
+                }
+            ],
+        }
+    )
+    prepared = prepare_operation(parsed, read_call=prepare_reader).as_dict()
 
     assert prepared["dispatch"]["args"]["listMode"] == "append"
     assert prepared["dispatch"]["args"]["autoAddToSourceControl"] is False
@@ -307,16 +322,290 @@ def test_rtpc_add_materializes_only_the_closed_append_shape_and_verifies_full_li
         }
     ]
     assert prepared["semantic_preview"]["envelope"]["metadata"]["raw_replace_all_allowed"] is False
+    assert prepare_reader.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {"from": {"id": [OBJECT_ID]}},
+        {"return": ["id", "@RTPC"]},
+    )
+
+    guard = validate_prepared_roles(
+        prepared,
+        read_call=ScriptedReader(
+            {
+                "ak.wwise.core.object.get": [
+                    {"return": [_object_row()]},
+                    {
+                        "return": [
+                            _object_row(
+                                CONTROL_ID,
+                                name="Distance",
+                                object_type="GameParameter",
+                            )
+                        ]
+                    },
+                    _rtpc_owner_result(),
+                ]
+            }
+        ),
+    )
+    assert guard["status"] == "valid"
+    assert guard["ok"] is True
 
     actual = _rtpc_row(points=points, notes="Distance curve")
+    verify_reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.get": [
+                _rtpc_owner_result(actual),
+                {"return": [actual]},
+            ]
+        }
+    )
+    verified = verify_prepared_operation(
+        prepared,
+        execution_result={"result": {}},
+        read_call=verify_reader,
+    )
+    assert verified.ok
+    assert verify_reader.calls == [
+        (
+            "ak.wwise.core.object.get",
+            {"from": {"id": [OBJECT_ID]}},
+            {"return": ["id", "@RTPC"]},
+        ),
+        (
+            "ak.wwise.core.object.get",
+            {"from": {"id": [RTPC_ID]}},
+            {
+                "return": [
+                    "id",
+                    "name",
+                    "type",
+                    "path",
+                    "notes",
+                    "@PropertyName",
+                    "@ControlInput",
+                    "@Curve",
+                ]
+            },
+        ),
+    ]
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+def test_version_proven_missing_empty_rtpc_field_is_normalized_through_prepare_guard_and_verify(
+    version: str,
+) -> None:
+    parsed = parse_operation_request(
+        _request(
+            "object.setRTPC",
+            {
+                "object": {"kind": "id", "value": OBJECT_ID},
+                "property": "Volume",
+                "control_input": {"kind": "id", "value": CONTROL_ID},
+                "points": [{"x": 0, "y": -12, "shape": "Linear"}],
+            },
+            version=version,
+        )
+    )
+    prepared = prepare_operation(
+        parsed,
+        read_call=ScriptedReader(
+            {
+                "ak.wwise.core.object.get": [
+                    {"return": [_object_row()]},
+                    {
+                        "return": [
+                            _object_row(
+                                CONTROL_ID,
+                                name="Distance",
+                                object_type="GameParameter",
+                            )
+                        ]
+                    },
+                    _missing_rtpc_owner_result(),
+                ],
+                "ak.wwise.core.object.getPropertyInfo": [
+                    {
+                        "name": "Volume",
+                        "type": "Real32",
+                        "supports": {
+                            "randomizer": True,
+                            "rtpc": "Additive",
+                            "unlink": True,
+                        },
+                    }
+                ],
+            }
+        ),
+    ).as_dict()
+
+    normalization = {
+        "kind": "missing-empty-object-list",
+        "version": version,
+        "field": "@RTPC",
+        "observed_row_keys": ["id"],
+        "normalized_value": [],
+    }
+    assert prepared["pre_state"]["rtpc_snapshot"]["rows"] == []
+    assert prepared["pre_state"]["rtpc_snapshot"]["readback_compatibility"] == [
+        normalization
+    ]
+    assert prepared["preflight_reads"][-1]["result"] == _missing_rtpc_owner_result()
+
+    guard = validate_prepared_roles(
+        prepared,
+        read_call=ScriptedReader(
+            {
+                "ak.wwise.core.object.get": [
+                    {"return": [_object_row()]},
+                    {
+                        "return": [
+                            _object_row(
+                                CONTROL_ID,
+                                name="Distance",
+                                object_type="GameParameter",
+                            )
+                        ]
+                    },
+                    _missing_rtpc_owner_result(),
+                ]
+            }
+        ),
+    )
+    assert guard["ok"] is True
+    guard_owner = next(
+        row for row in guard["readbacks"] if row.get("role") == "object-rtpc-owner"
+    )
+    assert guard_owner["result"] == _missing_rtpc_owner_result()
+    assert guard_owner["compatibility_normalization"] == normalization
+
     verified = verify_prepared_operation(
         prepared,
         execution_result={"result": {}},
         read_call=ScriptedReader(
-            {"ak.wwise.core.object.get": [{"return": [actual]}]}
+            {"ak.wwise.core.object.get": [_missing_rtpc_owner_result()]}
         ),
     )
-    assert verified.ok
+    assert verified.ok is False
+    assert verified.status == "verification_failed"
+    assert verified.readbacks[0]["result"] == _missing_rtpc_owner_result()
+    assert verified.readbacks[0]["compatibility_normalization"] == normalization
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1"))
+def test_missing_rtpc_owner_field_remains_invalid_without_live_version_evidence(
+    version: str,
+) -> None:
+    reader = ScriptedReader(
+        {"ak.wwise.core.object.get": [_missing_rtpc_owner_result()]}
+    )
+
+    with pytest.raises(OperationContractError) as exc_info:
+        _read_rtpc_rows_with_evidence(
+            OBJECT_ID,
+            version=version,
+            read=reader,
+        )
+
+    assert exc_info.value.error_code == "INVALID_READBACK"
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+def test_explicit_empty_rtpc_owner_array_remains_valid(version: str) -> None:
+    reader = ScriptedReader(
+        {"ak.wwise.core.object.get": [_rtpc_owner_result()]}
+    )
+
+    rows, readbacks = _read_rtpc_rows_with_evidence(
+        OBJECT_ID,
+        version=version,
+        read=reader,
+    )
+
+    assert rows == []
+    assert readbacks == [
+        {
+            "role": "object-rtpc-owner",
+            "uri": "ak.wwise.core.object.get",
+            "args": {"from": {"id": [OBJECT_ID]}},
+            "options": {"return": ["id", "@RTPC"]},
+            "result": _rtpc_owner_result(),
+        }
+    ]
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+@pytest.mark.parametrize(
+    "owner_result",
+    (
+        {"return": []},
+        {"return": [{}]},
+        {"return": [{"id": CONTROL_ID}]},
+        {"return": [{"id": OBJECT_ID}, {"id": OBJECT_ID}]},
+    ),
+)
+def test_compatibility_version_still_requires_one_canonical_owner_row(
+    version: str,
+    owner_result: Mapping[str, Any],
+) -> None:
+    reader = ScriptedReader(
+        {"ak.wwise.core.object.get": [owner_result]}
+    )
+
+    with pytest.raises(OperationContractError) as exc_info:
+        _read_rtpc_rows_with_evidence(
+            OBJECT_ID,
+            version=version,
+            read=reader,
+        )
+
+    assert exc_info.value.error_code == "INVALID_READBACK"
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+def test_compatibility_version_missing_rtpc_field_with_an_extra_key_remains_invalid(
+    version: str,
+) -> None:
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.get": [
+                {"return": [{"id": OBJECT_ID, "name": "Sound"}]}
+            ]
+        }
+    )
+
+    with pytest.raises(OperationContractError) as exc_info:
+        _read_rtpc_rows_with_evidence(
+            OBJECT_ID,
+            version=version,
+            read=reader,
+        )
+
+    assert exc_info.value.error_code == "INVALID_READBACK"
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+@pytest.mark.parametrize("malformed", (None, {}, "not-a-list", 0))
+def test_present_rtpc_owner_field_must_remain_an_array_in_compatibility_versions(
+    version: str,
+    malformed: Any,
+) -> None:
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.get": [
+                {"return": [{"id": OBJECT_ID, "@RTPC": malformed}]}
+            ]
+        }
+    )
+
+    with pytest.raises(OperationContractError) as exc_info:
+        _read_rtpc_rows_with_evidence(
+            OBJECT_ID,
+            version=version,
+            read=reader,
+        )
+
+    assert exc_info.value.error_code == "INVALID_READBACK"
 
 
 def test_rtpc_update_targets_existing_rtpc_without_replace_all() -> None:
@@ -352,6 +641,7 @@ def test_rtpc_update_targets_existing_rtpc_without_replace_all() -> None:
                             )
                         ]
                     },
+                    _rtpc_owner_result(before),
                     {"return": [before]},
                 ],
                 "ak.wwise.core.object.getPropertyInfo": [
@@ -378,7 +668,12 @@ def test_rtpc_update_targets_existing_rtpc_without_replace_all() -> None:
         prepared,
         execution_result={"result": {}},
         read_call=ScriptedReader(
-            {"ak.wwise.core.object.get": [{"return": [_rtpc_row(points=points)]}]}
+            {
+                "ak.wwise.core.object.get": [
+                    _rtpc_owner_result(_rtpc_row(points=points)),
+                    {"return": [_rtpc_row(points=points)]},
+                ]
+            }
         ),
     )
     assert verified.ok
@@ -409,6 +704,7 @@ def test_rtpc_add_fails_before_dispatch_when_complete_list_is_at_capacity() -> N
                         )
                     ]
                 },
+                _rtpc_owner_result(*_nonmatching_rtpc_rows(128)),
                 {"return": _nonmatching_rtpc_rows(128)},
             ],
             "ak.wwise.core.object.getPropertyInfo": [
@@ -436,6 +732,60 @@ def test_rtpc_add_fails_before_dispatch_when_complete_list_is_at_capacity() -> N
     }
 
 
+def test_rtpc_owner_list_over_snapshot_limit_fails_before_detail_read() -> None:
+    parsed = parse_operation_request(
+        _request(
+            "object.setRTPC",
+            {
+                "object": {"kind": "id", "value": OBJECT_ID},
+                "property": "Volume",
+                "control_input": {"kind": "id", "value": CONTROL_ID},
+                "points": [{"x": 0, "y": 0, "shape": "Linear"}],
+            },
+        )
+    )
+    rows = _nonmatching_rtpc_rows(129)
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.get": [
+                {"return": [_object_row()]},
+                {
+                    "return": [
+                        _object_row(
+                            CONTROL_ID,
+                            name="Distance",
+                            object_type="GameParameter",
+                        )
+                    ]
+                },
+                _rtpc_owner_result(*rows),
+            ],
+            "ak.wwise.core.object.getPropertyInfo": [
+                {
+                    "name": "Volume",
+                    "type": "Real32",
+                    "supports": {
+                        "randomizer": True,
+                        "rtpc": "Additive",
+                        "unlink": True,
+                    },
+                }
+            ],
+        }
+    )
+
+    with pytest.raises(OperationContractError) as exc_info:
+        prepare_operation(parsed, read_call=reader)
+
+    assert exc_info.value.error_code == "RTPC_LIST_LIMIT_EXCEEDED"
+    assert exc_info.value.details == {"count": 129, "limit": 128}
+    assert reader.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {"from": {"id": [OBJECT_ID]}},
+        {"return": ["id", "@RTPC"]},
+    )
+
+
 def test_rtpc_update_remains_available_when_complete_list_is_at_capacity() -> None:
     parsed = parse_operation_request(
         _request(
@@ -461,6 +811,10 @@ def test_rtpc_update_remains_available_when_complete_list_is_at_capacity() -> No
                         )
                     ]
                 },
+                _rtpc_owner_result(
+                    *_nonmatching_rtpc_rows(127),
+                    _rtpc_row(),
+                ),
                 {"return": [*_nonmatching_rtpc_rows(127), _rtpc_row()]},
             ],
             "ak.wwise.core.object.getPropertyInfo": [

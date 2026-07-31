@@ -22,6 +22,30 @@ The program gate forces `WWISE_LIVE=0`, `WWISE_DESTRUCTIVE=0`, and `WWISE_STRICT
 
 Extra arguments after `--` may be pytest flags or filters such as `-q`, `-ra`, `--collect-only`, or `-k expression`. Additional test paths, node ids, `.py` files, and `--pyargs` are rejected so the fixed program-only collection cannot be widened accidentally.
 
+## New Wwise version checklist
+
+For a new supported Wwise lane, validate the whole path rather than only adding
+a version string:
+
+1. Re-run version-matched reflection for functions, topics, schemas, and the
+   required Authoring-only supplement; review URI substitutions as well as
+   count changes.
+2. Regenerate and validate the versioned manifest, inventory digests, deferred
+   classifications, metadata index, and semantic/WAQL resources.
+3. Classify changed routes by host and execution lane, then update the
+   capability and execution registries, adapter and request-mapping registries,
+   and native-surface policy where applicable. For structured Gateway
+   operations, `skills/waapi-skill/wwise_waapi/operation_registry.py` is
+   authoritative; a builder implementation by itself is not a public operation
+   contract.
+4. Run focused tests and extend `ci/test.sh --mode program` to prove the new
+   supported-version matrix. Then run the matching smoke/live and destructive
+   sandbox lanes sequentially.
+5. Update README inventories and `tests/TEST_INVENTORY.md` only after the
+   corresponding generation or run. Use a targeted fresh-Codex semantic case
+   for changed routing or agent behavior; do not spend a broad semantic matrix
+   on a schema-only addition.
+
 ## Local real-Wwise path config
 
 For live/destructive/smoke/matrix modes, machine-specific paths can be stored in the untracked JSON file:
@@ -90,6 +114,25 @@ and every sandbox was cleaned. The six authorized writes each verified seven
 created objects through 46 passing business assertions. Preserve this exact
 scope: it is policy-interaction evidence, not broad API or cross-version
 semantic coverage.
+
+The `integration_workflows_cross_version_6` profile is a separate integration
+acceptance contract, not a per-API coverage profile. It contains three
+prewritten multi-operation workflows, each run once on Wwise 2022.1 and once on
+2025.1: six fresh memory-off Codex tasks, 20 user turns, and 12 separately
+previewed transactions. Use the formal campaign runner with `gpt-5.6-terra`,
+medium reasoning, and the default service tier. Cases and versions run
+sequentially. Keep the first pass frozen, collect ordinary semantic failures,
+then make one repair batch and start a new campaign root; stop early only for a
+systemic harness, sandbox, evidence, or cleanup fault. These totals define the
+planned profile.
+
+Completed evidence is split across three frozen 2026-07-31 roots. Initial
+`a12` passed the four Alarm/Harbor version units and failed both Weather units;
+fresh `a20-int22-weather` and `a24-int25-weather` roots passed the repaired
+Weather units. This is passing evidence for all six unique units across roots,
+not one single-candidate 6/6 campaign. Passing sandboxes were cleaned, failed
+sandboxes remain quarantined, and every lifecycle record reports unchanged
+source-project full hash and mtime.
 
 The review-oriented v3 bundle is rooted at
 `skills/waapi-skill/evals/suite-v3.json` and deliberately separates:

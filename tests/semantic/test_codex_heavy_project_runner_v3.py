@@ -185,6 +185,7 @@ def _prepared(
     cleanup=None,
     cleanup_before_shutdown=None,
     post_shutdown=None,
+    turn_reference_schedule=None,
 ) -> runner._PreparedCase:
     typed_sections = SimpleNamespace(
         writer_kwargs=lambda: {
@@ -208,6 +209,7 @@ def _prepared(
         required_reference="references/waapi-query.md",
         snapshot=lambda: ("sealed",),
         verify_final=lambda _payload, _result: _Verification(),
+        turn_reference_schedule=turn_reference_schedule,
         typed_sections=typed_sections,
         cleanup_success=cleanup,
         cleanup_before_shutdown=cleanup_before_shutdown,
@@ -531,10 +533,40 @@ def _install_orchestration_fakes(
     )
 
 
+def test_project_runner_forwards_prepared_reference_schedule(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    schedule = (("references/waapi-query.md",),)
+    _install_orchestration_fakes(
+        monkeypatch,
+        prepared=_prepared(turn_reference_schedule=schedule),
+    )
+    captured: dict[str, object] = {}
+
+    def run_task(**kwargs):
+        captured["turn_reference_schedule"] = kwargs[
+            "turn_reference_schedule"
+        ]
+        return _fake_task(kwargs["task_root"])
+
+    monkeypatch.setattr(runner, "run_v3_codex_task", run_task)
+
+    outcome = runner.run_heavy_project_unit(
+        _unit(),
+        scenario_root=tmp_path / "case",
+        options=_options(tmp_path),
+    )
+
+    assert outcome.status == "PASS"
+    assert captured["turn_reference_schedule"] == schedule
+
+
 def test_project_runner_api_union_is_exact_and_excludes_only_cli() -> None:
     assert runner.PROJECT_RUNNER_APIS == frozenset(
         {
             *runner.OBJECT_APIS,
+            *runner.INTEGRATION_PRIMARY_APIS,
             *runner.IMPORT_APIS,
             *runner.SOUNDBANK_RUNTIME_APIS,
             runner.AUDIO_CONVERT_URI,

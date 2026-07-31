@@ -209,6 +209,89 @@ def test_generate_plan_rejects_implicit_or_ambiguous_scope(
     assert exc.value.error_code == error_code
 
 
+@pytest.mark.parametrize(
+    "soundbanks,skip_languages,languages",
+    [
+        (
+            [{"name": "Gameplay_Main", "artifactExpectation": "nonlocalized"}],
+            False,
+            ["English(US)"],
+        ),
+        (
+            [{"name": "Gameplay_Main", "artifactExpectation": "nonlocalized"}],
+            True,
+            ["English(US)"],
+        ),
+        (
+            [{"name": "Dialogue_Main", "artifactExpectation": "localized"}],
+            True,
+            None,
+        ),
+        (
+            [{"name": "Dialogue_Main", "artifactExpectation": "mixed"}],
+            False,
+            ["SFX"],
+        ),
+    ],
+)
+def test_generate_plan_rejects_inconsistent_batch_language_modes(
+    tmp_path: Path,
+    soundbanks: list[dict[str, Any]],
+    skip_languages: bool,
+    languages: list[str] | None,
+) -> None:
+    io_root, project = _project(tmp_path)
+    arguments: dict[str, Any] = {
+        "soundbanks": soundbanks,
+        "platforms": ["Mac"],
+        "skipLanguages": skip_languages,
+        "writeToDisk": True,
+    }
+    if languages is not None:
+        arguments["languages"] = languages
+
+    with pytest.raises(SoundBankContractError) as rejected:
+        build_generate_operation_plan(
+            arguments,
+            version="2022.1",
+            project_info=project,
+            io_root=io_root,
+        )
+
+    assert rejected.value.error_code == "INVALID_SCOPE"
+
+
+def test_generate_plan_accepts_mixed_nonlocalized_and_localized_batch(
+    tmp_path: Path,
+) -> None:
+    io_root, project = _project(tmp_path)
+
+    plan = build_generate_operation_plan(
+        {
+            "soundbanks": [
+                {
+                    "name": "Gameplay_Main",
+                    "artifactExpectation": "nonlocalized",
+                },
+                {
+                    "name": "Dialogue_Main",
+                    "artifactExpectation": "localized",
+                },
+            ],
+            "platforms": ["Mac"],
+            "languages": ["English(US)"],
+            "skipLanguages": False,
+            "writeToDisk": True,
+        },
+        version="2022.1",
+        project_info=project,
+        io_root=io_root,
+    )
+
+    assert plan["dispatch_args"]["languages"] == [ENGLISH_ID]
+    assert plan["dispatch_args"]["skipLanguages"] is False
+
+
 def test_generate_plan_requires_clean_contained_project_and_parser_owned_2021_context(tmp_path: Path) -> None:
     io_root, dirty_project = _project(tmp_path / "dirty", dirty=True)
     with pytest.raises(SoundBankContractError) as dirty:

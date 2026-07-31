@@ -155,6 +155,7 @@ from .operation_soundbank import (
 from .platform_paths import WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT
 from .transaction_cleanup import build_transaction_cleanup_spec
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
+from .waql import quote_waql_literal
 
 
 OPERATION_REQUEST_CONTRACT = "waapi-skill.operation-request/v1"
@@ -318,6 +319,7 @@ RTPC_SNAPSHOT_FIELDS = (
     "@Curve",
 )
 RTPC_MAX_LIST_ROWS = 128
+RTPC_EMPTY_OWNER_FIELD_OMISSION_VERSIONS = frozenset({"2022.1", "2025.1"})
 RTPC_CONTROL_INPUT_TYPE_TOKENS = frozenset(
     {
         "gameparameter",
@@ -349,6 +351,12 @@ IMPORT_WRITABLE_PARENT_TYPES = frozenset(
         "MusicSegment",
     }
 )
+IMPORT_REFLECTED_WRITABLE_PARENT_TYPES_BY_VERSION: Mapping[
+    str,
+    frozenset[str],
+] = {
+    "2025.1": frozenset({"PropertyContainer"}),
+}
 OBJECT_CREATE_WRITABLE_PARENT_TYPES = frozenset(
     {
         "WorkUnit",
@@ -420,6 +428,9 @@ FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS: Mapping[str, frozenset[str]] = {
     ),
 }
 
+DIRECT_CHILD_MAX_PARENT_LITERAL_LENGTH = 4096
+DIRECT_CHILD_MAX_TYPE_LENGTH = 128
+
 
 _ID_IDENTITY_SCHEMA: Mapping[str, Any] = {
     "type": "object",
@@ -439,11 +450,71 @@ _WAQL_IDENTITY_SCHEMA: Mapping[str, Any] = {
     "additionalProperties": False,
     "properties": {"kind": {"const": "waql"}, "value": {"type": "string", "minLength": 1}},
 }
+_DIRECT_CHILD_PARENT_ID_SCHEMA: Mapping[str, Any] = {
+    "type": "object",
+    "required": ["kind", "value"],
+    "additionalProperties": False,
+    "properties": {
+        "kind": {"const": "id"},
+        "value": {
+            "oneOf": [
+                {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": DIRECT_CHILD_MAX_PARENT_LITERAL_LENGTH,
+                },
+                {"type": "integer"},
+            ]
+        },
+    },
+}
+_DIRECT_CHILD_PARENT_PATH_SCHEMA: Mapping[str, Any] = {
+    "type": "object",
+    "required": ["kind", "value"],
+    "additionalProperties": False,
+    "properties": {
+        "kind": {"const": "path"},
+        "value": {
+            "type": "string",
+            "pattern": r"^\\",
+            "maxLength": DIRECT_CHILD_MAX_PARENT_LITERAL_LENGTH,
+        },
+    },
+}
+_DIRECT_CHILD_IDENTITY_SCHEMA: Mapping[str, Any] = {
+    "type": "object",
+    "required": ["kind", "parent", "type"],
+    "additionalProperties": False,
+    "properties": {
+        "kind": {"const": "direct-child"},
+        "parent": {
+            "description": (
+                "Closed id or path identity. The Gateway resolves it live, "
+                "then constructs the bounded direct-child selector."
+            ),
+            "oneOf": [
+                _DIRECT_CHILD_PARENT_ID_SCHEMA,
+                _DIRECT_CHILD_PARENT_PATH_SCHEMA,
+            ],
+        },
+        "type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": DIRECT_CHILD_MAX_TYPE_LENGTH,
+            "description": "Exact Wwise type token for the one required direct child.",
+        },
+    },
+    "description": (
+        "Resolve exactly one direct child of the closed parent by exact type. "
+        "No caller-authored WAQL is accepted by this identity kind."
+    ),
+}
 IDENTITY_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     "oneOf": [
         _ID_IDENTITY_SCHEMA,
         _PATH_IDENTITY_SCHEMA,
         _WAQL_IDENTITY_SCHEMA,
+        _DIRECT_CHILD_IDENTITY_SCHEMA,
         {
             "type": "object",
             "required": ["kind", "name", "type", "parent"],
@@ -921,14 +992,37 @@ _LIVE_METADATA_DEPENDENCY_CLOSURE_CONTRACT: Mapping[str, Any] = {
         "dependency_identity": "exact_returned_property_name",
     },
     "materialization": {
-        "required_values_count": 1,
-        "kind": "property",
-        "copy_name_from": "dependency_requirements[].property",
-        "copy_value_from": "dependency_requirements[].required_values[0]",
-        "scope": {
-            "inherit_selected_owner_scope": True,
-            "defaults": "$.arguments.defaults.properties",
-            "row": "$.arguments.imports[owner_row_index].properties",
+        "ordinary_dependencies": {
+            "owner": "request",
+            "required_values_count": 1,
+            "kind": "property",
+            "copy_name_from": "dependency_requirements[].property",
+            "copy_value_from": (
+                "dependency_requirements[].required_values[0]"
+            ),
+            "scope": {
+                "inherit_selected_owner_scope": True,
+                "defaults": "$.arguments.defaults.properties",
+                "row": (
+                    "$.arguments.imports[owner_row_index].properties"
+                ),
+            },
+        },
+        "supported_reference_activation": {
+            "owner": "gateway",
+            "supported_shape": {
+                "dependency_type": "override",
+                "action": "Enable",
+                "context": "Self",
+                "property_type": ["bool", "boolean"],
+                "required_value": True,
+            },
+            "request_forms": {
+                "omitted": "accepted_and_derived_before_dispatch",
+                "explicit_required_value": "accepted_and_deduplicated",
+                "explicit_conflict": "rejected",
+            },
+            "scope": "same_object_as_reference",
         },
     },
     "failure_policy": {
@@ -976,6 +1070,26 @@ _AUDIO_IMPORT_REQUEST_COMPOSITION_CONTRACT: Mapping[str, Any] = {
         "subset_shared_without_explicit_baseline": (
             "keep_in_each_applicable_import_row"
         ),
+        "defaults_scope": {
+            "applies_to": "every_imports_row",
+            "object_type_filtering": False,
+            "mixed_structure_and_sound_rows": {
+                "sound_only_fields": [
+                    "import_language",
+                    "properties",
+                    "references",
+                    "event",
+                ],
+                "placement": "keep_on_each_applicable_sound_row",
+                "defaults_placement": "forbidden",
+            },
+            "rule": (
+                "defaults has no object-type filter and affects every imports "
+                "row; when structure-only and Sound rows are mixed, keep "
+                "import_language, properties, references, and event on each "
+                "applicable Sound row instead of defaults"
+            ),
+        },
         "fixed_fields": [
             name
             for name in _IMPORT_COMMON_ARGUMENT_PROPERTIES
@@ -1000,6 +1114,13 @@ _SOUNDBANK_GENERATE_ITEM_SCHEMA: Mapping[str, Any] = {
         "artifact_expectation": {
             "type": "string",
             "enum": ["nonlocalized", "localized", "mixed"],
+            "description": (
+                "Expected artifact layout for this SoundBank. nonlocalized means "
+                "only the root non-localized/SFX Bank artifact; localized means "
+                "per-language artifacts; mixed means both root and per-language "
+                "artifacts. Language selection is a batch-level rule derived from "
+                "all soundbanks[] rows."
+            ),
         },
         "events": {"type": "array", "minItems": 1, "items": IDENTITY_ARGUMENT_SCHEMA},
         "aux_busses": {"type": "array", "minItems": 1, "items": IDENTITY_ARGUMENT_SCHEMA},
@@ -1371,7 +1492,13 @@ class OperationSpec:
             result["selection_guidance"] = _json_mapping(self.selection_guidance)
         if self.identity_arguments:
             result["identity_contract"] = {
-                "one_of": ["id", "path", "waql", "scoped-name"],
+                "one_of": [
+                    "id",
+                    "path",
+                    "waql",
+                    "direct-child",
+                    "scoped-name",
+                ],
                 "argument_fields": list(self.identity_arguments),
                 "runtime_live_resolution_required": True,
                 "caller_rows_allowed": False,
@@ -2835,13 +2962,20 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         ),
         identity_arguments=("soundbank", "inclusions[].object"),
         constraints=(
-            "replace sets the complete normalized inclusion list and may use an empty list",
+            "replace is one transaction scoped only to the selected SoundBank: "
+            "submit its complete desired post-state; omitted existing rows are "
+            "removed without naming them, every other SoundBank is unaffected, "
+            "and the list may be empty",
             "add upserts the complete filter row for each requested object while preserving other objects",
             "remove requires an exact live filter-row match and removes the requested object inclusion",
         ),
         selection_guidance=_selection_guidance(
             use_when=(
                 "The user directly describes additions, removals, replacement, or clearing of one live SoundBank's inclusion rows.",
+                "The user gives one SoundBank's complete desired final inclusion "
+                "set and asks to remove Debug or any other omitted rows; use one "
+                "replace transaction and never split that final-state request "
+                "into add and remove transactions.",
             ),
             avoid_when=(
                 "The user supplies SoundBank Definition TSV files and asks Wwise to process those files.",
@@ -2878,8 +3012,26 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             {
                 "soundbanks": {"type": "array", "minItems": 1, "maxItems": 64, "items": _SOUNDBANK_GENERATE_ITEM_SCHEMA},
                 "platforms": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
-                "languages": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
-                "skip_languages": {"type": "boolean"},
+                "languages": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"type": "string", "minLength": 1},
+                    "description": (
+                        "Batch language selection. Omit when every SoundBank has "
+                        "artifact_expectation=nonlocalized. When any SoundBank is "
+                        "localized or mixed, supply one or more real localized "
+                        "project language names; SFX is not a localized language "
+                        "and is forbidden here."
+                    ),
+                },
+                "skip_languages": {
+                    "type": "boolean",
+                    "description": (
+                        "Batch switch derived from the complete soundbanks[] list: "
+                        "true exactly when every SoundBank is nonlocalized, and "
+                        "false when any SoundBank is localized or mixed."
+                    ),
+                },
                 "write_to_disk": {"const": True},
                 "rebuild_soundbanks": {
                     "type": "boolean",
@@ -2910,6 +3062,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         identity_arguments=("soundbanks[].events[]", "soundbanks[].aux_busses[]"),
         constraints=(
             "the user SoundBank, platform, and language scope is explicit; Init is an automatic by-product and cannot be requested",
+            "language selection is batch-wide: all-nonlocalized soundbanks require skip_languages=true and languages omitted; any localized or mixed soundbank requires skip_languages=false plus non-empty live project languages, never SFX; one batch may combine nonlocalized with localized or mixed rows",
             "batch-level rebuild_soundbanks and per-Bank soundbanks[].rebuild are independent; preserve every explicitly supplied value at its original level",
             "Event and AuxBus descriptors resolve live to one GUID before preview",
             "Wwise 2021.1 derives project paths from the live Project filePath plus a hashed strict WPROJ parse; later versions use live core.getProjectInfo",
@@ -5364,7 +5517,11 @@ def _prepare_object_set_rtpc(
             "object.setRTPC mode must be add or add_or_replace.",
             details={"mode": mode},
         )
-    before_rows = _read_rtpc_rows(target.object, read=read)
+    before_rows, rtpc_readbacks = _read_rtpc_rows_with_evidence(
+        target.object,
+        version=request.version,
+        read=read,
+    )
     matches = [
         row
         for row in before_rows
@@ -5455,6 +5612,11 @@ def _prepare_object_set_rtpc(
         "object_id": target.object,
         "fields": list(RTPC_SNAPSHOT_FIELDS),
         "rows": before_rows,
+        "readback_compatibility": [
+            dict(item["compatibility_normalization"])
+            for item in rtpc_readbacks
+            if isinstance(item.get("compatibility_normalization"), Mapping)
+        ],
     }
     verification = {
         "kind": "object-rtpc-state",
@@ -5485,22 +5647,161 @@ def _prepare_object_set_rtpc(
     )
 
 
-def _read_rtpc_rows(object_id: Any, *, read: ReadCall) -> list[dict[str, Any]]:
-    result = read(
-        OBJECT_GET_URI,
-        {
-            "from": {"id": [object_id]},
-            "transform": [{"select": ["@RTPC"]}],
-        },
-        {"return": list(RTPC_SNAPSHOT_FIELDS)},
-    )
-    rows = _rows(result)
-    if len(rows) > RTPC_MAX_LIST_ROWS:
+def _read_rtpc_rows_with_evidence(
+    object_id: Any,
+    *,
+    version: str,
+    read: ReadCall,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Read one complete RTPC list through schema-valid object accessors.
+
+    ``transform.select`` accepts hierarchy relationships, not object-list
+    accessors.  Read the owner's ``@RTPC`` accessor first, then resolve the
+    returned bounded GUID set in one ordinary ``from.id`` query.
+    """
+
+    owner_args = {"from": {"id": [object_id]}}
+    owner_options = {"return": ["id", "@RTPC"]}
+    owner_result = read(OBJECT_GET_URI, owner_args, owner_options)
+    if not isinstance(owner_result, Mapping):
+        raise OperationContractError(
+            "INVALID_READBACK",
+            "The RTPC owner readback must be an object.",
+        )
+    owner_rows = _rows(owner_result)
+    if (
+        len(owner_rows) != 1
+        or not _same_identity(owner_rows[0].get("id"), object_id)
+    ):
+        raise OperationContractError(
+            "INVALID_READBACK",
+            "The RTPC owner must resolve exactly once by canonical ID.",
+            details={"object_id": object_id, "rows": owner_rows},
+        )
+    owner_row = owner_rows[0]
+    compatibility_normalization: dict[str, Any] | None = None
+    if "@RTPC" not in owner_row:
+        if (
+            version in RTPC_EMPTY_OWNER_FIELD_OMISSION_VERSIONS
+            and set(owner_row) == {"id"}
+        ):
+            raw_references: Any = []
+            compatibility_normalization = {
+                "kind": "missing-empty-object-list",
+                "version": version,
+                "field": "@RTPC",
+                "observed_row_keys": ["id"],
+                "normalized_value": [],
+            }
+        else:
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "The RTPC owner readback must contain an @RTPC array.",
+                details={
+                    "object_id": object_id,
+                    "version": version,
+                    "row": owner_row,
+                },
+            )
+    else:
+        raw_references = owner_row["@RTPC"]
+    if not isinstance(raw_references, list):
+        raise OperationContractError(
+            "INVALID_READBACK",
+            "The RTPC owner readback must contain an @RTPC array.",
+            details={
+                "object_id": object_id,
+                "version": version,
+                "row": owner_row,
+            },
+        )
+    if len(raw_references) > RTPC_MAX_LIST_ROWS:
         raise OperationContractError(
             "RTPC_LIST_LIMIT_EXCEEDED",
             "The target RTPC list exceeds the reviewed snapshot limit.",
-            details={"count": len(rows), "limit": RTPC_MAX_LIST_ROWS},
+            details={
+                "count": len(raw_references),
+                "limit": RTPC_MAX_LIST_ROWS,
+            },
         )
+    reference_ids: list[Any] = []
+    reference_keys: set[str] = set()
+    for index, reference in enumerate(raw_references):
+        reference_id = (
+            reference.get("id")
+            if isinstance(reference, Mapping)
+            else None
+        )
+        if (
+            not isinstance(reference_id, str)
+            or not _PLUGIN_GUID.fullmatch(reference_id)
+        ):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "Every @RTPC list entry must expose a canonical GUID.",
+                details={"index": index, "entry": reference},
+            )
+        key = _identity_key(reference_id)
+        if key in reference_keys:
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "The @RTPC list contains a duplicate GUID.",
+                details={"index": index, "id": reference_id},
+            )
+        reference_keys.add(key)
+        reference_ids.append(reference_id)
+
+    owner_readback = {
+        "role": "object-rtpc-owner",
+        "uri": OBJECT_GET_URI,
+        "args": owner_args,
+        "options": owner_options,
+        "result": dict(owner_result),
+    }
+    if compatibility_normalization is not None:
+        owner_readback["compatibility_normalization"] = (
+            compatibility_normalization
+        )
+    readbacks = [owner_readback]
+    if not reference_ids:
+        return [], readbacks
+
+    entries_args = {"from": {"id": reference_ids}}
+    entries_options = {"return": list(RTPC_SNAPSHOT_FIELDS)}
+    entries_result = read(OBJECT_GET_URI, entries_args, entries_options)
+    if not isinstance(entries_result, Mapping):
+        raise OperationContractError(
+            "INVALID_READBACK",
+            "The RTPC entry readback must be an object.",
+        )
+    unordered_rows = _rows(entries_result)
+    rows_by_id: dict[str, dict[str, Any]] = {}
+    for index, row in enumerate(unordered_rows):
+        row_id = row.get("id")
+        if not isinstance(row_id, str) or not _PLUGIN_GUID.fullmatch(row_id):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "Every RTPC detail row must expose a canonical GUID.",
+                details={"index": index, "row": row},
+            )
+        key = _identity_key(row_id)
+        if key in rows_by_id:
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "The RTPC detail readback contains a duplicate GUID.",
+                details={"index": index, "id": row_id},
+            )
+        rows_by_id[key] = row
+    if set(rows_by_id) != reference_keys:
+        raise OperationContractError(
+            "INVALID_READBACK",
+            "The RTPC detail readback does not match the owner's complete @RTPC GUID list.",
+            details={
+                "owner_ids": reference_ids,
+                "detail_ids": [row.get("id") for row in unordered_rows],
+            },
+        )
+    rows = [rows_by_id[_identity_key(reference_id)] for reference_id in reference_ids]
     if not all(
         _valid_object_id(row.get("id"))
         and row.get("type") == "RTPC"
@@ -5515,7 +5816,16 @@ def _read_rtpc_rows(object_id: Any, *, read: ReadCall) -> list[dict[str, Any]]:
             "The complete RTPC list snapshot contains an unrecognized row.",
             details={"rows": rows},
         )
-    return rows
+    readbacks.append(
+        {
+            "role": "object-rtpc-entries",
+            "uri": OBJECT_GET_URI,
+            "args": entries_args,
+            "options": entries_options,
+            "result": dict(entries_result),
+        }
+    )
+    return rows, readbacks
 
 
 def _is_rtpc_control_input(value: Any) -> bool:
@@ -7515,7 +7825,11 @@ def _prepare_audio_import(
             role=role,
             read=read,
         )
-        _require_import_parent(resolved, index=0)
+        _require_import_parent(
+            resolved,
+            index=0,
+            version=request.version,
+        )
         path = resolved.row.get("path")
         if not isinstance(path, str) or not path.startswith("\\"):
             raise OperationContractError(
@@ -7569,7 +7883,11 @@ def _prepare_audio_import_tab_delimited(
     read: ReadCall,
 ) -> tuple[SemanticPreview, dict[str, ResolvedObject], dict[str, Any], dict[str, Any], dict[str, Any]]:
     location = _resolve_identity(arguments.get("import_location"), role="import_location", read=read)
-    _require_import_parent(location, index=0)
+    _require_import_parent(
+        location,
+        index=0,
+        version=request.version,
+    )
     location_path = location.row.get("path")
     if not isinstance(location_path, str):
         raise OperationContractError("INVALID_READBACK", "import_location must expose an absolute path.")
@@ -8163,8 +8481,24 @@ def _prepare_import_dynamic_fields(
                 "An import target has a malformed requested object type.",
                 details={"index": index, "requested_type": requested_type},
             )
-        metadata_type = _import_metadata_object_type(requested_type)
+        metadata_type = _import_metadata_object_type(
+            requested_type,
+            version=request.version,
+        )
         type_info = _resolve_object_type(metadata_type, catalog=type_catalog)
+        if (
+            request.version == "2025.1"
+            and _object_type_token(requested_type) == "actormixer"
+            and _object_type_token(type_info.name) != "propertycontainer"
+        ):
+            raise OperationContractError(
+                "INVALID_OBJECT_TYPE",
+                "Wwise 2025.1 ActorMixer imports must resolve through the live PropertyContainer metadata row.",
+                details={
+                    "requested": requested_type,
+                    "resolved": type_info.as_dict(),
+                },
+            )
         target["metadata_object_type"] = type_info.name
         target["metadata_class_id"] = type_info.class_id
 
@@ -8629,8 +8963,12 @@ def _metadata_is_reference(info: PropertyInfoMetadataRecord) -> bool:
     )
 
 
-def _import_metadata_object_type(value: str) -> str:
+def _import_metadata_object_type(value: str, *, version: str) -> str:
     token = _object_type_token(value)
+    if version == "2025.1" and token == "actormixer":
+        # Wwise 2025.1 reflects Actor Mixers as PropertyContainer metadata,
+        # while audio.import still accepts the stable native ActorMixer token.
+        return "PropertyContainer"
     aliases = {
         "soundsfx": "Sound",
         "soundvoice": "Sound",
@@ -8784,6 +9122,7 @@ def _prepare_closed_import_plan(
             target_path,
             role=f"targets[{index}].anchor",
             read=read,
+            version=request.version,
         )
         roles[f"targets[{index}].anchor"] = anchor
         fields = _import_target_return_fields(target, version=request.version)
@@ -9553,6 +9892,7 @@ def _resolve_import_anchor(
     *,
     role: str,
     read: ReadCall,
+    version: str,
 ) -> tuple[ResolvedObject, list[dict[str, Any]]]:
     segments = target_path[1:].split("\\") if target_path.startswith("\\") else []
     if len(segments) < 3:
@@ -9588,7 +9928,11 @@ def _resolve_import_anchor(
             resolution="live-path",
             row=row,
         )
-        _require_import_parent(resolved, index=0)
+        _require_import_parent(
+            resolved,
+            index=0,
+            version=version,
+        )
         return resolved, empty_snapshots
     raise OperationContractError(
         "IMPORT_ANCHOR_NOT_FOUND",
@@ -11168,11 +11512,18 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
 
     rtpc_snapshot = pre_state.get("rtpc_snapshot") if isinstance(pre_state, Mapping) else None
     if isinstance(rtpc_snapshot, Mapping):
+        request_payload = prepared.get("request")
+        version = (
+            request_payload.get("version")
+            if isinstance(request_payload, Mapping)
+            else None
+        )
         object_id = rtpc_snapshot.get("object_id")
         fields = rtpc_snapshot.get("fields")
         expected = rtpc_snapshot.get("rows")
         if (
-            not _valid_object_id(object_id)
+            not isinstance(version, str)
+            or not _valid_object_id(object_id)
             or fields != list(RTPC_SNAPSHOT_FIELDS)
             or not isinstance(expected, list)
         ):
@@ -11180,27 +11531,12 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 "INVALID_PREVIEW",
                 "RTPC precondition snapshot is malformed.",
             )
-        args = {
-            "from": {"id": [object_id]},
-            "transform": [{"select": ["@RTPC"]}],
-        }
-        options = {"return": list(RTPC_SNAPSHOT_FIELDS)}
-        result = read_call(OBJECT_GET_URI, args, options)
-        if not isinstance(result, Mapping):
-            raise OperationContractError(
-                "INVALID_READBACK",
-                "RTPC precondition readback must be an object.",
-            )
-        actual = _rows(result)
-        readbacks.append(
-            {
-                "role": "object-rtpc-list",
-                "uri": OBJECT_GET_URI,
-                "args": args,
-                "options": options,
-                "result": dict(result),
-            }
+        actual, rtpc_readbacks = _read_rtpc_rows_with_evidence(
+            object_id,
+            version=version,
+            read=read_call,
         )
+        readbacks.extend(rtpc_readbacks)
         assertions.append(
             {
                 "name": "complete RTPC list pre-state unchanged",
@@ -14705,26 +15041,12 @@ def verify_prepared_operation(
                 "RTPC verification plan is malformed.",
             )
         check_result_schema(OBJECT_SET_URI, version)
-        args = {
-            "from": {"id": [object_id]},
-            "transform": [{"select": ["@RTPC"]}],
-        }
-        options = {"return": list(RTPC_SNAPSHOT_FIELDS)}
-        result = read_call(OBJECT_GET_URI, args, options)
-        if not isinstance(result, Mapping):
-            raise OperationContractError(
-                "INVALID_READBACK",
-                "RTPC verification readback must be an object.",
-            )
-        actual_rows = _rows(result)
-        readbacks.append(
-            {
-                "uri": OBJECT_GET_URI,
-                "args": args,
-                "options": options,
-                "result": dict(result),
-            }
+        actual_rows, rtpc_readbacks = _read_rtpc_rows_with_evidence(
+            object_id,
+            version=version,
+            read=read_call,
         )
+        readbacks.extend(rtpc_readbacks)
         before_by_id = {
             _identity_key(row.get("id")): dict(row)
             for row in before_rows
@@ -16297,6 +16619,8 @@ def _resolve_identity(payload: Any, *, role: str, read: ReadCall) -> ResolvedObj
     if not isinstance(payload, Mapping):
         raise OperationContractError("INVALID_IDENTITY", f"{role} identity must be a JSON object.")
     kind = payload.get("kind")
+    direct_child_parent: ResolvedObject | None = None
+    direct_child_type: str | None = None
     if kind == "id":
         _require_exact_keys(payload, required=("kind", "value"), context=f"{role} identity")
         value = payload.get("value")
@@ -16318,6 +16642,34 @@ def _resolve_identity(payload: Any, *, role: str, read: ReadCall) -> ResolvedObj
             raise OperationContractError("INVALID_IDENTITY", f"{role} WAQL must be a non-empty string.")
         identity = ObjectIdentity(waql=value)
         args = {"waql": value}
+    elif kind == "direct-child":
+        _validate_direct_child_identity_payload(payload, role=role)
+        parent_payload = payload["parent"]
+        assert isinstance(parent_payload, Mapping)
+        direct_child_parent = _resolve_identity(
+            parent_payload,
+            role=f"{role}.parent",
+            read=read,
+        )
+        direct_child_type = str(payload["type"])
+        parent_literal = str(parent_payload["value"])
+        try:
+            query = (
+                f"from object {quote_waql_literal(parent_literal)} "
+                f"select children where type = "
+                f"{quote_waql_literal(direct_child_type)} take 2"
+            )
+        except ValueError as exc:
+            raise OperationContractError(
+                "INVALID_IDENTITY",
+                f"{role} direct-child identity contains an unsupported WAQL literal.",
+                details={
+                    "role": role,
+                    "boundary": "packaged-waql-literal-evidence",
+                },
+            ) from exc
+        identity = ObjectIdentity(waql=query)
+        args = {"waql": query}
     elif kind == "scoped-name":
         _require_exact_keys(payload, required=("kind", "name", "type", "parent"), context=f"{role} identity")
         parent_payload = payload.get("parent")
@@ -16332,7 +16684,7 @@ def _resolve_identity(payload: Any, *, role: str, read: ReadCall) -> ResolvedObj
     else:
         raise OperationContractError(
             "INVALID_IDENTITY",
-            f"{role} identity kind must be id, path, waql, or scoped-name.",
+            f"{role} identity kind must be id, path, waql, direct-child, or scoped-name.",
             details={"kind": kind},
         )
     result = read(OBJECT_GET_URI, args, {"return": list(IDENTITY_RETURN_FIELDS)})
@@ -16351,6 +16703,32 @@ def _resolve_identity(payload: Any, *, role: str, read: ReadCall) -> ResolvedObj
         raise OperationContractError("IDENTITY_MISMATCH", f"{role} live GUID does not match the request.", details={"row": row})
     if kind == "path" and row.get("path") != payload.get("value"):
         raise OperationContractError("IDENTITY_MISMATCH", f"{role} live path does not match the request.", details={"row": row})
+    if kind == "direct-child":
+        assert direct_child_type is not None and direct_child_parent is not None
+        if row.get("type") != direct_child_type:
+            raise OperationContractError(
+                "IDENTITY_MISMATCH",
+                f"{role} live direct child type does not exactly match the request.",
+                details={
+                    "expected_type": direct_child_type,
+                    "actual_type": row.get("type"),
+                    "row": row,
+                },
+            )
+        parent_match = _direct_child_parent_relationship_matches(
+            row,
+            direct_child_parent,
+        )
+        if parent_match is False:
+            raise OperationContractError(
+                "IDENTITY_MISMATCH",
+                f"{role} live object is not a direct child of the resolved parent.",
+                details={
+                    "expected_parent": direct_child_parent.as_dict(),
+                    "actual_parent": row.get("parent"),
+                    "row": row,
+                },
+            )
     return ResolvedObject(identity=identity, object=object_id, resolution=f"live-{kind}", row=row)
 
 
@@ -16786,6 +17164,9 @@ def _validate_nested_request_shape(
                 details=exc.details,
             ) from exc
         return
+    if operation in {"object.setName", "object.setNotes"}:
+        _validate_identity_payload_shape(arguments.get("object"), role="object")
+        return
     if operation in {"object.setProperty", "object.setReference"}:
         _validate_identity_payload_shape(arguments.get("object"), role="object")
         if (
@@ -16968,6 +17349,7 @@ def _validate_nested_request_shape(
         return
     if operation == "soundbank.generate":
         soundbanks = _mapping_sequence(arguments.get("soundbanks"), field="soundbanks")
+        artifact_expectations: list[str] = []
         for bank_index, bank in enumerate(soundbanks):
             _require_exact_keys(
                 bank,
@@ -16975,6 +17357,22 @@ def _validate_nested_request_shape(
                 optional=("events", "aux_busses", "inclusions", "rebuild"),
                 context=f"soundbank.generate soundbanks[{bank_index}]",
             )
+            artifact_expectation = bank.get("artifact_expectation")
+            if artifact_expectation not in {
+                "nonlocalized",
+                "localized",
+                "mixed",
+            }:
+                raise OperationContractError(
+                    "INVALID_ARGUMENT",
+                    "soundbank.generate soundbanks[] artifact_expectation must "
+                    "be nonlocalized, localized, or mixed.",
+                    details={
+                        "index": bank_index,
+                        "actual": artifact_expectation,
+                    },
+                )
+            artifact_expectations.append(str(artifact_expectation))
             for field_name in ("events", "aux_busses"):
                 if field_name not in bank:
                     continue
@@ -16989,6 +17387,51 @@ def _validate_nested_request_shape(
                         value,
                         role=f"soundbanks[{bank_index}].{field_name}[{value_index}]",
                     )
+        skip_languages = arguments.get("skip_languages")
+        if not isinstance(skip_languages, bool):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "soundbank.generate skip_languages must be a boolean.",
+            )
+        language_dependent = any(
+            expectation in {"localized", "mixed"}
+            for expectation in artifact_expectations
+        )
+        if not language_dependent:
+            if skip_languages is not True or "languages" in arguments:
+                raise OperationContractError(
+                    "INVALID_SCOPE",
+                    "An all-nonlocalized SoundBank batch requires "
+                    "skip_languages=true and languages omitted.",
+                )
+            return
+        if skip_languages is not False:
+            raise OperationContractError(
+                "INVALID_SCOPE",
+                "A SoundBank batch containing any localized or mixed row "
+                "requires skip_languages=false.",
+            )
+        languages = arguments.get("languages")
+        if (
+            not isinstance(languages, list)
+            or not languages
+            or not all(
+                isinstance(language, str) and bool(language.strip())
+                for language in languages
+            )
+        ):
+            raise OperationContractError(
+                "INVALID_SCOPE",
+                "A SoundBank batch containing any localized or mixed row "
+                "requires a non-empty languages array of localized project "
+                "language names.",
+            )
+        if any(language.strip().casefold() == "sfx" for language in languages):
+            raise OperationContractError(
+                "INVALID_SCOPE",
+                "SFX is not a localized project language and cannot appear in "
+                "soundbank.generate languages.",
+            )
         return
     if operation == "soundbank.convertExternalSources":
         for index, row in enumerate(_mapping_sequence(arguments.get("sources"), field="sources")):
@@ -17025,6 +17468,9 @@ def _validate_identity_payload_shape(payload: Any, *, role: str) -> None:
     if kind in {"id", "path", "waql"}:
         _require_exact_keys(payload, required=("kind", "value"), context=f"{role} identity")
         return
+    if kind == "direct-child":
+        _validate_direct_child_identity_payload(payload, role=role)
+        return
     if kind == "scoped-name":
         _require_exact_keys(payload, required=("kind", "name", "type", "parent"), context=f"{role} identity")
         parent = payload.get("parent")
@@ -17034,9 +17480,89 @@ def _validate_identity_payload_shape(payload: Any, *, role: str) -> None:
         return
     raise OperationContractError(
         "INVALID_IDENTITY",
-        f"{role} identity kind must be id, path, waql, or scoped-name.",
+        f"{role} identity kind must be id, path, waql, direct-child, or scoped-name.",
         details={"kind": kind},
     )
+
+
+def _validate_direct_child_identity_payload(
+    payload: Mapping[str, Any],
+    *,
+    role: str,
+) -> None:
+    _require_exact_keys(
+        payload,
+        required=("kind", "parent", "type"),
+        context=f"{role} identity",
+    )
+    parent = payload.get("parent")
+    if not isinstance(parent, Mapping) or parent.get("kind") not in {"id", "path"}:
+        raise OperationContractError(
+            "INVALID_IDENTITY",
+            f"{role} direct-child parent must be an id or path identity.",
+        )
+    _require_exact_keys(
+        parent,
+        required=("kind", "value"),
+        context=f"{role}.parent identity",
+    )
+    parent_value = parent.get("value")
+    if parent.get("kind") == "id":
+        if (
+            isinstance(parent_value, bool)
+            or not isinstance(parent_value, (str, int))
+            or (
+                isinstance(parent_value, str)
+                and (
+                    not parent_value.strip()
+                    or len(parent_value) > DIRECT_CHILD_MAX_PARENT_LITERAL_LENGTH
+                )
+            )
+        ):
+            raise OperationContractError(
+                "INVALID_IDENTITY",
+                f"{role} direct-child parent id must be a bounded non-empty string or integer.",
+                details={
+                    "limit": DIRECT_CHILD_MAX_PARENT_LITERAL_LENGTH,
+                },
+            )
+    else:
+        if (
+            not isinstance(parent_value, str)
+            or not parent_value.startswith("\\")
+            or len(parent_value) > DIRECT_CHILD_MAX_PARENT_LITERAL_LENGTH
+        ):
+            raise OperationContractError(
+                "INVALID_IDENTITY",
+                f"{role} direct-child parent path must be a bounded absolute Wwise path.",
+                details={
+                    "limit": DIRECT_CHILD_MAX_PARENT_LITERAL_LENGTH,
+                },
+            )
+    object_type = payload.get("type")
+    if (
+        not isinstance(object_type, str)
+        or not object_type
+        or object_type != object_type.strip()
+        or len(object_type) > DIRECT_CHILD_MAX_TYPE_LENGTH
+    ):
+        raise OperationContractError(
+            "INVALID_IDENTITY",
+            f"{role} direct-child type must be one bounded exact Wwise type token.",
+            details={"limit": DIRECT_CHILD_MAX_TYPE_LENGTH},
+        )
+    try:
+        quote_waql_literal(str(parent_value))
+        quote_waql_literal(object_type)
+    except ValueError as exc:
+        raise OperationContractError(
+            "INVALID_IDENTITY",
+            f"{role} direct-child identity contains an unsupported WAQL literal.",
+            details={
+                "role": role,
+                "boundary": "packaged-waql-literal-evidence",
+            },
+        ) from exc
 
 
 def _canonical_import_target_paths(object_path: str, *, version: str) -> tuple[str, str]:
@@ -17095,14 +17621,31 @@ def _canonical_import_target_paths(object_path: str, *, version: str) -> tuple[s
     return target_path, parent_path
 
 
-def _require_import_parent(parent: ResolvedObject, *, index: int) -> None:
+def _require_import_parent(
+    parent: ResolvedObject,
+    *,
+    index: int,
+    version: str,
+) -> None:
     parent_type = parent.row.get("type")
     parent_path = parent.row.get("path")
-    if parent_type not in IMPORT_WRITABLE_PARENT_TYPES or not isinstance(parent_path, str):
+    allowed_types = (
+        IMPORT_WRITABLE_PARENT_TYPES
+        | IMPORT_REFLECTED_WRITABLE_PARENT_TYPES_BY_VERSION.get(
+            version,
+            frozenset(),
+        )
+    )
+    if parent_type not in allowed_types or not isinstance(parent_path, str):
         raise OperationContractError(
             "INVALID_TARGET_TYPE",
             "audio.import requires a live writable audio hierarchy parent container.",
-            details={"index": index, "allowed_types": sorted(IMPORT_WRITABLE_PARENT_TYPES), "parent": parent.as_dict()},
+            details={
+                "index": index,
+                "version": version,
+                "allowed_types": sorted(allowed_types),
+                "parent": parent.as_dict(),
+            },
         )
 
 
@@ -17761,6 +18304,48 @@ def _parent_value(value: Any) -> Any:
     if isinstance(value, Mapping):
         return value.get("id") or value.get("path") or value.get("name")
     return value
+
+
+def _direct_child_parent_relationship_matches(
+    child_row: Mapping[str, Any],
+    parent: ResolvedObject,
+) -> bool | None:
+    """Prove a direct-child row's parent when canonical readback permits it."""
+
+    actual = child_row.get("parent")
+    if isinstance(actual, Mapping):
+        checked = False
+        for field_name, expected in (
+            ("id", parent.object),
+            ("path", parent.row.get("path")),
+        ):
+            value = actual.get(field_name)
+            if value is None or expected is None:
+                continue
+            checked = True
+            if not _same_identity(value, expected):
+                return False
+        if checked:
+            return True
+    elif isinstance(actual, (str, int)) and not isinstance(actual, bool):
+        expected_values = (
+            parent.object,
+            parent.row.get("id"),
+            parent.row.get("path"),
+        )
+        return any(
+            expected is not None and _same_identity(actual, expected)
+            for expected in expected_values
+        )
+
+    child_path = child_row.get("path")
+    parent_path = parent.row.get("path")
+    if isinstance(child_path, str) and isinstance(parent_path, str):
+        separator = "" if parent_path.endswith("\\") else "\\"
+        relative = child_path.removeprefix(f"{parent_path}{separator}")
+        if relative != child_path:
+            return bool(relative) and "\\" not in relative
+    return None
 
 
 def _field_value(row: Mapping[str, Any], field_name: str) -> Any:

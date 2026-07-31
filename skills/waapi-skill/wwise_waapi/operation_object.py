@@ -34,6 +34,7 @@ DEFAULT_MAX_FIELDS_PER_NODE = 32
 DEFAULT_MAX_REQUEST_BYTES = 256 * 1024
 DEFAULT_MAX_NAME_LENGTH = 255
 DEFAULT_MAX_TYPE_LENGTH = 128
+DEFAULT_MAX_IDENTITY_PARENT_LITERAL_LENGTH = 4096
 DEFAULT_MAX_FIELD_NAME_LENGTH = 128
 DEFAULT_MAX_NOTES_LENGTH = 64 * 1024
 DEFAULT_MAX_RTPCS = 32
@@ -73,7 +74,9 @@ RTPC_POINT_SHAPES = frozenset(
         "Exp3",
     }
 )
-IDENTITY_KINDS = frozenset({"id", "path", "waql", "scoped-name"})
+IDENTITY_KINDS = frozenset(
+    {"id", "path", "waql", "direct-child", "scoped-name"}
+)
 _DYNAMIC_FIELD_NAME = re.compile(r"^[:_a-zA-Z0-9]+$")
 
 
@@ -168,6 +171,13 @@ class ObjectIdentityDescriptor:
     parent: ObjectIdentityDescriptor | None = None
 
     def as_dict(self) -> dict[str, Any]:
+        if self.kind == "direct-child":
+            assert self.type is not None and self.parent is not None
+            return {
+                "kind": self.kind,
+                "parent": self.parent.as_dict(),
+                "type": self.type,
+            }
         if self.kind == "scoped-name":
             assert self.name is not None and self.type is not None and self.parent is not None
             return {
@@ -1401,7 +1411,7 @@ def _normalize_identity(
     if kind not in IDENTITY_KINDS:
         raise ObjectOperationContractError(
             "INVALID_IDENTITY",
-            f"{path}.kind must be id, path, waql, or scoped-name.",
+            f"{path}.kind must be id, path, waql, direct-child, or scoped-name.",
             details={"path": path, "kind": kind},
         )
     if kind in {"id", "path", "waql"}:
@@ -1423,6 +1433,63 @@ def _normalize_identity(
                     details={"path": f"{path}.value", "kind": kind},
                 )
         return ObjectIdentityDescriptor(kind=kind, value=value)
+    if kind == "direct-child":
+        _exact_fields(
+            mapping,
+            required={"kind", "parent", "type"},
+            optional=frozenset(),
+            path=path,
+        )
+        object_type = _bounded_token(
+            mapping.get("type"),
+            path=f"{path}.type",
+            max_length=limits.max_type_length,
+            disallow_path_separator=False,
+        )
+        if '"' in object_type:
+            raise ObjectOperationContractError(
+                "INVALID_IDENTITY",
+                f"{path}.type is outside the packaged WAQL literal boundary.",
+                details={"path": f"{path}.type"},
+            )
+        parent = _normalize_identity(
+            mapping.get("parent"),
+            path=f"{path}.parent",
+            limits=limits,
+        )
+        if parent.kind not in {"id", "path"}:
+            raise ObjectOperationContractError(
+                "INVALID_IDENTITY",
+                "A direct-child identity parent must use a closed id or path identity.",
+                details={"path": f"{path}.parent", "kind": parent.kind},
+            )
+        parent_value = parent.value
+        if (
+            isinstance(parent_value, str)
+            and (
+                len(parent_value) > DEFAULT_MAX_IDENTITY_PARENT_LITERAL_LENGTH
+                or '"' in parent_value
+                or any(
+                    ord(character) < 32
+                    or ord(character) == 127
+                    or character in {"\u2028", "\u2029"}
+                    for character in parent_value
+                )
+            )
+        ):
+            raise ObjectOperationContractError(
+                "INVALID_IDENTITY",
+                f"{path}.parent exceeds the packaged WAQL literal boundary.",
+                details={
+                    "path": f"{path}.parent",
+                    "limit": DEFAULT_MAX_IDENTITY_PARENT_LITERAL_LENGTH,
+                },
+            )
+        return ObjectIdentityDescriptor(
+            kind=kind,
+            type=object_type,
+            parent=parent,
+        )
     _exact_fields(mapping, required={"kind", "name", "type", "parent"}, optional=frozenset(), path=path)
     name = _bounded_token(
         mapping.get("name"),

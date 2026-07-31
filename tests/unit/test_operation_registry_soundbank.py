@@ -176,6 +176,119 @@ def _minimal_generate_request(io_root: Path) -> dict[str, Any]:
     )
 
 
+@pytest.mark.parametrize(
+    "version",
+    ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
+)
+def test_generate_parser_accepts_batch_wide_language_modes(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    base = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": version,
+        "operation": "soundbank.generate",
+    }
+    nonlocalized = {
+        **base,
+        "arguments": {
+            "soundbanks": [
+                {
+                    "name": "Gameplay_Main",
+                    "artifact_expectation": "nonlocalized",
+                }
+            ],
+            "platforms": ["Mac"],
+            "skip_languages": True,
+            "write_to_disk": True,
+            "io_root": str(tmp_path),
+        },
+    }
+    mixed_batch = {
+        **base,
+        "arguments": {
+            "soundbanks": [
+                {
+                    "name": "Gameplay_Main",
+                    "artifact_expectation": "nonlocalized",
+                },
+                {
+                    "name": "Dialogue_Main",
+                    "artifact_expectation": "localized",
+                },
+            ],
+            "platforms": ["Mac"],
+            "languages": ["English(US)"],
+            "skip_languages": False,
+            "write_to_disk": True,
+            "io_root": str(tmp_path),
+        },
+    }
+
+    assert parse_operation_request(nonlocalized).arguments["skip_languages"] is True
+    parsed_mixed = parse_operation_request(mixed_batch)
+    assert parsed_mixed.arguments["languages"] == ["English(US)"]
+
+
+@pytest.mark.parametrize(
+    "version",
+    ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
+)
+@pytest.mark.parametrize(
+    "soundbanks,skip_languages,languages",
+    [
+        (
+            [{"name": "Gameplay_Main", "artifact_expectation": "nonlocalized"}],
+            False,
+            ["English(US)"],
+        ),
+        (
+            [{"name": "Gameplay_Main", "artifact_expectation": "nonlocalized"}],
+            True,
+            ["English(US)"],
+        ),
+        (
+            [{"name": "Dialogue_Main", "artifact_expectation": "localized"}],
+            True,
+            None,
+        ),
+        (
+            [{"name": "Dialogue_Main", "artifact_expectation": "mixed"}],
+            False,
+            ["SFX"],
+        ),
+    ],
+)
+def test_generate_parser_rejects_inconsistent_batch_language_modes(
+    tmp_path: Path,
+    version: str,
+    soundbanks: list[dict[str, Any]],
+    skip_languages: bool,
+    languages: list[str] | None,
+) -> None:
+    arguments: dict[str, Any] = {
+        "soundbanks": soundbanks,
+        "platforms": ["Mac"],
+        "skip_languages": skip_languages,
+        "write_to_disk": True,
+        "io_root": str(tmp_path),
+    }
+    if languages is not None:
+        arguments["languages"] = languages
+
+    with pytest.raises(OperationContractError) as rejected:
+        parse_operation_request(
+            {
+                "contract": OPERATION_REQUEST_CONTRACT,
+                "version": version,
+                "operation": "soundbank.generate",
+                "arguments": arguments,
+            }
+        )
+
+    assert rejected.value.error_code == "INVALID_SCOPE"
+
+
 def test_generate_binds_relative_project_directories_to_live_project_file(
     tmp_path: Path,
 ) -> None:

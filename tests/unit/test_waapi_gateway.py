@@ -881,6 +881,22 @@ def test_main_prints_object_set_operation_schema_as_bounded_compact_json(
     assert exit_code == 0
     assert parsed == payload
     assert list(parsed) == list(payload)
+    shell_transport = parsed["request_envelope_policy"]["shell_transport"]
+    assert shell_transport == {
+        "outer_quoting": "single_quote_entire_compact_json",
+        "json_string_serialization": "exactly_once",
+        "decoded_value_rules": {
+            "embedded_quotes": (
+                "ordinary quotation marks with no preceding backslash"
+            ),
+            "wwise_path_separator": "one backslash",
+        },
+        "forbidden": [
+            "double_escape_json_string_contents",
+            "leave_json_escape_backslashes_in_decoded_values",
+            "repair_or_retry_invalid_json_in_the_same_turn",
+        ],
+    }
     assert stdout.count("\n") == 1
     assert stdout == (
         json.dumps(
@@ -953,12 +969,33 @@ def test_gateway_import_schemas_share_semantic_import_operation_contract(
     assert dependency_contract["selection"]["selected_fields_only"] is True
     assert dependency_contract["metadata_source"]["same_result_required"] is True
     assert dependency_contract["traversal"]["recursive"] is True
-    assert dependency_contract["materialization"]["required_values_count"] == 1
-    assert dependency_contract["materialization"]["scope"] == {
+    ordinary = dependency_contract["materialization"][
+        "ordinary_dependencies"
+    ]
+    activation = dependency_contract["materialization"][
+        "supported_reference_activation"
+    ]
+    assert ordinary["owner"] == "request"
+    assert ordinary["required_values_count"] == 1
+    assert ordinary["scope"] == {
         "inherit_selected_owner_scope": True,
         "defaults": "$.arguments.defaults.properties",
         "row": "$.arguments.imports[owner_row_index].properties",
     }
+    assert activation["owner"] == "gateway"
+    assert activation["supported_shape"] == {
+        "dependency_type": "override",
+        "action": "Enable",
+        "context": "Self",
+        "property_type": ["bool", "boolean"],
+        "required_value": True,
+    }
+    assert activation["request_forms"] == {
+        "omitted": "accepted_and_derived_before_dispatch",
+        "explicit_required_value": "accepted_and_deduplicated",
+        "explicit_conflict": "rejected",
+    }
+    assert activation["scope"] == "same_object_as_reference"
     assert dependency_contract["failure_policy"]["action"] == "stop"
     assert dependency_contract["failure_policy"]["guessing_allowed"] is False
     encoded_contract = json.dumps(

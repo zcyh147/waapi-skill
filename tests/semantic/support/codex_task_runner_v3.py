@@ -27,6 +27,7 @@ from tests.semantic.support.codex_gateway_broker import (
     TrustedSubscriptionAckSpec,
     TrustedStepObserver,
     TrustedStepPreObserver,
+    gateway_step_sequence_matches,
 )
 from tests.semantic.support.codex_harness import (
     CodexCliTask,
@@ -68,6 +69,14 @@ _CODEX_INFRASTRUCTURE_CATEGORIES = frozenset(
         "service_unavailable",
         "timeout_before_agent_action",
         "turn_failed_before_agent_action",
+    }
+)
+_PACKAGED_LANE_REFERENCES = frozenset(
+    {
+        "references/waapi-coverage.md",
+        "references/waapi-operate.md",
+        "references/waapi-query.md",
+        "references/waapi-setup.md",
     }
 )
 
@@ -155,6 +164,7 @@ def run_v3_codex_task(
     runner_environment: Mapping[str, str],
     required_reference: str,
     business_oracle_plan: BusinessOraclePlanEvidence,
+    turn_reference_schedule: Sequence[Sequence[str]] | None = None,
     trusted_subscription_ack: TrustedSubscriptionAckSpec | None = None,
     trusted_subscription_ack_observer: TrustedSubscriptionAckObserver | None = None,
     trusted_step_pre_observer: TrustedStepPreObserver | None = None,
@@ -171,8 +181,11 @@ def run_v3_codex_task(
             "prompt count must equal protocol turn-boundary count: "
             f"prompts={len(prompt_values)} prefixes={len(protocol.turn_prefix_counts)}"
         )
-    if not required_reference.startswith("references/waapi-") or not required_reference.endswith(".md"):
-        raise V3TaskRunnerError("required_reference must be one packaged waapi lane reference")
+    expected_skill_reads = _normalize_turn_reference_schedule(
+        prompt_count=len(prompt_values),
+        required_reference=required_reference,
+        turn_reference_schedule=turn_reference_schedule,
+    )
     root = Path(task_root).expanduser().resolve(strict=False)
     if (
         root.name != "codex-task"
@@ -294,6 +307,9 @@ def run_v3_codex_task(
     broker = CodexGatewayBroker(
         skill_source=skill_source,
         expected_steps=protocol.steps,
+        commutative_read_only_step_groups=(
+            protocol.commutative_read_only_step_groups
+        ),
         expected_wwise_version=version,
         project_modification_policy=project_modification_policy,
         runner_environment=runner_environment,
@@ -434,6 +450,9 @@ def run_v3_codex_task(
                         result,
                         turn_index=turn_index,
                         required_reference=required_reference,
+                        expected_skill_reads=expected_skill_reads[
+                            turn_index - 1
+                        ],
                         expected_gateway_count=effective_prefix - previous_prefix,
                         expected_terminal_execute_exit2_count=(
                             terminal_execute_exit2_count
@@ -547,10 +566,16 @@ def _broker_terminal_protocol_passed(
         step.name for step in protocol.steps[:consumed_count]
     )
     if (
-        evidence.consumed_step_names != expected_names
+        evidence.commutative_read_only_step_groups
+        != protocol.commutative_read_only_step_groups
+        or not gateway_step_sequence_matches(
+            expected_names,
+            evidence.consumed_step_names,
+            protocol.commutative_read_only_step_groups,
+        )
         or len(evidence.records) != consumed_count
         or tuple(record.step_name for record in evidence.records)
-        != expected_names
+        != evidence.consumed_step_names
         or evidence.rejected_records
         or not all(record.succeeded for record in evidence.records)
     ):
@@ -569,6 +594,7 @@ def _grade_common_turn(
     *,
     turn_index: int,
     required_reference: str,
+    expected_skill_reads: Sequence[str] | None = None,
     expected_gateway_count: int,
     expected_terminal_execute_exit2_count: int = 0,
     prompt_provenance: Any | None = None,
@@ -576,7 +602,15 @@ def _grade_common_turn(
     facts = result.command_facts
     allowed_reads = tuple(facts.allowed_read_commands)
     read_files = tuple(facts.skill_read_files)
-    expected_reads = ("SKILL.md", required_reference) if turn_index == 1 else ()
+    expected_reads = (
+        tuple(expected_skill_reads)
+        if expected_skill_reads is not None
+        else (
+            ("SKILL.md", required_reference)
+            if turn_index == 1
+            else ()
+        )
+    )
     records = facts.command_records
     gateway_count = len(facts.gateway_attempt_commands)
     try:
@@ -640,6 +674,90 @@ def _grade_common_turn(
     }
     errors = tuple(key for key, value in gates.items() if not value)
     return errors, gates
+
+
+def _normalize_turn_reference_schedule(
+    *,
+    prompt_count: int,
+    required_reference: str,
+    turn_reference_schedule: Sequence[Sequence[str]] | None,
+) -> tuple[tuple[str, ...], ...]:
+    """Close per-turn lane reads while preserving the historical default.
+
+    Callers schedule lane references only.  The runner owns the mandatory
+    initial ``SKILL.md`` read, so it cannot be moved to a resumed turn or
+    accidentally omitted.  A lane reference may appear at most once in the
+    task, matching the Skill's conversation-scoped read contract.
+    """
+
+    if (
+        type(prompt_count) is not int
+        or prompt_count < 1
+        or not isinstance(required_reference, str)
+        or required_reference not in _PACKAGED_LANE_REFERENCES
+    ):
+        raise V3TaskRunnerError(
+            "required_reference must be one packaged waapi lane reference"
+        )
+    if turn_reference_schedule is None:
+        reference_rows: tuple[tuple[str, ...], ...] = (
+            ((required_reference,),) + ((),) * (prompt_count - 1)
+        )
+    else:
+        if isinstance(turn_reference_schedule, (str, bytes)):
+            raise V3TaskRunnerError(
+                "turn_reference_schedule must contain one row per prompt"
+            )
+        try:
+            schedule_length = len(turn_reference_schedule)
+        except TypeError as exc:
+            raise V3TaskRunnerError(
+                "turn_reference_schedule must contain one row per prompt"
+            ) from exc
+        if schedule_length != prompt_count:
+            raise V3TaskRunnerError(
+                "turn_reference_schedule must contain one row per prompt"
+            )
+        normalized_rows: list[tuple[str, ...]] = []
+        seen: set[str] = set()
+        for raw_row in turn_reference_schedule:
+            if isinstance(raw_row, (str, bytes)):
+                raise V3TaskRunnerError(
+                    "turn_reference_schedule rows must be reference sequences"
+                )
+            try:
+                row = tuple(raw_row)
+            except TypeError as exc:
+                raise V3TaskRunnerError(
+                    "turn_reference_schedule rows must be reference sequences"
+                ) from exc
+            if len(row) > 1:
+                raise V3TaskRunnerError(
+                    "each Codex turn may read at most one waapi lane reference"
+                )
+            for reference in row:
+                if (
+                    not isinstance(reference, str)
+                    or reference not in _PACKAGED_LANE_REFERENCES
+                ):
+                    raise V3TaskRunnerError(
+                        "turn_reference_schedule contains an unreviewed reference"
+                    )
+                if reference in seen:
+                    raise V3TaskRunnerError(
+                        "a waapi lane reference may be read only once per task"
+                    )
+                seen.add(reference)
+            normalized_rows.append(row)
+        reference_rows = tuple(normalized_rows)
+        if reference_rows[0] != (required_reference,):
+            raise V3TaskRunnerError(
+                "turn 1 must read the required_reference lane"
+            )
+    return (
+        ("SKILL.md", *reference_rows[0]),
+        *reference_rows[1:],
+    )
 
 
 def _terminal_execute_exit2_count(
@@ -1002,10 +1120,14 @@ def _validate_infrastructure_failure(
         ),
         "broker_prefix_exact": (
             0 <= previous_broker_prefix <= len(expected_step_names)
-            and broker_evidence.consumed_step_names == expected_prefix_names
+            and gateway_step_sequence_matches(
+                expected_prefix_names,
+                broker_evidence.consumed_step_names,
+                broker_evidence.commutative_read_only_step_groups,
+            )
             and len(broker_records) == previous_broker_prefix
             and tuple(record.step_name for record in broker_records)
-            == expected_prefix_names
+            == broker_evidence.consumed_step_names
             and all(record.succeeded for record in broker_records)
             and (
                 (

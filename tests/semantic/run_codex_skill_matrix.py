@@ -111,6 +111,14 @@ DEFAULT_MODIFICATION_POLICY_V3_SUITE = (
 DEFAULT_COMPOUND_HEAVY_V1_SUITE = (
     REPO_ROOT / "tests" / "semantic" / "data" / "compound-heavy-v1" / "profile.json"
 )
+DEFAULT_INTEGRATION_WORKFLOWS_V1_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "integration-workflows-v1"
+    / "profile.json"
+)
 DEFAULT_ITERATION_ROOT = SKILL_ROOT.parent / "waapi-skill-workspace" / "iteration-9-v2-matrix"
 DEFAULT_HEAVY_V3_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "heavy-cross-version-80"
@@ -120,6 +128,11 @@ DEFAULT_MODIFICATION_POLICY_V3_ITERATION_ROOT = (
 )
 DEFAULT_COMPOUND_HEAVY_V1_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "compound-heavy-cross-version-24"
+)
+DEFAULT_INTEGRATION_WORKFLOWS_V1_ITERATION_ROOT = (
+    SKILL_ROOT.parent
+    / "waapi-skill-workspace"
+    / "integration-workflows-cross-version-6"
 )
 DEFAULT_CODEX_BINARY = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
 DEFAULT_AUTH_JSON = Path.home() / ".codex" / "auth.json"
@@ -153,11 +166,13 @@ _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 HEAVY_V3_PROFILE_ID = "heavy_cross_version_80"
 MODIFICATION_POLICY_V3_PROFILE_ID = "modification_policy_9"
 COMPOUND_HEAVY_V1_PROFILE_ID = "compound_heavy_cross_version_24"
+INTEGRATION_WORKFLOWS_V1_PROFILE_ID = "integration_workflows_cross_version_6"
 EXECUTABLE_V3_PROFILE_IDS = frozenset(
     {
         HEAVY_V3_PROFILE_ID,
         MODIFICATION_POLICY_V3_PROFILE_ID,
         COMPOUND_HEAVY_V1_PROFILE_ID,
+        INTEGRATION_WORKFLOWS_V1_PROFILE_ID,
     }
 )
 HEAVY_V3_RUN_CONFIG_CONTRACT = "waapi-skill.codex-heavy-matrix-config/v3"
@@ -298,6 +313,16 @@ HeavyV3DependencyPreflight = Callable[[], Mapping[str, Any]]
 def load_heavy_v3_units(options: RunnerOptions) -> tuple[Any, ...]:
     """Load and filter the reviewed V3 bundle without importing live runners."""
 
+    if options.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID:
+        integration_module = importlib.import_module(
+            "tests.semantic.support.codex_integration_workflows_v1"
+        )
+        profile = integration_module.load_integration_workflows_profile(
+            options.suite_path,
+            unit_ids=options.case_ids,
+            versions=options.versions,
+        )
+        return tuple(profile.units)
     if options.profile == COMPOUND_HEAVY_V1_PROFILE_ID:
         compound_module = importlib.import_module(
             "tests.semantic.support.codex_compound_heavy_v1"
@@ -3196,7 +3221,8 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     is_executable_v3 = args.profile in EXECUTABLE_V3_PROFILE_IDS
     is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
     is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
-    is_terra_v3 = is_policy_v3 or is_compound_v1
+    is_integration_v1 = args.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID
+    is_terra_v3 = is_policy_v3 or is_compound_v1 or is_integration_v1
     if args.timeout <= 0:
         parser.error("--timeout must be greater than zero")
     if len(set(args.version)) != len(args.version):
@@ -3217,11 +3243,11 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         parser.error(
             f"{MODIFICATION_POLICY_V3_PROFILE_ID} supports only --version 2022.1"
         )
-    if is_compound_v1 and any(
+    if (is_compound_v1 or is_integration_v1) and any(
         version not in {"2022.1", "2025.1"} for version in args.version
     ):
         parser.error(
-            f"{COMPOUND_HEAVY_V1_PROFILE_ID} supports only "
+            f"{args.profile} supports only "
             "--version 2022.1 and 2025.1"
         )
     model = args.model or (
@@ -3243,7 +3269,11 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         (
             DEFAULT_MODIFICATION_POLICY_V3_SUITE
             if is_policy_v3
-            else DEFAULT_COMPOUND_HEAVY_V1_SUITE
+            else (
+                DEFAULT_INTEGRATION_WORKFLOWS_V1_SUITE
+                if is_integration_v1
+                else DEFAULT_COMPOUND_HEAVY_V1_SUITE
+            )
         )
         if is_terra_v3
         else (DEFAULT_V3_SUITE if is_executable_v3 else DEFAULT_SUITE)
@@ -3252,7 +3282,11 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         (
             DEFAULT_MODIFICATION_POLICY_V3_ITERATION_ROOT
             if is_policy_v3
-            else DEFAULT_COMPOUND_HEAVY_V1_ITERATION_ROOT
+            else (
+                DEFAULT_INTEGRATION_WORKFLOWS_V1_ITERATION_ROOT
+                if is_integration_v1
+                else DEFAULT_COMPOUND_HEAVY_V1_ITERATION_ROOT
+            )
         )
         if is_terra_v3
         else (

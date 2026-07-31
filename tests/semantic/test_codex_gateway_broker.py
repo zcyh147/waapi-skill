@@ -17,9 +17,11 @@ from .support import codex_gateway_broker as broker_module  # pyright: ignore[re
 from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImports]
     BASH_ENV_NAME,
     BROKER_TOKEN_ENV,
+    BoundedIntegerArgument,
     CodexGatewayBroker,
     ExpectedGatewayStep,
     GATEWAY_REQUIRED_ENV,
+    GatewayDerivedReferenceActivationAllowance,
     GatewayBrokerError,
     GatewayInvocationError,
     MetadataBoundJsonArgument,
@@ -3497,6 +3499,436 @@ def test_broker_accepts_empty_explicit_working_root_and_preserves_evidence(tmp_p
     assert (state_directory / "fake-runner-calls.jsonl").is_file()
 
 
+def _metadata_step_with_limit(
+    configured_limit: str | BoundedIntegerArgument,
+    *,
+    object_type: str = "ActorMixer",
+    query_labels: tuple[str, ...] = ("output volume",),
+) -> ExpectedGatewayStep:
+    query_arguments = tuple(
+        item
+        for label in query_labels
+        for item in ("--query", MetadataQueryArgument(label))
+    )
+    return ExpectedGatewayStep(
+        "metadata.discover",
+        "metadata",
+        (
+            "discover",
+            "--object-type",
+            object_type,
+            *query_arguments,
+            "--limit",
+            configured_limit,
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("configured_limit", "queries"),
+    (
+        ("2", ("looping", "routing", "volume", "playback limit", "instances")),
+        ("3", ("fade time", "delay", "probability")),
+        ("8", ("volume",)),
+    ),
+)
+def test_metadata_query_slots_accept_the_configured_candidate_limit(
+    tmp_path: Path,
+    configured_limit: str,
+    queries: tuple[str, ...],
+) -> None:
+    metadata_step = _metadata_step_with_limit(
+        configured_limit,
+        query_labels=queries,
+    )
+    broker = CodexGatewayBroker(
+        skill_source=tmp_path / "waapi-skill",
+        expected_steps=(metadata_step,),
+    )
+    supplied_queries = tuple(
+        item
+        for index in range(len(queries))
+        for item in ("--query", f"bounded query {index}")
+    )
+    actual = (
+        "metadata",
+        "discover",
+        "--object-type",
+        "ActorMixer",
+        *supplied_queries,
+        "--limit",
+        configured_limit,
+    )
+
+    semantic_hash, execution_arguments = broker._validate_step(  # noqa: SLF001
+        metadata_step,
+        actual,
+    )
+
+    assert len(semantic_hash) == 64
+    assert execution_arguments == actual
+
+
+def test_metadata_query_slots_accept_only_canonical_bounded_limits(
+    tmp_path: Path,
+) -> None:
+    metadata_step = _metadata_step_with_limit(
+        BoundedIntegerArgument(1, 8),
+    )
+    broker = CodexGatewayBroker(
+        skill_source=tmp_path / "waapi-skill",
+        expected_steps=(metadata_step,),
+    )
+    hashes: dict[str, str] = {}
+    for supplied_limit in ("1", "3", "8"):
+        actual = (
+            "metadata",
+            "discover",
+            "--object-type",
+            "ActorMixer",
+            "--query",
+            "volume",
+            "--limit",
+            supplied_limit,
+        )
+        semantic_hash, execution_arguments = broker._validate_step(  # noqa: SLF001
+            metadata_step,
+            actual,
+        )
+        hashes[supplied_limit] = semantic_hash
+        assert execution_arguments == actual
+    assert len(set(hashes.values())) == 3
+
+    for supplied_limit in ("0", "9", "01", "+3", "3.0"):
+        with pytest.raises(GatewayInvocationError):
+            broker._validate_step(  # noqa: SLF001
+                metadata_step,
+                (
+                    "metadata",
+                    "discover",
+                    "--object-type",
+                    "ActorMixer",
+                    "--query",
+                    "volume",
+                    "--limit",
+                    supplied_limit,
+                ),
+            )
+
+
+@pytest.mark.parametrize(
+    "runtime_order",
+    (
+        ("schema", "metadata.discover"),
+        ("metadata.discover", "schema"),
+    ),
+)
+def test_broker_accepts_only_declared_read_only_pair_linearizations(
+    tmp_path: Path,
+    runtime_order: tuple[str, str],
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    schema = ExpectedGatewayStep(
+        "schema",
+        "operation-schema",
+        ("object.set",),
+    )
+    metadata = _metadata_step_with_limit(BoundedIntegerArgument(1, 8))
+    commands = {
+        "schema": ["operation-schema", "object.set"],
+        "metadata.discover": [
+            "metadata",
+            "discover",
+            "--object-type",
+            "ActorMixer",
+            "--query",
+            "volume",
+            "--limit",
+            "3",
+        ],
+    }
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(schema, metadata),
+        commutative_read_only_step_groups=(
+            ("schema", "metadata.discover"),
+        ),
+        transport="tcp",
+    ) as broker:
+        completed = [
+            run_model_command(broker, commands[name])
+            for name in runtime_order
+        ]
+        assert [result.returncode for result in completed] == [0, 0]
+        evidence = broker.evidence()
+        assert evidence.expected_step_names == (
+            "schema",
+            "metadata.discover",
+        )
+        assert evidence.consumed_step_names == runtime_order
+        assert tuple(record.step_name for record in evidence.records) == runtime_order
+        assert evidence.passed is True
+        reconciliation = broker.reconcile(
+            [result.args for result in completed]
+        )
+        assert reconciliation.passed is True
+
+
+def test_broker_commutative_pair_still_rejects_duplicates_and_preview_races(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    schema = ExpectedGatewayStep(
+        "schema",
+        "operation-schema",
+        ("object.set",),
+    )
+    metadata = _metadata_step_with_limit(BoundedIntegerArgument(1, 8))
+    preview = ExpectedGatewayStep("preview", "preview")
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(schema, metadata, preview),
+        commutative_read_only_step_groups=(
+            ("schema", "metadata.discover"),
+        ),
+        transport="tcp",
+    ) as broker:
+        first = run_model_command(
+            broker,
+            [
+                "metadata",
+                "discover",
+                "--object-type",
+                "ActorMixer",
+                "--query",
+                "volume",
+                "--limit",
+                "3",
+            ],
+        )
+        duplicate = run_model_command(
+            broker,
+            [
+                "metadata",
+                "discover",
+                "--object-type",
+                "ActorMixer",
+                "--query",
+                "volume",
+                "--limit",
+                "3",
+            ],
+        )
+        assert first.returncode == 0
+        assert duplicate.returncode != 0
+        assert broker.evidence().passed is False
+
+    other_root = tmp_path / "other"
+    other_root.mkdir()
+    other_skill = make_fake_skill(other_root)
+    with CodexGatewayBroker(
+        skill_source=other_skill,
+        expected_steps=(schema, metadata, preview),
+        commutative_read_only_step_groups=(
+            ("schema", "metadata.discover"),
+        ),
+        transport="tcp",
+    ) as broker:
+        raced = run_model_command(broker, ["preview"])
+        assert raced.returncode != 0
+        assert broker.evidence().consumed_step_names == ()
+
+
+@pytest.mark.parametrize(
+    "wrong_command",
+    (
+        ["operation-schema", "object.create"],
+        [
+            "metadata",
+            "discover",
+            "--object-type",
+            "Sound",
+            "--query",
+            "volume",
+            "--limit",
+            "3",
+        ],
+    ),
+)
+def test_broker_commutative_pair_rejects_wrong_operation_or_object_scope(
+    tmp_path: Path,
+    wrong_command: list[str],
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    schema = ExpectedGatewayStep(
+        "schema",
+        "operation-schema",
+        ("object.set",),
+    )
+    metadata = _metadata_step_with_limit(BoundedIntegerArgument(1, 8))
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(schema, metadata),
+        commutative_read_only_step_groups=(
+            ("schema", "metadata.discover"),
+        ),
+        transport="tcp",
+    ) as broker:
+        rejected = run_model_command(broker, wrong_command)
+        assert rejected.returncode != 0
+        evidence = broker.evidence()
+        assert evidence.consumed_step_names == ()
+        assert len(evidence.rejected_records) == 1
+
+
+@pytest.mark.parametrize(
+    ("configured_limit", "supplied_limit"),
+    (("2", "8"), ("8", "2")),
+)
+def test_metadata_query_slots_reject_a_limit_mismatched_with_the_expected_step(
+    tmp_path: Path,
+    configured_limit: str,
+    supplied_limit: str,
+) -> None:
+    metadata_step = _metadata_step_with_limit(configured_limit)
+    broker = CodexGatewayBroker(
+        skill_source=tmp_path / "waapi-skill",
+        expected_steps=(metadata_step,),
+    )
+
+    with pytest.raises(GatewayInvocationError, match="matching --limit"):
+        broker._validate_step(  # noqa: SLF001
+            metadata_step,
+            (
+                "metadata",
+                "discover",
+                "--object-type",
+                "ActorMixer",
+                "--query",
+                "volume",
+                "--limit",
+                supplied_limit,
+            ),
+        )
+
+
+@pytest.mark.parametrize("configured_limit", ("0", "9", "01", "+2", " 2", "2 "))
+def test_metadata_query_slots_reject_a_noncanonical_configured_limit(
+    tmp_path: Path,
+    configured_limit: str,
+) -> None:
+    metadata_step = _metadata_step_with_limit(configured_limit)
+    broker = CodexGatewayBroker(
+        skill_source=tmp_path / "waapi-skill",
+        expected_steps=(metadata_step,),
+    )
+
+    with pytest.raises(
+        GatewayInvocationError,
+        match="canonical --limit.*1 through 8",
+    ):
+        broker._validate_step(  # noqa: SLF001
+            metadata_step,
+            (
+                "metadata",
+                "discover",
+                "--object-type",
+                "ActorMixer",
+                "--query",
+                "volume",
+                "--limit",
+                configured_limit,
+            ),
+        )
+
+
+def test_weather_limit_two_metadata_step_crosses_broker_validation(
+    tmp_path: Path,
+) -> None:
+    from .support.codex_integration_weather_runtime_v1 import (  # noqa: PLC0415
+        ACTION_METADATA_QUERIES,
+        RTPC_METADATA_QUERIES,
+        SOUND_METADATA_QUERIES,
+        _build_metadata_workflow_protocol,
+    )
+
+    def request(operation: str, sentinel: int) -> dict[str, object]:
+        return {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": "2022.1",
+            "operation": operation,
+            "arguments": {"sentinel": sentinel},
+        }
+
+    volume_projection = (
+        MetadataTokenProjection("Volume", "property", "Real64"),
+    )
+    protocol = _build_metadata_workflow_protocol(
+        (
+            request("audio.import", 1),
+            request("object.set", 2),
+            request("object.setRTPC", 3),
+        ),
+        metadata=(
+            (
+                "Sound",
+                SOUND_METADATA_QUERIES,
+                ("Volume",),
+                volume_projection,
+                "wire_exact",
+            ),
+            (
+                "Action",
+                ACTION_METADATA_QUERIES,
+                ("FadeTime",),
+                (
+                    MetadataTokenProjection(
+                        "FadeTime",
+                        "property",
+                        "Real64",
+                    ),
+                ),
+                "wire_exact",
+            ),
+            (
+                "Sound",
+                RTPC_METADATA_QUERIES,
+                ("Volume",),
+                volume_projection,
+                "wire_exact",
+            ),
+        ),
+    )
+    metadata_step = protocol.steps[0]
+    assert metadata_step.name == "tx01.metadata"
+    assert metadata_step.arguments[-2:] == ("--limit", "2")
+    broker = CodexGatewayBroker(
+        skill_source=tmp_path / "waapi-skill",
+        expected_steps=protocol.steps,
+    )
+    actual = (
+        "metadata",
+        "discover",
+        "--object-type",
+        "Sound",
+        *tuple(
+            item
+            for query in SOUND_METADATA_QUERIES
+            for item in ("--query", query)
+        ),
+        "--limit",
+        "2",
+    )
+
+    semantic_hash, execution_arguments = broker._validate_step(  # noqa: SLF001
+        metadata_step,
+        actual,
+    )
+
+    assert len(semantic_hash) == 64
+    assert execution_arguments == actual
+
+
 def test_metadata_query_slots_accept_rephrasing_but_keep_a_closed_scope(
     tmp_path: Path,
 ) -> None:
@@ -3987,6 +4419,70 @@ def test_object_set_metadata_equivalence_rejects_every_unreviewed_difference(
         )
 
 
+def test_object_set_metadata_equivalence_keeps_direct_child_identity_exact(
+    tmp_path: Path,
+) -> None:
+    expected_request = _object_set_metadata_request()
+    expected_request["arguments"]["objects"][0]["object"] = {
+        "kind": "direct-child",
+        "parent": {
+            "kind": "path",
+            "value": r"\Events\Default Work Unit\Weather\Play_Rain",
+        },
+        "type": "Action",
+    }
+    broker, preview_step = _object_set_metadata_broker(
+        tmp_path,
+        expected_request,
+    )
+    exact_request = json.loads(json.dumps(expected_request))
+    exact_argv = (
+        "preview",
+        "--apply",
+        "--request-json",
+        json.dumps(exact_request, separators=(",", ":")),
+    )
+
+    semantic_hash, execution_arguments = broker._validate_step(  # noqa: SLF001
+        preview_step,
+        exact_argv,
+    )
+
+    assert len(semantic_hash) == 64
+    assert execution_arguments == exact_argv
+
+    variants = []
+    wrong_parent = json.loads(json.dumps(expected_request))
+    wrong_parent["arguments"]["objects"][0]["object"]["parent"]["value"] = (
+        r"\Events\Default Work Unit\Weather\Play_Wind"
+    )
+    variants.append(wrong_parent)
+    wrong_type = json.loads(json.dumps(expected_request))
+    wrong_type["arguments"]["objects"][0]["object"]["type"] = "Event"
+    variants.append(wrong_type)
+    legacy_waql = json.loads(json.dumps(expected_request))
+    legacy_waql["arguments"]["objects"][0]["object"] = {
+        "kind": "waql",
+        "value": (
+            'from object "\\Events\\Default Work Unit\\Weather\\Play_Rain" '
+            'select children where type = "Action" take 2'
+        ),
+    }
+    variants.append(legacy_waql)
+
+    for changed_request in variants:
+        with pytest.raises(GatewayInvocationError, match="semantically equal"):
+            broker._validate_step(  # noqa: SLF001
+                preview_step,
+                (
+                    "preview",
+                    "--apply",
+                    "--request-json",
+                    json.dumps(changed_request, separators=(",", ":")),
+                ),
+            )
+
+
 def test_object_set_metadata_equivalence_accepts_equal_live_real_number_spellings(
     tmp_path: Path,
 ) -> None:
@@ -4322,6 +4818,311 @@ def _audio_import_equivalence_broker(
     return broker, preview_step
 
 
+def _reference_activation_equivalence_broker(
+    tmp_path: Path,
+) -> tuple[
+    CodexGatewayBroker,
+    ExpectedGatewayStep,
+    dict[str, object],
+]:
+    expected: dict[str, object] = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": (
+                        r"\Actor-Mixer Hierarchy\Default Work Unit"
+                        r"\Weather"
+                    ),
+                    "object_type": "ActorMixer",
+                },
+                {
+                    "object_path": (
+                        r"\Actor-Mixer Hierarchy\Default Work Unit"
+                        r"\Weather\<Sound>Rain"
+                    ),
+                    "object_type": "Sound",
+                    "audio_file": "/owned/rain.wav",
+                    "properties": [
+                        {
+                            "name": "UseMaxSoundPerInstance",
+                            "value": True,
+                        },
+                        {"name": "OverrideOutput", "value": True},
+                    ],
+                    "references": [
+                        {
+                            "name": "OutputBus",
+                            "target": {
+                                "kind": "path",
+                                "value": (
+                                    r"\Master-Mixer Hierarchy"
+                                    r"\Default Work Unit\Weather"
+                                ),
+                            },
+                        }
+                    ],
+                },
+            ],
+            "import_operation": "createNew",
+        },
+    }
+    metadata_step = ExpectedGatewayStep(
+        "metadata.discover",
+        "metadata",
+        (
+            "discover",
+            "--object-type",
+            "Sound",
+            "--query",
+            MetadataQueryArgument("routing and playback limit"),
+            "--limit",
+            "8",
+        ),
+    )
+    preview_step = ExpectedGatewayStep(
+        "tx01.preview",
+        "preview",
+        (
+            "--apply",
+            "--request-json",
+            MetadataBoundJsonArgument(
+                expected=expected,
+                metadata_step="metadata.discover",
+                object_type="Sound",
+                required_tokens=(
+                    "UseMaxSoundPerInstance",
+                    "OutputBus",
+                    "OverrideOutput",
+                ),
+                expected_required_token_projection=(
+                    MetadataTokenProjection(
+                        "UseMaxSoundPerInstance",
+                        "property",
+                        "Boolean",
+                    ),
+                    MetadataTokenProjection(
+                        "OutputBus",
+                        "reference",
+                        "",
+                    ),
+                    MetadataTokenProjection(
+                        "OverrideOutput",
+                        "property",
+                        "Boolean",
+                    ),
+                ),
+                equivalence="audio_import_v1",
+                gateway_derived_reference_activations=(
+                    GatewayDerivedReferenceActivationAllowance(
+                        row_index=1,
+                        property_name="OverrideOutput",
+                        property_value=True,
+                        reference_name="OutputBus",
+                    ),
+                ),
+            ),
+        ),
+    )
+    broker = CodexGatewayBroker(
+        skill_source=tmp_path / "waapi-skill",
+        expected_steps=(metadata_step, preview_step),
+    )
+    broker._payloads_by_step["metadata.discover"] = (  # noqa: SLF001
+        _metadata_discovery_payload(
+            object_type="Sound",
+            candidate_names=(
+                "UseMaxSoundPerInstance",
+                "OutputBus",
+            ),
+            dependency_names=("OverrideOutput",),
+        )
+    )
+    return broker, preview_step, expected
+
+
+def test_audio_import_reference_activation_explicit_and_omitted_hash_equally(
+    tmp_path: Path,
+) -> None:
+    broker, preview_step, expected = (
+        _reference_activation_equivalence_broker(tmp_path)
+    )
+    omitted = json.loads(json.dumps(expected))
+    omitted_properties = omitted["arguments"]["imports"][1]["properties"]
+    omitted["arguments"]["imports"][1]["properties"] = [
+        item
+        for item in omitted_properties
+        if item["name"] != "OverrideOutput"
+    ]
+
+    explicit_hash, _ = broker._validate_step(  # noqa: SLF001
+        preview_step,
+        (
+            "preview",
+            "--apply",
+            "--request-json",
+            json.dumps(expected, separators=(",", ":")),
+        ),
+    )
+    omitted_hash, omitted_argv = broker._validate_step(  # noqa: SLF001
+        preview_step,
+        (
+            "preview",
+            "--apply",
+            "--request-json",
+            json.dumps(omitted, separators=(",", ":")),
+        ),
+    )
+
+    assert explicit_hash == omitted_hash
+    executed_request = json.loads(omitted_argv[-1])
+    assert executed_request == omitted
+    assert all(
+        item["name"] != "OverrideOutput"
+        for item in executed_request["arguments"]["imports"][1][
+            "properties"
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    (
+        lambda value: value["arguments"]["imports"][1]["properties"][1].__setitem__(
+            "value",
+            False,
+        ),
+        lambda value: (
+            value["arguments"]["imports"][1].__setitem__(
+                "properties",
+                [
+                    item
+                    for item in value["arguments"]["imports"][1]["properties"]
+                    if item["name"] != "OverrideOutput"
+                ],
+            ),
+            value["arguments"]["imports"][0].__setitem__(
+                "properties",
+                [{"name": "OverrideOutput", "value": True}],
+            ),
+        ),
+        lambda value: (
+            value["arguments"]["imports"][1].__setitem__(
+                "properties",
+                [
+                    item
+                    for item in value["arguments"]["imports"][1]["properties"]
+                    if item["name"] != "OverrideOutput"
+                ],
+            ),
+            value["arguments"].__setitem__(
+                "defaults",
+                {
+                    "properties": [
+                        {"name": "OverrideOutput", "value": True}
+                    ]
+                },
+            ),
+        ),
+        lambda value: (
+            value["arguments"]["imports"][1].__setitem__(
+                "properties",
+                [
+                    item
+                    for item in value["arguments"]["imports"][1]["properties"]
+                    if item["name"] != "OverrideOutput"
+                ],
+            ),
+            value["arguments"]["imports"][1].pop("references"),
+        ),
+        lambda value: (
+            value["arguments"]["imports"][1].__setitem__(
+                "properties",
+                [
+                    item
+                    for item in value["arguments"]["imports"][1]["properties"]
+                    if item["name"] != "OverrideOutput"
+                ],
+            ),
+            value["arguments"]["imports"][1]["references"][0].__setitem__(
+                "name",
+                "UserAuxSend0",
+            ),
+        ),
+        lambda value: (
+            value["arguments"]["imports"][1].__setitem__(
+                "properties",
+                [
+                    item
+                    for item in value["arguments"]["imports"][1]["properties"]
+                    if item["name"] != "OverrideOutput"
+                ],
+            ),
+            value["arguments"]["imports"][1]["references"][0][
+                "target"
+            ].__setitem__(
+                "value",
+                r"\Master-Mixer Hierarchy\Default Work Unit\Other",
+            ),
+        ),
+        lambda value: value["arguments"]["imports"][1].__setitem__(
+            "properties",
+            [
+                item
+                for item in value["arguments"]["imports"][1]["properties"]
+                if item["name"] != "UseMaxSoundPerInstance"
+            ],
+        ),
+    ),
+    ids=(
+        "explicit-conflict",
+        "wrong-row",
+        "defaults-promotion",
+        "missing-related-reference",
+        "wrong-related-reference-name",
+        "wrong-related-reference-target",
+        "ordinary-dependency-omission",
+    ),
+)
+def test_audio_import_reference_activation_rejects_unapproved_differences(
+    tmp_path: Path,
+    mutate,
+) -> None:
+    broker, preview_step, expected = (
+        _reference_activation_equivalence_broker(tmp_path)
+    )
+    actual = json.loads(json.dumps(expected))
+    mutate(actual)
+
+    with pytest.raises(GatewayInvocationError, match="semantically equal"):
+        broker._validate_step(  # noqa: SLF001
+            preview_step,
+            (
+                "preview",
+                "--apply",
+                "--request-json",
+                json.dumps(actual, separators=(",", ":")),
+            ),
+        )
+
+
+def test_audio_import_reference_activation_does_not_tolerate_bad_json(
+    tmp_path: Path,
+) -> None:
+    broker, preview_step, expected = (
+        _reference_activation_equivalence_broker(tmp_path)
+    )
+    encoded = json.dumps(expected, separators=(",", ":"))[:-1]
+
+    with pytest.raises(GatewayInvocationError, match="strict JSON"):
+        broker._validate_step(  # noqa: SLF001
+            preview_step,
+            ("preview", "--apply", "--request-json", encoded),
+        )
+
+
 def test_audio_import_metadata_equivalence_expands_defaults_and_binds_actual(
     tmp_path: Path,
 ) -> None:
@@ -4374,6 +5175,279 @@ def test_audio_import_metadata_equivalence_expands_defaults_and_binds_actual(
     assert len(expected_hash) == len(expanded_hash) == len(partial_hash) == 64
     assert expected_hash == expanded_hash == partial_hash
     assert json.loads(expanded_argv[-1]) == expanded
+
+
+@pytest.mark.parametrize(
+    ("import_language", "expected_type", "actual_type"),
+    (
+        ("SFX", "Sound", "Sound SFX"),
+        ("SFX", "Sound SFX", "Sound"),
+        ("English(US)", "Sound", "Sound Voice"),
+        ("English(US)", "Sound Voice", "Sound"),
+    ),
+    ids=(
+        "sfx-generic-to-specialized",
+        "sfx-specialized-to-generic",
+        "voice-generic-to-specialized",
+        "voice-specialized-to-generic",
+    ),
+)
+def test_audio_import_media_sound_aliases_have_one_canonical_hash(
+    tmp_path: Path,
+    import_language: str,
+    expected_type: str,
+    actual_type: str,
+) -> None:
+    expected, _ = _audio_import_equivalence_requests()
+    for row in expected["arguments"]["imports"]:
+        row["object_type"] = expected_type
+        row["import_language"] = import_language
+    actual = json.loads(json.dumps(expected))
+    for row in actual["arguments"]["imports"]:
+        row["object_type"] = actual_type
+    broker, preview_step = _audio_import_equivalence_broker(
+        tmp_path,
+        expected,
+    )
+
+    expected_hash, _ = broker._validate_step(  # noqa: SLF001
+        preview_step,
+        (
+            "preview",
+            "--apply",
+            "--request-json",
+            json.dumps(expected, separators=(",", ":")),
+        ),
+    )
+    actual_hash, execution_argv = broker._validate_step(  # noqa: SLF001
+        preview_step,
+        (
+            "preview",
+            "--apply",
+            "--request-json",
+            json.dumps(actual, separators=(",", ":")),
+        ),
+    )
+
+    assert expected_hash == actual_hash
+    assert json.loads(execution_argv[-1]) == actual
+
+
+@pytest.mark.parametrize(
+    ("import_language", "expected_type", "actual_type"),
+    (
+        ("SFX", "Sound", "Sound Voice"),
+        ("SFX", "Sound SFX", "Sound Voice"),
+        ("English(US)", "Sound", "Sound SFX"),
+        ("English(US)", "Sound Voice", "Sound SFX"),
+    ),
+    ids=(
+        "sfx-generic-is-not-voice",
+        "sfx-specialized-is-not-voice",
+        "voice-generic-is-not-sfx",
+        "voice-specialized-is-not-sfx",
+    ),
+)
+def test_audio_import_media_sound_aliases_do_not_cross_language_semantics(
+    tmp_path: Path,
+    import_language: str,
+    expected_type: str,
+    actual_type: str,
+) -> None:
+    expected, _ = _audio_import_equivalence_requests()
+    for row in expected["arguments"]["imports"]:
+        row["object_type"] = expected_type
+        row["import_language"] = import_language
+    actual = json.loads(json.dumps(expected))
+    for row in actual["arguments"]["imports"]:
+        row["object_type"] = actual_type
+    broker, preview_step = _audio_import_equivalence_broker(
+        tmp_path,
+        expected,
+    )
+
+    with pytest.raises(GatewayInvocationError, match="semantically equal"):
+        broker._validate_step(  # noqa: SLF001
+            preview_step,
+            (
+                "preview",
+                "--apply",
+                "--request-json",
+                json.dumps(actual, separators=(",", ":")),
+            ),
+        )
+
+
+def test_audio_import_sound_alias_requires_an_effective_media_language(
+    tmp_path: Path,
+) -> None:
+    expected, _ = _audio_import_equivalence_requests()
+    for row in expected["arguments"]["imports"]:
+        row["object_type"] = "Sound"
+    actual = json.loads(json.dumps(expected))
+    for row in actual["arguments"]["imports"]:
+        row["object_type"] = "Sound SFX"
+    broker, preview_step = _audio_import_equivalence_broker(
+        tmp_path,
+        expected,
+    )
+
+    with pytest.raises(GatewayInvocationError, match="semantically equal"):
+        broker._validate_step(  # noqa: SLF001
+            preview_step,
+            (
+                "preview",
+                "--apply",
+                "--request-json",
+                json.dumps(actual, separators=(",", ":")),
+            ),
+        )
+
+
+@pytest.mark.parametrize(
+    ("expected_type", "actual_type"),
+    (
+        ("Sound", "Sound SFX"),
+        ("ActorMixer", "PropertyContainer"),
+        ("RandomSequenceContainer", "RandomContainer"),
+        ("RandomSequenceContainer", "SequenceContainer"),
+        ("MusicPlaylistContainer", "MusicRanSeqCntr"),
+    ),
+    ids=(
+        "structure-only-sound",
+        "actor-mixer-reflection-name",
+        "random-container-specialization",
+        "sequence-container-specialization",
+        "music-playlist-reflection-name",
+    ),
+)
+def test_audio_import_non_media_or_non_sound_syntax_aliases_remain_exact(
+    expected_type: str,
+    actual_type: str,
+) -> None:
+    expected = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": (
+                        r"\Actor-Mixer Hierarchy\Default Work Unit\Node"
+                    ),
+                    "object_type": expected_type,
+                }
+            ],
+            "import_operation": "createNew",
+        },
+    }
+    actual = json.loads(json.dumps(expected))
+    actual["arguments"]["imports"][0]["object_type"] = actual_type
+    argument = MetadataBoundJsonArgument(
+        expected=expected,
+        metadata_step="metadata.discover",
+        object_type="Sound",
+        required_tokens=("Volume",),
+        equivalence="audio_import_v1",
+    )
+
+    assert not broker_module._metadata_bound_json_equal(  # noqa: SLF001
+        actual,
+        argument,
+    )
+
+
+def test_audio_import_metadata_equivalence_normalizes_only_live_real_values() -> None:
+    expected, _ = _audio_import_equivalence_requests()
+    expected["arguments"]["imports"][0]["properties"][0]["value"] = -1.0
+    argument = MetadataBoundJsonArgument(
+        expected=expected,
+        metadata_step="metadata.discover",
+        object_type="Sound",
+        required_tokens=(
+            "Volume",
+            "IsLoopingEnabled",
+            "OutputBus",
+        ),
+        expected_required_token_projection=(
+            MetadataTokenProjection("Volume", "property", "Real64"),
+            MetadataTokenProjection(
+                "IsLoopingEnabled",
+                "property",
+                "Boolean",
+            ),
+            MetadataTokenProjection("OutputBus", "reference", ""),
+        ),
+        equivalence="audio_import_v1",
+    )
+    integral = json.loads(json.dumps(expected))
+    integral["arguments"]["imports"][0]["properties"][0]["value"] = -1
+
+    assert broker_module._metadata_bound_json_equal(  # noqa: SLF001
+        integral,
+        argument,
+    )
+
+    unrelated = json.loads(json.dumps(integral))
+    unrelated["arguments"]["imports"][0]["properties"].append(
+        {"name": "Unrequested", "value": True}
+    )
+    assert not broker_module._metadata_bound_json_equal(  # noqa: SLF001
+        unrelated,
+        argument,
+    )
+
+
+def test_rtpc_metadata_equivalence_normalizes_points_and_default_mode_only() -> None:
+    expected = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.setRTPC",
+        "arguments": {
+            "object": {
+                "kind": "path",
+                "value": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+            },
+            "property": "Volume",
+            "control_input": {
+                "kind": "path",
+                "value": r"\Game Parameters\Default Work Unit\Rain",
+            },
+            "points": [
+                {"x": 0.0, "y": -48.0, "shape": "Linear"},
+                {"x": 100.0, "y": 0.0, "shape": "Linear"},
+            ],
+            "mode": "add_or_replace",
+        },
+    }
+    argument = MetadataBoundJsonArgument(
+        expected=expected,
+        metadata_step="metadata.discover",
+        object_type="Sound",
+        required_tokens=("Volume",),
+        expected_required_token_projection=(
+            MetadataTokenProjection("Volume", "property", "Real64"),
+        ),
+        equivalence="object_set_rtpc_v1",
+    )
+    equivalent = json.loads(json.dumps(expected))
+    equivalent["arguments"].pop("mode")
+    equivalent["arguments"]["points"] = [
+        {"x": 0, "y": -48, "shape": "Linear"},
+        {"x": 100, "y": 0, "shape": "Linear"},
+    ]
+
+    assert broker_module._metadata_bound_json_equal(  # noqa: SLF001
+        equivalent,
+        argument,
+    )
+
+    different = json.loads(json.dumps(equivalent))
+    different["arguments"]["points"][1]["y"] = -1
+    assert not broker_module._metadata_bound_json_equal(  # noqa: SLF001
+        different,
+        argument,
+    )
 
 
 def test_audio_import_metadata_equivalence_rejects_only_omitted_use_existing_mode(

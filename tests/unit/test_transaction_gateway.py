@@ -1128,6 +1128,22 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
             "object": "$.arguments.object",
             "value": "$.arguments.value",
         },
+        "preview_invocation": {
+            "intended_change": {
+                "subcommand": "preview",
+                "required_flag": "--apply",
+                "effect": (
+                    "creates a durable confirmation-bound preview and does not "
+                    "execute the change"
+                ),
+                "includes_later_ordered_transactions": True,
+            },
+            "omit_apply_only_when": [
+                "hypothetical",
+                "design_only",
+                "explicitly_non_executable",
+            ],
+        },
     }
 
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
@@ -1192,6 +1208,34 @@ def test_operation_schema_exposes_tab_import_path_only_progression(
         "media_validation",
         "exact_path_conflict_validation",
     ]
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+def test_soundbank_inclusion_schema_exposes_one_scoped_replace_for_complete_post_state(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    exit_code, payload = execute(
+        ["operation-schema", "soundbank.setInclusions"],
+        tmp_path=tmp_path,
+        version=version,
+    )
+
+    assert exit_code == 0
+    assert payload["ok"] is True
+    operation = payload["operation"]
+    assert operation["constraints"][0] == (
+        "replace is one transaction scoped only to the selected SoundBank: "
+        "submit its complete desired post-state; omitted existing rows are "
+        "removed without naming them, every other SoundBank is unaffected, "
+        "and the list may be empty"
+    )
+    assert operation["selection_guidance"]["use_when"][1] == (
+        "The user gives one SoundBank's complete desired final inclusion set "
+        "and asks to remove Debug or any other omitted rows; use one replace "
+        "transaction and never split that final-state request into add and "
+        "remove transactions."
+    )
 
 
 @pytest.mark.parametrize("version", tuple(UNDO_GROUP_INNER_URIS_BY_VERSION))
@@ -1457,20 +1501,36 @@ def test_object_set_operation_schema_discloses_versioned_target_and_metadata_sco
     assert "Omission defaults to fail" in on_name_conflict["description"]
 
 
-def test_soundbank_generate_operation_schema_keeps_rebuild_levels_independent(
+@pytest.mark.parametrize(
+    "version",
+    ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
+)
+def test_soundbank_generate_operation_schema_closes_batch_language_scope(
     tmp_path: Path,
+    version: str,
 ) -> None:
     exit_code, payload = execute(
         ["operation-schema", "soundbank.generate"],
         tmp_path=tmp_path,
-        version="2025.1",
+        version=version,
     )
 
     assert exit_code == 0
     properties = payload["operation"]["argument_contract"]["properties"]
+    row_expectation = properties["soundbanks"]["items"]["properties"][
+        "artifact_expectation"
+    ]
     row_rebuild = properties["soundbanks"]["items"]["properties"]["rebuild"]
     batch_rebuild = properties["rebuild_soundbanks"]
 
+    assert "batch-level rule" in row_expectation["description"]
+    assert "Omit when every SoundBank" in properties["languages"]["description"]
+    assert "SFX is not a localized language" in properties["languages"][
+        "description"
+    ]
+    assert "true exactly when every SoundBank is nonlocalized" in properties[
+        "skip_languages"
+    ]["description"]
     assert row_rebuild["default"] is False
     assert batch_rebuild["default"] is False
     assert properties["clear_audio_file_cache"]["default"] is False
@@ -1485,6 +1545,27 @@ def test_soundbank_generate_operation_schema_keeps_rebuild_levels_independent(
         in constraint
         for constraint in payload["operation"]["constraints"]
     )
+    assert any(
+        "language selection is batch-wide" in constraint
+        and "never SFX" in constraint
+        for constraint in payload["operation"]["constraints"]
+    )
+    assert payload["request_envelope_policy"]["preview_invocation"] == {
+        "intended_change": {
+            "subcommand": "preview",
+            "required_flag": "--apply",
+            "effect": (
+                "creates a durable confirmation-bound preview and does not "
+                "execute the change"
+            ),
+            "includes_later_ordered_transactions": True,
+        },
+        "omit_apply_only_when": [
+            "hypothetical",
+            "design_only",
+            "explicitly_non_executable",
+        ],
+    }
 
 
 @pytest.mark.parametrize("version", ["2024.1", "2025.1"])

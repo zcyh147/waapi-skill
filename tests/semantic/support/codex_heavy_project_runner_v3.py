@@ -188,6 +188,10 @@ from tests.semantic.support.codex_soundbank_runtime_v3 import (
     PreparedSoundBankRuntime,
     prepare_soundbank_runtime,
 )
+from tests.semantic.support.codex_workflow_business_plan_v3 import (
+    WorkflowBusinessPlanSections,
+    compile_workflow_business_plan_sections,
+)
 from wwise_waapi.metadata_discovery import (
     MAX_METADATA_DISCOVERY_LIMIT,
     discover_metadata,
@@ -220,6 +224,11 @@ OBJECT_APIS = frozenset(
         "ak.wwise.core.object.set",
     }
 )
+INTEGRATION_PRIMARY_APIS = frozenset(
+    {
+        "ak.wwise.core.object.setReference",
+    }
+)
 IMPORT_APIS = frozenset(
     {
         "ak.wwise.core.audio.import",
@@ -230,6 +239,7 @@ MEDIA_FIXTURE_APIS = frozenset({*IMPORT_APIS, *SOUNDBANK_RUNTIME_APIS})
 PROJECT_RUNNER_APIS = frozenset(
     {
         *OBJECT_APIS,
+        *INTEGRATION_PRIMARY_APIS,
         *IMPORT_APIS,
         *SOUNDBANK_RUNTIME_APIS,
         AUDIO_CONVERT_URI,
@@ -733,16 +743,18 @@ def _bounded_exception_summary(exc: BaseException, *, ceiling_bytes: int = 2048)
 @dataclass(slots=True)
 class _PreparedCase:
     prompt: str
-    visible_values: Mapping[str, str]
+    visible_values: Mapping[str, Any]
     protocol: V3GatewayProtocol
     required_reference: str
     snapshot: Callable[[], Any]
     verify_final: Callable[[Mapping[str, Any] | None, CodexRunResult], Any]
+    turn_reference_schedule: tuple[tuple[str, ...], ...] | None = None
     typed_sections: (
         ObjectBusinessPlanSections
         | ImportBusinessPlanSections
         | AudioMediaBusinessPlanSections
         | SoundBankBusinessPlanSections
+        | WorkflowBusinessPlanSections
         | None
     ) = None
     prompt_sources: Mapping[str, Any] = field(default_factory=dict)
@@ -758,6 +770,8 @@ class _PreparedCase:
     topic_publishers: tuple[Mapping[str, Any], ...] = ()
     topic_payload_step: str | None = None
     observe_payload: Callable[[ExpectedGatewayStep, Mapping[str, Any]], None] | None = None
+    verify_turn: Callable[[int, CodexRunResult], Any] | None = None
+    expected_dispatches: tuple[tuple[str, int], ...] = ()
     post_shutdown: Callable[[ScenarioRuntime], None] | None = None
 
 
@@ -826,6 +840,7 @@ def run_heavy_project_unit(
             direct=direct,
             media_holder=media_holder,
             project_modification_policy=policy_mode,
+            unit=unit,
         )
         prompts = (prepared.prompt, *(turn.prompt for turn in unit.turns[1:]))
         task_root = runtime.evidence_root / "codex-task"
@@ -896,6 +911,7 @@ def run_heavy_project_unit(
             runner_environment=runtime.runner_environment,
             required_reference=prepared.required_reference,
             business_oracle_plan=business_oracle_plan,
+            turn_reference_schedule=prepared.turn_reference_schedule,
             trusted_subscription_ack=trusted_subscription_ack,
             trusted_subscription_ack_observer=(
                 observer.before_subscription_wait
@@ -960,6 +976,11 @@ def run_heavy_project_unit(
             topic_subscription_ack=observer.checks.get("topic_subscription_ack"),
             expected_count=_unit_primary_dispatch_count(unit),
         )
+        if prepared.expected_dispatches:
+            checks["workflow_dispatch"] = _audit_workflow_dispatch(
+                task=task,
+                expected_dispatches=prepared.expected_dispatches,
+            )
         if prepared.cleanup_success is not None:
             try:
                 cleanup_value = prepared.cleanup_success()
@@ -1422,6 +1443,19 @@ class _CaseObservers:
             self.checks[
                 f"policy_turn_{turn_index:02d}_response"
             ] = True
+        if self.prepared.verify_turn is not None:
+            verification = self.prepared.verify_turn(turn_index, result)
+            _assert_verification(
+                verification,
+                context=f"turn {turn_index} workflow oracle",
+            )
+            self.checks[f"turn_{turn_index:02d}_workflow"] = _oracle_evidence(
+                scenario=self.scenario,
+                version=self.version,
+                runner="project",
+                business_oracle_plan_sha256=self.business_oracle_plan_sha256,
+                verification=verification,
+            )
         if turn_index == len(self.prepared.protocol.turn_prefix_counts):
             if self.scenario.protocol == "single" and self.prepared.topic_payload_step is None:
                 payload = self.payloads[self.prepared.protocol.steps[-1].name]
@@ -3476,6 +3510,398 @@ def _build_compound_object_metadata_protocol(
     )
 
 
+_INTEGRATION_WORKFLOW_IDS = frozenset(
+    {
+        "interactive_weather_build",
+        "alarm_diagnose_and_repair",
+        "harbor_soundbank_release",
+    }
+)
+_ALARM_TURN_REFERENCE_SCHEDULE = (
+    ("references/waapi-query.md",),
+    ("references/waapi-operate.md",),
+    (),
+)
+
+
+def _integration_workflow_id(scenario: Any) -> str | None:
+    """Return a reviewed integration identity without matching legacy cases."""
+
+    value = getattr(scenario, "scenario_family", None)
+    if value in _INTEGRATION_WORKFLOW_IDS:
+        return str(value)
+    value = getattr(scenario, "workflow_id", None)
+    if value in _INTEGRATION_WORKFLOW_IDS:
+        return str(value)
+    return None
+
+
+def _prepare_integration_workflow_case(
+    scenario: Any,
+    *,
+    runtime: ScenarioRuntime,
+    direct: OwnedDirectWaapiCall,
+    unit: Any | None,
+) -> _PreparedCase:
+    """Adapt one reviewed integration runtime to the existing project runner."""
+
+    workflow_id = _integration_workflow_id(scenario)
+    workflow = getattr(unit, "workflow", None)
+    if (
+        workflow_id is None
+        or unit is None
+        or getattr(workflow, "id", None) != workflow_id
+        or getattr(unit, "scenario", None) is not scenario
+        or getattr(unit, "version", None) != runtime.version
+    ):
+        raise HeavyProjectRunnerError(
+            "integration workflow unit, scenario, and runtime are not exactly bound"
+        )
+    if workflow_id == "interactive_weather_build":
+        from tests.semantic.support.codex_integration_weather_runtime_v1 import (
+            prepare_weather_workflow,
+        )
+
+        prepared = prepare_weather_workflow(
+            scenario,
+            version=runtime.version,
+            scenario_root=runtime.scenario_root,
+            owned_root=runtime.owned_root,
+            direct=direct,
+        )
+        typed_sections = prepared.typed_sections
+        prompt = prepared.prompt
+        cleanup = prepared.cleanup_success
+        verify_turn = prepared.verify_turn
+    elif workflow_id == "alarm_diagnose_and_repair":
+        from tests.semantic.support.codex_integration_alarm_runtime_v1 import (
+            prepare_alarm_integration_runtime,
+        )
+
+        prepared = prepare_alarm_integration_runtime(
+            workflow,
+            scenario,
+            version=runtime.version,
+            paths=runtime,
+            direct_call=direct,
+        )
+        prompt = scenario.render_prompt(prepared.visible_values)
+        cleanup = prepared.cleanup
+        def verify_alarm_turn(turn_index: int, result: CodexRunResult) -> Any:
+            if turn_index in {1, 2}:
+                return prepared.verify_turn(turn_index, result)
+            if turn_index == 3:
+                return prepared.verify_final(None, result)
+            raise HeavyProjectRunnerError(
+                f"Alarm workflow received unexpected turn {turn_index}"
+            )
+
+        verify_turn = verify_alarm_turn
+        typed_sections = _compile_integration_workflow_plan(
+            unit=unit,
+            protocol=prepared.protocol,
+            visible_values=prepared.visible_values,
+            oracle_requirements=prepared.oracle_requirements,
+        )
+    elif workflow_id == "harbor_soundbank_release":
+        from tests.semantic.support.codex_integration_soundbank_runtime_v1 import (
+            prepare_harbor_integration_runtime,
+        )
+
+        prepared = prepare_harbor_integration_runtime(
+            workflow,
+            scenario,
+            version=runtime.version,
+            runtime=runtime,
+            direct=direct,
+        )
+        prompt = prepared.prompt
+        cleanup = prepared.cleanup
+        verify_turn = None
+        typed_sections = _compile_integration_workflow_plan(
+            unit=unit,
+            protocol=prepared.protocol,
+            visible_values=prepared.visible_values,
+            oracle_requirements=prepared.oracle_requirements,
+        )
+    else:  # pragma: no cover - workflow identity is closed above
+        raise HeavyProjectRunnerError(
+            f"integration workflow has no runtime: {workflow_id}"
+        )
+
+    visible_values = MappingProxyType(dict(prepared.visible_values))
+    expected_dispatches = _integration_expected_dispatches(
+        prepared.expected_dispatches
+    )
+    if not expected_dispatches:
+        raise HeavyProjectRunnerError(
+            "integration runtime omitted its mutation dispatch vector"
+        )
+    return _PreparedCase(
+        prompt=prompt,
+        visible_values=visible_values,
+        protocol=prepared.protocol,
+        required_reference=(
+            "references/waapi-query.md"
+            if workflow_id == "alarm_diagnose_and_repair"
+            else getattr(
+                prepared,
+                "required_reference",
+                "references/waapi-operate.md",
+            )
+        ),
+        turn_reference_schedule=(
+            _ALARM_TURN_REFERENCE_SCHEDULE
+            if workflow_id == "alarm_diagnose_and_repair"
+            else None
+        ),
+        snapshot=prepared.snapshot,
+        verify_final=prepared.verify_final,
+        typed_sections=typed_sections,
+        prompt_sources=MappingProxyType(
+            {"integration_visible_inputs": dict(visible_values)}
+        ),
+        cleanup_success=cleanup,
+        observe_payload=getattr(prepared, "observe_payload", None),
+        verify_turn=verify_turn,
+        expected_dispatches=expected_dispatches,
+    )
+
+
+def _integration_expected_dispatches(
+    values: Sequence[Any],
+) -> tuple[tuple[str, int], ...]:
+    aggregated: dict[str, int] = {}
+    order: list[str] = []
+    for value in values:
+        if (
+            isinstance(value, (list, tuple))
+            and len(value) == 2
+        ):
+            api, count = value
+        else:
+            api = getattr(value, "api", None)
+            count = getattr(value, "count", None)
+        if (
+            not isinstance(api, str)
+            or not api.startswith(("ak.wwise.", "ak.soundengine."))
+            or type(count) is not int
+            or count < 1
+        ):
+            raise HeavyProjectRunnerError(
+                "integration runtime has an invalid dispatch expectation"
+            )
+        if api not in aggregated:
+            order.append(api)
+            aggregated[api] = 0
+        aggregated[api] += count
+    return tuple((api, aggregated[api]) for api in order)
+
+
+def _compile_integration_workflow_plan(
+    *,
+    unit: Any,
+    protocol: V3GatewayProtocol,
+    visible_values: Mapping[str, Any],
+    oracle_requirements: Sequence[Any],
+) -> WorkflowBusinessPlanSections:
+    transactions = tuple(getattr(unit, "transactions", ()))
+    if not transactions:
+        raise HeavyProjectRunnerError(
+            "integration unit has no transaction topology"
+        )
+    weather_phases = (
+        "import_weather_assets",
+        "configure_event_actions",
+        "bind_rain_intensity_rtpc",
+    )
+    if (
+        unit.workflow_id == "interactive_weather_build"
+        and len(transactions) != len(weather_phases)
+    ):
+        raise HeavyProjectRunnerError(
+            "interactive weather transaction phases differ from the reviewed workflow"
+        )
+    transaction_rows = tuple(
+        {
+            "transaction_id": f"tx{index:02d}",
+            "api": transaction.api,
+            "operation": transaction.operation,
+            "phase": (
+                weather_phases[index - 1]
+                if unit.workflow_id == "interactive_weather_build"
+                else f"{unit.workflow_id}.transaction_{index:02d}"
+            ),
+            "primary_step": f"tx{index:02d}.execute",
+        }
+        for index, transaction in enumerate(transactions, start=1)
+    )
+    transaction_by_id = {
+        row["transaction_id"]: row for row in transaction_rows
+    }
+    kind_by_subcommand = {
+        "operation-schema": "operation_schema",
+        "preview": "preview",
+        "transaction-show": "transaction_show",
+        "confirm": "confirm",
+        "execute": "execute",
+        "verify": "verify",
+    }
+    workflow_steps: list[Mapping[str, Any]] = []
+    diagnostic_evidence: list[Mapping[str, Any]] = []
+    for step in protocol.steps:
+        transaction_id = (
+            step.name.split(".", 1)[0]
+            if step.name.startswith("tx")
+            else None
+        )
+        transaction = transaction_by_id.get(transaction_id)
+        if transaction is not None and step.subcommand in kind_by_subcommand:
+            workflow_steps.append(
+                {
+                    "name": step.name,
+                    "kind": kind_by_subcommand[step.subcommand],
+                    "phase": transaction["phase"],
+                    "transaction_id": transaction_id,
+                    "api": transaction["api"],
+                }
+            )
+            continue
+        is_diagnostic = (
+            step.subcommand == "query-object"
+            and not any(
+                row["name"].startswith(f"{transaction_id}.")
+                for row in workflow_steps
+                if transaction_id is not None
+            )
+        )
+        kind = "diagnostic" if is_diagnostic else "checkpoint"
+        phase = (
+            f"{unit.workflow_id}.diagnosis"
+            if is_diagnostic
+            else f"{unit.workflow_id}.checkpoint"
+        )
+        workflow_steps.append(
+            {
+                "name": step.name,
+                "kind": kind,
+                "phase": phase,
+                "transaction_id": None,
+                "api": (
+                    "ak.wwise.core.object.get"
+                    if is_diagnostic
+                    else None
+                ),
+            }
+        )
+        if is_diagnostic:
+            diagnostic_evidence.append(
+                {
+                    "evidence_id": f"{step.name}.bounded-read",
+                    "step": step.name,
+                    "api": "ak.wwise.core.object.get",
+                    "phase": phase,
+                    "expectation": {
+                        "gateway_step": step.name,
+                        "bounded_live_read": True,
+                    },
+                }
+            )
+    workflow_steps.append(
+        {
+            "name": "cleanup.success",
+            "kind": "cleanup",
+            "phase": (
+                "cleanup"
+                if unit.workflow_id == "interactive_weather_build"
+                else f"{unit.workflow_id}.cleanup"
+            ),
+            "transaction_id": None,
+            "api": None,
+        }
+    )
+    requirements: list[Mapping[str, Any]] = []
+    requirement_rows = [
+        value.as_dict() if hasattr(value, "as_dict") else value
+        for value in oracle_requirements
+    ]
+    if requirement_rows and all(
+        isinstance(row, Mapping)
+        and set(row) == {"transaction_id", "expectation"}
+        for row in requirement_rows
+    ):
+        for index, row in enumerate(requirement_rows, start=1):
+            assert isinstance(row, Mapping)
+            transaction_id = row.get("transaction_id")
+            expectation = row.get("expectation")
+            if (
+                transaction_id != f"tx{index:02d}"
+                or not isinstance(expectation, Mapping)
+                or not expectation
+            ):
+                raise HeavyProjectRunnerError(
+                    "integration oracle requirements differ from transactions"
+                )
+            requirements.append(
+                {
+                    "transaction_id": transaction_id,
+                    "expectation": dict(expectation),
+                }
+            )
+    elif requirement_rows:
+        if len(transaction_rows) != 1:
+            raise HeavyProjectRunnerError(
+                "workflow-level oracle requirements are ambiguous across transactions"
+            )
+        normalized_rows: list[dict[str, str]] = []
+        for value in oracle_requirements:
+            phase = getattr(value, "phase", None)
+            subject = getattr(value, "subject", None)
+            expectation = getattr(value, "expectation", None)
+            if not all(
+                isinstance(item, str) and item
+                for item in (phase, subject, expectation)
+            ):
+                raise HeavyProjectRunnerError(
+                    "integration workflow oracle requirement is invalid"
+                )
+            normalized_rows.append(
+                {
+                    "phase": phase,
+                    "subject": subject,
+                    "expectation": expectation,
+                }
+            )
+        requirements.append(
+            {
+                "transaction_id": "tx01",
+                "expectation": {"workflow_requirements": normalized_rows},
+            }
+        )
+    if not requirements:
+        requirements = [
+            {
+                "transaction_id": row["transaction_id"],
+                "expectation": {
+                    "operation": row["operation"],
+                    "reviewed_delta_required": True,
+                },
+            }
+            for row in transaction_rows
+        ]
+    return compile_workflow_business_plan_sections(
+        workflow_id=unit.workflow_id,
+        transactions=transaction_rows,
+        workflow_steps=tuple(workflow_steps),
+        diagnostic_evidence=tuple(diagnostic_evidence),
+        live_bindings={
+            "version": unit.version,
+            "visible_values": dict(visible_values),
+        },
+        transaction_expectations=tuple(requirements),
+    )
+
+
 def _prepare_case(
     scenario: OnlineScenario,
     *,
@@ -3483,7 +3909,19 @@ def _prepare_case(
     direct: OwnedDirectWaapiCall,
     media_holder: Mapping[str, Any],
     project_modification_policy: str | None = None,
+    unit: Any | None = None,
 ) -> _PreparedCase:
+    if _integration_workflow_id(scenario) is not None:
+        if project_modification_policy is not None:
+            raise HeavyProjectRunnerError(
+                "integration workflows own their reviewed confirmation topology"
+            )
+        return _prepare_integration_workflow_case(
+            scenario,
+            runtime=runtime,
+            direct=direct,
+            unit=unit,
+        )
     if scenario.api in OBJECT_APIS:
         recipe = build_object_heavy_v3_recipe(
             scenario.id,
@@ -3919,6 +4357,30 @@ def _prelaunch_hook(
         return make_audio_conversion_prelaunch_hook(scenario)
 
     values = tuple(_walk_scalars(scenario.fixture))
+    integration_workflow_id = _integration_workflow_id(scenario)
+    if integration_workflow_id is not None:
+        languages = ("SFX",)
+        platforms = (
+            ("Windows", "Mac")
+            if integration_workflow_id == "harbor_soundbank_release"
+            else ("Windows",)
+        )
+        return make_project_prelaunch_hook(
+            ProjectPrelaunchRequest(
+                scenario_id=scenario.id,
+                languages=languages,
+                platforms=platforms,
+                auro_isolation_profile=(
+                    WWISE_2025_SOUNDBANK_AURO_PROFILE
+                    if (
+                        version == "2025.1"
+                        and integration_workflow_id
+                        == "harbor_soundbank_release"
+                    )
+                    else None
+                ),
+            )
+        )
     if scenario.api in MEDIA_FIXTURE_APIS:
         asset_spec = scenario.fixture.get("asset_spec")
         if not isinstance(asset_spec, Mapping):
@@ -4688,6 +5150,60 @@ def _audit_primary_dispatch(
     )
 
 
+def _audit_workflow_dispatch(
+    *,
+    task: V3TaskRun,
+    expected_dispatches: Sequence[tuple[str, int]],
+) -> Mapping[str, Any]:
+    """Require the exact reviewed mutation vector for one integration workflow."""
+
+    if not expected_dispatches:
+        raise _HeavyProjectInfrastructureError(
+            "workflow dispatch audit has no reviewed expectations"
+        )
+    normalized: list[tuple[str, int]] = []
+    seen: set[str] = set()
+    for api, count in expected_dispatches:
+        if (
+            not isinstance(api, str)
+            or not api.startswith(("ak.wwise.", "ak.soundengine."))
+            or type(count) is not int
+            or count < 1
+            or api in seen
+        ):
+            raise _HeavyProjectInfrastructureError(
+                "workflow dispatch expectations are invalid or duplicated"
+            )
+        seen.add(api)
+        normalized.append((api, count))
+    try:
+        evidence_root = Path(task.broker_evidence.evidence_directory).resolve(
+            strict=True
+        )
+    except (OSError, RuntimeError) as exc:
+        raise _HeavyProjectInfrastructureError(
+            f"workflow dispatcher evidence root is unavailable: {exc}"
+        ) from exc
+    rows = _read_dispatch_evidence(evidence_root)
+    observed = {
+        api: sum(row.get("api") == api for row in rows)
+        for api, _count in normalized
+    }
+    expected = dict(normalized)
+    if observed != expected:
+        raise HeavyProjectRunnerError(
+            "workflow mutation dispatch vector differs: "
+            f"expected={expected} observed={observed}"
+        )
+    return MappingProxyType(
+        {
+            "expected": expected,
+            "observed": observed,
+            "total_expected_dispatches": sum(expected.values()),
+        }
+    )
+
+
 def _read_dispatch_evidence(
     directory: Path,
     *,
@@ -5031,6 +5547,7 @@ def _write_common_business_oracle_plan(
         | ImportBusinessPlanSections
         | AudioMediaBusinessPlanSections
         | SoundBankBusinessPlanSections
+        | WorkflowBusinessPlanSections
         | None
     ),
     primary_dispatch_count: int | None = None,

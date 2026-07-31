@@ -1,0 +1,17 @@
+{
+  "contract": "waapi-skill.codex-integration-workflows-profile/v1",
+  "profile_id": "integration_workflows_cross_version_6",
+  "data_files": [
+    "workflows.json"
+  ],
+  "versions": [
+    "2022.1",
+    "2025.1"
+  ],
+  "totals": {
+    "logical_workflow_count": 3,
+    "task_count": 6,
+    "transaction_count": 12,
+    "user_turn_count": 20
+  }
+}

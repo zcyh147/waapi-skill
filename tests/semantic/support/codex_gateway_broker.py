@@ -206,6 +206,24 @@ _OBJECT_SET_SCHEMA_DEFAULTS = MappingProxyType(
         "auto_add_to_source_control": False,
     }
 )
+_OBJECT_SET_RTPC_REQUIRED_ARGUMENT_FIELDS = frozenset(
+    {"object", "property", "control_input", "points"}
+)
+_OBJECT_SET_RTPC_OPTIONAL_ARGUMENT_FIELDS = frozenset({"notes", "mode"})
+_OBJECT_SET_RTPC_POINT_SHAPES = frozenset(
+    {
+        "Constant",
+        "Linear",
+        "Log3",
+        "Log2",
+        "Log1",
+        "InvertedSCurve",
+        "SCurve",
+        "Exp1",
+        "Exp2",
+        "Exp3",
+    }
+)
 _SOUNDBANK_GENERATE_DEFAULT_FALSE_ARGUMENT_FIELDS = (
     "rebuild_soundbanks",
     "clear_audio_file_cache",
@@ -285,6 +303,25 @@ class MetadataQueryArgument:
 
 
 @dataclass(frozen=True, slots=True)
+class BoundedIntegerArgument:
+    """One canonical decimal argv integer inside a closed inclusive range."""
+
+    minimum: int
+    maximum: int
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.minimum) is not int
+            or type(self.maximum) is not int
+            or not 0 <= self.minimum <= self.maximum <= 2**63 - 1
+        ):
+            raise ValueError(
+                "BoundedIntegerArgument requires an ordered non-negative "
+                "64-bit integer range"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class MetadataTokenProjection:
     """Stable live metadata fields for one mutation-relevant exact token."""
 
@@ -339,6 +376,65 @@ class MetadataTokenProjection:
 
 
 @dataclass(frozen=True, slots=True)
+class GatewayDerivedReferenceActivationAllowance:
+    """One runner-owned audio.import property the Gateway may derive.
+
+    The allowance is deliberately row-local and binds the Boolean activation
+    property to the exact reference that causes the production Gateway to
+    derive it.  It is test-oracle provenance, never Agent-authored input.
+    """
+
+    row_index: int
+    property_name: str
+    property_value: bool
+    reference_name: str
+
+    def __post_init__(self) -> None:
+        if type(self.row_index) is not int or self.row_index < 0:
+            raise ValueError(
+                "GatewayDerivedReferenceActivationAllowance.row_index "
+                "must be a non-negative integer"
+            )
+        for field, value in (
+            ("property_name", self.property_name),
+            ("reference_name", self.reference_name),
+        ):
+            if (
+                not isinstance(value, str)
+                or not value
+                or value != value.strip()
+                or value.startswith("@")
+                or len(value) > 256
+                or any(
+                    ord(character) < 32 or ord(character) == 127
+                    for character in value
+                )
+            ):
+                raise ValueError(
+                    "GatewayDerivedReferenceActivationAllowance."
+                    f"{field} must be one bounded exact live name"
+                )
+        if self.property_name.casefold() == self.reference_name.casefold():
+            raise ValueError(
+                "GatewayDerivedReferenceActivationAllowance property and "
+                "reference names must differ"
+            )
+        if self.property_value is not True:
+            raise ValueError(
+                "GatewayDerivedReferenceActivationAllowance.property_value "
+                "must be the supported Boolean activation value true"
+            )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "row_index": self.row_index,
+            "property_name": self.property_name,
+            "property_value": self.property_value,
+            "reference_name": self.reference_name,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class MetadataBoundJsonArgument:
     """Request JSON whose dynamic names must come from one prior read."""
 
@@ -350,6 +446,9 @@ class MetadataBoundJsonArgument:
         tuple[MetadataTokenProjection, ...] | None
     ) = None
     equivalence: str = "wire_exact"
+    gateway_derived_reference_activations: tuple[
+        GatewayDerivedReferenceActivationAllowance, ...
+    ] = ()
 
     def __post_init__(self) -> None:
         if (
@@ -412,11 +511,43 @@ class MetadataBoundJsonArgument:
             "audio_import_v1",
             "audio_import_tab_v1",
             "object_set_v1",
+            "object_set_rtpc_v1",
         }:
             raise ValueError(
                 "MetadataBoundJsonArgument.equivalence must be "
                 "wire_exact, audio_import_v1, audio_import_tab_v1, "
-                "or object_set_v1"
+                "object_set_v1, or object_set_rtpc_v1"
+            )
+        allowances = self.gateway_derived_reference_activations
+        if (
+            not isinstance(allowances, tuple)
+            or any(
+                not isinstance(
+                    item,
+                    GatewayDerivedReferenceActivationAllowance,
+                )
+                for item in allowances
+            )
+            or len(allowances)
+            != len(
+                {
+                    (
+                        item.row_index,
+                        item.property_name.casefold(),
+                        item.reference_name.casefold(),
+                    )
+                    for item in allowances
+                }
+            )
+        ):
+            raise ValueError(
+                "MetadataBoundJsonArgument gateway-derived reference "
+                "activation allowances must be unique trusted rows"
+            )
+        if allowances and self.equivalence != "audio_import_v1":
+            raise ValueError(
+                "Gateway-derived reference activation allowances are only "
+                "valid for audio_import_v1"
             )
         if self.equivalence == "audio_import_v1":
             try:
@@ -431,6 +562,10 @@ class MetadataBoundJsonArgument:
                     "audio_import_v1 request field names must be bound to "
                     "required live metadata tokens"
                 )
+            _validate_gateway_derived_reference_activation_allowances(
+                self,
+                normalized,
+            )
         elif self.equivalence == "audio_import_tab_v1":
             try:
                 _normalize_audio_import_tab_request(self.expected)
@@ -445,6 +580,14 @@ class MetadataBoundJsonArgument:
             except (TypeError, ValueError) as exc:
                 raise ValueError(
                     "object_set_v1 requires one valid object.set request"
+                ) from exc
+        elif self.equivalence == "object_set_rtpc_v1":
+            try:
+                _normalize_object_set_rtpc_request(self.expected)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "object_set_rtpc_v1 requires one valid "
+                    "object.setRTPC request"
                 ) from exc
 
 
@@ -464,6 +607,7 @@ ExpectedArgument = (
     str
     | SemanticJsonArgument
     | MetadataQueryArgument
+    | BoundedIntegerArgument
     | MetadataBoundJsonArgument
     | ResponseBinding
 )
@@ -699,6 +843,83 @@ class GatewayBrokerRecord:
         )
 
 
+CommutativeReadOnlyStepGroups = tuple[tuple[str, str], ...]
+
+
+def validate_commutative_read_only_step_groups(
+    expected_steps: Sequence[ExpectedGatewayStep],
+    groups: Sequence[Sequence[str]],
+) -> CommutativeReadOnlyStepGroups:
+    """Validate explicitly declared adjacent read-only step permutations."""
+
+    steps = tuple(expected_steps)
+    names = tuple(step.name for step in steps)
+    indexes = {name: index for index, name in enumerate(names)}
+    normalized: list[tuple[str, str]] = []
+    claimed: set[str] = set()
+    for raw_group in groups:
+        group = tuple(raw_group)
+        if (
+            len(group) != 2
+            or any(not isinstance(name, str) or not name for name in group)
+            or group[0] == group[1]
+            or any(name not in indexes for name in group)
+            or indexes[group[1]] != indexes[group[0]] + 1
+            or any(name in claimed for name in group)
+        ):
+            raise ValueError(
+                "commutative read-only groups must name disjoint adjacent "
+                "expected steps in canonical order"
+            )
+        grouped_steps = (steps[indexes[group[0]]], steps[indexes[group[1]]])
+        if {step.subcommand for step in grouped_steps} != {
+            "operation-schema",
+            "metadata",
+        }:
+            raise ValueError(
+                "commutative read-only groups are limited to one "
+                "operation-schema and one metadata step"
+            )
+        claimed.update(group)
+        normalized.append((group[0], group[1]))
+    return tuple(normalized)
+
+
+def gateway_step_sequence_matches(
+    expected: Sequence[str],
+    actual: Sequence[str],
+    groups: Sequence[Sequence[str]] = (),
+) -> bool:
+    """Match a canonical sequence while allowing only declared pair swaps."""
+
+    expected_names = tuple(expected)
+    actual_names = tuple(actual)
+    if len(expected_names) != len(actual_names):
+        return False
+    group_by_first = {
+        tuple(group)[0]: tuple(group)
+        for group in groups
+        if len(tuple(group)) == 2
+    }
+    index = 0
+    while index < len(expected_names):
+        group = group_by_first.get(expected_names[index])
+        if (
+            group is not None
+            and index + 1 < len(expected_names)
+            and expected_names[index : index + 2] == group
+        ):
+            supplied = actual_names[index : index + 2]
+            if supplied not in {group, tuple(reversed(group))}:
+                return False
+            index += 2
+            continue
+        if actual_names[index] != expected_names[index]:
+            return False
+        index += 1
+    return True
+
+
 @dataclass(frozen=True, slots=True)
 class GatewayBrokerEvidence:
     """Trusted in-memory evidence snapshot consumed by the harness."""
@@ -711,6 +932,7 @@ class GatewayBrokerEvidence:
     runner_path: str
     terminal_state: str
     complete: bool
+    commutative_read_only_step_groups: CommutativeReadOnlyStepGroups = ()
 
     @property
     def rejected_records(self) -> tuple[GatewayBrokerRecord, ...]:
@@ -726,6 +948,7 @@ class GatewayBrokerEvidence:
 
     @property
     def passed(self) -> bool:
+        record_names = tuple(record.step_name for record in self.records)
         return (
             self.complete
             and self.terminal_state == _BROKER_COMPLETE
@@ -733,6 +956,12 @@ class GatewayBrokerEvidence:
             and len(self.records) == len(self.expected_step_names)
             and not self.rejected_records
             and all(record.succeeded for record in self.records)
+            and record_names == self.consumed_step_names
+            and gateway_step_sequence_matches(
+                self.expected_step_names,
+                self.consumed_step_names,
+                self.commutative_read_only_step_groups,
+            )
         )
 
     @property
@@ -766,6 +995,8 @@ class GatewayBrokerEvidence:
 
     def as_dict(self, *, include_output: bool = False) -> dict[str, Any]:
         payload = asdict(self)
+        if not self.commutative_read_only_step_groups:
+            payload.pop("commutative_read_only_step_groups")
         payload["passed"] = self.passed
         for record_payload, record in zip(payload["records"], self.records):
             record_payload["succeeded"] = record.succeeded
@@ -1086,11 +1317,18 @@ def _metadata_bound_json_equal(
             if not _audio_import_actual_defaults_are_expected_subset(
                 actual,
                 expected.expected,
+                metadata_bound=expected,
             ):
                 return False
-            normalized_actual = _normalize_audio_import_request(actual)
-            normalized_expected = _normalize_audio_import_request(
-                expected.expected
+            normalized_actual = _normalize_metadata_bound_audio_import_request(
+                actual,
+                expected,
+            )
+            normalized_expected = (
+                _normalize_metadata_bound_audio_import_request(
+                    expected.expected,
+                    expected,
+                )
             )
         elif expected.equivalence == "object_set_v1":
             normalized_actual = _normalize_metadata_bound_object_set_request(
@@ -1102,6 +1340,11 @@ def _metadata_bound_json_equal(
                     expected.expected,
                     expected,
                 )
+            )
+        elif expected.equivalence == "object_set_rtpc_v1":
+            normalized_actual = _normalize_object_set_rtpc_request(actual)
+            normalized_expected = _normalize_object_set_rtpc_request(
+                expected.expected
             )
         else:
             normalized_actual = _normalize_audio_import_tab_request(actual)
@@ -1120,11 +1363,13 @@ def _metadata_bound_semantic_value(
     expected: MetadataBoundJsonArgument,
 ) -> Any:
     if expected.equivalence == "audio_import_v1":
-        return _normalize_audio_import_request(actual)
+        return _normalize_metadata_bound_audio_import_request(actual, expected)
     if expected.equivalence == "audio_import_tab_v1":
         return _normalize_audio_import_tab_request(actual)
     if expected.equivalence == "object_set_v1":
         return _normalize_metadata_bound_object_set_request(actual, expected)
+    if expected.equivalence == "object_set_rtpc_v1":
+        return _normalize_object_set_rtpc_request(actual)
     return actual
 
 
@@ -1217,6 +1462,245 @@ def _normalize_metadata_bound_object_set_request(
     """Canonicalize equal spellings only for live-proven real properties."""
 
     normalized = _normalize_object_set_request(value)
+    return _normalize_metadata_bound_real_property_values(
+        normalized,
+        expected,
+    )
+
+
+def _normalize_metadata_bound_audio_import_request(
+    value: Any,
+    expected: MetadataBoundJsonArgument,
+) -> dict[str, Any]:
+    """Canonicalize reviewed audio.import semantic equivalences."""
+
+    normalized = _normalize_audio_import_request(value)
+    normalized = _normalize_metadata_bound_real_property_values(
+        normalized,
+        expected,
+    )
+    expected_normalized = _normalize_metadata_bound_real_property_values(
+        _normalize_audio_import_request(expected.expected),
+        expected,
+    )
+    return _materialize_gateway_derived_reference_activations(
+        normalized,
+        expected_normalized=expected_normalized,
+        allowances=expected.gateway_derived_reference_activations,
+    )
+
+
+def _validate_gateway_derived_reference_activation_allowances(
+    expected: MetadataBoundJsonArgument,
+    normalized_request: Mapping[str, Any],
+) -> None:
+    """Bind every allowance to trusted request rows and live metadata."""
+
+    allowances = expected.gateway_derived_reference_activations
+    if not allowances:
+        return
+    projection = expected.expected_required_token_projection
+    if projection is None:
+        raise ValueError(
+            "Gateway-derived reference activation allowances require a "
+            "trusted live metadata projection"
+        )
+    projection_by_name = {item.name: item for item in projection}
+    raw_arguments = (
+        expected.expected.get("arguments")
+        if isinstance(expected.expected, Mapping)
+        else None
+    )
+    raw_imports = (
+        raw_arguments.get("imports")
+        if isinstance(raw_arguments, Mapping)
+        else None
+    )
+    normalized_arguments = normalized_request.get("arguments")
+    normalized_imports = (
+        normalized_arguments.get("imports")
+        if isinstance(normalized_arguments, Mapping)
+        else None
+    )
+    if not isinstance(raw_imports, list) or not isinstance(
+        normalized_imports,
+        list,
+    ):
+        raise ValueError(
+            "Gateway-derived reference activation allowances require "
+            "audio.import rows"
+        )
+    default_properties, default_references = (
+        _audio_import_default_named_fields(expected.expected)
+    )
+    for allowance in allowances:
+        property_projection = projection_by_name.get(
+            allowance.property_name
+        )
+        reference_projection = projection_by_name.get(
+            allowance.reference_name
+        )
+        if (
+            property_projection is None
+            or property_projection.kind != "property"
+            or property_projection.metadata_type.casefold()
+            not in {"bool", "boolean"}
+            or reference_projection is None
+            or reference_projection.kind != "reference"
+        ):
+            raise ValueError(
+                "Gateway-derived reference activation allowances must bind "
+                "one live Boolean property and one live reference"
+            )
+        if (
+            allowance.property_name in default_properties
+            or allowance.reference_name in default_references
+        ):
+            raise ValueError(
+                "Gateway-derived reference activation allowances must be "
+                "bound to explicit import rows, not defaults"
+            )
+        if allowance.row_index >= len(raw_imports):
+            raise ValueError(
+                "Gateway-derived reference activation allowance row is "
+                "outside the trusted import request"
+            )
+        raw_row = raw_imports[allowance.row_index]
+        normalized_row = normalized_imports[allowance.row_index]
+        if not isinstance(raw_row, Mapping) or not isinstance(
+            normalized_row,
+            Mapping,
+        ):
+            raise ValueError(
+                "Gateway-derived reference activation allowance row is invalid"
+            )
+        row_properties = _named_audio_import_fields(
+            raw_row.get("properties", []),
+            path=(
+                "arguments.imports"
+                f"[{allowance.row_index}].properties"
+            ),
+            kind="property",
+        )
+        row_references = _named_audio_import_fields(
+            raw_row.get("references", []),
+            path=(
+                "arguments.imports"
+                f"[{allowance.row_index}].references"
+            ),
+            kind="reference",
+        )
+        property_item = row_properties.get(allowance.property_name)
+        if (
+            property_item is None
+            or property_item.get("value")
+            is not allowance.property_value
+            or allowance.reference_name not in row_references
+        ):
+            raise ValueError(
+                "Gateway-derived reference activation allowance must match "
+                "an explicit trusted row property and related reference"
+            )
+
+
+def _materialize_gateway_derived_reference_activations(
+    normalized: dict[str, Any],
+    *,
+    expected_normalized: Mapping[str, Any],
+    allowances: Sequence[GatewayDerivedReferenceActivationAllowance],
+) -> dict[str, Any]:
+    """Fill only omitted row activators the production Gateway will derive."""
+
+    if not allowances:
+        return normalized
+    arguments = normalized.get("arguments")
+    expected_arguments = expected_normalized.get("arguments")
+    imports = (
+        arguments.get("imports")
+        if isinstance(arguments, Mapping)
+        else None
+    )
+    expected_imports = (
+        expected_arguments.get("imports")
+        if isinstance(expected_arguments, Mapping)
+        else None
+    )
+    if not isinstance(imports, list) or not isinstance(
+        expected_imports,
+        list,
+    ):
+        raise ValueError(
+            "audio_import_v1 Gateway derivation rows are unavailable"
+        )
+    for allowance in allowances:
+        if allowance.row_index >= len(imports):
+            continue
+        row = imports[allowance.row_index]
+        expected_row = expected_imports[allowance.row_index]
+        if not isinstance(row, Mapping) or not isinstance(
+            expected_row,
+            Mapping,
+        ):
+            continue
+        actual_properties = _named_audio_import_fields(
+            row.get("properties", []),
+            path=(
+                "arguments.imports"
+                f"[{allowance.row_index}].properties"
+            ),
+            kind="property",
+        )
+        if any(
+            name.casefold() == allowance.property_name.casefold()
+            for name in actual_properties
+        ):
+            continue
+        actual_references = _named_audio_import_fields(
+            row.get("references", []),
+            path=(
+                "arguments.imports"
+                f"[{allowance.row_index}].references"
+            ),
+            kind="reference",
+        )
+        if allowance.reference_name not in actual_references:
+            continue
+        expected_properties = _named_audio_import_fields(
+            expected_row.get("properties", []),
+            path=(
+                "trusted.arguments.imports"
+                f"[{allowance.row_index}].properties"
+            ),
+            kind="property",
+        )
+        expected_item = expected_properties.get(allowance.property_name)
+        if (
+            expected_item is None
+            or expected_item.get("value")
+            is not allowance.property_value
+        ):
+            raise ValueError(
+                "trusted Gateway-derived reference activation is invalid"
+            )
+        updated_row = dict(row)
+        updated_row["properties"] = sorted(
+            [*actual_properties.values(), dict(expected_item)],
+            key=lambda item: str(item["name"]),
+        )
+        imports[allowance.row_index] = updated_row
+    updated_arguments = dict(arguments)
+    updated_arguments["imports"] = imports
+    result = dict(normalized)
+    result["arguments"] = updated_arguments
+    return result
+
+
+def _normalize_metadata_bound_real_property_values(
+    normalized: dict[str, Any],
+    expected: MetadataBoundJsonArgument,
+) -> dict[str, Any]:
+    """Canonicalize integral spellings only for live-proven real properties."""
+
     projection = expected.expected_required_token_projection
     if projection is None:
         return normalized
@@ -1267,6 +1751,83 @@ def _normalize_metadata_bound_object_set_request(
     canonical = visit(normalized)
     assert isinstance(canonical, dict)
     return canonical
+
+
+def _normalize_object_set_rtpc_request(value: Any) -> dict[str, Any]:
+    """Normalize only RTPC numeric spellings and its declared default mode."""
+
+    if (
+        not isinstance(value, Mapping)
+        or not all(isinstance(key, str) for key in value)
+        or set(value) != {"contract", "version", "operation", "arguments"}
+        or value.get("contract") != "waapi-skill.operation-request/v1"
+        or value.get("version") not in _OBJECT_SET_SUPPORTED_VERSIONS
+        or value.get("operation") != "object.setRTPC"
+    ):
+        raise ValueError(
+            "object_set_rtpc_v1 requires one closed object.setRTPC request"
+        )
+    arguments = value.get("arguments")
+    if (
+        not isinstance(arguments, Mapping)
+        or not all(isinstance(key, str) for key in arguments)
+        or not _OBJECT_SET_RTPC_REQUIRED_ARGUMENT_FIELDS.issubset(arguments)
+        or set(arguments)
+        - (
+            _OBJECT_SET_RTPC_REQUIRED_ARGUMENT_FIELDS
+            | _OBJECT_SET_RTPC_OPTIONAL_ARGUMENT_FIELDS
+        )
+        or not isinstance(arguments.get("object"), Mapping)
+        or not isinstance(arguments.get("control_input"), Mapping)
+        or not isinstance(arguments.get("property"), str)
+        or not arguments["property"]
+        or arguments["property"] != arguments["property"].strip()
+        or (
+            "notes" in arguments
+            and not isinstance(arguments.get("notes"), str)
+        )
+        or arguments.get("mode", "add_or_replace")
+        not in {"add", "add_or_replace"}
+    ):
+        raise ValueError("object_set_rtpc_v1 arguments are not closed")
+    points = arguments.get("points")
+    if (
+        not isinstance(points, list)
+        or not 1 <= len(points) <= 256
+    ):
+        raise ValueError(
+            "object_set_rtpc_v1 points must be a bounded non-empty array"
+        )
+    normalized_points: list[dict[str, Any]] = []
+    for index, point in enumerate(points):
+        if (
+            not isinstance(point, Mapping)
+            or not all(isinstance(key, str) for key in point)
+            or set(point) != {"x", "y", "shape"}
+            or type(point.get("x")) not in {int, float}
+            or type(point.get("y")) not in {int, float}
+            or not math.isfinite(float(point["x"]))
+            or not math.isfinite(float(point["y"]))
+            or point.get("shape") not in _OBJECT_SET_RTPC_POINT_SHAPES
+        ):
+            raise ValueError(
+                f"object_set_rtpc_v1 points[{index}] is invalid"
+            )
+        x = float(point["x"])
+        y = float(point["y"])
+        normalized_points.append(
+            {
+                "x": 0.0 if x == 0.0 else x,
+                "y": 0.0 if y == 0.0 else y,
+                "shape": point["shape"],
+            }
+        )
+    normalized_arguments = dict(arguments)
+    normalized_arguments["points"] = normalized_points
+    normalized_arguments.setdefault("mode", "add_or_replace")
+    normalized = dict(value)
+    normalized["arguments"] = normalized_arguments
+    return normalized
 
 
 def _normalize_audio_import_tab_request(value: Any) -> dict[str, Any]:
@@ -1362,6 +1923,8 @@ def _normalize_audio_import_tab_request(value: Any) -> dict[str, Any]:
 def _audio_import_actual_defaults_are_expected_subset(
     actual: Any,
     expected: Any,
+    *,
+    metadata_bound: MetadataBoundJsonArgument,
 ) -> bool:
     """Permit trusted defaults to remain or expand, never to be refactored."""
 
@@ -1371,18 +1934,55 @@ def _audio_import_actual_defaults_are_expected_subset(
     expected_properties, expected_references = (
         _audio_import_default_named_fields(expected)
     )
-    for actual_fields, expected_fields in (
-        (actual_properties, expected_properties),
-        (actual_references, expected_references),
+    real_property_names = {
+        item.name
+        for item in (
+            metadata_bound.expected_required_token_projection or ()
+        )
+        if item.kind == "property"
+        and item.metadata_type.casefold()
+        in {"real32", "real64", "float", "double"}
+    }
+    for actual_fields, expected_fields, property_fields in (
+        (actual_properties, expected_properties, True),
+        (actual_references, expected_references, False),
     ):
         if any(
             name not in expected_fields
-            or _canonical_json_bytes(item)
-            != _canonical_json_bytes(expected_fields[name])
+            or _canonical_json_bytes(
+                _normalize_named_real_property_item(
+                    item,
+                    real_property_names=real_property_names,
+                )
+                if property_fields
+                else item
+            )
+            != _canonical_json_bytes(
+                _normalize_named_real_property_item(
+                    expected_fields[name],
+                    real_property_names=real_property_names,
+                )
+                if property_fields
+                else expected_fields[name]
+            )
             for name, item in actual_fields.items()
         ):
             return False
     return True
+
+
+def _normalize_named_real_property_item(
+    item: Mapping[str, Any],
+    *,
+    real_property_names: set[str],
+) -> dict[str, Any]:
+    normalized = dict(item)
+    value = normalized.get("value")
+    if normalized.get("name") in real_property_names and type(value) is int:
+        converted = float(value)
+        if math.isfinite(converted) and converted == value:
+            normalized["value"] = converted
+    return normalized
 
 
 def _audio_import_default_named_fields(
@@ -1547,11 +2147,55 @@ def _normalize_audio_import_request(value: Any) -> dict[str, Any]:
             ]
         else:
             row.pop("references", None)
+        _canonicalize_audio_import_media_object_type(row)
         normalized_imports.append(row)
 
     normalized_arguments["imports"] = normalized_imports
     normalized_request["arguments"] = normalized_arguments
     return normalized_request
+
+
+def _canonicalize_audio_import_media_object_type(
+    row: dict[str, Any],
+) -> None:
+    """Normalize only language-proven generic Sound import aliases.
+
+    The production import contract treats ``Sound`` as the generic spelling
+    behind the reviewed ``Sound SFX`` and ``Sound Voice`` import forms.  Those
+    two specialized forms are not interchangeable: the effective import
+    language decides which one can be equivalent to ``Sound``.  Structure-only
+    rows and media rows without an explicit effective language stay exact.
+
+    Other reviewed import-syntax pairs are deliberately excluded.  For
+    example, Random/Sequence Container and ActorMixer/PropertyContainer make a
+    typed path compatible with an explicit field; they do not make two complete
+    operation requests semantically identical.
+    """
+
+    if not any(
+        field in row for field in ("audio_file", "audio_file_base64")
+    ):
+        return
+    object_type = row.get("object_type")
+    import_language = row.get("import_language")
+    if not isinstance(object_type, str) or not isinstance(
+        import_language,
+        str,
+    ):
+        return
+    object_type_token = re.sub(
+        r"[^a-z0-9]",
+        "",
+        object_type.casefold(),
+    )
+    language_is_sfx = import_language.casefold() == "sfx"
+    compatible_tokens = (
+        {"sound", "soundsfx"}
+        if language_is_sfx
+        else {"sound", "soundvoice"}
+    )
+    if object_type_token in compatible_tokens:
+        row["object_type"] = "Sound"
 
 
 def _validate_audio_import_row_scope(
@@ -1782,7 +2426,7 @@ def _audio_import_field_names(
 def _validate_metadata_discover_query_arguments(
     step: ExpectedGatewayStep,
     supplied_arguments: Sequence[str],
-) -> tuple[str, ...] | None:
+) -> tuple[tuple[str, ...], int] | None:
     """Close the one flexible argv surface used by compound metadata reads."""
 
     query_specs = tuple(
@@ -1815,6 +2459,21 @@ def _validate_metadata_discover_query_arguments(
         raise GatewayInvocationError(
             "metadata discover allow-list must use one bounded object-type scope"
         )
+    configured_limit = (
+        step.arguments[-1]
+        if len(step.arguments) >= 2 and step.arguments[-2] == "--limit"
+        else None
+    )
+    if not (
+        isinstance(configured_limit, str)
+        and configured_limit in {str(value) for value in range(1, 9)}
+        or isinstance(configured_limit, BoundedIntegerArgument)
+        and 1 <= configured_limit.minimum <= configured_limit.maximum <= 8
+    ):
+        raise GatewayInvocationError(
+            "metadata discover allow-list must use one literal or bounded "
+            "canonical --limit from 1 through 8"
+        )
     configured_shape: list[Any] = [
         "discover",
         "--object-type",
@@ -1822,11 +2481,11 @@ def _validate_metadata_discover_query_arguments(
     ]
     for query_spec in query_specs:
         configured_shape.extend(("--query", query_spec))
-    configured_shape.extend(("--limit", "8"))
+    configured_shape.extend(("--limit", configured_limit))
     if list(step.arguments) != configured_shape:
         raise GatewayInvocationError(
             "metadata discover allow-list must contain only its exact "
-            "object-type, 1..8 query slots, and --limit 8"
+            "object-type, 1..8 query slots, and configured --limit"
         )
 
     if (
@@ -1837,7 +2496,7 @@ def _validate_metadata_discover_query_arguments(
     ):
         raise GatewayInvocationError(
             "metadata discover scope must be exactly the configured "
-            "object-type, 1..8 bounded --query pairs, and --limit 8"
+            "object-type, 1..8 bounded --query pairs, and configured --limit"
         )
 
     supplied_object_types: list[str] = []
@@ -1857,14 +2516,27 @@ def _validate_metadata_discover_query_arguments(
                 "metadata discover accepts only its configured --object-type, "
                 "--query, and --limit options"
             )
+    supplied_limit = supplied_limits[0] if len(supplied_limits) == 1 else ""
+    if supplied_limit not in {str(value) for value in range(1, 9)}:
+        raise GatewayInvocationError(
+            "metadata discover --limit must be one canonical decimal integer"
+        )
+    supplied_limit_value = int(supplied_limit)
+    limit_matches = (
+        supplied_limit == configured_limit
+        if isinstance(configured_limit, str)
+        else configured_limit.minimum
+        <= supplied_limit_value
+        <= configured_limit.maximum
+    )
     if (
         supplied_object_types != [object_type]
-        or supplied_limits != ["8"]
+        or not limit_matches
         or not 1 <= len(queries) <= 8
     ):
         raise GatewayInvocationError(
             "metadata discover scope must be exactly one configured "
-            "--object-type, 1..8 --query values, and one --limit 8"
+            "--object-type, 1..8 --query values, and one matching --limit"
         )
     query_values = tuple(queries)
     maximum_chars = min(item.maximum_chars for item in query_specs)
@@ -1895,7 +2567,7 @@ def _validate_metadata_discover_query_arguments(
         raise GatewayInvocationError(
             "metadata discover query text exceeds the combined bound"
         )
-    return query_values
+    return query_values, supplied_limit_value
 
 
 def _metadata_discovery_live_projection(
@@ -2313,7 +2985,11 @@ def reconcile_gateway_command_prefix(
             f"observed command count {len(command_argvs)} does not match expected prefix count "
             f"{expected_step_count}"
         )
-    if evidence.consumed_step_names != expected_prefix:
+    if not gateway_step_sequence_matches(
+        expected_prefix,
+        evidence.consumed_step_names,
+        evidence.commutative_read_only_step_groups,
+    ):
         errors.append(
             "broker consumed steps do not match the requested expected-step prefix"
         )
@@ -2327,7 +3003,7 @@ def reconcile_gateway_command_prefix(
             f"accepted broker record count {len(accepted)} does not match expected prefix count "
             f"{expected_step_count}"
         )
-    if tuple(record.step_name for record in accepted) != expected_prefix:
+    if tuple(record.step_name for record in accepted) != evidence.consumed_step_names:
         errors.append("accepted broker record names do not match the expected-step prefix")
     if len(resolved) != len(accepted):
         errors.append(
@@ -2648,6 +3324,7 @@ class CodexGatewayBroker:
         *,
         skill_source: Path,
         expected_steps: Sequence[ExpectedGatewayStep],
+        commutative_read_only_step_groups: Sequence[Sequence[str]] = (),
         gateway_global_arguments: Sequence[str] = (),
         expected_wwise_version: str = "",
         project_modification_policy: str = "ask_before_changes",
@@ -2667,6 +3344,21 @@ class CodexGatewayBroker:
         self.skill_source = _absolute_lexical(skill_source)
         self.runner_path = self.skill_source / "scripts" / "run.py"
         self.expected_steps = tuple(expected_steps)
+        self.commutative_read_only_step_groups = (
+            validate_commutative_read_only_step_groups(
+                self.expected_steps,
+                commutative_read_only_step_groups,
+            )
+        )
+        self._execution_steps = list(self.expected_steps)
+        self._commutative_group_start_indexes = {
+            next(
+                index
+                for index, step in enumerate(self.expected_steps)
+                if step.name == group[0]
+            )
+            for group in self.commutative_read_only_step_groups
+        }
         self.gateway_global_arguments = tuple(str(value) for value in gateway_global_arguments)
         self.expected_wwise_version = str(expected_wwise_version)
         self.project_modification_policy = str(project_modification_policy)
@@ -3118,7 +3810,9 @@ class CodexGatewayBroker:
     def evidence(self) -> GatewayBrokerEvidence:
         with self._lock:
             records = tuple(self._records)
-            consumed = tuple(step.name for step in self.expected_steps[: self._next_step])
+            consumed = tuple(
+                step.name for step in self._execution_steps[: self._next_step]
+            )
             successful_count = sum(record.succeeded for record in records)
             complete = (
                 self._terminal_state == _BROKER_COMPLETE
@@ -3137,6 +3831,9 @@ class CodexGatewayBroker:
             runner_path=str(self.runner_path),
             terminal_state=terminal_state,
             complete=complete,
+            commutative_read_only_step_groups=(
+                self.commutative_read_only_step_groups
+            ),
         )
 
     def reconcile(self, command_argvs: Sequence[Sequence[str]]) -> GatewayBrokerReconciliation:
@@ -3628,14 +4325,36 @@ class CodexGatewayBroker:
                     f"broker is terminal {self._terminal_state}",
                     authenticated=True,
                 )
-            step = self.expected_steps[self._next_step]
+            step = self._execution_steps[self._next_step]
             try:
                 semantic_hash, execution_arguments = self._validate_step(
                     step,
                     resolved.gateway_arguments,
                 )
-            except GatewayInvocationError as exc:
-                return self._reject_locked(resolved, str(exc), authenticated=True)
+            except GatewayInvocationError as first_error:
+                if self._next_step not in self._commutative_group_start_indexes:
+                    return self._reject_locked(
+                        resolved,
+                        str(first_error),
+                        authenticated=True,
+                    )
+                alternate = self._execution_steps[self._next_step + 1]
+                try:
+                    semantic_hash, execution_arguments = self._validate_step(
+                        alternate,
+                        resolved.gateway_arguments,
+                    )
+                except GatewayInvocationError as second_error:
+                    return self._reject_locked(
+                        resolved,
+                        "command matches neither declared commutative read-only "
+                        f"step: {first_error}; {second_error}",
+                        authenticated=True,
+                    )
+                self._execution_steps[
+                    self._next_step : self._next_step + 2
+                ] = (alternate, step)
+                step = alternate
             except Exception as exc:  # noqa: BLE001 - authenticated failures are terminal and recorded
                 return self._reject_locked(
                     resolved,
@@ -3719,12 +4438,12 @@ class CodexGatewayBroker:
                 *supplied_arguments[event_count_index:],
             )
             execution_arguments = (*expected_prefix, *validation_arguments)
-        metadata_queries = _validate_metadata_discover_query_arguments(
+        metadata_discovery = _validate_metadata_discover_query_arguments(
             step,
             validation_arguments,
         )
         if (
-            metadata_queries is None
+            metadata_discovery is None
             and len(validation_arguments) != len(step.arguments)
         ):
             raise GatewayInvocationError(
@@ -3746,13 +4465,14 @@ class CodexGatewayBroker:
             self.expected_wwise_version,
             *expected_prefix,
         ]
-        if metadata_queries is not None:
+        if metadata_discovery is not None:
+            metadata_queries, metadata_limit = metadata_discovery
             semantic_values.extend(
                 (
                     "metadata-discover-query-set/v1",
                     step.arguments[2],
                     list(metadata_queries),
-                    8,
+                    metadata_limit,
                 )
             )
         else:
@@ -3785,6 +4505,11 @@ class CodexGatewayBroker:
                     raise GatewayInvocationError(
                         "metadata query slot escaped its closed discover validator"
                     )
+                elif isinstance(expected, BoundedIntegerArgument):
+                    raise GatewayInvocationError(
+                        "bounded integer slot escaped its closed metadata "
+                        "discover validator"
+                    )
                 elif isinstance(expected, MetadataBoundJsonArgument):
                     actual_json = _decode_json_argument(
                         supplied,
@@ -3794,6 +4519,7 @@ class CodexGatewayBroker:
                                 "audio_import_v1",
                                 "audio_import_tab_v1",
                                 "object_set_v1",
+                                "object_set_rtpc_v1",
                             }
                         ),
                     )
@@ -3859,6 +4585,12 @@ class CodexGatewayBroker:
                                 if expected_projection is not None
                                 else None
                             ),
+                            [
+                                item.as_dict()
+                                for item in (
+                                    expected.gateway_derived_reference_activations
+                                )
+                            ],
                         )
                     )
                 elif isinstance(expected, ResponseBinding):
@@ -3997,7 +4729,7 @@ class CodexGatewayBroker:
                 isinstance(argument, ResponseBinding)
                 and argument.step == step.name
                 and argument.pointer == "/confirmation/token"
-                for later_step in self.expected_steps[self._next_step + 1 :]
+                for later_step in self._execution_steps[self._next_step + 1 :]
                 for argument in later_step.arguments
             )
             if (
@@ -4162,8 +4894,8 @@ class CodexGatewayBroker:
         record = GatewayBrokerRecord(
             sequence=0,
             step_name=(
-                self.expected_steps[self._next_step].name
-                if self._next_step < len(self.expected_steps)
+                self._execution_steps[self._next_step].name
+                if self._next_step < len(self._execution_steps)
                 else None
             ),
             authenticated=authenticated,
@@ -4212,6 +4944,7 @@ __all__ = [
     "GatewayBrokerRecord",
     "GatewayBrokerReconciliation",
     "GatewayInvocationError",
+    "GatewayDerivedReferenceActivationAllowance",
     "MetadataBoundJsonArgument",
     "MetadataQueryArgument",
     "MetadataTokenProjection",

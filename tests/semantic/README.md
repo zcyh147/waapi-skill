@@ -28,6 +28,13 @@ named test documents plus closed adapter and request-mapping registries:
   Any listed scenario is blocked from real execution until all of its entries
   are closed; the model must never guess an enum number or unresolved token.
 
+For structured Gateway mutations,
+`skills/waapi-skill/wwise_waapi/operation_registry.py` is the authoritative
+public operation-contract entrypoint. A semantic builder, fixture adapter, or
+dispatcher implementation does not by itself make an operation executable.
+The registry-backed `operation-schema` contract must expose the closed request
+shape and version scope before a semantic profile may schedule it.
+
 The v3 definitions cover the 198-URI union of executable APIs reflected across
 the five supported versions. The coverage unit is one unique URI, not each of
 the 808 packaged route-contract version/API rows: shared APIs use 2022.1
@@ -123,6 +130,33 @@ SoundBank inclusions. Its 24 fresh tasks require 48 user turns when every
 preview reaches confirmation. This is a regression profile for request
 composition and business assertions, not additional API-coverage credit.
 
+The targeted `integration_workflows_cross_version_6` profile is defined by
+`tests/semantic/data/integration-workflows-v1/profile.json`. It runs three
+prewritten, cross-operation workflows once on Wwise 2022.1 and once on Wwise
+2025.1. The closed schedule is six fresh memory-off Codex tasks, 20 user turns,
+and 12 separately previewed transactions. It is fixed to `gpt-5.6-terra`,
+medium reasoning, and the default service tier, and it reuses the formal
+campaign, broker, sandbox, evidence, and cleanup paths. All tasks run
+sequentially. This profile is integration acceptance across already reviewed
+operations; it adds no per-API functional-coverage credit.
+
+Treat its first campaign as one frozen pass. Continue after ordinary semantic
+case failures so they can be consolidated, then repair once and start a new
+campaign root. Stop the pass early only for a systemic harness, source-sandbox,
+evidence, or cleanup fault that could invalidate later cases. The profile
+totals are a design contract.
+
+The completed 2026-07-31 evidence is cumulative. The frozen initial
+`campaign-integration-workflows-v1-terra-20260731-a12` root passed the Alarm
+and Harbor workflows on both versions and failed both Weather workflows.
+Fresh repaired roots
+`campaign-integration-workflows-v1-terra-20260731-a20-int22-weather` and
+`campaign-integration-workflows-v1-terra-20260731-a24-int25-weather` passed
+the remaining 2022.1 and 2025.1 Weather units. Across those roots all six
+unique units have passing evidence, but there is no single final-candidate
+6/6 campaign. Passing sandboxes were cleaned, failed sandboxes were sealed and
+quarantined, and all source-project hashes and mtimes remained unchanged.
+
 The focused `modification_policy_9` profile reuses the existing
 `OBJ22-F-CREATE-01` fixture, runner, broker, lifecycle, and business oracle. It
 runs `read_only`, `ask_before_changes`, and `allow_changes` three times each:
@@ -191,6 +225,7 @@ The separately approved V3 executable profiles are:
 | --- | ---: | ---: | --- |
 | `heavy_cross_version_80` | 80 | 145 | Real sandboxed business-oracle coverage for the 16 implemented heavy APIs |
 | `compound_heavy_cross_version_24` | 24 | 48 | Complex batch composition and real business assertions on Wwise 2022.1 and 2025.1 |
+| `integration_workflows_cross_version_6` | 6 | 20 | Three prewritten cross-operation integration workflows on Wwise 2022.1 and 2025.1; no additional per-API coverage credit |
 | `modification_policy_9` | 9 | 15 | Three isolated repetitions of each canonical project-modification policy on one reviewed object.create business case |
 
 From the repository root, run each profile into a distinct campaign directory.
@@ -203,13 +238,14 @@ skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py -
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile full_cross_version_168 --campaign-root skills/waapi-skill-workspace/campaign-full-cross-version-168
 ```
 
-Run the approved heavy profile with the explicitly reviewed lower-cost model
-settings, or start with one pilot case:
+Run the approved executable profiles with their reviewed settings; the heavy
+profile also supports the bounded pilot selection shown below:
 
 ```bash
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile heavy_cross_version_80 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-heavy-v3-terra
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile heavy_cross_version_80 --case-id OBJ22-F-GET-01 --version 2022.1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-heavy-v3-pilot-object-get
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile compound_heavy_cross_version_24 --suite tests/semantic/data/compound-heavy-v1/profile.json --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-compound-heavy-v1
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile integration_workflows_cross_version_6 --suite tests/semantic/data/integration-workflows-v1/profile.json --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-integration-workflows-v1-terra
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile modification_policy_9 --campaign-root skills/waapi-skill-workspace/campaign-modification-policy-9
 ```
 

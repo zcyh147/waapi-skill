@@ -148,6 +148,12 @@ from tests.semantic.support.codex_soundbank_runtime_v3 import (  # noqa: E402
     PROCESS_REFUSAL_ERROR_CODE,
     SOUNDBANK_TOPIC,
 )
+from tests.semantic.support.codex_workflow_business_plan_v3 import (  # noqa: E402
+    WORKFLOW_FIXTURE_KIND,
+    WorkflowBusinessPlanError,
+    WorkflowBusinessPlanSections,
+    parse_workflow_business_plan_sections,
+)
 from tests.semantic.support.codex_object_heavy_v3 import (  # noqa: E402
     ObjectHeavyRecipeError,
     build_object_heavy_v3_recipe,
@@ -192,6 +198,7 @@ from tests.semantic.support.codex_gateway_broker import (  # noqa: E402
     SemanticJsonArgument,
     VALIDATED_SUBSCRIPTION_ACK_CONTRACT,
     resolve_gateway_invocation,
+    gateway_step_sequence_matches,
     validate_transaction_show_confirmation_payload,
 )
 from tests.semantic.support.codex_transaction_seal import (  # noqa: E402
@@ -217,9 +224,16 @@ EXIT_INTERRUPTED = 130
 HEAVY_V3_PROFILE_ID = matrix.HEAVY_V3_PROFILE_ID
 MODIFICATION_POLICY_V3_PROFILE_ID = matrix.MODIFICATION_POLICY_V3_PROFILE_ID
 COMPOUND_HEAVY_V1_PROFILE_ID = matrix.COMPOUND_HEAVY_V1_PROFILE_ID
+INTEGRATION_WORKFLOWS_V1_PROFILE_ID = (
+    matrix.INTEGRATION_WORKFLOWS_V1_PROFILE_ID
+)
 EXECUTABLE_V3_PROFILE_IDS = matrix.EXECUTABLE_V3_PROFILE_IDS
 TERRA_LOCKED_V3_PROFILE_IDS = frozenset(
-    {MODIFICATION_POLICY_V3_PROFILE_ID, COMPOUND_HEAVY_V1_PROFILE_ID}
+    {
+        MODIFICATION_POLICY_V3_PROFILE_ID,
+        COMPOUND_HEAVY_V1_PROFILE_ID,
+        INTEGRATION_WORKFLOWS_V1_PROFILE_ID,
+    }
 )
 HEAVY_V3_EFFECTIVE_CONTRACT = "waapi-skill.codex-semantic-campaign-effective/v3"
 HEAVY_V3_PHASE = "scenario"
@@ -324,6 +338,7 @@ class HeavyV3PromptEvidence:
         | AudioMediaBusinessPlanSections
         | SoundBankBusinessPlanSections
         | CliBusinessPlanSections
+        | WorkflowBusinessPlanSections
         | None
     )
 
@@ -2645,7 +2660,7 @@ def _validate_heavy_v3_retryable_task_failure(
     )
     expected_prompts = prompt_evidence.prompts
     protocol = prompt_evidence.provenance.protocol
-    required_reference = _heavy_v3_required_reference(expected_unit)
+    expected_skill_reads = _heavy_v3_expected_skill_reads(expected_unit)
 
     prompt = _load_strict_regular_text(failed_turn_root / "prompt.txt")
     if (
@@ -2717,7 +2732,7 @@ def _validate_heavy_v3_retryable_task_failure(
             expected_broker_prefix=expected_prefix,
             expected_steps=protocol.steps[previous_validated_prefix:expected_prefix],
             version=str(getattr(expected_unit, "version", "")),
-            required_reference=required_reference,
+            expected_skill_reads=expected_skill_reads[index - 1],
             prompt_provenance=prompt_evidence.provenance,
         )
         prior_gateway_records.extend(turn_gateway_records)
@@ -2955,6 +2970,24 @@ def _validate_heavy_v3_retryable_failed_facts(
             )
 
 
+def _steps_in_consumed_order(
+    canonical_steps: Sequence[Any],
+    consumed_names: Sequence[str],
+) -> tuple[Any, ...]:
+    """Resolve one already-validated protocol linearization by exact name."""
+
+    by_name = {step.name: step for step in canonical_steps}
+    if (
+        len(by_name) != len(canonical_steps)
+        or len(consumed_names) != len(canonical_steps)
+        or any(name not in by_name for name in consumed_names)
+    ):
+        raise CampaignEvidenceError(
+            "broker consumed names cannot linearize the sealed protocol"
+        )
+    return tuple(by_name[name] for name in consumed_names)
+
+
 def _validate_heavy_v3_retryable_partial_broker(
     value: Any,
     *,
@@ -2967,7 +3000,7 @@ def _validate_heavy_v3_retryable_partial_broker(
     version: str,
     expected_project_modification_policy: str | None = None,
 ) -> None:
-    if not isinstance(value, Mapping) or set(value) != {
+    top_keys = {
         "expected_step_names",
         "consumed_step_names",
         "records",
@@ -2977,7 +3010,18 @@ def _validate_heavy_v3_retryable_partial_broker(
         "terminal_state",
         "complete",
         "passed",
-    }:
+    }
+    expected_groups = [
+        list(group)
+        for group in getattr(
+            protocol,
+            "commutative_read_only_step_groups",
+            (),
+        )
+    ]
+    if expected_groups:
+        top_keys.add("commutative_read_only_step_groups")
+    if not isinstance(value, Mapping) or set(value) != top_keys:
         raise CampaignEvidenceError(
             "retryable heavy partial broker evidence has an invalid shape"
         )
@@ -2998,7 +3042,14 @@ def _validate_heavy_v3_retryable_partial_broker(
         or len(expected_names) != len(set(expected_names))
         or failed_prefix > len(expected_names)
         or value.get("expected_step_names") != expected_names
-        or consumed_names != expected_names[:previous_prefix]
+        or not isinstance(consumed_names, list)
+        or not gateway_step_sequence_matches(
+            expected_names[:previous_prefix],
+            consumed_names,
+            expected_groups,
+        )
+        or value.get("commutative_read_only_step_groups", [])
+        != expected_groups
         or not isinstance(records, list)
         or len(records) != previous_prefix
         or len(command_records) != previous_prefix
@@ -3011,7 +3062,10 @@ def _validate_heavy_v3_retryable_partial_broker(
     _validate_heavy_v3_broker_records(
         records,
         task_root=task_root,
-        steps=protocol.steps[:previous_prefix],
+        steps=_steps_in_consumed_order(
+            protocol.steps[:previous_prefix],
+            consumed_names,
+        ),
         command_records=command_records,
         options=options,
         version=version,
@@ -3508,6 +3562,11 @@ def _heavy_v3_topic_publisher_request_count(
 
 
 def _heavy_v3_required_reference(expected_unit: Any) -> str:
+    if (
+        _heavy_v3_integration_workflow_id(expected_unit)
+        == "alarm_diagnose_and_repair"
+    ):
+        return "references/waapi-query.md"
     scenario = getattr(expected_unit, "scenario", None)
     api = getattr(scenario, "api", None)
     item_type = getattr(scenario, "item_type", None)
@@ -3519,6 +3578,74 @@ def _heavy_v3_required_reference(expected_unit: Any) -> str:
     if isinstance(api, str) and api:
         return "references/waapi-operate.md"
     raise CampaignEvidenceError("heavy scenario has no exact Skill reference lane")
+
+
+def _heavy_v3_expected_skill_reads(
+    expected_unit: Any,
+) -> tuple[tuple[str, ...], ...]:
+    """Derive the closed lane-reference schedule from reviewed unit identity."""
+
+    turn_count = getattr(expected_unit, "user_turn_count", None)
+    if type(turn_count) is not int or turn_count < 1:
+        raise CampaignEvidenceError(
+            "heavy unit has no closed reference-read turn topology"
+        )
+    required_reference = _heavy_v3_required_reference(expected_unit)
+    if (
+        _heavy_v3_integration_workflow_id(expected_unit)
+        == "alarm_diagnose_and_repair"
+    ):
+        if turn_count != 3:
+            raise CampaignEvidenceError(
+                "Alarm reference-read schedule requires exactly three turns"
+            )
+        lane_schedule = (
+            ("references/waapi-query.md",),
+            ("references/waapi-operate.md",),
+            (),
+        )
+    else:
+        lane_schedule = (
+            ((required_reference,),) + ((),) * (turn_count - 1)
+        )
+    return (
+        ("SKILL.md", *lane_schedule[0]),
+        *lane_schedule[1:],
+    )
+
+
+_ALARM_REVIEWED_TURN_KINDS = (
+    "diagnosis_request",
+    "change_request",
+    "confirmation",
+)
+
+
+def _heavy_v3_receipt_kind_for_reviewed_turn(
+    expected_unit: Any,
+    turn: Any,
+    *,
+    index: int,
+) -> str:
+    """Map one closed reviewed turn kind to its generic receipt kind."""
+
+    receipt_kind = "request" if index == 1 else "confirmation"
+    if (
+        _heavy_v3_integration_workflow_id(expected_unit)
+        == "alarm_diagnose_and_repair"
+    ):
+        reviewed_kind = (
+            _ALARM_REVIEWED_TURN_KINDS[index - 1]
+            if 1 <= index <= len(_ALARM_REVIEWED_TURN_KINDS)
+            else None
+        )
+    else:
+        reviewed_kind = receipt_kind
+    if getattr(turn, "kind", None) != reviewed_kind:
+        raise CampaignEvidenceError(
+            "heavy reviewed turn plan has an invalid request/confirmation order"
+        )
+    return receipt_kind
 
 
 def _validate_heavy_v3_prompt_materialization(
@@ -3654,12 +3781,11 @@ def _validate_heavy_v3_prompt_materialization(
             raise CampaignEvidenceError(
                 "heavy reviewed turn plan has non-contiguous indices"
             )
-        kind = getattr(turn, "kind", None)
-        expected_kind = "request" if index == 1 else "confirmation"
-        if kind != expected_kind:
-            raise CampaignEvidenceError(
-                "heavy reviewed turn plan has an invalid request/confirmation order"
-            )
+        expected_kind = _heavy_v3_receipt_kind_for_reviewed_turn(
+            expected_unit,
+            turn,
+            index=index,
+        )
         prompt = provenance.prompts[index - 1]
         reviewed_prompt = (
             provenance.prompts[0]
@@ -3769,7 +3895,7 @@ def _validate_heavy_v3_task_result(
     gateway_records: list[Mapping[str, Any]] = []
     previous_prefix = 0
     protocol = prompt_evidence.provenance.protocol
-    required_reference = _heavy_v3_required_reference(expected_unit)
+    expected_skill_reads = _heavy_v3_expected_skill_reads(expected_unit)
     for index, grade in enumerate(turn_grades, start=1):
         turn_root = turns_root / f"turn-{index:02d}"
         expected_prefix = (
@@ -3799,7 +3925,7 @@ def _validate_heavy_v3_task_result(
             expected_broker_prefix=expected_prefix,
             expected_steps=protocol.steps[previous_prefix:expected_prefix],
             version=str(getattr(expected_unit, "version", "")),
-            required_reference=required_reference,
+            expected_skill_reads=expected_skill_reads[index - 1],
             prompt_provenance=prompt_evidence.provenance,
         )
         gateway_records.extend(turn_gateway_records)
@@ -3847,6 +3973,16 @@ def _validate_heavy_v3_broker_result(
         "complete",
         "passed",
     }
+    expected_groups = [
+        list(group)
+        for group in getattr(
+            protocol,
+            "commutative_read_only_step_groups",
+            (),
+        )
+    ]
+    if expected_groups:
+        top_keys.add("commutative_read_only_step_groups")
     if not isinstance(value, Mapping) or set(value) != top_keys:
         raise CampaignEvidenceError("passing heavy task broker evidence is malformed")
     expected_names = [step.name for step in protocol.steps]
@@ -3869,7 +4005,14 @@ def _validate_heavy_v3_broker_result(
         != ("COMPLETE" if complete_expected else "RUNNING")
         or not expected_names
         or value.get("expected_step_names") != expected_names
-        or consumed_names != expected_names[:consumed_count]
+        or not isinstance(consumed_names, list)
+        or not gateway_step_sequence_matches(
+            expected_names[:consumed_count],
+            consumed_names,
+            expected_groups,
+        )
+        or value.get("commutative_read_only_step_groups", [])
+        != expected_groups
         or len(expected_names) != len(set(expected_names))
         or not isinstance(records, list)
         or len(records) != consumed_count
@@ -3886,7 +4029,10 @@ def _validate_heavy_v3_broker_result(
     _validate_heavy_v3_broker_records(
         records,
         task_root=task_root,
-        steps=protocol.steps[:consumed_count],
+        steps=_steps_in_consumed_order(
+            protocol.steps[:consumed_count],
+            consumed_names,
+        ),
         command_records=command_records,
         options=options,
         version=version,
@@ -4348,7 +4494,7 @@ def _validate_heavy_v3_turn_grade(
     expected_broker_prefix: int,
     expected_steps: Sequence[Any],
     version: str,
-    required_reference: str,
+    expected_skill_reads: Sequence[str],
     prompt_provenance: PromptProvenanceEvidence,
 ) -> tuple[Mapping[str, Any], ...]:
     if not isinstance(value, Mapping) or set(value) != {
@@ -4423,7 +4569,7 @@ def _validate_heavy_v3_turn_grade(
         options=options,
         expected_steps=expected_steps,
         version=version,
-        required_reference=required_reference,
+        expected_skill_reads=expected_skill_reads,
         archived_common_gates=common_gates,
         prompt_provenance=prompt_provenance,
     )
@@ -4446,7 +4592,7 @@ def _validate_heavy_v3_codex_facts(
     options: CampaignOptions,
     expected_steps: Sequence[Any],
     version: str,
-    required_reference: str,
+    expected_skill_reads: Sequence[str],
     archived_common_gates: Mapping[str, Any],
     prompt_provenance: PromptProvenanceEvidence,
 ) -> tuple[Mapping[str, Any], ...]:
@@ -4603,9 +4749,7 @@ def _validate_heavy_v3_codex_facts(
     records = classified.command_records
     allowed_reads = tuple(classified.allowed_read_commands)
     read_files = tuple(classified.skill_read_files)
-    expected_reads = (
-        ("SKILL.md", required_reference) if turn_index == 1 else ()
-    )
+    expected_reads = tuple(expected_skill_reads)
     gateway_attempt_records = tuple(
         record
         for record in records
@@ -4796,6 +4940,17 @@ def _heavy_v3_business_plan_fixture_spec(
     kind = fixture_spec.get("kind")
     scenario = getattr(expected_unit, "scenario", None)
     api = getattr(scenario, "api", None)
+    if _heavy_v3_integration_workflow_id(expected_unit) is not None:
+        digest = fixture_spec.get("sha256")
+        if (
+            kind != WORKFLOW_FIXTURE_KIND
+            or not isinstance(digest, str)
+            or _SHA256_RE.fullmatch(digest) is None
+        ):
+            raise CampaignEvidenceError(
+                "integration workflow business-oracle fixture identity is invalid"
+            )
+        return {"kind": str(kind), "sha256": digest}
     typed_kinds = {
         "ak.wwise.core.object.get": "object_materialized_v1",
         "ak.wwise.core.object.create": "object_materialized_v1",
@@ -4884,10 +5039,11 @@ def _validate_heavy_v3_typed_business_plan(
     ObjectBusinessPlanSections
     | ImportBusinessPlanSections
     | AudioMediaBusinessPlanSections
-    | SoundBankBusinessPlanSections
-    | CliBusinessPlanSections
-    | None
-):
+        | SoundBankBusinessPlanSections
+        | CliBusinessPlanSections
+        | WorkflowBusinessPlanSections
+        | None
+    ):
     """Parse and independently validate one supported family plan archive."""
 
     scenario = getattr(expected_unit, "scenario", None)
@@ -4899,8 +5055,18 @@ def _validate_heavy_v3_typed_business_plan(
         | AudioMediaBusinessPlanSections
         | SoundBankBusinessPlanSections
         | CliBusinessPlanSections
+        | WorkflowBusinessPlanSections
         | None
     )
+    workflow_id = _heavy_v3_integration_workflow_id(expected_unit)
+    if workflow_id is not None:
+        sections = parse_workflow_business_plan_sections(plan_value)
+        _validate_integration_workflow_business_plan(
+            sections,
+            expected_unit=expected_unit,
+            provenance=provenance,
+        )
+        return sections
     if api in {
         "ak.wwise.core.object.get",
         "ak.wwise.core.object.create",
@@ -5060,6 +5226,280 @@ def _heavy_v3_plan_json_value(value: Any) -> Any:
     if isinstance(value, Path):
         return str(value)
     return repr(value)
+
+
+def _heavy_v3_integration_workflow_id(expected_unit: Any) -> str | None:
+    value = getattr(expected_unit, "workflow_id", None)
+    if value in {
+        "interactive_weather_build",
+        "alarm_diagnose_and_repair",
+        "harbor_soundbank_release",
+    }:
+        return str(value)
+    scenario = getattr(expected_unit, "scenario", None)
+    value = getattr(scenario, "scenario_family", None)
+    if value in {
+        "interactive_weather_build",
+        "alarm_diagnose_and_repair",
+        "harbor_soundbank_release",
+    }:
+        return str(value)
+    return None
+
+
+def _validate_integration_workflow_business_plan(
+    sections: WorkflowBusinessPlanSections,
+    *,
+    expected_unit: Any,
+    provenance: PromptProvenanceEvidence,
+) -> None:
+    """Rebind a workflow plan to frozen profile topology and protocol evidence."""
+
+    workflow_id = _heavy_v3_integration_workflow_id(expected_unit)
+    if workflow_id is None:
+        raise CampaignEvidenceError(
+            "workflow plan reached a non-integration expected unit"
+        )
+    static = sections.static_expectation
+    live = sections.live_binding
+    if (
+        static.get("workflow_id") != workflow_id
+        or live.get("workflow_id") != workflow_id
+    ):
+        raise CampaignEvidenceError(
+            "integration workflow plan identity differs from the frozen unit"
+        )
+    transactions = static.get("transactions")
+    expected_transactions = tuple(getattr(expected_unit, "transactions", ()))
+    if (
+        not isinstance(transactions, (list, tuple))
+        or len(transactions) != len(expected_transactions)
+    ):
+        raise CampaignEvidenceError(
+            "integration workflow transaction count differs from the frozen unit"
+        )
+    weather_phases = (
+        "import_weather_assets",
+        "configure_event_actions",
+        "bind_rain_intensity_rtpc",
+    )
+    if (
+        workflow_id == "interactive_weather_build"
+        and len(expected_transactions) != len(weather_phases)
+    ):
+        raise CampaignEvidenceError(
+            "interactive weather transaction phases differ from the frozen workflow"
+        )
+    expected_transaction_rows: list[dict[str, Any]] = []
+    for index, (row, expected) in enumerate(
+        zip(transactions, expected_transactions, strict=True),
+        start=1,
+    ):
+        expected_row = {
+            "transaction_id": f"tx{index:02d}",
+            "api": getattr(expected, "api", None),
+            "operation": getattr(expected, "operation", None),
+            "phase": (
+                weather_phases[index - 1]
+                if workflow_id == "interactive_weather_build"
+                else f"{workflow_id}.transaction_{index:02d}"
+            ),
+            "primary_step": f"tx{index:02d}.execute",
+        }
+        expected_transaction_rows.append(expected_row)
+        if not isinstance(row, Mapping) or dict(row) != expected_row:
+            raise CampaignEvidenceError(
+                "integration workflow transaction topology drifted"
+            )
+    steps = static.get("workflow_steps")
+    transaction_by_id = {
+        row["transaction_id"]: row for row in expected_transaction_rows
+    }
+    transaction_step_kind = {
+        "operation-schema": "operation_schema",
+        "preview": "preview",
+        "transaction-show": "transaction_show",
+        "confirm": "confirm",
+        "execute": "execute",
+        "verify": "verify",
+    }
+    expected_step_rows: list[dict[str, Any]] = []
+    expected_diagnostic_rows: list[dict[str, Any]] = []
+    for step in provenance.protocol.steps:
+        transaction_id = (
+            step.name.split(".", 1)[0]
+            if step.name.startswith("tx")
+            else None
+        )
+        transaction = transaction_by_id.get(transaction_id)
+        if (
+            transaction is not None
+            and step.subcommand in transaction_step_kind
+        ):
+            expected_step_rows.append(
+                {
+                    "name": step.name,
+                    "kind": transaction_step_kind[step.subcommand],
+                    "phase": transaction["phase"],
+                    "transaction_id": transaction_id,
+                    "api": transaction["api"],
+                }
+            )
+            continue
+        is_diagnostic = (
+            workflow_id == "alarm_diagnose_and_repair"
+            and transaction_id is None
+            and step.subcommand == "query-object"
+        )
+        phase = (
+            f"{workflow_id}.diagnosis"
+            if is_diagnostic
+            else (
+                transaction["phase"]
+                if (
+                    workflow_id == "interactive_weather_build"
+                    and transaction is not None
+                )
+                else f"{workflow_id}.checkpoint"
+            )
+        )
+        expected_step_rows.append(
+            {
+                "name": step.name,
+                "kind": "diagnostic" if is_diagnostic else "checkpoint",
+                "phase": phase,
+                "transaction_id": None,
+                "api": (
+                    "ak.wwise.core.object.get"
+                    if is_diagnostic
+                    else None
+                ),
+            }
+        )
+        if is_diagnostic:
+            expectation = {
+                "gateway_step": step.name,
+                "bounded_live_read": True,
+            }
+            expected_diagnostic_rows.append(
+                {
+                    "evidence_id": f"{step.name}.bounded-read",
+                    "step": step.name,
+                    "api": "ak.wwise.core.object.get",
+                    "phase": phase,
+                    "expectation": expectation,
+                    "expectation_sha256": hashlib.sha256(
+                        canonical_json_bytes(expectation)
+                    ).hexdigest(),
+                }
+            )
+    expected_step_rows.append(
+        {
+            "name": "cleanup.success",
+            "kind": "cleanup",
+            "phase": (
+                "cleanup"
+                if workflow_id == "interactive_weather_build"
+                else f"{workflow_id}.cleanup"
+            ),
+            "transaction_id": None,
+            "api": None,
+        }
+    )
+    if (
+        not isinstance(steps, (list, tuple))
+        or [dict(row) for row in steps if isinstance(row, Mapping)]
+        != expected_step_rows
+        or len(steps) != len(expected_step_rows)
+    ):
+        raise CampaignEvidenceError(
+            "integration workflow plan steps differ from sealed broker protocol"
+        )
+    diagnostic_rows = static.get("diagnostic_evidence")
+    if (
+        not isinstance(diagnostic_rows, (list, tuple))
+        or [
+            dict(row)
+            for row in diagnostic_rows
+            if isinstance(row, Mapping)
+        ]
+        != expected_diagnostic_rows
+        or len(diagnostic_rows) != len(expected_diagnostic_rows)
+    ):
+        raise CampaignEvidenceError(
+            "integration diagnostic evidence differs from sealed broker protocol"
+        )
+    primary_steps = sections.payload_bindings.get("primary_steps")
+    if not isinstance(primary_steps, (list, tuple)) or list(primary_steps) != [
+        f"tx{index:02d}.execute"
+        for index in range(1, len(expected_transactions) + 1)
+    ]:
+        raise CampaignEvidenceError(
+            "integration workflow primary steps differ from its transactions"
+        )
+    bindings = live.get("bindings")
+    if (
+        not isinstance(bindings, Mapping)
+        or bindings.get("version") != getattr(expected_unit, "version", None)
+    ):
+        raise CampaignEvidenceError(
+            "integration workflow live binding has another Wwise version"
+        )
+    visible_values = dict(provenance.visible_values)
+    if "visible_values" in bindings:
+        if (
+            set(bindings) != {"version", "visible_values"}
+            or bindings.get("visible_values") != visible_values
+        ):
+            raise CampaignEvidenceError(
+                "integration workflow live values differ from sealed prompt provenance"
+            )
+    elif workflow_id == "interactive_weather_build":
+        weather_root = bindings.get("weather_root")
+        event_root = bindings.get("event_root")
+        weather_bus = bindings.get("weather_bus")
+        rain_parameter = bindings.get("rain_parameter")
+        source_files = bindings.get("source_files")
+        source_directory = visible_values.get("weather_source_directory")
+        if (
+            set(bindings)
+            != {
+                "version",
+                "weather_root",
+                "event_root",
+                "weather_bus",
+                "rain_parameter",
+                "source_files",
+                "metadata",
+            }
+            or not isinstance(weather_root, Mapping)
+            or weather_root.get("path")
+            != visible_values.get("weather_root_path")
+            or not isinstance(event_root, Mapping)
+            or event_root.get("path")
+            != visible_values.get("weather_event_root_path")
+            or not isinstance(weather_bus, Mapping)
+            or weather_bus.get("path")
+            != visible_values.get("weather_bus_path")
+            or not isinstance(rain_parameter, Mapping)
+            or rain_parameter.get("path")
+            != visible_values.get("weather_game_parameter_path")
+            or not isinstance(source_files, Mapping)
+            or not isinstance(source_directory, str)
+            or any(
+                not isinstance(proof, Mapping)
+                or Path(str(proof.get("path", ""))).parent
+                != Path(source_directory)
+                for proof in source_files.values()
+            )
+        ):
+            raise CampaignEvidenceError(
+                "interactive weather live values differ from sealed prompt provenance"
+            )
+    else:
+        raise CampaignEvidenceError(
+            "integration workflow live values omit sealed prompt provenance"
+        )
 
 
 def _revalidate_modification_policy_natural_behavior(
@@ -5286,6 +5726,67 @@ def _validate_heavy_v3_pass_checks(
         or primary.get("dispatch_count") != primary_count
     ):
         raise CampaignEvidenceError("passing project primary-dispatch proof is invalid")
+    workflow_id = _heavy_v3_integration_workflow_id(expected_unit)
+    if workflow_id is not None:
+        expected_dispatches: dict[str, int] = {}
+        for transaction in getattr(expected_unit, "transactions", ()):
+            transaction_api = getattr(transaction, "api", None)
+            if not isinstance(transaction_api, str):
+                raise CampaignEvidenceError(
+                    "integration workflow transaction has no API identity"
+                )
+            expected_dispatches[transaction_api] = (
+                expected_dispatches.get(transaction_api, 0) + 1
+            )
+        workflow_dispatch = checks.get("workflow_dispatch")
+        if (
+            not isinstance(workflow_dispatch, Mapping)
+            or set(workflow_dispatch)
+            != {"expected", "observed", "total_expected_dispatches"}
+            or workflow_dispatch.get("expected") != expected_dispatches
+            or workflow_dispatch.get("observed") != expected_dispatches
+            or workflow_dispatch.get("total_expected_dispatches")
+            != sum(expected_dispatches.values())
+        ):
+            raise CampaignEvidenceError(
+                "passing integration workflow lacks its exact mutation dispatch vector"
+            )
+        required_turn_oracles = (
+            int(getattr(expected_unit, "user_turn_count", 0))
+            if workflow_id
+            in {"interactive_weather_build", "alarm_diagnose_and_repair"}
+            else 0
+        )
+        for turn_index in range(1, required_turn_oracles + 1):
+            _validate_heavy_v3_archived_verification(
+                checks.get(f"turn_{turn_index:02d}_workflow"),
+                api=api,
+                scenario_id=_heavy_v3_base_scenario_id(expected_unit),
+                version=str(expected_row["version"]),
+                runner=runner,
+                primary_count=primary_count,
+                task_root=task_root,
+                prompt_evidence=prompt_evidence,
+                scenario_fixture=getattr(scenario, "fixture", {}),
+                label=f"integration turn {turn_index} oracle",
+            )
+        if "runtime_cleanup" not in checks:
+            raise CampaignEvidenceError(
+                "passing integration workflow lacks successful owned cleanup"
+            )
+        _validate_heavy_v3_archived_verification(
+            checks.get("business_verification"),
+            api=api,
+            scenario_id=_heavy_v3_base_scenario_id(expected_unit),
+            version=str(expected_row["version"]),
+            runner=runner,
+            primary_count=primary_count,
+            task_root=task_root,
+            prompt_evidence=prompt_evidence,
+            scenario_fixture=getattr(scenario, "fixture", {}),
+            label="integration workflow business oracle",
+        )
+        return
     if primary_count == 0:
         if (
             getattr(
@@ -5410,6 +5911,8 @@ def _validate_heavy_v3_archived_verification(
         task_root=task_root,
         label=label,
     )
+    if isinstance(prompt_evidence.typed_sections, WorkflowBusinessPlanSections):
+        return
 
     if api in {
         "ak.wwise.core.object.get",
@@ -5533,6 +6036,7 @@ def _validate_heavy_v3_typed_archived_verification(
         | AudioMediaBusinessPlanSections
         | SoundBankBusinessPlanSections
         | CliBusinessPlanSections
+        | WorkflowBusinessPlanSections
         | None
     ),
     verification: Any,
@@ -5602,6 +6106,13 @@ def _validate_heavy_v3_typed_archived_verification(
                 )
             validate_cli_archived_verification(sections, verification)
             return
+        if isinstance(sections, WorkflowBusinessPlanSections):
+            _validate_integration_workflow_verification(
+                sections,
+                verification,
+                label=label,
+            )
+            return
         if api in {
             "ak.wwise.core.object.get",
             "ak.wwise.core.object.create",
@@ -5629,10 +6140,142 @@ def _validate_heavy_v3_typed_archived_verification(
         ImportBusinessPlanError,
         ObjectBusinessPlanError,
         SoundBankBusinessPlanError,
+        WorkflowBusinessPlanError,
     ) as exc:
         raise CampaignEvidenceError(
             f"{label} typed plan/evidence binding is invalid: {exc}"
         ) from exc
+
+
+def _validate_integration_workflow_verification(
+    sections: WorkflowBusinessPlanSections,
+    verification: Any,
+    *,
+    label: str,
+) -> None:
+    if not isinstance(verification, Mapping):
+        raise CampaignEvidenceError(
+            f"{label} integration verification is not an object"
+        )
+    keys = set(verification)
+    weather_keys = {
+        "workflow_id",
+        "phase",
+        "passed",
+        "failures",
+        "evidence",
+    }
+    alarm_keys = {
+        "phase",
+        "passed",
+        "failures",
+        "before",
+        "after",
+        "changed_fields",
+    }
+    harbor_keys = {
+        "phase",
+        "passed",
+        "failures",
+        "before",
+        "after",
+        "evidence",
+    }
+    workflow_id = sections.static_expectation.get("workflow_id")
+    expected_keys = {
+        "interactive_weather_build": weather_keys,
+        "alarm_diagnose_and_repair": alarm_keys,
+        "harbor_soundbank_release": harbor_keys,
+    }.get(workflow_id)
+    if expected_keys is None or keys != expected_keys:
+        raise CampaignEvidenceError(
+            f"{label} integration verification schema is not closed for "
+            f"{workflow_id}"
+        )
+    phase = verification.get("phase")
+    failures = verification.get("failures")
+    if (
+        not isinstance(phase, str)
+        or not phase
+        or verification.get("passed") is not True
+        or not isinstance(failures, (list, tuple))
+        or failures
+    ):
+        raise CampaignEvidenceError(
+            f"{label} integration verification did not pass cleanly"
+        )
+    if workflow_id == "interactive_weather_build":
+        if (
+            verification.get("workflow_id") != workflow_id
+            or phase
+            not in {
+                "turn_01_preview_only",
+                "turn_02",
+                "turn_03",
+                "turn_04",
+                "workflow_complete",
+            }
+            or not isinstance(verification.get("evidence"), Mapping)
+            or not verification["evidence"]
+        ):
+            raise CampaignEvidenceError(
+                f"{label} weather verification identity, phase, or evidence is invalid"
+            )
+        return
+    before = verification.get("before")
+    after = verification.get("after")
+    if workflow_id == "alarm_diagnose_and_repair":
+        changed = verification.get("changed_fields")
+        if not isinstance(changed, (list, tuple)):
+            raise CampaignEvidenceError(
+                f"{label} Alarm changed-field evidence is invalid"
+            )
+        if phase in {"diagnosis_read_only", "preview_no_change"}:
+            if changed:
+                raise CampaignEvidenceError(
+                    f"{label} Alarm read-only/preview phase changed state"
+                )
+        elif phase == "after_repair":
+            if list(changed) != ["sound.details.output_bus_id"]:
+                raise CampaignEvidenceError(
+                    f"{label} Alarm repair delta is not OutputBus-only"
+                )
+        else:
+            raise CampaignEvidenceError(
+                f"{label} Alarm verification phase is unreviewed"
+            )
+    elif phase not in {"tx01.verify", "final"}:
+        raise CampaignEvidenceError(
+            f"{label} Harbor verification phase or evidence is invalid"
+        )
+    if (
+        not isinstance(before, Mapping)
+        or not before
+        or not isinstance(after, Mapping)
+        or not after
+    ):
+        raise CampaignEvidenceError(
+            f"{label} integration before/after snapshots are unavailable"
+        )
+    if workflow_id == "alarm_diagnose_and_repair":
+        if phase in {"diagnosis_read_only", "preview_no_change"}:
+            if before != after:
+                raise CampaignEvidenceError(
+                    f"{label} Alarm read-only/preview phase changed state"
+                )
+        elif before == after:
+                raise CampaignEvidenceError(
+                    f"{label} Alarm repair delta is not OutputBus-only"
+                )
+        return
+    if (
+        not isinstance(verification.get("evidence"), Mapping)
+        or not verification["evidence"]
+        or before == after
+    ):
+        raise CampaignEvidenceError(
+            f"{label} Harbor verification phase or evidence is invalid"
+        )
 
 
 def _heavy_v3_broker_refusal_error_code(
@@ -10902,6 +11545,7 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     is_executable_v3 = args.profile in EXECUTABLE_V3_PROFILE_IDS
     is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
     is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
+    is_integration_v1 = args.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID
     is_terra_v3 = args.profile in TERRA_LOCKED_V3_PROFILE_IDS
     if args.verify_only and not args.resume:
         parser.error("--verify-only requires --resume")
@@ -10926,11 +11570,11 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
             parser.error(
                 "unknown v2 --case-id values: " + ", ".join(unknown_case_ids)
             )
-    if is_compound_v1 and any(
+    if (is_compound_v1 or is_integration_v1) and any(
         version not in {"2022.1", "2025.1"} for version in args.version
     ):
         parser.error(
-            f"{COMPOUND_HEAVY_V1_PROFILE_ID} supports only "
+            f"{args.profile} supports only "
             "--version 2022.1 and 2025.1"
         )
     model = args.model or (
@@ -10952,7 +11596,11 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         (
             matrix.DEFAULT_MODIFICATION_POLICY_V3_SUITE
             if is_policy_v3
-            else matrix.DEFAULT_COMPOUND_HEAVY_V1_SUITE
+            else (
+                matrix.DEFAULT_INTEGRATION_WORKFLOWS_V1_SUITE
+                if is_integration_v1
+                else matrix.DEFAULT_COMPOUND_HEAVY_V1_SUITE
+            )
         )
         if is_terra_v3
         else (matrix.DEFAULT_V3_SUITE if is_executable_v3 else matrix.DEFAULT_SUITE)

@@ -55,6 +55,11 @@ for Wwise Authoring. Read this file before changing the Skill or running tests.
     `transaction_runtime.py`, `transaction_cleanup.py`, `io_policy.py`,
     `dispatcher.py`, `subscriptions.py`, `metadata_discovery.py`,
     `metadata_cache.py`, and the semantic builders.
+  - `operation_registry.py` is the authoritative Gateway entrypoint for
+    structured operation contracts. Builder or dispatcher support alone does
+    not expose an operation: its public request shape, version scope, safety
+    behavior, and verification boundary must be present through this registry
+    and the Gateway `operation-schema` path.
 - `skills/waapi-skill/resources/manifest/<version>/`
   - reflected Console functions, topics, schemas, immutable inventory
     metadata, and the narrow `authoring-ui-commands-supplement.json` and
@@ -95,6 +100,31 @@ The packaged `skills/waapi-skill/references/semantic/` tree is the sole canonica
 human-readable source evidence for the five version lanes. There is no separate
 repository-root reference mirror. NotebookLM may be used to refresh offline
 source material, but it must never become a runtime dependency.
+
+## Adding a Wwise version
+
+Keep a new-version change small but complete. Do not copy a prior lane and call
+it supported without proving the reflected and executable surfaces:
+
+1. Reflect the matching WwiseConsole functions, topics, and schemas; collect the
+   narrow Authoring UI-command supplement separately when that overlay is in
+   scope.
+2. Add the versioned manifest inventory and required deferred, metadata,
+   semantic, and WAQL resources, with immutable counts and digests derived from
+   the new reflection.
+3. Classify every new or changed route in its execution lane and update the
+   capability, execution-contract, operation registry, adapter registry,
+   request-mapping registry, and native-surface policy entries that actually
+   apply. A structured mutation is not public until `operation_registry.py`
+   exposes its closed contract.
+4. Update README coverage and test-inventory documentation only from generated
+   inventories and completed runs; distinguish a reflected route, a
+   program-tested route, and real execution evidence.
+5. Run focused tests and extend the full supported-version program gate first,
+   then run the matching live and destructive lanes. Add a targeted fresh-Codex
+   semantic case only where routing, prompt behavior, or a new integration
+   boundary needs agent evidence. Run real versions sequentially and record
+   blocked prerequisites instead of treating them as passes.
 
 ## Configuration and local state
 
@@ -278,6 +308,26 @@ The official profiles are `screening` (40 sessions), `formal_98` (98), and
 requests that expense or a release criterion requires them. A partial, quota-
 blocked, or infrastructure-blocked campaign is not a semantic pass. Read
 `tests/semantic/README.md` before running any campaign.
+
+The targeted `integration_workflows_cross_version_6` acceptance profile is a
+separate design contract: three prewritten workflows run once on Wwise 2022.1
+and once on 2025.1, for six fresh memory-off Codex tasks, 20 user turns, and 12
+separately previewed transactions. It uses `gpt-5.6-terra`, medium reasoning,
+the default service tier, the formal campaign harness, and sequential
+execution. Freeze the first pass, consolidate ordinary case failures, and only
+then repair and start a new campaign root. This is cross-operation integration
+acceptance; it grants no additional per-API coverage credit.
+
+The completed 2026-07-31 integration evidence is cumulative across frozen
+campaign roots, not one final-candidate 6/6 run. The initial `a12` root passed
+both Alarm and Harbor workflows on both versions and failed both Weather
+workflows. Fresh repaired roots `a20-int22-weather` and
+`a24-int25-weather` then passed the two Weather units. Thus all six unique
+profile units have passing evidence across those roots; do not report that
+`a12` itself passed 6/6 or that all six were rerun after the final repair.
+Every passing sandbox was removed, failed sandboxes were sealed and
+quarantined, and both source SampleProjects retained identical full hashes and
+mtimes.
 
 For harness-only CI checks that start neither Codex nor Wwise, use the focused
 pytest commands in `tests/semantic/README.md`.

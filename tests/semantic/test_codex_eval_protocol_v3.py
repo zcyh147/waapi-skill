@@ -8,6 +8,7 @@ import pytest
 
 from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
+    V3GatewayProtocol,
     V3ProtocolError,
     build_direct_protocol,
     build_metadata_transaction_protocol,
@@ -19,6 +20,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     CodexGatewayBroker,
+    ExpectedGatewayStep,
     MetadataBoundJsonArgument,
     MetadataQueryArgument,
     MetadataTokenProjection,
@@ -71,6 +73,56 @@ def test_single_transaction_spans_two_turn_prefixes_with_response_bindings() -> 
     request_argument = protocol.steps[1].arguments[2]
     assert isinstance(request_argument, SemanticJsonArgument)
     assert request_argument.equivalence == "object_operation_v1"
+
+
+def test_commutative_read_only_groups_are_adjacent_and_cannot_cross_turns() -> None:
+    schema = ExpectedGatewayStep(
+        "tx01.operation-schema",
+        "operation-schema",
+        ("object.set",),
+    )
+    metadata = ExpectedGatewayStep(
+        "tx01.metadata",
+        "metadata",
+        (
+            "discover",
+            "--object-type",
+            "Action",
+            "--query",
+            MetadataQueryArgument("fade time"),
+            "--limit",
+            "8",
+        ),
+    )
+    preview = ExpectedGatewayStep("tx01.preview", "preview")
+
+    protocol = V3GatewayProtocol(
+        (schema, metadata, preview),
+        (3,),
+        commutative_read_only_step_groups=(
+            ("tx01.operation-schema", "tx01.metadata"),
+        ),
+    )
+    assert protocol.commutative_read_only_step_groups == (
+        ("tx01.operation-schema", "tx01.metadata"),
+    )
+
+    with pytest.raises(ValueError, match="cannot cross a turn prefix"):
+        V3GatewayProtocol(
+            (schema, metadata, preview),
+            (1, 3),
+            commutative_read_only_step_groups=(
+                ("tx01.operation-schema", "tx01.metadata"),
+            ),
+        )
+    with pytest.raises(ValueError, match="limited to one"):
+        V3GatewayProtocol(
+            (schema, metadata, preview),
+            (3,),
+            commutative_read_only_step_groups=(
+                ("tx01.metadata", "tx01.preview"),
+            ),
+        )
 
 
 def test_non_object_transaction_request_keeps_wire_exact_json() -> None:

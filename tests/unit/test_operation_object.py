@@ -218,11 +218,30 @@ def test_property_and_reference_descriptors_are_closed_and_typed() -> None:
                     "parent": {"kind": "path", "value": "\\Attenuations\\Default Work Unit"},
                 },
             },
+            {
+                "name": "Target",
+                "target": {
+                    "kind": "direct-child",
+                    "parent": {
+                        "kind": "path",
+                        "value": "\\Events\\Default Work Unit\\Play_Weather",
+                    },
+                    "type": "Action",
+                },
+            },
         ]
     )
     assert references[0].target.as_dict() == {"kind": "id", "value": "{BUS}"}
     assert references[1].target.parent is not None
     assert references[1].target.parent.kind == "path"
+    assert references[2].target.as_dict() == {
+        "kind": "direct-child",
+        "parent": {
+            "kind": "path",
+            "value": "\\Events\\Default Work Unit\\Play_Weather",
+        },
+        "type": "Action",
+    }
 
     for invalid_value in (None, [1, 2], {"value": 1}, math.nan, math.inf):
         with pytest.raises(ObjectOperationContractError) as invalid:

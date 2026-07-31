@@ -995,20 +995,39 @@ def build_generate_operation_plan(
         aliases=("id", "name", "baseName"),
         required_fields=("id", "name", "baseName", "soundBankPath", "copiedMediaPath"),
     )
+    language_dependent_banks = [
+        bank["name"]
+        for bank in normalized_banks
+        if bank["artifactExpectation"] in {"localized", "mixed"}
+    ]
     skip_languages = _require_bool(arguments.get("skipLanguages"), field="skipLanguages")
-    if skip_languages:
-        if "languages" in arguments:
+    if not language_dependent_banks:
+        if skip_languages is not True or "languages" in arguments:
             raise SoundBankContractError(
                 "INVALID_SCOPE",
-                "languages must be omitted when skipLanguages is true.",
+                "An all-nonlocalized SoundBank batch requires "
+                "skipLanguages=true and languages omitted.",
             )
         selected_languages: list[dict[str, Any]] = []
     else:
+        if skip_languages is not False:
+            raise SoundBankContractError(
+                "INVALID_SCOPE",
+                "A SoundBank batch containing any localized or mixed row "
+                "requires skipLanguages=false.",
+                details={"soundbanks": language_dependent_banks},
+            )
         requested_languages = _require_nonempty_strings(
             arguments.get("languages"),
             field="languages",
             limit=MAX_LANGUAGES,
         )
+        if any(language.strip().casefold() == "sfx" for language in requested_languages):
+            raise SoundBankContractError(
+                "INVALID_SCOPE",
+                "SFX is not a localized project language and cannot appear in "
+                "soundbank.generate languages.",
+            )
         selected_languages = _resolve_project_rows(
             requested_languages,
             project_info.get("languages"),
@@ -1016,11 +1035,12 @@ def build_generate_operation_plan(
             aliases=("id", "name"),
             required_fields=("id", "name"),
         )
-    language_dependent_banks = [
-        bank["name"]
-        for bank in normalized_banks
-        if bank["artifactExpectation"] in {"localized", "mixed"}
-    ]
+    if skip_languages:
+        if "languages" in arguments:
+            raise SoundBankContractError(
+                "INVALID_SCOPE",
+                "languages must be omitted when skipLanguages is true.",
+            )
     if language_dependent_banks and not selected_languages:
         raise SoundBankContractError(
             "INVALID_SCOPE",

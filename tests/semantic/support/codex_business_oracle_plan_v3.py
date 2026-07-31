@@ -42,6 +42,7 @@ _API_FAMILIES = {
     "ak.wwise.core.object.get": "object",
     "ak.wwise.core.object.create": "object",
     "ak.wwise.core.object.set": "object",
+    "ak.wwise.core.object.setReference": "object",
     "ak.wwise.core.audio.import": "audio_import",
     "ak.wwise.core.audio.importTabDelimited": "audio_import",
     "ak.wwise.core.audio.convert": "audio_conversion",

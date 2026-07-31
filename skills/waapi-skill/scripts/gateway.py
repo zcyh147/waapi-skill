@@ -3012,6 +3012,38 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "argument_paths": {
                     name: f"$.arguments.{name}" for name in argument_names
                 },
+                "shell_transport": {
+                    "outer_quoting": "single_quote_entire_compact_json",
+                    "json_string_serialization": "exactly_once",
+                    "decoded_value_rules": {
+                        "embedded_quotes": (
+                            "ordinary quotation marks with no preceding "
+                            "backslash"
+                        ),
+                        "wwise_path_separator": "one backslash",
+                    },
+                    "forbidden": [
+                        "double_escape_json_string_contents",
+                        "leave_json_escape_backslashes_in_decoded_values",
+                        "repair_or_retry_invalid_json_in_the_same_turn",
+                    ],
+                },
+                "preview_invocation": {
+                    "intended_change": {
+                        "subcommand": "preview",
+                        "required_flag": "--apply",
+                        "effect": (
+                            "creates a durable confirmation-bound preview and "
+                            "does not execute the change"
+                        ),
+                        "includes_later_ordered_transactions": True,
+                    },
+                    "omit_apply_only_when": [
+                        "hypothetical",
+                        "design_only",
+                        "explicitly_non_executable",
+                    ],
+                },
             },
         }
         if direct_fast_route_contract is not None:

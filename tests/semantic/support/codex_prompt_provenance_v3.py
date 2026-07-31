@@ -29,12 +29,18 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     operation_request_equivalence,
 )
 from tests.semantic.support.codex_gateway_broker import (
+    BoundedIntegerArgument,
     ExpectedGatewayStep,
+    GatewayDerivedReferenceActivationAllowance,
     MetadataBoundJsonArgument,
     MetadataQueryArgument,
     MetadataTokenProjection,
     ResponseBinding,
     SemanticJsonArgument,
+)
+from tests.semantic.support.codex_integration_workflows_v1 import (
+    EXPECTED_PRIMARY_API as INTEGRATION_PRIMARY_API,
+    WORKFLOW_IDS as INTEGRATION_WORKFLOW_IDS,
 )
 from tests.semantic.support.codex_soundbank_runtime_v3 import (
     render_soundbank_generation_build_locations,
@@ -65,6 +71,7 @@ HEAVY_APIS = frozenset(
         "ak.wwise.core.object.get",
         "ak.wwise.core.object.create",
         "ak.wwise.core.object.set",
+        "ak.wwise.core.object.setReference",
         "ak.wwise.core.audio.import",
         "ak.wwise.core.audio.importTabDelimited",
         "ak.wwise.core.audio.convert",
@@ -89,6 +96,19 @@ VISIBLE_KINDS = frozenset(
         "structured_object",
     }
 )
+INTEGRATION_VISIBLE_KINDS = frozenset(
+    {
+        "absolute_directory_path",
+        "object_path",
+        "string",
+        "structured_array",
+    }
+)
+INTEGRATION_VISIBLE_INPUT_SOURCE = "integration_visible_inputs"
+MAX_INTEGRATION_SCALAR_BYTES = 16 * 1024
+MAX_INTEGRATION_STRUCTURED_BYTES = 256 * 1024
+MAX_INTEGRATION_ARRAY_ITEMS = 64
+MAX_INTEGRATION_LEAVES = 4096
 
 
 class PromptProvenanceError(RuntimeError):
@@ -277,9 +297,15 @@ def read_prompt_provenance(
     ):
         raise PromptProvenanceError("prompt provenance protocol digest is invalid")
     protocol = deserialize_protocol(protocol_value)
-    if serialize_protocol(protocol) != protocol_value:
+    canonical_protocol_value = _canonicalize_legacy_protocol_manifest(
+        protocol_value
+    )
+    if serialize_protocol(protocol) != canonical_protocol_value:
         raise PromptProvenanceError("protocol manifest is not round-trip exact")
-    if expected_protocol is not None and protocol_value != serialize_protocol(expected_protocol):
+    if (
+        expected_protocol is not None
+        and canonical_protocol_value != serialize_protocol(expected_protocol)
+    ):
         raise PromptProvenanceError("in-memory protocol differs from sealed provenance")
 
     request = value.get("request")
@@ -393,19 +419,47 @@ def serialize_protocol(protocol: V3GatewayProtocol) -> dict[str, Any]:
             list(item) for item in protocol.allowed_turn_prefix_counts
         ]
         value["terminal_prefix_counts"] = list(protocol.terminal_prefix_counts)
+    if protocol.commutative_read_only_step_groups:
+        value["commutative_read_only_step_groups"] = [
+            list(group)
+            for group in protocol.commutative_read_only_step_groups
+        ]
     return value
+
+
+def _canonicalize_legacy_protocol_manifest(
+    value: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Upgrade the one reviewed v1 metadata-bound additive field in memory."""
+
+    canonical = _json_clone(value)
+    for step in canonical.get("steps", []):
+        for argument in step.get("arguments", []):
+            if (
+                argument.get("kind") == "metadata_bound_json"
+                and "gateway_derived_reference_activations" not in argument
+            ):
+                argument["gateway_derived_reference_activations"] = []
+    return canonical
 
 
 def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
     keys = set(value)
-    if keys not in (
-        {"turn_prefix_counts", "steps"},
-        {
-            "turn_prefix_counts",
-            "steps",
-            "allowed_turn_prefix_counts",
-            "terminal_prefix_counts",
-        },
+    required_keys = {"turn_prefix_counts", "steps"}
+    optional_prefix_keys = {
+        "allowed_turn_prefix_counts",
+        "terminal_prefix_counts",
+    }
+    allowed_keys = {
+        *required_keys,
+        *optional_prefix_keys,
+        "commutative_read_only_step_groups",
+    }
+    if (
+        not required_keys.issubset(keys)
+        or not keys.issubset(allowed_keys)
+        or bool(keys & optional_prefix_keys)
+        != optional_prefix_keys.issubset(keys)
     ):
         raise PromptProvenanceError("protocol manifest schema is invalid")
     prefixes = value.get("turn_prefix_counts")
@@ -418,6 +472,7 @@ def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
         raise PromptProvenanceError("protocol manifest topology is invalid")
     allowed: tuple[tuple[int, ...], ...] = ()
     terminal: tuple[int, ...] = ()
+    commutative_groups: tuple[tuple[str, str], ...] = ()
     if "allowed_turn_prefix_counts" in value:
         raw_allowed = value.get("allowed_turn_prefix_counts")
         raw_terminal = value.get("terminal_prefix_counts")
@@ -436,11 +491,29 @@ def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
             )
         allowed = tuple(tuple(row) for row in raw_allowed)
         terminal = tuple(raw_terminal)
+    if "commutative_read_only_step_groups" in value:
+        raw_groups = value.get("commutative_read_only_step_groups")
+        if (
+            not isinstance(raw_groups, list)
+            or any(
+                not isinstance(group, list)
+                or len(group) != 2
+                or any(not isinstance(item, str) for item in group)
+                for group in raw_groups
+            )
+        ):
+            raise PromptProvenanceError(
+                "commutative read-only protocol groups are invalid"
+            )
+        commutative_groups = tuple(
+            (group[0], group[1]) for group in raw_groups
+        )
     return V3GatewayProtocol(
         tuple(_deserialize_step(item) for item in steps),
         tuple(prefixes),
         allowed,
         terminal,
+        commutative_groups,
     )
 
 
@@ -468,6 +541,14 @@ def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
                     "maximum_chars": item.maximum_chars,
                 }
             )
+        elif isinstance(item, BoundedIntegerArgument):
+            arguments.append(
+                {
+                    "kind": "bounded_integer",
+                    "minimum": item.minimum,
+                    "maximum": item.maximum,
+                }
+            )
         elif isinstance(item, MetadataBoundJsonArgument):
             cloned = _json_clone(item.expected)
             arguments.append(
@@ -487,6 +568,10 @@ def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
                         if item.expected_required_token_projection is not None
                         else None
                     ),
+                    "gateway_derived_reference_activations": [
+                        value.as_dict()
+                        for value in item.gateway_derived_reference_activations
+                    ],
                 }
             )
         elif isinstance(item, ResponseBinding):
@@ -584,19 +669,54 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
                     int(row["maximum_chars"]),
                 )
             )
-        elif kind == "metadata_bound_json" and set(row) == {
+        elif kind == "bounded_integer" and set(row) == {
             "kind",
-            "value",
-            "sha256",
-            "equivalence",
-            "metadata_step",
-            "object_type",
-            "required_tokens",
-            "expected_required_token_projection",
+            "minimum",
+            "maximum",
         }:
+            if (
+                type(row.get("minimum")) is not int
+                or type(row.get("maximum")) is not int
+            ):
+                raise PromptProvenanceError(
+                    "bounded-integer protocol argument is invalid"
+                )
+            arguments.append(
+                BoundedIntegerArgument(
+                    int(row["minimum"]),
+                    int(row["maximum"]),
+                )
+            )
+        elif kind == "metadata_bound_json" and set(row) in (
+            {
+                "kind",
+                "value",
+                "sha256",
+                "equivalence",
+                "metadata_step",
+                "object_type",
+                "required_tokens",
+                "expected_required_token_projection",
+            },
+            {
+                "kind",
+                "value",
+                "sha256",
+                "equivalence",
+                "metadata_step",
+                "object_type",
+                "required_tokens",
+                "expected_required_token_projection",
+                "gateway_derived_reference_activations",
+            },
+        ):
             raw_tokens = row.get("required_tokens")
             raw_projection = row.get(
                 "expected_required_token_projection"
+            )
+            raw_activations = row.get(
+                "gateway_derived_reference_activations",
+                [],
             )
             if (
                 row.get("sha256") != _sha256_json(row.get("value"))
@@ -606,11 +726,28 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
                     "audio_import_v1",
                     "audio_import_tab_v1",
                     "object_set_v1",
+                    "object_set_rtpc_v1",
                 }
                 or not isinstance(row.get("metadata_step"), str)
                 or not isinstance(row.get("object_type"), str)
                 or not isinstance(raw_tokens, list)
                 or any(not isinstance(item, str) for item in raw_tokens)
+                or not isinstance(raw_activations, list)
+                or any(
+                    not isinstance(item, Mapping)
+                    or set(item)
+                    != {
+                        "row_index",
+                        "property_name",
+                        "property_value",
+                        "reference_name",
+                    }
+                    or type(item.get("row_index")) is not int
+                    or not isinstance(item.get("property_name"), str)
+                    or type(item.get("property_value")) is not bool
+                    or not isinstance(item.get("reference_name"), str)
+                    for item in raw_activations
+                )
                 or (
                     raw_projection is not None
                     and (
@@ -635,27 +772,41 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
                 raise PromptProvenanceError(
                     "metadata-bound JSON protocol argument is invalid"
                 )
-            arguments.append(
-                MetadataBoundJsonArgument(
-                    expected=_json_clone(row.get("value")),
-                    metadata_step=str(row["metadata_step"]),
-                    object_type=str(row["object_type"]),
-                    required_tokens=tuple(raw_tokens),
-                    expected_required_token_projection=(
-                        tuple(
-                            MetadataTokenProjection(
-                                name=str(item["name"]),
-                                kind=str(item["kind"]),
-                                metadata_type=str(item["metadata_type"]),
+            try:
+                arguments.append(
+                    MetadataBoundJsonArgument(
+                        expected=_json_clone(row.get("value")),
+                        metadata_step=str(row["metadata_step"]),
+                        object_type=str(row["object_type"]),
+                        required_tokens=tuple(raw_tokens),
+                        expected_required_token_projection=(
+                            tuple(
+                                MetadataTokenProjection(
+                                    name=str(item["name"]),
+                                    kind=str(item["kind"]),
+                                    metadata_type=str(item["metadata_type"]),
+                                )
+                                for item in raw_projection
                             )
-                            for item in raw_projection
-                        )
-                        if isinstance(raw_projection, list)
-                        else None
-                    ),
-                    equivalence=str(row["equivalence"]),
+                            if isinstance(raw_projection, list)
+                            else None
+                        ),
+                        equivalence=str(row["equivalence"]),
+                        gateway_derived_reference_activations=tuple(
+                            GatewayDerivedReferenceActivationAllowance(
+                                row_index=int(item["row_index"]),
+                                property_name=str(item["property_name"]),
+                                property_value=item["property_value"],
+                                reference_name=str(item["reference_name"]),
+                            )
+                            for item in raw_activations
+                        ),
+                    )
                 )
-            )
+            except (TypeError, ValueError) as exc:
+                raise PromptProvenanceError(
+                    "metadata-bound JSON protocol argument is invalid"
+                ) from exc
         elif kind == "response_binding" and set(row) == {"kind", "step", "pointer"}:
             if not isinstance(row.get("step"), str) or not isinstance(row.get("pointer"), str):
                 raise PromptProvenanceError("response-binding protocol argument is invalid")
@@ -700,8 +851,14 @@ def _input_rows(
     require_paths: bool,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
+    integration_workflow = _integration_workflow_id(scenario)
+    allowed_kinds = (
+        INTEGRATION_VISIBLE_KINDS
+        if integration_workflow is not None
+        else VISIBLE_KINDS
+    )
     for declared in scenario.visible_inputs:
-        if declared.kind not in VISIBLE_KINDS:
+        if declared.kind not in allowed_kinds:
             raise PromptProvenanceError(
                 f"heavy prompt uses an unreviewed visible kind: {declared.kind}"
             )
@@ -861,7 +1018,10 @@ def _leaf_binding(
     trusted_origin = bool(
         reviewed_origin
         and reviewed_origin.startswith(
-            "/compound_import_visible_rows/"
+            (
+                "/compound_import_visible_rows/",
+                f"/{INTEGRATION_VISIBLE_INPUT_SOURCE}/",
+            )
         )
     )
     if scenario.api == "ak.wwise.core.soundbank.generate" and input_name == "build_locations":
@@ -965,7 +1125,16 @@ def _derive_input(
     protocol_value: Mapping[str, Any],
     trusted_sources: Mapping[str, Any],
 ) -> _DerivedInput:
-    """Apply the closed heavy16 API/input mapping, never a value search."""
+    """Apply the closed reviewed input mapping, never a value search."""
+
+    workflow_id = _integration_workflow_id(scenario)
+    if workflow_id is not None:
+        return _derive_integration_visible_input(
+            scenario,
+            workflow_id=workflow_id,
+            input_name=input_name,
+            trusted_sources=trusted_sources,
+        )
 
     requests = _protocol_requests(protocol_value)
     api = scenario.api
@@ -1250,16 +1419,21 @@ def _protocol_requests(
                 "object_type",
                 "required_tokens",
                 "expected_required_token_projection",
+                "gateway_derived_reference_activations",
+            }
+            legacy_expected_keys = expected_keys - {
+                "gateway_derived_reference_activations"
             }
             projection = semantic.get("expected_required_token_projection")
             if (
-                set(semantic) != expected_keys
+                set(semantic) not in (expected_keys, legacy_expected_keys)
                 or semantic.get("equivalence")
                 not in {
                     "wire_exact",
                     "audio_import_v1",
                     "audio_import_tab_v1",
                     "object_set_v1",
+                    "object_set_rtpc_v1",
                 }
                 or not isinstance(semantic.get("metadata_step"), str)
                 or not semantic.get("metadata_step")
@@ -1269,6 +1443,13 @@ def _protocol_requests(
                 or not semantic.get("required_tokens")
                 or projection is not None
                 and not isinstance(projection, list)
+                or not isinstance(
+                    semantic.get(
+                        "gateway_derived_reference_activations",
+                        [],
+                    ),
+                    list,
+                )
             ):
                 raise PromptProvenanceError(
                     "metadata-bound preview request manifest is invalid"
@@ -1307,6 +1488,13 @@ def _protocol_requests(
             if (
                 equivalence == "object_set_v1"
                 and request.get("operation") != "object.set"
+            ):
+                raise PromptProvenanceError(
+                    "metadata-bound request JSON equivalence contract is invalid"
+                )
+            if (
+                equivalence == "object_set_rtpc_v1"
+                and request.get("operation") != "object.setRTPC"
             ):
                 raise PromptProvenanceError(
                     "metadata-bound request JSON equivalence contract is invalid"
@@ -1453,6 +1641,328 @@ def _cli_platform_paths(value: Any) -> list[str]:
     raise PromptProvenanceError("CLI SoundBank platform path mapping is invalid")
 
 
+def _integration_workflow_id(scenario: OnlineScenario) -> str | None:
+    candidates = tuple(
+        value
+        for value in (
+            getattr(scenario, "workflow_id", None),
+            getattr(scenario, "scenario_family", None),
+        )
+        if isinstance(value, str) and value in INTEGRATION_WORKFLOW_IDS
+    )
+    if not candidates:
+        return None
+    if len(set(candidates)) != 1:
+        raise PromptProvenanceError(
+            "integration workflow identity attributes disagree"
+        )
+    workflow_id = candidates[0]
+    if scenario.api != INTEGRATION_PRIMARY_API[workflow_id]:
+        raise PromptProvenanceError(
+            "integration workflow primary API identity drifted"
+        )
+    return workflow_id
+
+
+def _integration_visible_input_source(
+    scenario: OnlineScenario,
+    *,
+    workflow_id: str,
+    root: Path,
+    values: Mapping[str, str],
+    supplied: Mapping[str, Any],
+    require_paths: bool,
+    serialized: bool,
+) -> dict[str, Any]:
+    key = INTEGRATION_VISIBLE_INPUT_SOURCE
+    if set(supplied) != {key}:
+        raise PromptProvenanceError(
+            "integration visible-input source is missing or not closed"
+        )
+    source = supplied[key]
+    declarations = tuple(scenario.visible_inputs)
+    expected_names = tuple(item.name for item in declarations)
+    if len(expected_names) != len(set(expected_names)):
+        raise PromptProvenanceError(
+            "integration visible-input declarations are not unique"
+        )
+
+    archived_rows: Sequence[Any] | None = None
+    if serialized:
+        if not isinstance(source, Mapping) or set(source) != {
+            "workflow_id",
+            "inputs",
+            "sha256",
+        }:
+            raise PromptProvenanceError(
+                "sealed integration visible-input source schema is invalid"
+            )
+        if source.get("workflow_id") != workflow_id:
+            raise PromptProvenanceError(
+                "sealed integration visible-input workflow is misbound"
+            )
+        archived_rows = source.get("inputs")
+        if (
+            not isinstance(archived_rows, list)
+            or len(archived_rows) != len(declarations)
+        ):
+            raise PromptProvenanceError(
+                "sealed integration visible-input rows are incomplete"
+            )
+        raw_values: dict[str, str] = {}
+        for index, (declared, row) in enumerate(
+            zip(declarations, archived_rows, strict=True)
+        ):
+            if (
+                not isinstance(row, Mapping)
+                or row.get("name") != declared.name
+                or row.get("kind") != declared.kind
+                or not isinstance(row.get("value"), str)
+            ):
+                raise PromptProvenanceError(
+                    "sealed integration visible-input identity drifted"
+                )
+            raw_values[declared.name] = str(row["value"])
+    else:
+        if not isinstance(source, Mapping):
+            raise PromptProvenanceError(
+                "integration_visible_inputs must be a mapping"
+            )
+        raw_values = dict(source)
+
+    if (
+        set(raw_values) != set(expected_names)
+        or any(
+            not isinstance(name, str) or not isinstance(value, str)
+            for name, value in raw_values.items()
+        )
+        or raw_values != dict(values)
+    ):
+        raise PromptProvenanceError(
+            "integration visible-input keys or values differ from "
+            "visible_values"
+        )
+
+    rows = [
+        _seal_integration_visible_input(
+            declared,
+            value=raw_values[declared.name],
+            index=index,
+            root=root,
+            require_paths=require_paths,
+            archived=(
+                archived_rows[index]
+                if archived_rows is not None
+                else None
+            ),
+        )
+        for index, declared in enumerate(declarations)
+    ]
+    sealed_value = {
+        "workflow_id": workflow_id,
+        "inputs": rows,
+    }
+    result = {
+        key: {
+            **sealed_value,
+            "sha256": _sha256_json(sealed_value),
+        }
+    }
+    if serialized and supplied != result:
+        raise PromptProvenanceError(
+            "sealed integration visible-input source was rewrapped"
+        )
+    return result
+
+
+def _seal_integration_visible_input(
+    declared: Any,
+    *,
+    value: str,
+    index: int,
+    root: Path,
+    require_paths: bool,
+    archived: Any,
+) -> dict[str, Any]:
+    if declared.kind not in INTEGRATION_VISIBLE_KINDS:
+        raise PromptProvenanceError(
+            f"integration prompt uses an unreviewed visible kind: "
+            f"{declared.kind}"
+    )
+    value_bytes = value.encode("utf-8")
+    value_ceiling = (
+        MAX_INTEGRATION_STRUCTURED_BYTES
+        if declared.kind == "structured_array"
+        else MAX_INTEGRATION_SCALAR_BYTES
+    )
+    if (
+        not value
+        or b"\x00" in value_bytes
+        or len(value_bytes) > value_ceiling
+    ):
+        raise PromptProvenanceError(
+            f"integration visible input {declared.name} exceeds its "
+            "bounded scalar contract"
+        )
+
+    canonical_json: Any = None
+    if declared.kind == "structured_array":
+        parsed = _strict_json_text(value)
+        if (
+            not isinstance(parsed, list)
+            or not 1 <= len(parsed) <= MAX_INTEGRATION_ARRAY_ITEMS
+        ):
+            raise PromptProvenanceError(
+                f"integration visible input {declared.name} must be a "
+                "bounded non-empty JSON array"
+            )
+        if _canonical_json_bytes(parsed).decode("utf-8") != value:
+            raise PromptProvenanceError(
+                f"integration visible input {declared.name} is not "
+                "canonical JSON"
+            )
+        leaves = tuple(_walk_leaves(parsed))
+        if not leaves or len(leaves) > MAX_INTEGRATION_LEAVES:
+            raise PromptProvenanceError(
+                f"integration visible input {declared.name} has an "
+                "invalid leaf count"
+            )
+        canonical_json = parsed
+    elif declared.kind == "object_path":
+        if (
+            not value.startswith("\\")
+            or "\n" in value
+            or "\r" in value
+        ):
+            raise PromptProvenanceError(
+                f"integration visible input {declared.name} is not a "
+                "bounded Wwise object path"
+            )
+    elif declared.kind == "string":
+        if "\n" in value or "\r" in value:
+            raise PromptProvenanceError(
+                f"integration visible input {declared.name} is not a "
+                "bounded scalar string"
+            )
+
+    path_proof: dict[str, Any] | None = None
+    if declared.kind == "absolute_directory_path":
+        pointer = f"/inputs/{index}/value"
+        expected_proof = {
+            "pointer": pointer,
+            **_path_proof(
+                value,
+                root=root,
+                expected_kind="directory",
+                require_exists=require_paths,
+            ),
+        }
+        if archived is not None and not require_paths:
+            actual_proof = (
+                archived.get("path_proof")
+                if isinstance(archived, Mapping)
+                else None
+            )
+            if (
+                not isinstance(actual_proof, Mapping)
+                or set(actual_proof) != set(expected_proof)
+            ):
+                raise PromptProvenanceError(
+                    "archived integration directory proof is invalid"
+                )
+            _validate_archived_path_proof(
+                actual_proof,
+                expected_kind="directory",
+            )
+            if (
+                actual_proof.get("pointer") != pointer
+                or actual_proof.get("owned_relative_path")
+                != expected_proof["owned_relative_path"]
+            ):
+                raise PromptProvenanceError(
+                    "archived integration directory proof is misbound"
+                )
+            path_proof = dict(actual_proof)
+        else:
+            path_proof = expected_proof
+
+    row = {
+        "name": declared.name,
+        "kind": declared.kind,
+        "value": value,
+        "value_sha256": _sha256_text(value),
+        "canonical_json": canonical_json,
+        "path_proof": path_proof,
+    }
+    if archived is not None and dict(archived) != row:
+        raise PromptProvenanceError(
+            "sealed integration visible-input row was rewrapped"
+        )
+    return row
+
+
+def _derive_integration_visible_input(
+    scenario: OnlineScenario,
+    *,
+    workflow_id: str,
+    input_name: str,
+    trusted_sources: Mapping[str, Any],
+) -> _DerivedInput:
+    source = trusted_sources.get(INTEGRATION_VISIBLE_INPUT_SOURCE)
+    if (
+        not isinstance(source, Mapping)
+        or source.get("workflow_id") != workflow_id
+        or not isinstance(source.get("inputs"), list)
+    ):
+        raise PromptProvenanceError(
+            "sealed integration visible-input source is unavailable"
+        )
+    declarations = tuple(scenario.visible_inputs)
+    indexes = [
+        index
+        for index, declared in enumerate(declarations)
+        if declared.name == input_name
+    ]
+    if len(indexes) != 1:
+        raise PromptProvenanceError(
+            f"integration visible input is not uniquely declared: {input_name}"
+        )
+    index = indexes[0]
+    rows = source["inputs"]
+    if index >= len(rows):
+        raise PromptProvenanceError(
+            "sealed integration visible-input rows are incomplete"
+        )
+    row = rows[index]
+    declared = declarations[index]
+    if (
+        not isinstance(row, Mapping)
+        or row.get("name") != input_name
+        or row.get("kind") != declared.kind
+        or not isinstance(row.get("value"), str)
+    ):
+        raise PromptProvenanceError(
+            "sealed integration visible-input row is misbound"
+        )
+    value = str(row["value"])
+    source_base = (
+        f"/{INTEGRATION_VISIBLE_INPUT_SOURCE}/inputs/{index}"
+    )
+    if declared.kind == "structured_array":
+        parsed = row.get("canonical_json")
+        if not isinstance(parsed, list):
+            raise PromptProvenanceError(
+                "sealed integration structured input is unavailable"
+            )
+        origins = {
+            pointer: source_base + "/canonical_json" + pointer
+            for pointer, _ in _walk_leaves(parsed)
+        }
+    else:
+        origins = {"": source_base + "/value"}
+    return _DerivedInput(value, origins)
+
+
 def _trusted_sources(
     scenario: OnlineScenario,
     *,
@@ -1464,6 +1974,18 @@ def _trusted_sources(
     serialized: bool = False,
 ) -> dict[str, Any]:
     del protocol_value
+    workflow_id = _integration_workflow_id(scenario)
+    if workflow_id is not None:
+        return _integration_visible_input_source(
+            scenario,
+            workflow_id=workflow_id,
+            root=root,
+            values=values,
+            supplied=supplied,
+            require_paths=require_paths,
+            serialized=serialized,
+        )
+
     asset_spec = (
         scenario.fixture.get("asset_spec")
         if isinstance(scenario.fixture, Mapping)
@@ -1973,27 +2495,72 @@ def _expected_prompts(
     protocol: V3GatewayProtocol,
 ) -> tuple[str, ...]:
     request = scenario.render_prompt(values)
-    policy = _modification_policy_for_protocol(protocol)
-    if policy == "read_only":
-        from tests.semantic.support.codex_modification_policy_v3 import (
-            READ_ONLY_FOLLOW_UP_PROMPT,
-        )
-
-        expected = (request, READ_ONLY_FOLLOW_UP_PROMPT)
-    elif policy == "allow_changes":
-        expected = (request,)
+    if not isinstance(request, str) or not request.strip():
+        raise PromptProvenanceError("initial prompt must be non-empty")
+    explicit_follow_ups = _explicit_follow_up_prompts(scenario)
+    if explicit_follow_ups is not None:
+        expected_follow_up_count = len(protocol.turn_prefix_counts) - 1
+        if len(explicit_follow_ups) != expected_follow_up_count:
+            raise PromptProvenanceError(
+                "explicit follow-up prompt count differs from the closed "
+                "protocol turn boundaries"
+            )
+        expected = (request, *explicit_follow_ups)
     else:
-        count = 1 + scenario.confirmation_turn_count
-        if count == 1:
+        policy = _modification_policy_for_protocol(protocol)
+        if policy == "read_only":
+            from tests.semantic.support.codex_modification_policy_v3 import (
+                READ_ONLY_FOLLOW_UP_PROMPT,
+            )
+
+            expected = (request, READ_ONLY_FOLLOW_UP_PROMPT)
+        elif policy == "allow_changes":
             expected = (request,)
         else:
-            confirmation = scenario.confirmation_prompt
-            if not isinstance(confirmation, str) or not confirmation:
-                raise PromptProvenanceError("confirmation prompt is missing")
-            expected = (request, *((confirmation,) * (count - 1)))
-    if supplied is not None and tuple(str(item) for item in supplied) != expected:
-        raise PromptProvenanceError("in-memory prompts differ from the frozen scenario")
+            count = 1 + scenario.confirmation_turn_count
+            if count == 1:
+                expected = (request,)
+            else:
+                confirmation = scenario.confirmation_prompt
+                if not isinstance(confirmation, str) or not confirmation.strip():
+                    raise PromptProvenanceError("confirmation prompt is missing")
+                expected = (request, *((confirmation,) * (count - 1)))
+    if supplied is not None:
+        supplied_prompts = _nonempty_prompt_sequence(
+            supplied,
+            label="in-memory prompts",
+        )
+        if len(supplied_prompts) != len(expected):
+            raise PromptProvenanceError(
+                "in-memory prompt count differs from the frozen scenario"
+            )
+        if supplied_prompts != expected:
+            raise PromptProvenanceError(
+                "in-memory prompts differ from the frozen scenario"
+            )
     return expected
+
+
+def _explicit_follow_up_prompts(
+    scenario: OnlineScenario,
+) -> tuple[str, ...] | None:
+    raw = getattr(scenario, "follow_up_prompts", None)
+    if raw is None:
+        return None
+    return _nonempty_prompt_sequence(raw, label="explicit follow-up prompts")
+
+
+def _nonempty_prompt_sequence(
+    value: Sequence[str],
+    *,
+    label: str,
+) -> tuple[str, ...]:
+    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+        raise PromptProvenanceError(f"{label} must be a prompt sequence")
+    prompts = tuple(value)
+    if any(not isinstance(prompt, str) or not prompt.strip() for prompt in prompts):
+        raise PromptProvenanceError(f"{label} must contain only non-empty prompts")
+    return prompts
 
 
 def _modification_policy_for_protocol(

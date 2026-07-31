@@ -19,6 +19,7 @@ from tests.semantic.support.codex_gateway_broker import (
     MetadataTokenProjection,
     ResponseBinding,
     SemanticJsonArgument,
+    validate_commutative_read_only_step_groups,
 )
 
 
@@ -45,6 +46,7 @@ class V3GatewayProtocol:
     turn_prefix_counts: tuple[int, ...]
     allowed_turn_prefix_counts: tuple[tuple[int, ...], ...] = ()
     terminal_prefix_counts: tuple[int, ...] = ()
+    commutative_read_only_step_groups: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
         if not self.steps:
@@ -106,6 +108,23 @@ class V3GatewayProtocol:
         names = tuple(step.name for step in self.steps)
         if len(names) != len(set(names)):
             raise ValueError("V3 gateway step names must be unique")
+        groups = validate_commutative_read_only_step_groups(
+            self.steps,
+            self.commutative_read_only_step_groups,
+        )
+        if groups != self.commutative_read_only_step_groups:
+            raise ValueError(
+                "commutative read-only step groups must use canonical tuples"
+            )
+        checkpoint_counts = set(self.turn_prefix_counts)
+        for allowed in self.allowed_turn_prefix_counts:
+            checkpoint_counts.update(allowed)
+        indexes = {name: index for index, name in enumerate(names)}
+        for first, _second in groups:
+            if indexes[first] + 1 in checkpoint_counts:
+                raise ValueError(
+                    "a commutative read-only group cannot cross a turn prefix"
+                )
 
     def allowed_prefixes_for_turn(self, index: int) -> tuple[int, ...]:
         if not 1 <= index <= len(self.turn_prefix_counts):
@@ -306,10 +325,12 @@ def build_metadata_transaction_protocol(
         "audio_import_v1",
         "audio_import_tab_v1",
         "object_set_v1",
+        "object_set_rtpc_v1",
     }:
         raise V3ProtocolError(
             "metadata-bound equivalence must be wire_exact, "
-            "audio_import_v1, audio_import_tab_v1, or object_set_v1"
+            "audio_import_v1, audio_import_tab_v1, object_set_v1, "
+            "or object_set_rtpc_v1"
         )
     if equivalence == "audio_import_v1" and any(
         request.get("operation") != "audio.import"
@@ -332,6 +353,13 @@ def build_metadata_transaction_protocol(
     ):
         raise V3ProtocolError(
             "object_set_v1 is valid only for object.set requests"
+        )
+    if equivalence == "object_set_rtpc_v1" and any(
+        request.get("operation") != "object.setRTPC"
+        for request in requests
+    ):
+        raise V3ProtocolError(
+            "object_set_rtpc_v1 is valid only for object.setRTPC requests"
         )
     if (
         not isinstance(object_type, str)

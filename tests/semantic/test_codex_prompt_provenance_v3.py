@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
 
@@ -29,9 +29,15 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
+    GatewayDerivedReferenceActivationAllowance,
+    MetadataBoundJsonArgument,
     MetadataTokenProjection,
     ResponseBinding,
     SemanticJsonArgument,
+)
+from tests.semantic.support.codex_integration_workflows_v1 import (
+    WORKFLOW_IDS as INTEGRATION_WORKFLOW_IDS,
+    load_integration_workflows_profile,
 )
 from tests.semantic.support.codex_prompt_provenance_v3 import (
     PROMPT_MATERIALIZATION_RECEIPT_CONTRACT,
@@ -52,6 +58,31 @@ from tests.semantic.support.codex_soundbank_runtime_v3 import (
 
 VERSION = "2022.1"
 CONFIRMATION = "这个预览可以，执行吧。"
+INTEGRATION_PROFILE_PATH = (
+    Path(__file__).resolve().parent
+    / "data"
+    / "integration-workflows-v1"
+    / "profile.json"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _ScenarioWithFollowUpPrompts:
+    scenario: OnlineScenario
+    follow_up_prompts: object
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.scenario, name)
+
+
+@dataclass(frozen=True, slots=True)
+class _ScenarioWithWorkflowId:
+    scenario: Any
+    workflow_id: str
+    scenario_family: str = "prompt_provenance"
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.scenario, name)
 
 
 def _scenario_root(tmp_path: Path, name: str = "scenario") -> Path:
@@ -113,7 +144,110 @@ def _prompts(
     visible_values: dict[str, str],
 ) -> tuple[str, ...]:
     first = scenario.render_prompt(visible_values)
+    follow_ups = getattr(scenario, "follow_up_prompts", None)
+    if follow_ups is not None:
+        return (first, *tuple(follow_ups))
     return (first, *((CONFIRMATION,) * scenario.confirmation_turn_count))
+
+
+def _two_transaction_object_set_protocol() -> V3GatewayProtocol:
+    return build_transaction_protocol(
+        (
+            _operation_request(
+                "object.set",
+                {
+                    "objects": [
+                        {
+                            "object": {"kind": "id", "value": "{OBJECT-ONE}"},
+                            "properties": [{"name": "Volume", "value": -3}],
+                        }
+                    ]
+                },
+            ),
+            _operation_request(
+                "object.set",
+                {
+                    "objects": [
+                        {
+                            "object": {"kind": "id", "value": "{OBJECT-TWO}"},
+                            "properties": [{"name": "Pitch", "value": 100}],
+                        }
+                    ]
+                },
+            ),
+        )
+    )
+
+
+def _integration_case(
+    root: Path,
+    workflow_id: str,
+) -> tuple[Any, V3GatewayProtocol, dict[str, str]]:
+    profile = load_integration_workflows_profile(
+        INTEGRATION_PROFILE_PATH,
+        unit_ids=(
+            "INT22-" + workflow_id.replace("_", "-").upper(),
+        ),
+    )
+    unit = profile.units[0]
+    scenario = unit.scenario
+    values: dict[str, str] = {}
+    bindings = scenario.fixture["visible_bindings"]
+    kinds = {item.name: item.kind for item in scenario.visible_inputs}
+    for name, binding in bindings.items():
+        if binding["source"] == "owned_path":
+            directory = root / "owned" / binding["relative_path"]
+            directory.mkdir(parents=True)
+            values[name] = str(directory)
+        elif binding["source"] == "owned_root":
+            directory = root / "owned"
+            directory.mkdir(parents=True, exist_ok=True)
+            values[name] = str(directory)
+        elif kinds[name] == "structured_array":
+            values[name] = json.dumps(
+                binding["value"],
+                ensure_ascii=False,
+                allow_nan=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        else:
+            values[name] = str(binding["value"])
+
+    transaction_protocol = build_transaction_protocol(
+        tuple(
+            _operation_request(
+                transaction.operation,
+                (
+                    {
+                        "soundbanks": [{"name": "Harbor_Release"}],
+                        "platforms": ["Windows", "Mac"],
+                        "languages": ["SFX"],
+                    }
+                    if transaction.operation == "soundbank.generate"
+                    else {"integration_transaction": transaction.index}
+                ),
+            )
+            for transaction in unit.transactions
+        )
+    )
+    if workflow_id == "alarm_diagnose_and_repair":
+        protocol = V3GatewayProtocol(
+            steps=(
+                call_step(
+                    "diagnose-alarm-chain",
+                    "ak.wwise.core.object.get",
+                ),
+                *transaction_protocol.steps,
+            ),
+            turn_prefix_counts=(
+                1,
+                *(count + 1 for count in transaction_protocol.turn_prefix_counts),
+            ),
+        )
+    else:
+        protocol = transaction_protocol
+    return scenario, protocol, values
 
 
 def test_shared_cli_manifests_are_selected_from_closed_platform_union() -> None:
@@ -466,6 +600,422 @@ def test_fixed_provenance_path_round_trip_and_o_excl_preserves_first_document(
     with pytest.raises(FileExistsError):
         _write(scenario=scenario, root=root, protocol=protocol)
     assert evidence.path.read_bytes() == original
+
+
+def test_explicit_follow_up_prompts_round_trip_with_distinct_text(
+    tmp_path: Path,
+) -> None:
+    root = _scenario_root(tmp_path)
+    base = _scenario(
+        api="ak.wwise.core.object.set",
+        protocol="preview_confirm",
+        dispatch_count=2,
+    )
+    follow_ups = (
+        "先执行第一阶段；完成验证后，再预览第二阶段。",
+        "第二阶段的预览也符合预期，请执行并验证最终结果。",
+    )
+    scenario = _ScenarioWithFollowUpPrompts(base, follow_ups)
+    protocol = _two_transaction_object_set_protocol()
+
+    evidence = _write(
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+    )
+    expected = (base.prompt, *follow_ups)
+
+    assert evidence.prompts == expected
+    assert tuple(turn["prompt"] for turn in evidence.payload["turns"]) == expected
+    restored = _read_again(
+        evidence.path,
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+    )
+    assert restored.prompts == expected
+    assert restored.payload == evidence.payload
+
+
+@pytest.mark.parametrize(
+    "follow_ups",
+    (
+        ("只提供一条后续提示。",),
+        ("第一条。", "第二条。", "多出的一条。"),
+    ),
+    ids=("too-few", "too-many"),
+)
+def test_explicit_follow_up_prompt_count_must_match_protocol_turns(
+    tmp_path: Path,
+    follow_ups: tuple[str, ...],
+) -> None:
+    base = _scenario(
+        api="ak.wwise.core.object.set",
+        protocol="preview_confirm",
+        dispatch_count=2,
+    )
+    scenario = _ScenarioWithFollowUpPrompts(base, follow_ups)
+
+    with pytest.raises(
+        PromptProvenanceError,
+        match="explicit follow-up prompt count differs",
+    ):
+        _write(
+            scenario=scenario,
+            root=_scenario_root(tmp_path),
+            protocol=_two_transaction_object_set_protocol(),
+        )
+
+
+@pytest.mark.parametrize(
+    "follow_ups",
+    (
+        ("", "第二条。"),
+        ("第一条。", " \t "),
+        ("第一条。", 7),
+    ),
+    ids=("empty", "whitespace", "non-string"),
+)
+def test_explicit_follow_up_prompts_reject_empty_or_non_text_values(
+    tmp_path: Path,
+    follow_ups: tuple[object, ...],
+) -> None:
+    base = _scenario(
+        api="ak.wwise.core.object.set",
+        protocol="preview_confirm",
+        dispatch_count=2,
+    )
+    scenario = _ScenarioWithFollowUpPrompts(base, follow_ups)
+
+    with pytest.raises(
+        PromptProvenanceError,
+        match="explicit follow-up prompts must contain only non-empty prompts",
+    ):
+        _write(
+            scenario=scenario,
+            root=_scenario_root(tmp_path),
+            protocol=_two_transaction_object_set_protocol(),
+        )
+
+
+@pytest.mark.parametrize(
+    ("supplied", "message"),
+    (
+        (
+            (
+                "请读取当前项目里测试对象的名称、类型、父级和基础属性，并汇总结果。",
+                "第一条。",
+            ),
+            "in-memory prompt count differs",
+        ),
+        (
+            (
+                "请读取当前项目里测试对象的名称、类型、父级和基础属性，并汇总结果。",
+                "第一条。",
+                "被替换的第二条。",
+            ),
+            "in-memory prompts differ",
+        ),
+        (
+            (
+                "请读取当前项目里测试对象的名称、类型、父级和基础属性，并汇总结果。",
+                "",
+                "第二条。",
+            ),
+            "in-memory prompts must contain only non-empty prompts",
+        ),
+    ),
+    ids=("count", "text", "empty"),
+)
+def test_supplied_explicit_prompt_sequence_is_checked_exactly(
+    tmp_path: Path,
+    supplied: tuple[str, ...],
+    message: str,
+) -> None:
+    root = _scenario_root(tmp_path)
+    base = _scenario(
+        api="ak.wwise.core.object.set",
+        protocol="preview_confirm",
+        dispatch_count=2,
+    )
+    scenario = _ScenarioWithFollowUpPrompts(base, ("第一条。", "第二条。"))
+
+    with pytest.raises(PromptProvenanceError, match=message):
+        write_prompt_provenance(
+            scenario=scenario,
+            version=VERSION,
+            scenario_root=root,
+            prompts=supplied,
+            visible_values={},
+            protocol=_two_transaction_object_set_protocol(),
+        )
+
+
+def test_legacy_multi_transaction_scenario_still_repeats_confirmation(
+    tmp_path: Path,
+) -> None:
+    scenario = _scenario(
+        api="ak.wwise.core.object.set",
+        protocol="preview_confirm",
+        dispatch_count=2,
+    )
+    evidence = _write(
+        scenario=scenario,
+        root=_scenario_root(tmp_path),
+        protocol=_two_transaction_object_set_protocol(),
+    )
+
+    assert evidence.prompts == (scenario.prompt, CONFIRMATION, CONFIRMATION)
+
+
+@pytest.mark.parametrize("workflow_id", INTEGRATION_WORKFLOW_IDS)
+def test_integration_visible_inputs_are_sealed_and_round_trip(
+    tmp_path: Path,
+    workflow_id: str,
+) -> None:
+    root = _scenario_root(tmp_path)
+    scenario, protocol, values = _integration_case(root, workflow_id)
+    evidence = _write(
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+        visible_values=values,
+        trusted_sources={"integration_visible_inputs": values},
+    )
+    source = evidence.payload["trusted_sources"][
+        "integration_visible_inputs"
+    ]
+
+    assert set(source) == {"workflow_id", "inputs", "sha256"}
+    assert source["workflow_id"] == workflow_id
+    assert [row["name"] for row in source["inputs"]] == [
+        item.name for item in scenario.visible_inputs
+    ]
+    assert {
+        row["name"]: row["value"] for row in source["inputs"]
+    } == values
+    assert all(
+        row["path_proof"] is not None
+        if row["kind"] == "absolute_directory_path"
+        else row["path_proof"] is None
+        for row in source["inputs"]
+    )
+    assert all(
+        binding["origin_kind"] in {"trusted_source", "owned_path"}
+        for input_row in evidence.payload["request"]["inputs"]
+        for binding in input_row["leaf_bindings"]
+    )
+
+    restored = _read_again(
+        evidence.path,
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+        visible_values=values,
+    )
+    assert restored.visible_values == values
+    assert restored.payload == evidence.payload
+
+
+def test_integration_workflow_id_attribute_is_also_trusted(
+    tmp_path: Path,
+) -> None:
+    root = _scenario_root(tmp_path)
+    base, protocol, values = _integration_case(
+        root,
+        "interactive_weather_build",
+    )
+    scenario = _ScenarioWithWorkflowId(
+        base,
+        "interactive_weather_build",
+    )
+
+    evidence = _write(
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+        visible_values=values,
+        trusted_sources={"integration_visible_inputs": values},
+    )
+
+    assert evidence.visible_values == values
+
+
+@pytest.mark.parametrize(
+    "change",
+    ("missing", "extra", "value"),
+)
+def test_integration_source_must_exactly_equal_visible_values(
+    tmp_path: Path,
+    change: str,
+) -> None:
+    root = _scenario_root(tmp_path)
+    scenario, protocol, values = _integration_case(
+        root,
+        "harbor_soundbank_release",
+    )
+    source = dict(values)
+    if change == "missing":
+        source.pop("harbor_bank_name")
+    elif change == "extra":
+        source["hidden"] = "not-visible"
+    else:
+        source["harbor_bank_name"] = "Harbor_Changed"
+
+    with pytest.raises(
+        PromptProvenanceError,
+        match="keys or values differ",
+    ):
+        _write(
+            scenario=scenario,
+            root=root,
+            protocol=protocol,
+            visible_values=values,
+            trusted_sources={"integration_visible_inputs": source},
+        )
+
+
+def test_integration_owned_directory_cannot_escape_or_use_a_symlink(
+    tmp_path: Path,
+) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+
+    escape_root = _scenario_root(tmp_path, "escape")
+    scenario, protocol, values = _integration_case(
+        escape_root,
+        "interactive_weather_build",
+    )
+    values["weather_source_directory"] = str(outside)
+    with pytest.raises(PromptProvenanceError, match="escapes"):
+        _write(
+            scenario=scenario,
+            root=escape_root,
+            protocol=protocol,
+            visible_values=values,
+            trusted_sources={"integration_visible_inputs": values},
+        )
+
+    symlink_root = _scenario_root(tmp_path, "linked")
+    scenario, protocol, values = _integration_case(
+        symlink_root,
+        "interactive_weather_build",
+    )
+    source_directory = Path(values["weather_source_directory"])
+    source_directory.rmdir()
+    source_directory.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(PromptProvenanceError, match="symlink"):
+        _write(
+            scenario=scenario,
+            root=symlink_root,
+            protocol=protocol,
+            visible_values=values,
+            trusted_sources={"integration_visible_inputs": values},
+        )
+
+
+@pytest.mark.parametrize(
+    ("workflow_id", "input_name", "replacement", "message"),
+    (
+        (
+            "alarm_diagnose_and_repair",
+            "alarm_event_path",
+            "not-a-wwise-path",
+            "Wwise object path",
+        ),
+        (
+            "harbor_soundbank_release",
+            "harbor_bank_name",
+            "X" * (17 * 1024),
+            "bounded scalar",
+        ),
+        (
+            "harbor_soundbank_release",
+            "harbor_event_paths",
+            '["\\\\Events\\\\One"] ',
+            "canonical JSON",
+        ),
+    ),
+)
+def test_integration_non_directory_values_are_typed_and_bounded(
+    tmp_path: Path,
+    workflow_id: str,
+    input_name: str,
+    replacement: str,
+    message: str,
+) -> None:
+    root = _scenario_root(tmp_path)
+    scenario, protocol, values = _integration_case(root, workflow_id)
+    values[input_name] = replacement
+
+    with pytest.raises(PromptProvenanceError, match=message):
+        _write(
+            scenario=scenario,
+            root=root,
+            protocol=protocol,
+            visible_values=values,
+            trusted_sources={"integration_visible_inputs": values},
+        )
+
+
+def test_integration_sealed_source_tamper_is_rejected(
+    tmp_path: Path,
+) -> None:
+    root = _scenario_root(tmp_path)
+    scenario, protocol, values = _integration_case(
+        root,
+        "harbor_soundbank_release",
+    )
+    evidence = _write(
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+        visible_values=values,
+        trusted_sources={"integration_visible_inputs": values},
+    )
+    payload = json.loads(evidence.path.read_text(encoding="utf-8"))
+    source = payload["trusted_sources"]["integration_visible_inputs"]
+    source["inputs"][0]["value_sha256"] = "0" * 64
+    _rewrite_payload(evidence.path, payload)
+
+    with pytest.raises(PromptProvenanceError, match="rewrapped"):
+        _read_again(
+            evidence.path,
+            scenario=scenario,
+            root=root,
+            protocol=protocol,
+            visible_values=values,
+        )
+
+
+def test_integration_directory_proof_survives_archive_round_trip(
+    tmp_path: Path,
+) -> None:
+    root = _scenario_root(tmp_path)
+    scenario, protocol, values = _integration_case(
+        root,
+        "interactive_weather_build",
+    )
+    evidence = _write(
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+        visible_values=values,
+        trusted_sources={"integration_visible_inputs": values},
+    )
+    Path(values["weather_source_directory"]).rmdir()
+
+    archived = _read_again(
+        evidence.path,
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+        visible_values=values,
+        require_paths=False,
+    )
+
+    assert archived.visible_values == values
+    assert archived.payload == evidence.payload
 
 
 def test_read_rejects_non_fixed_provenance_path(tmp_path: Path) -> None:
@@ -1024,20 +1574,53 @@ def test_metadata_transaction_protocol_round_trips_its_scope_and_token_binding(
                 "metadata_type": "Real32",
             }
         ],
+        "gateway_derived_reference_activations": [],
     }
+    legacy_serialized = json.loads(json.dumps(serialized))
+    legacy_serialized["steps"][2]["arguments"][2].pop(
+        "gateway_derived_reference_activations"
+    )
+    legacy_restored = deserialize_protocol(legacy_serialized)
+    assert legacy_restored == protocol
+    assert _protocol_requests(legacy_serialized) == (
+        ("/steps/2/arguments/2/value", request),
+    )
+    assert serialize_protocol(legacy_restored) == serialized
     scenario = _scenario(
         api="ak.wwise.core.object.set",
         protocol="preview_confirm",
     )
+    root = _scenario_root(tmp_path)
     evidence = _write(
         scenario=scenario,
-        root=_scenario_root(tmp_path),
+        root=root,
         protocol=protocol,
     )
     assert evidence.prompts == (
         scenario.prompt,
         CONFIRMATION,
     )
+    legacy_payload = json.loads(evidence.path.read_text(encoding="utf-8"))
+    legacy_payload["protocol"]["value"]["steps"][2]["arguments"][2].pop(
+        "gateway_derived_reference_activations"
+    )
+    legacy_payload["protocol"]["sha256"] = hashlib.sha256(
+        json.dumps(
+            legacy_payload["protocol"]["value"],
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    _rewrite_payload(evidence.path, legacy_payload)
+    restored_legacy_evidence = _read_again(
+        evidence.path,
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+    )
+    assert restored_legacy_evidence.protocol == protocol
 
 
 def test_object_set_metadata_equivalence_round_trips_and_archive_revalidates(
@@ -1131,6 +1714,18 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
                 {
                     "object_path": r"\Actor-Mixer Hierarchy\Target",
                     "audio_file": "/owned/source.wav",
+                    "properties": [
+                        {"name": "OverrideOutput", "value": True}
+                    ],
+                    "references": [
+                        {
+                            "name": "OutputBus",
+                            "target": {
+                                "kind": "path",
+                                "value": r"\Master-Mixer Hierarchy\Main",
+                            },
+                        }
+                    ],
                 }
             ],
             "defaults": {
@@ -1144,13 +1739,59 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         (request,),
         object_type="Sound",
         metadata_queries=("looping enabled",),
-        required_tokens=("IsLoopingEnabled",),
+        required_tokens=(
+            "IsLoopingEnabled",
+            "OverrideOutput",
+            "OutputBus",
+        ),
+        expected_required_token_projection=(
+            MetadataTokenProjection(
+                "IsLoopingEnabled",
+                "property",
+                "Boolean",
+            ),
+            MetadataTokenProjection(
+                "OverrideOutput",
+                "property",
+                "Boolean",
+            ),
+            MetadataTokenProjection("OutputBus", "reference", ""),
+        ),
         equivalence="audio_import_v1",
+    )
+    preview = protocol.steps[2]
+    metadata_argument = preview.arguments[2]
+    assert isinstance(metadata_argument, MetadataBoundJsonArgument)
+    allowance = GatewayDerivedReferenceActivationAllowance(
+        row_index=0,
+        property_name="OverrideOutput",
+        property_value=True,
+        reference_name="OutputBus",
+    )
+    protocol = replace(
+        protocol,
+        steps=(
+            *protocol.steps[:2],
+            replace(
+                preview,
+                arguments=(
+                    *preview.arguments[:2],
+                    replace(
+                        metadata_argument,
+                        gateway_derived_reference_activations=(allowance,),
+                    ),
+                ),
+            ),
+            *protocol.steps[3:],
+        ),
     )
     serialized = serialize_protocol(protocol)
     argument = serialized["steps"][2]["arguments"][2]
 
     assert argument["equivalence"] == "audio_import_v1"
+    assert argument["gateway_derived_reference_activations"] == [
+        allowance.as_dict()
+    ]
     assert deserialize_protocol(serialized) == protocol
     assert _protocol_requests(serialized) == (
         ("/steps/2/arguments/2/value", request),
@@ -1168,8 +1809,8 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
     )
     payload = json.loads(evidence.path.read_text(encoding="utf-8"))
     payload["protocol"]["value"]["steps"][2]["arguments"][2][
-        "equivalence"
-    ] = "wire_exact"
+        "gateway_derived_reference_activations"
+    ][0]["row_index"] = 1
     payload["protocol"]["sha256"] = hashlib.sha256(
         json.dumps(
             payload["protocol"]["value"],
@@ -1183,7 +1824,7 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
 
     with pytest.raises(
         PromptProvenanceError,
-        match="in-memory protocol differs",
+        match="metadata-bound JSON protocol argument is invalid",
     ):
         _read_again(
             evidence.path,

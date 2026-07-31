@@ -34,8 +34,8 @@ def test_machine_readable_agent_result_is_terminal_for_fixed_reads_and_transacti
 
 
 def test_media_pool_reference_classification_uses_one_closed_versioned_query() -> None:
-    section = QUERY.split("#### Closed original-file reference classification", 1)[1].split(
-        "## Query examples", 1
+    section = QUERY.split("### Closed original-file reference classification", 1)[1].split(
+        "## Object queries", 1
     )[0]
     section_flat = " ".join(section.split())
     command = (
@@ -65,8 +65,8 @@ def test_media_pool_reference_classification_uses_one_closed_versioned_query() -
 
 
 def test_media_pool_reference_classification_documents_terminal_result_and_boundaries() -> None:
-    section = QUERY.split("#### Closed original-file reference classification", 1)[1].split(
-        "## Query examples", 1
+    section = QUERY.split("### Closed original-file reference classification", 1)[1].split(
+        "## Object queries", 1
     )[0]
     section_flat = " ".join(section.split())
 
@@ -188,6 +188,19 @@ def test_reverse_direct_parent_query_uses_the_parent_transform() -> None:
         "--return-field childrenCount --return-field notes "
         "--return-field OutputBus"
     ) in query_flat
+
+
+def test_reverse_direct_parent_example_contains_valid_path_json() -> None:
+    example = QUERY.split("Direct parents:", 1)[1].split("```bash", 1)[1].split(
+        "```", 1
+    )[0]
+    where_json = example.split("--where-json '", 1)[1].split("' --take", 1)[0]
+
+    predicates = json.loads(where_json)
+
+    assert predicates[0]["value"] == (
+        r"\Actor-Mixer Hierarchy\Default Work Unit\ParentReview"
+    )
 
 
 def test_reverse_parent_coverage_counts_raw_source_rows_not_children_count() -> None:
@@ -361,6 +374,18 @@ def test_ordinary_wwise_work_forbids_agent_authored_code() -> None:
         assert phrase in OPERATE
 
 
+def test_all_agent_cat_references_fit_the_single_read_window() -> None:
+    references = {
+        "waapi-setup.md": SETUP,
+        "waapi-query.md": QUERY,
+        "waapi-operate.md": OPERATE,
+        "waapi-coverage.md": COVERAGE,
+    }
+
+    for name, reference in references.items():
+        assert len(reference.encode("utf-8")) <= 32_768, name
+
+
 def test_operate_reference_is_a_bounded_single_read_control_plane() -> None:
     marker = "<!-- WAAPI_OPERATE_REFERENCE_END -->"
     assert len(OPERATE.encode("utf-8")) <= 32_768
@@ -371,6 +396,26 @@ def test_operate_reference_is_a_bounded_single_read_control_plane() -> None:
     assert "unique terminal sentinel required by `SKILL.md`" in OPERATE
     assert "no truncation or omission marker" in OPERATE
     assert "do not reread a range or invoke the Gateway" in OPERATE
+
+
+def test_query_reference_has_a_deterministic_end_and_separate_alarm_hops() -> None:
+    marker = "<!-- WAAPI_QUERY_REFERENCE_END -->"
+    query_flat = " ".join(QUERY.split())
+
+    assert len(QUERY.encode("utf-8")) <= 32_768
+    assert QUERY.count("WAAPI_QUERY_REFERENCE_END") == 1
+    assert QUERY.rstrip().endswith(marker)
+    assert marker not in QUERY[: QUERY.rfind(marker)]
+    assert "unique terminal sentinel required by `SKILL.md`" in query_flat
+    assert "no truncation or omission marker" in query_flat
+    assert "do not reread a range or invoke the Gateway" in query_flat
+    assert "`WAAPI_QUERY_REFERENCE_END` and `WAAPI_OPERATE_REFERENCE_END`" in SKILL
+    assert "matching sentinel is the final visible line" in SKILL
+    assert "That Sound projection ends at `OutputBus`" in query_flat
+    assert "do not add `@Volume` to the Sound hop" in query_flat
+    assert "query `@Volume` only on the exact Bus identities" in query_flat
+    assert "first the returned `OutputBus` id" in query_flat
+    assert "then the requested comparison Bus path or id" in query_flat
 
 
 def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
@@ -391,6 +436,17 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "`request_envelope_policy.status` is `ready`" in compact
     assert "copy `request_envelope` exactly" in compact
     assert "Unknown fields fail" in OPERATE
+    assert "serialize every JSON string exactly once" in OPERATE
+    assert "WAQL value contains ordinary `\"` characters" in OPERATE
+    assert "never leave JSON escape backslashes" in OPERATE
+    assert (
+        "Each later intended-change preview still uses `preview --apply`"
+        in OPERATE
+    )
+    assert (
+        "does not turn the next one into a design-only preview"
+        in OPERATE
+    )
 
 
 def test_operate_business_selection_and_execution_domains_remain_explicit() -> None:
@@ -428,6 +484,21 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
     assert "`object.create` same-name-root merge goes directly" in compact
     assert "`object.set` uses its returned target base and dynamic metadata scope" in compact
     assert "Do not insert `project-default-work-units`" in compact
+
+
+def test_operate_uses_one_bank_scoped_replace_for_a_complete_inclusion_post_state() -> None:
+    compact = " ".join(OPERATE.split())
+
+    assert (
+        "complete desired final inclusion set, use one "
+        "`soundbank.setInclusions` `replace` transaction"
+    ) in compact
+    assert "removed without being named individually" in compact
+    assert "every other Bank remains outside that transaction" in compact
+    assert (
+        "Do not split that final-state request into `add` and `remove` transactions"
+        in compact
+    )
 
 
 def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:

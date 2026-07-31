@@ -5,6 +5,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -32,8 +33,21 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (
 )
 
 
-def _result(*, turn: int, gateway_count: int):
-    reads = ("SKILL.md", "references/waapi-operate.md") if turn == 1 else ()
+def _result(
+    *,
+    turn: int,
+    gateway_count: int,
+    skill_reads: tuple[str, ...] | None = None,
+):
+    reads = (
+        skill_reads
+        if skill_reads is not None
+        else (
+            ("SKILL.md", "references/waapi-operate.md")
+            if turn == 1
+            else ()
+        )
+    )
     read_commands = tuple(f"cat {name}" for name in reads)
     command_records = tuple(SimpleNamespace(command=value) for value in read_commands) + tuple(
         SimpleNamespace(command=f"gateway {index}") for index in range(gateway_count)
@@ -77,6 +91,88 @@ def test_common_grade_accepts_first_and_resumed_turn_shapes() -> None:
         )
         assert errors == ()
         assert all(gates.values())
+
+
+def test_reference_schedule_preserves_default_and_allows_alarm_lane_transition() -> None:
+    assert task_runner._normalize_turn_reference_schedule(
+        prompt_count=3,
+        required_reference="references/waapi-operate.md",
+        turn_reference_schedule=None,
+    ) == (
+        ("SKILL.md", "references/waapi-operate.md"),
+        (),
+        (),
+    )
+    alarm_schedule = task_runner._normalize_turn_reference_schedule(
+        prompt_count=3,
+        required_reference="references/waapi-query.md",
+        turn_reference_schedule=(
+            ("references/waapi-query.md",),
+            ("references/waapi-operate.md",),
+            (),
+        ),
+    )
+
+    assert alarm_schedule == (
+        ("SKILL.md", "references/waapi-query.md"),
+        ("references/waapi-operate.md",),
+        (),
+    )
+    for turn_index, expected_reads in enumerate(alarm_schedule, start=1):
+        errors, gates = _grade_common_turn(
+            _result(
+                turn=turn_index,
+                gateway_count=1,
+                skill_reads=expected_reads,
+            ),
+            turn_index=turn_index,
+            required_reference="references/waapi-query.md",
+            expected_skill_reads=expected_reads,
+            expected_gateway_count=1,
+        )
+        assert errors == ()
+        assert all(gates.values())
+
+
+@pytest.mark.parametrize(
+    "schedule",
+    (
+        object(),
+        (("references/waapi-query.md",),),
+        ("references/waapi-query.md", (), ()),
+        ((None,), (), ()),
+        (
+            (
+                "references/waapi-query.md",
+                "references/waapi-operate.md",
+            ),
+            (),
+            (),
+        ),
+        (
+            ("references/waapi-query.md",),
+            ("references/waapi-query.md",),
+            (),
+        ),
+        (
+            ("references/waapi-query.md",),
+            ("references/not-packaged.md",),
+            (),
+        ),
+        (
+            ("references/waapi-operate.md",),
+            (),
+            (),
+        ),
+    ),
+)
+def test_reference_schedule_rejects_unclosed_shapes(schedule: Any) -> None:
+    with pytest.raises(task_runner.V3TaskRunnerError):
+        task_runner._normalize_turn_reference_schedule(
+            prompt_count=3,
+            required_reference="references/waapi-query.md",
+            turn_reference_schedule=schedule,
+        )
 
 
 def test_common_grade_rejects_reference_reread_on_resume() -> None:
@@ -341,6 +437,7 @@ class _FakeBrokerEvidence:
     ) -> None:
         self.expected_step_names = expected_names
         self.consumed_step_names = expected_names[:consumed_count]
+        self.commutative_read_only_step_groups = ()
         self.records = tuple(
             SimpleNamespace(
                 sequence=index,

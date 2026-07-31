@@ -1,0 +1,615 @@
+{
+  "contract": "waapi-skill.codex-integration-workflow-cases/v1",
+  "workflows": [
+    {
+      "id": "interactive_weather_build",
+      "versions": [
+        "2022.1",
+        "2025.1"
+      ],
+      "visible_inputs": [
+        {
+          "name": "weather_source_directory",
+          "kind": "absolute_directory_path",
+          "description": "包含五条确定性天气循环 WAV 的案例独占绝对目录"
+        },
+        {
+          "name": "weather_root_path",
+          "kind": "object_path",
+          "description": "承载交互天气结构的现有绝对 Actor-Mixer 路径"
+        },
+        {
+          "name": "weather_event_root_path",
+          "kind": "object_path",
+          "description": "承载五个天气 Play Event 的现有绝对 Event Work Unit 路径"
+        },
+        {
+          "name": "weather_game_parameter_path",
+          "kind": "object_path",
+          "description": "驱动雨层音量曲线的现有 Rain_Intensity Game Parameter 绝对路径"
+        },
+        {
+          "name": "weather_bus_path",
+          "kind": "object_path",
+          "description": "五个天气声音应统一引用的现有 Weather_Bus 绝对路径"
+        }
+      ],
+      "turns": [
+        {
+          "index": 1,
+          "kind": "request",
+          "prompt": "天气素材目录是 {weather_source_directory}，文件分别为 rain_bed.wav、wind_bed.wav、thunder_near.wav、thunder_mid.wav、thunder_far.wav。请把它们作为 SFX 导入：在 {weather_root_path} 下建立 Weather_Interactive Actor-Mixer；其下建立 Rain、Wind 两个 Actor-Mixer 和 Thunder Random Container，把 Rain_Bed、Wind_Bed 以及 Thunder_Near、Thunder_Mid、Thunder_Far 五个 Sound 分别放入对应容器，并在 {weather_event_root_path} 下建立 Play_Rain_Bed、Play_Wind_Bed、Play_Thunder_Near、Play_Thunder_Mid、Play_Thunder_Far 五个 Play Event。五个 Sound 导入时都启用无限循环、覆盖父级并启用本对象实例上限，输出统一指向 {weather_bus_path}；音量和实例上限依次为 Rain_Bed -4 dB/2、Wind_Bed -6 dB/2、Thunder_Near -2 dB/1、Thunder_Mid -8 dB/1、Thunder_Far -14 dB/1。随后设置五个 Play Action 的 FadeTime/Delay：Rain_Bed 0.25/0 秒、Wind_Bed 0.4/0.1 秒、Thunder_Near 0.05/0 秒、Thunder_Mid 0.12/0.08 秒、Thunder_Far 0.25/0.16 秒。最后把现有参数 {weather_game_parameter_path} 绑定到 Rain_Bed.Volume；若已有同属性绑定就替换，否则新增，三点线性曲线为 (0,-48)、(50,-12)、(100,0)。请分成三步：第一步同时完成层级、五个 Sound 导入和五个 Play Event；第二步只设置五个 Action 的 FadeTime/Delay；第三步绑定 RTPC。每一步都先给我看预览再执行。",
+          "confirms_transaction": null,
+          "expects_preview_transaction": 1
+        },
+        {
+          "index": 2,
+          "kind": "confirmation",
+          "prompt": "第一步的五个声音、事件、循环设置、音量、实例限制和输出总线预览都没问题，执行它；完成后先给我看五个 Play Action 的 FadeTime 和 Delay 预览。",
+          "confirms_transaction": 1,
+          "expects_preview_transaction": 2
+        },
+        {
+          "index": 3,
+          "kind": "confirmation",
+          "prompt": "五个 Play Action 的 FadeTime 和 Delay 预览符合需求，执行它；完成后先给我看 Rain_Intensity 到 Rain_Bed.Volume 的最后一步预览。",
+          "confirms_transaction": 2,
+          "expects_preview_transaction": 3
+        },
+        {
+          "index": 4,
+          "kind": "confirmation",
+          "prompt": "最后这条三点音量曲线预览也没问题，请执行并核对五个声音、五个事件、Action 设置和 RTPC 的完整结果。",
+          "confirms_transaction": 3,
+          "expects_preview_transaction": null
+        }
+      ],
+      "transactions": [
+        {
+          "index": 1,
+          "operation": "audio.import",
+          "api": "ak.wwise.core.audio.import",
+          "preview_turn": 1,
+          "confirmation_turn": 2
+        },
+        {
+          "index": 2,
+          "operation": "object.set",
+          "api": "ak.wwise.core.object.set",
+          "preview_turn": 2,
+          "confirmation_turn": 3
+        },
+        {
+          "index": 3,
+          "operation": "object.setRTPC",
+          "api": "ak.wwise.core.object.set",
+          "preview_turn": 3,
+          "confirmation_turn": 4
+        }
+      ],
+      "fixture": {
+        "adapter": "interactive_weather_fixture_v1",
+        "visible_bindings": {
+          "weather_source_directory": {
+            "source": "owned_path",
+            "relative_path": "weather/sources"
+          },
+          "weather_root_path": {
+            "source": "literal",
+            "value": "\\Actor-Mixer Hierarchy\\Default Work Unit\\IntegrationLab"
+          },
+          "weather_event_root_path": {
+            "source": "literal",
+            "value": "\\Events\\Default Work Unit\\Integration_Weather"
+          },
+          "weather_game_parameter_path": {
+            "source": "literal",
+            "value": "\\Game Parameters\\Ambience\\Rain_Intensity"
+          },
+          "weather_bus_path": {
+            "source": "literal",
+            "value": "\\Master-Mixer Hierarchy\\Default Work Unit\\Weather_Bus"
+          }
+        },
+        "parameters": {
+          "source_files": [
+            {
+              "key": "rain_bed",
+              "file_name": "rain_bed.wav",
+              "duration_ms": 613,
+              "frequency_hz": 263
+            },
+            {
+              "key": "wind_bed",
+              "file_name": "wind_bed.wav",
+              "duration_ms": 677,
+              "frequency_hz": 337
+            },
+            {
+              "key": "thunder_near",
+              "file_name": "thunder_near.wav",
+              "duration_ms": 733,
+              "frequency_hz": 421
+            },
+            {
+              "key": "thunder_mid",
+              "file_name": "thunder_mid.wav",
+              "duration_ms": 797,
+              "frequency_hz": 487
+            },
+            {
+              "key": "thunder_far",
+              "file_name": "thunder_far.wav",
+              "duration_ms": 863,
+              "frequency_hz": 557
+            }
+          ],
+          "import_rows": [
+            {
+              "source_key": "rain_bed",
+              "object_path": "<Actor-Mixer>Weather_Interactive\\<Actor-Mixer>Rain\\<Sound>Rain_Bed",
+              "event_name": "Play_Rain_Bed",
+              "properties": {
+                "IsLoopingEnabled": true,
+                "IsLoopingInfinite": true,
+                "IgnoreParentMaxSoundInstance": true,
+                "UseMaxSoundPerInstance": true,
+                "MaxSoundPerInstance": 2,
+                "Volume": -4.0
+              },
+              "references": {
+                "OutputBus": "{weather_bus_path}"
+              }
+            },
+            {
+              "source_key": "wind_bed",
+              "object_path": "<Actor-Mixer>Weather_Interactive\\<Actor-Mixer>Wind\\<Sound>Wind_Bed",
+              "event_name": "Play_Wind_Bed",
+              "properties": {
+                "IsLoopingEnabled": true,
+                "IsLoopingInfinite": true,
+                "IgnoreParentMaxSoundInstance": true,
+                "UseMaxSoundPerInstance": true,
+                "MaxSoundPerInstance": 2,
+                "Volume": -6.0
+              },
+              "references": {
+                "OutputBus": "{weather_bus_path}"
+              }
+            },
+            {
+              "source_key": "thunder_near",
+              "object_path": "<Actor-Mixer>Weather_Interactive\\<Random Container>Thunder\\<Sound>Thunder_Near",
+              "event_name": "Play_Thunder_Near",
+              "properties": {
+                "IsLoopingEnabled": true,
+                "IsLoopingInfinite": true,
+                "IgnoreParentMaxSoundInstance": true,
+                "UseMaxSoundPerInstance": true,
+                "MaxSoundPerInstance": 1,
+                "Volume": -2.0
+              },
+              "references": {
+                "OutputBus": "{weather_bus_path}"
+              }
+            },
+            {
+              "source_key": "thunder_mid",
+              "object_path": "<Actor-Mixer>Weather_Interactive\\<Random Container>Thunder\\<Sound>Thunder_Mid",
+              "event_name": "Play_Thunder_Mid",
+              "properties": {
+                "IsLoopingEnabled": true,
+                "IsLoopingInfinite": true,
+                "IgnoreParentMaxSoundInstance": true,
+                "UseMaxSoundPerInstance": true,
+                "MaxSoundPerInstance": 1,
+                "Volume": -8.0
+              },
+              "references": {
+                "OutputBus": "{weather_bus_path}"
+              }
+            },
+            {
+              "source_key": "thunder_far",
+              "object_path": "<Actor-Mixer>Weather_Interactive\\<Random Container>Thunder\\<Sound>Thunder_Far",
+              "event_name": "Play_Thunder_Far",
+              "properties": {
+                "IsLoopingEnabled": true,
+                "IsLoopingInfinite": true,
+                "IgnoreParentMaxSoundInstance": true,
+                "UseMaxSoundPerInstance": true,
+                "MaxSoundPerInstance": 1,
+                "Volume": -14.0
+              },
+              "references": {
+                "OutputBus": "{weather_bus_path}"
+              }
+            }
+          ],
+          "action_updates": [
+            {
+              "event_name": "Play_Rain_Bed",
+              "object": {
+                "kind": "direct-child",
+                "parent": {
+                  "kind": "path",
+                  "value": "\\Events\\Default Work Unit\\Integration_Weather\\Play_Rain_Bed"
+                },
+                "type": "Action"
+              },
+              "properties": {
+                "FadeTime": 0.25,
+                "Delay": 0.0
+              }
+            },
+            {
+              "event_name": "Play_Wind_Bed",
+              "object": {
+                "kind": "direct-child",
+                "parent": {
+                  "kind": "path",
+                  "value": "\\Events\\Default Work Unit\\Integration_Weather\\Play_Wind_Bed"
+                },
+                "type": "Action"
+              },
+              "properties": {
+                "FadeTime": 0.4,
+                "Delay": 0.1
+              }
+            },
+            {
+              "event_name": "Play_Thunder_Near",
+              "object": {
+                "kind": "direct-child",
+                "parent": {
+                  "kind": "path",
+                  "value": "\\Events\\Default Work Unit\\Integration_Weather\\Play_Thunder_Near"
+                },
+                "type": "Action"
+              },
+              "properties": {
+                "FadeTime": 0.05,
+                "Delay": 0.0
+              }
+            },
+            {
+              "event_name": "Play_Thunder_Mid",
+              "object": {
+                "kind": "direct-child",
+                "parent": {
+                  "kind": "path",
+                  "value": "\\Events\\Default Work Unit\\Integration_Weather\\Play_Thunder_Mid"
+                },
+                "type": "Action"
+              },
+              "properties": {
+                "FadeTime": 0.12,
+                "Delay": 0.08
+              }
+            },
+            {
+              "event_name": "Play_Thunder_Far",
+              "object": {
+                "kind": "direct-child",
+                "parent": {
+                  "kind": "path",
+                  "value": "\\Events\\Default Work Unit\\Integration_Weather\\Play_Thunder_Far"
+                },
+                "type": "Action"
+              },
+              "properties": {
+                "FadeTime": 0.25,
+                "Delay": 0.16
+              }
+            }
+          ],
+          "rtpc": {
+            "object_path": "Weather_Interactive\\Rain\\Rain_Bed",
+            "property": "Volume",
+            "control_input_path": "\\Game Parameters\\Ambience\\Rain_Intensity",
+            "mode": "add_or_replace",
+            "points": [
+              {
+                "x": 0.0,
+                "y": -48.0,
+                "shape": "Linear"
+              },
+              {
+                "x": 50.0,
+                "y": -12.0,
+                "shape": "Linear"
+              },
+              {
+                "x": 100.0,
+                "y": 0.0,
+                "shape": "Linear"
+              }
+            ]
+          },
+          "protected_paths": [
+            "{weather_game_parameter_path}",
+            "{weather_bus_path}"
+          ]
+        },
+        "cleanup": {
+          "success": "remove_scenario_owned_project_assets_and_outputs",
+          "failure": "seal_owned_state_never_reuse",
+          "source_project": "must_remain_unchanged"
+        }
+      }
+    },
+    {
+      "id": "alarm_diagnose_and_repair",
+      "versions": [
+        "2022.1",
+        "2025.1"
+      ],
+      "visible_inputs": [
+        {
+          "name": "alarm_event_path",
+          "kind": "object_path",
+          "description": "需要从 Event 开始完整诊断播放链路的现有 Alarm Event 绝对路径"
+        },
+        {
+          "name": "alarm_target_bus_path",
+          "kind": "object_path",
+          "description": "诊断确认后应设置为 OutputBus 的现有应急总线绝对路径"
+        }
+      ],
+      "turns": [
+        {
+          "index": 1,
+          "kind": "diagnosis_request",
+          "prompt": "请先只读诊断 {alarm_event_path} 的完整播放链路：从这个精确 Event 找到直接 Play Action 及其目标 Sound，确认 Sound 是否覆写输出、使用的 AudioSource 对应哪个原始文件和语言，再核对它当前实际指向的 Bus 与 {alarm_target_bus_path} 各自的音量，判断问题是路由错误还是总线静音。这一轮只报告 Event→Action→Sound→AudioSource→Bus 的逐层证据和结论，不要修改工程。",
+          "confirms_transaction": null,
+          "expects_preview_transaction": null
+        },
+        {
+          "index": 2,
+          "kind": "change_request",
+          "prompt": "诊断结果清楚了，我要修复这个路由。请只把链路中确认的 Sound 输出总线改为刚才的应急总线，Event、Action、AudioSource 和 Sound 的其他属性保持不变；这是要实际执行的修改，但先给我看预览并等我确认。",
+          "confirms_transaction": null,
+          "expects_preview_transaction": 1
+        },
+        {
+          "index": 3,
+          "kind": "confirmation",
+          "prompt": "这个路由修复预览符合诊断结论，请执行并重新核对输出总线和未涉及的属性。",
+          "confirms_transaction": 1,
+          "expects_preview_transaction": null
+        }
+      ],
+      "transactions": [
+        {
+          "index": 1,
+          "operation": "object.setReference",
+          "api": "ak.wwise.core.object.setReference",
+          "preview_turn": 2,
+          "confirmation_turn": 3
+        }
+      ],
+      "fixture": {
+        "adapter": "alarm_reference_fixture_v1",
+        "visible_bindings": {
+          "alarm_event_path": {
+            "source": "literal",
+            "value": "\\Events\\Default Work Unit\\IntegrationLab\\Alarm\\Play_Generator_Alarm"
+          },
+          "alarm_target_bus_path": {
+            "source": "literal",
+            "value": "\\Master-Mixer Hierarchy\\Default Work Unit\\Master Audio Bus\\SFX_Machinery"
+          }
+        },
+        "parameters": {
+          "reference_name": "OutputBus",
+          "wrong_bus_path": "\\Master-Mixer Hierarchy\\Default Work Unit\\Master Audio Bus\\Diagnostic_Dead_Bus",
+          "expected_chain": {
+            "event_path": "\\Events\\Default Work Unit\\IntegrationLab\\Alarm\\Play_Generator_Alarm",
+            "action_path": "\\Events\\Default Work Unit\\IntegrationLab\\Alarm\\Play_Generator_Alarm\\Play",
+            "sound_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\IntegrationLab\\Alarm\\Generator_Alarm",
+            "audio_source_file": "generator_alarm.wav",
+            "current_bus_path": "\\Master-Mixer Hierarchy\\Default Work Unit\\Master Audio Bus\\Diagnostic_Dead_Bus",
+            "target_bus_path": "\\Master-Mixer Hierarchy\\Default Work Unit\\Master Audio Bus\\SFX_Machinery"
+          },
+          "diagnostic_plan": [
+            {
+              "stage": "event",
+              "selector": "\\Events\\Default Work Unit\\IntegrationLab\\Alarm\\Play_Generator_Alarm",
+              "return_fields": [
+                "id",
+                "name",
+                "path",
+                "type"
+              ]
+            },
+            {
+              "stage": "action",
+              "selector_waql": "\"\\Events\\Default Work Unit\\IntegrationLab\\Alarm\\Play_Generator_Alarm\" select descendants where type = \"Action\" take 1",
+              "return_fields": [
+                "id",
+                "name",
+                "path",
+                "type",
+                "target"
+              ]
+            },
+            {
+              "stage": "sound",
+              "selector": "action.target",
+              "return_fields": [
+                "id",
+                "name",
+                "path",
+                "type",
+                "activeSource",
+                "OutputBus",
+                "@Volume",
+                "@Pitch"
+              ]
+            },
+            {
+              "stage": "audio_source",
+              "selector": "sound.activeSource",
+              "return_fields": [
+                "id",
+                "name",
+                "type",
+                "originalFilePath",
+                "audioSource:language"
+              ]
+            },
+            {
+              "stage": "bus",
+              "selector": "sound.OutputBus",
+              "return_fields": [
+                "id",
+                "name",
+                "path",
+                "type"
+              ]
+            }
+          ],
+          "protected_properties": [
+            "UseMaxSoundPerInstance",
+            "MaxSoundPerInstance",
+            "Volume",
+            "Pitch"
+          ],
+          "baseline": {
+            "use_max_sound_per_instance": true,
+            "max_sound_per_instance": 3,
+            "volume": 0.0,
+            "pitch": 0.0
+          }
+        },
+        "cleanup": {
+          "success": "remove_scenario_owned_project_assets_and_outputs",
+          "failure": "seal_owned_state_never_reuse",
+          "source_project": "must_remain_unchanged"
+        }
+      }
+    },
+    {
+      "id": "harbor_soundbank_release",
+      "versions": [
+        "2022.1",
+        "2025.1"
+      ],
+      "visible_inputs": [
+        {
+          "name": "harbor_bank_name",
+          "kind": "string",
+          "description": "需要保存包含项并生成发布产物的现有 SoundBank 名称"
+        },
+        {
+          "name": "harbor_event_paths",
+          "kind": "structured_array",
+          "description": "应直接保存到发布 Bank 的三个现有 Event 绝对路径"
+        },
+        {
+          "name": "soundbank_output_directory",
+          "kind": "absolute_directory_path",
+          "description": "案例独占的 SoundBank 生成输出目录"
+        },
+        {
+          "name": "soundbank_io_root",
+          "kind": "absolute_directory_path",
+          "description": "同时包含沙箱工程、缓存和全部生成输出的案例独占可信目录"
+        }
+      ],
+      "turns": [
+        {
+          "index": 1,
+          "kind": "request",
+          "prompt": "要发布的 Bank 是 {harbor_bank_name}，三个正式事件是 {harbor_event_paths}。本次工程、缓存和全部生成输出都在可信目录 {soundbank_io_root} 内，实际发布输出目录是 {soundbank_output_directory}。请把每个正式事件都以 Event、Structure、Media 完整包含项保存到这个 Bank，同时移除 Debug 包含项且不要改 Harbor_Control；随后为 Windows 和 Mac 两个平台生成 SFX 发布产物。两步分别给我预览，先不要跨过确认直接生成。",
+          "confirms_transaction": null,
+          "expects_preview_transaction": 1
+        },
+        {
+          "index": 2,
+          "kind": "confirmation",
+          "prompt": "三个正式事件的完整包含项、Debug 移除和 Harbor_Control 保持不变都符合要求，请保存；完成后先给我看 Windows、Mac 两个平台 SFX 发布产物的生成预览。",
+          "confirms_transaction": 1,
+          "expects_preview_transaction": 2
+        },
+        {
+          "index": 3,
+          "kind": "confirmation",
+          "prompt": "Windows 和 Mac 的生成预览符合发布范围，请执行并分别核对两个平台的 Bank 和媒体产物都位于指定发布目录。",
+          "confirms_transaction": 2,
+          "expects_preview_transaction": null
+        }
+      ],
+      "transactions": [
+        {
+          "index": 1,
+          "operation": "soundbank.setInclusions",
+          "api": "ak.wwise.core.soundbank.setInclusions",
+          "preview_turn": 1,
+          "confirmation_turn": 2
+        },
+        {
+          "index": 2,
+          "operation": "soundbank.generate",
+          "api": "ak.wwise.core.soundbank.generate",
+          "preview_turn": 2,
+          "confirmation_turn": 3
+        }
+      ],
+      "fixture": {
+        "adapter": "harbor_soundbank_fixture_v1",
+        "visible_bindings": {
+          "harbor_bank_name": {
+            "source": "literal",
+            "value": "Harbor_Release"
+          },
+          "harbor_event_paths": {
+            "source": "literal",
+            "value": [
+              "\\Events\\Default Work Unit\\IntegrationLab\\Harbor\\Play_Harbor_Waves",
+              "\\Events\\Default Work Unit\\IntegrationLab\\Harbor\\Play_Harbor_Gulls",
+              "\\Events\\Default Work Unit\\IntegrationLab\\Harbor\\Play_Harbor_Horns"
+            ]
+          },
+          "soundbank_output_directory": {
+            "source": "owned_path",
+            "relative_path": "harbor/soundbank-output"
+          },
+          "soundbank_io_root": {
+            "source": "owned_root"
+          }
+        },
+        "parameters": {
+          "events": [
+            "\\Events\\Default Work Unit\\IntegrationLab\\Harbor\\Play_Harbor_Waves",
+            "\\Events\\Default Work Unit\\IntegrationLab\\Harbor\\Play_Harbor_Gulls",
+            "\\Events\\Default Work Unit\\IntegrationLab\\Harbor\\Play_Harbor_Horns"
+          ],
+          "inclusion_filter": [
+            "events",
+            "structures",
+            "media"
+          ],
+          "remove_event_path": "\\Events\\Default Work Unit\\IntegrationLab\\Harbor\\Debug",
+          "control_bank_name": "Harbor_Control",
+          "platforms": [
+            "Windows",
+            "Mac"
+          ],
+          "languages": [
+            "SFX"
+          ],
+          "artifact_scope": [
+            "bank",
+            "media"
+          ]
+        },
+        "cleanup": {
+          "success": "remove_scenario_owned_project_assets_and_outputs",
+          "failure": "seal_owned_state_never_reuse",
+          "source_project": "must_remain_unchanged"
+        }
+      }
+    }
+  ]
+}

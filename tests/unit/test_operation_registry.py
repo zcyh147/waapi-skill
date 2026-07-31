@@ -375,6 +375,26 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     ]["minLength"] == 1
     assert "returned copy GUID" in specs["object.copy"]["boundary"]
     assert specs["object.setProperty"]["identity_contract"]["caller_rows_allowed"] is False
+    assert specs["object.setProperty"]["identity_contract"]["one_of"] == [
+        "id",
+        "path",
+        "waql",
+        "direct-child",
+        "scoped-name",
+    ]
+    direct_child_identity = specs["object.setNotes"]["argument_contract"][
+        "properties"
+    ]["object"]["oneOf"][3]
+    assert direct_child_identity["required"] == ["kind", "parent", "type"]
+    assert direct_child_identity["additionalProperties"] is False
+    assert direct_child_identity["properties"]["kind"] == {
+        "const": "direct-child"
+    }
+    assert direct_child_identity["properties"]["type"]["maxLength"] == 128
+    assert direct_child_identity["properties"]["parent"]["oneOf"][1][
+        "properties"
+    ]["value"]["maxLength"] == 4096
+    assert "No caller-authored WAQL" in direct_child_identity["description"]
     assert specs["soundbank.convertExternalSources"]["supported_versions"] == [
         "2022.1",
         "2023.1",
@@ -492,6 +512,27 @@ def test_audio_import_operation_schema_discloses_compact_batch_composition_contr
             "subset_shared_without_explicit_baseline": (
                 "keep_in_each_applicable_import_row"
             ),
+            "defaults_scope": {
+                "applies_to": "every_imports_row",
+                "object_type_filtering": False,
+                "mixed_structure_and_sound_rows": {
+                    "sound_only_fields": [
+                        "import_language",
+                        "properties",
+                        "references",
+                        "event",
+                    ],
+                    "placement": "keep_on_each_applicable_sound_row",
+                    "defaults_placement": "forbidden",
+                },
+                "rule": (
+                    "defaults has no object-type filter and affects every "
+                    "imports row; when structure-only and Sound rows are "
+                    "mixed, keep import_language, properties, references, "
+                    "and event on each applicable Sound row instead of "
+                    "defaults"
+                ),
+            },
             "fixed_fields": [
                 "object_path",
                 "object_type",
@@ -537,18 +578,44 @@ def test_audio_import_operation_schema_discloses_compact_batch_composition_contr
                 "dependency_identity": "exact_returned_property_name",
             },
             "materialization": {
-                "required_values_count": 1,
-                "kind": "property",
-                "copy_name_from": "dependency_requirements[].property",
-                "copy_value_from": (
-                    "dependency_requirements[].required_values[0]"
-                ),
-                "scope": {
-                    "inherit_selected_owner_scope": True,
-                    "defaults": "$.arguments.defaults.properties",
-                    "row": (
-                        "$.arguments.imports[owner_row_index].properties"
+                "ordinary_dependencies": {
+                    "owner": "request",
+                    "required_values_count": 1,
+                    "kind": "property",
+                    "copy_name_from": (
+                        "dependency_requirements[].property"
                     ),
+                    "copy_value_from": (
+                        "dependency_requirements[].required_values[0]"
+                    ),
+                    "scope": {
+                        "inherit_selected_owner_scope": True,
+                        "defaults": "$.arguments.defaults.properties",
+                        "row": (
+                            "$.arguments.imports"
+                            "[owner_row_index].properties"
+                        ),
+                    },
+                },
+                "supported_reference_activation": {
+                    "owner": "gateway",
+                    "supported_shape": {
+                        "dependency_type": "override",
+                        "action": "Enable",
+                        "context": "Self",
+                        "property_type": ["bool", "boolean"],
+                        "required_value": True,
+                    },
+                    "request_forms": {
+                        "omitted": (
+                            "accepted_and_derived_before_dispatch"
+                        ),
+                        "explicit_required_value": (
+                            "accepted_and_deduplicated"
+                        ),
+                        "explicit_conflict": "rejected",
+                    },
+                    "scope": "same_object_as_reference",
                 },
             },
             "failure_policy": {
@@ -622,11 +689,32 @@ def test_audio_import_schema_discloses_generic_live_dependency_closure() -> None
     assert dependency["metadata_source"]["authority"] == "live-waapi"
     assert dependency["metadata_source"]["same_result_required"] is True
     assert dependency["traversal"]["recursive"] is True
-    assert dependency["materialization"]["required_values_count"] == 1
-    assert dependency["materialization"]["scope"] == {
+    ordinary = dependency["materialization"]["ordinary_dependencies"]
+    activation = dependency["materialization"][
+        "supported_reference_activation"
+    ]
+    assert ordinary["owner"] == "request"
+    assert ordinary["required_values_count"] == 1
+    assert ordinary["scope"] == {
         "inherit_selected_owner_scope": True,
         "defaults": "$.arguments.defaults.properties",
         "row": "$.arguments.imports[owner_row_index].properties",
+    }
+    assert activation == {
+        "owner": "gateway",
+        "supported_shape": {
+            "dependency_type": "override",
+            "action": "Enable",
+            "context": "Self",
+            "property_type": ["bool", "boolean"],
+            "required_value": True,
+        },
+        "request_forms": {
+            "omitted": "accepted_and_derived_before_dispatch",
+            "explicit_required_value": "accepted_and_deduplicated",
+            "explicit_conflict": "rejected",
+        },
+        "scope": "same_object_as_reference",
     }
     assert dependency["failure_policy"]["phase"] == "before_preview"
     assert dependency["failure_policy"]["action"] == "stop"
@@ -2216,6 +2304,345 @@ def test_all_identities_are_live_resolved_and_ambiguous_or_protected_targets_fai
     assert target.value.error_code == "PROTECTED_TARGET"
 
 
+def test_direct_child_identity_builds_one_bounded_gateway_owned_selector() -> None:
+    parent_path = r"\Events\Default Work Unit\Weather_Play"
+    parent_id = "{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}"
+    action_id = "{bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb}"
+    parent_row = object_row(
+        object_id=parent_id,
+        name="Weather_Play",
+        object_type="Event",
+        path=parent_path,
+        parent="{cccccccc-cccc-cccc-cccc-cccccccccccc}",
+    )
+    action_row = object_row(
+        object_id=action_id,
+        name="Action",
+        object_type="Action",
+        path=f"{parent_path}\\Action",
+        parent=parent_id,
+    )
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.get": [
+                {"return": [parent_row]},
+                {"return": [action_row]},
+            ]
+        }
+    )
+
+    prepared = prepare_operation(
+        parse_operation_request(
+            request(
+                "object.setNotes",
+                {
+                    "object": {
+                        "kind": "direct-child",
+                        "parent": {"kind": "path", "value": parent_path},
+                        "type": "Action",
+                    },
+                    "value": "reviewed",
+                },
+            )
+        ),
+        read_call=reader,
+    ).as_dict()
+
+    assert reader.calls[0][1] == {"from": {"path": [parent_path]}}
+    assert reader.calls[1][1] == {
+        "waql": (
+            f'from object "{parent_path}" '
+            'select children where type = "Action" take 2'
+        )
+    }
+    assert reader.calls[1][2]["return"] == [
+        "id",
+        "name",
+        "type",
+        "path",
+        "parent",
+        "notes",
+    ]
+    assert prepared["dispatch"]["args"] == {
+        "object": action_id,
+        "value": "reviewed",
+    }
+    assert prepared["resolved_roles"]["object"]["resolution"] == (
+        "live-direct-child"
+    )
+
+
+@pytest.mark.parametrize("child_rows", ([], [object_row(), object_row(object_id=TARGET_GUID)]))
+def test_direct_child_identity_rejects_zero_or_multiple_rows(
+    child_rows: list[dict[str, Any]],
+) -> None:
+    parent_path = r"\Events\Default Work Unit\Weather_Play"
+    parent_row = object_row(
+        object_id=PARENT_GUID,
+        name="Weather_Play",
+        object_type="Event",
+        path=parent_path,
+    )
+    parsed = parse_operation_request(
+        request(
+            "object.setNotes",
+            {
+                "object": {
+                    "kind": "direct-child",
+                    "parent": {"kind": "path", "value": parent_path},
+                    "type": "Action",
+                },
+                "value": "reviewed",
+            },
+        )
+    )
+
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(
+            parsed,
+            read_call=ScriptedReader(
+                {
+                    "ak.wwise.core.object.get": [
+                        {"return": [parent_row]},
+                        {"return": child_rows},
+                    ]
+                }
+            ),
+        )
+
+    assert rejected.value.error_code == "AMBIGUOUS_IDENTITY"
+    assert rejected.value.details["row_count"] == len(child_rows)
+
+
+@pytest.mark.parametrize(
+    ("child_type", "child_parent"),
+    (
+        ("Sound", PARENT_GUID),
+        ("Action", "{dddddddd-dddd-dddd-dddd-dddddddddddd}"),
+    ),
+)
+def test_direct_child_identity_rejects_wrong_type_or_parent(
+    child_type: str,
+    child_parent: str,
+) -> None:
+    parent_path = r"\Events\Default Work Unit\Weather_Play"
+    parent_row = object_row(
+        object_id=PARENT_GUID,
+        name="Weather_Play",
+        object_type="Event",
+        path=parent_path,
+    )
+    child_row = object_row(
+        object_id=TARGET_GUID,
+        name="Action",
+        object_type=child_type,
+        path=f"{parent_path}\\Action",
+        parent=child_parent,
+    )
+
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(
+            parse_operation_request(
+                request(
+                    "object.setNotes",
+                    {
+                        "object": {
+                            "kind": "direct-child",
+                            "parent": {
+                                "kind": "path",
+                                "value": parent_path,
+                            },
+                            "type": "Action",
+                        },
+                        "value": "reviewed",
+                    },
+                )
+            ),
+            read_call=ScriptedReader(
+                {
+                    "ak.wwise.core.object.get": [
+                        {"return": [parent_row]},
+                        {"return": [child_row]},
+                    ]
+                }
+            ),
+        )
+
+    assert rejected.value.error_code == "IDENTITY_MISMATCH"
+
+
+def test_direct_child_identity_quotes_valid_literal_content_without_query_splicing() -> None:
+    parent_path = (
+        r"\Events\Default Work Unit\Event where type = Sound select descendants"
+    )
+    object_type = "Action or type = Sound"
+    parent_row = object_row(
+        object_id=PARENT_GUID,
+        name="Event where type = Sound select descendants",
+        object_type="Event",
+        path=parent_path,
+    )
+    child_row = object_row(
+        object_id=TARGET_GUID,
+        name="OddType",
+        object_type=object_type,
+        path=f"{parent_path}\\OddType",
+        parent=PARENT_GUID,
+    )
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.get": [
+                {"return": [parent_row]},
+                {"return": [child_row]},
+            ]
+        }
+    )
+
+    prepare_operation(
+        parse_operation_request(
+            request(
+                "object.setNotes",
+                {
+                    "object": {
+                        "kind": "direct-child",
+                        "parent": {"kind": "path", "value": parent_path},
+                        "type": object_type,
+                    },
+                    "value": "reviewed",
+                },
+            )
+        ),
+        read_call=reader,
+    )
+
+    assert reader.calls[1][1] == {
+        "waql": (
+            f'from object "{parent_path}" select children where type = '
+            f'"{object_type}" take 2'
+        )
+    }
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        {
+            "kind": "direct-child",
+            "parent": {"kind": "path", "value": r"\Events\Default Work Unit\E"},
+        },
+        {
+            "kind": "direct-child",
+            "parent": {"kind": "waql", "value": "from type Event"},
+            "type": "Action",
+        },
+        {
+            "kind": "direct-child",
+            "parent": {"kind": "path", "value": r"\Events\Default Work Unit\E"},
+            "type": "Action",
+            "waql": "from type Sound",
+        },
+        {
+            "kind": "direct-child",
+            "parent": {"kind": "path", "value": "\\" + ("x" * 4096)},
+            "type": "Action",
+        },
+        {
+            "kind": "direct-child",
+            "parent": {"kind": "path", "value": r"\Events\Default Work Unit\E"},
+            "type": "x" * 129,
+        },
+        {
+            "kind": "direct-child",
+            "parent": {"kind": "path", "value": r'\Events\Default Work Unit\E"'},
+            "type": "Action",
+        },
+        {
+            "kind": "direct-child",
+            "parent": {"kind": "path", "value": r"\Events\Default Work Unit\E"},
+            "type": 'Action" or type = "Sound',
+        },
+    ),
+)
+def test_direct_child_identity_rejects_malformed_or_unbounded_shapes(
+    identity: Mapping[str, Any],
+) -> None:
+    with pytest.raises(OperationContractError) as rejected:
+        parse_operation_request(
+            request(
+                "object.setNotes",
+                {"object": identity, "value": "reviewed"},
+            )
+        )
+
+    assert rejected.value.error_code in {"INVALID_IDENTITY", "INVALID_REQUEST"}
+
+
+def test_existing_identity_resolution_shapes_keep_their_original_queries() -> None:
+    object_path = object_row()["path"]
+    cases = (
+        (
+            {"kind": "id", "value": GUID},
+            [{"return": [object_row()]}],
+            [{"from": {"id": [GUID]}}],
+        ),
+        (
+            {"kind": "path", "value": object_path},
+            [{"return": [object_row()]}],
+            [{"from": {"path": [object_path]}}],
+        ),
+        (
+            {"kind": "waql", "value": "from type Sound take 2"},
+            [{"return": [object_row()]}],
+            [{"waql": "from type Sound take 2"}],
+        ),
+        (
+            {
+                "kind": "scoped-name",
+                "name": "OldName",
+                "type": "Sound",
+                "parent": {"kind": "id", "value": PARENT_GUID},
+            },
+            [
+                {
+                    "return": [
+                        object_row(
+                            object_id=PARENT_GUID,
+                            name="Default Work Unit",
+                            object_type="WorkUnit",
+                            path=r"\Actor-Mixer Hierarchy\Default Work Unit",
+                        )
+                    ]
+                },
+                {"return": [object_row()]},
+            ],
+            [
+                {"from": {"id": [PARENT_GUID]}},
+                {
+                    "waql": (
+                        f'from object "{PARENT_GUID}" select children '
+                        'where type = "Sound" and name = "OldName"'
+                    )
+                },
+            ],
+        ),
+    )
+
+    for identity, responses, expected_args in cases:
+        reader = ScriptedReader(
+            {"ak.wwise.core.object.get": copy.deepcopy(responses)}
+        )
+        prepare_operation(
+            parse_operation_request(
+                request(
+                    "object.setNotes",
+                    {"object": identity, "value": "after"},
+                )
+            ),
+            read_call=reader,
+        )
+        assert [call[1] for call in reader.calls] == expected_args
+
+
 def test_rename_verifier_proves_same_guid_new_path_parent_and_old_path_absence() -> None:
     preview_reader = ScriptedReader({"ak.wwise.core.object.get": [{"return": [object_row()]}]})
     parsed = parse_operation_request(
@@ -3429,6 +3856,337 @@ def test_audio_import_uses_versioned_authoring_roots_for_2025_containers(tmp_pat
     with pytest.raises(OperationContractError) as wrong_root:
         prepare_operation(parsed_2024, read_call=ScriptedReader({}))
     assert wrong_root.value.error_code == "INVALID_TARGET"
+
+
+def test_audio_import_2025_accepts_property_container_as_deepest_path_anchor() -> None:
+    parent_path = (
+        r"\Containers\Default Work Unit\IntegrationLab"
+    )
+    target_path = parent_path + r"\Weather_Interactive"
+    parent_row = object_row(
+        object_id=PARENT_GUID,
+        name="IntegrationLab",
+        object_type="PropertyContainer",
+        path=parent_path,
+        parent="{containers-work-unit}",
+    )
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.getTypes": [
+                {
+                    "return": [
+                        {
+                            "classId": 1,
+                            "name": "PropertyContainer",
+                            "type": "WObject",
+                        }
+                    ]
+                }
+            ],
+            "ak.wwise.core.object.get": [
+                {"return": [parent_row]},
+                {"return": []},
+            ],
+        }
+    )
+
+    prepared = prepare_operation(
+        parse_operation_request(
+            request(
+                "audio.import",
+                {
+                    "imports": [
+                        {
+                            "object_path": target_path,
+                            "object_type": "ActorMixer",
+                        }
+                    ]
+                },
+                version="2025.1",
+            )
+        ),
+        read_call=reader,
+    ).as_dict()
+
+    assert prepared["dispatch"]["args"]["imports"] == [
+        {
+            "objectPath": target_path,
+            "objectType": "ActorMixer",
+        }
+    ]
+    assert prepared["resolved_roles"]["targets[0].anchor"]["object"] == (
+        PARENT_GUID
+    )
+
+
+@pytest.mark.parametrize("location_scope", ["defaults", "row"])
+def test_audio_import_2025_accepts_property_container_import_location(
+    location_scope: str,
+) -> None:
+    parent_path = (
+        r"\Containers\Default Work Unit\IntegrationLab"
+    )
+    target_path = parent_path + r"\Weather_Interactive"
+    parent_row = object_row(
+        object_id=PARENT_GUID,
+        name="IntegrationLab",
+        object_type="PropertyContainer",
+        path=parent_path,
+        parent="{containers-work-unit}",
+    )
+    import_location = {"kind": "path", "value": parent_path}
+    import_row: dict[str, Any] = {
+        "object_path": r"<ActorMixer>Weather_Interactive",
+        "object_type": "ActorMixer",
+    }
+    arguments: dict[str, Any] = {"imports": [import_row]}
+    if location_scope == "defaults":
+        arguments["defaults"] = {"import_location": import_location}
+        role = "defaults.import_location"
+    else:
+        import_row["import_location"] = import_location
+        role = "imports[0].import_location"
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.getTypes": [
+                {
+                    "return": [
+                        {
+                            "classId": 1,
+                            "name": "PropertyContainer",
+                            "type": "WObject",
+                        }
+                    ]
+                }
+            ],
+            "ak.wwise.core.object.get": [
+                {"return": [parent_row]},
+                {"return": [parent_row]},
+                {"return": []},
+            ],
+        }
+    )
+
+    prepared = prepare_operation(
+        parse_operation_request(
+            request(
+                "audio.import",
+                arguments,
+                version="2025.1",
+            )
+        ),
+        read_call=reader,
+    ).as_dict()
+
+    assert prepared["dispatch"]["args"]["imports"] == [
+        {
+            "objectPath": r"<ActorMixer>Weather_Interactive",
+            "objectType": "ActorMixer",
+            "importLocation": parent_path,
+        }
+    ]
+    assert prepared["verification_plan"]["targets"][0][
+        "canonical_target_path"
+    ] == target_path
+    assert prepared["resolved_roles"][role]["object"] == PARENT_GUID
+
+
+def test_tab_import_2025_accepts_property_container_import_location(
+    tmp_path: Path,
+) -> None:
+    parent_path = (
+        r"\Containers\Default Work Unit\IntegrationLab"
+    )
+    target_path = parent_path + r"\Weather_Interactive"
+    parent_row = object_row(
+        object_id=PARENT_GUID,
+        name="IntegrationLab",
+        object_type="PropertyContainer",
+        path=parent_path,
+        parent="{containers-work-unit}",
+    )
+    import_file = tmp_path / "structure.tsv"
+    import_file.write_text(
+        "Object Path\tObject Type\n"
+        "<ActorMixer>Weather_Interactive\tActorMixer\n",
+        encoding="utf-8",
+    )
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.getTypes": [
+                {
+                    "return": [
+                        {
+                            "classId": 1,
+                            "name": "PropertyContainer",
+                            "type": "WObject",
+                        }
+                    ]
+                }
+            ],
+            "ak.wwise.core.object.get": [
+                {"return": [parent_row]},
+                {"return": [parent_row]},
+                {"return": []},
+            ],
+        }
+    )
+
+    prepared = prepare_operation(
+        parse_operation_request(
+            request(
+                "audio.importTabDelimited",
+                {
+                    "import_file": str(import_file),
+                    "import_location": {
+                        "kind": "path",
+                        "value": parent_path,
+                    },
+                    "import_language": "SFX",
+                },
+                version="2025.1",
+            )
+        ),
+        read_call=reader,
+    ).as_dict()
+
+    assert prepared["dispatch"]["args"]["importLocation"] == PARENT_GUID
+    assert prepared["verification_plan"]["targets"][0][
+        "canonical_target_path"
+    ] == target_path
+    assert prepared["resolved_roles"]["import_location"]["object"] == (
+        PARENT_GUID
+    )
+
+
+@pytest.mark.parametrize(
+    "version",
+    ["2021.1", "2022.1", "2023.1", "2024.1"],
+)
+def test_audio_import_old_versions_reject_property_container_path_anchor(
+    version: str,
+) -> None:
+    parent_path = (
+        r"\Actor-Mixer Hierarchy\Default Work Unit\IntegrationLab"
+    )
+    parent_row = object_row(
+        object_id=PARENT_GUID,
+        name="IntegrationLab",
+        object_type="PropertyContainer",
+        path=parent_path,
+        parent="{actor-work-unit}",
+    )
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.getTypes": [
+                {
+                    "return": [
+                        {
+                            "classId": 1,
+                            "name": "ActorMixer",
+                            "type": "WObject",
+                        }
+                    ]
+                }
+            ],
+            "ak.wwise.core.object.get": [
+                {"return": [parent_row]},
+            ],
+        }
+    )
+
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(
+            parse_operation_request(
+                request(
+                    "audio.import",
+                    {
+                        "imports": [
+                            {
+                                "object_path": (
+                                    parent_path
+                                    + r"\Weather_Interactive"
+                                ),
+                                "object_type": "ActorMixer",
+                            }
+                        ]
+                    },
+                    version=version,
+                )
+            ),
+            read_call=reader,
+        )
+
+    assert rejected.value.error_code == "INVALID_TARGET_TYPE"
+    assert rejected.value.details["version"] == version
+    assert "PropertyContainer" not in rejected.value.details[
+        "allowed_types"
+    ]
+
+
+def test_audio_import_2025_resolves_actor_mixer_metadata_through_property_container() -> None:
+    parent_path = r"\Containers\Default Work Unit"
+    target_path = parent_path + r"\Weather_Interactive"
+    parent_row = object_row(
+        object_id=PARENT_GUID,
+        name="Default Work Unit",
+        object_type="WorkUnit",
+        path=parent_path,
+        parent="{containers-root}",
+    )
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.getTypes": [
+                {
+                    "return": [
+                        {
+                            "classId": 1,
+                            "name": "PropertyContainer",
+                            "type": "WObject",
+                        }
+                    ]
+                }
+            ],
+            "ak.wwise.core.object.get": [
+                {"return": [parent_row]},
+                {"return": []},
+            ],
+        }
+    )
+
+    prepared = prepare_operation(
+        parse_operation_request(
+            request(
+                "audio.import",
+                {
+                    "imports": [
+                        {
+                            "object_path": target_path,
+                            "object_type": "ActorMixer",
+                        }
+                    ]
+                },
+                version="2025.1",
+            )
+        ),
+        read_call=reader,
+    ).as_dict()
+
+    assert prepared["dispatch"]["args"]["imports"] == [
+        {
+            "objectPath": target_path,
+            "objectType": "ActorMixer",
+        }
+    ]
+    target = prepared["verification_plan"]["targets"][0]
+    assert target["requested_object_type"] == "ActorMixer"
+    assert target["metadata_object_type"] == "PropertyContainer"
+    assert target["metadata_class_id"] == 1
+    assert reader.calls[0] == (
+        "ak.wwise.core.object.getTypes",
+        {},
+        {},
+    )
 
 
 def test_soundbank_inclusions_use_internal_prestate_exact_poststate_and_drift_guard() -> None:
