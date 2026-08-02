@@ -223,6 +223,25 @@ def test_prompts_read_as_user_requests_and_close_visible_inputs() -> None:
             assert len(turn.prompt.strip()) >= 12
             assert not any(word.lower() in turn.prompt.lower() for word in forbidden)
 
+    weather_prompt = profile.workflows[0].turns[0].prompt
+    assert "-4 dB/2" not in weather_prompt
+    assert "0.25/0 秒" not in weather_prompt
+    assert "Rain_Bed 的音量设为 -4 dB，最大实例数设为 2" in weather_prompt
+    assert (
+        "Play_Thunder_Near 的 FadeTime 设为 0.05 秒，"
+        "Delay 设为 0 秒"
+    ) in weather_prompt
+
+    harbor_prompts = tuple(
+        turn.prompt for turn in profile.workflows[2].turns
+    )
+    assert all("正式事件" not in prompt for prompt in harbor_prompts)
+    assert (
+        "为下面三个 Event 分别增加 Event、Structure 和 Media 三类包含内容"
+        in harbor_prompts[0]
+    )
+    assert "同时移除已有的 Debug 包含项；不要修改 Harbor_Control" in harbor_prompts[0]
+
 
 def test_fixtures_supply_only_visible_inputs_and_owned_cleanup_contracts() -> None:
     profile = load_integration_workflows_profile(COMMITTED_PROFILE_PATH)

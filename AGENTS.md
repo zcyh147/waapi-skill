@@ -356,9 +356,23 @@ profile units have passing evidence across those roots; do not report that
 `a12` itself passed 6/6 or that all six were rerun after the final repair.
 Every passing sandbox was removed, failed sandboxes were sealed and
 quarantined, and both source SampleProjects retained identical full hashes and
-mtimes. This evidence belongs to the candidate before the structured-query
-request and closed mutation-selector migration; it must not be cited as fresh
-semantic validation of those later routing changes.
+mtimes. This older evidence belongs to the candidate before the
+structured-query request and closed mutation-selector migration.
+
+The 2026-08-03 current-wording rerun is also cumulative, not one final-candidate
+6/6 run. `campaign-integration-workflows-v1-terra-20260803-current-r1` passed
+five units and failed `INT25-ALARM-DIAGNOSE-AND-REPAIR` before mutation because
+the Agent redundantly re-read the Action instead of following the already
+returned `Target.id`. The Skill query reference was then narrowed to forbid
+that duplicate hop. Fresh roots `r2-int25-alarm-action-hop` and
+`r3-int22-alarm-action-hop` passed both Alarm versions on the same repaired
+candidate, and both passed `--resume --verify-only`. Weather and Harbor had
+loaded only the unchanged operate reference in `r1`; all four passed there.
+Thus all six current prompt units have passing evidence across these roots,
+but there is still no single repaired-candidate 6/6 campaign. All eight
+recorded lifecycles preserved source hashes and mtimes; passing sandboxes were
+removed and the one failed sandbox remains quarantined. Do not extrapolate
+this workflow evidence to unexercised advanced WAQL or unrelated APIs.
 
 For harness-only CI checks that start neither Codex nor Wwise, use the focused
 pytest commands in `tests/semantic/README.md`.

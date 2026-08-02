@@ -132,6 +132,18 @@ def test_exact_identity_query_is_complete_in_entry_file() -> None:
     assert "keep those four fields explicit for an exact path/GUID identity lookup" in QUERY
 
 
+def test_exact_hop_playback_diagnosis_does_not_repeat_the_action_lookup() -> None:
+    section = QUERY.split("## Exact-hop playback diagnosis", 1)[1].split(
+        "## Topics and Authoring-only reads", 1
+    )[0]
+    section_flat = " ".join(section.split())
+
+    assert "The Event children result is already the Action hop" in section_flat
+    assert "do not query the Action id again" in section_flat
+    assert "use the returned `Target.id` directly" in section_flat
+    assert "for the next exact-id Sound lookup" in section_flat
+
+
 def test_complex_query_guidance_preserves_tokens_pushdown_and_user_bounds() -> None:
     query_flat = " ".join(QUERY.split())
     for phrase in (

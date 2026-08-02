@@ -146,7 +146,7 @@ campaign root. Stop the pass early only for a systemic harness, source-sandbox,
 evidence, or cleanup fault that could invalidate later cases. The profile
 totals are a design contract.
 
-The completed 2026-07-31 evidence is cumulative. The frozen initial
+The completed 2026-07-31 historical evidence is cumulative. The frozen initial
 `campaign-integration-workflows-v1-terra-20260731-a12` root passed the Alarm
 and Harbor workflows on both versions and failed both Weather workflows.
 Fresh repaired roots
@@ -156,6 +156,21 @@ the remaining 2022.1 and 2025.1 Weather units. Across those roots all six
 unique units have passing evidence, but there is no single final-candidate
 6/6 campaign. Passing sandboxes were cleaned, failed sandboxes were sealed and
 quarantined, and all source-project hashes and mtimes remained unchanged.
+
+The 2026-08-03 current-wording campaign used the same transaction topology,
+fixtures, and business oracles. The full frozen `current-r1` root passed five
+units; only the 2025.1 Alarm failed, before mutation, when the Agent repeated an
+exact-ID Action read instead of following the `Target.id` already returned by
+the Event children query. A narrow `waapi-query.md` repair made that hop
+explicit. Fresh `r2-int25-alarm-action-hop` and
+`r3-int22-alarm-action-hop` roots then passed the two Alarm versions on the
+same repaired candidate and passed their identical `--resume --verify-only`
+audits. Weather and Harbor loaded only the unchanged operate reference and
+passed in `current-r1`. All six current prompt units therefore have passing
+evidence across these roots, but there is no single repaired-candidate 6/6
+run. All eight lifecycle records retained identical source hashes and mtimes;
+the seven passing sandboxes were removed and the one failed sandbox is sealed
+and quarantined.
 
 The focused `modification_policy_9` profile reuses the existing
 `OBJ22-F-CREATE-01` fixture, runner, broker, lifecycle, and business oracle. It

@@ -403,6 +403,9 @@ with exact-id lookups. For an Event use bounded direct
 `--select children --take 100`, not broad descendants or same-name search.
 Request identity plus only fields needed at that hop: Action ->
 `ActionType,Target`; Sound -> `OverrideOutput,activeSource,OutputBus`.
+The Event children result is already the Action hop. When that Action row
+contains `ActionType` and `Target`, do not query the Action id again; use the
+returned `Target.id` directly for the next exact-id Sound lookup.
 
 That Sound projection ends at `OutputBus`; do not add `@Volume` to the Sound
 hop unless the user asks for the Sound's own volume. For source file/language,

@@ -139,7 +139,7 @@ then make one repair batch and start a new campaign root; stop early only for a
 systemic harness, sandbox, evidence, or cleanup fault. These totals define the
 planned profile.
 
-Completed evidence is split across three frozen 2026-07-31 roots. Initial
+Historical evidence is split across three frozen 2026-07-31 roots. Initial
 `a12` passed the four Alarm/Harbor version units and failed both Weather units;
 fresh `a20-int22-weather` and `a24-int25-weather` roots passed the repaired
 Weather units. This is passing evidence for all six unique units across roots,
@@ -151,6 +151,20 @@ disclosed bounded advanced-WAQL layer, and the removal of raw WAQL mutation
 selectors. No fresh Codex semantic campaign has validated those newer routing
 contracts; keep the historical integration result attached only to its
 migration-before candidate.
+
+The natural-language prompt revision received a fresh 2026-08-03 campaign.
+`campaign-integration-workflows-v1-terra-20260803-current-r1` passed five of
+six units. The 2025.1 Alarm failed safely on turn one because the Agent added a
+redundant exact-ID Action lookup after the Event children row had already
+returned `ActionType` and `Target`; no mutation occurred. After a query-reference
+repair clarified that `Target.id` is the next Sound identity, fresh roots
+`r2-int25-alarm-action-hop` and `r3-int22-alarm-action-hop` passed the 2025.1
+and 2022.1 Alarm units on the same repaired candidate. Both repair roots pass
+`--resume --verify-only`. Weather and Harbor loaded only the unchanged operate
+reference and passed for both versions in `r1`. This gives all six current
+prompt units passing evidence across roots, not a single repaired-candidate
+6/6 run. All eight lifecycle records preserve source hashes and mtimes;
+passing sandboxes were cleaned and the failed sandbox remains quarantined.
 
 The review-oriented v3 bundle is rooted at
 `skills/waapi-skill/evals/suite-v3.json` and deliberately separates:
