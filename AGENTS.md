@@ -47,8 +47,9 @@ for Wwise Authoring. Read this file before changing the Skill or running tests.
     virtual environment.
 - `skills/waapi-skill/scripts/gateway.py`
   - the public CLI contract: offline catalog/config commands, bounded live
-    reads, the offline `query-schema` plus structured `query-object` contract,
-    subscriptions, transaction phases, result ceilings, and `session_context`.
+    reads, the progressively disclosed structured and advanced `query-schema`
+    contracts behind `query-object`, subscriptions, transaction phases, result
+    ceilings, and `session_context`.
 - `skills/waapi-skill/wwise_waapi/`
   - implementation library. Important seams include `capabilities.py`,
     `execution_contracts.py`, `operation_registry.py`, `transactions.py`,
@@ -159,14 +160,27 @@ user's approval.
   Operation-specific fields, nested shapes, and version deltas belong in the
   version-aware `operation-schema` or `describe` result; do not add per-API
   Markdown merely to repeat structured gateway contracts.
-- Keep every public query and mutation identity free of caller- or
-  model-authored raw WAQL. Simple reads use the closed `query-object` flags;
-  complex reads obtain the versioned `waapi-skill.object-query/v1` contract
-  from offline `query-schema` and pass it through
-  `query-object --request-json`. Mutation identities are limited to `id`,
-  `path`, `exact-type-name`, `direct-child`, and `scoped-name`; a complex
-  filter must first resolve through structured `query-object` to exactly one
-  verified GUID.
+- Keep mutation identities free of caller- or model-authored raw WAQL. Object
+  reads use three progressive layers: closed `query-object` flags, the
+  versioned `waapi-skill.object-query/v1` Builder from offline `query-schema`,
+  then—only when that schema cannot express a required read—the bounded
+  `waapi-skill.advanced-object-query/v1` contract disclosed by
+  `query-schema --advanced`. The advanced contract fixes
+  `ak.wwise.core.object.get`, owns its return projection and final `take`, and
+  never becomes a raw args/options or mutation path. Mutation identities remain
+  limited to `id`, `path`, `exact-type-name`, `direct-child`, and
+  `scoped-name`. An advanced query cannot certify target uniqueness: before a
+  later change, present its candidates, obtain the user's exact choice, and
+  verify that chosen GUID through the simple exact-ID query route before using
+  the normal closed mutation contract. Candidate projections keep unaliased
+  `id`, `name`, `type`, and `path`; the exact-ID readback must match the chosen
+  name/type/path or the workflow stops.
+- Generalize “shortcut flags → structured contract → controlled native
+  expression” only to fixed read-only APIs with a declarative DSL whose time,
+  row, and byte boundaries remain Gateway-owned. Do not copy the native
+  expression fallback to project mutations, SoundEngine commands, topics,
+  SoundBanks, imports, UI commands, or Lua/code execution; extend their closed
+  contracts instead.
 - Keep `agent_result` exact for machine-readable replies. Do not rebuild it from
   summaries, and preserve its final insertion-order position in gateway payloads.
 - All live results and structured failures must stay bounded. Cleanup failures,

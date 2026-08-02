@@ -333,6 +333,25 @@ def test_native_surface_policy_records_closed_import_semantic_boundaries() -> No
         ] == "intentionally_blocked"
 
 
+def test_native_surface_policy_records_bounded_advanced_waql_equivalence() -> None:
+    payload = load_native_surface_policy()
+    rules = [
+        rule
+        for rule in payload["rules"]
+        if rule["uri"] == "ak.wwise.core.object.get"
+    ]
+
+    assert len(rules) == 2
+    for rule in rules:
+        boundary = {
+            row["selector"]: row
+            for row in rule["semantic_boundaries"]
+        }["args.waql::caller-supplied-raw-expression"]
+        assert boundary["status"] == "normalized_equivalent"
+        assert "advanced object-query contract" in boundary["reason"]
+        assert "final take" in boundary["reason"]
+
+
 def test_native_surface_policy_rejects_an_unreviewed_special_route() -> None:
     payload = deepcopy(load_native_surface_policy())
     payload["route_audit"]["reviewed_special_uris"].pop()

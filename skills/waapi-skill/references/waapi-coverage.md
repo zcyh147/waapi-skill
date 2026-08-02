@@ -164,7 +164,7 @@ closed until the packaged contract is reviewed and updated.
 
 ## Verification scope
 
-The focused program gate currently contains 2087 passing tests and exercises
+The focused program gate currently contains 2362 passing tests and exercises
 all 808 packaged route-contract version/API rows with
 in-process fake clients. It validates exact URI dispatch, reflected request and
 result/event schemas, timeout/result ceilings, all three modification-policy
@@ -175,7 +175,11 @@ route bypass attempts, model-authored external command hooks, malformed nested
 payloads, and manifest drift. Direct and isolated generic transactions also run
 through complete preview/confirm/execute/verify program chains. Dedicated tests
 separately validate the 824-row Authoring overlay and its UI-command routes;
-this is not a second 824-row per-API fake-dispatch matrix.
+this is not a second 824-row per-API fake-dispatch matrix. The query tests cover
+all five versions of the closed Builder plus the advanced WAQL route's fixed
+read-only URI, framing, Gateway-appended final `take`, response cap, and
+explicit lack of a mutation-identity bridge. They do not prove native syntax
+acceptance by a real Wwise process.
 
 The completed, memory-off `h80-release-c38` Codex Terra campaign ran 80
 real-Wwise business scenarios for the 16 approved heavy APIs: 70 on 2022.1,

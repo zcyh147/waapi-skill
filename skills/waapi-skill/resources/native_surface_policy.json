@@ -486,8 +486,8 @@
       "semantic_boundaries": [
         {
           "selector": "args.waql::caller-supplied-raw-expression",
-          "status": "intentionally_blocked",
-          "reason": "The fixed route builds bounded WAQL from reviewed source, filter, selection, and take inputs instead of dispatching an unrestricted expression."
+          "status": "normalized_equivalent",
+          "reason": "The progressively disclosed advanced object-query contract accepts one native WAQL expression only through the fixed read-only object.get route, owns the return projection, appends a final take, and retains Gateway timeout and byte ceilings."
         }
       ]
     },
@@ -523,8 +523,8 @@
       "semantic_boundaries": [
         {
           "selector": "args.waql::caller-supplied-raw-expression",
-          "status": "intentionally_blocked",
-          "reason": "The fixed route builds bounded WAQL from reviewed source, filter, selection, and take inputs instead of dispatching an unrestricted expression."
+          "status": "normalized_equivalent",
+          "reason": "The progressively disclosed advanced object-query contract accepts one native WAQL expression only through the fixed read-only object.get route, owns the return projection, appends a final take, and retains Gateway timeout and byte ceilings."
         }
       ]
     },

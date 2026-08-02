@@ -12,6 +12,10 @@ from wwise_waapi.builders.common import (  # pyright: ignore[reportMissingImport
     SourceNoteCheck,
 )
 from wwise_waapi.builders.query import (  # pyright: ignore[reportMissingImports]
+    ADVANCED_QUERY_CONTRACT,
+    MAX_ADVANCED_RETURN_EXPRESSION_BYTES,
+    MAX_ADVANCED_RETURN_EXPRESSIONS,
+    MAX_ADVANCED_WAQL_BYTES,
     MAX_QUERY_TAKE,
     MAX_STRUCTURED_BOOLEAN_DEPTH,
     MAX_STRUCTURED_LITERAL_LENGTH,
@@ -22,6 +26,8 @@ from wwise_waapi.builders.query import (  # pyright: ignore[reportMissingImports
     MAX_STRUCTURED_TRANSFORMS,
     STRUCTURED_QUERY_CONTRACT,
     WaqlQueryBuilder,
+    advanced_query_schema,
+    build_advanced_object_get_query,
     build_structured_object_get_query,
     structured_query_schema,
 )
@@ -138,6 +144,185 @@ def request(
         },
         "transforms": transforms or [],
         "return": return_fields or ["id", "name", "type", "path"],
+    }
+
+
+def advanced_request(
+    *,
+    waql: str = "from type Sound orderby name",
+    return_fields: list[str] | None = None,
+    max_results: int = 25,
+) -> dict[str, object]:
+    return {
+        "contract": ADVANCED_QUERY_CONTRACT,
+        "waql": waql,
+        "return": return_fields or ["id", "name", "type", "path"],
+        "max_results": max_results,
+    }
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_advanced_query_five_version_contract_appends_gateway_cap(version: str) -> None:
+    checker = FakeSourceNoteChecker()
+    preview = build_advanced_object_get_query(
+        advanced_request(
+            waql=(
+                'from type Sound where effects.any(effect.name = "Compressor") '
+                "orderby name distinct"
+            ),
+            return_fields=[
+                "id",
+                "name",
+                "effects.name as EffectNames",
+                "OutputBus.{name, shortid}",
+            ],
+            max_results=17,
+        ),
+        version=version,
+        source_note_checker=checker,
+    )
+
+    assert preview.envelope.uri == "ak.wwise.core.object.get"
+    assert preview.envelope.args == {
+        "waql": (
+            'from type Sound where effects.any(effect.name = "Compressor") '
+            "orderby name distinct take 17"
+        )
+    }
+    assert preview.envelope.options == {
+        "return": [
+            "id",
+            "name",
+            "effects.name as EffectNames",
+            "OutputBus.{name, shortid}",
+        ]
+    }
+    assert preview.envelope.metadata["query_contract"] == ADVANCED_QUERY_CONTRACT
+    assert preview.envelope.metadata["query_bound"] == {
+        "mode": "gateway-appended-take",
+        "value": 17,
+    }
+    assert preview.envelope.metadata["read_only"] is True
+    assert checker.calls == [(BuilderFamily.QUERY.value, version)]
+
+
+def test_advanced_query_preserves_existing_transforms_and_adds_a_second_take() -> None:
+    preview = build_advanced_object_get_query(
+        advanced_request(
+            waql="from type Sound skip 10 take 40 orderby name reverse   ",
+            max_results=7,
+        )
+    )
+
+    assert preview.envelope.args == {
+        "waql": "from type Sound skip 10 take 40 orderby name reverse take 7"
+    }
+
+
+def test_advanced_query_does_not_confuse_read_only_search_terms_with_mutation() -> None:
+    preview = build_advanced_object_get_query(
+        advanced_request(
+            waql=r'from search "delete; create // import" where notes = /[/;]set/',
+            max_results=3,
+        )
+    )
+
+    assert preview.envelope.args["waql"].endswith(" take 3")
+
+
+@pytest.mark.parametrize(
+    "payload",
+    (
+        {**advanced_request(), "contract": "wrong"},
+        {**advanced_request(), "unknown": True},
+        {**advanced_request(), "waql": ""},
+        {**advanced_request(), "waql": "   "},
+        {**advanced_request(), "waql": 7},
+        {**advanced_request(), "return": "id"},
+        {**advanced_request(), "return": [7]},
+        {**advanced_request(), "max_results": True},
+        {**advanced_request(), "max_results": 2.5},
+        {**advanced_request(), "max_results": "2"},
+        {**advanced_request(), "max_results": 0},
+        {**advanced_request(), "max_results": MAX_QUERY_TAKE + 1},
+        {**advanced_request(), "return": []},
+        {**advanced_request(), "return": ["id", "id"]},
+        {**advanced_request(), "return": [" id"]},
+        {
+            **advanced_request(),
+            "return": ["id"] * (MAX_ADVANCED_RETURN_EXPRESSIONS + 1),
+        },
+        {
+            **advanced_request(),
+            "return": ["x" * (MAX_ADVANCED_RETURN_EXPRESSION_BYTES + 1)],
+        },
+    ),
+)
+def test_advanced_query_rejects_contract_and_budget_drift(
+    payload: dict[str, object],
+) -> None:
+    with pytest.raises(SemanticValidationError) as caught:
+        build_advanced_object_get_query(payload)
+
+    assert caught.value.error_code is SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
+
+
+@pytest.mark.parametrize(
+    "waql",
+    (
+        "$ from type Sound",
+        "from type Sound\norderby name",
+        "from type Sound; from type Event",
+        "from type Sound // second query",
+        "from type Sound /* comment */",
+        'from search "unterminated',
+        "from type Sound where name = /unterminated",
+    ),
+)
+def test_advanced_query_rejects_ambiguous_query_frames(waql: str) -> None:
+    with pytest.raises(SemanticValidationError):
+        build_advanced_object_get_query(advanced_request(waql=waql))
+
+
+def test_advanced_query_utf8_byte_limits_are_runtime_enforced() -> None:
+    with pytest.raises(SemanticValidationError):
+        build_advanced_object_get_query(
+            advanced_request(waql="界" * (MAX_ADVANCED_WAQL_BYTES // 2))
+        )
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_advanced_query_schema_is_closed_and_versioned(version: str) -> None:
+    schema = advanced_query_schema(version=version)
+
+    assert schema["$id"] == ADVANCED_QUERY_CONTRACT
+    assert schema["x-wwise-version"] == version
+    assert schema["x-limits"]["gateway_json_document_bytes"] == 256 * 1024
+    assert schema["required"] == ["contract", "waql", "return", "max_results"]
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["return"]["uniqueItems"] is True
+    assert schema["properties"]["waql"]["x-maxUtf8Bytes"] == MAX_ADVANCED_WAQL_BYTES
+    assert schema["properties"]["waql"]["x-framing"] == {
+        "singleLine": True,
+        "queryEditorDollarPrefix": False,
+        "comments": False,
+        "statementSeparators": False,
+        "balancedDoubleQuotedStrings": True,
+        "balancedSlashRegexLiterals": True,
+        "trailingWhitespace": "removed-before-final-take",
+    }
+    assert schema["properties"]["return"]["items"]["x-maxUtf8Bytes"] == (
+        MAX_ADVANCED_RETURN_EXPRESSION_BYTES
+    )
+    assert schema["properties"]["return"]["items"]["x-framing"]["trimmed"] is True
+    assert schema["properties"]["max_results"] == {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": MAX_QUERY_TAKE,
+        "description": (
+            "Gateway-owned final row cap. It does not bound Wwise's "
+            "internal scan or sort cost."
+        ),
     }
 
 

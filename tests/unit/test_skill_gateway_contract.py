@@ -27,6 +27,8 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
         "python scripts/run.py gateway.py --version <supported-version> call ak.wwise.waapi.getTopics --args-json '{}' --options-json '{}'",
         "python scripts/run.py gateway.py query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path",
         "python scripts/run.py gateway.py query-object --type Event --take 100",
+        "python scripts/run.py gateway.py --version <supported-version> query-schema [--advanced]",
+        "python scripts/run.py gateway.py --version <supported-version> query-object (--request-json '<object-query-v1-json>' | --advanced-request-json '<advanced-object-query-v1-json>')",
         "python scripts/run.py gateway.py metadata types --summary-only",
         "python scripts/run.py gateway.py wait-topic <topic-uri>",
         "python scripts/run.py gateway.py --timeout <positive-finite-seconds> wait-topic <topic-uri>",
@@ -89,6 +91,7 @@ def test_cli_bootstrap_uses_only_the_injected_absolute_skill_locator() -> None:
 
 def test_query_reference_has_no_raw_client_fallback() -> None:
     query_reference = (SKILL_ROOT / "references" / "waapi-query.md").read_text(encoding="utf-8")
+    query_flat = " ".join(query_reference.split())
 
     assert "There is no raw-client fallback" in query_reference
     assert "gateway.py call <uri>" in query_reference
@@ -103,7 +106,13 @@ def test_query_reference_has_no_raw_client_fallback() -> None:
     assert "gateway.py wait-topic" in query_reference
     assert "gateway.py stream-topic" in query_reference
     assert "`--query` means an existing Wwise Query Editor object" in query_reference
-    assert "model-authored raw WAQL" in query_reference
+    assert "bounded native WAQL fallback" in query_reference
+    assert "query-schema --advanced" in query_reference
+    assert "query-object --advanced-request-json" in query_reference
+    assert "do not write Python" in query_reference
+    assert "Raw WAQL itself is never a mutation identity" in query_flat
+    assert "never alias another advanced expression onto" in query_flat
+    assert "The exact-ID readback must match" in query_flat
     assert "`owner` remain outside the packaged boundary" in query_reference
     assert "existing `--take N` or explicit user-requested `--all-results` rule" in query_reference
     assert "`--all-results`" in query_reference
@@ -299,7 +308,7 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
         assert "**656**" in readme
         assert "**152**" in readme
         assert "**6**" in readme
-        assert "2307" in readme
+        assert "2362" in readme
         assert "./skills/waapi-skill/references/waapi-coverage.md" in readme
 
     assert "198 unique routed WAAPI URIs" in english
@@ -308,4 +317,4 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
     assert "仍要求实时宿主为 Authoring" in " ".join(chinese.split())
     assert "not a claim that all 808 rows have been exercised against a real Wwise process" in english
     assert "不等于已经在真实 Wwise 进程中逐一运行了全部 808 行" in chinese
-    assert "currently contains 2087 passing tests" in coverage_contract
+    assert "currently contains 2362 passing tests" in coverage_contract

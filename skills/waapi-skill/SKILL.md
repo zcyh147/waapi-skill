@@ -53,8 +53,8 @@ python scripts/run.py gateway.py --version <supported-version> call ak.wwise.waa
 python scripts/run.py gateway.py --version <supported-version> call <bounded-read-uri> --args-json '<object>' --options-json '<object>'
 python scripts/run.py gateway.py query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path
 python scripts/run.py gateway.py query-object --type Event --take 100
-python scripts/run.py gateway.py --version <supported-version> query-schema
-python scripts/run.py gateway.py --version <supported-version> query-object --request-json '<object-query-v1-json>'
+python scripts/run.py gateway.py --version <supported-version> query-schema [--advanced]
+python scripts/run.py gateway.py --version <supported-version> query-object (--request-json '<object-query-v1-json>' | --advanced-request-json '<advanced-object-query-v1-json>')
 python scripts/run.py gateway.py --version <supported-version> object-types --query '<type keywords>' --limit 20
 python scripts/run.py gateway.py metadata types --summary-only
 python scripts/run.py gateway.py wait-topic <topic-uri>
@@ -85,7 +85,7 @@ Use exactly one command for the corresponding intent:
 | ask a Debug Wwise build to validate one reflected call shape without executing it | `debug-validate-call` |
 | inspect packaged API support, schema, route, or boundary | `capabilities` / `describe` |
 | call a capability whose catalog route is `manifest_dispatch` | `call` with reflected args/options |
-| object lookup: simple or complex | `query-object`; complex first uses `query-schema` |
+| object lookup | progressively disclose `query-object` flags, structured schema, then advanced schema |
 | packaged object-type discovery without Wwise | `object-types` |
 | live object type/property/reference metadata | `metadata` |
 | wait for one or a fixed bounded count of topic events | `wait-topic` |
@@ -122,7 +122,7 @@ For capability discovery, start with `capabilities --all-versions --summary-only
 
 When the user explicitly asks for the five-version coverage numbers, exclusions, or what the program matrix proves, read `references/waapi-coverage.md` once and combine it with the current offline catalog. Do not claim that program-tested coverage is live-Wwise verification.
 
-Simple queries use `query-object` flags. Complex queries use `query-schema` and `query-object --request-json` with its `waapi-skill.object-query/v1` fields; raw WAQL is forbidden. Structured broad/select queries need final `take`; simple flags allow `--all-results` only when the user requests every result. Never send `ak.wwise.core.object.get` through generic `call`; obey `QUERY_OBJECT_REQUIRED`, `FIXED_COMMAND_REQUIRED`, and `WAIT_TOPIC_REQUIRED`.
+Object discovery is progressive: simple flags, the structured Builder, then—only if its schema lacks required read-only syntax—the exact advanced contract. Do not reject the read or skip a sufficient earlier layer. Advanced WAQL stays inside fixed read-only `object.get` with Gateway row/time/byte limits; never rewrite a rejection or select a mutation from its result. For a later change, show candidates; after the user chooses, verify that GUID plus matching name/type/path via the simple exact-ID route. Generic `call` remains forbidden; obey `QUERY_OBJECT_REQUIRED`, `FIXED_COMMAND_REQUIRED`, and `WAIT_TOPIC_REQUIRED`.
 
 When the requested answer is machine-readable and any successful gateway payload contains `agent_result`, compact-serialize exactly that object as the result body and stop. This rule applies to fixed reads as well as transactions. Do not reconstruct its fields from the prompt, `normalized`, summaries, or verification evidence; do not alter JSON escaping or add/remove keys; and do not run another command after receiving it. If the required envelope is `WAAPI_RESULT_JSON=<json>`, append the compact serialization of `agent_result` directly after the prefix. Failed, deferred, indeterminate, or boundary payloads intentionally have no successful `agent_result`; report their actual state instead of inventing one. The one-time introduction belongs in a separate progress update when needed and never changes the exact machine-readable result body. For a normal natural-language answer, use the complete gateway evidence rather than only the compact projection.
 
@@ -142,11 +142,11 @@ Classify the requested action, not background wording. A request to listen for, 
 
 Default result shape: return the resolved structured result, not just “I called WAAPI”.
 
-Fast route from this entry file: when the user supplies one exact object path and asks whether that object exists or asks for its standard identity, run exactly one `query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path` command. For one exact GUID, use the same command with `--object-id '<exact-guid>'` in place of `--path`. Keep all four return fields explicit even though they are gateway defaults. This fixed route is complete: do not read the query reference before or after it, and do not retry a rejected or failed gateway invocation.
+For one exact path/GUID existence or standard identity lookup, run exactly one fixed `query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path`; substitute `--object-id '<exact-guid>'` for a GUID. Keep all four return fields explicit. This route is complete: do not read the query reference before or after it, and do not retry a rejected or failed gateway invocation.
 
 For current-selection questions, prefer the live selected-object query path first. If the connected endpoint is a headless or command-line Wwise instance where the UI selection API is unavailable, report that boundary clearly instead of drifting into repo/docs research or pretending a selection result exists.
 
-For `query-object --where-json`, translate the user's comparison literally: `"operator":"="` means exact equality, while `"operator":":"` is a contains/match predicate. A request to search and then restrict `name` to the exact same value therefore uses `--search '<value>'` plus `--where-json '{"field":"name","operator":"=","value":"<value>"}'`; `:` does not satisfy an exact-name request.
+For `query-object --where-json`, `=` is exact and `:` is contains/match; an exact-name restriction uses `=`.
 
 Conditional read for a query not fully covered by the fixed commands, exact-identity fast route, or exact reflection-call fast route: `references/waapi-query.md`
 

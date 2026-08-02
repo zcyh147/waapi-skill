@@ -17,7 +17,9 @@ invoke the Gateway.
   `query-object`, `object-types`, `metadata`, `wait-topic`, and `stream-topic`
   commands directly. Public command shapes include offline
   `gateway.py query-schema`, simple `gateway.py query-object` flags, structured
-  `gateway.py query-object --request-json`,
+  `gateway.py query-object --request-json`, progressively disclosed
+  `gateway.py query-schema --advanced` and
+  `gateway.py query-object --advanced-request-json`,
   `gateway.py wait-topic`, and `gateway.py stream-topic`.
   Observing a Topic is read-only and never authorizes the change that publishes it.
 - For a broad catalog question start with
@@ -144,8 +146,9 @@ This is a Wwise `2025.1`-only follow-up to a successful Media Pool read.
 
 ## Object queries
 
-Public object discovery has two closed forms. Neither accepts caller- or
-model-authored raw WAQL.
+Public object discovery has three progressively disclosed forms: simple flags,
+the closed structured Builder, and a bounded native WAQL fallback. Do not load
+or use a later layer while an earlier one can express the requested read.
 
 Use the existing flags for a simple lookup with one source and the flat
 conditions/transforms those flags expose: `--path`, `--object-id`, `--type`,
@@ -195,13 +198,64 @@ python scripts/run.py gateway.py query-object --path '\Events\Default Work Unit'
 python scripts/run.py gateway.py query-object --search 'ExactName' --where-json '{"field":"name","operator":"=","value":"ExactName"}' --take 1 --return-field id --return-field name --return-field type --return-field path
 ```
 
+### Advanced native WAQL fallback
+
+If the schema returned by ordinary `query-schema` lacks a required read-only
+construct—such as `skip`, `orderby`, `distinct`, a regular-expression literal,
+a WAQL list function, or an advanced return expression—do not reject the user
+request and do not write Python. Disclose only the third-layer contract:
+
+```bash
+python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version <supported-version> query-schema --advanced
+```
+
+Construct exactly the returned `waapi-skill.advanced-object-query/v1` shape and
+invoke:
+
+```bash
+python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version <supported-version> query-object --advanced-request-json '<advanced-object-query-v1-json>'
+```
+
+That document owns exactly four fields: `contract`, one native `waql` string,
+the native `return` expressions, and `max_results` from 1 through 1000. It
+cannot choose a URI, args/options object, timeout, result byte limit, or
+all-results mode. The Gateway fixes the call to read-only
+`ak.wwise.core.object.get`, rejects ambiguous multi-query framing, and appends
+a final `take <max_results>` after the supplied query. It then independently
+rejects a response above that row cap. Native return expressions may use
+version-supported advanced syntax; their count and size are bounded, while the
+connected Wwise parser remains authoritative for their meaning.
+
+Omit the Query Editor `$` marker. Keep the query on one line and do not add
+comments or statement separators. Do not keyword-filter ordinary object names:
+words such as “delete” remain harmless search text on this fixed read-only API.
+If Wwise rejects the query, report that structured error; never alter the WAQL,
+retry a guessed spelling, switch to generic `call`, or create a helper script in
+the same turn. A final `take` limits returned rows, not the internal work of an
+`orderby`, `distinct`, or other scan; the finite Gateway timeout and byte
+ceilings remain separate limits.
+
+For a purely read-only answer, choose the smallest honest `max_results` that
+matches the user's requested bound. Advanced WAQL may contain its own limiting,
+ordering, list, alias, or projection expressions, so even a one-row result does
+not prove that the underlying semantic target was unique. Never feed an
+advanced result directly into a mutation. If the user later wants a change,
+present the returned candidates, obtain their exact choice, then verify the
+chosen GUID through the simple `query-object --object-id` route before opening
+the normal closed mutation operation. Candidate displays must keep unaliased
+`id`, `name`, `type`, and `path`; never alias another advanced expression onto
+those reserved keys. The exact-ID readback must match the user's chosen name,
+type, and path or the workflow stops for a new choice. Raw WAQL itself is never
+a mutation identity.
+
 ### Bounded inventories
 
 Use the simple flags when one source, their fixed selects, and a flat AND cover
-the request. Use the schema-driven structured form only when the query needs a
+the request. Use the schema-driven structured form when the query needs a
 nested boolean predicate or ordered transform combination that those flags
-cannot express. Plan one bounded request and apply unsupported presentation
-logic only to that complete result.
+cannot express. Use the advanced contract only when the structured schema
+still lacks a required native WAQL construct. Plan one bounded request and
+apply presentation logic only to that complete result.
 
 - Field tokens are case-sensitive. Mappings include Volume -> `@Volume`, Pitch
   -> `@Pitch`, notes -> `notes`, Output Bus -> `OutputBus` (never `@OutputBus`),
@@ -291,12 +345,13 @@ call and use the structured request:
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2022.1 query-object --request-json '{"contract":"waapi-skill.object-query/v1","source":{"kind":"object","objects":[{"kind":"path","value":"\\Actor-Mixer Hierarchy\\Default Work Unit\\CombatMix"}]},"transforms":[{"kind":"select","expressions":[["descendants"]]},{"kind":"where","predicate":{"kind":"all","operands":[{"kind":"compare","path":["type"],"operator":"=","value":"Sound"},{"kind":"compare","path":["@Volume"],"operator":"<=","value":-6.0},{"kind":"any","operands":[{"kind":"compare","path":["notes"],"operator":":","value":"mix-review"},{"kind":"not","operand":{"kind":"truthy","path":["isIncluded"]}}]}]}},{"kind":"take","value":12}],"return":["id","name","type","path","@Volume","notes","audioSource:language","OutputBus","isIncluded"]}'
 ```
 
-This is a versioned core subset, not a complete WAQL implementation. Python
-program tests can prove that a valid request compiles deterministically and an
-invalid request fails before transport; they do not prove that a newly added
-construct has run successfully in real Wwise. Sort, aggregation, regex, or
-another construct absent from `query-schema` remains unsupported rather than a
-reason to write raw WAQL.
+The structured Builder is a versioned core subset, not a complete WAQL
+implementation. Python program tests prove its deterministic compiler and the
+advanced route's fixed URI, framing, final cap, and result checks; they do not
+prove that a native construct is accepted by a particular real Wwise version.
+When the structured schema lacks the construct, use the advanced route above
+and let the connected version accept or reject it without a generated-code
+fallback.
 
 ## Object types, live metadata, and fixed reads
 

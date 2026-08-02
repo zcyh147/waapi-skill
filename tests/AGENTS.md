@@ -44,10 +44,12 @@ a version string:
    operations, `skills/waapi-skill/wwise_waapi/operation_registry.py` is
    authoritative; a builder implementation by itself is not a public operation
    contract.
-4. Review `query-schema` and the closed query Builder against the new
-   reflection. Extend five-version source/transform/predicate compiler goldens,
-   schema parity, request ceilings, and negative raw-WAQL tests whenever that
-   supported core subset changes.
+4. Review the default structured `query-schema` and the separately disclosed
+   `query-schema --advanced` contract against the new reflection. Extend
+   five-version Builder compiler goldens, advanced fixed-URI/final-cap tests,
+   schema parity, request ceilings, and mutation-isolation negatives whenever
+   either query layer changes. Native advanced syntax is accepted or rejected
+   by the matching live Wwise version; program tests must not claim otherwise.
 5. Run focused tests and extend `ci/test.sh --mode program` to prove the new
    supported-version matrix. Then run the matching smoke/live and destructive
    sandbox lanes sequentially.
@@ -144,10 +146,11 @@ Weather units. This is passing evidence for all six unique units across roots,
 not one single-candidate 6/6 campaign. Passing sandboxes were cleaned, failed
 sandboxes remain quarantined, and every lifecycle record reports unchanged
 source-project full hash and mtime. Those campaigns predate the structured
-`query-schema`/`query-object --request-json` migration and the removal of raw
-WAQL mutation selectors. No fresh Codex semantic campaign has validated that
-new routing contract; keep the historical integration result attached only to
-its migration-before candidate.
+`query-schema`/`query-object --request-json` migration, the separately
+disclosed bounded advanced-WAQL layer, and the removal of raw WAQL mutation
+selectors. No fresh Codex semantic campaign has validated those newer routing
+contracts; keep the historical integration result attached only to its
+migration-before candidate.
 
 The review-oriented v3 bundle is rooted at
 `skills/waapi-skill/evals/suite-v3.json` and deliberately separates:

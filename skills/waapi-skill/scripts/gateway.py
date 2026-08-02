@@ -87,9 +87,12 @@ from wwise_waapi.metadata_discovery import (  # noqa: E402  # pyright: ignore[re
     discover_metadata,
 )
 from wwise_waapi.builders.query import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    ADVANCED_QUERY_CONTRACT,
     MAX_QUERY_TAKE,
     STRUCTURED_QUERY_CONTRACT,
     SUPPORTED_SELECTS,
+    advanced_query_schema,
+    build_advanced_object_get_query,
     build_object_get_query,
     build_structured_object_get_query,
     structured_query_schema,
@@ -1063,6 +1066,15 @@ def build_parser() -> argparse.ArgumentParser:
             "query-schema; raw WAQL and expression strings are not accepted"
         ),
     )
+    query_source.add_argument(
+        "--advanced-request-json",
+        metavar="ADVANCED_OBJECT_QUERY_JSON",
+        help=(
+            "Bounded waapi-skill.advanced-object-query/v1 document obtained "
+            "from query-schema --advanced; available only when the closed "
+            "structured query contract cannot express the requested read"
+        ),
+    )
     query_object.add_argument("--where-json")
     query_object.add_argument(
         "--match-original-file-path",
@@ -1286,6 +1298,14 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     query_schema.add_argument("--all-versions", action="store_true")
+    query_schema.add_argument(
+        "--advanced",
+        action="store_true",
+        help=(
+            "Disclose the third-layer bounded native WAQL contract instead "
+            "of the preferred structured object-query contract"
+        ),
+    )
 
     object_types = subparsers.add_parser(
         "object-types",
@@ -1898,8 +1918,8 @@ def query_object_required_payload(*, common: Mapping[str, Any] | None = None) ->
         "error_code": "QUERY_OBJECT_REQUIRED",
         "message": (
             "The public generic call path does not accept ak.wwise.core.object.get. "
-            "Use query-object so WAQL sources, result bounds, and exact-identity "
-            "normalization remain inside the packaged query contract."
+            "Use query-object so simple flags, the structured Builder, or the "
+            "bounded advanced WAQL contract retain Gateway-owned result limits."
         ),
         "required_command": "query-object",
         "executed": False,
@@ -2386,6 +2406,19 @@ def preflight_public_route(
 
 def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, str]) -> None:
     """Reject closed query input errors before opening a WAAPI transport."""
+
+    if advanced_query_requested(args):
+        _require_advanced_query_option_exclusivity(args)
+        request = parse_json_object(
+            args.advanced_request_json,
+            "--advanced-request-json",
+        )
+        (preflight_version,) = resolve_catalog_versions(args, env=env)
+        build_advanced_object_get_query(
+            request,
+            version=preflight_version,
+        )
+        return
 
     if structured_query_requested(args):
         _require_structured_query_option_exclusivity(args)
@@ -2988,12 +3021,40 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         }
     if args.command == "query-schema":
         versions = resolve_catalog_versions(args, env=env)
+        if args.advanced:
+            return {
+                "contract": GATEWAY_RESULT_CONTRACT,
+                "ok": True,
+                "status": "ok",
+                "command": "query-schema",
+                "offline": True,
+                "query_layer": "advanced-native-waql",
+                "query_contract": ADVANCED_QUERY_CONTRACT,
+                "versions": list(versions),
+                "schemas": {
+                    version: advanced_query_schema(version=version)
+                    for version in versions
+                },
+                "boundary": {
+                    "fixed_api": OBJECT_GET_URI,
+                    "read_only": True,
+                    "native_waql_accepted": True,
+                    "gateway_appends_final_take": True,
+                    "all_results_available": False,
+                    "arbitrary_uri_args_or_options_accepted": False,
+                    "gateway_json_input_bytes": MAX_GATEWAY_JSON_INPUT_BYTES,
+                    "gateway_result_bytes": MAX_GATEWAY_RESULT_JSON_BYTES,
+                    "version_specific_syntax_validated_by": "connected Wwise",
+                    "fallback_or_retry_on_invalid_query": False,
+                },
+            }
         return {
             "contract": GATEWAY_RESULT_CONTRACT,
             "ok": True,
             "status": "ok",
             "command": "query-schema",
             "offline": True,
+            "query_layer": "structured-builder",
             "query_contract": STRUCTURED_QUERY_CONTRACT,
             "versions": list(versions),
             "schemas": {
@@ -3015,6 +3076,15 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "regular-expression literals",
                     "WAQL 2.0 list functions",
                 ],
+                "advanced_fallback": {
+                    "available": True,
+                    "disclose_with": "query-schema --advanced",
+                    "execute_with": "query-object --advanced-request-json",
+                    "use_only_when": (
+                        "the structured schema cannot express the requested "
+                        "read-only WAQL construct"
+                    ),
+                },
             },
         }
     if args.command == "operations":
@@ -4530,6 +4600,53 @@ def dispatch_command(
                 dispatcher=dispatcher,
                 common=common,
             )
+        if advanced_query_requested(args):
+            _require_advanced_query_option_exclusivity(args)
+            request = parse_json_object(
+                args.advanced_request_json,
+                "--advanced-request-json",
+            )
+            preview = build_advanced_object_get_query(
+                request,
+                version=detected_version,
+            )
+            envelope = preview.envelope
+            query_bound = _advanced_query_bound(preview)
+            maximum_rows = query_bound["value"]
+            assert isinstance(maximum_rows, int) and not isinstance(maximum_rows, bool)
+            result = dispatch(
+                dispatcher,
+                envelope.uri,
+                connection=connection,
+                version=detected_version,
+                args=envelope.args,
+                options=envelope.options,
+                exact_object_lookup=False,
+            )
+            rows = (
+                strict_object_get_rows(
+                    result,
+                    command="query-object --advanced-request-json",
+                    maximum_rows=maximum_rows,
+                )
+                if result.get("ok")
+                else []
+            )
+            return {
+                "ok": bool(result.get("ok")),
+                "status": "ok" if result.get("ok") else "error",
+                **common,
+                "query_layer": "advanced-native-waql",
+                "query_contract": ADVANCED_QUERY_CONTRACT,
+                "semantic_preview": preview.as_dict(),
+                "query_bound": query_bound,
+                "call": dispatch_call_summary(result),
+                "count": len(rows) if result.get("ok") else None,
+                "limit_reached": (
+                    len(rows) == maximum_rows if result.get("ok") else None
+                ),
+                "objects": rows if result.get("ok") else None,
+            }
         if structured_query_requested(args):
             _require_structured_query_option_exclusivity(args)
             request = parse_json_object(args.request_json, "--request-json")
@@ -7146,6 +7263,69 @@ def structured_query_requested(args: argparse.Namespace) -> bool:
     return getattr(args, "request_json", None) is not None
 
 
+def advanced_query_requested(args: argparse.Namespace) -> bool:
+    """Return whether query-object uses the bounded native WAQL lane."""
+
+    return getattr(args, "advanced_request_json", None) is not None
+
+
+def _require_advanced_query_option_exclusivity(
+    args: argparse.Namespace,
+) -> None:
+    """Keep the advanced request document authoritative for the complete read."""
+
+    conflicting: list[str] = []
+    if args.where_json is not None:
+        conflicting.append("--where-json")
+    if args.match_original_file_paths:
+        conflicting.append("--match-original-file-path")
+    if args.select:
+        conflicting.append("--select")
+    if args.take is not None:
+        conflicting.append("--take")
+    if args.all_results:
+        conflicting.append("--all-results")
+    if args.return_fields:
+        conflicting.append("--return-field")
+    if conflicting:
+        raise GatewayInputError(
+            "query-object --advanced-request-json owns the native WAQL, return "
+            "expressions, and result bound; it cannot be combined with "
+            + ", ".join(conflicting)
+            + "."
+        )
+
+
+def _advanced_query_bound(preview: SemanticPreview) -> dict[str, Any]:
+    """Read the builder-owned final native WAQL row cap."""
+
+    bound = preview.envelope.metadata.get("query_bound")
+    if not isinstance(bound, Mapping) or set(bound) != {"mode", "value"}:
+        raise GatewayResultShapeError(
+            "Advanced query builder returned an invalid result-bound contract.",
+            details={"command": "query-object --advanced-request-json"},
+            error_code="INVALID_ADVANCED_QUERY_PLAN",
+        )
+    mode = bound.get("mode")
+    value = bound.get("value")
+    if (
+        mode != "gateway-appended-take"
+        or isinstance(value, bool)
+        or not isinstance(value, int)
+        or not 1 <= value <= MAX_QUERY_TAKE
+    ):
+        raise GatewayResultShapeError(
+            "Advanced query builder returned an invalid final row cap.",
+            details={
+                "command": "query-object --advanced-request-json",
+                "mode": mode,
+                "value": value,
+            },
+            error_code="INVALID_ADVANCED_QUERY_PLAN",
+        )
+    return {"mode": mode, "value": value}
+
+
 def _require_structured_query_option_exclusivity(
     args: argparse.Namespace,
 ) -> None:
@@ -7778,6 +7958,8 @@ def dispatch_call_summary(result: Mapping[str, Any]) -> dict[str, Any]:
         "error_code",
         "message",
         "details",
+        "waapi_error_uri",
+        "waapi_error_details",
         "normalization",
         "evidence_path",
         "timeout",

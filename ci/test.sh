@@ -434,6 +434,16 @@ run_program() {
     tests/unit/test_semantic_builder_metadata.py
     tests/unit/test_structured_waql_builder.py
     tests/unit/test_waapi_gateway.py::test_query_schema_returns_five_version_closed_contract_without_connecting
+    tests/unit/test_waapi_gateway.py::test_query_schema_advanced_discloses_bounded_native_contract_offline
+    tests/unit/test_waapi_gateway.py::test_query_object_advanced_dispatches_fixed_bounded_waql_once
+    tests/unit/test_waapi_gateway.py::test_query_object_advanced_invalid_contract_fails_before_connection
+    tests/unit/test_waapi_gateway.py::test_query_object_advanced_rejects_split_option_ownership_before_connection
+    tests/unit/test_waapi_gateway.py::test_query_object_advanced_rejects_result_count_above_gateway_cap
+    tests/unit/test_waapi_gateway.py::test_query_object_advanced_invalid_waql_is_not_retried_or_normalized
+    tests/unit/test_waapi_gateway.py::test_query_object_advanced_exact_looking_unknown_object_is_not_normalized
+    tests/unit/test_waapi_gateway.py::test_query_object_advanced_keeps_dispatcher_result_byte_ceiling
+    tests/unit/test_waapi_gateway.py::test_advanced_query_with_caller_take_and_id_alias_stays_read_only
+    tests/unit/test_waapi_gateway.py::test_structured_and_advanced_query_documents_are_mutually_exclusive
     tests/unit/test_waapi_gateway.py::test_query_object_structured_request_compiles_and_dispatches_once
     tests/unit/test_waapi_gateway.py::test_query_object_structured_raw_fragments_fail_before_connection
     tests/unit/test_waapi_gateway.py::test_query_object_structured_request_rejects_split_option_ownership

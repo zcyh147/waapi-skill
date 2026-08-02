@@ -64,9 +64,13 @@ from .properties import (  # pyright: ignore[reportMissingImports]
     build_set_reference_preview,
 )
 from .query import (  # pyright: ignore[reportMissingImports]
+    ADVANCED_QUERY_CONTRACT,
+    AdvancedWaqlQueryBuilder,
     QueryPredicate,
     STRUCTURED_QUERY_CONTRACT,
     WaqlQueryBuilder,
+    advanced_query_schema,
+    build_advanced_object_get_query,
     build_object_get_query,
     build_query_preview,
     build_structured_object_get_query,
@@ -119,6 +123,8 @@ from .switchcontainer import (  # pyright: ignore[reportMissingImports]
 )
 
 __all__ = [
+    "ADVANCED_QUERY_CONTRACT",
+    "AdvancedWaqlQueryBuilder",
     "AssignmentPair",
     "AttenuationCurveMetadataRecord",
     "BuilderContext",
@@ -168,6 +174,8 @@ __all__ = [
     "TopicExpectation",
     "TopicExpectationPlan",
     "WaqlQueryBuilder",
+    "advanced_query_schema",
+    "build_advanced_object_get_query",
     "build_add_assignment_preview",
     "assess_writable_container_suitability",
     "build_assignment_added_expectation",

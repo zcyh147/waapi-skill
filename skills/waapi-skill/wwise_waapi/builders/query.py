@@ -57,6 +57,7 @@ BUILTIN_ACCESSORS = {
 STRUCTURED_QUERY_CONTRACT = "waapi-skill.object-query/v1"
 # Compatibility alias for the descriptive name used during the internal draft.
 STRUCTURED_OBJECT_QUERY_CONTRACT = STRUCTURED_QUERY_CONTRACT
+ADVANCED_QUERY_CONTRACT = "waapi-skill.advanced-object-query/v1"
 MAX_STRUCTURED_QUERY_DEPTH = 12
 MAX_STRUCTURED_QUERY_NODES = 256
 MAX_STRUCTURED_SOURCE_ITEMS = 64
@@ -70,6 +71,9 @@ MAX_STRUCTURED_IDENTIFIER_LENGTH = 128
 MAX_STRUCTURED_LITERAL_LENGTH = 4096
 MAX_STRUCTURED_RETURN_FIELDS = 64
 MAX_STRUCTURED_RETURN_FIELD_LENGTH = 256
+MAX_ADVANCED_WAQL_BYTES = 32 * 1024
+MAX_ADVANCED_RETURN_EXPRESSIONS = 64
+MAX_ADVANCED_RETURN_EXPRESSION_BYTES = 4096
 
 # These patterns are shared by the public JSON Schema and the runtime compiler.
 # Keeping one definition prevents ``query-schema`` from advertising a wider
@@ -371,6 +375,237 @@ def build_structured_object_get_query(
         source_note_checker=source_note_checker,
         schema_validator=schema_validator,
     ).build(request)
+
+
+class AdvancedWaqlQueryBuilder:
+    """Bound one native WAQL query to the read-only ``object.get`` route.
+
+    This is the deliberately narrow third query layer.  It does not parse or
+    rewrite WAQL semantics: Wwise remains authoritative for the selected
+    version.  The builder owns the URI, return projection, a final ``take``
+    transform, reflected request validation, and a single-query-frame check.
+    """
+
+    def __init__(
+        self,
+        *,
+        version: str = DEFAULT_WWISE_VERSION,
+        source_note_checker: Any | None = None,
+        schema_validator: SemanticSchemaValidator | None = None,
+    ) -> None:
+        self.version = version
+        self.source_note_checker = source_note_checker
+        self.schema_validator = schema_validator
+
+    def build(self, request: Mapping[str, Any]) -> SemanticPreview:
+        """Validate ``waapi-skill.advanced-object-query/v1`` and append its cap."""
+
+        document = _structured_mapping(
+            request,
+            context="advanced object query",
+        )
+        _structured_exact_keys(
+            document,
+            required=("contract", "waql", "return", "max_results"),
+            context="advanced object query",
+        )
+        if document.get("contract") != ADVANCED_QUERY_CONTRACT:
+            raise _advanced_query_error(
+                "Advanced object query contract is unsupported.",
+                details={
+                    "contract": document.get("contract"),
+                    "expected": ADVANCED_QUERY_CONTRACT,
+                },
+            )
+
+        waql = _advanced_waql(document.get("waql"))
+        return_expressions = _advanced_return_expressions(document.get("return"))
+        max_results = document.get("max_results")
+        if (
+            isinstance(max_results, bool)
+            or not isinstance(max_results, int)
+            or not 1 <= max_results <= MAX_QUERY_TAKE
+        ):
+            raise _advanced_query_error(
+                f"Advanced object query max_results must be an integer from 1 to {MAX_QUERY_TAKE}.",
+                details={"max_results": max_results, "maximum": MAX_QUERY_TAKE},
+            )
+
+        bounded_waql = f"{waql.rstrip()} take {max_results}"
+        source_note = (
+            self.source_note_checker or SemanticSourceNoteChecker()
+        ).check(BuilderFamily.QUERY.value, self.version)
+        if not source_note.allowed:
+            raise SemanticValidationError(
+                source_note.semantic_error_code(),
+                source_note.reason
+                or "Semantic source note is not valid for advanced query builder.",
+                details=source_note.as_dict(),
+            )
+
+        args = {"waql": bounded_waql}
+        options = {"return": list(return_expressions)}
+        validation = (
+            self.schema_validator
+            or SemanticSchemaValidator(version=self.version)
+        ).validate(OBJECT_GET_URI, args, options)
+        envelope = SemanticEnvelope(
+            OBJECT_GET_URI,
+            args=args,
+            options=options,
+            metadata={
+                "builder_family": BuilderFamily.QUERY.value,
+                "query_contract": ADVANCED_QUERY_CONTRACT,
+                "query_bound": {
+                    "mode": "gateway-appended-take",
+                    "value": max_results,
+                },
+                "gateway_appended_take": max_results,
+                "source_note": source_note.as_dict(),
+                "schema_validation": validation.as_dict(),
+                "read_only": True,
+            },
+        )
+        return SemanticPreview(
+            envelope=envelope,
+            source_note_family=BuilderFamily.QUERY.value,
+            version=self.version,
+            readback_plan=(
+                SemanticReadbackPlan(
+                    OBJECT_GET_URI,
+                    args=args,
+                    options=options,
+                    description=(
+                        "read back one bounded native WAQL object discovery "
+                        "request"
+                    ),
+                ),
+            ),
+            evidence_plan=(
+                {
+                    "kind": "source-note",
+                    "family": BuilderFamily.QUERY.value,
+                    "version": self.version,
+                },
+                {
+                    "kind": "schema",
+                    "uri": OBJECT_GET_URI,
+                    "version": self.version,
+                },
+                {
+                    "kind": "advanced-query-contract",
+                    "contract": ADVANCED_QUERY_CONTRACT,
+                },
+                {
+                    "kind": "gateway-result-bound",
+                    "transform": "take",
+                    "value": max_results,
+                },
+            ),
+        )
+
+
+def build_advanced_object_get_query(
+    request: Mapping[str, Any],
+    *,
+    version: str = DEFAULT_WWISE_VERSION,
+    source_note_checker: Any | None = None,
+    schema_validator: SemanticSchemaValidator | None = None,
+) -> SemanticPreview:
+    """Build a dispatcher-ready, bounded native WAQL ``object.get`` preview."""
+
+    return AdvancedWaqlQueryBuilder(
+        version=version,
+        source_note_checker=source_note_checker,
+        schema_validator=schema_validator,
+    ).build(request)
+
+
+def advanced_query_schema(
+    *,
+    version: str = DEFAULT_WWISE_VERSION,
+) -> dict[str, Any]:
+    """Return the third-layer native WAQL request schema for one Wwise version."""
+
+    return {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": ADVANCED_QUERY_CONTRACT,
+        "x-wwise-version": version,
+        "x-limits": {
+            "gateway_json_document_bytes": 256 * 1024,
+            "waql_bytes": MAX_ADVANCED_WAQL_BYTES,
+            "return_expressions": MAX_ADVANCED_RETURN_EXPRESSIONS,
+            "return_expression_bytes": MAX_ADVANCED_RETURN_EXPRESSION_BYTES,
+            "max_results": MAX_QUERY_TAKE,
+        },
+        "title": "WAAPI Skill advanced read-only object query",
+        "description": (
+            "Third-layer fallback for native WAQL syntax that the structured "
+            "object-query contract cannot express. The Gateway fixes the URI "
+            "to ak.wwise.core.object.get and appends a final take transform."
+        ),
+        "type": "object",
+        "required": ["contract", "waql", "return", "max_results"],
+        "additionalProperties": False,
+        "properties": {
+            "contract": {"const": ADVANCED_QUERY_CONTRACT},
+            "waql": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": MAX_ADVANCED_WAQL_BYTES,
+                "x-maxUtf8Bytes": MAX_ADVANCED_WAQL_BYTES,
+                "x-framing": {
+                    "singleLine": True,
+                    "queryEditorDollarPrefix": False,
+                    "comments": False,
+                    "statementSeparators": False,
+                    "balancedDoubleQuotedStrings": True,
+                    "balancedSlashRegexLiterals": True,
+                    "trailingWhitespace": "removed-before-final-take",
+                },
+                "description": (
+                    "One native WAQL query without the Query Editor $ prefix, "
+                    "comments, statement separators, or line breaks. Limits "
+                    "are UTF-8 bytes, not Unicode character counts."
+                ),
+            },
+            "return": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": MAX_ADVANCED_RETURN_EXPRESSIONS,
+                "uniqueItems": True,
+                "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": MAX_ADVANCED_RETURN_EXPRESSION_BYTES,
+                    "x-maxUtf8Bytes": MAX_ADVANCED_RETURN_EXPRESSION_BYTES,
+                    "x-framing": {
+                        "trimmed": True,
+                        "singleLine": True,
+                        "comments": False,
+                        "statementSeparators": False,
+                        "balancedDoubleQuotedStrings": True,
+                        "balancedSlashRegexLiterals": True,
+                    },
+                    "description": (
+                        "A native object.get return accessor or advanced return "
+                        "expression. It must be trimmed and use one balanced, "
+                        "comment-free frame. Limits are UTF-8 bytes. Wwise "
+                        "validates version-specific semantics."
+                    ),
+                },
+            },
+            "max_results": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": MAX_QUERY_TAKE,
+                "description": (
+                    "Gateway-owned final row cap. It does not bound Wwise's "
+                    "internal scan or sort cost."
+                ),
+            },
+        },
+    }
 
 
 def structured_query_schema(
@@ -1270,6 +1505,170 @@ def _structured_query_error(
         message,
         details=details,
     )
+
+
+def _advanced_query_error(
+    message: str,
+    *,
+    details: Mapping[str, Any] | None = None,
+) -> SemanticValidationError:
+    return SemanticValidationError(
+        SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
+        message,
+        details=details,
+    )
+
+
+def _advanced_waql(value: Any) -> str:
+    if not isinstance(value, str):
+        raise _advanced_query_error(
+            "Advanced object query waql must be a string.",
+            details={"actual_type": type(value).__name__},
+        )
+    if not value.strip():
+        raise _advanced_query_error("Advanced object query waql must not be empty.")
+    try:
+        encoded_length = len(value.encode("utf-8"))
+    except UnicodeEncodeError as exc:
+        raise _advanced_query_error(
+            "Advanced object query waql must contain valid Unicode."
+        ) from exc
+    if encoded_length > MAX_ADVANCED_WAQL_BYTES:
+        raise _advanced_query_error(
+            "Advanced object query waql exceeds its UTF-8 byte limit.",
+            details={
+                "observed_bytes": encoded_length,
+                "maximum_bytes": MAX_ADVANCED_WAQL_BYTES,
+            },
+        )
+    if value.lstrip().startswith("$"):
+        raise _advanced_query_error(
+            "Advanced object query waql must omit the Query Editor $ prefix."
+        )
+    _validate_advanced_query_frame(value, context="advanced object query waql")
+    return value
+
+
+def _advanced_return_expressions(value: Any) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        raise _advanced_query_error(
+            "Advanced object query return must be an array.",
+            details={"actual_type": type(value).__name__},
+        )
+    if not 1 <= len(value) <= MAX_ADVANCED_RETURN_EXPRESSIONS:
+        raise _advanced_query_error(
+            "Advanced object query return must contain between 1 and "
+            f"{MAX_ADVANCED_RETURN_EXPRESSIONS} expressions.",
+            details={
+                "observed": len(value),
+                "maximum": MAX_ADVANCED_RETURN_EXPRESSIONS,
+            },
+        )
+    expressions: list[str] = []
+    for index, expression in enumerate(value):
+        if not isinstance(expression, str):
+            raise _advanced_query_error(
+                "Advanced object query return expressions must be strings.",
+                details={
+                    "index": index,
+                    "actual_type": type(expression).__name__,
+                },
+            )
+        if not expression or expression != expression.strip():
+            raise _advanced_query_error(
+                "Advanced object query return expressions must be non-empty and trimmed.",
+                details={"index": index},
+            )
+        try:
+            encoded_length = len(expression.encode("utf-8"))
+        except UnicodeEncodeError as exc:
+            raise _advanced_query_error(
+                "Advanced object query return expressions must contain valid Unicode.",
+                details={"index": index},
+            ) from exc
+        if encoded_length > MAX_ADVANCED_RETURN_EXPRESSION_BYTES:
+            raise _advanced_query_error(
+                "Advanced object query return expression exceeds its UTF-8 byte limit.",
+                details={
+                    "index": index,
+                    "observed_bytes": encoded_length,
+                    "maximum_bytes": MAX_ADVANCED_RETURN_EXPRESSION_BYTES,
+                },
+            )
+        _validate_advanced_query_frame(
+            expression,
+            context=f"advanced object query return[{index}]",
+        )
+        expressions.append(expression)
+    if len(set(expressions)) != len(expressions):
+        raise _advanced_query_error(
+            "Advanced object query return expressions must be unique."
+        )
+    return tuple(expressions)
+
+
+def _validate_advanced_query_frame(value: str, *, context: str) -> None:
+    """Reject framing ambiguity without pretending to parse native WAQL.
+
+    Double-quoted strings and slash-delimited regular expressions are opaque,
+    so punctuation inside either remains available to the native language.
+    Wwise validates every actual WAQL construct after this narrow framing pass.
+    """
+
+    if any(character in value for character in ("\r", "\n", "\u2028", "\u2029")):
+        raise _advanced_query_error(f"{context} must be one line.")
+    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in value):
+        raise _advanced_query_error(f"{context} contains a control character.")
+
+    state = "plain"
+    escaped = False
+    regex_character_class = False
+    index = 0
+    while index < len(value):
+        character = value[index]
+        if state == "string":
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                state = "plain"
+            index += 1
+            continue
+        if state == "regex":
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == "[" and not regex_character_class:
+                regex_character_class = True
+            elif character == "]" and regex_character_class:
+                regex_character_class = False
+            elif character == "/" and not regex_character_class:
+                state = "plain"
+            index += 1
+            continue
+
+        if character == '"':
+            state = "string"
+        elif character == "/":
+            following = value[index + 1] if index + 1 < len(value) else ""
+            if following in {"/", "*"}:
+                raise _advanced_query_error(
+                    f"{context} must not contain comments."
+                )
+            state = "regex"
+            regex_character_class = False
+        elif character == ";":
+            raise _advanced_query_error(
+                f"{context} must contain exactly one expression and no statement separator."
+            )
+        index += 1
+
+    if state != "plain":
+        raise _advanced_query_error(
+            f"{context} contains an unterminated {state} literal."
+        )
 
 
 def _source_clause(*, path: str | None, object_id: str | None, type: str | None, search: str | None, query: str | None) -> str:

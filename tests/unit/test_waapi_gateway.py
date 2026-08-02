@@ -3696,6 +3696,357 @@ def test_query_schema_returns_five_version_closed_contract_without_connecting(
     assert payload["boundary"]["raw_waql_accepted"] is False
 
 
+def test_query_schema_advanced_discloses_bounded_native_contract_offline(
+    tmp_path: Path,
+) -> None:
+    called = False
+
+    def client_factory(url: str) -> FakeClient:
+        nonlocal called
+        called = True
+        raise AssertionError(f"offline advanced query schema must not connect to {url}")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-schema", "--advanced", "--all-versions"],
+        env=gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 0
+    assert called is False
+    assert payload["query_layer"] == "advanced-native-waql"
+    assert payload["query_contract"] == "waapi-skill.advanced-object-query/v1"
+    assert tuple(payload["versions"]) == tuple(SUPPORTED_WWISE_VERSION_KEYS)
+    assert set(payload["schemas"]) == set(SUPPORTED_WWISE_VERSION_KEYS)
+    assert payload["boundary"] == {
+        "fixed_api": "ak.wwise.core.object.get",
+        "read_only": True,
+        "native_waql_accepted": True,
+        "gateway_appends_final_take": True,
+        "all_results_available": False,
+        "arbitrary_uri_args_or_options_accepted": False,
+        "gateway_json_input_bytes": waapi_gateway.MAX_GATEWAY_JSON_INPUT_BYTES,
+        "gateway_result_bytes": waapi_gateway.MAX_GATEWAY_RESULT_JSON_BYTES,
+        "version_specific_syntax_validated_by": "connected Wwise",
+        "fallback_or_retry_on_invalid_query": False,
+    }
+
+
+def test_query_object_advanced_dispatches_fixed_bounded_waql_once(
+    tmp_path: Path,
+) -> None:
+    object_id = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {
+                "return": [
+                    {
+                        "id": object_id,
+                        "name": "UI_Click",
+                        "EffectNames": ["Compressor"],
+                    }
+                ]
+            },
+        }
+    )
+    request = {
+        "contract": "waapi-skill.advanced-object-query/v1",
+        "waql": (
+            'from type Sound where effects.any(effect.name = "Compressor") '
+            "orderby name"
+        ),
+        "return": ["id", "name", "effects.name as EffectNames"],
+        "max_results": 2,
+    }
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--advanced-request-json",
+            json.dumps(request, separators=(",", ":")),
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["query_layer"] == "advanced-native-waql"
+    assert payload["query_contract"] == "waapi-skill.advanced-object-query/v1"
+    assert payload["query_bound"] == {
+        "mode": "gateway-appended-take",
+        "value": 2,
+    }
+    assert payload["count"] == 1
+    assert payload["limit_reached"] is False
+    assert "identity_handoff" not in payload
+    assert client.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {
+            "waql": (
+                'from type Sound where effects.any(effect.name = "Compressor") '
+                "orderby name take 2"
+            )
+        },
+        {"return": ["id", "name", "effects.name as EffectNames"]},
+    )
+    assert [call[0] for call in client.calls].count(
+        "ak.wwise.core.object.get"
+    ) == 1
+
+
+@pytest.mark.parametrize(
+    "query_request",
+    (
+        {
+            "contract": "waapi-skill.advanced-object-query/v1",
+            "waql": "from type Sound; from type Event",
+            "return": ["id"],
+            "max_results": 2,
+        },
+        {
+            "contract": "waapi-skill.advanced-object-query/v1",
+            "waql": "from type Sound",
+            "return": ["id"],
+            "max_results": 0,
+        },
+        {
+            "contract": "waapi-skill.advanced-object-query/v1",
+            "waql": "from type Sound",
+            "return": ["id"],
+            "max_results": 2,
+            "uri": "ak.wwise.core.object.set",
+        },
+    ),
+)
+def test_query_object_advanced_invalid_contract_fails_before_connection(
+    tmp_path: Path,
+    query_request: Mapping[str, Any],
+) -> None:
+    called = False
+
+    def client_factory(url: str) -> FakeClient:
+        nonlocal called
+        called = True
+        raise AssertionError(f"invalid advanced query must not connect to {url}")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-object", "--advanced-request-json", json.dumps(query_request)],
+        env=gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "SemanticValidationError"
+    assert called is False
+
+
+@pytest.mark.parametrize(
+    "conflicting_args",
+    (
+        ("--take", "1"),
+        ("--where-json", "{}"),
+        ("--match-original-file-path", "/tmp/candidate.wav"),
+        ("--select", "children"),
+        ("--all-results",),
+        ("--return-field", "id"),
+    ),
+)
+def test_query_object_advanced_rejects_split_option_ownership_before_connection(
+    tmp_path: Path,
+    conflicting_args: tuple[str, ...],
+) -> None:
+    called = False
+    request = {
+        "contract": "waapi-skill.advanced-object-query/v1",
+        "waql": "from type Sound",
+        "return": ["id"],
+        "max_results": 2,
+    }
+
+    def client_factory(url: str) -> FakeClient:
+        nonlocal called
+        called = True
+        raise AssertionError(f"split advanced query must not connect to {url}")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--advanced-request-json",
+            json.dumps(request),
+            *conflicting_args,
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert conflicting_args[0] in payload["message"]
+    assert called is False
+
+
+def test_query_object_advanced_rejects_result_count_above_gateway_cap(
+    tmp_path: Path,
+) -> None:
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {
+                "return": [{"id": "{one}"}, {"id": "{two}"}]
+            },
+        }
+    )
+    request = {
+        "contract": "waapi-skill.advanced-object-query/v1",
+        "waql": "from type Sound",
+        "return": ["id"],
+        "max_results": 1,
+    }
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-object", "--advanced-request-json", json.dumps(request)],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "INVALID_QUERY_RESULT"
+    assert payload["details"]["maximum_rows"] == 1
+    assert payload["details"]["actual_count"] == 2
+
+
+def test_query_object_advanced_invalid_waql_is_not_retried_or_normalized(
+    tmp_path: Path,
+) -> None:
+    client = FakeClient(
+        {"ak.wwise.core.getInfo": live_info()},
+        errors={
+            "ak.wwise.core.object.get": WaapiRequestFailed(
+                "ak.wwise.query.invalid_query",
+                {"message": "Unsupported WAQL syntax"},
+            )
+        },
+    )
+    request = {
+        "contract": "waapi-skill.advanced-object-query/v1",
+        "waql": "from type Sound orderby unsupportedAccessor",
+        "return": ["id"],
+        "max_results": 2,
+    }
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-object", "--advanced-request-json", json.dumps(request)],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["call"]["ok"] is False
+    assert payload["call"]["waapi_error_uri"] == "ak.wwise.query.invalid_query"
+    assert "normalization" not in payload["call"]
+    assert [call[0] for call in client.calls].count(
+        "ak.wwise.core.object.get"
+    ) == 1
+
+
+def test_query_object_advanced_exact_looking_unknown_object_is_not_normalized(
+    tmp_path: Path,
+) -> None:
+    object_id = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+    client = FakeClient(
+        {"ak.wwise.core.getInfo": live_info()},
+        errors={
+            "ak.wwise.core.object.get": WaapiRequestFailed(
+                "ak.wwise.query.unknown_object",
+                {"message": "Object not found"},
+            )
+        },
+    )
+    request = {
+        "contract": "waapi-skill.advanced-object-query/v1",
+        "waql": f'from object "{object_id}"',
+        "return": ["id"],
+        "max_results": 2,
+    }
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-object", "--advanced-request-json", json.dumps(request)],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["call"]["waapi_error_uri"] == "ak.wwise.query.unknown_object"
+    assert "normalization" not in payload["call"]
+    assert [call[0] for call in client.calls].count(
+        "ak.wwise.core.object.get"
+    ) == 1
+
+
+def test_query_object_advanced_keeps_dispatcher_result_byte_ceiling(
+    tmp_path: Path,
+) -> None:
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {
+                "return": [{"id": "{one}", "blob": "x" * (1024 * 1024)}]
+            },
+        }
+    )
+    request = {
+        "contract": "waapi-skill.advanced-object-query/v1",
+        "waql": "from type Sound",
+        "return": ["id", "blob"],
+        "max_results": 2,
+    }
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-object", "--advanced-request-json", json.dumps(request)],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["call"]["error_code"] == "RESULT_TOO_LARGE"
+    assert payload["objects"] is None
+    assert "identity_handoff" not in payload
+
+
+def test_advanced_query_with_caller_take_and_id_alias_stays_read_only(
+    tmp_path: Path,
+) -> None:
+    canonical = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {"return": [{"id": canonical}]},
+        }
+    )
+    request = {
+        "contract": "waapi-skill.advanced-object-query/v1",
+        "waql": 'from type Sound where name = "Duplicate" take 1',
+        "return": ["id", "parent.id as id"],
+        "max_results": 2,
+    }
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-object", "--advanced-request-json", json.dumps(request)],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["count"] == 1
+    assert "identity_handoff" not in payload
+    assert client.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {"waql": 'from type Sound where name = "Duplicate" take 1 take 2'},
+        {"return": ["id", "parent.id as id"]},
+    )
+
+
 def test_query_object_structured_request_compiles_and_dispatches_once(
     tmp_path: Path,
 ) -> None:
@@ -5073,6 +5424,19 @@ def test_query_take_and_all_results_are_mutually_exclusive() -> None:
                 "--take",
                 "1",
                 "--all-results",
+            ]
+        )
+
+
+def test_structured_and_advanced_query_documents_are_mutually_exclusive() -> None:
+    with pytest.raises(SystemExit):
+        waapi_gateway.build_parser().parse_args(
+            [
+                "query-object",
+                "--request-json",
+                "{}",
+                "--advanced-request-json",
+                "{}",
             ]
         )
 
