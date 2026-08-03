@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import uuid
 import wave
 import xml.etree.ElementTree as ET
 from collections import Counter
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from types import SimpleNamespace
 from typing import Any, Mapping, Sequence
 
@@ -779,7 +780,7 @@ def test_topic_runtime_localizes_long_wine_project_info_paths(
         platform["copiedMediaPath"] = str(platform_root / "Media")
 
     def wine_path(path: Path) -> str:
-        return "Y:\\" + "\\".join(path.relative_to(home).parts)
+        return str(PureWindowsPath("Y:/", *path.relative_to(home).parts))
 
     raw_project_path = wine_path(blueprint.sandbox_project)
     assert len(raw_project_path) > 255
@@ -1268,11 +1269,15 @@ def test_copied_original_path_parser_accepts_only_closed_absolute_mappings(
         sandbox_root=project,
     )
     wine_y = soundbank_runtime._copied_original_file_proof(
-        "Y:\\" + "\\".join(copied.relative_to(home).parts),
+        str(PureWindowsPath("Y:/", *copied.relative_to(home).parts)),
         sandbox_root=project,
     )
     wine_z = soundbank_runtime._copied_original_file_proof(
-        "Z:\\" + "\\".join(copied.parts[1:]),
+        (
+            str(copied)
+            if os.name == "nt"
+            else str(PureWindowsPath("Z:/", *copied.parts[1:]))
+        ),
         sandbox_root=project,
     )
     assert posix == wine_y == wine_z

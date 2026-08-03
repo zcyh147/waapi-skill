@@ -9,7 +9,7 @@ import uuid
 import xml.etree.ElementTree as ET
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, replace
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from types import SimpleNamespace
 from typing import Any
 
@@ -2484,8 +2484,11 @@ def test_oracle_context_localizes_wine_project_paths_and_requires_exact_target(
 ) -> None:
     host_home = Path.home().resolve(strict=False)
     target = host_home / "waapi-cli-runtime-v3" / "case" / "project" / "SampleProject.wproj"
-    relative = target.relative_to(host_home).as_posix().replace("/", "\\")
-    y_path = "Y:\\" + relative
+    y_path = (
+        str(target)
+        if os.name == "nt"
+        else str(PureWindowsPath("Y:/", *target.relative_to(host_home).parts))
+    )
     context = {
         "info": {"version": {"year": 2022, "major": 1}},
         "project": {"path": y_path},
@@ -2517,24 +2520,33 @@ def test_oracle_context_localizes_wine_project_paths_and_requires_exact_target(
 
     # Matching basenames are not identity evidence: the oracle must be bound
     # to this case's exact migrated target, not any SampleProject.wproj.
-    wrong_relative = (
+    wrong_target = (
         host_home / "waapi-cli-runtime-v3" / "case" / "business-host" / "SampleProject.wproj"
-    ).relative_to(host_home).as_posix().replace("/", "\\")
+    )
     with pytest.raises(CliRuntimeError, match="wrong project"):
         _assert_backend_context(
             {
                 "info": {"version": {"year": 2022, "major": 1}},
-                "project": {"path": "Y:\\" + wrong_relative},
+                "project": {
+                    "path": str(wrong_target)
+                    if os.name == "nt"
+                    else str(
+                        PureWindowsPath(
+                            "Y:/",
+                            *wrong_target.relative_to(host_home).parts,
+                        )
+                    )
+                },
             },
             version="2022.1",
             project_path=target,
         )
 
-    z_path = "Z:" + str(
-        tmp_path / "case" / "project" / "SampleProject.wproj"
-    ).replace("/", "\\")
-    z_target = (
-        tmp_path / "case" / "project" / "SampleProject.wproj"
+    z_target = tmp_path / "case" / "project" / "SampleProject.wproj"
+    z_path = (
+        str(z_target)
+        if os.name == "nt"
+        else str(PureWindowsPath("Z:/", *z_target.relative_to(Path("/")).parts))
     )
     assert _localize_waapi_host_path(z_path, field="test") == z_target
     _assert_backend_context(

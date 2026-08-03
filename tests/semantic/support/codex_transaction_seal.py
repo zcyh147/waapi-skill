@@ -27,6 +27,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from tests.semantic.support.codex_gateway_broker import (
     validate_transaction_show_confirmation_payload,
 )
+from tests.semantic.support.codex_filesystem_security import binary_file_open_flags
 from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
 from wwise_waapi.operation_registry import OperationContractError, parse_operation_request
 from wwise_waapi.transaction_runtime import (
@@ -642,9 +643,7 @@ def _validate_legal_event_states(events: Sequence[Mapping[str, Any]]) -> None:
 
 def _read_regular_file(path: Path, *, label: str) -> _FileSnapshot:
     _require_plain_file(path, label=label)
-    flags = os.O_RDONLY
-    if hasattr(os, "O_CLOEXEC"):
-        flags |= os.O_CLOEXEC
+    flags = binary_file_open_flags(os.O_RDONLY)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:

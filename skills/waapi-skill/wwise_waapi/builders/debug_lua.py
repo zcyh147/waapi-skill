@@ -386,7 +386,7 @@ def _regular_file_proof(
         ) from exc
     digest = hashlib.sha256()
     try:
-        flags = os.O_RDONLY
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
         if hasattr(os, "O_NOFOLLOW"):
             flags |= os.O_NOFOLLOW
         descriptor = os.open(canonical, flags)

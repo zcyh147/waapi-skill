@@ -22,7 +22,7 @@ import wave
 import xml.etree.ElementTree as ET
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Protocol
 
 from tests.destructive.support.sandbox_fixture import SandboxProject
@@ -30,6 +30,11 @@ from tests.semantic.support.codex_eval_bundle_v3 import OnlineScenario
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     build_transaction_protocol,
+)
+from tests.semantic.support.codex_host_paths import (
+    ReflectedHostPathError,
+    parse_posix_absolute_path,
+    parse_windows_drive_path,
 )
 from tests.semantic.support.codex_project_prelaunch_v3 import (
     ProjectPrelaunchRequest,
@@ -2134,12 +2139,14 @@ def _assert_project_original_representation(
     root: Path,
     field: str,
 ) -> None:
-    normalized = _validated_waapi_path_text(value, field=field)
-    if normalized.startswith("/") or re.fullmatch(
-        r"[A-Za-z]:/.*", normalized
-    ):
+    reflected = _validated_waapi_path_text(value, field=field)
+    try:
+        windows_path = parse_windows_drive_path(reflected)
+    except ReflectedHostPathError as exc:
+        raise AudioConversionRuntimeError(f"{field} is not a safe path") from exc
+    if windows_path is not None or reflected.startswith("/"):
         observed = _owned_waapi_host_file_path(
-            normalized,
+            reflected,
             root,
             field=field,
             require_exists=True,
@@ -2149,7 +2156,7 @@ def _assert_project_original_representation(
                 f"{field} does not identify the planned project Original"
             )
         return
-    parts = _safe_waapi_relative_path_parts(normalized, field=field)
+    parts = _safe_waapi_relative_path_parts(reflected, field=field)
     if parts not in allowed_relative:
         raise AudioConversionRuntimeError(
             f"{field} does not identify the planned project Original"
@@ -2157,17 +2164,23 @@ def _assert_project_original_representation(
 
 
 def _safe_waapi_relative_path_parts(value: str, *, field: str) -> tuple[str, ...]:
-    parts = value.split("/")
+    if (
+        value.endswith(("/", "\\"))
+        or re.search(r"[\\/]{2}", value)
+        or re.search(r"(?:^|[\\/])(?:\.{1,2})(?:[\\/]|$)", value)
+    ):
+        raise AudioConversionRuntimeError(f"{field} is not a safe relative path")
+    pure = PureWindowsPath(value) if "\\" in value else PurePosixPath(value)
+    parts = tuple(pure.parts)
     if (
         len(parts) > 32
         or any(part in {"", ".", ".."} for part in parts)
         or any(part != part.strip() or ":" in part for part in parts)
     ):
         raise AudioConversionRuntimeError(f"{field} is not a safe relative path")
-    pure = PurePosixPath(*parts)
-    if pure.is_absolute() or tuple(pure.parts) != tuple(parts):
+    if pure.is_absolute() or pure.anchor or pure.drive:
         raise AudioConversionRuntimeError(f"{field} is not a safe relative path")
-    return tuple(parts)
+    return parts
 
 
 def _validated_waapi_path_text(value: Any, *, field: str) -> str:
@@ -2178,7 +2191,7 @@ def _validated_waapi_path_text(value: Any, *, field: str) -> str:
         or "\x00" in value
     ):
         raise AudioConversionRuntimeError(f"{field} must be a non-empty path string")
-    return value.replace("\\", "/")
+    return value
 
 
 def _safe_originals_subfolder(value: Any) -> str:
@@ -2382,59 +2395,101 @@ def _owned_waapi_host_file_path(
     require_exists: bool,
 ) -> Path:
     return _owned_file_path(
-        _localize_waapi_host_path(value, field=field),
+        _localize_waapi_host_path(
+            value,
+            field=field,
+            wine_z_root=None if os.name == "nt" else Path("/"),
+        ),
         root,
         field=field,
         require_exists=require_exists,
     )
 
 
-def _localize_waapi_host_path(value: Any, *, field: str) -> Path:
+def _localize_waapi_host_path(
+    value: Any,
+    *,
+    field: str,
+    wine_z_root: Path | None = None,
+) -> Path:
     """Map only real host-absolute or the two reviewed Wine drive spellings."""
 
     normalized = _validated_waapi_path_text(value, field=field)
-    drive_match = re.fullmatch(r"([A-Za-z]):/(.*)", normalized)
-    if drive_match is not None:
-        suffix = drive_match.group(2)
-    elif normalized.startswith("/"):
-        suffix = normalized[1:]
-    else:
-        raise AudioConversionRuntimeError(f"{field} must be an absolute host path")
-    suffix_parts = suffix.split("/")
-    if (
-        len(suffix_parts) > 128
-        or any(part in {"", ".", ".."} for part in suffix_parts)
-        or any("\x00" in part for part in suffix_parts)
-    ):
+    try:
+        windows_path = parse_windows_drive_path(normalized)
+    except ReflectedHostPathError as exc:
         raise AudioConversionRuntimeError(
             f"{field} contains an unsafe host path component"
-        )
-
-    if os.name != "nt" and drive_match is not None:
-        drive = drive_match.group(1).upper()
-        if drive == "Z":
-            path = Path("/").joinpath(*suffix_parts)
+        ) from exc
+    if windows_path is not None:
+        drive = windows_path.drive
+        suffix_parts = windows_path.relative_parts
+        if len(suffix_parts) > 128:
+            raise AudioConversionRuntimeError(
+                f"{field} contains an unsafe host path component"
+            )
+        native = Path(windows_path.pure) if os.name == "nt" else None
+        if native is not None and _available_directory(Path(native.anchor)):
+            return native
+        if drive == "Z" and wine_z_root is not None:
+            base = Path(wine_z_root)
+            path = base.joinpath(*suffix_parts)
+        elif drive == "Y" and (os.name != "nt" or pwd is not None):
+            path = _resolved_login_home(field=field).joinpath(*suffix_parts)
+        elif drive == "Z":
+            if wine_z_root is None:
+                if os.name == "nt":
+                    raise AudioConversionRuntimeError(
+                        f"{field} Wine Z: has no native root mapping"
+                    )
+                base = Path("/")
+            path = base.joinpath(*suffix_parts)
         elif drive == "Y":
-            if pwd is None:  # pragma: no cover - native Windows skips this branch
-                raise AudioConversionRuntimeError(
-                    f"{field} uses Wine Y: but the host account home is unavailable"
-                )
-            try:
-                home = Path(pwd.getpwuid(os.getuid()).pw_dir)
-            except (KeyError, OSError) as exc:
-                raise AudioConversionRuntimeError(
-                    f"{field} Wine Y: could not be mapped to the host account home"
-                ) from exc
-            path = home.joinpath(*suffix_parts)
+            raise AudioConversionRuntimeError(
+                f"{field} uses an unavailable native Windows drive Y:"
+            )
         else:
             raise AudioConversionRuntimeError(
                 f"{field} uses an unmappable Wine drive {drive}:"
             )
     else:
-        path = Path(normalized)
+        try:
+            path = Path(parse_posix_absolute_path(normalized))
+        except ReflectedHostPathError as exc:
+            raise AudioConversionRuntimeError(
+                f"{field} must be an absolute host path"
+            ) from exc
     if not path.is_absolute():
         raise AudioConversionRuntimeError(f"{field} must be an absolute host path")
     return path
+
+
+def _available_directory(path: Path) -> bool:
+    try:
+        return path.is_dir()
+    except OSError:
+        return False
+
+
+def _resolved_login_home(*, field: str) -> Path:
+    if pwd is None:
+        raise AudioConversionRuntimeError(
+            f"{field} Wine Y: mapping is unavailable on this host"
+        )
+    try:
+        getuid = getattr(os, "getuid", None)
+        uid = getuid() if callable(getuid) else None
+        home = Path(pwd.getpwuid(uid).pw_dir)
+        resolved = home.resolve(strict=True)
+    except (AttributeError, KeyError, OSError, RuntimeError, TypeError) as exc:
+        raise AudioConversionRuntimeError(
+            f"{field} Wine Y: could not be mapped to the host account home"
+        ) from exc
+    if not resolved.is_dir():
+        raise AudioConversionRuntimeError(
+            f"{field} Wine Y: host account home is not a directory"
+        )
+    return resolved
 
 
 def _owned_file_path(

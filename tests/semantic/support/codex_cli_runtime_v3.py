@@ -42,6 +42,12 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     build_transaction_protocol,
 )
+from tests.semantic.support.codex_host_paths import (
+    ReflectedHostPathError,
+    WindowsDrivePath,
+    parse_posix_absolute_path,
+    parse_windows_drive_path,
+)
 from wwise_waapi.operation_soundbank import parse_soundbank_definition_file
 from wwise_waapi.platform_paths import build_wwise_console_command
 
@@ -3383,39 +3389,43 @@ def _localize_waapi_host_path(value: str, *, field: str) -> Path:
 
     if not isinstance(value, str) or not value or value != value.strip() or "\x00" in value:
         raise CliRuntimeError(f"{field} must be a non-empty path string")
-    normalized = value.replace("\\", "/")
-    if os.name != "nt" and normalized.startswith("//"):
-        raise CliRuntimeError(f"{field} uses an unmappable UNC path")
-    drive_match = re.fullmatch(r"([A-Za-z]):/(.*)", normalized)
+
+    try:
+        windows_path = parse_windows_drive_path(value)
+    except ReflectedHostPathError as exc:
+        raise CliRuntimeError(f"{field} has an unsafe Windows path") from exc
     containment_root: Path | None = None
-    if os.name != "nt" and drive_match is not None:
-        drive = drive_match.group(1).upper()
-        suffix = drive_match.group(2)
-        parts = suffix.split("/")
-        if not suffix or any(part in {"", ".", ".."} for part in parts):
-            raise CliRuntimeError(f"{field} has an unsafe Wine drive suffix")
-        if drive == "Z":
+    if windows_path is not None:
+        drive = windows_path.drive
+        parts = windows_path.relative_parts
+        native_drive_root = _native_windows_drive_root(windows_path)
+        if drive == "Y" and (os.name != "nt" or pwd is not None):
+            containment_root = _resolved_account_home(field=field)
+            path = containment_root.joinpath(*parts)
+        elif native_drive_root is not None:
+            containment_root = native_drive_root
+            path = Path(windows_path.pure)
+        elif drive == "Z":
+            if os.name == "nt":
+                raise CliRuntimeError(
+                    f"{field} uses Wine Z: on a native Windows host"
+                )
             containment_root = Path("/")
+            path = containment_root.joinpath(*parts)
         elif drive == "Y":
-            if pwd is None:  # pragma: no cover - native Windows skips this branch
-                raise CliRuntimeError(
-                    f"{field} uses a Wine Y: drive but the host account home is unavailable"
-                )
-            try:
-                containment_root = Path(pwd.getpwuid(os.getuid()).pw_dir).resolve(
-                    strict=True
-                )
-            except (KeyError, OSError) as exc:
-                raise CliRuntimeError(
-                    f"{field} Wine Y: drive could not be mapped to the host account home"
-                ) from exc
+            raise CliRuntimeError(
+                f"{field} uses an unavailable native Windows drive Y:"
+            )
         else:
             raise CliRuntimeError(f"{field} uses unmappable Wine drive {drive}:")
-        path = containment_root.joinpath(*parts)
     else:
-        if any(part in {".", ".."} for part in normalized.split("/")):
-            raise CliRuntimeError(f"{field} has an unsafe path component")
-        path = Path(normalized)
+        try:
+            posix_path = parse_posix_absolute_path(value)
+        except ReflectedHostPathError as exc:
+            raise CliRuntimeError(
+                f"{field} must be an absolute host path"
+            ) from exc
+        path = Path(posix_path)
     if not path.is_absolute():
         raise CliRuntimeError(f"{field} must be an absolute host path")
     if containment_root is None:
@@ -3429,11 +3439,53 @@ def _localize_waapi_host_path(value: str, *, field: str) -> Path:
         current = current / part
         if current.is_symlink():
             raise CliRuntimeError(f"{field} contains a symlink component")
-    resolved = path.resolve(strict=False)
+    try:
+        resolved = path.resolve(strict=False)
+    except OSError as exc:
+        raise CliRuntimeError(f"{field} could not be resolved on this host") from exc
     try:
         resolved.relative_to(containment_root.resolve(strict=False))
     except ValueError as exc:
         raise CliRuntimeError(f"{field} escaped its mapped host root") from exc
+    return resolved
+
+
+def _native_windows_drive_root(value: WindowsDrivePath) -> Path | None:
+    """Return an available native drive root, otherwise leave it unprobed.
+
+    On Windows, a real mapped ``Y:`` or ``Z:`` drive wins over the historical
+    Wine aliases.  An absent drive is never passed to ``Path.resolve``.
+    """
+
+    if os.name != "nt":
+        return None
+    root = Path(value.pure.anchor)
+    try:
+        return root if root.is_dir() else None
+    except OSError:
+        return None
+
+
+def _resolved_account_home(*, field: str) -> Path:
+    """Resolve the immutable OS account home for a Wine ``Y:`` mapping."""
+
+    if pwd is None:
+        raise CliRuntimeError(
+            f"{field} Wine Y: mapping is unavailable on this host"
+        )
+    try:
+        getuid = getattr(os, "getuid", None)
+        uid = getuid() if callable(getuid) else None
+        home = Path(pwd.getpwuid(uid).pw_dir)
+        resolved = home.resolve(strict=True)
+    except (AttributeError, KeyError, OSError, RuntimeError, TypeError) as exc:
+        raise CliRuntimeError(
+            f"{field} Wine Y: drive could not be mapped to the host account home"
+        ) from exc
+    if not resolved.is_dir():
+        raise CliRuntimeError(
+            f"{field} Wine Y: drive account home is not a directory"
+        )
     return resolved
 
 

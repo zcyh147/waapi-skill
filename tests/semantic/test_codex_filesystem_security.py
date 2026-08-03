@@ -15,6 +15,22 @@ def _restrict_owner_only_on_posix(path: Path) -> None:
         path.chmod(0o600)
 
 
+def test_binary_file_open_flags_include_windows_binary_and_close_on_exec_bits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(filesystem.os, "O_BINARY", 0x8000, raising=False)
+    monkeypatch.setattr(filesystem.os, "O_CLOEXEC", 0x80000, raising=False)
+
+    assert filesystem.binary_file_open_flags(os.O_WRONLY, os.O_CREAT) == (
+        os.O_WRONLY | os.O_CREAT | 0x8000 | 0x80000
+    )
+
+
+def test_binary_file_open_flags_reject_non_integer_flags() -> None:
+    with pytest.raises(TypeError, match="must be integers"):
+        filesystem.binary_file_open_flags("read-only")  # type: ignore[arg-type]
+
+
 @pytest.mark.parametrize(
     ("platform_name", "mode", "expected"),
     (

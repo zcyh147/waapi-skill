@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from tests.semantic.support.codex_filesystem_security import binary_file_open_flags
+
 
 BUSINESS_ORACLE_PLAN_CONTRACT = "waapi-skill.business-oracle-plan/v1"
 BUSINESS_ORACLE_PLAN_FILE = "business-oracle-plan.json"
@@ -483,7 +485,17 @@ def _absolute_path(path: Path) -> Path:
 
 
 def _read_one_json(path: Path) -> tuple[bytes, Any]:
-    flags = os.O_RDONLY
+    try:
+        initial = os.lstat(path)
+    except OSError as exc:
+        raise BusinessOraclePlanError(
+            f"cannot open business-oracle plan: {exc}"
+        ) from exc
+    if stat.S_ISLNK(initial.st_mode) or not stat.S_ISREG(initial.st_mode):
+        raise BusinessOraclePlanError(
+            "cannot open business-oracle plan: path is not a regular file"
+        )
+    flags = binary_file_open_flags(os.O_RDONLY)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:
@@ -559,7 +571,7 @@ def _write_exclusive_json(path: Path, value: Mapping[str, Any]) -> None:
     raw = _canonical_json_bytes(value) + b"\n"
     if len(raw) > MAX_BUSINESS_ORACLE_PLAN_BYTES:
         raise BusinessOraclePlanError("business-oracle plan exceeds its size ceiling")
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags = binary_file_open_flags(os.O_WRONLY, os.O_CREAT, os.O_EXCL)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:

@@ -579,7 +579,12 @@ class DurableMetadataCache:
             ):
                 return False
             temporary = directory / f".{key_sha256}.{uuid.uuid4().hex}.tmp"
-            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            flags = (
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_EXCL
+                | getattr(os, "O_BINARY", 0)
+            )
             if hasattr(os, "O_NOFOLLOW"):
                 flags |= os.O_NOFOLLOW
             fd = os.open(temporary, flags, 0o600)

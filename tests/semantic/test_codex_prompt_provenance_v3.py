@@ -937,6 +937,7 @@ def test_integration_owned_directory_cannot_escape_or_use_a_symlink(
             "canonical JSON",
         ),
     ),
+    ids=("invalid-object-path", "oversized-scalar", "noncanonical-json"),
 )
 def test_integration_non_directory_values_are_typed_and_bounded(
     tmp_path: Path,

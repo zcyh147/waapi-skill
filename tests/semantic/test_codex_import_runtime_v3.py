@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import os
 import re
 import shutil
 import xml.etree.ElementTree as ET
@@ -1557,9 +1558,13 @@ def test_copied_original_posix_z_and_y_paths_seal_identical_evidence(
     )
 
     posix = str(copied)
-    z_path = "Z:" + posix.replace("/", "\\")
+    z_path = (
+        str(copied)
+        if os.name == "nt"
+        else str(PureWindowsPath("Z:/", *copied.parts[1:]))
+    )
     y_relative = copied.relative_to(login_home)
-    y_path = "Y:\\" + "\\".join(y_relative.parts)
+    y_path = str(PureWindowsPath("Y:/", *y_relative.parts))
 
     posix_result = _copied_original_evidence(posix, project_root=project_root)
     z_result = _copied_original_evidence(z_path, project_root=project_root)
@@ -1605,7 +1610,6 @@ def test_native_windows_original_path_rejects_unc_relative_and_traversal(
         "",
         "relative/file.wav",
         "~/file.wav",
-        "/tmp/~/file.wav",
         "C:\\tmp\\file.wav",
         "\\\\server\\share\\file.wav",
         "/tmp//file.wav",

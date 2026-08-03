@@ -496,16 +496,16 @@ def _with_snapshot_digest(value: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _file_proof(name: str) -> dict[str, Any]:
+def _file_proof(root: Path, name: str) -> dict[str, Any]:
     return {
-        "path": f"/tmp/{name}",
+        "path": str((root / name).resolve()),
         "relative_path": f"Originals/SFX/{name}",
         "size": 4,
         "sha256": SHA_A,
     }
 
 
-def _snapshot(workflow_id: str, *, changed: bool) -> dict[str, Any]:
+def _snapshot(workflow_id: str, *, changed: bool, root: Path) -> dict[str, Any]:
     state = {"parent": GUID_2, "marker": 2 if changed else 1}
     common: dict[str, Any] = {
         "workflow_id": workflow_id,
@@ -527,7 +527,7 @@ def _snapshot(workflow_id: str, *, changed: bool) -> dict[str, Any]:
                 "active_source_id": GUID_3,
                 "source_parent_id": GUID_1,
                 "language": "SFX",
-                "original": _file_proof("sound.wav"),
+                "original": _file_proof(root, "sound.wav"),
             }
         ],
         "source_project": {
@@ -541,7 +541,9 @@ def _snapshot(workflow_id: str, *, changed: bool) -> dict[str, Any]:
             {
                 "absent_roles": [],
                 "container_children": [],
-                "input_files": [{"key": "rifle", **_file_proof("rifle.wav")}],
+                "input_files": [
+                    {"key": "rifle", **_file_proof(root, "rifle.wav")}
+                ],
             }
         )
     elif workflow_id == "footsteps_snow_assignment_maintenance":
@@ -550,15 +552,17 @@ def _snapshot(workflow_id: str, *, changed: bool) -> dict[str, Any]:
                 "absent_roles": [],
                 "children": [],
                 "assignments": [],
-                "input_files": [{"key": "snow", **_file_proof("snow.wav")}],
+                "input_files": [
+                    {"key": "snow", **_file_proof(root, "snow.wav")}
+                ],
             }
         )
     return _with_snapshot_digest(common)
 
 
-def _rifle_runtime_snapshot(*, changed: bool) -> rifle.RifleSnapshot:
+def _rifle_runtime_snapshot(*, changed: bool, root: Path) -> rifle.RifleSnapshot:
     original = rifle.RifleFileProof(
-        "/tmp/sound.wav",
+        str((root / "sound.wav").resolve()),
         "Originals/SFX/sound.wav",
         4,
         SHA_A,
@@ -598,7 +602,7 @@ def _rifle_runtime_snapshot(*, changed: bool) -> rifle.RifleSnapshot:
     return replace(snapshot, digest=campaign._canonical_sha256(serial))
 
 
-def test_runner_archives_v2_runtime_as_dict_projection() -> None:
+def test_runner_archives_v2_runtime_as_dict_projection(tmp_path: Path) -> None:
     unit = _unit("rifle_safe_reimport")
     verification = rifle.RifleVerification(
         phase="after_import",
@@ -610,8 +614,8 @@ def test_runner_archives_v2_runtime_as_dict_projection() -> None:
                 for assertion in EXPECTED_ASSERTION_IDS[unit.workflow_id]
             }
         ),
-        before=_rifle_runtime_snapshot(changed=False),
-        after=_rifle_runtime_snapshot(changed=True),
+        before=_rifle_runtime_snapshot(changed=False, root=tmp_path),
+        after=_rifle_runtime_snapshot(changed=True, root=tmp_path),
     )
 
     evidence = project_runner._oracle_evidence(
@@ -647,6 +651,7 @@ def test_runner_archives_v2_runtime_as_dict_projection() -> None:
 def test_campaign_accepts_only_closed_v2_runtime_verification_shape(
     workflow_id: str,
     phase: str,
+    tmp_path: Path,
 ) -> None:
     verification = {
         "phase": phase,
@@ -655,8 +660,8 @@ def test_campaign_accepts_only_closed_v2_runtime_verification_shape(
         "assertions": {
             key: True for key in EXPECTED_ASSERTION_IDS[workflow_id]
         },
-        "before": _snapshot(workflow_id, changed=False),
-        "after": _snapshot(workflow_id, changed=True),
+        "before": _snapshot(workflow_id, changed=False, root=tmp_path),
+        "after": _snapshot(workflow_id, changed=True, root=tmp_path),
     }
 
     campaign._validate_integration_v2_verification(
@@ -677,30 +682,39 @@ def test_campaign_accepts_only_closed_v2_runtime_verification_shape(
 
 
 @pytest.mark.parametrize(
-    ("workflow_id", "cleanup"),
+    "workflow_id",
     (
-        (
-            "rifle_safe_reimport",
-            rifle.RifleCleanupProof(
-                True, False, "/tmp/rifle-input", True, True, ()
-            ).as_dict(),
-        ),
-        (
-            "footsteps_snow_assignment_maintenance",
-            footsteps.FootstepsCleanupProof(
-                True, False, "/tmp/footsteps-input", True, True, ()
-            ).as_dict(),
-        ),
-        (
-            "weapons_query_guided_batch_cleanup",
-            weapons.WeaponsCleanupProof(True, False, True, True, ()).as_dict(),
-        ),
+        "rifle_safe_reimport",
+        "footsteps_snow_assignment_maintenance",
+        "weapons_query_guided_batch_cleanup",
     ),
 )
 def test_campaign_accepts_exact_runtime_cleanup_as_dict(
     workflow_id: str,
-    cleanup: dict[str, Any],
+    tmp_path: Path,
 ) -> None:
+    if workflow_id == "rifle_safe_reimport":
+        cleanup = rifle.RifleCleanupProof(
+            True,
+            False,
+            str((tmp_path / "rifle-input").resolve()),
+            True,
+            True,
+            (),
+        ).as_dict()
+    elif workflow_id == "footsteps_snow_assignment_maintenance":
+        cleanup = footsteps.FootstepsCleanupProof(
+            True,
+            False,
+            str((tmp_path / "footsteps-input").resolve()),
+            True,
+            True,
+            (),
+        ).as_dict()
+    else:
+        cleanup = weapons.WeaponsCleanupProof(
+            True, False, True, True, ()
+        ).as_dict()
     campaign._validate_integration_v2_cleanup(
         cleanup,
         workflow_id=workflow_id,

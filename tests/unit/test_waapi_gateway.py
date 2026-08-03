@@ -1109,6 +1109,15 @@ def test_main_rejects_non_strict_json_values(monkeypatch: pytest.MonkeyPatch) ->
         ('{"value":[' + ",".join("0" for _ in range(10_000)) + "]}", "node JSON input limit"),
         ('{"value":"' + ("x" * (256 * 1024)) + '"}', "JSON input limit"),
     ),
+    ids=(
+        "duplicate-key",
+        "nan",
+        "infinite-number",
+        "oversized-string",
+        "excessive-depth",
+        "excessive-nodes",
+        "oversized-document",
+    ),
 )
 def test_generic_call_rejects_hostile_json_before_connecting(
     tmp_path: Path,

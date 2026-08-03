@@ -21,6 +21,27 @@ class BoundedRegularFile:
     metadata: os.stat_result
 
 
+def binary_file_open_flags(*flags: int) -> int:
+    """Return raw-file descriptor flags with portable binary byte semantics.
+
+    Native Windows otherwise lets the CRT translate ``CRLF`` while
+    :func:`os.read` and :func:`os.write` are operating on a descriptor.  That
+    makes the byte count disagree with ``stat().st_size`` and invalidates the
+    exact-byte integrity checks shared by the semantic harness.  POSIX defines
+    neither translation nor ``O_BINARY``, so its zero fallback is a no-op.
+
+    This helper is for regular files whose contents are consumed as bytes.  A
+    directory descriptor has different platform semantics and must not use it.
+    """
+
+    result = getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0)
+    for flag in flags:
+        if type(flag) is not int:
+            raise TypeError("file-open flags must be integers")
+        result |= flag
+    return result
+
+
 def _platform_name() -> str:
     """Return the standard-library platform discriminator through a test seam."""
 
@@ -121,7 +142,7 @@ def read_bounded_exclusive_regular_file(
     except OSError as exc:
         raise CodexFileSecurityError(f"evidence path cannot be inspected: {exc}") from exc
 
-    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0)
+    flags = binary_file_open_flags(os.O_RDONLY)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     descriptor: int | None = None

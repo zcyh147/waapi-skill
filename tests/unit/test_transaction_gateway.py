@@ -11,7 +11,7 @@ import sys
 import threading
 from collections import deque
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Mapping, Sequence
 
 import pytest  # pyright: ignore[reportMissingImports]
@@ -1994,7 +1994,7 @@ def test_transaction_next_command_quotes_posix_shell_arguments_without_reconstru
     monkeypatch.setattr(
         waapi_gateway,
         "GATEWAY_RUNNER_PATH",
-        Path("/tmp/WAAPI Skill/scripts/run.py"),
+        PurePosixPath("/tmp/WAAPI Skill/scripts/run.py"),
     )
 
     payload = waapi_gateway.transaction_next_command(
@@ -2025,7 +2025,7 @@ def test_transaction_next_command_keeps_one_copy_source_on_windows(
     monkeypatch.setattr(
         waapi_gateway,
         "GATEWAY_RUNNER_PATH",
-        Path(r"C:\WAAPI Skill\scripts\run.py"),
+        PureWindowsPath(r"C:\WAAPI Skill\scripts\run.py"),
     )
 
     payload = waapi_gateway.transaction_next_command(

@@ -187,6 +187,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (  # noqa: E402
 )
 from tests.semantic.support.codex_filesystem_security import (  # noqa: E402
     CodexFileSecurityError,
+    binary_file_open_flags,
     read_bounded_exclusive_regular_file,
 )
 from tests.semantic.support.codex_prompt_asset_reads_v3 import (  # noqa: E402
@@ -11668,7 +11669,7 @@ def _strict_real_subdirectory_names(root: Path) -> set[str]:
 
 def _load_strict_regular_text(path: Path, *, limit_bytes: int = 8 * 1024 * 1024) -> str:
     source = Path(path)
-    flags = os.O_RDONLY
+    flags = binary_file_open_flags(os.O_RDONLY)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:

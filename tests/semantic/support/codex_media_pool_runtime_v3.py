@@ -44,6 +44,11 @@ from types import MappingProxyType
 from typing import Any, Literal, Mapping, Sequence
 
 from .codex_eval_bundle_v3 import OnlineScenario
+from .codex_host_paths import (
+    ReflectedHostPathError,
+    parse_posix_absolute_path,
+    parse_windows_drive_path,
+)
 
 
 VERSION = "2025.1"
@@ -886,7 +891,7 @@ def host_directory_to_wine_z_path(
             raise MediaPoolRuntimeError(
                 "custom database path contains a Windows-unsafe component"
             )
-    return "Z:\\" + "\\".join(components)
+    return str(PureWindowsPath("Z:/", *components))
 
 
 def media_pool_preflight(
@@ -2875,48 +2880,48 @@ def _localize_waapi_path(
 
     if not isinstance(value, str) or not value or "\x00" in value or value != value.strip():
         raise MediaPoolRuntimeError("WAAPI file path is malformed")
-    normalized = value.replace("\\", "/")
-    if normalized.startswith("//"):
-        raise MediaPoolRuntimeError("WAAPI UNC paths are not supported")
-    if os.name == "nt":
-        drive, parts = _parse_native_windows_absolute_path(value)
-        candidate = Path(f"{drive}:\\").joinpath(*parts)
-        boundary = (
-            _lexical_absolute_path(owned_root, field="WAAPI path owned root")
-            if owned_root is not None
-            else Path(candidate.anchor)
-        )
-        return _require_real_owned_file(
-            candidate,
-            root=boundary,
-            field="WAAPI file path",
-        )
-    match = re.fullmatch(r"([A-Za-z]):/(.*)", normalized)
-    if match:
-        drive = match.group(1).upper()
-        parts = _closed_waapi_path_parts(match.group(2))
-        if drive == "Z":
-            candidate = Path("/").joinpath(*parts)
+    try:
+        windows_path = parse_windows_drive_path(value)
+    except ReflectedHostPathError as exc:
+        raise MediaPoolRuntimeError("WAAPI file path is malformed") from exc
+    if windows_path is not None:
+        drive = windows_path.drive
+        parts = windows_path.relative_parts
+        native = Path(windows_path.pure) if os.name == "nt" else None
+        if native is not None and _available_directory(Path(native.anchor)):
+            candidate = native
         elif drive == "Y" and waapi_y_drive_root is not None:
             candidate = _lexical_absolute_path(
                 waapi_y_drive_root,
                 field="Wine Y drive root",
             ).joinpath(*parts)
+        elif drive == "Z":
+            if os.name == "nt":
+                raise MediaPoolRuntimeError(
+                    "Wine Z: path has no native filesystem-root binding"
+                )
+            else:
+                base = Path("/")
+            candidate = base.joinpath(*parts)
+        elif os.name == "nt":
+            candidate = Path(windows_path.pure)
         else:
             raise MediaPoolRuntimeError(
                 f"unreviewed WAAPI virtual drive in Media Pool result: {drive}:"
             )
-    elif normalized.startswith("/"):
-        parts = _closed_waapi_path_parts(normalized[1:])
-        candidate = Path("/").joinpath(*parts)
     else:
-        if relative_root is None:
-            raise MediaPoolRuntimeError("WAAPI Media Pool Path is not absolute")
-        parts = _closed_waapi_path_parts(normalized)
-        candidate = _lexical_absolute_path(
-            relative_root,
-            field="Project Originals root",
-        ).joinpath(*parts)
+        try:
+            candidate = Path(parse_posix_absolute_path(value))
+        except ReflectedHostPathError:
+            if relative_root is None:
+                raise MediaPoolRuntimeError(
+                    "WAAPI Media Pool Path is not absolute"
+                ) from None
+            parts = _closed_relative_waapi_path_parts(value)
+            candidate = _lexical_absolute_path(
+                relative_root,
+                field="Project Originals root",
+            ).joinpath(*parts)
 
     boundary = (
         _lexical_absolute_path(owned_root, field="WAAPI path owned root")
@@ -2933,21 +2938,37 @@ def _localize_waapi_path(
 def _parse_native_windows_absolute_path(value: str) -> tuple[str, tuple[str, ...]]:
     """Parse a local-drive Windows path without host-dependent ``Path`` rules."""
 
-    normalized = value.replace("\\", "/")
-    if normalized.startswith("//"):
-        raise MediaPoolRuntimeError("WAAPI UNC paths are not supported")
-    match = re.fullmatch(r"([A-Za-z]):/(.*)", normalized)
-    parsed = PureWindowsPath(value)
-    if match is None or not parsed.is_absolute() or parsed.root != "\\":
+    try:
+        parsed = parse_windows_drive_path(value)
+    except ReflectedHostPathError as exc:
+        raise MediaPoolRuntimeError(
+            "WAAPI file path is not drive-absolute"
+        ) from exc
+    if parsed is None:
         raise MediaPoolRuntimeError("WAAPI file path is not drive-absolute")
-    drive = match.group(1).upper()
-    if parsed.drive.casefold() != f"{drive}:".casefold():
-        raise MediaPoolRuntimeError("WAAPI file path has an ambiguous Windows drive")
-    return drive, _closed_waapi_path_parts(match.group(2))
+    return parsed.drive, parsed.relative_parts
 
 
-def _closed_waapi_path_parts(value: str) -> tuple[str, ...]:
-    parts = tuple(value.split("/"))
+def _available_directory(path: Path) -> bool:
+    try:
+        return path.is_dir()
+    except OSError:
+        return False
+
+
+def _closed_relative_waapi_path_parts(value: str) -> tuple[str, ...]:
+    if (
+        value.endswith(("/", "\\"))
+        or re.search(r"[\\/]{2}", value)
+        or re.search(r"(?:^|[\\/])(?:\.{1,2})(?:[\\/]|$)", value)
+    ):
+        raise MediaPoolRuntimeError(
+            "WAAPI file path contains an empty, dot, or escaping component"
+        )
+    pure = PureWindowsPath(value) if "\\" in value else PurePosixPath(value)
+    if pure.anchor or pure.drive:
+        raise MediaPoolRuntimeError("WAAPI file path is not relative")
+    parts = tuple(pure.parts)
     if not parts or any(not part or part in {".", ".."} for part in parts):
         raise MediaPoolRuntimeError(
             "WAAPI file path contains an empty, dot, or escaping component"

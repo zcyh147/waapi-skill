@@ -49,6 +49,11 @@ from types import MappingProxyType
 from typing import Any, Literal, Protocol
 
 from .codex_eval_bundle_v3 import OnlineScenario
+from .codex_host_paths import (
+    ReflectedHostPathError,
+    parse_posix_absolute_path,
+    parse_windows_drive_path,
+)
 from .codex_version_layout_v3 import (
     CodexVersionLayoutV3,
     get_codex_version_layout_v3,
@@ -3554,30 +3559,39 @@ def _localize_wwise_host_path(value: str, field: str) -> Path:
     therefore raise ``ENAMETOOLONG`` instead of proving project ownership.
     """
 
-    normalized = value.replace("\\", "/")
-    drive_match = re.fullmatch(r"([A-Za-z]):/(.*)", normalized)
-    if os.name != "nt" and drive_match is not None:
-        drive = drive_match.group(1).upper()
-        suffix = drive_match.group(2)
-        if drive == "Z":
-            path = Path("/") / suffix
-        elif drive == "Y":
-            if pwd is None:  # pragma: no cover - native Windows skips this branch
+    try:
+        windows_path = parse_windows_drive_path(value)
+    except ReflectedHostPathError as exc:
+        raise SoundBankRuntimeError(f"{field} has an unsafe host path") from exc
+    if windows_path is not None:
+        drive = windows_path.drive
+        parts = windows_path.relative_parts
+        native = Path(windows_path.pure) if os.name == "nt" else None
+        if drive == "Y" and (os.name != "nt" or pwd is not None):
+            path = _resolved_login_home(field=field).joinpath(*parts)
+        elif native is not None and _available_directory(Path(native.anchor)):
+            return native
+        elif drive == "Z":
+            if os.name == "nt":
                 raise SoundBankRuntimeError(
-                    f"{field} uses a Wine Y: drive but the host account home is unavailable"
+                    f"{field} uses Wine Z: on a native Windows host"
                 )
-            try:
-                path = Path(pwd.getpwuid(os.getuid()).pw_dir) / suffix
-            except (KeyError, OSError) as exc:
-                raise SoundBankRuntimeError(
-                    f"{field} Wine Y: drive could not be mapped to the host account home"
-                ) from exc
+            path = Path("/").joinpath(*parts)
+        elif drive == "Y":
+            raise SoundBankRuntimeError(
+                f"{field} uses an unavailable native Windows drive Y:"
+            )
         else:
             raise SoundBankRuntimeError(
                 f"{field} uses unmappable Wine drive {drive}:"
             )
     else:
-        path = Path(normalized).expanduser()
+        try:
+            path = Path(parse_posix_absolute_path(value))
+        except ReflectedHostPathError as exc:
+            raise SoundBankRuntimeError(
+                f"{field} must be an absolute host path"
+            ) from exc
     if not path.is_absolute():
         raise SoundBankRuntimeError(f"{field} must be an absolute host path")
     return path
@@ -3686,7 +3700,10 @@ def _copied_original_file_proof(
     paths identify the same regular file below ``<case>/Originals``.
     """
 
-    candidate = _localize_copied_original_path(value)
+    candidate = _localize_copied_original_path(
+        value,
+        wine_z_root=None if os.name == "nt" else Path("/"),
+    )
     root = sandbox_root.resolve(strict=True)
     originals = root / "Originals"
     try:
@@ -3741,7 +3758,11 @@ def _copied_original_file_proof(
     return _file_proof(resolved_candidate, root)
 
 
-def _localize_copied_original_path(value: Any) -> Path:
+def _localize_copied_original_path(
+    value: Any,
+    *,
+    wine_z_root: Path | None = None,
+) -> Path:
     if isinstance(value, os.PathLike):
         value = os.fspath(value)
     if (
@@ -3753,72 +3774,78 @@ def _localize_copied_original_path(value: Any) -> Path:
         raise SoundBankRuntimeError(
             "copied WAV requires a non-empty absolute path string"
         )
-    normalized = value.replace("\\", "/")
-    if normalized.startswith("//"):
-        raise SoundBankRuntimeError("copied WAV uses an unmappable UNC path")
-
-    if os.name == "nt":  # pragma: no cover - exercised on native Windows
-        drive_match = re.fullmatch(r"([A-Za-z]):/(.*)", normalized)
-        if drive_match is None:
-            raise SoundBankRuntimeError(
-                "copied WAV must be a native Windows drive-absolute path"
-            )
-        parts = drive_match.group(2).split("/")
-        if any(part in {"", ".", ".."} or part.startswith("~") for part in parts):
-            raise SoundBankRuntimeError(
-                "copied WAV contains an unsafe host path component"
-            )
-        candidate = Path(value)
-        if not candidate.is_absolute():
-            raise SoundBankRuntimeError(
-                "copied WAV must localize to an absolute host path"
-            )
-        return candidate
-
-    drive_prefix = re.match(r"^[A-Za-z]:", normalized)
-    drive_match = re.fullmatch(r"([A-Za-z]):/(.*)", normalized)
-    if drive_prefix is not None:
-        if drive_match is None:
-            raise SoundBankRuntimeError(
-                "copied WAV has an unsafe Wine drive spelling"
-            )
-        drive = drive_match.group(1).upper()
-        suffix = drive_match.group(2)
-        if drive == "Z":
-            base = Path("/")
+    try:
+        windows_path = parse_windows_drive_path(value)
+    except ReflectedHostPathError as exc:
+        raise SoundBankRuntimeError(
+            "copied WAV has an unsafe Windows drive spelling"
+        ) from exc
+    if windows_path is not None:
+        drive = windows_path.drive
+        parts = windows_path.relative_parts
+        native = Path(windows_path.pure) if os.name == "nt" else None
+        if native is not None and _available_directory(Path(native.anchor)):
+            return native
+        if drive == "Z" and wine_z_root is not None:
+            base = Path(wine_z_root)
+        elif drive == "Y" and (os.name != "nt" or pwd is not None):
+            base = _resolved_login_home(field="copied WAV")
+        elif drive == "Z":
+            if wine_z_root is None:
+                if os.name == "nt":
+                    raise SoundBankRuntimeError(
+                        "copied WAV Wine Z: has no native root mapping"
+                    )
+                base = Path("/")
         elif drive == "Y":
-            if pwd is None:
-                raise SoundBankRuntimeError(
-                    "copied WAV uses Wine Y: but the login home is unavailable"
-                )
-            try:
-                base = Path(pwd.getpwuid(os.getuid()).pw_dir).resolve(strict=True)
-            except (KeyError, OSError) as exc:
-                raise SoundBankRuntimeError(
-                    "copied WAV Wine Y: could not be mapped to the login home"
-                ) from exc
+            raise SoundBankRuntimeError(
+                "copied WAV uses an unavailable native Windows drive Y:"
+            )
         else:
             raise SoundBankRuntimeError(
                 f"copied WAV uses unmappable Wine drive {drive}:"
             )
+        candidate = base.joinpath(*parts)
     else:
-        if not normalized.startswith("/"):
+        try:
+            candidate = Path(parse_posix_absolute_path(value))
+        except ReflectedHostPathError as exc:
             raise SoundBankRuntimeError(
                 "copied WAV must be an absolute host path"
-            )
-        base = Path("/")
-        suffix = normalized[1:]
-    parts = suffix.split("/")
-    if any(part in {"", ".", ".."} or part.startswith("~") for part in parts):
-        raise SoundBankRuntimeError(
-            "copied WAV contains an unsafe host path component"
-        )
-    candidate = base.joinpath(*parts)
+            ) from exc
     if not candidate.is_absolute():
         raise SoundBankRuntimeError(
             "copied WAV must localize to an absolute host path"
         )
     return candidate
+
+
+def _available_directory(path: Path) -> bool:
+    try:
+        return path.is_dir()
+    except OSError:
+        return False
+
+
+def _resolved_login_home(*, field: str) -> Path:
+    if pwd is None:
+        raise SoundBankRuntimeError(
+            f"{field} Wine Y: mapping is unavailable on this host"
+        )
+    try:
+        getuid = getattr(os, "getuid", None)
+        uid = getuid() if callable(getuid) else None
+        home = Path(pwd.getpwuid(uid).pw_dir)
+        resolved = home.resolve(strict=True)
+    except (AttributeError, KeyError, OSError, RuntimeError, TypeError) as exc:
+        raise SoundBankRuntimeError(
+            f"{field} Wine Y: could not be mapped to the login home"
+        ) from exc
+    if not resolved.is_dir():
+        raise SoundBankRuntimeError(
+            f"{field} Wine Y: login home is not a directory"
+        )
+    return resolved
 
 
 def _project_identity_map(value: Any, field: str) -> dict[str, str]:

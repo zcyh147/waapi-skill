@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import struct
 import uuid
 from dataclasses import replace
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from types import SimpleNamespace
 
 import pytest
@@ -887,8 +888,10 @@ def test_custom_database_wine_path_boundary_is_exact_and_fail_closed(
         launch_home=isolation.launch_home,
         wine_prefix=isolation.wine_prefix,
     )
-    assert mapped == "Z:\\" + "\\".join(source.parts[1:])
-    localized = (Path("/") / mapped[3:].replace("\\", "/")).resolve()
+    wire_path = PureWindowsPath(mapped)
+    assert wire_path.drive == "Z:"
+    assert wire_path.parts[1:] == source.parts[1:]
+    localized = Path(source.anchor).joinpath(*wire_path.parts[1:]).resolve()
     assert localized == source.resolve()
 
     alias = owned / "source-alias"
@@ -1051,13 +1054,18 @@ def test_index_seal_accepts_only_bound_y_and_database_relative_paths(
     originals_root = staged.sandbox_project.parent / "Originals"
     for row, item in zip(observed, staged.assets, strict=True):
         y_row = dict(row)
-        y_row["Path"] = "Y:\\" + "\\".join(
-            item.indexed_host_path.relative_to(y_root).parts
+        y_row["Path"] = str(
+            PureWindowsPath(
+                "Y:/",
+                *item.indexed_host_path.relative_to(y_root).parts,
+            )
         )
         y_rows.append(y_row)
         relative_row = dict(row)
-        relative_row["Path"] = "\\".join(
-            item.indexed_host_path.relative_to(originals_root).parts
+        relative_row["Path"] = str(
+            PureWindowsPath(
+                *item.indexed_host_path.relative_to(originals_root).parts
+            )
         )
         relative_rows.append(relative_row)
 
@@ -1713,15 +1721,26 @@ def test_reference_associations_close_posix_z_and_relative_original_paths(
 
     posix_rows = rows(str)
     z_rows = rows(
-        lambda path: "Z:\\" + "\\".join(path.resolve(strict=True).parts[1:])
+        lambda path: (
+            str(path.resolve(strict=True))
+            if os.name == "nt"
+            else str(
+                PureWindowsPath(
+                    "Z:/", *path.resolve(strict=True).parts[1:]
+                )
+            )
+        )
     )
     relative_rows = rows(
         lambda path: path.relative_to(originals_root).as_posix()
     )
     y_root = staged.owned_root
     y_rows = rows(
-        lambda path: "Y:\\" + "\\".join(
-            path.resolve(strict=True).relative_to(y_root).parts
+        lambda path: str(
+            PureWindowsPath(
+                "Y:/",
+                *path.resolve(strict=True).relative_to(y_root).parts,
+            )
         )
     )
 

@@ -39,6 +39,11 @@ from .codex_import_assets_v3 import (
     canonical_wwise_language,
     compound_dynamic_modes_by_row,
 )
+from .codex_host_paths import (
+    ReflectedHostPathError,
+    parse_posix_absolute_path,
+    parse_windows_drive_path,
+)
 from .codex_version_layout_v3 import (
     CodexVersionLayoutError,
     get_codex_version_layout_v3,
@@ -2884,7 +2889,10 @@ def _copied_original_evidence(
     that no path component is a symlink.
     """
 
-    candidate = _localize_waapi_original_path(value)
+    candidate = _localize_waapi_original_path(
+        value,
+        wine_z_root=None if os.name == "nt" else Path("/"),
+    )
 
     root = project_root.resolve(strict=True)
     originals = root / "Originals"
@@ -2948,7 +2956,11 @@ def _copied_original_evidence(
     return proof, relative
 
 
-def _localize_waapi_original_path(value: Any) -> Path:
+def _localize_waapi_original_path(
+    value: Any,
+    *,
+    wine_z_root: Path | None = None,
+) -> Path:
     """Map only POSIX absolute paths and the two reviewed Wine drives.
 
     Wwise running through Wine reports the login-account home as ``Y:`` and
@@ -2968,54 +2980,48 @@ def _localize_waapi_original_path(value: Any) -> Path:
             "copied original requires a non-empty absolute path string"
         )
 
-    normalized = value.replace("\\", "/")
-    if normalized.startswith("//"):
-        raise ImportRuntimeError("copied original uses an unmappable UNC path")
-
-    if os.name == "nt":  # pragma: no cover - parser is tested portably below
-        return Path(_validated_native_windows_original_path(value))
-
-    drive_prefix = re.match(r"^[A-Za-z]:", normalized)
-    drive_match = re.fullmatch(r"([A-Za-z]):/(.*)", normalized)
-    if drive_prefix is not None:
-        if drive_match is None:
-            raise ImportRuntimeError(
-                "copied original has an unsafe Wine drive spelling"
-            )
-        drive = drive_match.group(1).upper()
-        suffix = drive_match.group(2)
-        if drive == "Z":
-            base = Path("/")
+    try:
+        windows_path = parse_windows_drive_path(value)
+    except ReflectedHostPathError as exc:
+        raise ImportRuntimeError(
+            "copied original has an unsafe Windows drive spelling"
+        ) from exc
+    if windows_path is not None:
+        drive = windows_path.drive
+        parts = windows_path.relative_parts
+        native = Path(windows_path.pure) if os.name == "nt" else None
+        native_root_available = (
+            native is not None and _available_directory(Path(native.anchor))
+        )
+        if native_root_available:
+            return native
+        if drive == "Z" and wine_z_root is not None:
+            base = Path(wine_z_root)
+        elif drive == "Y" and (os.name != "nt" or pwd is not None):
+            base = _resolved_login_home()
+        elif drive == "Z":
+            if wine_z_root is None:
+                if os.name == "nt":
+                    raise ImportRuntimeError(
+                        "copied original Wine Z: has no native root mapping"
+                    )
+                base = Path("/")
         elif drive == "Y":
-            if pwd is None:  # pragma: no cover - native Windows skips this branch
-                raise ImportRuntimeError(
-                    "copied original uses Wine Y: but the login home is unavailable"
-                )
-            try:
-                base = Path(pwd.getpwuid(os.getuid()).pw_dir).resolve(strict=True)
-            except (KeyError, OSError) as exc:
-                raise ImportRuntimeError(
-                    "copied original Wine Y: could not be mapped to the login home"
-                ) from exc
+            raise ImportRuntimeError(
+                "copied original uses an unavailable native Windows drive Y:"
+            )
         else:
             raise ImportRuntimeError(
                 f"copied original uses unmappable Wine drive {drive}:"
             )
+        candidate = base.joinpath(*parts)
     else:
-        if not normalized.startswith("/"):
-            raise ImportRuntimeError("copied original must be an absolute host path")
-        base = Path("/")
-        suffix = normalized[1:]
-
-    parts = suffix.split("/")
-    if any(
-        part in {"", ".", ".."} or part.startswith("~")
-        for part in parts
-    ):
-        raise ImportRuntimeError(
-            "copied original contains an unsafe host path component"
-        )
-    candidate = base.joinpath(*parts)
+        try:
+            candidate = Path(parse_posix_absolute_path(value))
+        except ReflectedHostPathError as exc:
+            raise ImportRuntimeError(
+                "copied original must be an absolute host path"
+            ) from exc
     if not candidate.is_absolute():  # defensive on unusual pathlib platforms
         raise ImportRuntimeError("copied original must localize to an absolute path")
     return candidate
@@ -3024,28 +3030,45 @@ def _localize_waapi_original_path(value: Any) -> Path:
 def _validated_native_windows_original_path(value: str) -> PureWindowsPath:
     """Validate one native-Windows drive-absolute path without host I/O."""
 
-    normalized = value.replace("\\", "/")
-    if normalized.startswith("//"):
-        raise ImportRuntimeError("copied original uses an unmappable UNC path")
-    drive_match = re.fullmatch(r"([A-Za-z]):/(.*)", normalized)
-    if drive_match is None:
+    try:
+        parsed = parse_windows_drive_path(value)
+    except ReflectedHostPathError as exc:
+        raise ImportRuntimeError(
+            "copied original must be a native Windows drive-absolute path"
+        ) from exc
+    if parsed is None:
         raise ImportRuntimeError(
             "copied original must be a native Windows drive-absolute path"
         )
-    parts = drive_match.group(2).split("/")
-    if any(
-        part in {"", ".", ".."} or part.startswith("~")
-        for part in parts
-    ):
+    return parsed.pure
+
+
+def _available_directory(path: Path) -> bool:
+    try:
+        return path.is_dir()
+    except OSError:
+        return False
+
+
+def _resolved_login_home() -> Path:
+    if pwd is None:
         raise ImportRuntimeError(
-            "copied original contains an unsafe host path component"
+            "copied original Wine Y: mapping is unavailable on this host"
         )
-    candidate = PureWindowsPath(f"{drive_match.group(1).upper()}:\\", *parts)
-    if not candidate.is_absolute():
+    try:
+        getuid = getattr(os, "getuid", None)
+        uid = getuid() if callable(getuid) else None
+        home = Path(pwd.getpwuid(uid).pw_dir)
+        resolved = home.resolve(strict=True)
+    except (AttributeError, KeyError, OSError, RuntimeError, TypeError) as exc:
         raise ImportRuntimeError(
-            "copied original must be a native Windows drive-absolute path"
+            "copied original Wine Y: could not be mapped to the login home"
+        ) from exc
+    if not resolved.is_dir():
+        raise ImportRuntimeError(
+            "copied original Wine Y: login home is not a directory"
         )
-    return candidate
+    return resolved
 
 
 def _result_rows(value: Any, *, context: str) -> tuple[Mapping[str, Any], ...]:

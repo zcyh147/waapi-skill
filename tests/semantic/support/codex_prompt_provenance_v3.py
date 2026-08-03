@@ -21,6 +21,7 @@ from tests.semantic.support.codex_business_oracle_plan_v3 import (
     BUSINESS_ORACLE_PLAN_FILE,
     BusinessOraclePlanEvidence,
 )
+from tests.semantic.support.codex_filesystem_security import binary_file_open_flags
 from tests.semantic.support.codex_eval_bundle_v3 import OnlineScenario
 from tests.semantic.support.codex_eval_protocol_v3 import V3GatewayProtocol
 from tests.semantic.support.codex_eval_protocol_v3 import (
@@ -2790,7 +2791,7 @@ def _strict_json_text(value: str) -> Any:
 
 
 def _read_one_json(path: Path) -> tuple[bytes, Any]:
-    flags = os.O_RDONLY
+    flags = binary_file_open_flags(os.O_RDONLY)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:
@@ -2820,7 +2821,7 @@ def _read_one_json(path: Path) -> tuple[bytes, Any]:
 def _write_exclusive_json(path: Path, value: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     raw = _canonical_json_bytes(value) + b"\n"
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags = binary_file_open_flags(os.O_WRONLY, os.O_CREAT, os.O_EXCL)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     descriptor = os.open(path, flags, 0o600)

@@ -1878,7 +1878,7 @@ def _capture_path_proof(value: Any, *, role: str) -> dict[str, Any]:
 
 
 def _open_no_follow(path: Path) -> int:
-    flags = os.O_RDONLY
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:

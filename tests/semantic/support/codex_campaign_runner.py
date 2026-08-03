@@ -22,6 +22,7 @@ from tests.semantic.support.codex_campaign import (
     stable_tree_sha256,
 )
 from tests.semantic.support.codex_eval_suite import EvalSession
+from tests.semantic.support.codex_filesystem_security import binary_file_open_flags
 from tests.semantic.support.codex_harness import (
     WORKSPACE_SKILL_EXCLUDED_NAMES,
     assert_detached_workspace_skill_copy,
@@ -125,7 +126,7 @@ def load_strict_regular_json(path: Path) -> Any:
     """Read and parse exactly one non-symlink regular file descriptor."""
 
     source = Path(path)
-    flags = os.O_RDONLY
+    flags = binary_file_open_flags(os.O_RDONLY)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:
@@ -1749,7 +1750,7 @@ def _reject_all_symlinks(root: Path) -> None:
 
 
 def _exclusive_write(path: Path, data: bytes) -> None:
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags = binary_file_open_flags(os.O_WRONLY, os.O_CREAT, os.O_EXCL)
     descriptor = os.open(path, flags, 0o600)
     try:
         view = memoryview(data)
