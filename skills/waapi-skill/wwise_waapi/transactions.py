@@ -1061,7 +1061,15 @@ class TransactionStore:
     @staticmethod
     def _append_event(path: Path, event: Mapping[str, Any]) -> None:
         payload = canonical_json_bytes(event) + b"\n"
-        flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+        # Raw ``os.write`` calls inherit the descriptor's text/binary mode on
+        # Windows.  Open the journal in binary mode so its hash-chained JSONL
+        # representation always contains the exact canonical LF byte.
+        flags = (
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_APPEND
+            | getattr(os, "O_BINARY", 0)
+        )
         fd = os.open(path, flags, 0o600)
         try:
             view = memoryview(payload)
@@ -1220,7 +1228,12 @@ def _read_json_object(path: Path, transaction_id: str) -> dict[str, Any]:
 def _atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
     data = canonical_json_bytes(payload) + b"\n"
     temporary = path.parent / f".{path.name}.{uuid.uuid4().hex}.tmp"
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags = (
+        os.O_WRONLY
+        | os.O_CREAT
+        | os.O_EXCL
+        | getattr(os, "O_BINARY", 0)
+    )
     fd = os.open(temporary, flags, 0o600)
     try:
         handle = os.fdopen(fd, "wb", closefd=True)

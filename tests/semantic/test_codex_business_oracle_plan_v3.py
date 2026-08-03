@@ -23,6 +23,9 @@ from tests.semantic.support.codex_business_oracle_plan_v3 import (
     read_business_oracle_plan_envelope,
     write_business_oracle_plan,
 )
+from tests.semantic.support.codex_filesystem_security import (
+    path_is_link_or_reparse,
+)
 
 
 SHA_A = "a" * 64
@@ -189,9 +192,12 @@ def test_write_and_read_round_trip_fixed_canonical_closed_plan(tmp_path: Path) -
     assert written.payload["static_expectation"] == kwargs["static_expectation"]
     assert written.payload["live_binding"] == kwargs["live_binding"]
     assert written.payload["delta_rules"] == kwargs["delta_rules"]
-    mode = os.lstat(written.path).st_mode
-    assert stat.S_ISREG(mode)
-    assert stat.S_IMODE(mode) & 0o077 == 0
+    metadata = os.lstat(written.path)
+    assert stat.S_ISREG(metadata.st_mode)
+    assert metadata.st_nlink == 1
+    assert path_is_link_or_reparse(written.path, metadata=metadata) is False
+    if os.name == "posix":
+        assert stat.S_IMODE(metadata.st_mode) & 0o077 == 0
 
 
 def test_zero_dispatch_and_empty_common_optional_structures_are_valid(

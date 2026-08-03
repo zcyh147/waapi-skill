@@ -112,6 +112,18 @@ def _schema(uri: str) -> dict[str, Any]:
     }
 
 
+def test_deterministic_json_writer_persists_exact_utf8_lf_bytes(tmp_path: Path) -> None:
+    writer = DeterministicJsonWriter()
+    payload = {"z": "音频", "a": [1, 2]}
+    path = tmp_path / "nested" / "resource.json"
+
+    writer.write(path, payload)
+
+    assert path.read_bytes() == writer.dumps(payload).encode("utf-8")
+    assert path.read_bytes().endswith(b"\n")
+    assert b"\r\n" not in path.read_bytes()
+
+
 def _write_console_manifest(root: Path) -> None:
     version_dir = root / VERSION
     writer = DeterministicJsonWriter()

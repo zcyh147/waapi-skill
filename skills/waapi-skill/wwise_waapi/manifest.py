@@ -233,7 +233,10 @@ class DeterministicJsonWriter:
 
     def write(self, path: Path, payload: Mapping[str, Any]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(self.dumps(payload), encoding="utf-8")
+        # ``Path.write_text`` uses the platform newline convention.  These
+        # resources are digest-bound, so persist the exact UTF-8/LF bytes on
+        # every host, including Windows.
+        path.write_bytes(self.dumps(payload).encode("utf-8"))
 
 
 class ManifestResourceMissingError(FileNotFoundError):

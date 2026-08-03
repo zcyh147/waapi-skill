@@ -776,7 +776,7 @@ def _publish_subscription_ack(topic: str) -> Mapping[str, Any] | None:
     temporary = real_evidence / (
         f".{target.name}.{os.getpid()}.{secrets.token_hex(16)}.tmp"
     )
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     descriptor: int | None = None

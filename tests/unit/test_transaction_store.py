@@ -339,6 +339,13 @@ def test_preview_is_atomic_write_once_and_events_are_canonical_jsonl(tmp_path) -
     assert events[0]["event_hash"] == record.last_event_hash
     event_line = (tmp_path / "transactions" / "tx-001" / "events.jsonl").read_bytes()
     assert event_line == canonical_json_bytes(events[0]) + b"\n"
+    transaction_dir = tmp_path / "transactions" / "tx-001"
+    assert (transaction_dir / "preview.json").read_bytes() == (
+        canonical_json_bytes(preview.as_dict()) + b"\n"
+    )
+    assert (transaction_dir / "state.json").read_bytes() == (
+        canonical_json_bytes(record.as_dict()) + b"\n"
+    )
     assert not list((tmp_path / "transactions").glob("*.tmp"))
     assert not list((tmp_path / "transactions" / "tx-001").glob("*.tmp"))
 

@@ -121,6 +121,19 @@ class SoundBankContractError(ValueError):
         }
 
 
+def _stat_is_link_or_reparse_point(metadata: os.stat_result) -> bool:
+    """Reject POSIX links and Windows reparse points with one portable check."""
+
+    if stat.S_ISLNK(metadata.st_mode):
+        return True
+    attributes = getattr(metadata, "st_file_attributes", 0)
+    # Python exposes this constant on supported Windows builds.  Keep the
+    # documented Win32 value as a compatibility fallback for older runtimes;
+    # POSIX stat results have no ``st_file_attributes`` so remain unaffected.
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x0400)
+    return bool(attributes & reparse_flag)
+
+
 def capture_file_proof(
     value: str | os.PathLike[str],
     *,
@@ -223,10 +236,10 @@ def prove_artifact_path(
                 f"{field} could not be inspected.",
                 details={"path": str(supplied), "error": str(exc)},
             ) from exc
-        if stat.S_ISLNK(leaf_stat.st_mode):
+        if _stat_is_link_or_reparse_point(leaf_stat):
             raise SoundBankContractError(
                 "SYMLINK_NOT_ALLOWED",
-                f"{field} must not be a symbolic link.",
+                f"{field} must not be a symbolic link or Windows reparse point.",
                 details={"path": str(supplied)},
             )
         if stat.S_ISDIR(leaf_stat.st_mode):
@@ -330,10 +343,10 @@ def capture_artifact_tree(
                         "An artifact entry could not be inspected.",
                         details={"path": entry.path, "error": str(exc)},
                     ) from exc
-                if stat.S_ISLNK(entry_stat.st_mode):
+                if _stat_is_link_or_reparse_point(entry_stat):
                     raise SoundBankContractError(
                         "SYMLINK_NOT_ALLOWED",
-                        "Artifact trees must not contain symbolic links.",
+                        "Artifact trees must not contain symbolic links or Windows reparse points.",
                         details={"path": entry.path},
                     )
                 if stat.S_ISDIR(entry_stat.st_mode):
@@ -351,25 +364,24 @@ def capture_artifact_tree(
                         "Artifact tree exceeds the closed file limit.",
                         details={"files": len(files) + 1, "limit": max_files},
                     )
-                if entry_stat.st_size > max_file_bytes:
-                    raise SoundBankContractError(
-                        "LIMIT_EXCEEDED",
-                        "An artifact file exceeds the closed per-file limit.",
-                        details={"path": entry.path, "size": entry_stat.st_size, "limit": max_file_bytes},
-                    )
-                total_bytes += entry_stat.st_size
+                # DirEntry metadata is sufficient to classify the entry, but
+                # it is not the file-proof authority.  In particular, Windows
+                # can report a different inode representation for
+                # DirEntry.stat() and the handle-backed lstat()/fstat() path.
+                # Capture the file through the no-follow proof path and use
+                # that single handle-backed result for all size budgets and
+                # evidence fields.
+                proof = capture_file_proof(
+                    entry.path,
+                    field="artifact_file",
+                    max_bytes=max_file_bytes,
+                )
+                total_bytes += proof["size"]
                 if total_bytes > max_total_bytes:
                     raise SoundBankContractError(
                         "LIMIT_EXCEEDED",
                         "Artifact tree exceeds the closed total byte limit.",
                         details={"total_bytes": total_bytes, "limit": max_total_bytes},
-                    )
-                proof = capture_file_proof(entry.path, field="artifact_file", max_bytes=max_file_bytes)
-                if (entry_stat.st_dev, entry_stat.st_ino) != (proof["device"], proof["inode"]):
-                    raise SoundBankContractError(
-                        "FILE_CHANGED",
-                        "An artifact entry changed while the tree snapshot was captured.",
-                        details={"path": entry.path},
                     )
                 files.append(
                     {
@@ -2331,10 +2343,10 @@ def _open_regular_file(
             f"{field} is not accessible.",
             details={"path": str(supplied), "error": str(exc)},
         ) from exc
-    if stat.S_ISLNK(leaf_stat.st_mode):
+    if _stat_is_link_or_reparse_point(leaf_stat):
         raise SoundBankContractError(
             "SYMLINK_NOT_ALLOWED",
-            f"{field} must not be a symbolic link.",
+            f"{field} must not be a symbolic link or Windows reparse point.",
             details={"path": str(supplied)},
         )
     if not stat.S_ISREG(leaf_stat.st_mode):

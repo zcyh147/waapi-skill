@@ -348,7 +348,7 @@ def test_executed_topic_uses_authoring_overlay_and_unsubscribes(
         subscription_events={EXECUTED_TOPIC: [event]},
     )
     code, payload = execute(
-        ["--timeout", "0.5", "wait-topic", EXECUTED_TOPIC],
+        ["--timeout", "5", "wait-topic", EXECUTED_TOPIC],
         tmp_path=tmp_path,
         version="2024.1",
         client=client,

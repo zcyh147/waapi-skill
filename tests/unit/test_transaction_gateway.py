@@ -6058,6 +6058,10 @@ def test_remote_named_capture_screen_is_not_a_locality_transaction(
     ]
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Wine host path translation is POSIX-only",
+)
 def test_local_wine_cli_execute_translates_only_the_transient_dispatch_paths(
     tmp_path: Path,
 ) -> None:
@@ -6146,6 +6150,10 @@ def test_local_wine_cli_execute_translates_only_the_transient_dispatch_paths(
     assert completion["details"]["wire_path_adaptation"] == proof
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Wine host path translation is POSIX-only",
+)
 def test_local_wine_soundbank_execute_translates_sealed_host_paths_transiently(
     tmp_path: Path,
 ) -> None:
@@ -6393,6 +6401,10 @@ def test_tab_import_wire_path_selection_rejects_audit_or_dispatch_drift(
     assert error.value.error_code == "WIRE_PATH_AUDIT_MISMATCH"
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Wine host path translation is POSIX-only",
+)
 def test_local_wine_cli_mapping_failure_requires_repreview_before_execution_start(
     tmp_path: Path,
 ) -> None:

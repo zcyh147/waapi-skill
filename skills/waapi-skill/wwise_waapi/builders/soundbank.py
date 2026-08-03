@@ -621,13 +621,14 @@ def _generate_artifact_plan(args: Mapping[str, Any], *, output_root_hint: str | 
     languages = language_value if isinstance(language_value, list) else (["<no-localized-language>"] if args.get("skipLanguages") is True else ["<all-languages>"])
     soundbanks = soundbank_value if isinstance(soundbank_value, list) else [{"name": "<all-soundbanks>"}]
     expected_paths: list[str] = []
-    root = str(output_root_hint)
+    root = Path(output_root_hint)
     for platform in platforms:
         for language in languages:
             for soundbank in soundbanks:
                 name = soundbank.get("name", "<soundbank>") if isinstance(soundbank, Mapping) else "<soundbank>"
-                expected_paths.append(f"{root}/{platform}/{language}/{name}.bnk")
-                expected_paths.append(f"{root}/{platform}/{language}/{name}.json")
+                artifact_root = root / str(platform) / str(language)
+                expected_paths.append(str(artifact_root / f"{name}.bnk"))
+                expected_paths.append(str(artifact_root / f"{name}.json"))
     return {
         "platform_assumptions": list(platforms),
         "language_assumptions": list(languages),

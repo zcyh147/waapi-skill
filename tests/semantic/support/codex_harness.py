@@ -7,18 +7,20 @@ import json
 import os
 import re
 import shlex
+import shutil
 import signal
 import stat
 import subprocess
+import sys
 import tempfile
 import time
 from contextlib import ExitStack, contextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Iterator, Mapping, Sequence
+from typing import Any, Callable, Iterator, Mapping, Sequence
 
 
-DEFAULT_CODEX_BINARY = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
+MACOS_APP_CODEX_FALLBACK = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
 DEFAULT_AUTH_JSON = Path.home() / ".codex" / "auth.json"
 DEFAULT_MODEL = "gpt-5.6-sol"
 DEFAULT_REASONING_EFFORT = "medium"
@@ -26,6 +28,9 @@ DEFAULT_SERVICE_TIER = "priority"
 DEFAULT_TIMEOUT_SECONDS = 180.0
 PROMPT_AUDIT_TIMEOUT_SECONDS = 30.0
 PROMPT_AUDIT_MAX_ATTEMPTS = 2
+WORKSPACE_SKILL_EXCLUDED_NAMES = frozenset(
+    {".venv", "__pycache__", ".pytest_cache", ".DS_Store", ".coverage"}
+)
 MEMORY_MARKERS = (
     "MEMORY_SUMMARY",
     "## Memory",
@@ -82,17 +87,26 @@ GATEWAY_SUBCOMMANDS = frozenset(
     }
 )
 _PROTECTED_ENV_EXACT = frozenset({"HOME", "CODEX_HOME"})
-_BROKER_MODEL_ENV_NAMES = frozenset(
+_BROKER_COMMON_MODEL_ENV_NAMES = frozenset(
     {
-        "BASH_ENV",
         "WAAPI_CODEX_GATEWAY_BROKER_ENDPOINT",
         "WAAPI_CODEX_GATEWAY_BROKER_TOKEN",
         "WAAPI_CODEX_GATEWAY_BROKER_TRANSPORT",
         "WAAPI_CODEX_GATEWAY_REQUIRED",
     }
 )
-_BROKER_MODEL_OVERLAY_NAMES = _BROKER_MODEL_ENV_NAMES | {"PATH"}
+_BROKER_POSIX_MODEL_ENV_NAMES = _BROKER_COMMON_MODEL_ENV_NAMES | {"BASH_ENV"}
+_BROKER_WINDOWS_TRUSTED_PYTHON_ENV = "WAAPI_CODEX_GATEWAY_SHIM_TRUSTED_PYTHON"
+_BROKER_WINDOWS_MODEL_ENV_NAMES = _BROKER_COMMON_MODEL_ENV_NAMES | {
+    _BROKER_WINDOWS_TRUSTED_PYTHON_ENV
+}
+_BROKER_ALL_MODEL_ENV_NAMES = (
+    _BROKER_POSIX_MODEL_ENV_NAMES | _BROKER_WINDOWS_MODEL_ENV_NAMES
+)
+_BROKER_POSIX_OVERLAY_NAMES = _BROKER_POSIX_MODEL_ENV_NAMES | {"PATH"}
+_BROKER_WINDOWS_OVERLAY_NAMES = _BROKER_WINDOWS_MODEL_ENV_NAMES | {"PATH", "PATHEXT"}
 _SHELL_ASSIGNMENT_RE = re.compile(r"(?P<name>[A-Za-z_][A-Za-z0-9_]*)=(?P<value>.*)", re.DOTALL)
+_PYTHON_EXECUTABLE_RE = re.compile(r"python(?:3(?:\.\d+)?)?(?:\.exe)?")
 _RUNNER_VERSION_SELECTORS = frozenset({"--version", "--wwise-version"})
 _SKILL_LINE_RE = re.compile(
     r"(?m)^\s*-\s+(?P<name>[A-Za-z0-9_.:-]+)\s*:\s*.*?"
@@ -166,6 +180,286 @@ class CodexHarnessError(RuntimeError):
     """Raised when a Codex semantic run cannot satisfy the isolation contract."""
 
 
+def _strict_codex_binary(candidate: Path, *, source: str) -> Path:
+    """Resolve one Codex executable candidate without accepting a missing path."""
+
+    try:
+        resolved = candidate.expanduser().resolve(strict=True)
+    except OSError as exc:
+        raise CodexHarnessError(f"{source} Codex binary is unavailable: {candidate}") from exc
+    if not resolved.is_file() or not os.access(resolved, os.X_OK):
+        raise CodexHarnessError(f"{source} Codex binary is not executable: {resolved}")
+    return resolved
+
+
+def discover_codex_binary(
+    *,
+    platform_name: str | None = None,
+    which: Callable[[str], str | None] | None = None,
+    macos_app_fallback: Path = MACOS_APP_CODEX_FALLBACK,
+) -> Path:
+    """Discover the host-native Codex CLI, with an App fallback only on macOS."""
+
+    platform_name = sys.platform if platform_name is None else platform_name
+    which = shutil.which if which is None else which
+    command_names = ("codex.exe", "codex") if platform_name.startswith("win") else ("codex",)
+    for command_name in command_names:
+        discovered = which(command_name)
+        if discovered:
+            return _strict_codex_binary(Path(discovered), source=f"PATH ({command_name})")
+    if platform_name == "darwin":
+        return _strict_codex_binary(macos_app_fallback, source="macOS App fallback")
+    raise CodexHarnessError(
+        "Codex CLI was not found on PATH; pass an explicit --codex-binary path"
+    )
+
+
+def resolve_codex_binary(value: str | os.PathLike[str] | None) -> Path:
+    """Honor an explicit CLI path before attempting host-native discovery."""
+
+    if value is None:
+        return discover_codex_binary()
+    return _strict_codex_binary(Path(value), source="explicit")
+
+
+def _is_windows(platform_name: str | None = None) -> bool:
+    """Return the active platform through one injectable test seam."""
+
+    return (os.name if platform_name is None else platform_name) == "nt"
+
+
+def is_link_or_junction(path: Path) -> bool:
+    """Reject links, junctions, and older-Python Windows reparse points."""
+
+    if path.is_symlink():
+        return True
+    is_junction = getattr(path, "is_junction", None)
+    if is_junction is not None and is_junction():
+        return True
+    try:
+        attributes = int(getattr(path.lstat(), "st_file_attributes", 0))
+    except OSError:
+        return False
+    reparse_flag = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
+    return bool(attributes & reparse_flag)
+
+
+def _sha256_regular_file(path: Path) -> str:
+    if is_link_or_junction(path) or not path.is_file():
+        raise CodexHarnessError(f"expected a real regular file: {path}")
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as exc:
+        raise CodexHarnessError(f"cannot read regular file {path}: {exc}") from exc
+    return digest.hexdigest()
+
+
+def _workspace_skill_manifest(
+    root: Path,
+    *,
+    exclude_names: Sequence[str] = (),
+) -> tuple[dict[str, Any], ...]:
+    """Return a content-only manifest while rejecting aliases and special files."""
+
+    candidate = Path(root)
+    if is_link_or_junction(candidate):
+        raise CodexHarnessError(f"workspace Skill tree must be a real directory: {candidate}")
+    try:
+        tree = candidate.resolve(strict=True)
+    except OSError as exc:
+        raise CodexHarnessError(f"workspace Skill tree does not exist: {candidate}") from exc
+    if not tree.is_dir():
+        raise CodexHarnessError(f"workspace Skill tree must be a directory: {tree}")
+    excluded = frozenset(str(name) for name in exclude_names)
+    rows: list[dict[str, Any]] = []
+
+    def walk(directory: Path) -> None:
+        try:
+            entries = sorted(os.scandir(directory), key=lambda entry: entry.name)
+        except OSError as exc:
+            raise CodexHarnessError(f"cannot scan workspace Skill tree {directory}: {exc}") from exc
+        for entry in entries:
+            if entry.name in excluded:
+                continue
+            path = Path(entry.path)
+            relative = path.relative_to(tree).as_posix()
+            try:
+                info = entry.stat(follow_symlinks=False)
+            except OSError as exc:
+                raise CodexHarnessError(f"cannot stat workspace Skill entry {path}: {exc}") from exc
+            if stat.S_ISLNK(info.st_mode) or is_link_or_junction(path):
+                raise CodexHarnessError(f"workspace Skill tree contains a link or junction: {path}")
+            if stat.S_ISDIR(info.st_mode):
+                rows.append(
+                    {
+                        "path": relative,
+                        "type": "directory",
+                        "executable": bool(info.st_mode & 0o111),
+                    }
+                )
+                walk(path)
+            elif stat.S_ISREG(info.st_mode):
+                rows.append(
+                    {
+                        "path": relative,
+                        "type": "file",
+                        "executable": bool(info.st_mode & 0o111),
+                        "size": info.st_size,
+                        "sha256": _sha256_regular_file(path),
+                    }
+                )
+            else:
+                raise CodexHarnessError(f"workspace Skill tree contains a special file: {path}")
+
+    walk(tree)
+    return tuple(rows)
+
+
+def workspace_skill_tree_sha256(
+    root: Path,
+    *,
+    exclude_names: Sequence[str] = (),
+) -> str:
+    """Hash the same path/content/executable tree shape used by campaign evidence."""
+
+    payload = json.dumps(
+        _workspace_skill_manifest(root, exclude_names=exclude_names),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def assert_detached_workspace_skill_copy(source: Path, installed: Path) -> None:
+    """Prove a copied Skill has no hardlink alias back into the candidate tree."""
+
+    source_tree = Path(source).resolve(strict=True)
+    installed_tree = Path(installed).resolve(strict=True)
+    source_ids: set[tuple[int, int]] = set()
+    installed_ids: set[tuple[int, int]] = set()
+    for root, excluded, identities in (
+        (source_tree, WORKSPACE_SKILL_EXCLUDED_NAMES, source_ids),
+        (installed_tree, frozenset(), installed_ids),
+    ):
+        for directory, dirnames, filenames in os.walk(root, followlinks=False):
+            directory_path = Path(directory)
+            dirnames[:] = [name for name in dirnames if name not in excluded]
+            for name in filenames:
+                if name in excluded:
+                    continue
+                path = directory_path / name
+                if is_link_or_junction(path):
+                    raise CodexHarnessError(
+                        f"workspace Skill copy contains a link or junction: {path}"
+                    )
+                try:
+                    info = path.stat()
+                except OSError as exc:
+                    raise CodexHarnessError(f"cannot stat workspace Skill file {path}: {exc}") from exc
+                if not stat.S_ISREG(info.st_mode):
+                    raise CodexHarnessError(f"workspace Skill copy contains a special file: {path}")
+                identities.add((int(info.st_dev), int(info.st_ino)))
+    shared = source_ids.intersection(installed_ids)
+    if shared:
+        raise CodexHarnessError(
+            "workspace Skill copy contains hardlink aliases to the candidate Skill"
+        )
+
+
+def workspace_skill_install_path(workspace: Path) -> Path:
+    return Path(workspace) / ".agents" / "skills" / "waapi-skill"
+
+
+def prepare_workspace_skill_install(
+    workspace: Path,
+    skill_source: Path,
+    *,
+    platform_name: str | None = None,
+) -> Path:
+    """Install one Skill without requiring Windows symlink privilege.
+
+    POSIX retains the read-only alias created by a directory symlink.  Native
+    Windows receives an independently copied, campaign-hash-equivalent tree;
+    runtime/cache directories are excluded and the copy is proven not to share
+    file identities with the frozen candidate.
+    """
+
+    source_path = Path(skill_source)
+    if is_link_or_junction(source_path):
+        raise CodexHarnessError(f"Skill source must be a real directory: {source_path}")
+    source = source_path.expanduser().resolve(strict=True)
+    if not source.is_dir():
+        raise CodexHarnessError(f"Skill source must be a directory: {source}")
+    install = workspace_skill_install_path(workspace)
+    install.parent.mkdir(parents=True, exist_ok=False)
+    if _is_windows(platform_name):
+        source_sha256 = workspace_skill_tree_sha256(
+            source,
+            exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+        )
+        try:
+            shutil.copytree(
+                source,
+                install,
+                copy_function=shutil.copy2,
+                ignore=shutil.ignore_patterns(*sorted(WORKSPACE_SKILL_EXCLUDED_NAMES)),
+                symlinks=True,
+            )
+        except OSError as exc:
+            raise CodexHarnessError(f"cannot copy Skill into Windows workspace: {exc}") from exc
+        installed_sha256 = workspace_skill_tree_sha256(install)
+        if installed_sha256 != source_sha256:
+            raise CodexHarnessError(
+                "Windows workspace Skill copy does not match the candidate tree: "
+                f"expected={source_sha256} actual={installed_sha256}"
+            )
+        assert_detached_workspace_skill_copy(source, install)
+    else:
+        install.symlink_to(source, target_is_directory=True)
+    return install
+
+
+def verify_workspace_skill_install(
+    workspace: Path,
+    skill_source: Path,
+    *,
+    platform_name: str | None = None,
+) -> Path:
+    """Verify the platform-specific install without accepting a weaker shape."""
+
+    source = Path(skill_source).expanduser().resolve(strict=True)
+    install = workspace_skill_install_path(workspace)
+    if _is_windows(platform_name):
+        if is_link_or_junction(install) or not install.is_dir():
+            raise CodexHarnessError(
+                f"WAAPI skill install must be an independent Windows directory copy: {install}"
+            )
+        expected = workspace_skill_tree_sha256(
+            source,
+            exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+        )
+        observed = workspace_skill_tree_sha256(install)
+        if observed != expected:
+            raise CodexHarnessError(
+                "WAAPI skill Windows copy differs from the candidate tree: "
+                f"expected={expected} actual={observed}"
+            )
+        assert_detached_workspace_skill_copy(source, install)
+    else:
+        if not install.is_symlink():
+            raise CodexHarnessError(f"WAAPI skill install must be a symlink: {install}")
+        if install.resolve(strict=True) != source:
+            raise CodexHarnessError(
+                f"WAAPI skill symlink resolves to {install.resolve(strict=True)}, expected {source}"
+            )
+    return install
+
+
 @dataclass(frozen=True, slots=True)
 class CodexGatewayErrorExpectation:
     """One explicitly expected, structured gateway error result.
@@ -222,19 +516,39 @@ class CodexEnvironmentAudit:
     auth_is_symlink: bool
     auth_target: str
     expected_auth_target: str
+    auth_install_mode: str = "symlink"
+    auth_sha256: str = ""
+    expected_auth_sha256: str = ""
+    auth_same_file_as_source: bool = True
+    expected_broker_environment_keys: tuple[str, ...] = tuple(
+        sorted(_BROKER_POSIX_MODEL_ENV_NAMES)
+    )
     broker_environment_keys: tuple[str, ...] = ()
     unexpected_sensitive_environment_keys: tuple[str, ...] = ()
 
     @property
     def passed(self) -> bool:
+        if self.auth_install_mode == "symlink":
+            auth_install_passed = (
+                self.auth_is_symlink
+                and self.auth_target == self.expected_auth_target
+            )
+        elif self.auth_install_mode == "copy":
+            auth_install_passed = (
+                not self.auth_is_symlink
+                and not self.auth_same_file_as_source
+                and bool(self.auth_sha256)
+                and self.auth_sha256 == self.expected_auth_sha256
+            )
+        else:
+            auth_install_passed = False
         return (
             not self.home_entries
             and self.codex_home_entries == ("auth.json",)
-            and self.auth_is_symlink
-            and self.auth_target == self.expected_auth_target
+            and auth_install_passed
             and not self.unexpected_sensitive_environment_keys
             and self.broker_environment_keys
-            in ((), tuple(sorted(_BROKER_MODEL_ENV_NAMES)))
+            in ((), self.expected_broker_environment_keys)
         )
 
 
@@ -383,7 +697,7 @@ class CodexInfrastructureError(CodexHarnessError):
 class CodexHarnessConfig:
     workspace: Path
     skill_source: Path
-    codex_binary: Path = DEFAULT_CODEX_BINARY
+    codex_binary: Path = field(default_factory=discover_codex_binary)
     auth_json: Path = DEFAULT_AUTH_JSON
     model: str = DEFAULT_MODEL
     reasoning_effort: str = DEFAULT_REASONING_EFFORT
@@ -419,17 +733,11 @@ class CodexCliHarness:
         workspace = self.config.workspace.expanduser().resolve(strict=True)
         skill_source = self.config.skill_source.expanduser().resolve(strict=True)
         skills_dir = workspace / ".agents" / "skills"
-        skill_install = skills_dir / "waapi-skill"
         if not binary.is_file() or not os.access(binary, os.X_OK):
             raise CodexHarnessError(f"Codex binary is missing or not executable: {binary}")
         if not auth.is_file():
             raise CodexHarnessError(f"Codex auth file is missing: {auth}")
-        if not skill_install.is_symlink():
-            raise CodexHarnessError(f"WAAPI skill install must be a symlink: {skill_install}")
-        if skill_install.resolve(strict=True) != skill_source:
-            raise CodexHarnessError(
-                f"WAAPI skill symlink resolves to {skill_install.resolve(strict=True)}, expected {skill_source}"
-            )
+        verify_workspace_skill_install(workspace, skill_source)
         installed_skills = tuple(sorted(path.name for path in skills_dir.iterdir()))
         if installed_skills != ("waapi-skill",):
             raise CodexHarnessError(
@@ -510,7 +818,7 @@ class CodexCliHarness:
             raise CodexHarnessError("codex debug prompt-input did not return JSON") from exc
         return audit_prompt_input_payload(
             payload,
-            target_skill_source=self.config.skill_source,
+            target_skill_source=workspace_skill_install_path(self.config.workspace),
             system_skill_root=Path(env["CODEX_HOME"]) / "skills" / ".system",
         )
 
@@ -757,7 +1065,8 @@ def _finalize_codex_run(
     command_records = completed_command_records(events)
     command_facts = classify_commands(
         command_records,
-        skill_source=config.skill_source,
+        skill_source=workspace_skill_install_path(config.workspace),
+        alternate_gateway_skill_sources=(config.skill_source,),
         expected_gateway_subcommands=config.expected_gateway_subcommands,
         expected_gateway_errors=config.expected_gateway_errors,
         expected_wwise_version=config.expected_wwise_version,
@@ -819,6 +1128,7 @@ def run_process(
     """Run a process in its own group so timeouts also stop internal agents."""
 
     started = time.monotonic()
+    process_group_options = subprocess_process_group_options()
     process = subprocess.Popen(
         [str(part) for part in command],
         cwd=str(cwd),
@@ -827,7 +1137,7 @@ def run_process(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        start_new_session=os.name != "nt",
+        **process_group_options,
     )
     try:
         stdout, stderr = process.communicate(timeout=timeout)
@@ -876,7 +1186,7 @@ def terminate_and_reap_process(
     """Terminate a process group, wait briefly, then kill and reap if needed."""
 
     if process.poll() is None:
-        signal_process_group(process, signal.SIGTERM)
+        terminate_process_group(process)
     try:
         return process.communicate(timeout=grace_seconds)
     except subprocess.TimeoutExpired:
@@ -887,22 +1197,113 @@ def force_kill_and_reap_process(process: subprocess.Popen[str]) -> tuple[str, st
     """Best-effort hard stop followed by an unbounded pipe/process reap."""
 
     if process.poll() is None:
-        signal_process_group(process, signal.SIGKILL)
+        kill_process_group(process)
     return process.communicate()
 
 
-def signal_process_group(process: subprocess.Popen[str], requested_signal: signal.Signals) -> None:
-    """Signal the isolated process group without failing on an exit race."""
+def terminate_process_group(
+    process: subprocess.Popen[str],
+    *,
+    platform_name: str | None = None,
+) -> None:
+    """Request graceful termination without evaluating POSIX-only signals on Windows."""
+
+    if _is_windows(platform_name):
+        taskkill_process_tree(process, force=False)
+        return
+    signal_posix_process_group(process, signal.SIGTERM)
+
+
+def kill_process_group(
+    process: subprocess.Popen[str],
+    *,
+    platform_name: str | None = None,
+) -> None:
+    """Hard-stop a process without requiring ``signal.SIGKILL`` on Windows."""
+
+    if _is_windows(platform_name):
+        taskkill_process_tree(process, force=True)
+        return
+    signal_posix_process_group(process, signal.SIGKILL)
+
+
+def signal_posix_process_group(
+    process: subprocess.Popen[str],
+    requested_signal: signal.Signals,
+) -> None:
+    """Signal a POSIX process group without failing on an exit race."""
 
     try:
-        if os.name != "nt":
-            os.killpg(process.pid, requested_signal)
-        elif requested_signal == signal.SIGTERM:  # pragma: no cover - Windows local harness is not used
-            process.terminate()
-        else:  # pragma: no cover
-            process.kill()
+        os.killpg(process.pid, requested_signal)
     except ProcessLookupError:
         pass
+
+
+def subprocess_process_group_options(
+    *,
+    platform_name: str | None = None,
+) -> dict[str, Any]:
+    """Return the native Popen boundary needed for descendant cleanup."""
+
+    if not _is_windows(platform_name):
+        return {"start_new_session": True}
+    creation_flag = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", None)
+    if not isinstance(creation_flag, int) or creation_flag <= 0:
+        raise CodexHarnessError(
+            "native Windows Codex cleanup requires CREATE_NEW_PROCESS_GROUP"
+        )
+    return {"creationflags": creation_flag}
+
+
+def taskkill_process_tree(
+    process: subprocess.Popen[str],
+    *,
+    force: bool,
+) -> None:
+    """Terminate one native-Windows process tree through the system utility."""
+
+    if process.poll() is not None:
+        return
+    executable = shutil.which("taskkill.exe") or shutil.which("taskkill")
+    if not executable:
+        raise CodexHarnessError("native Windows process-tree cleanup cannot find taskkill.exe")
+    command = [executable, "/PID", str(process.pid), "/T"]
+    if force:
+        command.append("/F")
+    try:
+        completed = subprocess.run(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=15.0,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise CodexHarnessError(
+            f"native Windows process-tree cleanup failed to run taskkill.exe: {exc}"
+        ) from exc
+    if completed.returncode == 0:
+        return
+    output = f"{completed.stdout or ''}\n{completed.stderr or ''}".casefold()
+    not_found = completed.returncode == 128 or any(
+        marker in output
+        for marker in (
+            "not found",
+            "no running instance",
+            "not running",
+            "找不到",
+        )
+    )
+    if not_found:
+        process.poll()
+        if process.returncode is not None:
+            return
+    raise CodexHarnessError(
+        "native Windows taskkill.exe could not terminate the Codex process tree: "
+        f"exit={completed.returncode} output={(completed.stdout or '') + (completed.stderr or '')!r}"
+    )
 
 
 @contextmanager
@@ -910,16 +1311,35 @@ def isolated_codex_environment(
     auth_json: Path,
     *,
     extra_env: Mapping[str, str] | None = None,
+    platform_name: str | None = None,
 ) -> Iterator[dict[str, str]]:
     """Create disposable HOME/CODEX_HOME directories for exactly one prompt."""
 
     auth = auth_json.expanduser().resolve(strict=True)
     normalized_extra_env = {str(key): str(value) for key, value in (extra_env or {}).items()}
-    validate_extra_environment(normalized_extra_env)
+    validate_extra_environment(normalized_extra_env, platform_name=platform_name)
     with tempfile.TemporaryDirectory(prefix="codex-waapi-home-") as home_text:
         with tempfile.TemporaryDirectory(prefix="codex-waapi-state-") as codex_home_text:
             codex_home = Path(codex_home_text)
-            (codex_home / "auth.json").symlink_to(auth)
+            auth_install = codex_home / "auth.json"
+            if _is_windows(platform_name):
+                try:
+                    shutil.copy2(auth, auth_install)
+                except OSError as exc:
+                    raise CodexHarnessError(
+                        f"cannot copy auth.json into isolated Windows CODEX_HOME: {exc}"
+                    ) from exc
+                try:
+                    if os.path.samefile(auth, auth_install):
+                        raise CodexHarnessError(
+                            "isolated Windows auth.json must not be a hardlink to the source"
+                        )
+                except OSError as exc:
+                    raise CodexHarnessError(
+                        f"cannot attest isolated Windows auth.json identity: {exc}"
+                    ) from exc
+            else:
+                auth_install.symlink_to(auth)
             env = {
                 str(key): str(value)
                 for key, value in os.environ.items()
@@ -937,7 +1357,11 @@ def isolated_codex_environment(
             yield env
 
 
-def validate_extra_environment(extra_env: Mapping[str, str]) -> None:
+def validate_extra_environment(
+    extra_env: Mapping[str, str],
+    *,
+    platform_name: str | None = None,
+) -> None:
     """Reject state escapes and permit only the runner-owned broker overlay.
 
     Ambient Wwise/WAAPI controls are always removed.  A trusted runner may add
@@ -955,7 +1379,8 @@ def validate_extra_environment(extra_env: Mapping[str, str]) -> None:
     forbidden_sensitive = sorted(
         key
         for key in extra_env
-        if is_evaluation_sensitive_environment_key(key) and key not in _BROKER_MODEL_ENV_NAMES
+        if is_evaluation_sensitive_environment_key(key)
+        and key not in _BROKER_ALL_MODEL_ENV_NAMES
     )
     if forbidden_sensitive:
         raise CodexHarnessError(
@@ -963,19 +1388,37 @@ def validate_extra_environment(extra_env: Mapping[str, str]) -> None:
             + ", ".join(forbidden_sensitive)
         )
 
-    broker_names = _BROKER_MODEL_ENV_NAMES.intersection(extra_env)
+    broker_names = _BROKER_ALL_MODEL_ENV_NAMES.intersection(extra_env)
     if not broker_names:
         return
-    missing = sorted(_BROKER_MODEL_OVERLAY_NAMES.difference(extra_env))
+    expected_overlay = (
+        _BROKER_WINDOWS_OVERLAY_NAMES
+        if _is_windows(platform_name)
+        else _BROKER_POSIX_OVERLAY_NAMES
+    )
+    missing = sorted(expected_overlay.difference(extra_env))
     if missing:
         raise CodexHarnessError(
             "broker extra_env must provide the complete controlled overlay; missing: "
             + ", ".join(missing)
         )
-    validate_broker_model_overlay(extra_env)
+    unexpected_platform_fields = sorted(
+        (_BROKER_ALL_MODEL_ENV_NAMES | {"PATHEXT"}).intersection(extra_env)
+        - expected_overlay
+    )
+    if unexpected_platform_fields:
+        raise CodexHarnessError(
+            "broker extra_env contains fields for the wrong platform: "
+            + ", ".join(unexpected_platform_fields)
+        )
+    validate_broker_model_overlay(extra_env, platform_name=platform_name)
 
 
-def validate_broker_model_overlay(extra_env: Mapping[str, str]) -> None:
+def validate_broker_model_overlay(
+    extra_env: Mapping[str, str],
+    *,
+    platform_name: str | None = None,
+) -> None:
     """Validate the small environment shape emitted by CodexGatewayBroker."""
 
     if extra_env["WAAPI_CODEX_GATEWAY_REQUIRED"] != "1":
@@ -991,7 +1434,7 @@ def validate_broker_model_overlay(extra_env: Mapping[str, str]) -> None:
             raise CodexHarnessError("broker TCP endpoint must use an integer port") from exc
         if separator != ":" or host != "127.0.0.1" or not 1 <= port <= 65535:
             raise CodexHarnessError("broker TCP endpoint must be loopback 127.0.0.1:<port>")
-    elif transport == "unix":
+    elif transport == "unix" and not _is_windows(platform_name):
         endpoint_path = Path(endpoint)
         if not endpoint_path.is_absolute():
             raise CodexHarnessError("broker Unix endpoint must be an absolute path")
@@ -1007,6 +1450,10 @@ def validate_broker_model_overlay(extra_env: Mapping[str, str]) -> None:
     token = extra_env["WAAPI_CODEX_GATEWAY_BROKER_TOKEN"]
     if len(token) < 32 or any(character.isspace() for character in token):
         raise CodexHarnessError("broker token must be a non-empty high-entropy value")
+
+    if _is_windows(platform_name):
+        _validate_windows_broker_model_overlay(extra_env)
+        return
 
     bash_env = Path(extra_env["BASH_ENV"])
     if not bash_env.is_absolute() or bash_env.is_symlink():
@@ -1036,6 +1483,41 @@ def validate_broker_model_overlay(extra_env: Mapping[str, str]) -> None:
             raise CodexHarnessError(f"broker shim is missing or unsafe: {executable_name}")
 
 
+def _validate_windows_broker_model_overlay(extra_env: Mapping[str, str]) -> None:
+    """Validate native-Windows CMD shims without POSIX mode or X_OK assumptions."""
+
+    trusted_python = Path(extra_env[_BROKER_WINDOWS_TRUSTED_PYTHON_ENV])
+    if (
+        not trusted_python.is_absolute()
+        or is_link_or_junction(trusted_python)
+        or not trusted_python.is_file()
+    ):
+        raise CodexHarnessError(
+            "Windows broker trusted Python must be an absolute, real regular file"
+        )
+
+    extensions = extra_env["PATHEXT"].split(";")
+    if not extensions or any(not item or item != item.strip() for item in extensions):
+        raise CodexHarnessError("Windows broker PATHEXT must be a closed semicolon list")
+    if ".cmd" not in {item.casefold() for item in extensions}:
+        raise CodexHarnessError("Windows broker PATHEXT must include .CMD")
+
+    path_entries = extra_env["PATH"].split(";")
+    if not path_entries or not path_entries[0]:
+        raise CodexHarnessError("Windows broker PATH must begin with the shim directory")
+    shim_directory = Path(path_entries[0])
+    if (
+        not shim_directory.is_absolute()
+        or is_link_or_junction(shim_directory)
+        or not shim_directory.is_dir()
+    ):
+        raise CodexHarnessError("Windows broker shim directory must be absolute and real")
+    for filename in ("broker_shim.py", "python.cmd", "python3.cmd"):
+        shim = shim_directory / filename
+        if is_link_or_junction(shim) or not shim.is_file():
+            raise CodexHarnessError(f"Windows broker shim is missing or unsafe: {filename}")
+
+
 def is_protected_environment_key(key: str) -> bool:
     normalized = key.upper()
     return normalized in _PROTECTED_ENV_EXACT or normalized.startswith("XDG_") or normalized.startswith("CODEX_")
@@ -1048,25 +1530,55 @@ def is_evaluation_sensitive_environment_key(key: str) -> bool:
     return normalized == "BASH_ENV" or normalized.startswith(("WWISE_", "WAAPI_"))
 
 
-def inspect_isolated_environment(env: Mapping[str, str], *, auth_json: Path) -> CodexEnvironmentAudit:
+def inspect_isolated_environment(
+    env: Mapping[str, str],
+    *,
+    auth_json: Path,
+    platform_name: str | None = None,
+) -> CodexEnvironmentAudit:
     home = Path(env["HOME"]).expanduser().resolve(strict=True)
     codex_home = Path(env["CODEX_HOME"]).expanduser().resolve(strict=True)
     auth_link = codex_home / "auth.json"
     expected_auth = auth_json.expanduser().resolve(strict=True)
+    auth_exists = auth_link.exists()
+    auth_is_symlink = auth_link.is_symlink()
+    auth_install_mode = "copy" if _is_windows(platform_name) else "symlink"
+    auth_sha256 = _sha256_regular_file(auth_link) if auth_exists and not auth_is_symlink else ""
+    expected_auth_sha256 = _sha256_regular_file(expected_auth)
+    auth_same_file_as_source = False
+    if auth_exists:
+        try:
+            auth_same_file_as_source = os.path.samefile(auth_link, expected_auth)
+        except OSError:
+            auth_same_file_as_source = True
     sensitive_environment_keys = {
         str(key) for key in env if is_evaluation_sensitive_environment_key(str(key))
     }
+    expected_broker_environment_keys = tuple(
+        sorted(
+            _BROKER_WINDOWS_MODEL_ENV_NAMES
+            if _is_windows(platform_name)
+            else _BROKER_POSIX_MODEL_ENV_NAMES
+        )
+    )
     return CodexEnvironmentAudit(
         home=str(home),
         codex_home=str(codex_home),
         home_entries=tuple(sorted(path.name for path in home.iterdir())),
         codex_home_entries=tuple(sorted(path.name for path in codex_home.iterdir())),
-        auth_is_symlink=auth_link.is_symlink(),
-        auth_target=str(auth_link.resolve(strict=True)) if auth_link.exists() else "",
+        auth_is_symlink=auth_is_symlink,
+        auth_target=str(auth_link.resolve(strict=True)) if auth_exists else "",
         expected_auth_target=str(expected_auth),
-        broker_environment_keys=tuple(sorted(sensitive_environment_keys & _BROKER_MODEL_ENV_NAMES)),
+        auth_install_mode=auth_install_mode,
+        auth_sha256=auth_sha256,
+        expected_auth_sha256=expected_auth_sha256,
+        auth_same_file_as_source=auth_same_file_as_source,
+        expected_broker_environment_keys=expected_broker_environment_keys,
+        broker_environment_keys=tuple(
+            sorted(sensitive_environment_keys & _BROKER_ALL_MODEL_ENV_NAMES)
+        ),
         unexpected_sensitive_environment_keys=tuple(
-            sorted(sensitive_environment_keys - _BROKER_MODEL_ENV_NAMES)
+            sorted(sensitive_environment_keys - _BROKER_ALL_MODEL_ENV_NAMES)
         ),
     )
 
@@ -1599,6 +2111,7 @@ def classify_commands(
     commands: Sequence[str | CodexCommandRecord],
     *,
     skill_source: Path,
+    alternate_gateway_skill_sources: Sequence[Path] = (),
     expected_gateway_subcommands: Sequence[str] = (),
     expected_gateway_errors: Sequence[CodexGatewayErrorExpectation] = (),
     expected_wwise_version: str = "",
@@ -1618,6 +2131,12 @@ def classify_commands(
     non_gateway_unexpected: list[str] = []
     skill_read = False
     expected = frozenset(str(value) for value in expected_gateway_subcommands)
+    gateway_skill_sources = tuple(
+        dict.fromkeys(
+            Path(source).expanduser().resolve(strict=False)
+            for source in (skill_source, *alternate_gateway_skill_sources)
+        )
+    )
     error_expectations: dict[str, str] = {}
     for expectation in expected_gateway_errors:
         if expectation.command in error_expectations:
@@ -1628,16 +2147,36 @@ def classify_commands(
         command = record.command
         lowered = command.lower()
         executable = Path(record.argv[0]).name.lower() if record.argv else ""
-        gateway_shape = gateway_invocation(
-            record,
-            skill_source=skill_source,
-            expected_wwise_version=expected_wwise_version,
+        matched_gateway_source_and_shape = next(
+            (
+                (source, shape)
+                for source in gateway_skill_sources
+                if (
+                    shape := gateway_invocation(
+                        record,
+                        skill_source=source,
+                        expected_wwise_version=expected_wwise_version,
+                    )
+                )
+                is not None
+            ),
+            None,
+        )
+        matched_gateway_source = (
+            matched_gateway_source_and_shape[0]
+            if matched_gateway_source_and_shape is not None
+            else gateway_skill_sources[0]
+        )
+        gateway_shape = (
+            matched_gateway_source_and_shape[1]
+            if matched_gateway_source_and_shape is not None
+            else None
         )
         if gateway_shape is not None:
             gateway_attempts.append(command)
         gateway_payload = successful_gateway_payload(
             record,
-            skill_source=skill_source,
+            skill_source=matched_gateway_source,
             expected_gateway_subcommands=expected,
             expected_wwise_version=expected_wwise_version,
         )
@@ -1646,7 +2185,7 @@ def classify_commands(
             if expected_error_code is not None:
                 gateway_payload = expected_gateway_error_payload(
                     record,
-                    skill_source=skill_source,
+                    skill_source=matched_gateway_source,
                     expected_subcommand=gateway_shape,
                     expected_error_code=expected_error_code,
                     expected_wwise_version=expected_wwise_version,
@@ -1657,10 +2196,10 @@ def classify_commands(
             gateway_results.append(gateway_payload)
             gateway_subcommands.append(str(gateway_payload.get("command") or gateway_shape or ""))
 
-        is_python = bool(re.fullmatch(r"python(?:3(?:\.\d+)?)?", executable))
-        is_packaged_runner_attempt = packaged_runner_attempt(
-            record,
-            skill_source=skill_source,
+        is_python = _PYTHON_EXECUTABLE_RE.fullmatch(executable) is not None
+        is_packaged_runner_attempt = any(
+            packaged_runner_attempt(record, skill_source=source)
+            for source in gateway_skill_sources
         )
         if is_python and not is_gateway and not is_packaged_runner_attempt:
             inline_python.append(command)
@@ -1721,7 +2260,7 @@ def packaged_runner_attempt(record: CodexCommandRecord, *, skill_source: Path) -
     if len(record.argv) < 2 or record.parse_error:
         return False
     executable = Path(record.argv[0]).name.lower()
-    if not re.fullmatch(r"python(?:3(?:\.\d+)?)?", executable):
+    if _PYTHON_EXECUTABLE_RE.fullmatch(executable) is None:
         return False
     supplied_runner = Path(record.argv[1]).expanduser()
     if not supplied_runner.is_absolute():
@@ -1834,7 +2373,7 @@ def gateway_invocation(
     if record.has_shell_operators or record.parse_error or len(argv) < 4:
         return None
     executable = Path(argv[0]).name.lower()
-    if not re.fullmatch(r"python(?:3(?:\.\d+)?)?", executable):
+    if _PYTHON_EXECUTABLE_RE.fullmatch(executable) is None:
         return None
     runner = argv[1]
     expected_runner = (skill_source.expanduser().resolve(strict=False) / "scripts" / "run.py").resolve(strict=False)
@@ -2262,6 +2801,8 @@ __all__ = [
     "CodexRunResult",
     "CodexSessionAudit",
     "ProcessResult",
+    "WORKSPACE_SKILL_EXCLUDED_NAMES",
+    "assert_detached_workspace_skill_copy",
     "audit_prompt_input_payload",
     "audit_session_events",
     "build_exec_command",
@@ -2272,19 +2813,29 @@ __all__ = [
     "completed_command_records",
     "completed_commands",
     "count_invalid_jsonl_lines",
+    "discover_codex_binary",
     "final_agent_message",
     "first_gateway_backed_agent_message",
     "gateway_runtime_apis",
     "inspect_isolated_environment",
+    "is_link_or_junction",
     "is_protected_environment_key",
     "isolated_codex_environment",
+    "kill_process_group",
     "normalized_gateway_command_argv",
     "parse_jsonl_events",
     "parse_command_argv",
+    "prepare_workspace_skill_install",
     "prompt_skill_inventory",
+    "resolve_codex_binary",
     "run_process",
     "snapshot_workspace",
     "snapshot_tree_hash",
+    "subprocess_process_group_options",
+    "taskkill_process_tree",
     "turn_usage",
+    "verify_workspace_skill_install",
     "workspace_changes",
+    "workspace_skill_install_path",
+    "workspace_skill_tree_sha256",
 ]

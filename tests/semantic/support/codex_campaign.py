@@ -17,7 +17,7 @@ import stat
 import uuid
 from copy import deepcopy
 from pathlib import Path, PurePosixPath
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 
 CAMPAIGN_CONFIG_CONTRACT = "waapi-skill.codex-semantic-campaign-config/v1"
@@ -43,6 +43,16 @@ class CampaignEvidenceError(RuntimeError):
     """Campaign evidence is missing, mutable, malformed, or contradictory."""
 
 
+def _is_windows_junction(path: Path) -> bool:
+    if _path_reports_windows_junction(path):
+        return True
+    try:
+        info = path.lstat()
+    except OSError:
+        return False
+    return _stat_is_windows_reparse_point(info)
+
+
 def canonical_json_bytes(value: Any) -> bytes:
     """Return deterministic strict-JSON bytes without a trailing newline."""
 
@@ -65,17 +75,7 @@ def sha256_file(path: Path) -> str:
 
     candidate = Path(path)
     digest = hashlib.sha256()
-    fd = _open_real_regular_file(candidate, label="file")
-    try:
-        with os.fdopen(fd, "rb", closefd=True) as handle:
-            fd = -1
-            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-                digest.update(chunk)
-    except OSError as exc:
-        raise CampaignEvidenceError(f"cannot read file {candidate}: {exc}") from exc
-    finally:
-        if fd >= 0:
-            os.close(fd)
+    _consume_real_regular_file(candidate, label="file", consume=digest.update)
     return digest.hexdigest()
 
 
@@ -115,6 +115,8 @@ def stable_tree_manifest(
                 except OSError as exc:
                     raise CampaignEvidenceError(f"cannot read symlink {path}: {exc}") from exc
                 rows.append({"path": relative, "type": "symlink", "target": target})
+            elif _is_windows_junction(path):
+                raise CampaignEvidenceError(f"tree contains a Windows junction: {path}")
             elif stat.S_ISDIR(info.st_mode):
                 rows.append(
                     {
@@ -179,7 +181,7 @@ def load_verified_json(path: Path) -> Any:
 def create_immutable_campaign_config(root: Path, payload: Mapping[str, Any]) -> dict[str, Any]:
     campaign_root = Path(root)
     campaign_root.mkdir(parents=True, exist_ok=True)
-    if campaign_root.is_symlink() or not campaign_root.is_dir():
+    if campaign_root.is_symlink() or _is_windows_junction(campaign_root) or not campaign_root.is_dir():
         raise CampaignEvidenceError(f"campaign root must be a real directory: {campaign_root}")
     config_path = campaign_root / CAMPAIGN_CONFIG_FILE
     ledger_path = campaign_root / ATTEMPT_LEDGER_FILE
@@ -841,7 +843,11 @@ def _require_real_directory(path: Path, *, label: str) -> Path:
         info = candidate.lstat()
     except OSError as exc:
         raise CampaignEvidenceError(f"cannot stat {label} {candidate}: {exc}") from exc
-    if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+    if (
+        stat.S_ISLNK(info.st_mode)
+        or _is_windows_junction(candidate)
+        or not stat.S_ISDIR(info.st_mode)
+    ):
         raise CampaignEvidenceError(f"{label} must be a real directory: {candidate}")
     return candidate
 
@@ -871,37 +877,138 @@ def _load_verified_json_and_digest(path: Path) -> tuple[Any, str]:
 
 
 def _read_real_regular_file(path: Path, *, label: str) -> bytes:
-    fd = _open_real_regular_file(path, label=label)
+    chunks: list[bytes] = []
+    _consume_real_regular_file(path, label=label, consume=chunks.append)
+    return b"".join(chunks)
+
+
+def _consume_real_regular_file(
+    path: Path,
+    *,
+    label: str,
+    consume: Callable[[bytes], None],
+) -> None:
+    """Consume one stable regular-file snapshot through its open descriptor."""
+
+    source = Path(path)
+    fd = _open_real_regular_file(source, label=label)
+    bytes_read = 0
     try:
-        with os.fdopen(fd, "rb", closefd=True) as handle:
-            fd = -1
-            return handle.read()
+        before = os.fstat(fd)
+        _require_real_regular_stat(before, path=source, label=label)
+        while True:
+            chunk = os.read(fd, 1024 * 1024)
+            if not chunk:
+                break
+            bytes_read += len(chunk)
+            consume(chunk)
+        after = os.fstat(fd)
     except OSError as exc:
-        raise CampaignEvidenceError(f"cannot read {label} {path}: {exc}") from exc
+        raise CampaignEvidenceError(f"cannot read {label} {source}: {exc}") from exc
     finally:
-        if fd >= 0:
-            os.close(fd)
+        os.close(fd)
+
+    if not _same_regular_file_snapshot(before, after) or bytes_read != before.st_size:
+        raise CampaignEvidenceError(f"{label} changed while it was being read: {source}")
+    try:
+        final = source.lstat()
+    except OSError as exc:
+        raise CampaignEvidenceError(
+            f"{label} path disappeared after it was read: {source}: {exc}"
+        ) from exc
+    _require_real_regular_stat(final, path=source, label=label)
+    if not _same_regular_file_snapshot(after, final):
+        raise CampaignEvidenceError(f"{label} path changed while it was being read: {source}")
 
 
 def _open_real_regular_file(path: Path, *, label: str) -> int:
-    nofollow = getattr(os, "O_NOFOLLOW", None)
-    if nofollow is None:
-        raise CampaignEvidenceError("platform does not support O_NOFOLLOW evidence reads")
-    flags = os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0)
+    """Open a real regular file safely on POSIX and native Windows.
+
+    POSIX keeps the kernel-level ``O_NOFOLLOW`` guarantee.  Native Windows has
+    no equivalent flag, so the path is inspected before and immediately after
+    ``open`` and bound to the descriptor through ``samestat``.  The caller
+    performs the corresponding post-read descriptor/path checks.
+    """
+
+    source = Path(path)
     try:
-        fd = os.open(path, flags)
+        before = source.lstat()
+    except OSError as exc:
+        raise CampaignEvidenceError(f"cannot inspect {label} {source}: {exc}") from exc
+    _require_real_regular_stat(before, path=source, label=label)
+
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(source, flags)
     except OSError as exc:
         raise CampaignEvidenceError(
-            f"cannot open {label} {path} without following links: {exc}"
+            f"cannot open {label} {source} without following links: {exc}"
         ) from exc
     try:
-        info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode):
-            raise CampaignEvidenceError(f"{label} must be a real regular file: {path}")
+        opened = os.fstat(fd)
+        _require_real_regular_stat(opened, path=source, label=label)
+        try:
+            after_open = source.lstat()
+        except OSError as exc:
+            raise CampaignEvidenceError(
+                f"{label} path disappeared while it was being opened: {source}: {exc}"
+            ) from exc
+        _require_real_regular_stat(after_open, path=source, label=label)
+        if (
+            not _same_regular_file_snapshot(before, opened)
+            or not _same_regular_file_snapshot(opened, after_open)
+        ):
+            raise CampaignEvidenceError(
+                f"{label} path changed while it was being opened: {source}"
+            )
         return fd
     except BaseException:
         os.close(fd)
         raise
+
+
+def _require_real_regular_stat(
+    value: os.stat_result,
+    *,
+    path: Path,
+    label: str,
+) -> None:
+    if (
+        stat.S_ISLNK(value.st_mode)
+        or _stat_is_windows_reparse_point(value)
+        or _path_reports_windows_junction(path)
+        or not stat.S_ISREG(value.st_mode)
+    ):
+        raise CampaignEvidenceError(
+            f"cannot open {label} {path} without following links: "
+            "path must be a real regular file, not a symlink, junction, or reparse point"
+        )
+
+
+def _same_regular_file_snapshot(
+    left: os.stat_result,
+    right: os.stat_result,
+) -> bool:
+    return (
+        os.path.samestat(left, right)
+        and stat.S_IFMT(left.st_mode) == stat.S_IFMT(right.st_mode)
+        and left.st_size == right.st_size
+        and left.st_mtime_ns == right.st_mtime_ns
+        and left.st_ctime_ns == right.st_ctime_ns
+        and left.st_nlink == right.st_nlink
+    )
+
+
+def _path_reports_windows_junction(path: Path) -> bool:
+    is_junction = getattr(path, "is_junction", None)
+    return bool(is_junction is not None and is_junction())
+
+
+def _stat_is_windows_reparse_point(value: os.stat_result) -> bool:
+    attributes = int(getattr(value, "st_file_attributes", 0))
+    reparse_flag = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
+    return bool(attributes & reparse_flag)
 
 
 def _require_string_json_keys(value: Any) -> None:

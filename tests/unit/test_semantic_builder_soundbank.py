@@ -150,7 +150,16 @@ def test_generate_preview_records_artifact_evidence_plan_without_outputs(tmp_pat
     assert artifact_plan["write_to_disk_requested"] is True
     assert artifact_plan["writes_files_by_preview"] is False
     assert artifact_plan["completion_claim"] == "not-claimed"
-    assert f"{tmp_path / 'GeneratedSoundBanks'}/Mac/English(US)/UnitBank.bnk" in artifact_plan["expected_output_artifact_paths"]
+    expected_artifact_paths = {
+        Path(value) for value in artifact_plan["expected_output_artifact_paths"]
+    }
+    assert (
+        tmp_path
+        / "GeneratedSoundBanks"
+        / "Mac"
+        / "English(US)"
+        / "UnitBank.bnk"
+    ) in expected_artifact_paths
     assert not any(tmp_path.rglob("*.bnk"))
     assert preview.readback_plan == ()
     assert preview.envelope.metadata["execution_result_evidence"]["replay_for_evidence"] is False

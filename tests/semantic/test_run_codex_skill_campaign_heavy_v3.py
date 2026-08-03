@@ -352,6 +352,7 @@ def _options(tmp_path: Path) -> campaign.CampaignOptions:
     suite.write_text("{}\n", encoding="utf-8")
     codex = tmp_path / "codex"
     codex.write_text("synthetic codex binary\n", encoding="utf-8")
+    codex.chmod(0o755)
     auth = tmp_path / "auth.json"
     auth.write_text("{}\n", encoding="utf-8")
     versions: dict[str, dict[str, str]] = {}
@@ -4173,7 +4174,15 @@ def _validation(
     )
 
 
-def test_parse_args_selects_heavy_defaults_and_preserves_v2_defaults(tmp_path: Path) -> None:
+def test_parse_args_selects_heavy_defaults_and_preserves_v2_defaults(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        matrix,
+        "resolve_codex_binary",
+        lambda _value: Path("/synthetic-host/codex"),
+    )
     root = tmp_path / "campaign"
     v2 = campaign.parse_args(["--campaign-root", str(root)])
     heavy = campaign.parse_args(

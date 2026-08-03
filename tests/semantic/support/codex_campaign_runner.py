@@ -10,13 +10,23 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import stat
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from tests.semantic.support.codex_campaign import CampaignEvidenceError, canonical_json_bytes
+from tests.semantic.support.codex_campaign import (
+    CampaignEvidenceError,
+    canonical_json_bytes,
+    stable_tree_sha256,
+)
 from tests.semantic.support.codex_eval_suite import EvalSession
+from tests.semantic.support.codex_harness import (
+    WORKSPACE_SKILL_EXCLUDED_NAMES,
+    assert_detached_workspace_skill_copy,
+    is_link_or_junction,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -26,6 +36,7 @@ PHASE_ERROR_CONTRACT = "waapi-skill.codex-semantic-phase-error/v2"
 RUNTIME_CONTRACT = "waapi-skill.codex-semantic-version-runtime/v2"
 LIVE_PREFLIGHT_CONTRACT = "waapi-skill.codex-semantic-live-preflight/v1"
 SKILL_LINK_ATTESTATION_CONTRACT = "waapi-skill.codex-campaign-skill-link/v1"
+SKILL_COPY_ATTESTATION_CONTRACT = "waapi-skill.codex-campaign-skill-copy/v1"
 LIVE_READINESS_RETRY_CATEGORY = "live_readiness_before_agent_action"
 
 AUTO_RETRY_CATEGORIES = frozenset(
@@ -145,21 +156,32 @@ def replace_expected_skill_symlinks(
     *,
     skill_source: Path,
     candidate_sha256: str,
+    platform_name: str | None = None,
 ) -> tuple[str, ...]:
-    """Replace only matrix-created Skill links with sealed regular attestations.
+    """Replace only exact runner Skill installs with sealed regular attestations.
 
     This must run before any child-controlled evidence is interpreted.  Every
-    other symlink is a hard evidence failure.
+    other symlink is a hard evidence failure.  POSIX installs remain exact
+    links to the frozen candidate.  A native-Windows directory install is
+    accepted only when its filtered tree hash equals the frozen candidate and
+    no copied file is a hardlink alias to that candidate.
     """
 
-    tree = Path(root).resolve(strict=True)
-    expected_target = Path(skill_source).resolve(strict=True)
-    if not expected_target.is_dir() or expected_target.is_symlink():
+    root_path = Path(root)
+    if is_link_or_junction(root_path):
+        raise CampaignEvidenceError(f"child evidence root must be a real directory: {root_path}")
+    tree = root_path.resolve(strict=True)
+    source_path = Path(skill_source)
+    if is_link_or_junction(source_path):
+        raise CampaignEvidenceError(f"Skill source must be a real directory: {source_path}")
+    expected_target = source_path.resolve(strict=True)
+    if not expected_target.is_dir():
         raise CampaignEvidenceError(f"Skill source must be a real directory: {expected_target}")
     if _SHA256_RE.fullmatch(candidate_sha256) is None:
         raise CampaignEvidenceError("candidate Skill hash must be lowercase SHA-256")
 
     links: list[Path] = []
+    copies: list[Path] = []
     agent_workspaces: list[Path] = []
 
     def walk(directory: Path) -> None:
@@ -173,9 +195,15 @@ def replace_expected_skill_symlinks(
                 info = entry.stat(follow_symlinks=False)
             except OSError as exc:
                 raise CampaignEvidenceError(f"cannot stat child evidence {path}: {exc}") from exc
-            if stat.S_ISLNK(info.st_mode):
+            if stat.S_ISLNK(info.st_mode) or is_link_or_junction(path):
                 if not _is_expected_skill_link(path, root=tree):
-                    raise CampaignEvidenceError(f"unexpected symlink in child evidence: {path}")
+                    raise CampaignEvidenceError(
+                        f"unexpected symlink or junction in child evidence: {path}"
+                    )
+                if not stat.S_ISLNK(info.st_mode):
+                    raise CampaignEvidenceError(
+                        f"expected Skill install must not be a Windows junction: {path}"
+                    )
                 try:
                     target = path.resolve(strict=True)
                 except OSError as exc:
@@ -187,9 +215,8 @@ def replace_expected_skill_symlinks(
                 links.append(path)
             elif stat.S_ISDIR(info.st_mode):
                 if _is_expected_skill_link(path, root=tree):
-                    raise CampaignEvidenceError(
-                        f"expected installed Skill path is a directory, not the runner link: {path}"
-                    )
+                    copies.append(path)
+                    continue
                 if path.name == "agent-workspace" and "sessions" in path.relative_to(tree).parts:
                     agent_workspaces.append(path)
                 walk(path)
@@ -202,12 +229,17 @@ def replace_expected_skill_symlinks(
                 raise CampaignEvidenceError(f"unsupported child evidence entry: {path}")
 
     walk(tree)
-    linked_paths = frozenset(links)
+    active_platform = os.name if platform_name is None else platform_name
+    if copies and active_platform != "nt":
+        raise CampaignEvidenceError(
+            "runner-created Skill directories are allowed only for native Windows campaigns"
+        )
+    installed_paths = frozenset((*links, *copies))
     for workspace in agent_workspaces:
-        expected_link = workspace / ".agents" / "skills" / "waapi-skill"
-        if expected_link not in linked_paths:
+        expected_install = workspace / ".agents" / "skills" / "waapi-skill"
+        if expected_install not in installed_paths:
             raise CampaignEvidenceError(
-                f"agent workspace is missing the exact runner-created Skill symlink: {workspace}"
+                f"agent workspace is missing the exact runner-created Skill install: {workspace}"
             )
     for link in links:
         relative = link.relative_to(tree).as_posix()
@@ -225,10 +257,52 @@ def replace_expected_skill_symlinks(
             + b"\n",
         )
 
+    expected_copy_sha256 = stable_tree_sha256(
+        expected_target,
+        exclude_names=tuple(sorted(WORKSPACE_SKILL_EXCLUDED_NAMES)),
+    )
+    if copies and expected_copy_sha256 != candidate_sha256:
+        raise CampaignEvidenceError(
+            "Windows Skill-copy exclusions do not match the frozen campaign candidate: "
+            f"candidate={candidate_sha256} copy_source={expected_copy_sha256}"
+        )
+    for copied in copies:
+        relative = copied.relative_to(tree).as_posix()
+        try:
+            observed_sha256 = stable_tree_sha256(copied)
+            assert_detached_workspace_skill_copy(expected_target, copied)
+        except (CampaignEvidenceError, OSError, RuntimeError) as exc:
+            raise CampaignEvidenceError(
+                f"cannot attest independent Windows Skill copy {copied}: {exc}"
+            ) from exc
+        if observed_sha256 != candidate_sha256:
+            raise CampaignEvidenceError(
+                "Windows Skill copy differs from the frozen candidate: "
+                f"expected={candidate_sha256} actual={observed_sha256}: {copied}"
+            )
+        try:
+            shutil.rmtree(copied)
+        except OSError as exc:
+            raise CampaignEvidenceError(
+                f"cannot remove attested Windows Skill copy {copied}: {exc}"
+            ) from exc
+        _exclusive_write(
+            copied,
+            canonical_json_bytes(
+                {
+                    "contract": SKILL_COPY_ATTESTATION_CONTRACT,
+                    "candidate_sha256": candidate_sha256,
+                    "copied_from": str(expected_target),
+                    "path": relative,
+                }
+            )
+            + b"\n",
+        )
+
     # A second complete scan proves replacement did not leave or introduce a
     # link anywhere in the attempt tree.
     _reject_all_symlinks(tree)
-    return tuple(path.relative_to(tree).as_posix() for path in links)
+    return tuple(path.relative_to(tree).as_posix() for path in (*links, *copies))
 
 
 def validate_child_run(
@@ -1662,8 +1736,10 @@ def _reject_all_symlinks(root: Path) -> None:
             for entry in entries:
                 info = entry.stat(follow_symlinks=False)
                 path = Path(entry.path)
-                if stat.S_ISLNK(info.st_mode):
-                    raise CampaignEvidenceError(f"symlink remained in child evidence: {path}")
+                if stat.S_ISLNK(info.st_mode) or is_link_or_junction(path):
+                    raise CampaignEvidenceError(
+                        f"link or junction remained in child evidence: {path}"
+                    )
                 if stat.S_ISDIR(info.st_mode):
                     walk(path)
                 elif not stat.S_ISREG(info.st_mode):
@@ -1710,6 +1786,7 @@ __all__ = [
     "LIVE_READINESS_RETRY_CATEGORY",
     "PAUSE_RETRY_CATEGORIES",
     "PhaseVerdict",
+    "SKILL_COPY_ATTESTATION_CONTRACT",
     "classify_phase",
     "load_strict_regular_json",
     "replace_expected_skill_symlinks",

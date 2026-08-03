@@ -41,6 +41,11 @@ from tests.semantic.support.codex_audio_media_business_plan_v3 import (
 )
 from tests.semantic.support.codex_eval_bundle_v3 import OnlineScenario
 from tests.semantic.support.codex_eval_execution_v3 import HeavyScenarioUnit
+from tests.semantic.support.codex_filesystem_security import (
+    CodexFileSecurityError,
+    path_is_link_or_reparse,
+    read_bounded_exclusive_regular_file,
+)
 from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
     V3GatewayProtocol,
@@ -1979,33 +1984,39 @@ class _CaseObservers:
         while True:
             if self._publisher_abort.is_set():
                 return None
-            if expectation.path.is_symlink():
+            try:
+                candidate_metadata = expectation.path.lstat()
+            except FileNotFoundError:
+                candidate_metadata = None
+            except OSError as exc:
                 raise _HeavyProjectInfrastructureError(
-                    "topic subscription ACK target became a symlink"
-                )
-            if expectation.path.exists():
-                try:
-                    candidate_metadata = expectation.path.lstat()
-                except FileNotFoundError:
-                    candidate_metadata = None
-                if candidate_metadata is not None:
-                    if (
-                        stat.S_ISREG(candidate_metadata.st_mode)
-                        and candidate_metadata.st_nlink == 1
-                    ):
-                        break
-                    if (
-                        not stat.S_ISREG(candidate_metadata.st_mode)
-                        or candidate_metadata.st_nlink != 2
-                    ):
-                        raise _HeavyProjectInfrastructureError(
-                            "topic subscription ACK is not an exclusive regular file"
-                        )
-                    # The atomic no-overwrite writer publishes by linking its
-                    # complete temp inode, then immediately unlinks the temp
-                    # name.  During that tiny interval the target legitimately
-                    # has nlink==2.  Retry only this exact transitional state;
-                    # final evidence must still reach nlink==1.
+                    f"topic subscription ACK is unavailable: {exc}"
+                ) from exc
+            if candidate_metadata is not None:
+                if path_is_link_or_reparse(
+                    expectation.path,
+                    metadata=candidate_metadata,
+                ):
+                    raise _HeavyProjectInfrastructureError(
+                        "topic subscription ACK target became a link or reparse point"
+                    )
+                if (
+                    stat.S_ISREG(candidate_metadata.st_mode)
+                    and candidate_metadata.st_nlink == 1
+                ):
+                    break
+                if (
+                    not stat.S_ISREG(candidate_metadata.st_mode)
+                    or candidate_metadata.st_nlink != 2
+                ):
+                    raise _HeavyProjectInfrastructureError(
+                        "topic subscription ACK is not an exclusive regular file"
+                    )
+                # The atomic no-overwrite writer publishes by linking its
+                # complete temp inode, then immediately unlinks the temp
+                # name.  During that tiny interval the target legitimately
+                # has nlink==2.  Retry only this exact transitional state;
+                # final evidence must still reach nlink==1.
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise _HeavyProjectInfrastructureError(
@@ -2014,10 +2025,18 @@ class _CaseObservers:
             self._publisher_abort.wait(min(_TOPIC_ACK_POLL_SECONDS, remaining))
 
         try:
-            metadata = expectation.path.lstat()
-            raw = expectation.path.read_bytes()
+            snapshot = read_bounded_exclusive_regular_file(
+                expectation.path,
+                max_bytes=4096,
+            )
+            raw = snapshot.raw
+        except CodexFileSecurityError as exc:
+            raise _HeavyProjectInfrastructureError(
+                f"topic subscription ACK failed its file-integrity boundary: {exc}"
+            ) from exc
+        try:
             payload = json.loads(raw.decode("utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise _HeavyProjectInfrastructureError(
                 f"topic subscription ACK is unreadable: {exc}"
             ) from exc
@@ -2038,13 +2057,7 @@ class _CaseObservers:
             else ""
         )
         if (
-            not stat.S_ISREG(metadata.st_mode)
-            or metadata.st_nlink != 1
-            or metadata.st_size != len(raw)
-            or metadata.st_size <= 0
-            or metadata.st_size > 4096
-            or stat.S_IMODE(metadata.st_mode) & 0o077
-            or not isinstance(payload, Mapping)
+            not isinstance(payload, Mapping)
             or set(payload) != expected_keys
             or payload.get("contract") != expectation.contract
             or payload.get("step_name") != expectation.step_name
@@ -2065,7 +2078,7 @@ class _CaseObservers:
             or payload.get("subscribed_at_monotonic_ns", 0) <= 0
         ):
             raise _HeavyProjectInfrastructureError(
-                "topic subscription ACK identity, mode, or timestamps are invalid"
+                "topic subscription ACK identity or timestamps are invalid"
             )
         canonical = (
             json.dumps(

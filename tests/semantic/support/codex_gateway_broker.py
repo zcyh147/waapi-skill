@@ -33,6 +33,12 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Callable, Mapping, Sequence
 
+from tests.semantic.support.codex_filesystem_security import (
+    CodexFileSecurityError,
+    path_is_link_or_reparse,
+    read_bounded_exclusive_regular_file,
+)
+
 
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
 TRANSACTION_CONFIRMATION_BINDING_CONTRACT = (
@@ -48,6 +54,7 @@ BROKER_TRANSPORT_ENV = "WAAPI_CODEX_GATEWAY_BROKER_TRANSPORT"
 BROKER_ENDPOINT_ENV = "WAAPI_CODEX_GATEWAY_BROKER_ENDPOINT"
 BROKER_TOKEN_ENV = "WAAPI_CODEX_GATEWAY_BROKER_TOKEN"
 GATEWAY_REQUIRED_ENV = "WAAPI_CODEX_GATEWAY_REQUIRED"
+SHIM_TRUSTED_PYTHON_ENV = "WAAPI_CODEX_GATEWAY_SHIM_TRUSTED_PYTHON"
 SUBSCRIPTION_ACK_CONTRACT = "waapi-skill.broker-subscription-ack/v2"
 VALIDATED_SUBSCRIPTION_ACK_CONTRACT = (
     "waapi-skill.broker-validated-subscription-ack/v1"
@@ -71,12 +78,21 @@ _BROKER_ENV_NAMES = frozenset(
         BROKER_ENDPOINT_ENV,
         BROKER_TOKEN_ENV,
         GATEWAY_REQUIRED_ENV,
+        SHIM_TRUSTED_PYTHON_ENV,
         BASH_ENV_NAME,
         CONFIG_PATH_ENV,
         *_SUBSCRIPTION_ACK_ENV_NAMES,
     }
 )
 _PYTHON_NAMES = frozenset({"python", "python3"})
+WINDOWS_SHIM_SCRIPT_NAME = "broker_shim.py"
+WINDOWS_COMMAND_SHIM_NAMES = tuple(
+    f"{name}.cmd" for name in sorted(_PYTHON_NAMES)
+)
+_WINDOWS_PATHEXT_NAME = "PATHEXT"
+_WINDOWS_PATH_SEPARATOR = ";"
+_WINDOWS_DEFAULT_PATHEXT = (".COM", ".EXE", ".BAT", ".CMD")
+_WINDOWS_PATHEXT_RE = re.compile(r"^\.[A-Za-z0-9]{1,16}$")
 _SUPPORTED_WWISE_VERSIONS = frozenset({"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"})
 _BROKER_READY = "READY"
 _BROKER_RUNNING = "RUNNING"
@@ -3232,6 +3248,79 @@ def _absolute_lexical(path: Path) -> Path:
     return Path(os.path.abspath(os.fspath(path.expanduser())))
 
 
+def _broker_platform_name() -> str:
+    """Return the standard-library host discriminator used by shim policy."""
+
+    return os.name
+
+
+def _remove_environment_names(
+    environment: dict[str, str],
+    names: Sequence[str],
+    *,
+    platform_name: str,
+) -> None:
+    """Remove exact POSIX names or case-insensitive Windows names in place."""
+
+    if platform_name == "nt":
+        folded = {name.casefold() for name in names}
+        for key in tuple(environment):
+            if key.casefold() in folded:
+                environment.pop(key, None)
+        return
+    for name in names:
+        environment.pop(name, None)
+
+
+def _environment_value(
+    environment: Mapping[str, str],
+    name: str,
+    *,
+    platform_name: str,
+) -> str | None:
+    """Read one environment field with native Windows key semantics."""
+
+    if platform_name != "nt":
+        return environment.get(name)
+    matches = [
+        str(value)
+        for key, value in environment.items()
+        if str(key).casefold() == name.casefold()
+    ]
+    if len(matches) > 1:
+        raise GatewayBrokerError(
+            f"Windows model environment contains duplicate {name} spellings"
+        )
+    return matches[0] if matches else None
+
+
+def _normalize_windows_pathext(value: str | None) -> str:
+    """Return one closed PATHEXT with the broker's CMD shim preferred."""
+
+    raw = (
+        _WINDOWS_PATH_SEPARATOR.join(_WINDOWS_DEFAULT_PATHEXT)
+        if value is None
+        else str(value)
+    )
+    parts = raw.split(_WINDOWS_PATH_SEPARATOR)
+    if not parts or any(
+        not part or part != part.strip() or _WINDOWS_PATHEXT_RE.fullmatch(part) is None
+        for part in parts
+    ):
+        raise GatewayBrokerError(
+            "Windows PATHEXT must be a non-empty semicolon-delimited list of safe extensions"
+        )
+    normalized: list[str] = [".CMD"]
+    seen = {".cmd"}
+    for part in parts:
+        folded = part.casefold()
+        if folded in seen:
+            continue
+        normalized.append(part.upper())
+        seen.add(folded)
+    return _WINDOWS_PATH_SEPARATOR.join(normalized)
+
+
 def _require_real_directory(path: Path, *, label: str) -> Path:
     candidate = _absolute_lexical(path)
     if candidate.is_symlink():
@@ -3245,6 +3334,7 @@ def resolve_gateway_invocation(
     argv: Sequence[str],
     *,
     skill_source: Path,
+    invocation_skill_source: Path | None = None,
     shim_directory: Path | None = None,
 ) -> ResolvedGatewayInvocation:
     """Resolve and strictly validate one model-side gateway command argv.
@@ -3259,8 +3349,12 @@ def resolve_gateway_invocation(
 
     ``python3`` is also accepted.  When ``shim_directory`` is supplied, an
     absolute interpreter path must point to its ``python`` or ``python3`` shim.
-    The skill runner is compared lexically to the configured absolute locator;
-    a different symlink spelling is intentionally rejected.
+    The skill runner is compared lexically to the configured absolute locator.
+    A distinct ``invocation_skill_source`` allows a native-Windows workspace
+    copy to be model-visible while the broker still executes the immutable
+    candidate under ``skill_source``.  The candidate locator remains accepted
+    because a packaged transaction response can legitimately return its exact
+    runner path for the next command.  Every other spelling is rejected.
     """
 
     values = tuple(str(value) for value in argv)
@@ -3278,10 +3372,17 @@ def resolve_gateway_invocation(
         if _absolute_lexical(interpreter_path).parent != expected_parent:
             raise GatewayInvocationError("absolute Python interpreter is not the broker shim")
 
-    expected_runner = _absolute_lexical(skill_source) / "scripts" / "run.py"
+    candidate_runner = _absolute_lexical(skill_source) / "scripts" / "run.py"
+    invocation_runner = (
+        _absolute_lexical(invocation_skill_source) / "scripts" / "run.py"
+        if invocation_skill_source is not None
+        else candidate_runner
+    )
+    allowed_runners = tuple(dict.fromkeys((invocation_runner, candidate_runner)))
     supplied_runner = Path(values[1])
-    if not supplied_runner.is_absolute() or supplied_runner != expected_runner:
-        raise GatewayInvocationError(f"runner path must be exactly {expected_runner}")
+    if not supplied_runner.is_absolute() or supplied_runner not in allowed_runners:
+        expected = " or ".join(str(path) for path in allowed_runners)
+        raise GatewayInvocationError(f"runner path must be exactly {expected}")
     if values[2] == "gateway.py":
         gateway_arguments = values[3:]
     else:
@@ -3311,11 +3412,11 @@ def resolve_gateway_invocation(
             )
         gateway_arguments = (*canonical_selector, *remainder)
 
-    normalized = (interpreter_name, str(expected_runner), "gateway.py", *gateway_arguments)
+    normalized = (interpreter_name, str(supplied_runner), "gateway.py", *gateway_arguments)
     return ResolvedGatewayInvocation(
         interpreter=interpreter_name,
         raw_model_argv=values,
-        runner_path=str(expected_runner),
+        runner_path=str(supplied_runner),
         gateway_script="gateway.py",
         gateway_arguments=gateway_arguments,
         normalized_model_argv=normalized,
@@ -3328,6 +3429,7 @@ def reconcile_gateway_commands(
     evidence: GatewayBrokerEvidence,
     *,
     skill_source: Path,
+    invocation_skill_source: Path | None = None,
     shim_directory: Path | None = None,
 ) -> GatewayBrokerReconciliation:
     """Cross-check harness-observed argv against accepted broker records."""
@@ -3340,6 +3442,7 @@ def reconcile_gateway_commands(
                 resolve_gateway_invocation(
                     argv,
                     skill_source=skill_source,
+                    invocation_skill_source=invocation_skill_source,
                     shim_directory=shim_directory,
                 )
             )
@@ -3379,6 +3482,7 @@ def reconcile_gateway_command_prefix(
     *,
     expected_step_count: int,
     skill_source: Path,
+    invocation_skill_source: Path | None = None,
     shim_directory: Path | None = None,
 ) -> GatewayBrokerReconciliation:
     """Reconcile one exact successful prefix without weakening final checks.
@@ -3408,6 +3512,7 @@ def reconcile_gateway_command_prefix(
                 resolve_gateway_invocation(
                     argv,
                     skill_source=skill_source,
+                    invocation_skill_source=invocation_skill_source,
                     shim_directory=shim_directory,
                 )
             )
@@ -3769,7 +3874,7 @@ def _validate_branching_execute_payload(
     )
 
 
-_SHIM_SOURCE = r'''#!{python}
+_SHIM_SOURCE = r'''{shim_header}
 from __future__ import annotations
 import json
 import os
@@ -3779,6 +3884,7 @@ import time
 
 OUTPUT_ARM_SECONDS = {output_arm!r}
 OUTPUT_DRAIN_SECONDS = {output_drain!r}
+WINDOWS_WRAPPER = {windows_wrapper!r}
 
 def write_all(descriptor, value):
     encoded = str(value).encode("utf-8")
@@ -3790,10 +3896,22 @@ def write_all(descriptor, value):
         remaining = remaining[written:]
     return bool(encoded)
 
+if WINDOWS_WRAPPER:
+    if len(sys.argv) < 2 or sys.argv[1] not in {{"python", "python3"}}:
+        raise SystemExit(125)
+    shim_interpreter = sys.argv[1]
+    shim_argv = sys.argv[2:]
+else:
+    shim_interpreter = sys.argv[0]
+    shim_argv = sys.argv[1:]
+
 transport = os.environ.get({transport_env!r}, "")
 endpoint = os.environ.get({endpoint_env!r}, "")
 token = os.environ.get({token_env!r}, "")
-request = json.dumps({{"token": token, "interpreter": sys.argv[0], "argv": sys.argv[1:]}}, separators=(",", ":")) + "\n"
+request = json.dumps(
+    {{"token": token, "interpreter": shim_interpreter, "argv": shim_argv}},
+    separators=(",", ":"),
+) + "\n"
 try:
     if transport == "unix":
         connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -3843,6 +3961,27 @@ except Exception as exc:
 '''
 
 
+def _windows_command_shim_source(interpreter_name: str) -> bytes:
+    """Build one ASCII CMD launcher without embedding any host path."""
+
+    if interpreter_name not in _PYTHON_NAMES:
+        raise GatewayBrokerError(
+            f"unsupported Windows shim interpreter name: {interpreter_name!r}"
+        )
+    lines = (
+        "@echo off",
+        "setlocal DisableDelayedExpansion",
+        f"if not defined {SHIM_TRUSTED_PYTHON_ENV} exit /b 125",
+        (
+            f'"%{SHIM_TRUSTED_PYTHON_ENV}%" '
+            f'"%~dp0{WINDOWS_SHIM_SCRIPT_NAME}" {interpreter_name} %*'
+        ),
+        "exit /b %ERRORLEVEL%",
+        "",
+    )
+    return "\r\n".join(lines).encode("ascii")
+
+
 class CodexGatewayBroker:
     """One-run local broker for an ordered semantic gateway scenario."""
 
@@ -3850,6 +3989,7 @@ class CodexGatewayBroker:
         self,
         *,
         skill_source: Path,
+        invocation_skill_source: Path | None = None,
         expected_steps: Sequence[ExpectedGatewayStep],
         commutative_read_only_step_groups: Sequence[Sequence[str]] = (),
         gateway_global_arguments: Sequence[str] = (),
@@ -3870,6 +4010,13 @@ class CodexGatewayBroker:
     ) -> None:
         self.skill_source = _absolute_lexical(skill_source)
         self.runner_path = self.skill_source / "scripts" / "run.py"
+        self.invocation_skill_source = _absolute_lexical(
+            invocation_skill_source or self.skill_source
+        )
+        self.invocation_runner_path = (
+            self.invocation_skill_source / "scripts" / "run.py"
+        )
+        self.platform_name = _broker_platform_name()
         self.expected_steps = tuple(expected_steps)
         self.commutative_read_only_step_groups = (
             validate_commutative_read_only_step_groups(
@@ -4122,8 +4269,18 @@ class CodexGatewayBroker:
         # filesystem state would make the audit boundary ambiguous.
         self._ever_started = True
         try:
+            if self.platform_name not in {"posix", "nt"}:
+                raise GatewayBrokerError(
+                    "gateway broker shims support only native POSIX or Windows hosts; "
+                    f"got os.name={self.platform_name!r}"
+                )
             if not self.runner_path.is_file():
                 raise GatewayBrokerError(f"packaged runner does not exist: {self.runner_path}")
+            if not self.invocation_runner_path.is_file():
+                raise GatewayBrokerError(
+                    "model-visible packaged runner does not exist: "
+                    f"{self.invocation_runner_path}"
+                )
             if not self.trusted_python.is_file():
                 raise GatewayBrokerError(f"trusted Python does not exist: {self.trusted_python}")
 
@@ -4310,12 +4467,46 @@ class CodexGatewayBroker:
         if not self._started:
             raise GatewayBrokerError("broker has not started")
         environment = dict(os.environ if base is None else base)
-        for name in _SUBSCRIPTION_ACK_ENV_NAMES:
-            environment.pop(name, None)
-        environment.update(self.model_environment_overrides(environment.get("PATH")))
+        existing_path = _environment_value(
+            environment,
+            "PATH",
+            platform_name=self.platform_name,
+        )
+        existing_pathext = _environment_value(
+            environment,
+            _WINDOWS_PATHEXT_NAME,
+            platform_name=self.platform_name,
+        )
+        replaced_names = {
+            *_SUBSCRIPTION_ACK_ENV_NAMES,
+            BROKER_TRANSPORT_ENV,
+            BROKER_ENDPOINT_ENV,
+            BROKER_TOKEN_ENV,
+            GATEWAY_REQUIRED_ENV,
+            SHIM_TRUSTED_PYTHON_ENV,
+            "PATH",
+        }
+        if self.platform_name == "nt":
+            replaced_names.update({BASH_ENV_NAME, _WINDOWS_PATHEXT_NAME})
+        _remove_environment_names(
+            environment,
+            tuple(replaced_names),
+            platform_name=self.platform_name,
+        )
+        environment.update(
+            self.model_environment_overrides(
+                existing_path,
+                existing_pathext=existing_pathext,
+            )
+        )
         return environment
 
-    def model_environment_overrides(self, existing_path: str | None = None) -> dict[str, str]:
+    def model_environment_overrides(
+        self,
+        existing_path: str | None = None,
+        *,
+        existing_pathext: str | None = None,
+    ) -> dict[str, str]:
         """Return the small overlay suitable for ``CodexCliHarness.extra_env``.
 
         Unlike :meth:`model_environment`, this does not copy ``HOME``,
@@ -4325,14 +4516,39 @@ class CodexGatewayBroker:
         if not self._started:
             raise GatewayBrokerError("broker has not started")
         old_path = existing_path if existing_path is not None else os.environ.get("PATH", os.defpath)
-        return {
-            "PATH": os.pathsep.join((str(self.shim_directory), old_path)),
-            BASH_ENV_NAME: str(self.bash_env_path),
+        common = {
             BROKER_TRANSPORT_ENV: self.transport,
             BROKER_ENDPOINT_ENV: self.endpoint,
             BROKER_TOKEN_ENV: self._token,
             GATEWAY_REQUIRED_ENV: "1",
         }
+        if self.platform_name == "posix":
+            return {
+                "PATH": os.pathsep.join((str(self.shim_directory), old_path)),
+                BASH_ENV_NAME: str(self.bash_env_path),
+                **common,
+            }
+        if self.platform_name == "nt":
+            pathext = (
+                existing_pathext
+                if existing_pathext is not None
+                else _environment_value(
+                    os.environ,
+                    _WINDOWS_PATHEXT_NAME,
+                    platform_name="nt",
+                )
+            )
+            return {
+                "PATH": _WINDOWS_PATH_SEPARATOR.join(
+                    (str(self.shim_directory), old_path)
+                ),
+                _WINDOWS_PATHEXT_NAME: _normalize_windows_pathext(pathext),
+                SHIM_TRUSTED_PYTHON_ENV: str(self.trusted_python),
+                **common,
+            }
+        raise GatewayBrokerError(
+            f"gateway broker has no model environment for os.name={self.platform_name!r}"
+        )
 
     def evidence(self) -> GatewayBrokerEvidence:
         with self._lock:
@@ -4368,6 +4584,7 @@ class CodexGatewayBroker:
             command_argvs,
             self.evidence(),
             skill_source=self.skill_source,
+            invocation_skill_source=self.invocation_skill_source,
             shim_directory=self.shim_directory,
         )
 
@@ -4382,6 +4599,7 @@ class CodexGatewayBroker:
             self.evidence(),
             expected_step_count=expected_step_count,
             skill_source=self.skill_source,
+            invocation_skill_source=self.invocation_skill_source,
             shim_directory=self.shim_directory,
         )
 
@@ -4421,7 +4639,12 @@ class CodexGatewayBroker:
 
     def _write_shims(self) -> None:
         source = _SHIM_SOURCE.format(
-            python=self.trusted_python,
+            shim_header=(
+                f"#!{self.trusted_python}"
+                if self.platform_name == "posix"
+                else ""
+            ),
+            windows_wrapper=self.platform_name == "nt",
             transport_env=BROKER_TRANSPORT_ENV,
             endpoint_env=BROKER_ENDPOINT_ENV,
             token_env=BROKER_TOKEN_ENV,
@@ -4432,19 +4655,32 @@ class CodexGatewayBroker:
             output_arm=_SHIM_OUTPUT_ARM_SECONDS,
             output_drain=_SHIM_OUTPUT_DRAIN_SECONDS,
         )
-        for name in sorted(_PYTHON_NAMES):
-            path = self.shim_directory / name
-            path.write_text(source, encoding="utf-8")
-            path.chmod(0o700)
-        self._bash_env_path = self.shim_directory / "bash_env"
-        self._bash_env_path.write_text(
-            "unset -f python python3 2>/dev/null || :\n"
-            "unalias python python3 2>/dev/null || :\n"
-            f"export PATH={shlex.quote(str(self.shim_directory))}:\"${{PATH:-/usr/bin:/bin}}\"\n"
-            "hash -r 2>/dev/null || :\n",
-            encoding="utf-8",
+        if self.platform_name == "posix":
+            for name in sorted(_PYTHON_NAMES):
+                path = self.shim_directory / name
+                path.write_text(source, encoding="utf-8")
+                path.chmod(0o700)
+            self._bash_env_path = self.shim_directory / "bash_env"
+            self._bash_env_path.write_text(
+                "unset -f python python3 2>/dev/null || :\n"
+                "unalias python python3 2>/dev/null || :\n"
+                f"export PATH={shlex.quote(str(self.shim_directory))}:\"${{PATH:-/usr/bin:/bin}}\"\n"
+                "hash -r 2>/dev/null || :\n",
+                encoding="utf-8",
+            )
+            self._bash_env_path.chmod(0o400)
+            return
+        if self.platform_name == "nt":
+            source_path = self.shim_directory / WINDOWS_SHIM_SCRIPT_NAME
+            source_path.write_text(source, encoding="utf-8")
+            for name in sorted(_PYTHON_NAMES):
+                path = self.shim_directory / f"{name}.cmd"
+                path.write_bytes(_windows_command_shim_source(name))
+            self._bash_env_path = None
+            return
+        raise GatewayBrokerError(
+            f"gateway broker cannot write shims for os.name={self.platform_name!r}"
         )
-        self._bash_env_path.chmod(0o400)
 
     def _wake_server(self) -> None:
         try:
@@ -4553,10 +4789,6 @@ class CodexGatewayBroker:
         path = expectation.path
         deadline = time.monotonic() + _SUBSCRIPTION_ACK_WAIT_SECONDS
         while True:
-            if path.is_symlink():
-                raise GatewayInvocationError(
-                    "broker subscription ACK target became a symlink"
-                )
             try:
                 candidate_metadata = path.lstat()
             except FileNotFoundError:
@@ -4566,6 +4798,10 @@ class CodexGatewayBroker:
                     f"broker subscription ACK is unavailable: {exc}"
                 ) from exc
             if candidate_metadata is not None:
+                if path_is_link_or_reparse(path, metadata=candidate_metadata):
+                    raise GatewayInvocationError(
+                        "broker subscription ACK target became a link or reparse point"
+                    )
                 if (
                     stat.S_ISREG(candidate_metadata.st_mode)
                     and candidate_metadata.st_nlink == 1
@@ -4592,49 +4828,35 @@ class CodexGatewayBroker:
                 )
             time.sleep(min(_SUBSCRIPTION_ACK_POLL_SECONDS, remaining))
 
-        flags = os.O_RDONLY
-        if hasattr(os, "O_NOFOLLOW"):
-            flags |= os.O_NOFOLLOW
-        if path.parent.is_symlink() or not path.parent.is_dir():
+        try:
+            parent_metadata = path.parent.lstat()
+        except OSError as exc:
+            raise GatewayInvocationError(
+                f"broker subscription ACK parent cannot be inspected: {exc}"
+            ) from exc
+        if (
+            path_is_link_or_reparse(path.parent, metadata=parent_metadata)
+            or not stat.S_ISDIR(parent_metadata.st_mode)
+        ):
             raise GatewayInvocationError(
                 "broker subscription ACK parent is not one exact real directory"
             )
-        descriptor: int | None = None
         try:
-            descriptor = os.open(path, flags)
-            metadata = os.fstat(descriptor)
-            chunks: list[bytes] = []
-            remaining_bytes = _SUBSCRIPTION_ACK_MAX_BYTES + 1
-            while remaining_bytes > 0:
-                chunk = os.read(descriptor, min(65536, remaining_bytes))
-                if not chunk:
-                    break
-                chunks.append(chunk)
-                remaining_bytes -= len(chunk)
-            raw = b"".join(chunks)
-            final_metadata = path.lstat()
+            snapshot = read_bounded_exclusive_regular_file(
+                path,
+                max_bytes=_SUBSCRIPTION_ACK_MAX_BYTES,
+            )
+            raw = snapshot.raw
+        except CodexFileSecurityError as exc:
+            raise GatewayInvocationError(
+                f"broker subscription ACK is not one private bounded regular file: {exc}"
+            ) from exc
+        try:
             payload = json.loads(raw.decode("utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise GatewayInvocationError(
                 f"broker subscription ACK is not strict UTF-8 JSON: {exc}"
             ) from exc
-        finally:
-            if descriptor is not None:
-                os.close(descriptor)
-        if (
-            not stat.S_ISREG(metadata.st_mode)
-            or metadata.st_nlink != 1
-            or metadata.st_size <= 0
-            or metadata.st_size > _SUBSCRIPTION_ACK_MAX_BYTES
-            or metadata.st_size != len(raw)
-            or stat.S_IMODE(metadata.st_mode) & 0o077
-            or final_metadata.st_dev != metadata.st_dev
-            or final_metadata.st_ino != metadata.st_ino
-            or final_metadata.st_nlink != 1
-        ):
-            raise GatewayInvocationError(
-                "broker subscription ACK is not one private bounded regular file"
-            )
         expected_keys = {
             "contract",
             "step_name",
@@ -4832,6 +5054,7 @@ class CodexGatewayBroker:
             resolved = resolve_gateway_invocation(
                 model_argv,
                 skill_source=self.skill_source,
+                invocation_skill_source=self.invocation_skill_source,
                 shim_directory=self.shim_directory,
             )
         except GatewayInvocationError as exc:
@@ -5213,8 +5436,11 @@ class CodexGatewayBroker:
         try:
             command[1] = str(self.runner_path.resolve(strict=True))
             runner_env = dict(self._runner_environment)
-            for name in _BROKER_ENV_NAMES:
-                runner_env.pop(name, None)
+            _remove_environment_names(
+                runner_env,
+                tuple(_BROKER_ENV_NAMES),
+                platform_name=self.platform_name,
+            )
             runner_env[STATE_DIRECTORY_ENV] = str(self.state_directory)
             runner_env[EVIDENCE_DIRECTORY_ENV] = str(self.evidence_directory)
             runner_env[CONFIG_PATH_ENV] = str(self.config_path)
@@ -5507,6 +5733,9 @@ __all__ = [
     "BROKER_ENDPOINT_ENV",
     "BROKER_TOKEN_ENV",
     "BROKER_TRANSPORT_ENV",
+    "SHIM_TRUSTED_PYTHON_ENV",
+    "WINDOWS_COMMAND_SHIM_NAMES",
+    "WINDOWS_SHIM_SCRIPT_NAME",
     "CodexGatewayBroker",
     "ExpectedGatewayStep",
     "GatewayBrokerError",

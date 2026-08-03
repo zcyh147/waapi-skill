@@ -33,6 +33,13 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
         "log_path = Path(os.environ['CI_TEST_LOG'])\n"
         "argv = sys.argv[1:]\n"
         "effective_argv = argv[2:] if argv[:2] == ['run', 'python'] else argv\n"
+        "if effective_argv and Path(effective_argv[0]).name in {\n"
+        "    'resolve_live_test_config.py', 'run_live_test_command.py'\n"
+        "}:\n"
+        "    import runpy\n"
+        "    sys.path.insert(0, str(Path(effective_argv[0]).resolve().parent))\n"
+        "    sys.argv = effective_argv\n"
+        "    runpy.run_path(effective_argv[0], run_name='__main__')\n"
         "program_manifest_nodes = None\n"
         "if len(effective_argv) >= 2 and Path(effective_argv[0]).name == 'run_program_tests.py':\n"
         "    manifest_path = Path(effective_argv[1])\n"
@@ -58,6 +65,7 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
         "    'WWISE_CONSOLE': os.environ.get('WWISE_CONSOLE'),\n"
         "    'WWISE_SAMPLE_PROJECT_PATH': os.environ.get('WWISE_SAMPLE_PROJECT_PATH'),\n"
         "    'WWISE_SANDBOX_ROOT': os.environ.get('WWISE_SANDBOX_ROOT'),\n"
+        "    'WWISE_TEST_CONFIG': os.environ.get('WWISE_TEST_CONFIG'),\n"
         "    'PYTEST_ADDOPTS': os.environ.get('PYTEST_ADDOPTS'),\n"
         "}\n"
         "with log_path.open('a', encoding='utf-8') as handle:\n"
@@ -343,6 +351,19 @@ def test_ci_test_bat_help_matches_shell_parity_surface() -> None:
     assert "smoke        Run focused WAAPI getInfo smoke via HeadlessLifecycle" in result.stdout
     assert "ci\\test.bat all matrix" in result.stdout
     assert "poetry run python ..." in result.stdout
+    assert "WWISE_TEST_CONFIG" in result.stdout
+
+
+def test_ci_test_bat_and_shell_share_pathlib_config_resolver() -> None:
+    shell_source = CI_TEST_SH.read_text(encoding="utf-8")
+    batch_source = CI_TEST_BAT.read_text(encoding="utf-8")
+    live_runner_source = (
+        REPO_ROOT / "ci" / "run_live_test_command.py"
+    ).read_text(encoding="utf-8")
+
+    assert shell_source.count("ci/resolve_live_test_config.py") == 1
+    assert "ci\\run_live_test_command.py" in batch_source
+    assert "resolve_live_test_config" in live_runner_source
 
 
 def test_ci_test_bat_all_mode_defaults_to_all_and_runs_full_matrix(tmp_path: Path) -> None:
@@ -385,6 +406,110 @@ def test_ci_test_bat_smoke_all_runs_all_five_versions(tmp_path: Path) -> None:
     assert all(call["WWISE_DESTRUCTIVE"] == "0" for call in calls)
     assert all(call["WWISE_STRICT_REAL"] == "1" for call in calls)
     assert all(_smoke_argv(call) and str(_smoke_argv(call)[0]).endswith("ci\\wwise_smoke.py") for call in calls)
+
+
+def test_ci_test_bat_reads_versioned_live_environment_config(tmp_path: Path) -> None:
+    env, log_path = _base_env(tmp_path)
+    configured_root = tmp_path / "配置 !percent% & equals= paths"
+    console_path = configured_root / "WwiseConsole.exe"
+    console_path.parent.mkdir(parents=True)
+    console_path.write_text("console\n", encoding="utf-8")
+    project_path = configured_root / "SampleProject.wproj"
+    project_path.write_text("<Project />\n", encoding="utf-8")
+    sandbox_root = configured_root / "sandbox"
+    config_path = tmp_path / "配置 !percent% & equals= environment.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "versions": {
+                    "2024.1": {
+                        "wwise_console": str(console_path),
+                        "sample_project": str(project_path),
+                        "sandbox_root": str(sandbox_root),
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    env["WWISE_TEST_CONFIG"] = str(config_path)
+    env.pop("WWISE_CONSOLE", None)
+    env.pop("WWISE_SAMPLE_PROJECT_PATH", None)
+    env.pop("WWISE_SANDBOX_ROOT", None)
+
+    result = _run_ci_test(
+        env,
+        "--version",
+        "2024.1",
+        "--mode",
+        "live",
+        "--",
+        "--collect-only",
+        "-q",
+    )
+
+    assert result.returncode == 0, result.stderr
+    calls = _load_calls(log_path)
+    assert len(calls) == 1
+    assert calls[0]["WWISE_CONSOLE"] == str(console_path.resolve())
+    assert calls[0]["WWISE_SAMPLE_PROJECT_PATH"] == str(project_path.resolve())
+    assert calls[0]["WWISE_SANDBOX_ROOT"] == str(sandbox_root.resolve())
+    assert calls[0]["WWISE_TEST_CONFIG"] == str(config_path.resolve())
+
+
+def test_ci_test_bat_explicit_paths_override_versioned_config(tmp_path: Path) -> None:
+    env, log_path = _base_env(tmp_path)
+    configured_root = tmp_path / "configured"
+    configured_console = configured_root / "WwiseConsole.exe"
+    configured_console.parent.mkdir(parents=True)
+    configured_console.write_text("console\n", encoding="utf-8")
+    configured_project = configured_root / "SampleProject.wproj"
+    configured_project.write_text("<Project />\n", encoding="utf-8")
+    config_path = tmp_path / "live-environment.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "versions": {
+                    "2024.1": {
+                        "wwise_console": str(configured_console),
+                        "sample_project": str(configured_project),
+                        "sandbox_root": str(configured_root / "sandbox"),
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    env["WWISE_TEST_CONFIG"] = str(config_path)
+
+    result = _run_ci_test(
+        env,
+        "--version",
+        "2024.1",
+        "--mode",
+        "live",
+        "--",
+        "--collect-only",
+        "-q",
+    )
+
+    assert result.returncode == 0, result.stderr
+    calls = _load_calls(log_path)
+    assert len(calls) == 1
+    assert calls[0]["WWISE_CONSOLE"] == env["WWISE_CONSOLE"]
+    assert calls[0]["WWISE_SAMPLE_PROJECT_PATH"] == env["WWISE_SAMPLE_PROJECT_PATH"]
+    assert calls[0]["WWISE_SANDBOX_ROOT"] == env["WWISE_SANDBOX_ROOT"]
+
+
+def test_ci_test_bat_rejects_missing_explicit_live_config(tmp_path: Path) -> None:
+    env, log_path = _base_env(tmp_path)
+    env["WWISE_TEST_CONFIG"] = str(tmp_path / "missing-live-environment.json")
+
+    result = _run_ci_test(env, "--version", "2024.1", "--mode", "live")
+
+    assert result.returncode == 2
+    assert "explicit WWISE_TEST_CONFIG does not exist" in result.stderr
+    assert not log_path.exists()
 
 
 def test_ci_test_bat_nonlive_defaults_to_none_and_stops_before_live_on_failure(tmp_path: Path) -> None:

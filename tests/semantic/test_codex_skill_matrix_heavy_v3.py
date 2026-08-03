@@ -90,7 +90,14 @@ def _install_nonlive_root(
     return writes
 
 
-def test_parse_args_preserves_v2_defaults_and_selects_v3_defaults() -> None:
+def test_parse_args_preserves_v2_defaults_and_selects_v3_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        matrix,
+        "resolve_codex_binary",
+        lambda _value: Path("/synthetic-host/codex"),
+    )
     v2 = matrix.parse_args([])
     heavy = matrix.parse_args(
         [

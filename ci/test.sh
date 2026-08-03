@@ -22,7 +22,8 @@ Modes:
 
 Notes:
   - Environment overrides are respected if already set:
-      WWISE_CONSOLE, WWISE_SAMPLE_PROJECT_PATH, WWISE_SANDBOX_ROOT,
+      WWISE_TEST_CONFIG, WWISE_CONSOLE, WWISE_SAMPLE_PROJECT_PATH,
+      WWISE_SANDBOX_ROOT,
       WWISE_STARTUP_TIMEOUT, WWISE_READINESS_TIMEOUT,
       WWISE_PROBE_TIMEOUT, WWISE_SHUTDOWN_TIMEOUT
   - Default sandbox root if not set:
@@ -202,49 +203,30 @@ load_version_config_paths() {
   local v="$1"
   local config_path="${INITIAL_WWISE_TEST_CONFIG:-${WWISE_TEST_CONFIG:-$ROOT_DIR/tests/fixtures/local/live-environment.json}}"
   if [[ ! -f "$config_path" ]]; then
+    if [[ "$HAS_INITIAL_WWISE_TEST_CONFIG" == "1" ]]; then
+      echo "Explicit WWISE_TEST_CONFIG does not exist: $config_path" >&2
+      return 1
+    fi
     return 0
   fi
   RESOLVED_TEST_CONFIG="$config_path"
+  local config_output
+  if ! config_output="$(
+    python3 "$ROOT_DIR/ci/resolve_live_test_config.py" \
+      --config "$config_path" \
+      --version "$v" \
+      --repo-root "$ROOT_DIR"
+  )"; then
+    echo "Failed to resolve live-test config: $config_path" >&2
+    return 1
+  fi
   while IFS='=' read -r key value; do
     case "$key" in
       WWISE_CONSOLE) RESOLVED_CONSOLE="$value" ;;
       WWISE_SAMPLE_PROJECT_PATH) RESOLVED_PROJECT="$value" ;;
       WWISE_SANDBOX_ROOT) RESOLVED_SANDBOX="$value" ;;
     esac
-  done < <(python3 - "$config_path" "$v" "$ROOT_DIR" <<'PYCONFIG'
-from __future__ import annotations
-import json
-import sys
-from pathlib import Path
-
-config_path = Path(sys.argv[1]).expanduser().resolve(strict=False)
-version = sys.argv[2]
-repo_root = Path(sys.argv[3]).resolve(strict=False)
-payload = json.loads(config_path.read_text(encoding="utf-8"))
-entry = payload.get("versions", {}).get(version, {}) if isinstance(payload, dict) else {}
-if not isinstance(entry, dict):
-    entry = {}
-
-def path_value(*keys: str) -> str | None:
-    for key in keys:
-        value = entry.get(key)
-        if isinstance(value, str) and value:
-            path = Path(value).expanduser()
-            if not path.is_absolute():
-                path = repo_root / path
-            return str(path.resolve(strict=False))
-    return None
-
-values = {
-    "WWISE_CONSOLE": path_value("wwise_console", "console_path"),
-    "WWISE_SAMPLE_PROJECT_PATH": path_value("sample_project", "sample_project_path"),
-    "WWISE_SANDBOX_ROOT": path_value("sandbox_root"),
-}
-for key, value in values.items():
-    if value is not None:
-        print(f"{key}={value}")
-PYCONFIG
-  )
+  done <<< "$config_output"
 }
 
 set_version_environment() {

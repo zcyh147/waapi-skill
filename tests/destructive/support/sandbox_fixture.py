@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
@@ -29,6 +30,16 @@ from .live_environment import (  # pyright: ignore[reportMissingImports]
     require_live_environment,
 )
 
+try:  # pragma: no branch - tests exercise the unavailable-backend seam.
+    import fcntl as _fcntl
+except ImportError:  # pragma: no cover - fcntl is unavailable on Windows.
+    _fcntl = None
+
+try:  # pragma: no branch - tests exercise the unavailable-backend seam.
+    import msvcrt as _msvcrt
+except ImportError:  # pragma: no cover - msvcrt is unavailable on POSIX.
+    _msvcrt = None
+
 
 ENV_WWISE_SANDBOX_KEEP_ON_FAILURE = "WWISE_SANDBOX_KEEP_ON_FAILURE"
 ENV_WWISE_STRICT_REAL = "WWISE_STRICT_REAL"
@@ -37,10 +48,124 @@ DEFAULT_SANDBOX_ROOT = Path(".waapi-skill-state") / "runtime" / "wwise-waapi-san
 KEEP_ON_FAILURE_ROOT = Path(".waapi-skill-state") / "evidence" / "wwise-waapi-live-sandbox-coverage"
 LOCK_FILE_NAME = ".wwise-live-sandbox.lock"
 REAL_LAUNCH_AUDIT_PATH = Path(".waapi-skill-state") / "evidence" / "waapi-test-remediation" / "real-wwise-launches.jsonl"
+_LOCK_REGION_BYTES = 1
+_WINDOWS_LOCK_RETRY_SECONDS = 0.05
+_WINDOWS_LOCK_VIOLATION = 33
 
 
 class SandboxFixtureError(RuntimeError):
     """Raised when a sandbox copy would be unsafe or incomplete."""
+
+
+class _PosixLiveSandboxLockBackend:
+    """Blocking whole-file advisory locking through ``fcntl.flock``."""
+
+    def __init__(self, module: Any) -> None:
+        self._module = module
+
+    def acquire(self, handle: Any) -> None:
+        try:
+            self._module.flock(handle.fileno(), self._module.LOCK_EX)
+        except OSError as exc:
+            raise SandboxFixtureError(
+                "LiveSandboxLock could not acquire its POSIX fcntl.flock lock."
+            ) from exc
+
+    def release(self, handle: Any) -> None:
+        try:
+            self._module.flock(handle.fileno(), self._module.LOCK_UN)
+        except OSError as exc:
+            raise SandboxFixtureError(
+                "LiveSandboxLock could not release its POSIX fcntl.flock lock."
+            ) from exc
+
+
+class _WindowsLiveSandboxLockBackend:
+    """Blocking one-byte region locking through ``msvcrt.locking``."""
+
+    def __init__(self, module: Any) -> None:
+        self._module = module
+
+    @staticmethod
+    def _seek_lock_region(handle: Any) -> None:
+        try:
+            handle.seek(0, os.SEEK_SET)
+        except OSError as exc:
+            raise SandboxFixtureError(
+                "LiveSandboxLock could not seek to its Windows lock region."
+            ) from exc
+
+    def acquire(self, handle: Any) -> None:
+        while True:
+            self._seek_lock_region(handle)
+            try:
+                self._module.locking(
+                    handle.fileno(),
+                    self._module.LK_NBLCK,
+                    _LOCK_REGION_BYTES,
+                )
+            except OSError as exc:
+                if _is_windows_lock_contention(exc):
+                    time.sleep(_WINDOWS_LOCK_RETRY_SECONDS)
+                    continue
+                raise SandboxFixtureError(
+                    "LiveSandboxLock could not acquire its Windows msvcrt.locking lock."
+                ) from exc
+            return
+
+    def release(self, handle: Any) -> None:
+        self._seek_lock_region(handle)
+        try:
+            self._module.locking(
+                handle.fileno(),
+                self._module.LK_UNLCK,
+                _LOCK_REGION_BYTES,
+            )
+        except OSError as exc:
+            raise SandboxFixtureError(
+                "LiveSandboxLock could not release its Windows msvcrt.locking lock."
+            ) from exc
+
+
+def _is_windows_lock_contention(exc: OSError) -> bool:
+    """Return whether a Windows lock error means another process owns it."""
+
+    return exc.errno in {errno.EACCES, errno.EDEADLK} or (
+        getattr(exc, "winerror", None) == _WINDOWS_LOCK_VIOLATION
+    )
+
+
+def _select_live_sandbox_lock_backend(platform_name: str) -> Any:
+    """Select a supported backend without permitting an unlocked live run."""
+
+    if platform_name == "posix":
+        if _fcntl is None or any(
+            not hasattr(_fcntl, attribute)
+            for attribute in ("flock", "LOCK_EX", "LOCK_UN")
+        ):
+            raise SandboxFixtureError(
+                "LiveSandboxLock requires fcntl.flock on macOS/Linux and will not run unlocked."
+            )
+        return _PosixLiveSandboxLockBackend(_fcntl)
+    if platform_name == "nt":
+        if _msvcrt is None or any(
+            not hasattr(_msvcrt, attribute)
+            for attribute in ("locking", "LK_NBLCK", "LK_UNLCK")
+        ):
+            raise SandboxFixtureError(
+                "LiveSandboxLock requires msvcrt.locking on Windows and will not run unlocked."
+            )
+        return _WindowsLiveSandboxLockBackend(_msvcrt)
+    raise SandboxFixtureError(
+        f"LiveSandboxLock has no cross-process lock backend for os.name={platform_name!r}; "
+        "it will not run unlocked."
+    )
+
+
+def _lock_platform_name() -> str:
+    """Return the standard-library platform discriminator for lock selection."""
+
+    return os.name
 
 
 @dataclass(slots=True)
@@ -125,31 +250,65 @@ class LiveSandboxLock(AbstractContextManager["LiveSandboxLock"]):
         self.root = root
         self.path = root / LOCK_FILE_NAME
         self._handle = None
+        self._backend = None
 
     def __enter__(self) -> "LiveSandboxLock":
+        backend = _select_live_sandbox_lock_backend(_lock_platform_name())
         self.root.mkdir(parents=True, exist_ok=True)
-        self._handle = self.path.open("a+", encoding="utf-8")
+        flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_BINARY", 0)
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        fd = os.open(self.path, flags, 0o600)
         try:
-            import fcntl
-
-            fcntl.flock(self._handle.fileno(), fcntl.LOCK_EX)
-        except ImportError:  # pragma: no cover - non-POSIX fallback is best effort
-            pass
+            handle = os.fdopen(fd, "r+b", buffering=0, closefd=True)
+        except BaseException:
+            os.close(fd)
+            raise
+        try:
+            # Windows region locking requires a real byte at offset zero. Two
+            # first-time entrants may both write the same sentinel byte, but
+            # because neither descriptor uses append mode the file remains one
+            # byte and both subsequently contend on the identical region.
+            if os.fstat(handle.fileno()).st_size < _LOCK_REGION_BYTES:
+                handle.seek(0, os.SEEK_SET)
+                handle.write(b"\0")
+                handle.flush()
+                os.fsync(handle.fileno())
+            backend.acquire(handle)
+        except BaseException:
+            handle.close()
+            raise
+        self._handle = handle
+        self._backend = backend
         return self
 
     def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
         if self._handle is None:
             return
+        handle = self._handle
+        backend = self._backend
+        cleanup_error: BaseException | None = None
         try:
             try:
-                import fcntl
-
-                fcntl.flock(self._handle.fileno(), fcntl.LOCK_UN)
-            except ImportError:  # pragma: no cover - non-POSIX fallback is best effort
-                pass
+                if backend is None:
+                    raise SandboxFixtureError(
+                        "LiveSandboxLock lost its selected backend before release."
+                    )
+                backend.release(handle)
+            except BaseException as release_error:
+                cleanup_error = release_error
         finally:
-            self._handle.close()
+            try:
+                handle.close()
+            except BaseException as close_error:
+                if cleanup_error is None:
+                    cleanup_error = close_error
             self._handle = None
+            self._backend = None
+        # Preserve an exception from the protected live operation instead of
+        # masking it with a secondary unlock/close failure.
+        if cleanup_error is not None and exc_type is None:
+            raise cleanup_error
 
 
 def prepare_sample_project_sandbox(

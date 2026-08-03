@@ -74,10 +74,13 @@ from tests.semantic.support.codex_gateway_broker import (  # noqa: E402  # pyrig
 )
 from tests.semantic.support.codex_harness import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     CodexCliHarness,
+    CodexHarnessError,
     CodexHarnessConfig,
     CodexInfrastructureError,
     CodexRunResult,
     normalized_gateway_command_argv,
+    prepare_workspace_skill_install,
+    resolve_codex_binary,
 )
 from tests.semantic.support.codex_transaction_seal import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     PreviewSealEvidence,
@@ -147,7 +150,7 @@ DEFAULT_INTEGRATION_WORKFLOWS_V2_ITERATION_ROOT = (
     / "waapi-skill-workspace"
     / "integration-workflows-v2-cross-version-6"
 )
-DEFAULT_CODEX_BINARY = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
+DEFAULT_CODEX_BINARY: str | None = None
 DEFAULT_AUTH_JSON = Path.home() / ".codex" / "auth.json"
 DEFAULT_LIVE_CONFIG = REPO_ROOT / "tests" / "fixtures" / "local" / "live-environment.json"
 GLOBAL_LIVE_LIFECYCLE_LOCK_ROOT = REPO_ROOT / ".waapi-skill-state" / "runtime" / "wwise-live-lifecycle-lock"
@@ -1898,12 +1901,13 @@ def run_fresh_phase(
         prompt = session.render_prompt(values)
         (output_dir / "prompt.txt").write_text(prompt + "\n", encoding="utf-8")
         stage = "prepare-agent-workspace"
-        prepare_agent_workspace(workspace, options.skill_source)
+        skill_install = prepare_agent_workspace(workspace, options.skill_source)
         stage = "build-gateway-protocol"
         expected_steps = build_expected_gateway_steps(session, values)
         stage = "broker-initialize"
         broker = CodexGatewayBroker(
             skill_source=options.skill_source,
+            invocation_skill_source=(skill_install if os.name == "nt" else None),
             expected_steps=expected_steps,
             expected_wwise_version=session.version,
             runner_environment=runner_environment,
@@ -1955,7 +1959,8 @@ def run_fresh_phase(
             stage = "broker-evidence"
             gateway_argvs = gateway_candidate_argvs(
                 result,
-                skill_source=options.skill_source,
+                skill_source=skill_install,
+                alternate_skill_sources=(options.skill_source,),
                 expected_wwise_version=session.version,
             )
             broker_evidence = broker.evidence()
@@ -2038,6 +2043,7 @@ def gateway_candidate_argvs(
     result: CodexRunResult,
     *,
     skill_source: Path,
+    alternate_skill_sources: Sequence[Path] = (),
     expected_wwise_version: str = "",
 ) -> tuple[tuple[str, ...], ...]:
     """Return every event command shaped like the target packaged runner.
@@ -2047,7 +2053,10 @@ def gateway_candidate_argvs(
     than being filtered out before grading.
     """
 
-    expected_runner = os.path.abspath(os.fspath(skill_source / "scripts" / "run.py"))
+    expected_runners = {
+        os.path.abspath(os.fspath(source / "scripts" / "run.py"))
+        for source in (skill_source, *alternate_skill_sources)
+    }
     candidates: list[tuple[str, ...]] = []
     for record in result.command_facts.command_records:
         argv = normalized_gateway_command_argv(
@@ -2056,7 +2065,7 @@ def gateway_candidate_argvs(
         )
         if (
             len(argv) >= 4
-            and os.path.abspath(os.path.expanduser(argv[1])) == expected_runner
+            and os.path.abspath(os.path.expanduser(argv[1])) in expected_runners
             and argv[2] == "gateway.py"
         ):
             candidates.append(argv)
@@ -3072,10 +3081,17 @@ def trusted_gateway_environment(overrides: Mapping[str, str] | None = None) -> d
     return environment
 
 
-def prepare_agent_workspace(workspace: Path, skill_source: Path) -> None:
-    install = workspace / ".agents" / "skills" / "waapi-skill"
-    install.parent.mkdir(parents=True, exist_ok=False)
-    install.symlink_to(skill_source, target_is_directory=True)
+def prepare_agent_workspace(
+    workspace: Path,
+    skill_source: Path,
+    *,
+    platform_name: str | None = None,
+) -> Path:
+    return prepare_workspace_skill_install(
+        workspace,
+        skill_source,
+        platform_name=platform_name,
+    )
 
 
 def select_sessions(
@@ -3263,7 +3279,11 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     parser.add_argument("--suite")
     parser.add_argument("--iteration-root")
     parser.add_argument("--skill-source", default=str(SKILL_ROOT))
-    parser.add_argument("--codex-binary", default=str(DEFAULT_CODEX_BINARY))
+    parser.add_argument(
+        "--codex-binary",
+        default=DEFAULT_CODEX_BINARY,
+        help="explicit Codex CLI path; otherwise discover the host-native executable",
+    )
     parser.add_argument("--auth-json", default=str(DEFAULT_AUTH_JSON))
     parser.add_argument("--live-config", default=str(DEFAULT_LIVE_CONFIG))
     parser.add_argument("--model")
@@ -3371,12 +3391,16 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
             else DEFAULT_ITERATION_ROOT
         )
     )
+    try:
+        codex_binary = resolve_codex_binary(args.codex_binary)
+    except CodexHarnessError as exc:
+        parser.error(str(exc))
     return RunnerOptions(
         profile=str(args.profile),
         iteration_root=Path(iteration_root).expanduser().resolve(strict=False),
         suite_path=Path(suite).expanduser().resolve(strict=True),
         skill_source=Path(args.skill_source).expanduser().resolve(strict=True),
-        codex_binary=Path(args.codex_binary).expanduser().resolve(strict=True),
+        codex_binary=codex_binary,
         auth_json=Path(args.auth_json).expanduser().resolve(strict=True),
         live_config=Path(args.live_config).expanduser().resolve(strict=True),
         model=str(model),

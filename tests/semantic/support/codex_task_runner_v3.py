@@ -38,6 +38,7 @@ from tests.semantic.support.codex_harness import (
     CodexInfrastructureFailure,
     CodexRunResult,
     normalized_gateway_command_argv,
+    prepare_workspace_skill_install,
 )
 from tests.semantic.support.codex_prompt_provenance_v3 import (
     PROMPT_MATERIALIZATION_RECEIPT_CONTRACT,
@@ -270,7 +271,7 @@ def run_v3_codex_task(
         business_oracle_plan=sealed_plan,
     )
     workspace = root / "agent-workspace"
-    _prepare_agent_workspace(workspace, skill_source)
+    skill_install = _prepare_agent_workspace(workspace, skill_source)
     broker_root = root / "broker"
     results: list[CodexRunResult] = []
     grades: list[V3TurnGrade] = []
@@ -306,6 +307,7 @@ def run_v3_codex_task(
     )
     broker = CodexGatewayBroker(
         skill_source=skill_source,
+        invocation_skill_source=(skill_install if os.name == "nt" else None),
         expected_steps=protocol.steps,
         commutative_read_only_step_groups=(
             protocol.commutative_read_only_step_groups
@@ -378,7 +380,8 @@ def run_v3_codex_task(
                     results.append(result)
                     turn_gateway = _gateway_candidate_argvs(
                         result,
-                        skill_source=skill_source,
+                        skill_source=skill_install,
+                        alternate_skill_sources=(skill_source,),
                         expected_wwise_version=version,
                     )
                     cumulative_gateway_argvs.extend(turn_gateway)
@@ -789,9 +792,13 @@ def _gateway_candidate_argvs(
     result: CodexRunResult,
     *,
     skill_source: Path,
+    alternate_skill_sources: Sequence[Path] = (),
     expected_wwise_version: str,
 ) -> tuple[tuple[str, ...], ...]:
-    expected_runner = os.path.abspath(os.fspath(skill_source / "scripts" / "run.py"))
+    expected_runners = {
+        os.path.abspath(os.fspath(source / "scripts" / "run.py"))
+        for source in (skill_source, *alternate_skill_sources)
+    }
     candidates: list[tuple[str, ...]] = []
     for record in result.command_facts.command_records:
         argv = normalized_gateway_command_argv(
@@ -800,17 +807,24 @@ def _gateway_candidate_argvs(
         )
         if (
             len(argv) >= 4
-            and os.path.abspath(os.path.expanduser(argv[1])) == expected_runner
+            and os.path.abspath(os.path.expanduser(argv[1])) in expected_runners
             and argv[2] == "gateway.py"
         ):
             candidates.append(argv)
     return tuple(candidates)
 
 
-def _prepare_agent_workspace(workspace: Path, skill_source: Path) -> None:
-    install = workspace / ".agents" / "skills" / "waapi-skill"
-    install.parent.mkdir(parents=True, exist_ok=False)
-    install.symlink_to(skill_source, target_is_directory=True)
+def _prepare_agent_workspace(
+    workspace: Path,
+    skill_source: Path,
+    *,
+    platform_name: str | None = None,
+) -> Path:
+    return prepare_workspace_skill_install(
+        workspace,
+        skill_source,
+        platform_name=platform_name,
+    )
 
 
 def _archive_turn(

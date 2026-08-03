@@ -193,6 +193,94 @@ def _install_synthetic_execution(
     return child_calls
 
 
+def test_campaign_lock_is_cross_platform_exclusive(tmp_path: Path) -> None:
+    root = tmp_path / "campaign"
+    root.mkdir()
+
+    with campaign.CampaignLock(root, timeout_seconds=0.1):
+        lock_path = root / campaign.LOCK_FILE
+        lock_bytes = lock_path.read_bytes()
+        assert lock_bytes.startswith(b"pid=")
+        assert lock_bytes.endswith(b"\n")
+        assert b"\r\n" not in lock_bytes
+        with pytest.raises(campaign.CampaignConfigError, match="remained busy"):
+            with campaign.CampaignLock(root, timeout_seconds=0.01):
+                pytest.fail("a second campaign writer acquired the same lock")
+
+    expected_unlocked_bytes = b"\0" if campaign.os.name == "nt" else b""
+    assert (root / campaign.LOCK_FILE).read_bytes() == expected_unlocked_bytes
+
+
+def test_campaign_lock_fails_closed_without_supported_backend(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(campaign, "_campaign_lock_platform_name", lambda: "unknown")
+
+    with pytest.raises(campaign.CampaignConfigError, match="no supported backend"):
+        with campaign.CampaignLock(tmp_path, timeout_seconds=0.01):
+            pytest.fail("an unsupported host ran without a campaign lock")
+
+
+def test_windows_campaign_lock_materializes_and_preserves_lock_region(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[int, int, int]] = []
+
+    class FakeMsvcrt:
+        LK_NBLCK = 1
+        LK_UNLCK = 2
+
+        @staticmethod
+        def locking(descriptor: int, mode: int, _length: int) -> None:
+            calls.append(
+                (
+                    mode,
+                    campaign.os.lseek(descriptor, 0, campaign.os.SEEK_CUR),
+                    campaign.os.fstat(descriptor).st_size,
+                )
+            )
+
+    monkeypatch.setattr(campaign, "_campaign_lock_platform_name", lambda: "nt")
+    monkeypatch.setattr(campaign, "_msvcrt", FakeMsvcrt)
+
+    with campaign.CampaignLock(tmp_path, timeout_seconds=0.01):
+        assert (tmp_path / campaign.LOCK_FILE).read_bytes().startswith(b"pid=")
+
+    assert [(mode, offset) for mode, offset, _ in calls] == [
+        (FakeMsvcrt.LK_NBLCK, 0),
+        (FakeMsvcrt.LK_UNLCK, 0),
+    ]
+    assert all(size >= 1 for _, _, size in calls)
+    assert (tmp_path / campaign.LOCK_FILE).read_bytes() == b"\0"
+
+
+def test_campaign_lock_cleanup_does_not_mask_protected_exception(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FailingCleanupBackend:
+        def try_acquire(self, _descriptor: int) -> bool:
+            return True
+
+        def clear_owner(self, _descriptor: int) -> None:
+            raise RuntimeError("cleanup failed")
+
+        def release(self, _descriptor: int) -> None:
+            return None
+
+    monkeypatch.setattr(
+        campaign,
+        "_campaign_lock_backend",
+        lambda: FailingCleanupBackend(),
+    )
+
+    with pytest.raises(ValueError, match="protected failure"):
+        with campaign.CampaignLock(tmp_path, timeout_seconds=0.01):
+            raise ValueError("protected failure")
+
+
 def test_live_readiness_category_auto_retries_exactly_once_per_invocation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

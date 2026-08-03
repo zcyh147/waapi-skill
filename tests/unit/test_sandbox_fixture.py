@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
+import os
 import shutil
 from pathlib import Path
 from typing import Any
@@ -15,6 +17,7 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
     ENV_WWISE_SANDBOX_KEEP_ON_FAILURE,
     ENV_WWISE_STRICT_REAL,
     KEEP_ON_FAILURE_ROOT,
+    LiveSandboxLock,
     SandboxFixtureError,
     cleanup_sandbox,
     hash_project,
@@ -29,6 +32,22 @@ from wwise_waapi.headless import CleanupReport, ResidualProcess  # pyright: igno
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ORG_FIXTURE_ROOT = REPO_ROOT / "tests" / "_org" / "2022.1"
 ORG_FIXTURE_2023_ROOT = REPO_ROOT / "tests" / "_org" / "2023.1"
+
+
+def _hold_live_sandbox_lock(root: str, acquired: Any, release: Any, results: Any) -> None:
+    try:
+        with LiveSandboxLock(Path(root)):
+            acquired.set()
+            if not release.wait(timeout=10):
+                raise TimeoutError("test did not release the live sandbox lock holder")
+    except BaseException as exc:
+        results.put(("error", type(exc).__name__, str(exc)))
+    else:
+        results.put(("released",))
+
+
+def _cross_process_context() -> multiprocessing.context.BaseContext:
+    return multiprocessing.get_context("spawn" if os.name == "nt" else "fork")
 
 
 def make_console(tmp_path: Path) -> Path:
@@ -58,6 +77,103 @@ def base_env(console: Path, project: Path, sandbox_root: Path) -> dict[str, str]
 
 class FakeProcess:
     pid = 4242
+
+
+def test_live_sandbox_lock_serializes_actual_host_processes(tmp_path: Path) -> None:
+    context = _cross_process_context()
+    first_acquired = context.Event()
+    release_first = context.Event()
+    second_acquired = context.Event()
+    release_second = context.Event()
+    results = context.Queue()
+    first = context.Process(
+        target=_hold_live_sandbox_lock,
+        args=(str(tmp_path), first_acquired, release_first, results),
+    )
+    second = context.Process(
+        target=_hold_live_sandbox_lock,
+        args=(str(tmp_path), second_acquired, release_second, results),
+    )
+
+    first.start()
+    assert first_acquired.wait(timeout=5), "first process did not acquire the live sandbox lock"
+    second.start()
+    assert not second_acquired.wait(timeout=0.25), (
+        "second process acquired the live sandbox lock before the first released it"
+    )
+
+    release_first.set()
+    assert second_acquired.wait(timeout=5), (
+        "second process did not acquire the live sandbox lock after the first released it"
+    )
+    release_second.set()
+
+    outcomes = [results.get(timeout=5) for _ in range(2)]
+    for process in (first, second):
+        process.join(timeout=5)
+        assert process.exitcode == 0
+    assert outcomes == [("released",), ("released",)]
+    assert (tmp_path / sandbox_fixture.LOCK_FILE_NAME).read_bytes() == b"\0"
+
+
+def test_live_sandbox_lock_windows_backend_uses_materialized_byte_zero(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    class FakeMsvcrt:
+        LK_NBLCK = 1
+        LK_UNLCK = 2
+
+        def __init__(self) -> None:
+            self.calls: list[tuple[int, int, int, int]] = []
+
+        def locking(self, fd: int, mode: int, byte_count: int) -> None:
+            self.calls.append(
+                (
+                    mode,
+                    byte_count,
+                    os.lseek(fd, 0, os.SEEK_CUR),
+                    os.fstat(fd).st_size,
+                )
+            )
+
+    fake_msvcrt = FakeMsvcrt()
+    monkeypatch.setattr(sandbox_fixture, "_msvcrt", fake_msvcrt)
+    monkeypatch.setattr(sandbox_fixture, "_lock_platform_name", lambda: "nt")
+
+    with LiveSandboxLock(tmp_path):
+        assert (tmp_path / sandbox_fixture.LOCK_FILE_NAME).read_bytes() == b"\0"
+
+    assert fake_msvcrt.calls == [
+        (fake_msvcrt.LK_NBLCK, 1, 0, 1),
+        (fake_msvcrt.LK_UNLCK, 1, 0, 1),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("platform_name", "module_name", "message"),
+    [
+        ("posix", "_fcntl", r"fcntl\.flock.*will not run unlocked"),
+        ("nt", "_msvcrt", r"msvcrt\.locking.*will not run unlocked"),
+        ("unsupported", None, r"no cross-process lock backend.*will not run unlocked"),
+    ],
+)
+def test_live_sandbox_lock_missing_or_unknown_backend_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    platform_name: str,
+    module_name: str | None,
+    message: str,
+) -> None:
+    monkeypatch.setattr(sandbox_fixture, "_lock_platform_name", lambda: platform_name)
+    if module_name is not None:
+        monkeypatch.setattr(sandbox_fixture, module_name, None)
+
+    with pytest.raises(SandboxFixtureError, match=message):
+        with LiveSandboxLock(tmp_path):
+            pytest.fail("an unsupported platform must never enter without a lock")
+
+    assert not (tmp_path / sandbox_fixture.LOCK_FILE_NAME).exists()
 
 
 def test_prepare_and_cleanup_success_preserves_source_immutability(tmp_path: Path) -> None:

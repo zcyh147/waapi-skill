@@ -30,6 +30,7 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     MetadataTokenProjection,
     ResponseBinding,
     SemanticJsonArgument,
+    SHIM_TRUSTED_PYTHON_ENV,
     SUBSCRIPTION_ACK_CONTRACT,
     SUBSCRIPTION_ACK_NONCE_ENV,
     SUBSCRIPTION_ACK_PATH_ENV,
@@ -37,6 +38,8 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     SUBSCRIPTION_ACK_TOPIC_ENV,
     TrustedSubscriptionAckExpectation,
     TrustedSubscriptionAckSpec,
+    WINDOWS_COMMAND_SHIM_NAMES,
+    WINDOWS_SHIM_SCRIPT_NAME,
     reconcile_gateway_command_prefix,
     reconcile_gateway_commands,
     project_required_metadata_tokens,
@@ -377,6 +380,7 @@ payload = {
     "config_path": os.environ.get("WAAPI_SKILL_CONFIG_PATH"),
     "broker_token_visible": "WAAPI_CODEX_GATEWAY_BROKER_TOKEN" in os.environ,
     "bash_env_visible": "BASH_ENV" in os.environ,
+    "shim_trusted_python_visible": "WAAPI_CODEX_GATEWAY_SHIM_TRUSTED_PYTHON" in os.environ,
     "gateway_required_visible": "WAAPI_CODEX_GATEWAY_REQUIRED" in os.environ,
 }
 transaction_id = os.environ.get("FAKE_GATEWAY_TRANSACTION_ID", "tx-dynamic-123")
@@ -585,10 +589,27 @@ def run_model_command(
     arguments: list[str],
     *,
     environment: dict[str, str] | None = None,
+    runner_path: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     env = environment or broker.model_environment(os.environ)
+    command = [
+        "python",
+        str(runner_path or broker.invocation_runner_path),
+        "gateway.py",
+        *arguments,
+    ]
+    if os.name == "nt":
+        return subprocess.run(
+            subprocess.list2cmdline(command),
+            executable=os.environ.get("COMSPEC", "cmd.exe"),
+            shell=True,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
     return subprocess.run(
-        ["python", str(broker.runner_path), "gateway.py", *arguments],
+        command,
         env=env,
         capture_output=True,
         text=True,
@@ -709,6 +730,7 @@ def test_broker_executes_exact_order_with_semantic_json_and_response_bindings(
         assert preview["state_dir"] == str(broker.state_directory)
         assert preview["evidence_dir"] == str(broker.evidence_directory)
         assert preview["config_path"] == str(broker.config_path)
+        assert preview["shim_trusted_python_visible"] is False
         assert broker.config_path.is_file()
 
         evidence = broker.evidence()
@@ -781,6 +803,53 @@ def test_broker_accepts_non_awaiting_status_show_without_confirmation(
         assert "confirmation" not in shown
         assert "next_command" not in shown
         assert broker.evidence().passed is True
+
+
+def test_broker_accepts_model_visible_skill_copy_but_executes_candidate(
+    tmp_path: Path,
+) -> None:
+    candidate = make_fake_skill(tmp_path / "candidate")
+    invocation = tmp_path / "agent-workspace" / ".agents" / "skills" / "waapi-skill"
+    invocation_runner = invocation / "scripts" / "run.py"
+    invocation_runner.parent.mkdir(parents=True)
+    invocation_runner.write_text(
+        'raise RuntimeError("writable invocation copy must never execute")\n',
+        encoding="utf-8",
+    )
+    steps = (
+        ExpectedGatewayStep("copy-path", "status"),
+        ExpectedGatewayStep("candidate-path", "status"),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=candidate,
+        invocation_skill_source=invocation,
+        expected_steps=steps,
+        transport="tcp",
+    ) as broker:
+        from_copy = run_model_command(broker, ["status"])
+        from_candidate = run_model_command(
+            broker,
+            ["status"],
+            runner_path=broker.runner_path,
+        )
+
+        assert from_copy.returncode == 0
+        assert from_candidate.returncode == 0
+        records = broker.evidence().records
+        assert [record.normalized_model_argv[1] for record in records] == [
+            str(invocation_runner),
+            str(broker.runner_path),
+        ]
+        observed = (
+            ("python", str(invocation_runner), "gateway.py", "status"),
+            ("python", str(broker.runner_path), "gateway.py", "status"),
+        )
+        assert broker.reconcile(observed).passed is True
+        calls = (
+            broker.state_directory / "fake-runner-calls.jsonl"
+        ).read_text(encoding="utf-8").splitlines()
+        assert len(calls) == 2
 
 
 def test_query_object_accepts_a_permutation_of_unique_return_fields(
@@ -3028,7 +3097,8 @@ def test_broker_token_authentication_fails_before_runner(tmp_path: Path) -> None
         assert broker.evidence().records[0].rejection == "broker authentication failed"
 
 
-def test_broker_installs_both_shims_and_exposes_small_harness_overlay(tmp_path: Path) -> None:
+@pytest.mark.skipif(os.name == "nt", reason="POSIX shim contract")
+def test_broker_installs_posix_shims_and_exposes_small_harness_overlay(tmp_path: Path) -> None:
     skill = make_fake_skill(tmp_path)
     with CodexGatewayBroker(
         skill_source=skill,
@@ -3054,6 +3124,8 @@ def test_broker_installs_both_shims_and_exposes_small_harness_overlay(tmp_path: 
         assert "CODEX_HOME" not in overlay
         assert overlay["PATH"] == f"{broker.shim_directory}{os.pathsep}/trusted/bin"
         assert overlay[BASH_ENV_NAME] == str(broker.bash_env_path)
+        assert "PATHEXT" not in overlay
+        assert SHIM_TRUSTED_PYTHON_ENV not in overlay
         assert overlay[GATEWAY_REQUIRED_ENV] == "1"
 
         result = subprocess.run(
@@ -3086,6 +3158,136 @@ def test_broker_installs_both_shims_and_exposes_small_harness_overlay(tmp_path: 
         assert record.payload["gateway_required_visible"] is False
 
 
+def test_broker_materializes_closed_windows_cmd_shims_and_overlay(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(broker_module, "_broker_platform_name", lambda: "nt")
+    skill = make_fake_skill(tmp_path)
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(ExpectedGatewayStep("status", "status"),),
+        transport="tcp",
+    ) as broker:
+        assert broker.platform_name == "nt"
+        assert not (broker.shim_directory / "python").exists()
+        assert not (broker.shim_directory / "python3").exists()
+        source_path = broker.shim_directory / WINDOWS_SHIM_SCRIPT_NAME
+        assert source_path.is_file()
+        assert source_path.is_symlink() is False
+        source = source_path.read_text(encoding="utf-8")
+        assert "WINDOWS_WRAPPER = True" in source
+        assert "shim_interpreter = sys.argv[1]" in source
+        assert "shim_argv = sys.argv[2:]" in source
+        for name in WINDOWS_COMMAND_SHIM_NAMES:
+            wrapper = broker.shim_directory / name
+            assert wrapper.is_file()
+            assert wrapper.is_symlink() is False
+            raw = wrapper.read_bytes()
+            assert raw.endswith(b"\r\n")
+            assert b"\n" not in raw.replace(b"\r\n", b"")
+            assert b"setlocal DisableDelayedExpansion" in raw
+            assert SHIM_TRUSTED_PYTHON_ENV.encode("ascii") in raw
+            assert WINDOWS_SHIM_SCRIPT_NAME.encode("ascii") in raw
+
+        overlay = broker.model_environment_overrides(
+            r"C:\Windows\System32",
+            existing_pathext=".EXE;.bat;.Cmd;.PY",
+        )
+        assert overlay["PATH"] == (
+            f"{broker.shim_directory};" r"C:\Windows\System32"
+        )
+        assert overlay["PATHEXT"] == ".CMD;.EXE;.BAT;.PY"
+        assert overlay[SHIM_TRUSTED_PYTHON_ENV] == str(broker.trusted_python)
+        assert BASH_ENV_NAME not in overlay
+        with pytest.raises(GatewayBrokerError, match="has not started"):
+            _ = broker.bash_env_path
+
+        mixed_case_base = {
+            "Path": r"C:\Trusted\Bin",
+            "PathExt": ".EXE;.CMD",
+            "Bash_Env": r"C:\forged\bash_env",
+            "waapi_codex_gateway_shim_trusted_python": r"C:\forged\python.exe",
+        }
+        environment = broker.model_environment(mixed_case_base)
+        assert "Path" not in environment
+        assert "PathExt" not in environment
+        assert "Bash_Env" not in environment
+        assert "waapi_codex_gateway_shim_trusted_python" not in environment
+        assert environment["PATH"].endswith(r";C:\Trusted\Bin")
+        assert environment["PATHEXT"] == ".CMD;.EXE"
+        assert environment[SHIM_TRUSTED_PYTHON_ENV] == str(
+            broker.trusted_python
+        )
+
+
+@pytest.mark.parametrize(
+    "value",
+    ("", ".EXE;;.CMD", ".EXE; .CMD", ".EXE;.CMD&calc", "EXE;.CMD"),
+)
+def test_broker_windows_pathext_fails_closed_on_ambiguous_entries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    value: str,
+) -> None:
+    monkeypatch.setattr(broker_module, "_broker_platform_name", lambda: "nt")
+    skill = make_fake_skill(tmp_path)
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(ExpectedGatewayStep("status", "status"),),
+        transport="tcp",
+    ) as broker:
+        with pytest.raises(GatewayBrokerError, match="PATHEXT"):
+            broker.model_environment_overrides(
+                r"C:\Windows\System32",
+                existing_pathext=value,
+            )
+
+
+def test_broker_fails_closed_when_no_native_shim_backend_exists(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        broker_module,
+        "_broker_platform_name",
+        lambda: "unsupported",
+    )
+    skill = make_fake_skill(tmp_path)
+    broker = CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(ExpectedGatewayStep("status", "status"),),
+        transport="tcp",
+    )
+
+    with pytest.raises(GatewayBrokerError, match="only native POSIX or Windows"):
+        broker.start()
+    assert broker._temporary_directory is None
+    assert broker._working_root is None
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows CMD resolution")
+def test_native_windows_cmd_shim_dispatches_bare_python(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(ExpectedGatewayStep("status", "status"),),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, ["status"])
+
+        assert result.returncode == 0
+        payload = json.loads(result.stdout[result.stdout.index("{") :])
+        assert payload["command"] == "status"
+        assert payload["shim_trusted_python_visible"] is False
+        assert payload["bash_env_visible"] is False
+        record = broker.evidence().records[0]
+        assert record.normalized_model_argv[0] == "python"
+        assert record.succeeded is True
+
+
 @pytest.mark.parametrize(
     ("runner_timeout", "expected_response_timeout"),
     ((0.05, 30.0), (120.0, 135.0), (240.0, 255.0)),
@@ -3102,7 +3304,8 @@ def test_broker_shim_response_timeout_is_finite_and_outlives_runner_budget(
         transport="tcp",
         runner_timeout_seconds=runner_timeout,
     ) as broker:
-        source = (broker.shim_directory / "python").read_text(encoding="utf-8")
+        source_name = WINDOWS_SHIM_SCRIPT_NAME if os.name == "nt" else "python"
+        source = (broker.shim_directory / source_name).read_text(encoding="utf-8")
         assert f"connection.settimeout({expected_response_timeout!r})" in source
 
 

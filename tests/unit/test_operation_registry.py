@@ -1805,6 +1805,7 @@ def test_2022_cli_external_source_rejects_proven_partial_multi_manifest_shapes(
 
 def audio_convert_request(
     *,
+    io_root: Path,
     version: str = "2024.1",
     objects: Any = None,
     platforms: Any = None,
@@ -1828,7 +1829,7 @@ def audio_convert_request(
             "api": "ak.wwise.core.audio.convert",
             "args": args,
             "options": {},
-            "io_root": "/tmp/waapi-audio-convert",
+            "io_root": str(io_root.resolve()),
         },
         version=version,
     )
@@ -1837,8 +1838,9 @@ def audio_convert_request(
 @pytest.mark.parametrize("version", ["2024.1", "2025.1"])
 def test_audio_convert_preserves_exact_non_empty_string_array_values_and_order(
     version: str,
+    tmp_path: Path,
 ) -> None:
-    payload = audio_convert_request(version=version)
+    payload = audio_convert_request(io_root=tmp_path, version=version)
 
     parsed = parse_operation_request(payload, expected_version=version)
 
@@ -1864,6 +1866,7 @@ def test_audio_convert_rejects_non_product_array_shapes(
     value: Any,
     invalid_index: int | None,
     version: str,
+    tmp_path: Path,
 ) -> None:
     kwargs = {
         "objects": None,
@@ -1874,7 +1877,7 @@ def test_audio_convert_rejects_non_product_array_shapes(
 
     with pytest.raises(OperationContractError) as boundary:
         parse_operation_request(
-            audio_convert_request(version=version, **kwargs),
+            audio_convert_request(io_root=tmp_path, version=version, **kwargs),
             expected_version=version,
         )
 
@@ -1890,8 +1893,9 @@ def test_audio_convert_rejects_non_product_array_shapes(
 @pytest.mark.parametrize("version", ["2024.1", "2025.1"])
 def test_audio_convert_missing_languages_fails_reflected_required_field(
     version: str,
+    tmp_path: Path,
 ) -> None:
-    payload = audio_convert_request(version=version)
+    payload = audio_convert_request(io_root=tmp_path, version=version)
     del payload["arguments"]["args"]["languages"]
 
     with pytest.raises(

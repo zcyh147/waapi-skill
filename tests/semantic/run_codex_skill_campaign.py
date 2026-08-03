@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
-import fcntl
+import errno
 import hashlib
 import importlib.metadata
 import json
@@ -29,6 +29,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Mapping, Sequence
+
+try:  # Native Windows has no fcntl module.
+    import fcntl as _fcntl
+except ImportError:  # pragma: no cover - exercised by native Windows gates.
+    _fcntl = None
+
+try:  # POSIX hosts have no msvcrt module.
+    import msvcrt as _msvcrt
+except ImportError:  # pragma: no cover - exercised by POSIX gates.
+    _msvcrt = None
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -175,6 +185,10 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (  # noqa: E402
 from tests.semantic.support.codex_eval_protocol_v3 import (  # noqa: E402
     operation_request_equivalence,
 )
+from tests.semantic.support.codex_filesystem_security import (  # noqa: E402
+    CodexFileSecurityError,
+    read_bounded_exclusive_regular_file,
+)
 from tests.semantic.support.codex_prompt_asset_reads_v3 import (  # noqa: E402
     PromptAssetReadError,
     remove_validated_command_occurrences,
@@ -218,6 +232,8 @@ CHILD_CLASSIFICATION_CONTRACT = "waapi-skill.codex-semantic-child-classification
 CONSOLIDATED_SUMMARY_FILE = "consolidated-summary.json"
 LOCK_FILE = ".campaign.lock"
 LOCK_OWNER_FILE = ".campaign-lock-owner.json"
+_LOCK_REGION_BYTES = 1
+_WINDOWS_LOCK_VIOLATION = 33
 EXIT_PASS = 0
 EXIT_FAIL = 1
 EXIT_CONFIG = 2
@@ -382,57 +398,198 @@ class ChildGroup:
         return self.version is None
 
 
+class _PosixCampaignLockBackend:
+    def try_acquire(self, descriptor: int) -> bool:
+        if _fcntl is None:
+            raise CampaignConfigError(
+                "campaign locking requires fcntl.flock on this POSIX host"
+            )
+        try:
+            _fcntl.flock(descriptor, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+        except BlockingIOError:
+            return False
+        except OSError as exc:
+            if exc.errno in {errno.EACCES, errno.EAGAIN}:
+                return False
+            raise CampaignConfigError(
+                "campaign writer lock could not be acquired with fcntl.flock"
+            ) from exc
+        return True
+
+    def release(self, descriptor: int) -> None:
+        if _fcntl is None:  # pragma: no cover - guarded during acquisition.
+            raise CampaignConfigError("campaign POSIX lock backend disappeared")
+        _fcntl.flock(descriptor, _fcntl.LOCK_UN)
+
+    @staticmethod
+    def clear_owner(descriptor: int) -> None:
+        os.ftruncate(descriptor, 0)
+        os.fsync(descriptor)
+
+
+class _WindowsCampaignLockBackend:
+    @staticmethod
+    def _seek_region(descriptor: int) -> None:
+        os.lseek(descriptor, 0, os.SEEK_SET)
+
+    @staticmethod
+    def _ensure_region_exists(descriptor: int) -> None:
+        if os.fstat(descriptor).st_size >= _LOCK_REGION_BYTES:
+            return
+        previous_offset = os.lseek(descriptor, 0, os.SEEK_CUR)
+        try:
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            os.write(descriptor, b"\0")
+            os.fsync(descriptor)
+        finally:
+            os.lseek(descriptor, previous_offset, os.SEEK_SET)
+
+    def try_acquire(self, descriptor: int) -> bool:
+        if _msvcrt is None:
+            raise CampaignConfigError(
+                "campaign locking requires msvcrt.locking on this Windows host"
+            )
+        self._ensure_region_exists(descriptor)
+        self._seek_region(descriptor)
+        try:
+            _msvcrt.locking(
+                descriptor,
+                _msvcrt.LK_NBLCK,
+                _LOCK_REGION_BYTES,
+            )
+        except OSError as exc:
+            if exc.errno in {errno.EACCES, errno.EAGAIN, errno.EDEADLK} or (
+                getattr(exc, "winerror", None) == _WINDOWS_LOCK_VIOLATION
+            ):
+                return False
+            raise CampaignConfigError(
+                "campaign writer lock could not be acquired with msvcrt.locking"
+            ) from exc
+        return True
+
+    def release(self, descriptor: int) -> None:
+        if _msvcrt is None:  # pragma: no cover - guarded during acquisition.
+            raise CampaignConfigError("campaign Windows lock backend disappeared")
+        self._seek_region(descriptor)
+        _msvcrt.locking(
+            descriptor,
+            _msvcrt.LK_UNLCK,
+            _LOCK_REGION_BYTES,
+        )
+
+    @classmethod
+    def clear_owner(cls, descriptor: int) -> None:
+        os.ftruncate(descriptor, _LOCK_REGION_BYTES)
+        cls._seek_region(descriptor)
+        os.write(descriptor, b"\0")
+        os.fsync(descriptor)
+        cls._seek_region(descriptor)
+
+
+def _campaign_lock_platform_name() -> str:
+    return os.name
+
+
+def _campaign_lock_backend() -> Any:
+    platform_name = _campaign_lock_platform_name()
+    if platform_name == "posix":
+        return _PosixCampaignLockBackend()
+    if platform_name == "nt":
+        return _WindowsCampaignLockBackend()
+    raise CampaignConfigError(
+        f"campaign locking has no supported backend for os.name={platform_name!r}"
+    )
+
+
+def _write_all(descriptor: int, payload: bytes) -> None:
+    view = memoryview(payload)
+    while view:
+        written = os.write(descriptor, view)
+        if written <= 0:  # pragma: no cover - defensive OS boundary.
+            raise OSError("campaign lock owner write made no progress")
+        view = view[written:]
+
+
 class CampaignLock:
     def __init__(self, root: Path, *, timeout_seconds: float) -> None:
         self.root = Path(root)
         self.timeout_seconds = timeout_seconds
         self._descriptor: int | None = None
+        self._backend: Any | None = None
 
     def __enter__(self) -> "CampaignLock":
         lock_path = self.root / LOCK_FILE
-        flags = os.O_RDWR | os.O_CREAT
+        backend = _campaign_lock_backend()
+        flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_BINARY", 0)
         if hasattr(os, "O_NOFOLLOW"):
             flags |= os.O_NOFOLLOW
         descriptor = os.open(lock_path, flags, 0o600)
-        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
-            os.close(descriptor)
-            raise CampaignConfigError(f"campaign lock is not a regular file: {lock_path}")
-        deadline = time.monotonic() + self.timeout_seconds
-        while True:
-            try:
-                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                break
-            except BlockingIOError:
+        acquired = False
+        try:
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                raise CampaignConfigError(
+                    f"campaign lock is not a regular file: {lock_path}"
+                )
+            deadline = time.monotonic() + self.timeout_seconds
+            while not backend.try_acquire(descriptor):
                 if time.monotonic() >= deadline:
-                    os.close(descriptor)
                     raise CampaignConfigError(
                         f"campaign writer lock remained busy for {self.timeout_seconds:.1f}s: {lock_path}"
                     )
                 time.sleep(min(0.1, max(0.01, deadline - time.monotonic())))
-        self._descriptor = descriptor
-        os.ftruncate(descriptor, 0)
-        os.write(descriptor, f"pid={os.getpid()} started={utc_now()}\n".encode("utf-8"))
-        os.fsync(descriptor)
-        atomic_write_json_with_digest(
-            self.root / LOCK_OWNER_FILE,
-            {
-                "pid": os.getpid(),
-                "started_at": utc_now(),
-                "campaign_root": str(self.root.resolve(strict=True)),
-            },
-        )
-        return self
+            acquired = True
+            self._descriptor = descriptor
+            self._backend = backend
+            owner_payload = (
+                f"pid={os.getpid()} started={utc_now()}\n".encode("utf-8")
+            )
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            _write_all(descriptor, owner_payload)
+            # Truncate only after replacing the owner record.  A Windows
+            # msvcrt lock covers byte zero, so the locked region must never be
+            # removed while the lock is held.
+            os.ftruncate(descriptor, len(owner_payload))
+            os.fsync(descriptor)
+            atomic_write_json_with_digest(
+                self.root / LOCK_OWNER_FILE,
+                {
+                    "pid": os.getpid(),
+                    "started_at": utc_now(),
+                    "campaign_root": str(self.root.resolve(strict=True)),
+                },
+            )
+            return self
+        except BaseException:
+            if acquired:
+                try:
+                    backend.release(descriptor)
+                except BaseException:
+                    pass
+            os.close(descriptor)
+            self._descriptor = None
+            self._backend = None
+            raise
 
-    def __exit__(self, _type: object, _value: object, _traceback: object) -> None:
-        if self._descriptor is None:
+    def __exit__(self, exc_type: object, _value: object, _traceback: object) -> None:
+        if self._descriptor is None or self._backend is None:
             return
+        cleanup_error: BaseException | None = None
         try:
-            os.ftruncate(self._descriptor, 0)
-            os.fsync(self._descriptor)
-            fcntl.flock(self._descriptor, fcntl.LOCK_UN)
+            try:
+                self._backend.clear_owner(self._descriptor)
+            except BaseException as error:
+                cleanup_error = error
+            try:
+                self._backend.release(self._descriptor)
+            except BaseException as error:
+                if cleanup_error is None:
+                    cleanup_error = error
         finally:
             os.close(self._descriptor)
             self._descriptor = None
+            self._backend = None
+        if cleanup_error is not None and exc_type is None:
+            raise cleanup_error
 
 
 class InterruptLatch:
@@ -11034,7 +11191,6 @@ def _validate_heavy_v3_topic_subscription_ack(
     ack_path = Path(ack_path_value)
     evidence_directory = task_root / "broker" / "evidence"
     try:
-        metadata = ack_path.lstat()
         real_parent = ack_path.parent.resolve(strict=True)
         real_evidence = evidence_directory.resolve(strict=True)
     except OSError as exc:
@@ -11043,25 +11199,26 @@ def _validate_heavy_v3_topic_subscription_ack(
         ) from exc
     if (
         not ack_path.is_absolute()
-        or ack_path.is_symlink()
         or ack_path.parent != evidence_directory
         or real_parent != real_evidence
         or not ack_path.name.startswith("subscription-ack-")
         or not ack_path.name.endswith(".json")
-        or not stat.S_ISREG(metadata.st_mode)
-        or metadata.st_nlink != 1
-        or metadata.st_size <= 0
-        or metadata.st_size > 4096
-        or stat.S_IMODE(metadata.st_mode) & 0o077
     ):
         raise CampaignEvidenceError(
             "topic subscription ACK is not one private exclusive broker artifact"
         )
-    raw = ack_path.read_bytes()
-    if (
-        hashlib.sha256(raw).hexdigest() != proof.get("ack_file_sha256")
-        or metadata.st_size != len(raw)
-    ):
+    try:
+        snapshot = read_bounded_exclusive_regular_file(
+            ack_path,
+            max_bytes=4096,
+        )
+        raw = snapshot.raw
+    except CodexFileSecurityError as exc:
+        raise CampaignEvidenceError(
+            "topic subscription ACK is not one private exclusive broker artifact: "
+            f"{exc}"
+        ) from exc
+    if hashlib.sha256(raw).hexdigest() != proof.get("ack_file_sha256"):
         raise CampaignEvidenceError("topic subscription ACK file proof drifted")
     try:
         payload = json.loads(raw.decode("utf-8"))
@@ -11757,6 +11914,11 @@ def build_child_argv(
 
 
 def run_child(argv: Sequence[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
+    process_group_options: dict[str, Any] = {}
+    if os.name == "posix":
+        process_group_options["start_new_session"] = True
+    elif hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
+        process_group_options["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
     return subprocess.run(
         list(argv),
         cwd=cwd,
@@ -11764,7 +11926,7 @@ def run_child(argv: Sequence[str], *, cwd: Path) -> subprocess.CompletedProcess[
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         check=False,
-        start_new_session=True,
+        **process_group_options,
     )
 
 
@@ -12083,7 +12245,11 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     )
     parser.add_argument("--suite")
     parser.add_argument("--skill-source", default=str(matrix.SKILL_ROOT))
-    parser.add_argument("--codex-binary", default=str(matrix.DEFAULT_CODEX_BINARY))
+    parser.add_argument(
+        "--codex-binary",
+        default=matrix.DEFAULT_CODEX_BINARY,
+        help="explicit Codex CLI path; otherwise discover the host-native executable",
+    )
     parser.add_argument("--auth-json", default=str(matrix.DEFAULT_AUTH_JSON))
     parser.add_argument("--live-config", default=str(matrix.DEFAULT_LIVE_CONFIG))
     parser.add_argument("--model")
@@ -12172,10 +12338,10 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     try:
         suite_path = Path(suite).expanduser().resolve(strict=True)
         skill_source = Path(args.skill_source).expanduser().resolve(strict=True)
-        codex_binary = Path(args.codex_binary).expanduser().resolve(strict=True)
+        codex_binary = matrix.resolve_codex_binary(args.codex_binary)
         auth_json = Path(args.auth_json).expanduser().resolve(strict=True)
         live_config = Path(args.live_config).expanduser().resolve(strict=True)
-    except OSError as exc:
+    except (OSError, matrix.CodexHarnessError) as exc:
         parser.error(str(exc))
     return CampaignOptions(
         campaign_root=Path(args.campaign_root).expanduser().resolve(strict=False),

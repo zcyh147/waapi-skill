@@ -47,6 +47,7 @@ def _dependency_args(tmp_path: Path) -> list[str]:
     auth = tmp_path / "auth.json"
     live = tmp_path / "live-environment.json"
     codex.write_text("not invoked\n", encoding="utf-8")
+    codex.chmod(0o755)
     auth.write_text("{}\n", encoding="utf-8")
     live.write_text("{}\n", encoding="utf-8")
     return [

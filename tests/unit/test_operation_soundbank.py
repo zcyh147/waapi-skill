@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -172,8 +173,10 @@ def test_generate_plan_closes_scope_resolves_project_rows_and_proves_outputs(tmp
     assert plan["scope"]["implicit_all_languages_allowed"] is False
     assert plan["artifact_plan"]["automatic_byproducts"] == ["Init.bnk"]
     artifacts = plan["artifact_plan"]["platforms"][0]["expected_user_soundbanks"][0]["expected_artifacts"]
-    assert any(row["path"].endswith("/Mac/Gameplay_Main.bnk") for row in artifacts)
-    assert any(row["path"].endswith("/Mac/English(US)/Gameplay_Main.bnk") for row in artifacts)
+    artifact_paths = {Path(row["path"]) for row in artifacts}
+    output_root = Path(project["directories"]["soundBankOutputRoot"])
+    assert output_root / "Mac" / "Gameplay_Main.bnk" in artifact_paths
+    assert output_root / "Mac" / "English(US)" / "Gameplay_Main.bnk" in artifact_paths
     assert all(proof["within_io_root"] for proof in plan["artifact_plan"]["path_proofs"])
     _assert_seal(plan, "plan_sha256")
 
@@ -581,6 +584,31 @@ def test_artifact_path_and_tree_reject_escape_symlink_and_limits(tmp_path: Path)
     with pytest.raises(SoundBankContractError) as symlinked:
         capture_artifact_tree(output, io_root=io_root)
     assert symlinked.value.error_code == "SYMLINK_NOT_ALLOWED"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="NTFS junction behavior requires Windows")
+def test_artifact_tree_rejects_windows_directory_junction(tmp_path: Path) -> None:
+    io_root = tmp_path / "sandbox"
+    output = io_root / "GeneratedSoundBanks"
+    outside = tmp_path / "outside"
+    output.mkdir(parents=True)
+    outside.mkdir()
+    (outside / "escaped.bnk").write_bytes(b"bank")
+    junction = output / "junction"
+    created = subprocess.run(
+        ["cmd.exe", "/d", "/c", "mklink", "/J", str(junction), str(outside)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert created.returncode == 0, created.stderr or created.stdout
+    try:
+        with pytest.raises(SoundBankContractError) as rejected:
+            capture_artifact_tree(output, io_root=io_root)
+        assert rejected.value.error_code == "SYMLINK_NOT_ALLOWED"
+    finally:
+        if junction.exists():
+            junction.rmdir()
 
 
 def test_external_sources_parser_hashes_inputs_and_derives_destinations(tmp_path: Path) -> None:

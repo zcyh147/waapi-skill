@@ -3,7 +3,9 @@ from __future__ import annotations
 import hashlib
 import os
 import shutil
+import stat
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -73,28 +75,16 @@ def test_canonical_json_is_deterministic_and_strict() -> None:
         canonical_json_bytes({"nested": {1: "ambiguous"}})
 
 
-def test_stable_tree_hash_ignores_times_but_binds_content_mode_path_and_symlink(
+def test_stable_tree_hash_ignores_times_but_binds_content_and_path(
     tmp_path: Path,
 ) -> None:
     root = tmp_path / "tree"
     root.mkdir()
     payload = root / "payload.txt"
     payload.write_text("one", encoding="utf-8")
-    target_a = root / "target-a"
-    target_b = root / "target-b"
-    target_a.write_text("same", encoding="utf-8")
-    target_b.write_text("same", encoding="utf-8")
-    link = root / "link"
-    create_symlink_or_skip(link, "target-a")
 
     baseline = stable_tree_sha256(root)
     os.utime(payload, (payload.stat().st_atime + 10, payload.stat().st_mtime + 10))
-    assert stable_tree_sha256(root) == baseline
-
-    os.chmod(payload, payload.stat().st_mode | 0o111)
-    mode_hash = stable_tree_sha256(root)
-    assert mode_hash != baseline
-    os.chmod(payload, payload.stat().st_mode & ~0o111)
     assert stable_tree_sha256(root) == baseline
 
     payload.write_text("two", encoding="utf-8")
@@ -102,15 +92,42 @@ def test_stable_tree_hash_ignores_times_but_binds_content_mode_path_and_symlink(
     payload.write_text("one", encoding="utf-8")
     assert stable_tree_sha256(root) == baseline
 
+    payload.rename(root / "renamed.txt")
+    assert stable_tree_sha256(root) != baseline
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX execute-bit contract")
+def test_stable_tree_hash_binds_posix_execute_bit(tmp_path: Path) -> None:
+    root = tmp_path / "tree"
+    root.mkdir()
+    payload = root / "payload.txt"
+    payload.write_text("one", encoding="utf-8")
+    original_mode = stat.S_IMODE(payload.stat().st_mode)
+    baseline = stable_tree_sha256(root)
+
+    os.chmod(payload, original_mode | stat.S_IXUSR)
+    assert stable_tree_sha256(root) != baseline
+    os.chmod(payload, original_mode)
+    assert stable_tree_sha256(root) == baseline
+
+
+def test_stable_tree_hash_binds_symlink_target(tmp_path: Path) -> None:
+    root = tmp_path / "tree"
+    root.mkdir()
+    target_a = root / "target-a"
+    target_b = root / "target-b"
+    target_a.write_text("same", encoding="utf-8")
+    target_b.write_text("same", encoding="utf-8")
+    link = root / "link"
+    create_symlink_or_skip(link, "target-a")
+    baseline = stable_tree_sha256(root)
+
     link.unlink()
     create_symlink_or_skip(link, "target-b")
     assert stable_tree_sha256(root) != baseline
     link.unlink()
     create_symlink_or_skip(link, "target-a")
     assert stable_tree_sha256(root) == baseline
-
-    payload.rename(root / "renamed.txt")
-    assert stable_tree_sha256(root) != baseline
 
 
 def test_stable_tree_manifest_records_symlink_without_following_and_supports_excludes(
@@ -132,6 +149,34 @@ def test_stable_tree_manifest_records_symlink_without_following_and_supports_exc
         "type": "symlink",
         "target": "missing-target",
     }
+
+
+def test_stable_tree_manifest_rejects_windows_junction_without_following(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "tree"
+    junction = root / "junction"
+    junction.mkdir(parents=True)
+    (junction / "must-not-be-read.txt").write_text("outside\n", encoding="utf-8")
+    real_is_junction = getattr(Path, "is_junction", lambda _self: False)
+    monkeypatch.setattr(
+        Path,
+        "is_junction",
+        lambda self: self == junction or real_is_junction(self),
+        raising=False,
+    )
+
+    with pytest.raises(CampaignEvidenceError, match="Windows junction"):
+        stable_tree_manifest(root)
+
+
+def test_campaign_junction_guard_detects_python311_reparse_attribute() -> None:
+    fake_path = SimpleNamespace(
+        lstat=lambda: SimpleNamespace(st_file_attributes=0x400),
+    )
+
+    assert campaign_module._is_windows_junction(fake_path) is True
 
 
 def test_atomic_json_digest_round_trip_and_tamper_detection(tmp_path: Path) -> None:
@@ -187,6 +232,104 @@ def test_verified_json_uses_one_nofollow_read_per_attested_file(
     )
     with pytest.raises(CampaignEvidenceError, match="without following links"):
         load_verified_json(link)
+
+
+def test_verified_json_uses_identity_checked_fallback_without_o_nofollow(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "windows-evidence.json"
+    atomic_write_json_with_digest(path, {"platform": "windows", "safe": True})
+    monkeypatch.delattr(campaign_module.os, "O_NOFOLLOW", raising=False)
+
+    assert load_verified_json(path) == {"platform": "windows", "safe": True}
+
+
+def test_identity_checked_fallback_rejects_symlink_without_o_nofollow(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real = tmp_path / "real.json"
+    real.write_bytes(b"{}\n")
+    link = tmp_path / "link.json"
+    create_symlink_or_skip(link, real.name)
+    monkeypatch.delattr(campaign_module.os, "O_NOFOLLOW", raising=False)
+
+    with pytest.raises(CampaignEvidenceError, match="without following links"):
+        campaign_module._read_real_regular_file(link, label="JSON")
+
+
+def test_identity_checked_fallback_rejects_windows_reparse_point(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "reparse.json"
+    path.write_bytes(b"{}\n")
+    real_reports_junction = campaign_module._path_reports_windows_junction
+    monkeypatch.setattr(
+        campaign_module,
+        "_path_reports_windows_junction",
+        lambda candidate: Path(candidate) == path or real_reports_junction(candidate),
+    )
+    monkeypatch.delattr(campaign_module.os, "O_NOFOLLOW", raising=False)
+
+    with pytest.raises(CampaignEvidenceError, match="junction, or reparse point"):
+        campaign_module._read_real_regular_file(path, label="JSON")
+
+
+def test_identity_checked_open_rejects_path_swap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "evidence.json"
+    replacement = tmp_path / "replacement.json"
+    path.write_bytes(b'{"value":"original"}\n')
+    replacement.write_bytes(b'{"value":"replacement"}\n')
+    real_open = campaign_module.os.open
+    swapped = False
+
+    def swapping_open(candidate: Path, flags: int, mode: int = 0o777) -> int:
+        nonlocal swapped
+        if Path(candidate) == path and not swapped:
+            replacement.replace(path)
+            swapped = True
+        return real_open(candidate, flags, mode)
+
+    monkeypatch.setattr(campaign_module.os, "open", swapping_open)
+    monkeypatch.delattr(campaign_module.os, "O_NOFOLLOW", raising=False)
+
+    with pytest.raises(CampaignEvidenceError, match="changed while it was being opened"):
+        campaign_module._read_real_regular_file(path, label="JSON")
+
+
+def test_identity_checked_read_rejects_final_path_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "evidence.json"
+    other = tmp_path / "other.json"
+    path.write_bytes(b'{"value":"stable"}\n')
+    other.write_bytes(b'{"value":"other"}\n')
+    real_lstat = Path.lstat
+    path_lstat_calls = 0
+
+    def drifting_lstat(candidate: Path) -> os.stat_result:
+        nonlocal path_lstat_calls
+        if candidate == path:
+            path_lstat_calls += 1
+            if path_lstat_calls >= 3:
+                return real_lstat(other)
+        return real_lstat(candidate)
+
+    monkeypatch.setattr(Path, "lstat", drifting_lstat)
+    monkeypatch.setattr(
+        campaign_module,
+        "_path_reports_windows_junction",
+        lambda _candidate: False,
+    )
+
+    with pytest.raises(CampaignEvidenceError, match="path changed while it was being read"):
+        campaign_module._read_real_regular_file(path, label="JSON")
 
 
 def test_campaign_config_is_immutable_and_digest_verified(tmp_path: Path) -> None:

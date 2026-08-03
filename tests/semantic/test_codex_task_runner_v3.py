@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -851,6 +852,53 @@ def _run_infrastructure_task(
         business_oracle_plan=business_oracle_plan,
     )
     return task_root
+
+
+def test_v3_workspace_injection_uses_detached_copy_on_native_windows(tmp_path: Path) -> None:
+    source = tmp_path / "waapi-skill"
+    (source / "references").mkdir(parents=True)
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    (source / "references" / "waapi-operate.md").write_text("operate\n", encoding="utf-8")
+    (source / ".venv").mkdir()
+    workspace = tmp_path / "workspace"
+
+    install = task_runner._prepare_agent_workspace(
+        workspace,
+        source,
+        platform_name="nt",
+    )
+
+    assert install.is_dir() and not install.is_symlink()
+    assert (install / "references" / "waapi-operate.md").is_file()
+    assert not (install / ".venv").exists()
+    assert not os.path.samefile(source / "SKILL.md", install / "SKILL.md")
+
+
+def test_v3_gateway_accounting_accepts_copy_then_candidate_runner(tmp_path: Path) -> None:
+    copied = tmp_path / "workspace-copy"
+    candidate = tmp_path / "candidate"
+    records = (
+        SimpleNamespace(
+            argv=("python", str(copied / "scripts" / "run.py"), "gateway.py", "preview")
+        ),
+        SimpleNamespace(
+            argv=(
+                "python",
+                str(candidate / "scripts" / "run.py"),
+                "gateway.py",
+                "execute",
+                "tx-1",
+            )
+        ),
+    )
+    result = SimpleNamespace(command_facts=SimpleNamespace(command_records=records))
+
+    assert task_runner._gateway_candidate_argvs(
+        result,
+        skill_source=copied,
+        alternate_skill_sources=(candidate,),
+        expected_wwise_version="2022.1",
+    ) == tuple(record.argv for record in records)
 
 
 def test_task_runner_stops_at_exact_indeterminate_execute_without_verify(

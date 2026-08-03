@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 import threading
 import time
@@ -33,18 +34,6 @@ assert GATEWAY_SPEC is not None and GATEWAY_SPEC.loader is not None
 waapi_gateway = importlib.util.module_from_spec(GATEWAY_SPEC)
 sys.modules[GATEWAY_SPEC.name] = waapi_gateway
 GATEWAY_SPEC.loader.exec_module(waapi_gateway)
-
-
-def _require_skill_symlink_capability(tmp_path: Path) -> None:
-    """Skip POSIX workspace-link tests only for Windows privilege error 1314."""
-
-    probe = tmp_path / "skill-symlink-probe"
-    create_symlink_or_skip(
-        probe,
-        matrix.SKILL_ROOT,
-        target_is_directory=True,
-    )
-    probe.unlink()
 
 
 def _suite():
@@ -232,10 +221,24 @@ def _q5_absence_evidence() -> tuple[dict[str, object], dict[str, object]]:
     return gateway, dispatch
 
 
-def test_parse_args_uses_closed_defaults_and_resolves_explicit_live_config(tmp_path: Path) -> None:
+def test_parse_args_uses_closed_defaults_and_resolves_explicit_live_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    discovered_codex = tmp_path / "discovered-codex"
+    discovered_codex.write_text("not invoked\n", encoding="utf-8")
+    discovered_codex.chmod(0o755)
+    discovery_values: list[str | None] = []
+
+    def resolve_codex(value: str | None) -> Path:
+        discovery_values.append(value)
+        return discovered_codex.resolve(strict=True)
+
+    monkeypatch.setattr(matrix, "resolve_codex_binary", resolve_codex)
     defaults = matrix.parse_args([])
 
     assert defaults.profile == "screening"
+    assert defaults.codex_binary == discovered_codex.resolve(strict=True)
     assert defaults.live_config == matrix.DEFAULT_LIVE_CONFIG.resolve(strict=True)
     assert defaults.suite_path == matrix.DEFAULT_SUITE.resolve(strict=True)
     assert defaults.skill_source == matrix.SKILL_ROOT.resolve(strict=True)
@@ -272,6 +275,41 @@ def test_parse_args_uses_closed_defaults_and_resolves_explicit_live_config(tmp_p
     assert explicit.pair_ids == ("custom-profile:Q1:2025.1:r1",)
     assert explicit.offline_only is True
     assert explicit.overwrite is True
+    assert discovery_values == [None, None]
+
+
+def test_parse_args_gives_explicit_codex_binary_priority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    explicit_codex = tmp_path / "codex.exe"
+    explicit_codex.write_text("not invoked\n", encoding="utf-8")
+    explicit_codex.chmod(0o755)
+    observed: list[str | None] = []
+
+    def resolve_codex(value: str | None) -> Path:
+        observed.append(value)
+        assert value == str(explicit_codex)
+        return explicit_codex.resolve(strict=True)
+
+    monkeypatch.setattr(matrix, "resolve_codex_binary", resolve_codex)
+
+    parsed = matrix.parse_args(["--codex-binary", str(explicit_codex)])
+
+    assert parsed.codex_binary == explicit_codex.resolve(strict=True)
+    assert observed == [str(explicit_codex)]
+
+
+def test_parse_args_fails_closed_when_codex_discovery_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def reject(_value: str | None) -> Path:
+        raise matrix.CodexHarnessError("Codex CLI was not found on PATH")
+
+    monkeypatch.setattr(matrix, "resolve_codex_binary", reject)
+
+    with pytest.raises(SystemExit):
+        matrix.parse_args([])
 
 
 def test_parse_args_rejects_non_positive_timeout() -> None:
@@ -566,6 +604,26 @@ def test_gateway_candidate_accounting_normalizes_only_matching_version_prefix() 
             "object.copy",
         ),
     )
+
+
+def test_gateway_candidate_accounting_accepts_windows_copy_and_candidate_runners(
+    tmp_path: Path,
+) -> None:
+    copied = tmp_path / "workspace-copy"
+    candidate = tmp_path / "candidate"
+    copied_runner = copied / "scripts" / "run.py"
+    candidate_runner = candidate / "scripts" / "run.py"
+    records = (
+        SimpleNamespace(argv=("python", str(copied_runner), "gateway.py", "preview")),
+        SimpleNamespace(argv=("python", str(candidate_runner), "gateway.py", "execute", "tx-1")),
+    )
+    result = SimpleNamespace(command_facts=SimpleNamespace(command_records=records))
+
+    assert matrix.gateway_candidate_argvs(
+        result,
+        skill_source=copied,
+        alternate_skill_sources=(candidate,),
+    ) == tuple(record.argv for record in records)
 
 
 def test_offline_fixture_and_oracle_helpers_are_closed_to_offline_cases() -> None:
@@ -1538,6 +1596,26 @@ def test_trusted_gateway_environment_removes_only_ambient_waapi_controls(monkeyp
     assert trusted["WWISE_WAAPI_PORT"] == "12345"
 
 
+def test_prepare_agent_workspace_uses_detached_copy_on_native_windows(tmp_path: Path) -> None:
+    source = tmp_path / "waapi-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    (source / ".venv").mkdir()
+    (source / ".venv" / "python.exe").write_bytes(b"excluded runtime")
+    workspace = tmp_path / "workspace"
+
+    install = matrix.prepare_agent_workspace(
+        workspace,
+        source,
+        platform_name="nt",
+    )
+
+    assert install.is_dir() and not install.is_symlink()
+    assert (install / "SKILL.md").read_text(encoding="utf-8") == "skill\n"
+    assert not (install / ".venv").exists()
+    assert not os.path.samefile(source / "SKILL.md", install / "SKILL.md")
+
+
 @pytest.mark.parametrize(
     ("runner_oracle", "oracle_factory"),
     [
@@ -1575,7 +1653,6 @@ def test_run_fresh_phase_archives_raw_evidence_for_each_failure_stage(
     failure_point: str,
     expected_stage: str,
 ) -> None:
-    _require_skill_symlink_capability(tmp_path)
     result = _fake_codex_result()
 
     class FakeHarness:
@@ -1645,7 +1722,6 @@ def test_pre_action_codex_infrastructure_failure_skips_grading_and_archives_resu
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _require_skill_symlink_capability(tmp_path)
     result = _fake_codex_result()
     failure = CodexInfrastructureFailure(
         category="quota_or_rate_limit",

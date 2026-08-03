@@ -35,7 +35,7 @@ import re
 import shlex
 import stat
 import subprocess
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Mapping, Sequence
 
 from .authorization import DEFAULT_TRANSACTION_AUTHORIZATION_MODES
@@ -1592,7 +1592,10 @@ def _materialize_commands(
             )
             if handler["lua_module_directories"]:
                 item["luaPaths"] = [
-                    f"{path.rstrip('/')}/?.lua"
+                    _lua_module_search_pattern(
+                        path,
+                        host_platform=host_platform,
+                    )
                     for path in handler["lua_module_directories"]
                 ]
             if handler["lua_selected_return"]:
@@ -1629,6 +1632,18 @@ def _materialize_commands(
             )
         native.append(item)
     return native
+
+
+def _lua_module_search_pattern(
+    directory: str,
+    *,
+    host_platform: str,
+) -> str:
+    """Build Wwise's Lua module pattern with the target host's path rules."""
+
+    host = _require_host_platform(host_platform)
+    path_type = PureWindowsPath if host == "windows" else PurePosixPath
+    return str(path_type(directory) / "?.lua")
 
 
 def _materialize_handler_common(

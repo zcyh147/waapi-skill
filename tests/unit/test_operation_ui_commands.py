@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import copy
 import os
-from pathlib import Path
+import shutil
+import sys
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import pytest  # pyright: ignore[reportMissingImports]
 
@@ -555,19 +557,23 @@ def test_lua_registration_is_versioned_and_accepts_only_existing_script_paths(
             )
         assert error.value.error_code == "VERSION_BEHAVIOR_BOUNDARY"
 
-    for version in ("2023.1", "2024.1", "2025.1"):
-        plan = build_ui_commands_register_plan(
-            version=version,
-            host_platform="macos",
-            commands=[descriptor],
-            source_authority=USER_SUPPLIED_SOURCE_AUTHORITY,
-        )
-        native = plan["dispatch"]["arguments"]["commands"][0]
-        assert native["luaScript"] == str(script)
-        assert native["luaPaths"] == [f"{modules}/?.lua"]
-        assert native["luaSelectedReturn"] == ["id", "name", "path"]
-        assert "script_source" not in plan["request"]["commands"][0]["handler"]
-        assert validate_ui_command_plan(plan) == plan
+    for host_platform, path_type in (
+        ("macos", PurePosixPath),
+        ("windows", PureWindowsPath),
+    ):
+        for version in ("2023.1", "2024.1", "2025.1"):
+            plan = build_ui_commands_register_plan(
+                version=version,
+                host_platform=host_platform,
+                commands=[descriptor],
+                source_authority=USER_SUPPLIED_SOURCE_AUTHORITY,
+            )
+            native = plan["dispatch"]["arguments"]["commands"][0]
+            assert native["luaScript"] == str(script)
+            assert native["luaPaths"] == [str(path_type(modules) / "?.lua")]
+            assert native["luaSelectedReturn"] == ["id", "name", "path"]
+            assert "script_source" not in plan["request"]["commands"][0]["handler"]
+            assert validate_ui_command_plan(plan) == plan
 
 
 def test_register_rejects_raw_shell_fields_interpreters_and_unbounded_batches(
@@ -773,8 +779,14 @@ def test_redirect_outputs_is_windows_only(tmp_path: Path) -> None:
 def test_program_proof_rejects_non_executable_and_detects_drift(
     tmp_path: Path,
 ) -> None:
-    program = tmp_path / "program"
-    program.write_bytes(b"v1")
+    if os.name == "nt":
+        program = tmp_path / "program.exe"
+        shutil.copy2(Path(sys.executable), program)
+        host_platform = "windows"
+    else:
+        program = tmp_path / "program"
+        program.write_bytes(b"v1")
+        host_platform = "macos"
     descriptor = {
         "id": "example.program",
         "display_name": "Program",
@@ -783,23 +795,25 @@ def test_program_proof_rejects_non_executable_and_detects_drift(
             "program_path": str(program),
         },
     }
-    with pytest.raises(UiCommandContractError) as not_executable:
-        build_ui_commands_register_plan(
-            version="2025.1",
-            host_platform="macos",
-            commands=[descriptor],
-        )
-    assert not_executable.value.error_code == "PATH_NOT_EXECUTABLE"
+    if os.name == "posix":
+        with pytest.raises(UiCommandContractError) as not_executable:
+            build_ui_commands_register_plan(
+                version="2025.1",
+                host_platform=host_platform,
+                commands=[descriptor],
+            )
+        assert not_executable.value.error_code == "PATH_NOT_EXECUTABLE"
+        program.chmod(0o700)
 
-    program.chmod(0o700)
     plan = build_ui_commands_register_plan(
         version="2025.1",
-        host_platform="macos",
+        host_platform=host_platform,
         commands=[descriptor],
         source_authority=USER_SUPPLIED_SOURCE_AUTHORITY,
     )
-    program.write_bytes(b"v2")
-    os.chmod(program, 0o700)
+    program.write_bytes(program.read_bytes() + b"drift")
+    if os.name == "posix":
+        program.chmod(0o700)
     with pytest.raises(UiCommandContractError) as changed:
         revalidate_ui_command_file_proofs(plan)
     assert changed.value.error_code == "PATH_CHANGED"

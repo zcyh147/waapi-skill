@@ -6,10 +6,119 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
+from ci.resolve_live_test_config import LiveTestConfigError, resolve_version_config
+from ci.run_live_test_command import build_live_test_environment
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CI_TEST_SH = REPO_ROOT / "ci" / "test.sh"
 CI_TEST_BAT = REPO_ROOT / "ci" / "test.bat"
+
+
+def test_live_config_resolver_uses_host_native_pathlib_and_aliases(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo root"
+    resolved = resolve_version_config(
+        {
+            "versions": {
+                "2025.1": {
+                    "console_path": "tooling/WwiseConsole",
+                    "sample_project_path": "fixtures/SampleProject.wproj",
+                    "sandbox_root": "runtime/sandboxes",
+                }
+            }
+        },
+        version="2025.1",
+        repo_root=repo_root,
+    )
+
+    assert resolved == {
+        "WWISE_CONSOLE": str((repo_root / "tooling" / "WwiseConsole").resolve()),
+        "WWISE_SAMPLE_PROJECT_PATH": str(
+            (repo_root / "fixtures" / "SampleProject.wproj").resolve()
+        ),
+        "WWISE_SANDBOX_ROOT": str(
+            (repo_root / "runtime" / "sandboxes").resolve()
+        ),
+    }
+    if os.name == "nt":
+        assert all("/" not in value for value in resolved.values())
+
+
+def test_live_config_resolver_rejects_invalid_path_fields(tmp_path: Path) -> None:
+    with pytest.raises(LiveTestConfigError, match="must be a non-empty string"):
+        resolve_version_config(
+            {"versions": {"2025.1": {"wwise_console": ["not", "a", "path"]}}},
+            version="2025.1",
+            repo_root=tmp_path,
+        )
+
+
+def test_live_command_environment_uses_config_then_explicit_overrides(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    configured = tmp_path / "configured"
+    overridden_console = tmp_path / "override" / "WwiseConsole"
+    config_path = tmp_path / "live-environment.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "versions": {
+                    "2025.1": {
+                        "wwise_console": str(configured / "WwiseConsole"),
+                        "sample_project": str(configured / "SampleProject.wproj"),
+                        "sandbox_root": str(configured / "sandbox"),
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    environment = build_live_test_environment(
+        {
+            "WWISE_TEST_CONFIG": str(config_path),
+            "WWISE_CONSOLE": str(overridden_console),
+        },
+        version="2025.1",
+        mode="destructive",
+        repo_root=repo_root,
+        default_config=repo_root / "default.json",
+        default_console=repo_root / "default-console",
+        default_project=repo_root / "default-project.wproj",
+        default_sandbox=repo_root / "default-sandbox",
+    )
+
+    assert environment["WWISE_CONSOLE"] == str(overridden_console)
+    assert environment["WWISE_SAMPLE_PROJECT_PATH"] == str(
+        (configured / "SampleProject.wproj").resolve()
+    )
+    assert environment["WWISE_SANDBOX_ROOT"] == str(
+        (configured / "sandbox").resolve()
+    )
+    assert environment["WWISE_TEST_CONFIG"] == str(config_path.resolve())
+    assert environment["WWISE_LIVE"] == "1"
+    assert environment["WWISE_DESTRUCTIVE"] == "1"
+    assert environment["WWISE_STRICT_REAL"] == "1"
+
+
+def test_live_command_environment_rejects_missing_explicit_config(
+    tmp_path: Path,
+) -> None:
+    missing = tmp_path / "missing-live-environment.json"
+    with pytest.raises(LiveTestConfigError, match="explicit WWISE_TEST_CONFIG"):
+        build_live_test_environment(
+            {"WWISE_TEST_CONFIG": str(missing)},
+            version="2025.1",
+            mode="live",
+            repo_root=tmp_path,
+            default_config=tmp_path / "default.json",
+            default_console=tmp_path / "WwiseConsole",
+            default_project=tmp_path / "SampleProject.wproj",
+            default_sandbox=tmp_path / "sandbox",
+        )
 
 
 def _write_fake_python(bin_dir: Path, fail_on_nonlive: bool = False) -> Path:
@@ -21,6 +130,11 @@ def _write_fake_python(bin_dir: Path, fail_on_nonlive: bool = False) -> Path:
         f"log_path = Path(os.environ['CI_TEST_LOG'])\n"
         "argv = sys.argv[1:]\n"
         "effective_argv = argv[2:] if argv[:2] == ['run', 'python'] else argv\n"
+        "if effective_argv and Path(effective_argv[0]).name == 'run_live_test_command.py':\n"
+        "    import runpy\n"
+        "    sys.path.insert(0, str(Path(effective_argv[0]).resolve().parent))\n"
+        "    sys.argv = effective_argv\n"
+        "    runpy.run_path(effective_argv[0], run_name='__main__')\n"
         "with log_path.open('a', encoding='utf-8') as handle:\n"
         "    handle.write(json.dumps(argv) + '\\n')\n"
         f"if {str(fail_on_nonlive)} and effective_argv[:3] == ['-m', 'pytest', '-m'] and 'not live and not destructive' in effective_argv:\n"
@@ -36,9 +150,7 @@ def _write_fake_python(bin_dir: Path, fail_on_nonlive: bool = False) -> Path:
         poetry = bin_dir / "poetry.bat"
         poetry.write_text(
             '@echo off\r\n'
-            'if /I "%~1"=="run" shift\r\n'
-            'if /I "%~1"=="python" shift\r\n'
-            f'"{sys.executable}" "{script}" %1 %2 %3 %4 %5 %6 %7 %8 %9\r\nexit /b %%%%ERRORLEVEL%%%%\r\n',
+            f'"{sys.executable}" "{script}" %*\r\nexit /b %%%%ERRORLEVEL%%%%\r\n',
             encoding="utf-8",
         )
     else:
@@ -264,3 +376,21 @@ def test_ci_test_sh_env_overrides_versioned_live_environment_config(tmp_path: Pa
     calls = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
     assert len(calls) == 1
     assert "--collect-only" in _pytest_argv(calls[0])
+
+
+def test_ci_test_sh_rejects_missing_explicit_live_environment_config(
+    tmp_path: Path,
+) -> None:
+    if os.name == "nt":
+        pytest.skip("ci/test.sh missing-config test is for the POSIX shell runner")
+
+    env = os.environ.copy()
+    env["WWISE_TEST_CONFIG"] = str(tmp_path / "missing-live-environment.json")
+    env.pop("WWISE_CONSOLE", None)
+    env.pop("WWISE_SAMPLE_PROJECT_PATH", None)
+    env.pop("WWISE_SANDBOX_ROOT", None)
+
+    result = _run_ci_test(env, "--version", "2024.1", "--mode", "live")
+
+    assert result.returncode != 0
+    assert "Explicit WWISE_TEST_CONFIG does not exist" in result.stderr

@@ -5,7 +5,9 @@ import os
 import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Mapping, Sequence
 
 import pytest
@@ -32,15 +34,21 @@ from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     final_agent_message,
     gateway_runtime_apis,
     inspect_isolated_environment,
+    is_link_or_junction,
     isolated_codex_environment,
+    kill_process_group,
     parse_command_argv,
     parse_jsonl_events,
     run_process,
+    subprocess_process_group_options,
+    prepare_workspace_skill_install,
     snapshot_tree_hash,
     snapshot_workspace,
     turn_usage,
     workspace_changes,
     validated_skill_read,
+    verify_workspace_skill_install,
+    workspace_skill_install_path,
 )
 from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImports]
     BASH_ENV_NAME,
@@ -53,12 +61,7 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
 )
 
 
-def _require_auth_symlink_capability(tmp_path: Path, auth: Path) -> None:
-    """Skip POSIX-auth-link tests only when this Windows token lacks privilege."""
-
-    probe = tmp_path / "auth-symlink-probe"
-    create_symlink_or_skip(probe, auth)
-    probe.unlink()
+_FAKE_KILL_RETURN_CODE = -9
 
 
 def completed_record(
@@ -100,6 +103,72 @@ def passing_prompt_audit() -> codex_harness_module.CodexPromptAudit:
     )
 
 
+def executable_file(path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("codex test executable\n", encoding="utf-8")
+    path.chmod(0o755)
+    return path
+
+
+def test_codex_binary_discovery_uses_host_native_path_lookup(tmp_path: Path) -> None:
+    linux_binary = executable_file(tmp_path / "codex")
+    windows_binary = executable_file(tmp_path / "codex.exe")
+    linux_calls: list[str] = []
+    windows_calls: list[str] = []
+
+    def linux_which(name: str) -> str | None:
+        linux_calls.append(name)
+        return str(linux_binary) if name == "codex" else None
+
+    def windows_which(name: str) -> str | None:
+        windows_calls.append(name)
+        return str(windows_binary) if name == "codex.exe" else None
+
+    assert codex_harness_module.discover_codex_binary(
+        platform_name="linux", which=linux_which
+    ) == linux_binary.resolve(strict=True)
+    assert linux_calls == ["codex"]
+    assert codex_harness_module.discover_codex_binary(
+        platform_name="win32", which=windows_which
+    ) == windows_binary.resolve(strict=True)
+    assert windows_calls == ["codex.exe"]
+
+    windows_alias_calls: list[str] = []
+
+    def windows_alias_which(name: str) -> str | None:
+        windows_alias_calls.append(name)
+        return str(linux_binary) if name == "codex" else None
+
+    assert codex_harness_module.discover_codex_binary(
+        platform_name="win32", which=windows_alias_which
+    ) == linux_binary.resolve(strict=True)
+    assert windows_alias_calls == ["codex.exe", "codex"]
+
+
+def test_codex_binary_discovery_uses_app_fallback_only_on_macos(tmp_path: Path) -> None:
+    fallback = executable_file(tmp_path / "Codex.app" / "Contents" / "Resources" / "codex")
+
+    assert codex_harness_module.discover_codex_binary(
+        platform_name="darwin",
+        which=lambda _name: None,
+        macos_app_fallback=fallback,
+    ) == fallback.resolve(strict=True)
+    with pytest.raises(CodexHarnessError, match="not found on PATH"):
+        codex_harness_module.discover_codex_binary(
+            platform_name="linux",
+            which=lambda _name: None,
+            macos_app_fallback=fallback,
+        )
+
+
+def test_explicit_codex_binary_has_priority_and_resolves_strictly(tmp_path: Path) -> None:
+    explicit = executable_file(tmp_path / "explicit-codex")
+
+    assert codex_harness_module.resolve_codex_binary(explicit) == explicit.resolve(strict=True)
+    with pytest.raises(CodexHarnessError, match="explicit Codex binary is unavailable"):
+        codex_harness_module.resolve_codex_binary(tmp_path / "missing-codex")
+
+
 class InterruptingFakeProcess:
     """Popen test double that requires TERM, wait, KILL, then reap."""
 
@@ -119,7 +188,7 @@ class InterruptingFakeProcess:
             raise KeyboardInterrupt
         if len(self.communicate_calls) == 2:
             raise subprocess.TimeoutExpired(cmd=["fake-codex"], timeout=timeout or 0.0)
-        self.returncode = -int(signal.SIGKILL)
+        self.returncode = _FAKE_KILL_RETURN_CODE
         return "reaped stdout", "reaped stderr"
 
     def terminate(self) -> None:
@@ -277,7 +346,7 @@ def test_exec_command_uses_medium_memory_off_ephemeral_and_disposable_state_cont
     config = CodexHarnessConfig(
         workspace=tmp_path,
         skill_source=tmp_path / "skill",
-        codex_binary=Path("/Applications/ChatGPT.app/Contents/Resources/codex"),
+        codex_binary=tmp_path / "codex",
     )
 
     command = build_exec_command(config, prompt="List buses.", writable_dir=tmp_path / "outputs")
@@ -296,6 +365,7 @@ def test_exec_command_supports_brokered_read_only_model_sandbox_without_writable
     config = CodexHarnessConfig(
         workspace=tmp_path,
         skill_source=tmp_path / "skill",
+        codex_binary=tmp_path / "codex",
         sandbox_mode="read-only",
         allow_output_write=False,
         network_access=False,
@@ -314,7 +384,7 @@ def test_task_commands_start_non_ephemeral_then_resume_exact_thread_with_isolati
     config = CodexHarnessConfig(
         workspace=tmp_path,
         skill_source=tmp_path / "skill",
-        codex_binary=Path("/Applications/ChatGPT.app/Contents/Resources/codex"),
+        codex_binary=tmp_path / "codex",
     )
     output_dir = tmp_path / "outputs"
 
@@ -352,7 +422,7 @@ def test_prompt_audit_command_uses_supported_global_flags_with_pristine_codex_ho
     config = CodexHarnessConfig(
         workspace=tmp_path,
         skill_source=tmp_path / "skill",
-        codex_binary=Path("/Applications/ChatGPT.app/Contents/Resources/codex"),
+        codex_binary=tmp_path / "codex",
     )
 
     command = build_prompt_audit_command(config, prompt="List buses.")
@@ -456,7 +526,6 @@ def test_prompt_audit_and_exec_environments_scrub_ambient_waapi_state(
 ) -> None:
     auth = tmp_path / "auth.json"
     auth.write_text("{}\n", encoding="utf-8")
-    _require_auth_symlink_capability(tmp_path, auth)
     ambient_sensitive = {
         "WWISE_WAAPI_PORT": "65535",
         "WWISE_EVIDENCE_DIR": "/ambient/evidence",
@@ -490,13 +559,140 @@ def test_prompt_audit_and_exec_environments_scrub_ambient_waapi_state(
     assert first.codex_home != second.codex_home
 
 
+def test_native_windows_isolated_environment_uses_detached_auth_copy(tmp_path: Path) -> None:
+    auth = tmp_path / "auth.json"
+    auth.write_text('{"token":"runner-owned"}\n', encoding="utf-8")
+
+    with isolated_codex_environment(auth, platform_name="nt") as environment:
+        audit = inspect_isolated_environment(
+            environment,
+            auth_json=auth,
+            platform_name="nt",
+        )
+        installed_auth = Path(environment["CODEX_HOME"]) / "auth.json"
+
+        assert audit.passed is True
+        assert audit.auth_install_mode == "copy"
+        assert audit.auth_is_symlink is False
+        assert audit.auth_same_file_as_source is False
+        assert audit.auth_sha256 == audit.expected_auth_sha256
+        assert not os.path.samefile(installed_auth, auth)
+
+        installed_auth.write_text('{"token":"isolated"}\n', encoding="utf-8")
+        assert auth.read_text(encoding="utf-8") == '{"token":"runner-owned"}\n'
+
+
+def test_native_windows_broker_overlay_uses_cmd_shims_without_bash_env(tmp_path: Path) -> None:
+    auth = tmp_path / "auth.json"
+    auth.write_text("{}\n", encoding="utf-8")
+    trusted_python = tmp_path / "python.exe"
+    trusted_python.write_bytes(b"synthetic interpreter")
+    shims = tmp_path / "broker-shims"
+    shims.mkdir()
+    for name in ("broker_shim.py", "python.cmd", "python3.cmd"):
+        (shims / name).write_text("shim\n", encoding="utf-8")
+    overlay = {
+        "PATH": f"{shims};C:\\Windows\\System32",
+        "PATHEXT": ".CMD;.EXE;.BAT",
+        "WAAPI_CODEX_GATEWAY_BROKER_ENDPOINT": "127.0.0.1:54321",
+        "WAAPI_CODEX_GATEWAY_BROKER_TOKEN": "a" * 32,
+        "WAAPI_CODEX_GATEWAY_BROKER_TRANSPORT": "tcp",
+        "WAAPI_CODEX_GATEWAY_REQUIRED": "1",
+        "WAAPI_CODEX_GATEWAY_SHIM_TRUSTED_PYTHON": str(trusted_python.resolve()),
+    }
+
+    with isolated_codex_environment(
+        auth,
+        extra_env=overlay,
+        platform_name="nt",
+    ) as environment:
+        audit = inspect_isolated_environment(
+            environment,
+            auth_json=auth,
+            platform_name="nt",
+        )
+
+        assert audit.passed is True
+        assert "BASH_ENV" not in environment
+        assert audit.broker_environment_keys == tuple(
+            sorted(
+                {
+                    "WAAPI_CODEX_GATEWAY_BROKER_ENDPOINT",
+                    "WAAPI_CODEX_GATEWAY_BROKER_TOKEN",
+                    "WAAPI_CODEX_GATEWAY_BROKER_TRANSPORT",
+                    "WAAPI_CODEX_GATEWAY_REQUIRED",
+                    "WAAPI_CODEX_GATEWAY_SHIM_TRUSTED_PYTHON",
+                }
+            )
+        )
+
+
+def test_windows_workspace_skill_copy_is_filtered_detached_and_attested(tmp_path: Path) -> None:
+    source = tmp_path / "waapi-skill"
+    (source / "references").mkdir(parents=True)
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    (source / "references" / "waapi-query.md").write_text("query\n", encoding="utf-8")
+    (source / ".venv").mkdir()
+    (source / ".venv" / "runtime.bin").write_bytes(b"excluded")
+    workspace = tmp_path / "workspace"
+
+    install = prepare_workspace_skill_install(
+        workspace,
+        source,
+        platform_name="nt",
+    )
+
+    assert install == workspace_skill_install_path(workspace)
+    assert install.is_dir() and not install.is_symlink()
+    assert not (install / ".venv").exists()
+    assert not os.path.samefile(source / "SKILL.md", install / "SKILL.md")
+    assert verify_workspace_skill_install(
+        workspace,
+        source,
+        platform_name="nt",
+    ) == install
+
+    (install / "SKILL.md").write_text("drift\n", encoding="utf-8")
+    with pytest.raises(CodexHarnessError, match="differs from the candidate tree"):
+        verify_workspace_skill_install(
+            workspace,
+            source,
+            platform_name="nt",
+        )
+
+
+def test_windows_workspace_skill_copy_rejects_hardlink_alias(tmp_path: Path) -> None:
+    source = tmp_path / "waapi-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    install = workspace_skill_install_path(workspace)
+    install.mkdir(parents=True)
+    os.link(source / "SKILL.md", install / "SKILL.md")
+
+    with pytest.raises(CodexHarnessError, match="hardlink aliases"):
+        verify_workspace_skill_install(
+            workspace,
+            source,
+            platform_name="nt",
+        )
+
+
+def test_link_guard_detects_python311_windows_reparse_attribute() -> None:
+    fake_path = SimpleNamespace(
+        is_symlink=lambda: False,
+        lstat=lambda: SimpleNamespace(st_file_attributes=0x400),
+    )
+
+    assert is_link_or_junction(fake_path) is True  # type: ignore[arg-type]
+
+
 def test_isolated_environment_preserves_only_complete_runner_owned_broker_overlay(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     auth = tmp_path / "auth.json"
     auth.write_text("{}\n", encoding="utf-8")
-    _require_auth_symlink_capability(tmp_path, auth)
     scripts = tmp_path / "waapi-skill" / "scripts"
     scripts.mkdir(parents=True)
     (scripts / "run.py").write_text("raise SystemExit(0)\n", encoding="utf-8")
@@ -550,9 +746,7 @@ def test_codex_cli_task_reuses_one_disposable_state_and_resumes_exact_thread(
     skill.mkdir()
     (skill / "SKILL.md").write_text("skill\n", encoding="utf-8")
     workspace = tmp_path / "workspace"
-    skills = workspace / ".agents" / "skills"
-    skills.mkdir(parents=True)
-    create_symlink_or_skip(skills / "waapi-skill", skill, target_is_directory=True)
+    prepare_workspace_skill_install(workspace, skill)
     commands: list[tuple[str, ...]] = []
     execution_environments: list[dict[str, str]] = []
     prompt_audit_homes: list[str] = []
@@ -664,9 +858,7 @@ def test_codex_cli_task_fails_closed_on_resumed_thread_id_mismatch(
     skill.mkdir()
     (skill / "SKILL.md").write_text("skill\n", encoding="utf-8")
     workspace = tmp_path / "workspace"
-    skills = workspace / ".agents" / "skills"
-    skills.mkdir(parents=True)
-    create_symlink_or_skip(skills / "waapi-skill", skill, target_is_directory=True)
+    prepare_workspace_skill_install(workspace, skill)
     thread_ids = iter(("thread-initial", "thread-wrong"))
 
     monkeypatch.setattr(
@@ -712,6 +904,7 @@ def test_run_process_keyboard_interrupt_terminates_kills_reaps_and_reraises(
     fake = InterruptingFakeProcess()
     popen_arguments: dict[str, object] = {}
     group_signals: list[tuple[int, signal.Signals]] = []
+    windows_tree_kills: list[bool] = []
 
     def fake_popen(*args: object, **kwargs: object) -> InterruptingFakeProcess:
         popen_arguments.update(kwargs)
@@ -720,17 +913,118 @@ def test_run_process_keyboard_interrupt_terminates_kills_reaps_and_reraises(
     monkeypatch.setattr(subprocess, "Popen", fake_popen)
     if os.name != "nt":
         monkeypatch.setattr(os, "killpg", lambda pid, requested: group_signals.append((pid, requested)))
+    else:
+        monkeypatch.setattr(
+            codex_harness_module,
+            "taskkill_process_tree",
+            lambda _process, *, force: windows_tree_kills.append(force),
+        )
 
     with pytest.raises(KeyboardInterrupt):
         run_process(["fake-codex"], cwd=tmp_path, env={}, timeout=10.0)
 
-    assert popen_arguments["start_new_session"] is (os.name != "nt")
+    if os.name == "nt":
+        assert popen_arguments["creationflags"] == subprocess.CREATE_NEW_PROCESS_GROUP
+        assert "start_new_session" not in popen_arguments
+    else:
+        assert popen_arguments["start_new_session"] is True
+        assert "creationflags" not in popen_arguments
     assert fake.communicate_calls == [10.0, 5.0, None]
     if os.name != "nt":
         assert group_signals == [(fake.pid, signal.SIGTERM), (fake.pid, signal.SIGKILL)]
-    else:  # pragma: no cover - Windows local harness is not used
-        assert fake.windows_signals == ["terminate", "kill"]
-    assert fake.returncode == -int(signal.SIGKILL)
+    else:
+        assert windows_tree_kills == [False, True]
+        assert fake.windows_signals == []
+    assert fake.returncode == _FAKE_KILL_RETURN_CODE
+
+
+def test_native_windows_hard_kill_uses_tree_taskkill_not_posix_signal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = InterruptingFakeProcess()
+    observed: list[tuple[object, bool]] = []
+    monkeypatch.setattr(
+        codex_harness_module,
+        "taskkill_process_tree",
+        lambda process, *, force: observed.append((process, force)),
+    )
+
+    kill_process_group(fake, platform_name="nt")  # type: ignore[arg-type]
+
+    assert observed == [(fake, True)]
+    assert fake.windows_signals == []
+
+
+def test_native_windows_popen_boundary_uses_new_process_group(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x200, raising=False)
+
+    assert subprocess_process_group_options(platform_name="nt") == {
+        "creationflags": 0x200
+    }
+    assert subprocess_process_group_options(platform_name="posix") == {
+        "start_new_session": True
+    }
+
+
+def test_native_windows_taskkill_command_is_tree_scoped_and_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = InterruptingFakeProcess()
+    observed: list[tuple[str, ...]] = []
+    monkeypatch.setattr(codex_harness_module.shutil, "which", lambda _name: "taskkill.exe")
+
+    def successful_run(command: Sequence[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        observed.append(tuple(command))
+        return subprocess.CompletedProcess(command, 0, "SUCCESS", "")
+
+    monkeypatch.setattr(subprocess, "run", successful_run)
+    codex_harness_module.taskkill_process_tree(fake, force=True)
+    assert observed == [("taskkill.exe", "/PID", str(fake.pid), "/T", "/F")]
+
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda command, **_kwargs: subprocess.CompletedProcess(
+            command,
+            5,
+            "",
+            "access denied",
+        ),
+    )
+    with pytest.raises(CodexHarnessError, match="could not terminate"):
+        codex_harness_module.taskkill_process_tree(fake, force=False)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows process-tree proof")
+def test_native_windows_timeout_reaps_spawned_child_process_tree(tmp_path: Path) -> None:
+    sentinel = tmp_path / "child-sentinel.txt"
+    child_code = (
+        "import pathlib,sys,time\n"
+        "path=pathlib.Path(sys.argv[1])\n"
+        "while True:\n"
+        " path.open('a', encoding='utf-8').write('alive\\n')\n"
+        " time.sleep(0.05)\n"
+    )
+    parent_code = (
+        "import subprocess,sys,time\n"
+        f"subprocess.Popen([sys.executable, '-c', {child_code!r}, {str(sentinel)!r}])\n"
+        "time.sleep(60)\n"
+    )
+
+    result = run_process(
+        [sys.executable, "-c", parent_code],
+        cwd=tmp_path,
+        env=os.environ,
+        timeout=0.5,
+    )
+
+    assert result.exit_status == 124
+    assert sentinel.is_file()
+    size_after_cleanup = sentinel.stat().st_size
+    time.sleep(0.3)
+    assert sentinel.stat().st_size == size_after_cleanup
 
 
 def test_run_process_real_timeout_still_returns_124_after_reaping(tmp_path: Path) -> None:
@@ -757,8 +1051,7 @@ def test_harness_verify_requires_exactly_one_installed_workspace_skill(tmp_path:
     (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
     workspace = tmp_path / "workspace"
     skills = workspace / ".agents" / "skills"
-    skills.mkdir(parents=True)
-    create_symlink_or_skip(skills / "waapi-skill", source, target_is_directory=True)
+    prepare_workspace_skill_install(workspace, source)
     harness = CodexCliHarness(
         CodexHarnessConfig(
             workspace=workspace,
@@ -769,7 +1062,7 @@ def test_harness_verify_requires_exactly_one_installed_workspace_skill(tmp_path:
     )
 
     harness.verify()
-    create_symlink_or_skip(skills / "unexpected-skill", source, target_is_directory=True)
+    (skills / "unexpected-skill").mkdir()
 
     with pytest.raises(CodexHarnessError, match="only waapi-skill"):
         harness.verify()
@@ -1350,6 +1643,42 @@ def test_command_classifier_does_not_count_unproven_relative_skill_read(tmp_path
     assert facts.unexpected_commands == ("cat SKILL.md",)
 
 
+def test_command_classifier_accepts_windows_copy_and_candidate_gateway_paths(
+    tmp_path: Path,
+) -> None:
+    copied = tmp_path / "workspace-copy"
+    candidate = tmp_path / "candidate"
+    records = (
+        completed_record(
+            gateway_command(copied, "preview"),
+            {
+                "contract": "waapi-skill.gateway-result/v1",
+                "command": "preview",
+                "ok": True,
+            },
+        ),
+        completed_record(
+            gateway_command(candidate, "execute tx-1"),
+            {
+                "contract": "waapi-skill.gateway-result/v1",
+                "command": "execute",
+                "ok": True,
+            },
+        ),
+    )
+
+    facts = classify_commands(
+        records,
+        skill_source=copied,
+        alternate_gateway_skill_sources=(candidate,),
+        expected_gateway_subcommands=("preview", "execute"),
+    )
+
+    assert facts.gateway_commands == tuple(record.command for record in records)
+    assert facts.gateway_attempt_commands == tuple(record.command for record in records)
+    assert facts.unexpected_commands == ()
+
+
 def test_command_classifier_detects_direct_clients_and_write_variants(tmp_path: Path) -> None:
     skill = tmp_path / "waapi-skill"
     skill.mkdir()
@@ -1371,6 +1700,34 @@ def test_command_classifier_detects_direct_clients_and_write_variants(tmp_path: 
     assert commands[3].command in facts.write_like_commands
     assert commands[4].command in facts.write_like_commands
     assert len(facts.unexpected_commands) == len(commands)
+
+
+def test_command_classifier_treats_python_exe_as_python_and_only_exact_gateway_as_legal(
+    tmp_path: Path,
+) -> None:
+    skill = tmp_path / "waapi-skill"
+    skill.mkdir()
+    trusted_python = tmp_path / "Python313" / "python.exe"
+    runner = skill / "scripts" / "run.py"
+    inline = completed_record(f'"{trusted_python}" -c "print(1)"')
+    gateway = completed_record(
+        f'"{trusted_python}" "{runner}" gateway.py status',
+        {
+            "contract": "waapi-skill.gateway-result/v1",
+            "command": "status",
+            "ok": True,
+        },
+    )
+
+    facts = classify_commands(
+        (inline, gateway),
+        skill_source=skill,
+        expected_gateway_subcommands=("status",),
+    )
+
+    assert facts.inline_python_commands == (inline.command,)
+    assert facts.gateway_commands == (gateway.command,)
+    assert facts.unexpected_commands == (inline.command,)
 
 
 def test_gateway_runtime_apis_only_accepts_call_shaped_objects() -> None:

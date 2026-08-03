@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import queue
 import stat
 import threading
@@ -138,9 +139,13 @@ def test_subscription_ack_is_atomically_published_only_after_subscribe(
     assert payload["gateway_process_id"] > 0
     assert payload["subscribed_at_unix_ns"] > 0
     assert payload["subscribed_at_monotonic_ns"] > 0
+    encoded = target.read_bytes()
+    assert encoded.endswith(b"\n")
+    assert b"\r\n" not in encoded
     metadata = target.stat()
     assert metadata.st_nlink == 1
-    assert stat.S_IMODE(metadata.st_mode) & 0o077 == 0
+    if os.name == "posix":
+        assert stat.S_IMODE(metadata.st_mode) & 0o077 == 0
     assert not list(evidence.glob(".subscription-ack-test.json.*.tmp"))
     handle.unsubscribe()
 

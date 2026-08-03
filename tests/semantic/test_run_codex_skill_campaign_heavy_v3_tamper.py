@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -15,6 +16,11 @@ from tests.semantic.support.codex_campaign import CampaignEvidenceError
 from tests.semantic.support.codex_prompt_provenance_v3 import (
     PromptProvenanceEvidence,
 )
+
+
+def _set_owner_only_mode_on_posix(path: Path) -> None:
+    if os.name == "posix":
+        path.chmod(0o600)
 
 
 def _passing_case(
@@ -467,7 +473,7 @@ def _topic_ack_validator_case(
     }
     raw = campaign.canonical_json_bytes(payload) + b"\n"
     ack_path.write_bytes(raw)
-    ack_path.chmod(0o600)
+    _set_owner_only_mode_on_posix(ack_path)
     requirement = {
         "contract": campaign.TOPIC_ACK_REQUIREMENT_CONTRACT,
         "ack_contract": campaign.TOPIC_ACK_CONTRACT,
@@ -831,7 +837,7 @@ def test_topic_ack_campaign_validator_rejects_tampered_evidence(
         payload["topic"] = "ak.wwise.core.soundbank.other"
         raw = campaign.canonical_json_bytes(payload) + b"\n"
         ack_path.write_bytes(raw)
-        ack_path.chmod(0o600)
+        _set_owner_only_mode_on_posix(ack_path)
         proof["ack_payload"] = payload
         proof["ack_file_sha256"] = hashlib.sha256(raw).hexdigest()
     elif tamper == "requirement":
@@ -843,13 +849,13 @@ def test_topic_ack_campaign_validator_rejects_tampered_evidence(
     elif tamper == "outside_broker_evidence":
         outside = tmp_path / "subscription-ack-outside.json"
         outside.write_bytes(ack_path.read_bytes())
-        outside.chmod(0o600)
+        _set_owner_only_mode_on_posix(outside)
         proof["ack_path"] = str(outside.resolve())
     elif tamper == "noncanonical":
         payload = proof["ack_payload"]
         raw = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
         ack_path.write_bytes(raw)
-        ack_path.chmod(0o600)
+        _set_owner_only_mode_on_posix(ack_path)
         proof["ack_file_sha256"] = hashlib.sha256(raw).hexdigest()
     elif tamper == "broker_hash":
         broker_record["subscription_ack"]["ack_file_sha256"] = "f" * 64

@@ -20,10 +20,15 @@ from tests.semantic.support.codex_campaign_runner import (
     PHASE_ERROR_CONTRACT,
     RUNTIME_CONTRACT,
     RUN_CONTRACT,
+    SKILL_COPY_ATTESTATION_CONTRACT,
     SKILL_LINK_ATTESTATION_CONTRACT,
     classify_phase,
     replace_expected_skill_symlinks,
     validate_child_run,
+)
+from tests.semantic.support.codex_harness import (
+    prepare_workspace_skill_install,
+    workspace_skill_tree_sha256,
 )
 from tests.semantic.support.codex_eval_suite import SUPPORTED_VERSIONS, EvalSession, load_eval_suite
 
@@ -781,6 +786,75 @@ def test_expected_skill_symlink_is_replaced_by_regular_attestation(tmp_path: Pat
     }
 
 
+def test_expected_windows_skill_copy_is_hash_checked_detached_and_attested(
+    tmp_path: Path,
+) -> None:
+    skill_source, _suite, _live = _inputs(tmp_path)
+    attempt = tmp_path / "attempt"
+    workspace = (
+        attempt
+        / "runs"
+        / "online"
+        / "matrix"
+        / "sessions"
+        / "screening-Q1-2022-1-r1-single"
+        / "agent-workspace"
+    )
+    copied = prepare_workspace_skill_install(
+        workspace,
+        skill_source,
+        platform_name="nt",
+    )
+    candidate_sha256 = workspace_skill_tree_sha256(skill_source)
+
+    replaced = replace_expected_skill_symlinks(
+        attempt,
+        skill_source=skill_source,
+        candidate_sha256=candidate_sha256,
+        platform_name="nt",
+    )
+
+    assert replaced == (copied.relative_to(attempt).as_posix(),)
+    assert copied.is_file() and not copied.is_symlink()
+    assert json.loads(copied.read_text(encoding="utf-8")) == {
+        "contract": SKILL_COPY_ATTESTATION_CONTRACT,
+        "candidate_sha256": candidate_sha256,
+        "copied_from": str(skill_source.resolve()),
+        "path": copied.relative_to(attempt).as_posix(),
+    }
+
+
+def test_windows_skill_copy_attestation_rejects_drift_and_posix_directory_install(
+    tmp_path: Path,
+) -> None:
+    skill_source, _suite, _live = _inputs(tmp_path)
+    attempt = tmp_path / "attempt"
+    workspace = attempt / "matrix" / "sessions" / "session" / "agent-workspace"
+    copied = prepare_workspace_skill_install(
+        workspace,
+        skill_source,
+        platform_name="nt",
+    )
+    candidate_sha256 = workspace_skill_tree_sha256(skill_source)
+
+    with pytest.raises(CampaignEvidenceError, match="only for native Windows"):
+        replace_expected_skill_symlinks(
+            attempt,
+            skill_source=skill_source,
+            candidate_sha256=candidate_sha256,
+            platform_name="posix",
+        )
+
+    (copied / "SKILL.md").write_text("drift\n", encoding="utf-8")
+    with pytest.raises(CampaignEvidenceError, match="differs from the frozen candidate"):
+        replace_expected_skill_symlinks(
+            attempt,
+            skill_source=skill_source,
+            candidate_sha256=candidate_sha256,
+            platform_name="nt",
+        )
+
+
 def test_any_unexpected_symlink_blocks_skill_link_replacement(tmp_path: Path) -> None:
     skill_source, _suite, _live = _inputs(tmp_path)
     attempt = tmp_path / "attempt"
@@ -797,12 +871,38 @@ def test_any_unexpected_symlink_blocks_skill_link_replacement(tmp_path: Path) ->
         )
 
 
-def test_agent_workspace_without_runner_skill_link_is_rejected(tmp_path: Path) -> None:
+def test_any_windows_junction_blocks_skill_install_attestation_without_following(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    skill_source, _suite, _live = _inputs(tmp_path)
+    attempt = tmp_path / "attempt"
+    junction = attempt / "junction"
+    junction.mkdir(parents=True)
+    (junction / "must-not-be-read.txt").write_text("outside\n", encoding="utf-8")
+    real_is_junction = getattr(Path, "is_junction", lambda _self: False)
+    monkeypatch.setattr(
+        Path,
+        "is_junction",
+        lambda self: self == junction or real_is_junction(self),
+        raising=False,
+    )
+
+    with pytest.raises(CampaignEvidenceError, match="unexpected symlink or junction"):
+        replace_expected_skill_symlinks(
+            attempt,
+            skill_source=skill_source,
+            candidate_sha256=_HASH,
+            platform_name="nt",
+        )
+
+
+def test_agent_workspace_without_runner_skill_install_is_rejected(tmp_path: Path) -> None:
     skill_source, _suite, _live = _inputs(tmp_path)
     workspace = tmp_path / "attempt" / "matrix" / "sessions" / "session" / "agent-workspace"
     workspace.mkdir(parents=True)
 
-    with pytest.raises(CampaignEvidenceError, match="missing the exact runner-created Skill symlink"):
+    with pytest.raises(CampaignEvidenceError, match="missing the exact runner-created Skill install"):
         replace_expected_skill_symlinks(
             tmp_path / "attempt",
             skill_source=skill_source,

@@ -16,6 +16,7 @@ def _required_path_args(tmp_path: Path) -> list[str]:
     live = tmp_path / "live-environment.json"
     for path in (codex, auth, live):
         path.write_text("{}\n", encoding="utf-8")
+    codex.chmod(0o755)
     return [
         "--codex-binary",
         str(codex),

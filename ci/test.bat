@@ -13,17 +13,6 @@ if defined PYTHONPATH (
     set "PYTHONPATH=%SKILL_DIR%"
 )
 
-set "INITIAL_WWISE_CONSOLE=%WWISE_CONSOLE%"
-set "INITIAL_WWISE_SAMPLE_PROJECT_PATH=%WWISE_SAMPLE_PROJECT_PATH%"
-set "INITIAL_WWISE_SANDBOX_ROOT=%WWISE_SANDBOX_ROOT%"
-set "HAS_INITIAL_WWISE_CONSOLE=0"
-set "HAS_INITIAL_WWISE_SAMPLE_PROJECT_PATH=0"
-set "HAS_INITIAL_WWISE_SANDBOX_ROOT=0"
-
-if defined WWISE_CONSOLE set "HAS_INITIAL_WWISE_CONSOLE=1"
-if defined WWISE_SAMPLE_PROJECT_PATH set "HAS_INITIAL_WWISE_SAMPLE_PROJECT_PATH=1"
-if defined WWISE_SANDBOX_ROOT set "HAS_INITIAL_WWISE_SANDBOX_ROOT=1"
-
 set "VERSION="
 set "MODE="
 set "PYTEST_EXTRA_ARGS="
@@ -237,7 +226,7 @@ if "%CHECK_VERSION%"=="none" exit /b 0
 echo Unsupported version: %CHECK_VERSION% 1>&2
 goto usage_error
 
-:set_version_environment
+:set_version_defaults
 set "RESOLVED_BUILD="
 set "RESOLVED_CONSOLE="
 set "RESOLVED_PROJECT="
@@ -252,23 +241,7 @@ if not defined RESOLVED_BUILD (
 )
 set "RESOLVED_CONSOLE=C:\Audiokinetic\Wwise%RESOLVED_BUILD%\Authoring\x64\Release\bin\WwiseConsole.exe"
 set "RESOLVED_PROJECT=%ROOT_DIR%\tests\_org\%~1\SampleProject.wproj"
-
-set "WWISE_VERSION=%~1"
-if "%HAS_INITIAL_WWISE_CONSOLE%"=="1" (
-    set "WWISE_CONSOLE=%INITIAL_WWISE_CONSOLE%"
-) else (
-    set "WWISE_CONSOLE=%RESOLVED_CONSOLE%"
-)
-if "%HAS_INITIAL_WWISE_SAMPLE_PROJECT_PATH%"=="1" (
-    set "WWISE_SAMPLE_PROJECT_PATH=%INITIAL_WWISE_SAMPLE_PROJECT_PATH%"
-) else (
-    set "WWISE_SAMPLE_PROJECT_PATH=%RESOLVED_PROJECT%"
-)
-if "%HAS_INITIAL_WWISE_SANDBOX_ROOT%"=="1" (
-    set "WWISE_SANDBOX_ROOT=%INITIAL_WWISE_SANDBOX_ROOT%"
-) else (
-    set "WWISE_SANDBOX_ROOT=%DEFAULT_SANDBOX_BASE%\%~1-%~2"
-)
+set "RESOLVED_SANDBOX=%DEFAULT_SANDBOX_BASE%\%~1-%~2"
 exit /b 0
 
 :print_context
@@ -289,6 +262,11 @@ if defined WWISE_SANDBOX_ROOT (
     echo sandbox_root: %WWISE_SANDBOX_ROOT%
 ) else (
     echo sandbox_root: ^<unset^>
+)
+if defined WWISE_TEST_CONFIG (
+    echo test_config:  %WWISE_TEST_CONFIG%
+) else (
+    echo test_config:  ^<unset^>
 )
 if defined PYTEST_EXTRA_ARGS (
     echo pytest args:  %PYTEST_EXTRA_ARGS%
@@ -368,31 +346,23 @@ popd >nul
 exit /b !RESULT!
 
 :run_smoke_for_version
-call :set_version_environment "%~1" "smoke"
+call :set_version_defaults "%~1" "smoke"
 if errorlevel 1 exit /b !ERRORLEVEL!
-call :set_mode_flags "smoke"
-call :require_real_prerequisites "%~1" "smoke"
-if errorlevel 1 exit /b !ERRORLEVEL!
-call :print_context "%~1" "smoke"
 pushd "%ROOT_DIR%" >nul
-call poetry run python "%ROOT_DIR%\ci\wwise_smoke.py"
+call poetry run python "%ROOT_DIR%\ci\run_live_test_command.py" --version "%~1" --mode smoke --repo-root "%ROOT_DIR%" --default-config "%ROOT_DIR%\tests\fixtures\local\live-environment.json" --default-console "%RESOLVED_CONSOLE%" --default-project "%RESOLVED_PROJECT%" --default-sandbox "%RESOLVED_SANDBOX%" -- poetry run python "%ROOT_DIR%\ci\wwise_smoke.py"
 set "RESULT=!ERRORLEVEL!"
 popd >nul
 exit /b !RESULT!
 
 :run_live_for_version
-call :set_version_environment "%~1" "live"
+call :set_version_defaults "%~1" "live"
 if errorlevel 1 exit /b !ERRORLEVEL!
-call :set_mode_flags "live"
-call :require_real_prerequisites "%~1" "live"
-if errorlevel 1 exit /b !ERRORLEVEL!
-call :print_context "%~1" "live"
 pushd "%ROOT_DIR%" >nul
-if "%~1"=="2021.1" call poetry run python -m pytest tests/live/test_2021_1_live_prerequisites.py::test_2021_1_live_read_only_prerequisites_validate_exact_get_info_before_matrix tests/live/test_2021_1_reflection_prerequisites.py::test_2021_1_live_reflection_prerequisites_and_resource_generation tests/live/test_2021_1_object_get_matrix.py::test_2021_1_live_waql_object_get_matrix_runs_read_only_against_sandbox tests/live/test_2021_1_object_topics_sandbox.py::test_2021_1_live_safe_object_topics_against_sandbox %PYTEST_EXTRA_ARGS%
-if "%~1"=="2022.1" call poetry run python -m pytest tests/live/test_2022_live_prerequisites.py::test_2022_live_environment_prerequisites_fail_fast tests/live/test_2022_reflection_inventory.py::test_2022_live_reflection_inventory_runs_against_sandbox tests/live/test_2022_waql_live_matrix.py::test_2022_live_waql_object_get_matrix_runs_read_only_against_sandbox %PYTEST_EXTRA_ARGS%
-if "%~1"=="2023.1" call poetry run python -m pytest tests/live/test_2023_reflection_inventory.py::test_2023_live_reflection_inventory_runs_against_sandbox tests/live/test_2023_waql_live_matrix.py::test_2023_live_waql_object_get_matrix_runs_read_only_against_sandbox %PYTEST_EXTRA_ARGS%
-if "%~1"=="2024.1" call poetry run python -m pytest tests/live/test_2024_reflection_inventory.py::test_2024_live_reflection_inventory_runs_against_sandbox tests/live/test_2024_waql_live_matrix.py::test_2024_live_waql_object_get_matrix_runs_read_only_against_sandbox tests/live/test_2024_object_topics_sandbox.py::test_2024_1_live_safe_object_topics_against_sandbox %PYTEST_EXTRA_ARGS%
-if "%~1"=="2025.1" call poetry run python -m pytest tests/live/test_2025_1_reflection_inventory.py::test_2025_live_reflection_inventory_runs_against_sandbox tests/live/test_2025_1_waql_live_matrix.py::test_2025_live_waql_object_get_matrix_runs_read_only_against_sandbox tests/live/test_2025_1_object_topics_sandbox.py::test_2025_1_live_safe_object_topics_against_sandbox %PYTEST_EXTRA_ARGS%
+if "%~1"=="2021.1" call poetry run python "%ROOT_DIR%\ci\run_live_test_command.py" --version "%~1" --mode live --repo-root "%ROOT_DIR%" --default-config "%ROOT_DIR%\tests\fixtures\local\live-environment.json" --default-console "%RESOLVED_CONSOLE%" --default-project "%RESOLVED_PROJECT%" --default-sandbox "%RESOLVED_SANDBOX%" -- poetry run python -m pytest tests/live/test_2021_1_live_prerequisites.py::test_2021_1_live_read_only_prerequisites_validate_exact_get_info_before_matrix tests/live/test_2021_1_reflection_prerequisites.py::test_2021_1_live_reflection_prerequisites_and_resource_generation tests/live/test_2021_1_object_get_matrix.py::test_2021_1_live_waql_object_get_matrix_runs_read_only_against_sandbox tests/live/test_2021_1_object_topics_sandbox.py::test_2021_1_live_safe_object_topics_against_sandbox %PYTEST_EXTRA_ARGS%
+if "%~1"=="2022.1" call poetry run python "%ROOT_DIR%\ci\run_live_test_command.py" --version "%~1" --mode live --repo-root "%ROOT_DIR%" --default-config "%ROOT_DIR%\tests\fixtures\local\live-environment.json" --default-console "%RESOLVED_CONSOLE%" --default-project "%RESOLVED_PROJECT%" --default-sandbox "%RESOLVED_SANDBOX%" -- poetry run python -m pytest tests/live/test_2022_live_prerequisites.py::test_2022_live_environment_prerequisites_fail_fast tests/live/test_2022_reflection_inventory.py::test_2022_live_reflection_inventory_runs_against_sandbox tests/live/test_2022_waql_live_matrix.py::test_2022_live_waql_object_get_matrix_runs_read_only_against_sandbox %PYTEST_EXTRA_ARGS%
+if "%~1"=="2023.1" call poetry run python "%ROOT_DIR%\ci\run_live_test_command.py" --version "%~1" --mode live --repo-root "%ROOT_DIR%" --default-config "%ROOT_DIR%\tests\fixtures\local\live-environment.json" --default-console "%RESOLVED_CONSOLE%" --default-project "%RESOLVED_PROJECT%" --default-sandbox "%RESOLVED_SANDBOX%" -- poetry run python -m pytest tests/live/test_2023_reflection_inventory.py::test_2023_live_reflection_inventory_runs_against_sandbox tests/live/test_2023_waql_live_matrix.py::test_2023_live_waql_object_get_matrix_runs_read_only_against_sandbox %PYTEST_EXTRA_ARGS%
+if "%~1"=="2024.1" call poetry run python "%ROOT_DIR%\ci\run_live_test_command.py" --version "%~1" --mode live --repo-root "%ROOT_DIR%" --default-config "%ROOT_DIR%\tests\fixtures\local\live-environment.json" --default-console "%RESOLVED_CONSOLE%" --default-project "%RESOLVED_PROJECT%" --default-sandbox "%RESOLVED_SANDBOX%" -- poetry run python -m pytest tests/live/test_2024_reflection_inventory.py::test_2024_live_reflection_inventory_runs_against_sandbox tests/live/test_2024_waql_live_matrix.py::test_2024_live_waql_object_get_matrix_runs_read_only_against_sandbox tests/live/test_2024_object_topics_sandbox.py::test_2024_1_live_safe_object_topics_against_sandbox %PYTEST_EXTRA_ARGS%
+if "%~1"=="2025.1" call poetry run python "%ROOT_DIR%\ci\run_live_test_command.py" --version "%~1" --mode live --repo-root "%ROOT_DIR%" --default-config "%ROOT_DIR%\tests\fixtures\local\live-environment.json" --default-console "%RESOLVED_CONSOLE%" --default-project "%RESOLVED_PROJECT%" --default-sandbox "%RESOLVED_SANDBOX%" -- poetry run python -m pytest tests/live/test_2025_1_reflection_inventory.py::test_2025_live_reflection_inventory_runs_against_sandbox tests/live/test_2025_1_waql_live_matrix.py::test_2025_live_waql_object_get_matrix_runs_read_only_against_sandbox tests/live/test_2025_1_object_topics_sandbox.py::test_2025_1_live_safe_object_topics_against_sandbox %PYTEST_EXTRA_ARGS%
 set "RESULT=!ERRORLEVEL!"
 popd >nul
 if not "!RESULT!"=="0" exit /b !RESULT!
@@ -405,18 +375,14 @@ echo Unsupported live version: %~1 1>&2
 exit /b 1
 
 :run_destructive_for_version
-call :set_version_environment "%~1" "destructive"
+call :set_version_defaults "%~1" "destructive"
 if errorlevel 1 exit /b !ERRORLEVEL!
-call :set_mode_flags "destructive"
-call :require_real_prerequisites "%~1" "destructive"
-if errorlevel 1 exit /b !ERRORLEVEL!
-call :print_context "%~1" "destructive"
 pushd "%ROOT_DIR%" >nul
-if "%~1"=="2021.1" call poetry run python -m pytest tests/destructive/test_2021_1_project_mutation_sandbox.py tests/destructive/test_2021_1_soundbank_audio_sandbox.py tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py %PYTEST_EXTRA_ARGS%
-if "%~1"=="2022.1" call poetry run python -m pytest tests/destructive/test_2022_project_mutation_sandbox.py tests/destructive/test_2022_soundbank_audio_sandbox.py tests/destructive/test_2022_switchcontainer_assignment_sandbox.py %PYTEST_EXTRA_ARGS%
-if "%~1"=="2023.1" call poetry run python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py %PYTEST_EXTRA_ARGS%
-if "%~1"=="2024.1" call poetry run python -m pytest tests/destructive/test_2024_project_mutation_sandbox.py tests/destructive/test_2024_soundbank_audio_sandbox.py tests/destructive/test_2024_switchcontainer_assignment_sandbox.py %PYTEST_EXTRA_ARGS%
-if "%~1"=="2025.1" call poetry run python -m pytest tests/destructive/test_2025_1_project_mutation_sandbox.py tests/destructive/test_2025_1_soundbank_audio_sandbox.py tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py %PYTEST_EXTRA_ARGS%
+if "%~1"=="2021.1" call poetry run python "%ROOT_DIR%\ci\run_live_test_command.py" --version "%~1" --mode destructive --repo-root "%ROOT_DIR%" --default-config "%ROOT_DIR%\tests\fixtures\local\live-environment.json" --default-console "%RESOLVED_CONSOLE%" --default-project "%RESOLVED_PROJECT%" --default-sandbox "%RESOLVED_SANDBOX%" -- poetry run python -m pytest tests/destructive/test_2021_1_project_mutation_sandbox.py tests/destructive/test_2021_1_soundbank_audio_sandbox.py tests/destructive/test_2021_1_switchcontainer_assignment_sandbox.py %PYTEST_EXTRA_ARGS%
+if "%~1"=="2022.1" call poetry run python "%ROOT_DIR%\ci\run_live_test_command.py" --version "%~1" --mode destructive --repo-root "%ROOT_DIR%" --default-config "%ROOT_DIR%\tests\fixtures\local\live-environment.json" --default-console "%RESOLVED_CONSOLE%" --default-project "%RESOLVED_PROJECT%" --default-sandbox "%RESOLVED_SANDBOX%" -- poetry run python -m pytest tests/destructive/test_2022_project_mutation_sandbox.py tests/destructive/test_2022_soundbank_audio_sandbox.py tests/destructive/test_2022_switchcontainer_assignment_sandbox.py %PYTEST_EXTRA_ARGS%
+if "%~1"=="2023.1" call poetry run python "%ROOT_DIR%\ci\run_live_test_command.py" --version "%~1" --mode destructive --repo-root "%ROOT_DIR%" --default-config "%ROOT_DIR%\tests\fixtures\local\live-environment.json" --default-console "%RESOLVED_CONSOLE%" --default-project "%RESOLVED_PROJECT%" --default-sandbox "%RESOLVED_SANDBOX%" -- poetry run python -m pytest tests/destructive/test_2023_project_mutation_sandbox.py tests/destructive/test_2023_soundbank_audio_sandbox.py tests/destructive/test_2023_switchcontainer_assignment_sandbox.py %PYTEST_EXTRA_ARGS%
+if "%~1"=="2024.1" call poetry run python "%ROOT_DIR%\ci\run_live_test_command.py" --version "%~1" --mode destructive --repo-root "%ROOT_DIR%" --default-config "%ROOT_DIR%\tests\fixtures\local\live-environment.json" --default-console "%RESOLVED_CONSOLE%" --default-project "%RESOLVED_PROJECT%" --default-sandbox "%RESOLVED_SANDBOX%" -- poetry run python -m pytest tests/destructive/test_2024_project_mutation_sandbox.py tests/destructive/test_2024_soundbank_audio_sandbox.py tests/destructive/test_2024_switchcontainer_assignment_sandbox.py %PYTEST_EXTRA_ARGS%
+if "%~1"=="2025.1" call poetry run python "%ROOT_DIR%\ci\run_live_test_command.py" --version "%~1" --mode destructive --repo-root "%ROOT_DIR%" --default-config "%ROOT_DIR%\tests\fixtures\local\live-environment.json" --default-console "%RESOLVED_CONSOLE%" --default-project "%RESOLVED_PROJECT%" --default-sandbox "%RESOLVED_SANDBOX%" -- poetry run python -m pytest tests/destructive/test_2025_1_project_mutation_sandbox.py tests/destructive/test_2025_1_soundbank_audio_sandbox.py tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py %PYTEST_EXTRA_ARGS%
 set "RESULT=!ERRORLEVEL!"
 popd >nul
 if not "!RESULT!"=="0" exit /b !RESULT!
@@ -496,7 +462,8 @@ echo   focused      Alias for matrix
 echo.
 echo Notes:
 echo   - Environment overrides are respected if already set:
-echo       WWISE_CONSOLE, WWISE_SAMPLE_PROJECT_PATH, WWISE_SANDBOX_ROOT,
+echo       WWISE_TEST_CONFIG, WWISE_CONSOLE, WWISE_SAMPLE_PROJECT_PATH,
+echo       WWISE_SANDBOX_ROOT,
 echo       WWISE_STARTUP_TIMEOUT, WWISE_READINESS_TIMEOUT,
 echo       WWISE_PROBE_TIMEOUT, WWISE_SHUTDOWN_TIMEOUT
 echo   - Python execution uses Poetry by default:

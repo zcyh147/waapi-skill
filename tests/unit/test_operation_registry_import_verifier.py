@@ -59,6 +59,7 @@ class ScriptedReader:
         project_languages: list[Mapping[str, Any]] | None = None,
         project_root: Path | None = None,
         originals_root: Path | None = None,
+        legacy_project_file: Path | None = None,
     ) -> None:
         self.responses = deque(responses)
         self.calls: list[tuple[str, Mapping[str, Any], Mapping[str, Any]]] = []
@@ -81,6 +82,9 @@ class ScriptedReader:
         ).resolve()
         self.originals_root = (
             originals_root or self.project_root
+        ).resolve()
+        self.legacy_project_file = (
+            legacy_project_file or WWISE_2021_PROJECT
         ).resolve()
 
     def __call__(self, uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -130,7 +134,7 @@ class ScriptedReader:
                         "name": "SampleProject",
                         "type": "Project",
                         "path": "\\",
-                        "filePath": str(WWISE_2021_PROJECT),
+                        "filePath": str(self.legacy_project_file),
                         "workunitIsDirty": False,
                     }
                 ]
@@ -169,6 +173,15 @@ def _media(root: Path, name: str, content: bytes = b"RIFF-closed-import-WAVE") -
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(content)
     return path
+
+
+def _copy_2021_project_fixture(tmp_path: Path) -> Path:
+    project_root = tmp_path / "SampleProject-2021.1"
+    project_root.mkdir()
+    (project_root / "Originals").mkdir()
+    project_file = project_root / WWISE_2021_PROJECT.name
+    shutil.copy2(WWISE_2021_PROJECT, project_file)
+    return project_file
 
 
 def _target(
@@ -851,7 +864,15 @@ def test_import_object_get_projection_never_uses_unproven_relative_accessor(
             },
         }
     )
-    reader = ScriptedReader([{"return": [anchor]}, {"return": []}])
+    legacy_project_file = (
+        _copy_2021_project_fixture(tmp_path)
+        if version == "2021.1"
+        else None
+    )
+    reader = ScriptedReader(
+        [{"return": [anchor]}, {"return": []}],
+        legacy_project_file=legacy_project_file,
+    )
 
     prepared = prepare_operation(parsed, read_call=reader).as_dict()
 
@@ -1459,6 +1480,7 @@ def test_use_existing_rejects_two_competing_audio_source_notes_fields(
 
 
 def test_2021_subfolder_prepare_binds_hashed_wproj_originals_setting(tmp_path: Path) -> None:
+    project_file = _copy_2021_project_fixture(tmp_path)
     source = _media(tmp_path, "projection-2021-subfolder.wav")
     anchor = {
         "id": PARENT_GUID,
@@ -1488,14 +1510,14 @@ def test_2021_subfolder_prepare_binds_hashed_wproj_originals_setting(tmp_path: P
     prepared = prepare_operation(
         parsed,
         read_call=Import2021Reader(
-            WWISE_2021_PROJECT,
+            project_file,
             [{"return": [anchor]}, {"return": []}],
         ),
     ).as_dict()
 
     context = prepared["verification_plan"]["originals_context"]
     assert context["authority"] == "waapi_object_get_filePath_plus_hashed_wproj"
-    assert context["originals_root"] == str(WWISE_2021_PROJECT.parent / "Originals")
+    assert context["originals_root"] == str(project_file.parent / "Originals")
     assert len(context["source_proof_sha256"]) == 64
     assert prepared["pre_state"]["import_guard"]["originals_context"] == context
 
@@ -2674,11 +2696,7 @@ def test_2021_import_language_wproj_drift_blocks_confirmation(
     tmp_path: Path,
     drift_kind: str,
 ) -> None:
-    project_root = tmp_path / "SampleProject"
-    project_root.mkdir()
-    (project_root / "Originals").mkdir()
-    project_file = project_root / "SampleProject.wproj"
-    shutil.copy2(WWISE_2021_PROJECT, project_file)
+    project_file = _copy_2021_project_fixture(tmp_path)
     source = _media(tmp_path, "language-2021.wav")
     anchor = {
         "id": PARENT_GUID,
