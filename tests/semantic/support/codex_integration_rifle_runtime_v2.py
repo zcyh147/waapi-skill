@@ -27,6 +27,10 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Protocol
 
+from tests.semantic.support.codex_archive_paths import (
+    ArchiveRelativePathError,
+    parse_archive_relative_path,
+)
 from tests.semantic.support.codex_campaign import (
     canonical_json_bytes,
     stable_tree_sha256,
@@ -2075,18 +2079,19 @@ def _normalize_rtpc_row(row: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _fresh_owned_directory(root: Path, relative: str) -> Path:
-    parts = Path(relative.replace("\\", "/"))
-    if parts.is_absolute() or not parts.parts or ".." in parts.parts:
+    try:
+        parsed_relative = parse_archive_relative_path(relative)
+    except ArchiveRelativePathError as exc:
         raise RifleIntegrationRuntimeError(
             "Rifle input relative path is unsafe"
-        )
-    candidate = root.joinpath(*parts.parts)
+        ) from exc
+    candidate = root.joinpath(*parsed_relative.parts)
     if candidate.exists() or candidate.is_symlink():
         raise RifleIntegrationRuntimeError(
             f"Rifle input root is not fresh: {candidate}"
         )
     current = root
-    for part in parts.parts:
+    for part in parsed_relative.parts:
         current /= part
         current.mkdir(exist_ok=False)
         _real_directory(current, "Rifle input directory")
@@ -2224,7 +2229,10 @@ def _copied_original_proof(
         raise RifleIntegrationRuntimeError(
             f"copied Original escapes the sandbox: {candidate}"
         ) from exc
-    if not lexical_relative.parts or lexical_relative.parts[0] != "Originals":
+    if (
+        not lexical_relative.parts
+        or Path(lexical_relative.parts[0]) != Path("Originals")
+    ):
         raise RifleIntegrationRuntimeError(
             f"copied Original is outside sandbox Originals: {candidate}"
         )
@@ -2248,7 +2256,7 @@ def _copied_original_proof(
         raise RifleIntegrationRuntimeError(
             "copied Original resolves outside the sandbox"
         ) from exc
-    if resolved_relative.parts != lexical_relative.parts:
+    if Path(*resolved_relative.parts) != Path(*lexical_relative.parts):
         raise RifleIntegrationRuntimeError(
             "copied Original changed during containment proof"
         )

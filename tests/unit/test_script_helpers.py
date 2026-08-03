@@ -181,6 +181,7 @@ def test_run_main_escalates_and_reaps_child_that_ignores_interrupt(
     run_script.VENV_DIR.mkdir(parents=True)
     monkeypatch.setattr(run_script, "bootstrap_if_needed", lambda: None)
     events: list[tuple[str, float | int | None]] = []
+    synthetic_killed_exit_code = -1
 
     class StuckPopen:
         def __init__(self) -> None:
@@ -193,11 +194,11 @@ def test_run_main_escalates_and_reaps_child_that_ignores_interrupt(
                 raise KeyboardInterrupt
             events.append(("wait", timeout))
             if self.killed:
-                return -signal.SIGKILL
+                return synthetic_killed_exit_code
             raise subprocess.TimeoutExpired(cmd=["gateway.py"], timeout=timeout)
 
         def poll(self) -> int | None:
-            return -signal.SIGKILL if self.killed else None
+            return synthetic_killed_exit_code if self.killed else None
 
         def send_signal(self, requested_signal: int) -> None:
             events.append(("signal", requested_signal))

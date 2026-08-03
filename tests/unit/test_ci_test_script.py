@@ -144,13 +144,13 @@ def _write_fake_python(bin_dir: Path, fail_on_nonlive: bool = False) -> Path:
     if os.name == "nt":
         launcher = bin_dir / "python.bat"
         launcher.write_text(
-            f'@echo off\r\n"{sys.executable}" "%~dp0fake_python.py" %*\r\nexit /b %%%%ERRORLEVEL%%%%\r\n',
+            f'@echo off\r\n"{sys.executable}" "%~dp0fake_python.py" %*\r\nexit /b %ERRORLEVEL%\r\n',
             encoding="utf-8",
         )
         poetry = bin_dir / "poetry.bat"
         poetry.write_text(
             '@echo off\r\n'
-            f'"{sys.executable}" "{script}" %*\r\nexit /b %%%%ERRORLEVEL%%%%\r\n',
+            f'"{sys.executable}" "{script}" %*\r\nexit /b %ERRORLEVEL%\r\n',
             encoding="utf-8",
         )
     else:

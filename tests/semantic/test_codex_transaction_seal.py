@@ -205,6 +205,41 @@ def test_seal_creation_requires_awaiting_confirmation_and_complete_artifact(tmp_
         create_preview_seal(tmp_path / "incomplete", "tx-incomplete")
 
 
+@pytest.mark.parametrize(
+    ("relative_path", "message"),
+    (
+        ("wwise_waapi//operation_registry.py", "unsafe relative path"),
+        ("wwise_waapi/./operation_registry.py", "unsafe relative path"),
+        ("wwise_waapi/../operation_registry.py", "unsafe relative path"),
+        (r"wwise_waapi\..\operation_registry.py", "unsafe relative path"),
+        (r"wwise_waapi\operation_registry.py", "canonical POSIX"),
+        (r"C:\runtime\operation_registry.py", "unsafe relative path"),
+        (r"\\server\share\operation_registry.py", "unsafe relative path"),
+    ),
+)
+def test_runtime_guard_archive_paths_reject_cross_host_normalization(
+    tmp_path: Path,
+    relative_path: str,
+    message: str,
+) -> None:
+    artifact = _artifact()
+    body = {
+        "version": "2022.1",
+        "files": {relative_path: "a" * 64},
+    }
+    artifact["runtime_guard"] = {
+        "contract": RUNTIME_GUARD_CONTRACT,
+        **body,
+        "fingerprint": canonical_sha256(body),
+    }
+    store = TransactionStore(tmp_path)
+    store.create_preview("tx-sealed", artifact)
+    store.submit_for_confirmation("tx-sealed")
+
+    with pytest.raises(TransactionSealError, match=message):
+        create_preview_seal(tmp_path, "tx-sealed")
+
+
 def test_confirm_and_verified_state_progression_preserves_phase_a_preview(tmp_path: Path) -> None:
     store = _awaiting_store(tmp_path)
     seal = create_preview_seal(tmp_path, "tx-sealed")
@@ -346,7 +381,10 @@ def test_symlinked_preview_and_state_root_are_rejected(tmp_path: Path) -> None:
     preview.unlink()
     create_symlink_or_skip(preview, external)
 
-    with pytest.raises(TransactionSealError, match="preview.json cannot be a symlink"):
+    with pytest.raises(
+        TransactionSealError,
+        match="preview.json cannot be a link or reparse point",
+    ):
         verify_preview_seal(
             state_root,
             "tx-sealed",
@@ -356,8 +394,32 @@ def test_symlinked_preview_and_state_root_are_rejected(tmp_path: Path) -> None:
 
     root_link = tmp_path / "state-link"
     create_symlink_or_skip(root_link, state_root, target_is_directory=True)
-    with pytest.raises(TransactionSealError, match="State-directory symlink"):
+    with pytest.raises(
+        TransactionSealError,
+        match="State-directory link or reparse point",
+    ):
         create_preview_seal(root_link, "tx-sealed")
+
+
+def test_state_directory_rejects_windows_junction_component(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state_root = tmp_path / "state"
+    _awaiting_store(state_root)
+    real_is_junction = getattr(Path, "is_junction", lambda _self: False)
+    monkeypatch.setattr(
+        Path,
+        "is_junction",
+        lambda self: self == state_root or real_is_junction(self),
+        raising=False,
+    )
+
+    with pytest.raises(
+        TransactionSealError,
+        match="State-directory link or reparse point",
+    ):
+        create_preview_seal(state_root, "tx-sealed")
 
 
 def test_state_directory_path_drift_and_non_explicit_allowed_states_fail(tmp_path: Path) -> None:

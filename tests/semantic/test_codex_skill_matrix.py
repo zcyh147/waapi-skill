@@ -235,11 +235,13 @@ def test_parse_args_uses_closed_defaults_and_resolves_explicit_live_config(
         return discovered_codex.resolve(strict=True)
 
     monkeypatch.setattr(matrix, "resolve_codex_binary", resolve_codex)
+    unconfigured_live_config = tmp_path / "missing-local-live-environment.json"
+    monkeypatch.setattr(matrix, "DEFAULT_LIVE_CONFIG", unconfigured_live_config)
     defaults = matrix.parse_args([])
 
     assert defaults.profile == "screening"
     assert defaults.codex_binary == discovered_codex.resolve(strict=True)
-    assert defaults.live_config == matrix.DEFAULT_LIVE_CONFIG.resolve(strict=True)
+    assert defaults.live_config == unconfigured_live_config.resolve(strict=False)
     assert defaults.suite_path == matrix.DEFAULT_SUITE.resolve(strict=True)
     assert defaults.skill_source == matrix.SKILL_ROOT.resolve(strict=True)
     assert defaults.model == "gpt-5.6-sol"

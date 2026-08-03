@@ -16,8 +16,13 @@ import tempfile
 import time
 from contextlib import ExitStack, contextmanager
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Callable, Iterator, Mapping, Sequence
+
+from wwise_waapi.platform_commands import (
+    PlatformCommandError,
+    decode_windows_powershell_argv,
+)
 
 
 MACOS_APP_CODEX_FALLBACK = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
@@ -26,6 +31,7 @@ DEFAULT_MODEL = "gpt-5.6-sol"
 DEFAULT_REASONING_EFFORT = "medium"
 DEFAULT_SERVICE_TIER = "priority"
 DEFAULT_TIMEOUT_SECONDS = 180.0
+WINDOWS_HARD_REAP_SECONDS = 5.0
 PROMPT_AUDIT_TIMEOUT_SECONDS = 30.0
 PROMPT_AUDIT_MAX_ATTEMPTS = 2
 WORKSPACE_SKILL_EXCLUDED_NAMES = frozenset(
@@ -1182,23 +1188,44 @@ def terminate_and_reap_process(
     process: subprocess.Popen[str],
     *,
     grace_seconds: float = 5.0,
+    platform_name: str | None = None,
 ) -> tuple[str, str]:
     """Terminate a process group, wait briefly, then kill and reap if needed."""
 
     if process.poll() is None:
-        terminate_process_group(process)
+        try:
+            terminate_process_group(process, platform_name=platform_name)
+        except CodexHarnessError:
+            # Native taskkill cannot always stop a console process tree without
+            # /F (notably while a child remains active).  Escalate through the
+            # same tree-scoped primitive instead of leaking the descendants.
+            if not _is_windows(platform_name):
+                raise
+            return force_kill_and_reap_process(process, platform_name=platform_name)
     try:
         return process.communicate(timeout=grace_seconds)
     except subprocess.TimeoutExpired:
-        return force_kill_and_reap_process(process)
+        return force_kill_and_reap_process(process, platform_name=platform_name)
 
 
-def force_kill_and_reap_process(process: subprocess.Popen[str]) -> tuple[str, str]:
+def force_kill_and_reap_process(
+    process: subprocess.Popen[str],
+    *,
+    platform_name: str | None = None,
+) -> tuple[str, str]:
     """Best-effort hard stop followed by an unbounded pipe/process reap."""
 
     if process.poll() is None:
-        kill_process_group(process)
-    return process.communicate()
+        kill_process_group(process, platform_name=platform_name)
+    if not _is_windows(platform_name):
+        return process.communicate()
+    try:
+        return process.communicate(timeout=WINDOWS_HARD_REAP_SECONDS)
+    except subprocess.TimeoutExpired as exc:
+        raise CodexHarnessError(
+            "native Windows process-tree cleanup left descendant pipes open "
+            "after the forced kill"
+        ) from exc
 
 
 def terminate_process_group(
@@ -1264,9 +1291,7 @@ def taskkill_process_tree(
 
     if process.poll() is not None:
         return
-    executable = shutil.which("taskkill.exe") or shutil.which("taskkill")
-    if not executable:
-        raise CodexHarnessError("native Windows process-tree cleanup cannot find taskkill.exe")
+    executable = windows_system_executable("taskkill.exe")
     command = [executable, "/PID", str(process.pid), "/T"]
     if force:
         command.append("/F")
@@ -1304,6 +1329,65 @@ def taskkill_process_tree(
         "native Windows taskkill.exe could not terminate the Codex process tree: "
         f"exit={completed.returncode} output={(completed.stdout or '') + (completed.stderr or '')!r}"
     )
+
+
+def windows_system_executable(
+    executable_name: str,
+    *,
+    environment: Mapping[str, str] | None = None,
+    platform_name: str | None = None,
+) -> str:
+    """Resolve one fixed System32 executable without consulting ``PATH``."""
+
+    if not _is_windows(platform_name):
+        raise CodexHarnessError("Windows system executable requested on a non-Windows host")
+    if executable_name != "taskkill.exe":
+        raise CodexHarnessError("Windows cleanup permits only taskkill.exe")
+    source = os.environ if environment is None else environment
+    values = [
+        str(value)
+        for key, value in source.items()
+        if str(key).casefold() == "systemroot"
+    ]
+    if len(values) != 1 or not values[0] or values[0] != values[0].strip():
+        raise CodexHarnessError(
+            "native Windows process-tree cleanup requires one absolute SystemRoot"
+        )
+    root = PureWindowsPath(values[0])
+    if (
+        not root.is_absolute()
+        or root.drive.startswith("\\")
+        or any(part in {".", ".."} for part in root.parts)
+    ):
+        raise CodexHarnessError("native Windows SystemRoot is not a local absolute path")
+    candidate_text = str(root / "System32" / executable_name)
+
+    # A simulated Windows unit test can prove the lexical contract on POSIX;
+    # the real host additionally attests every filesystem component.
+    if os.name != "nt":
+        return candidate_text
+    candidate = Path(candidate_text)
+    for label, path, expect_directory in (
+        ("SystemRoot", Path(str(root)), True),
+        ("System32", Path(str(root / "System32")), True),
+        (executable_name, candidate, False),
+    ):
+        try:
+            metadata = path.lstat()
+        except OSError as exc:
+            raise CodexHarnessError(
+                f"native Windows {label} is unavailable: {path}: {exc}"
+            ) from exc
+        if is_link_or_junction(path):
+            raise CodexHarnessError(
+                f"native Windows {label} must not be a link or reparse point: {path}"
+            )
+        expected_kind = stat.S_ISDIR if expect_directory else stat.S_ISREG
+        if not expected_kind(metadata.st_mode):
+            raise CodexHarnessError(
+                f"native Windows {label} has the wrong filesystem kind: {path}"
+            )
+    return str(candidate)
 
 
 @contextmanager
@@ -1704,7 +1788,10 @@ def audit_prompt_input_payload(
         prompt_sha256=hashlib.sha256(serialized.encode("utf-8")).hexdigest(),
         has_memory=any(marker.casefold() in serialized_casefold for marker in MEMORY_MARKERS),
         has_target_skill=bool(target_entries),
-        has_user_agent_skills=any("/.agents/skills/" in locator.replace("\\", "/") for _, locator in unexpected),
+        has_user_agent_skills=any(
+            local_locator_contains_parts(locator, (".agents", "skills"))
+            for _, locator in unexpected
+        ),
         has_codex_system_skills=bool(system_skills),
         skill_inventory=entries,
         system_skills=tuple(system_skills),
@@ -1794,6 +1881,23 @@ def clean_skill_locator(locator: str) -> str:
     return locator.strip().strip("`\"'")
 
 
+def local_locator_contains_parts(
+    locator: str,
+    expected_parts: Sequence[str],
+) -> bool:
+    """Match a locator using only the active host's filesystem semantics."""
+
+    if not locator or not expected_parts:
+        return False
+    parts = Path(locator).expanduser().parts
+    width = len(expected_parts)
+    expected = Path(*expected_parts)
+    return any(
+        Path(*parts[index : index + width]) == expected
+        for index in range(len(parts) - width + 1)
+    )
+
+
 def is_codex_system_skill(locator: str, *, system_skill_root: Path | None = None) -> bool:
     if not locator:
         return False
@@ -1805,8 +1909,10 @@ def is_codex_system_skill(locator: str, *, system_skill_root: Path | None = None
         except (OSError, ValueError):
             return False
         return len(relative.parts) >= 2 and relative.name.lower() == "skill.md"
-    normalized = locator.replace("\\", "/")
-    return "/.codex/skills/.system/" in normalized
+    return local_locator_contains_parts(
+        locator,
+        (".codex", "skills", ".system"),
+    )
 
 
 def skill_locator_resolves_to(locator: str, target_skill_source: Path) -> bool:
@@ -2050,15 +2156,32 @@ def completed_command_records(events: Sequence[Mapping[str, Any]]) -> tuple[Code
 
 
 def parse_command_argv(command: str) -> tuple[tuple[str, ...], bool, str]:
+    """Parse a recorded command with the host's native command-line grammar.
+
+    Explicit POSIX shell wrappers retain POSIX parsing on every host.  Bare
+    commands use ``CommandLineToArgvW`` on Windows so drive, UNC, and backslash
+    paths are not corrupted by POSIX escape rules.  CMD and PowerShell wrappers
+    are deliberately not unwrapped: they remain unexpected outer commands
+    instead of mixing incompatible shell grammars.
+    """
+
+    if os.name == "nt" and command.startswith("powershell.exe "):
+        try:
+            return decode_windows_powershell_argv(command), False, ""
+        except PlatformCommandError as exc:
+            return (), True, str(exc)
+
     try:
         outer = shlex.split(command, posix=True)
-    except ValueError as exc:
-        return (), True, str(exc)
+    except ValueError:
+        outer = []
     if not outer:
-        return (), False, "empty command"
+        if not command.strip():
+            return (), False, "empty command"
     script = command
-    shell_name = Path(outer[0]).name.lower()
-    if shell_name in {"bash", "sh", "zsh", "dash", "ksh"}:
+    shell_name = PureWindowsPath(outer[0]).name.casefold() if outer else ""
+    shell_stem = shell_name.removesuffix(".exe")
+    if shell_stem in {"bash", "sh", "zsh", "dash", "ksh"}:
         shell_option_index = next(
             (index for index, value in enumerate(outer[1:], start=1) if value in {"-c", "-lc", "-ic"}),
             None,
@@ -2068,15 +2191,62 @@ def parse_command_argv(command: str) -> tuple[tuple[str, ...], bool, str]:
         if shell_option_index + 2 != len(outer):
             return (), True, "shell command has unexpected arguments after its script"
         script = outer[shell_option_index + 1]
-    has_operators = shell_script_has_operators(script)
+        has_operators = shell_script_has_operators(script, platform_name="posix")
+        try:
+            argv = tuple(shlex.split(script, posix=True))
+        except ValueError as exc:
+            return (), True, str(exc)
+        return argv, has_operators, ""
+
+    platform_name = "nt" if os.name == "nt" else "posix"
+    has_operators = shell_script_has_operators(script, platform_name=platform_name)
     try:
-        argv = tuple(shlex.split(script, posix=True))
-    except ValueError as exc:
+        argv = split_native_command_line(script, platform_name=platform_name)
+    except (OSError, ValueError) as exc:
         return (), True, str(exc)
     return argv, has_operators, ""
 
 
-def shell_script_has_operators(script: str) -> bool:
+def split_native_command_line(
+    command: str,
+    *,
+    platform_name: str | None = None,
+) -> tuple[str, ...]:
+    """Split one shell-free command according to the selected host grammar."""
+
+    if not _is_windows(platform_name):
+        return tuple(shlex.split(command, posix=True))
+
+    # CommandLineToArgvW is the Windows system parser used for native argv
+    # semantics.  Keep the import inside the Windows branch so this module
+    # remains importable on POSIX hosts.
+    import ctypes
+    from ctypes import wintypes
+
+    argument_count = ctypes.c_int()
+    command_line_to_argv = ctypes.windll.shell32.CommandLineToArgvW
+    command_line_to_argv.argtypes = [wintypes.LPCWSTR, ctypes.POINTER(ctypes.c_int)]
+    command_line_to_argv.restype = ctypes.POINTER(wintypes.LPWSTR)
+    argument_vector = command_line_to_argv(command, ctypes.byref(argument_count))
+    if not argument_vector:
+        raise OSError(ctypes.get_last_error(), "CommandLineToArgvW failed")
+    try:
+        return tuple(argument_vector[index] for index in range(argument_count.value))
+    finally:
+        local_free = ctypes.windll.kernel32.LocalFree
+        local_free.argtypes = [ctypes.c_void_p]
+        local_free.restype = ctypes.c_void_p
+        local_free(ctypes.cast(argument_vector, ctypes.c_void_p))
+
+
+def shell_script_has_operators(
+    script: str,
+    *,
+    platform_name: str | None = None,
+) -> bool:
+    if _is_windows(platform_name):
+        return windows_shell_script_has_operators(script)
+
     quote = ""
     escaped = False
     index = 0
@@ -2105,6 +2275,32 @@ def shell_script_has_operators(script: str) -> bool:
             return True
         index += 1
     return bool(quote or escaped)
+
+
+def windows_shell_script_has_operators(script: str) -> bool:
+    """Fail closed on unquoted CMD/PowerShell composition operators."""
+
+    quoted = False
+    escaped = False
+    index = 0
+    while index < len(script):
+        character = script[index]
+        if escaped:
+            escaped = False
+            index += 1
+            continue
+        if character == "^" and not quoted:
+            escaped = True
+            index += 1
+            continue
+        if character == '"':
+            quoted = not quoted
+            index += 1
+            continue
+        if not quoted and character in "|&;<>\n\r`":
+            return True
+        index += 1
+    return quoted or escaped
 
 
 def classify_commands(
@@ -2765,7 +2961,10 @@ def snapshot_workspace(root: Path) -> dict[str, str]:
             metadata = path.stat()
             snapshot[relative] = hashlib.sha256(
                 b"file\0"
-                + f"{stat.S_IMODE(metadata.st_mode)}\0{metadata.st_size}\0{metadata.st_ctime_ns}\0".encode("ascii")
+                + (
+                    f"{stat.S_IMODE(metadata.st_mode)}\0{metadata.st_size}\0"
+                    f"{metadata.st_mtime_ns}\0{metadata.st_ctime_ns}\0"
+                ).encode("ascii")
                 + path.read_bytes()
             ).hexdigest()
     return snapshot

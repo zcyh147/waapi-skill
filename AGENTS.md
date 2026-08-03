@@ -225,6 +225,10 @@ user's approval.
 - A new mutation route needs a closed request schema, immutable preview artifact,
   confirmation or policy-authorization binding, drift checks, non-retry
   semantics, and an appropriate verifier or an explicit weaker boundary.
+- A Windows `next_command.shell_command` is the fixed encoded PowerShell argv
+  envelope from `wwise_waapi/platform_commands.py`. Do not replace it with
+  `subprocess.list2cmdline`, `cmd.exe` quoting, or model-reconstructed argv;
+  `list2cmdline` is a CreateProcess/MSVCRT serializer, not a CMD shell escape.
 - Update README coverage numbers and `tests/TEST_INVENTORY.md` only from an actual
   completed run; never estimate a passing count.
 - Fresh Codex campaign and matrix runners are the only agent-semantic test lane.

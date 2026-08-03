@@ -2132,7 +2132,10 @@ def _copied_original_proof(
         raise WeaponsIntegrationRuntimeError(
             "copied Original is outside the sandbox"
         ) from exc
-    if not lexical_relative.parts or lexical_relative.parts[0] != "Originals":
+    if (
+        not lexical_relative.parts
+        or Path(lexical_relative.parts[0]) != Path("Originals")
+    ):
         raise WeaponsIntegrationRuntimeError(
             "copied Original is outside sandbox Originals"
         )
@@ -2156,7 +2159,7 @@ def _copied_original_proof(
         raise WeaponsIntegrationRuntimeError(
             "copied Original resolves outside the sandbox"
         ) from exc
-    if resolved_relative.parts != lexical_relative.parts:
+    if Path(*resolved_relative.parts) != Path(*lexical_relative.parts):
         raise WeaponsIntegrationRuntimeError(
             "copied Original changed during containment proof"
         )

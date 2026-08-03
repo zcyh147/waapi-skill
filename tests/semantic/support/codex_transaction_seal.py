@@ -24,10 +24,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
+from tests.semantic.support.codex_archive_paths import (
+    ArchiveRelativePathError,
+    parse_archive_relative_path,
+)
 from tests.semantic.support.codex_gateway_broker import (
     validate_transaction_show_confirmation_payload,
 )
-from tests.semantic.support.codex_filesystem_security import binary_file_open_flags
+from tests.semantic.support.codex_filesystem_security import (
+    binary_file_open_flags,
+    path_is_link_or_reparse,
+    same_regular_file_handle_snapshot,
+    same_regular_file_path_handle_snapshot,
+)
 from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
 from wwise_waapi.operation_registry import OperationContractError, parse_operation_request
 from wwise_waapi.transaction_runtime import (
@@ -587,8 +596,16 @@ def _validate_guard(
         if not isinstance(files, Mapping) or not files:
             raise TransactionSealError("runtime_guard.files must be a non-empty object")
         for path, digest in files.items():
-            if not isinstance(path, str) or not path or Path(path).is_absolute() or ".." in Path(path).parts:
-                raise TransactionSealError("runtime_guard.files contains an unsafe relative path")
+            try:
+                relative = parse_archive_relative_path(path)
+            except (ArchiveRelativePathError, TypeError) as exc:
+                raise TransactionSealError(
+                    "runtime_guard.files contains an unsafe relative path"
+                ) from exc
+            if relative.source_flavor != "posix" or relative.canonical != path:
+                raise TransactionSealError(
+                    "runtime_guard.files must use canonical POSIX relative paths"
+                )
             _require_sha256(digest, field=f"runtime_guard.files[{path!r}]")
     return str(fingerprint)
 
@@ -662,13 +679,13 @@ def _read_regular_file(path: Path, *, label: str) -> _FileSnapshot:
         after = os.fstat(descriptor)
     finally:
         os.close(descriptor)
-    if _stat_identity(before) != _stat_identity(after):
+    if not same_regular_file_handle_snapshot(before, after):
         raise TransactionSealError(f"{label} changed while it was being read")
     try:
         final = os.lstat(path)
     except OSError as exc:
         raise TransactionSealError(f"{label} disappeared after it was read: {exc}") from exc
-    if _stat_identity(after) != _stat_identity(final):
+    if not same_regular_file_path_handle_snapshot(after, final):
         raise TransactionSealError(f"{label} path drifted while it was being read")
     data = b"".join(chunks)
     if len(data) != before.st_size:
@@ -685,19 +702,8 @@ def _read_regular_file(path: Path, *, label: str) -> _FileSnapshot:
     )
 
 
-def _stat_identity(value: os.stat_result) -> tuple[int, int, int, int, int, int]:
-    return (
-        value.st_dev,
-        value.st_ino,
-        value.st_size,
-        stat.S_IMODE(value.st_mode),
-        value.st_ctime_ns,
-        value.st_nlink,
-    )
-
-
 def _validate_file_stat(value: os.stat_result, *, path: Path, label: str) -> None:
-    if not stat.S_ISREG(value.st_mode):
+    if path_is_link_or_reparse(path, metadata=value) or not stat.S_ISREG(value.st_mode):
         raise TransactionSealError(f"{label} must be a regular file: {path}")
     if value.st_nlink != 1:
         raise TransactionSealError(f"{label} must not be hard-linked: {path}")
@@ -713,8 +719,11 @@ def _require_real_directory_tree(path: Path) -> None:
             info = os.lstat(current)
         except OSError as exc:
             raise TransactionSealError(f"State-directory component is missing: {current}: {exc}") from exc
-        if stat.S_ISLNK(info.st_mode):
-            raise TransactionSealError(f"State-directory symlink is not allowed: {current}")
+        if path_is_link_or_reparse(current, metadata=info):
+            raise TransactionSealError(
+                "State-directory link or reparse point is not allowed: "
+                f"{current}"
+            )
         if not stat.S_ISDIR(info.st_mode):
             raise TransactionSealError(f"State-directory component is not a directory: {current}")
 
@@ -724,8 +733,10 @@ def _require_plain_directory(path: Path, *, label: str) -> None:
         info = os.lstat(path)
     except OSError as exc:
         raise TransactionSealError(f"{label} is missing: {path}: {exc}") from exc
-    if stat.S_ISLNK(info.st_mode):
-        raise TransactionSealError(f"{label} cannot be a symlink: {path}")
+    if path_is_link_or_reparse(path, metadata=info):
+        raise TransactionSealError(
+            f"{label} cannot be a link or reparse point: {path}"
+        )
     if not stat.S_ISDIR(info.st_mode):
         raise TransactionSealError(f"{label} must be a directory: {path}")
 
@@ -735,8 +746,10 @@ def _require_plain_file(path: Path, *, label: str) -> None:
         info = os.lstat(path)
     except OSError as exc:
         raise TransactionSealError(f"{label} is missing: {path}: {exc}") from exc
-    if stat.S_ISLNK(info.st_mode):
-        raise TransactionSealError(f"{label} cannot be a symlink: {path}")
+    if path_is_link_or_reparse(path, metadata=info):
+        raise TransactionSealError(
+            f"{label} cannot be a link or reparse point: {path}"
+        )
     _validate_file_stat(info, path=path, label=label)
 
 

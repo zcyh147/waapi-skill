@@ -72,6 +72,9 @@ from tests.semantic.support.codex_gateway_broker import (  # noqa: E402  # pyrig
     TrustedStepObserver,
     TrustedStepPreObserver,
 )
+from tests.semantic.support.codex_filesystem_security import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    write_utf8_text_bytes,
+)
 from tests.semantic.support.codex_harness import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     CodexCliHarness,
     CodexHarnessError,
@@ -1899,7 +1902,7 @@ def run_fresh_phase(
 
     try:
         prompt = session.render_prompt(values)
-        (output_dir / "prompt.txt").write_text(prompt + "\n", encoding="utf-8")
+        write_text(output_dir / "prompt.txt", prompt + "\n")
         stage = "prepare-agent-workspace"
         skill_install = prepare_agent_workspace(workspace, options.skill_source)
         stage = "build-gateway-protocol"
@@ -2074,7 +2077,7 @@ def gateway_candidate_argvs(
 
 def archive_phase(execution: PhaseExecution, *, prompt: str) -> None:
     output_dir = execution.phase_root / "outputs"
-    (output_dir / "prompt.txt").write_text(prompt + "\n", encoding="utf-8")
+    write_text(output_dir / "prompt.txt", prompt + "\n")
     write_json(
         output_dir / "phase.json",
         {
@@ -2098,9 +2101,9 @@ def archive_phase(execution: PhaseExecution, *, prompt: str) -> None:
     write_json(output_dir / "broker-reconciliation.json", asdict(execution.reconciliation))
     write_json(output_dir / "runner-oracle.json", execution.runner_oracle)
     write_json(output_dir / "grading.json", execution.grade.as_dict())
-    (output_dir / "events.jsonl").write_text(execution.result.stdout, encoding="utf-8")
-    (output_dir / "stderr.txt").write_text(execution.result.stderr, encoding="utf-8")
-    (output_dir / "final.txt").write_text(execution.result.final_response + "\n", encoding="utf-8")
+    write_text(output_dir / "events.jsonl", execution.result.stdout)
+    write_text(output_dir / "stderr.txt", execution.result.stderr)
+    write_text(output_dir / "final.txt", execution.result.final_response + "\n")
 
 
 def mark_phase_execution_failed(
@@ -2166,7 +2169,7 @@ def archive_phase_failure(
 
     if prompt:
         try:
-            (output_dir / "prompt.txt").write_text(prompt + "\n", encoding="utf-8")
+            write_text(output_dir / "prompt.txt", prompt + "\n")
         except BaseException as archive_exc:  # noqa: BLE001
             archive_errors.append(f"prompt.txt: {type(archive_exc).__name__}: {archive_exc}")
 
@@ -2320,7 +2323,7 @@ def try_write_json(path: Path, payload: Mapping[str, Any], *, archive_errors: li
 
 def try_write_text(path: Path, text: str, *, archive_errors: list[str]) -> None:
     try:
-        path.write_text(text, encoding="utf-8")
+        write_text(path, text)
     except BaseException as exc:  # noqa: BLE001
         archive_errors.append(f"{path.name}: {type(exc).__name__}: {exc}")
 
@@ -3259,10 +3262,15 @@ def print_phase_error(session: EvalSession, error: str) -> None:
 
 def write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    write_utf8_text_bytes(
+        path,
         json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
     )
+
+
+def write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_utf8_text_bytes(path, text)
 
 
 def utc_now() -> str:
@@ -3402,7 +3410,11 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         skill_source=Path(args.skill_source).expanduser().resolve(strict=True),
         codex_binary=codex_binary,
         auth_json=Path(args.auth_json).expanduser().resolve(strict=True),
-        live_config=Path(args.live_config).expanduser().resolve(strict=True),
+        # This is a machine-local prerequisite, not part of argument syntax.
+        # Keep its canonical host path even when the optional local fixture has
+        # not been configured yet; real-Wwise preflight remains responsible for
+        # requiring and validating the file before a live lifecycle starts.
+        live_config=Path(args.live_config).expanduser().resolve(strict=False),
         model=str(model),
         reasoning_effort=str(args.reasoning_effort),
         service_tier=str(service_tier),

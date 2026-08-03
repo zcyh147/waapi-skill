@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
-from pathlib import Path
+import os
+from pathlib import Path, PureWindowsPath
 from types import SimpleNamespace
 from typing import Mapping
 
@@ -24,6 +26,7 @@ from tests.semantic.support.codex_integration_weather_runtime_v1 import (
     WeatherTarget,
     WorkflowVerification,
     _build_metadata_workflow_protocol,
+    _copied_original_proof,
     _gateway_derived_reference_activation_allowances,
     _metadata_dependency_properties,
     _read_rtpcs,
@@ -93,8 +96,71 @@ def test_weather_runtime_accepts_profile_proxy_scenario_family(
             version="2024.1",
             scenario_root=tmp_path,
             owned_root=tmp_path,
+            sandbox_project_root=tmp_path,
             direct=lambda *_args, **_kwargs: {},
         )
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Wine aliases are POSIX-host paths")
+def test_weather_copied_original_proof_hashes_wine_y_inside_sandbox(
+    tmp_path: Path,
+) -> None:
+    account_home = tmp_path / "account-home"
+    sandbox_root = account_home / "campaign" / "sandbox"
+    copied = sandbox_root / "Originals" / "SFX" / "~archive" / "Rain.wav"
+    copied.parent.mkdir(parents=True)
+    copied.write_bytes(b"weather-copied-original\n")
+    relative = copied.relative_to(account_home)
+    wine_path = str(PureWindowsPath("Y:/").joinpath(*relative.parts))
+
+    proof = _copied_original_proof(
+        wine_path,
+        sandbox_root=sandbox_root,
+        account_home=account_home,
+    )
+
+    assert proof["path"] == str(copied)
+    assert proof["sha256"] == hashlib.sha256(copied.read_bytes()).hexdigest()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Wine aliases are POSIX-host paths")
+def test_weather_copied_original_proof_rejects_wine_y_outside_sandbox(
+    tmp_path: Path,
+) -> None:
+    account_home = tmp_path / "account-home"
+    sandbox_root = account_home / "campaign" / "sandbox"
+    (sandbox_root / "Originals").mkdir(parents=True)
+    outside = account_home / "other" / "Originals" / "Rain.wav"
+    outside.parent.mkdir(parents=True)
+    outside.write_bytes(b"weather-copied-original\n")
+    relative = outside.relative_to(account_home)
+    wine_path = str(PureWindowsPath("Y:/").joinpath(*relative.parts))
+
+    with pytest.raises(IntegrationWeatherRuntimeError, match="escapes the sandbox"):
+        _copied_original_proof(
+            wine_path,
+            sandbox_root=sandbox_root,
+            account_home=account_home,
+        )
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows path semantics required")
+def test_weather_copied_original_proof_accepts_native_case_alias(
+    tmp_path: Path,
+) -> None:
+    sandbox_root = tmp_path / "sandbox"
+    copied = sandbox_root / "Originals" / "SFX" / "Rain.wav"
+    copied.parent.mkdir(parents=True)
+    copied.write_bytes(b"weather-native-case-alias\n")
+    case_alias = sandbox_root / "oRIGINALS" / "sfx" / "RAIN.WAV"
+
+    proof = _copied_original_proof(
+        str(case_alias),
+        sandbox_root=sandbox_root,
+    )
+
+    assert PureWindowsPath(str(proof["path"])) == PureWindowsPath(str(copied))
+    assert proof["sha256"] == hashlib.sha256(copied.read_bytes()).hexdigest()
 
 
 def test_weather_requests_close_five_sound_action_and_rtpc_requirements(

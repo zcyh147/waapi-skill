@@ -13,13 +13,17 @@ import hashlib
 import json
 import os
 import re
-import stat
 from collections import Counter
 from dataclasses import asdict, dataclass, fields, is_dataclass
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 
+from tests.semantic.support.codex_archive_paths import (
+    ArchiveAbsolutePath,
+    ArchiveRelativePathError,
+    parse_archive_absolute_path,
+)
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     build_direct_protocol,
@@ -28,6 +32,10 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_schema_query_transaction_protocol,
     build_transaction_protocol,
     query_object_step,
+)
+from tests.semantic.support.codex_filesystem_security import (
+    CodexFileSecurityError,
+    read_bounded_exclusive_regular_file,
 )
 from tests.semantic.support.codex_gateway_broker import (
     MetadataBoundJsonArgument,
@@ -54,6 +62,7 @@ OBJECT_APIS = frozenset(
     }
 )
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_MAX_OBJECT_INPUT_FILE_BYTES = 256 * 1024 * 1024
 _GUID_RE = re.compile(
     r"^\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
     r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}$"
@@ -95,33 +104,40 @@ def seal_object_input_file_manifest(
     if not isinstance(files, Mapping):
         raise ObjectBusinessPlanError("object input files must be a key/path mapping")
     rows: list[Mapping[str, Any]] = []
-    seen_paths: set[str] = set()
+    seen_paths: set[ArchiveAbsolutePath] = set()
     for key in sorted(files):
         if not isinstance(key, str) or not key:
             raise ObjectBusinessPlanError("object input file key is invalid")
         path = Path(files[key]).expanduser()
         absolute = Path(os.path.abspath(os.fspath(path)))
         try:
-            metadata = os.lstat(absolute)
-        except OSError as exc:
-            raise ObjectBusinessPlanError(
-                f"object input file cannot be inspected: {absolute}: {exc}"
-            ) from exc
-        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
-            raise ObjectBusinessPlanError(
-                f"object input file must be a real regular file: {absolute}"
+            snapshot = read_bounded_exclusive_regular_file(
+                absolute,
+                max_bytes=_MAX_OBJECT_INPUT_FILE_BYTES,
+                require_private_posix_mode=False,
             )
+        except CodexFileSecurityError as exc:
+            raise ObjectBusinessPlanError(
+                "object input file must be one bounded, exclusive, "
+                f"non-reparse regular file: {absolute}"
+            ) from exc
         text = str(absolute)
-        if text in seen_paths:
+        try:
+            path_identity = parse_archive_absolute_path(text)
+        except ArchiveRelativePathError as exc:  # pragma: no cover - host invariant
+            raise ObjectBusinessPlanError(
+                f"object input file path is not a valid absolute host path: {text}"
+            ) from exc
+        if path_identity in seen_paths:
             raise ObjectBusinessPlanError("object input file paths must be unique")
-        seen_paths.add(text)
+        seen_paths.add(path_identity)
         rows.append(
             MappingProxyType(
                 {
                     "key": key,
                     "path": text,
-                    "size": metadata.st_size,
-                    "sha256": _sha256_file(absolute),
+                    "size": snapshot.metadata.st_size,
+                    "sha256": hashlib.sha256(snapshot.raw).hexdigest(),
                 }
             )
         )
@@ -1940,7 +1956,7 @@ def _validate_input_manifest(
         raise ObjectBusinessPlanError("object input manifest must be an array")
     rows: list[dict[str, Any]] = []
     keys: set[str] = set()
-    paths: set[str] = set()
+    paths: set[ArchiveAbsolutePath] = set()
     for row in value:
         if not isinstance(row, Mapping) or set(row) != {
             "key",
@@ -1953,20 +1969,24 @@ def _validate_input_manifest(
         path_text = row.get("path")
         size = row.get("size")
         digest = row.get("sha256")
+        try:
+            path_identity = parse_archive_absolute_path(path_text)
+        except (ArchiveRelativePathError, TypeError):
+            path_identity = None
         if (
             not isinstance(key, str)
             or not key
             or key in keys
             or not isinstance(path_text, str)
-            or not os.path.isabs(path_text)
-            or path_text in paths
+            or path_identity is None
+            or path_identity in paths
             or type(size) is not int
-            or size < 0
+            or not 0 < size <= _MAX_OBJECT_INPUT_FILE_BYTES
             or not _is_sha256(digest)
         ):
             raise ObjectBusinessPlanError("object input manifest values are invalid")
         keys.add(key)
-        paths.add(path_text)
+        paths.add(path_identity)
         normalized = {
             "key": key,
             "path": path_text,
@@ -1975,17 +1995,23 @@ def _validate_input_manifest(
         }
         if verify_files:
             path = Path(path_text)
-            try:
-                metadata = os.lstat(path)
-            except OSError as exc:
+            if not path.is_absolute():
                 raise ObjectBusinessPlanError(
-                    f"object input manifest file cannot be inspected: {exc}"
+                    "object input manifest path does not belong to the current host"
+                )
+            try:
+                snapshot = read_bounded_exclusive_regular_file(
+                    path,
+                    max_bytes=size,
+                    require_private_posix_mode=False,
+                )
+            except CodexFileSecurityError as exc:
+                raise ObjectBusinessPlanError(
+                    "object input manifest differs from the current fixture file"
                 ) from exc
             if (
-                stat.S_ISLNK(metadata.st_mode)
-                or not stat.S_ISREG(metadata.st_mode)
-                or metadata.st_size != size
-                or _sha256_file(path) != digest
+                snapshot.metadata.st_size != size
+                or hashlib.sha256(snapshot.raw).hexdigest() != digest
             ):
                 raise ObjectBusinessPlanError(
                     "object input manifest differs from the current fixture file"
@@ -2171,14 +2197,6 @@ def _snapshot_digest(
     if override_output_rows is not None:
         payload["override_output_rows"] = override_output_rows
     return _sha256_json(payload)
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _sha256_json(value: Any) -> str:

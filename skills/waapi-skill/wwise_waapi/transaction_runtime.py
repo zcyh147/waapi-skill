@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import ntpath
-import posixpath
-import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -27,6 +24,7 @@ from .execution_contracts import (
     PROJECT_GUARD_TRANSITION_TO_NONE,
     PROJECT_GUARD_TRANSITION_TO_PATH,
 )
+from .host_paths import HostPathError, parse_absolute_host_path
 from .operation_registry import (
     OperationRequest,
     PreparedOperation,
@@ -48,7 +46,6 @@ PROJECT_GUARD_PHASES = frozenset(
         PROJECT_GUARD_PHASE_POST_VERIFICATION,
     }
 )
-_WINDOWS_ABSOLUTE_PATH = re.compile(r"^[A-Za-z]:[\\/]")
 
 
 class TransactionGuardError(RuntimeError):
@@ -226,39 +223,29 @@ def _runtime_context(
 def canonical_project_path(value: Any) -> str:
     """Return one host-independent canonical absolute WPROJ path."""
 
-    if not isinstance(value, str) or not value.strip() or "\x00" in value:
+    if not isinstance(value, str) or not value:
         raise TransactionGuardError(
             "INVALID_PROJECT_TRANSITION",
             "Project transitions require a non-empty absolute WPROJ path.",
             details={"target_project_path": value},
         )
-    path = value.strip()
-    windows_flavor = bool(_WINDOWS_ABSOLUTE_PATH.match(path) or path.startswith(("\\\\", "//")))
-    if windows_flavor:
-        normalized = ntpath.normpath(path.replace("/", "\\"))
-        if not ntpath.isabs(normalized):
-            raise TransactionGuardError(
-                "INVALID_PROJECT_TRANSITION",
-                "Project transition path must be absolute.",
-                details={"target_project_path": value},
-            )
-        canonical = f"windows:{ntpath.normcase(normalized)}"
-    else:
-        normalized = posixpath.normpath(path)
-        if not posixpath.isabs(normalized):
-            raise TransactionGuardError(
-                "INVALID_PROJECT_TRANSITION",
-                "Project transition path must be absolute.",
-                details={"target_project_path": value},
-            )
-        canonical = f"posix:{normalized}"
-    if not normalized.casefold().endswith(".wproj"):
+    try:
+        parsed = parse_absolute_host_path(value)
+    except HostPathError as exc:
+        raise TransactionGuardError(
+            "INVALID_PROJECT_TRANSITION",
+            "Project transition path must be a strict absolute host path.",
+            details={"target_project_path": value, "path_error": str(exc)},
+        ) from exc
+    if not parsed.pure_path.name.casefold().endswith(".wproj"):
         raise TransactionGuardError(
             "INVALID_PROJECT_TRANSITION",
             "Project transition path must identify a .wproj file.",
             details={"target_project_path": value},
         )
-    return canonical
+    if parsed.flavor == "posix":
+        return f"posix:{parsed.pure_path.as_posix()}"
+    return f"windows:{str(parsed.pure_path).casefold()}"
 
 
 def build_runtime_guard(skill_root: Path, version: str) -> dict[str, Any]:
@@ -697,7 +684,11 @@ def _require_project_guard_mode(value: Any) -> str:
 
 
 def _project_snapshot_path(project: Mapping[str, Any]) -> str | None:
-    for key in ("path", "projectPath", "filePath"):
+    # In Wwise 2021.1 the Project object's ``path`` is the hierarchy value
+    # ``\\``; ``filePath`` is the filesystem identity.  Later getProjectInfo
+    # responses expose the WPROJ path as ``path``.  Prefer explicit filesystem
+    # accessors while retaining the later-version fallback.
+    for key in ("filePath", "projectPath", "path"):
         value = project.get(key)
         if isinstance(value, str) and value.strip():
             return value

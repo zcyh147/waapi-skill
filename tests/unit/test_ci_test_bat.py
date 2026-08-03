@@ -86,14 +86,14 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
 
     python_bat = bin_dir / "python.bat"
     python_bat.write_text(
-        f'@echo off\r\n"{sys.executable}" "%~dp0fake_python.py" %*\r\nexit /b %%%%ERRORLEVEL%%%%\r\n',
+        f'@echo off\r\n"{sys.executable}" "%~dp0fake_python.py" %*\r\nexit /b %ERRORLEVEL%\r\n',
         encoding="utf-8",
     )
 
     poetry_bat = bin_dir / "poetry.bat"
     poetry_bat.write_text(
         '@echo off\r\n'
-        f'"{sys.executable}" "{runner}" %*\r\nexit /b %%%%ERRORLEVEL%%%%\r\n',
+        f'"{sys.executable}" "{runner}" %*\r\nexit /b %ERRORLEVEL%\r\n',
         encoding="utf-8",
     )
 

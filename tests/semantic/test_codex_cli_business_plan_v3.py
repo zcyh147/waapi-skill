@@ -8,10 +8,12 @@ from types import MappingProxyType
 
 import pytest
 
+from tests.semantic.support.codex_archive_paths import parse_archive_absolute_path
 from tests.semantic.support.codex_cli_business_plan_v3 import (
     CliBusinessPlanError, compile_cli_business_plan, parse_cli_business_plan_sections,
     validate_cli_archived_verification, validate_cli_business_plan,
-    validate_cli_business_plan_archive, _hash, _plain, _rules,
+    validate_cli_business_plan_archive, _archived_tree_rows,
+    _archived_trees_equal, _hash, _plain, _rules, _validate_proofs,
 )
 from tests.semantic.test_codex_cli_runtime_v3 import (
     _apply_success, _build, _dispatch, _make_console, _phase_evidence, _seal,
@@ -36,6 +38,209 @@ def _rehash_tree(tree: dict) -> None:
         digest.update(str(row["sha256"]).encode("ascii"))
         digest.update(b"\0")
     tree["sha256"] = digest.hexdigest()
+
+
+def test_archived_tree_rows_canonicalize_windows_relative_paths(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "tree"
+    path = root / "wav" / "source.wav"
+    raw_relative = r"wav\source.wav"
+    tree = {
+        "root": str(root),
+        "files": [
+            {
+                "path": str(path),
+                "relative_path": raw_relative,
+                "size": 4,
+                "sha256": "a" * 64,
+                "mtime_ns": 1,
+            }
+        ],
+        "sha256": "",
+    }
+    _rehash_tree(tree)
+
+    archived = _archived_tree_rows(tree, label="test tree")
+
+    assert archived.root_text == str(root)
+    assert set(archived.rows) == {"wav/source.wav"}
+    assert archived.rows["wav/source.wav"]["relative_path"] == "wav/source.wav"
+    assert archived.display_paths["wav/source.wav"] == (
+        str(path),
+        "wav/source.wav",
+    )
+
+    duplicate = copy.deepcopy(tree)
+    duplicate["files"].append(
+        {
+            **duplicate["files"][0],
+            "relative_path": "wav/source.wav",
+        }
+    )
+    _rehash_tree(duplicate)
+    with pytest.raises(CliBusinessPlanError, match="identity is duplicated"):
+        _archived_tree_rows(duplicate, label="test tree")
+
+
+def test_archived_tree_rows_parse_windows_roots_off_host() -> None:
+    tree = {
+        "root": r"C:\Campaign\tree",
+        "files": [
+            {
+                "path": r"C:\Campaign\tree\wav\source.wav",
+                "relative_path": r"wav\source.wav",
+                "size": 4,
+                "sha256": "a" * 64,
+                "mtime_ns": 1,
+            }
+        ],
+        "sha256": "",
+    }
+    _rehash_tree(tree)
+
+    archived = _archived_tree_rows(tree, label="Windows test tree")
+
+    assert archived.root_text == r"C:\Campaign\tree"
+    assert archived.root == parse_archive_absolute_path(r"c:\campaign\TREE")
+    assert set(archived.rows) == {"wav/source.wav"}
+    assert (
+        parse_archive_absolute_path(r"c:\campaign\TREE\WAV\SOURCE.WAV")
+        in archived.by_absolute_path
+    )
+
+    alias = copy.deepcopy(tree)
+    alias["root"] = "c:/campaign/TREE"
+    alias["files"][0]["path"] = "c:/campaign/TREE/WAV/SOURCE.WAV"
+    alias["files"][0]["relative_path"] = "WAV/SOURCE.WAV"
+    _rehash_tree(alias)
+    aliased_archive = _archived_tree_rows(alias, label="Windows alias tree")
+
+    assert _archived_trees_equal(archived, aliased_archive)
+    assert aliased_archive.display_paths["wav/source.wav"] == (
+        "c:/campaign/TREE/WAV/SOURCE.WAV",
+        "WAV/SOURCE.WAV",
+    )
+
+
+def test_archived_tree_rows_reject_windows_case_aliases() -> None:
+    tree = {
+        "root": r"C:\Campaign\tree",
+        "files": [
+            {
+                "path": r"C:\Campaign\tree\Foo.txt",
+                "relative_path": "Foo.txt",
+                "size": 4,
+                "sha256": "a" * 64,
+                "mtime_ns": 1,
+            },
+            {
+                "path": r"c:\campaign\tree\foo.TXT",
+                "relative_path": "foo.TXT",
+                "size": 4,
+                "sha256": "a" * 64,
+                "mtime_ns": 1,
+            },
+        ],
+        "sha256": "",
+    }
+    _rehash_tree(tree)
+
+    with pytest.raises(CliBusinessPlanError, match="identity is duplicated"):
+        _archived_tree_rows(tree, label="Windows test tree")
+
+
+def test_archived_tree_rows_keep_posix_case_distinct(tmp_path: Path) -> None:
+    root = tmp_path / "tree"
+    upper = {
+        "root": str(root),
+        "files": [
+            {
+                "path": str(root / "Foo.txt"),
+                "relative_path": "Foo.txt",
+                "size": 4,
+                "sha256": "a" * 64,
+                "mtime_ns": 1,
+            }
+        ],
+        "sha256": "",
+    }
+    lower = copy.deepcopy(upper)
+    lower["files"][0]["path"] = str(root / "foo.txt")
+    lower["files"][0]["relative_path"] = "foo.txt"
+    _rehash_tree(upper)
+    _rehash_tree(lower)
+
+    assert not _archived_trees_equal(
+        _archived_tree_rows(upper, label="POSIX upper tree"),
+        _archived_tree_rows(lower, label="POSIX lower tree"),
+    )
+
+
+def test_cli_input_proofs_reject_windows_case_aliases() -> None:
+    rows = [
+        {
+            "path": r"C:\Campaign\assets\Source.wav",
+            "relative_path": "wav/Source.wav",
+            "size": 4,
+            "sha256": "a" * 64,
+            "mtime_ns": 1,
+        },
+        {
+            "path": r"c:\campaign\ASSETS\source.WAV",
+            "relative_path": "wav/source-copy.wav",
+            "size": 4,
+            "sha256": "a" * 64,
+            "mtime_ns": 1,
+        },
+    ]
+
+    with pytest.raises(CliBusinessPlanError, match="absolute paths are duplicated"):
+        _validate_proofs(rows, verify_files=False)
+
+
+def test_cli_input_proof_verification_rejects_a_hard_linked_asset(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.wav"
+    source.write_bytes(b"RIFF-source")
+    (tmp_path / "source-alias.wav").hardlink_to(source)
+    metadata = source.stat()
+    rows = [
+        {
+            "path": str(source),
+            "relative_path": "source.wav",
+            "size": metadata.st_size,
+            "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+            "mtime_ns": metadata.st_mtime_ns,
+        }
+    ]
+
+    with pytest.raises(CliBusinessPlanError, match="input proof changed"):
+        _validate_proofs(rows, verify_files=True)
+
+
+def test_archived_tree_rows_reject_absolute_path_normalization(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "tree"
+    tree = {
+        "root": str(root),
+        "files": [
+            {
+                "path": f"{root}//wav/source.wav",
+                "relative_path": "wav/source.wav",
+                "size": 4,
+                "sha256": "a" * 64,
+                "mtime_ns": 1,
+            }
+        ],
+        "sha256": "",
+    }
+    _rehash_tree(tree)
+
+    with pytest.raises(CliBusinessPlanError, match="file proof is invalid"):
+        _archived_tree_rows(tree, label="test tree")
 
 
 def _sealed_convert_archive(tmp_path: Path):
@@ -69,6 +274,46 @@ def test_all_twenty_cli_cases_compile_recompute_and_archive(tmp_path: Path, case
         assert "tx01.verify" not in sections.payload_bindings["verification_steps"]
     else:
         assert "tx01.verify" in sections.payload_bindings["verification_steps"]
+
+
+def test_cli_archive_rejects_rehashed_input_proof_outside_case_root(
+    tmp_path: Path,
+) -> None:
+    case = next(
+        item
+        for item in _suite_cli_cases()
+        if item.id == "O22-CLI-CONVERT-EXTERNAL-01"
+    )
+    runtime, _backend, _lifecycle = _prepared(tmp_path, case)
+    protocol = runtime.gateway_protocol()
+    sections = compile_cli_business_plan(runtime, protocol)
+    static = _plain(sections.static_expectation)
+    live = _plain(sections.live_binding)
+    assert live["input_proofs"]
+    live["input_proofs"][0]["path"] = str(
+        Path(live["case_root"]).parent / "outside-case-root.wav"
+    )
+    forged = replace(
+        sections,
+        live_binding=MappingProxyType(live),
+        fixture_spec=MappingProxyType(
+            {
+                "kind": sections.fixture_spec["kind"],
+                "sha256": _hash({"static": static, "live": live}),
+            }
+        ),
+        delta_rules=tuple(
+            MappingProxyType(row) for row in _rules(static, live)
+        ),
+    )
+
+    with pytest.raises(CliBusinessPlanError, match="escapes scenario-owned root"):
+        validate_cli_business_plan_archive(
+            forged,
+            scenario=case,
+            version="2022.1",
+            protocol=protocol,
+        )
 
 
 @pytest.mark.parametrize("api", [
@@ -179,6 +424,7 @@ def test_generate04_archive_proves_stale_cache_bank_and_header_replaced(tmp_path
         if x["relative_path"].endswith("Windows/SFX/stale-audio-cache.wem")
     )
     cache_restored["after"]["output_tree"]["files"].append(cache_proof)
+    _rehash_tree(cache_restored["after"]["output_tree"])
     with pytest.raises(CliBusinessPlanError, match="cache"):
         validate_cli_archived_verification(sections, cache_restored)
 
@@ -186,8 +432,73 @@ def test_generate04_archive_proves_stale_cache_bank_and_header_replaced(tmp_path
         stale = copy.deepcopy(archived)
         row = next(x for x in stale["after"]["output_tree"]["files"] if x["relative_path"].endswith(suffix))
         row["sha256"] = before_by_path[row["path"]]["sha256"]
+        _rehash_tree(stale["after"]["output_tree"])
         with pytest.raises(CliBusinessPlanError):
             validate_cli_archived_verification(sections, stale)
+
+
+@pytest.mark.parametrize(
+    "tree_name",
+    ("project_tree", "source_template_tree", "asset_tree", "output_tree"),
+)
+def test_cli_archive_validates_every_after_tree_path_set(
+    tmp_path: Path,
+    tree_name: str,
+) -> None:
+    case = next(
+        item
+        for item in _suite_cli_cases()
+        if item.id == "O22-CLI-GENERATE-BANK-04"
+    )
+    runtime, backend, lifecycle = _prepared(tmp_path, case)
+    sections = compile_cli_business_plan(runtime, runtime.gateway_protocol())
+    _apply_success(runtime, backend)
+    archived = _plain(
+        runtime.verify_after(
+            dispatch=_dispatch(case),
+            lifecycle=lifecycle,
+            business_evidence=_phase_evidence(lifecycle.business),
+        )
+    )
+    validate_cli_archived_verification(sections, archived)
+
+    tampered = copy.deepcopy(archived)
+    tree = tampered["after"][tree_name]
+    tree["files"].append(
+        {
+            "path": str(Path(tree["root"]).parent / "escape.bin"),
+            "relative_path": "../escape.bin",
+            "size": 1,
+            "sha256": "e" * 64,
+            "mtime_ns": 1,
+        }
+    )
+    _rehash_tree(tree)
+
+    with pytest.raises(CliBusinessPlanError, match=tree_name.replace("_", " ")):
+        validate_cli_archived_verification(sections, tampered)
+
+
+def test_cli_archive_rejects_output_tree_digest_drift(tmp_path: Path) -> None:
+    case = next(
+        item
+        for item in _suite_cli_cases()
+        if item.id == "O22-CLI-GENERATE-BANK-04"
+    )
+    runtime, backend, lifecycle = _prepared(tmp_path, case)
+    sections = compile_cli_business_plan(runtime, runtime.gateway_protocol())
+    _apply_success(runtime, backend)
+    archived = _plain(
+        runtime.verify_after(
+            dispatch=_dispatch(case),
+            lifecycle=lifecycle,
+            business_evidence=_phase_evidence(lifecycle.business),
+        )
+    )
+    archived["after"]["output_tree"]["sha256"] = "0" * 64
+
+    with pytest.raises(CliBusinessPlanError, match="output tree"):
+        validate_cli_archived_verification(sections, archived)
 
 
 def test_convert_archive_accepts_only_the_sealed_relational_side_effects(

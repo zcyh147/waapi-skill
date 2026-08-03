@@ -27,6 +27,10 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Protocol
 
+from tests.semantic.support.codex_archive_paths import (
+    ArchiveRelativePathError,
+    parse_archive_relative_path,
+)
 from tests.semantic.support.codex_campaign import (
     canonical_json_bytes,
     stable_tree_sha256,
@@ -2368,18 +2372,19 @@ def _oracle_requirements() -> tuple[FootstepsOracleRequirement, ...]:
 
 
 def _fresh_owned_directory(root: Path, relative: str) -> Path:
-    parts = Path(relative.replace("\\", "/"))
-    if parts.is_absolute() or not parts.parts or ".." in parts.parts:
+    try:
+        parsed_relative = parse_archive_relative_path(relative)
+    except ArchiveRelativePathError as exc:
         raise FootstepsIntegrationRuntimeError(
             "Footsteps input relative path is unsafe"
-        )
-    candidate = root.joinpath(*parts.parts)
+        ) from exc
+    candidate = root.joinpath(*parsed_relative.parts)
     if candidate.exists() or candidate.is_symlink():
         raise FootstepsIntegrationRuntimeError(
             f"Footsteps input root is not fresh: {candidate}"
         )
     current = root
-    for part in parts.parts:
+    for part in parsed_relative.parts:
         current /= part
         current.mkdir(exist_ok=False)
         _real_directory(current, "Footsteps input directory")
@@ -2519,7 +2524,7 @@ def _copied_original_proof(
         ) from exc
     if (
         not lexical_relative.parts
-        or lexical_relative.parts[0] != "Originals"
+        or Path(lexical_relative.parts[0]) != Path("Originals")
     ):
         raise FootstepsIntegrationRuntimeError(
             f"copied Original is outside sandbox Originals: {candidate}"
@@ -2544,7 +2549,7 @@ def _copied_original_proof(
         raise FootstepsIntegrationRuntimeError(
             "copied Original resolves outside the sandbox"
         ) from exc
-    if resolved_relative.parts != lexical_relative.parts:
+    if Path(*resolved_relative.parts) != Path(*lexical_relative.parts):
         raise FootstepsIntegrationRuntimeError(
             "copied Original changed during containment proof"
         )
@@ -2649,12 +2654,13 @@ def _safe_file_name(value: Any) -> str:
 
 
 def _safe_original_relative(value: str) -> bool:
-    path = Path(value.replace("\\", "/"))
+    try:
+        path = parse_archive_relative_path(value)
+    except ArchiveRelativePathError:
+        return False
     return (
-        not path.is_absolute()
-        and len(path.parts) >= 2
+        len(path.parts) >= 2
         and path.parts[0] == "Originals"
-        and all(part not in {"", ".", ".."} for part in path.parts)
     )
 
 

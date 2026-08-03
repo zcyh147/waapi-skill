@@ -5,7 +5,6 @@ import json
 import os
 import shlex
 import shutil
-import subprocess
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -52,12 +51,17 @@ from tests.semantic.support.codex_harness import (
     CodexInfrastructureError,
     CodexInfrastructureFailure,
 )
+from tests.semantic.support.codex_filesystem_security import write_utf8_text_bytes
 from tests.semantic.test_codex_cli_runtime_v3 import (
     FakeBackend,
     _apply_success,
     _suite_cli_cases,
 )
 from wwise_waapi.transactions import TransactionState, TransactionStore
+from wwise_waapi.platform_commands import (
+    WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    encode_windows_powershell_argv,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -92,8 +96,8 @@ def _fake_transaction_next_command(
     if requires_later_user_message:
         result["requires_later_user_message"] = True
     if os.name == "nt":
-        result["shell_family"] = "windows-cmd"
-        shell_command = subprocess.list2cmdline(full_argv)
+        result["shell_family"] = WINDOWS_POWERSHELL_ENCODED_FAMILY
+        shell_command = encode_windows_powershell_argv(full_argv)
     else:
         result["shell_family"] = "posix-sh"
         shell_command = shlex.join(full_argv)
@@ -698,12 +702,12 @@ class _FakeWorld:
 
     @staticmethod
     def _write_dispatch_row(path: Path, payload: Mapping[str, Any]) -> None:
-        path.write_text(
+        write_utf8_text_bytes(
+            path,
             json.dumps(
                 {**payload, "evidence_path": str(path)},
                 sort_keys=True,
             ),
-            encoding="utf-8",
         )
 
     def dependencies(self) -> HeavyCliRunnerDependencies:

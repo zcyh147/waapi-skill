@@ -668,6 +668,27 @@ def test_external_sources_parser_hashes_inputs_and_derives_destinations(tmp_path
     assert drift.value.error_code in {"FILE_CHANGED", "LIMIT_EXCEEDED"}
 
 
+def test_external_sources_parser_localizes_windows_spelled_relative_paths(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "project"
+    source_root = project_root / "ExternalSources" / "nested"
+    source_root.mkdir(parents=True)
+    (source_root / "tone.wav").write_bytes(b"RIFF-tone")
+    source_list = _write_wsources(
+        project_root / "portable.wsources",
+        "ExternalSources\\",
+        r'  <Source Path="nested\tone.wav" Destination="portable/tone.wav" />',
+    )
+
+    parsed = parse_external_sources_file(source_list, project_root=project_root)
+
+    assert parsed["entries"][0]["source"]["path"] == str(
+        (source_root / "tone.wav").resolve()
+    )
+    assert parsed["entries"][0]["expected_destination"] == "portable/tone.wem"
+
+
 @pytest.mark.parametrize(
     ("body", "error_code"),
     [

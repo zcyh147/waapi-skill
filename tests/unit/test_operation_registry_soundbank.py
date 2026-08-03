@@ -82,6 +82,35 @@ def test_waapi_virtual_home_path_uses_host_account_not_disposable_home(
     )
 
 
+def test_waapi_posix_file_path_keeps_a_literal_backslash() -> None:
+    if os.name == "nt":
+        pytest.skip("a backslash is a native separator on Windows")
+
+    value = r"/srv/projects/name\with-backslash/SampleProject.wproj"
+    assert _localize_waapi_file_path(value) == value
+
+
+@pytest.mark.parametrize(
+    "value",
+    (
+        "relative/SampleProject.wproj",
+        r"C:\Projects\SampleProject.wproj",
+        r"\\server\share\SampleProject.wproj",
+        r"Y:\Projects\..\SampleProject.wproj",
+    ),
+)
+def test_waapi_posix_file_path_fails_closed_when_namespace_is_not_local(
+    value: str,
+) -> None:
+    if os.name == "nt":
+        pytest.skip("this test covers POSIX and Wine localization")
+
+    with pytest.raises(OperationContractError) as caught:
+        _localize_waapi_file_path(value)
+
+    assert caught.value.error_code == "INVALID_PROJECT_CONTEXT"
+
+
 def _project(tmp_path: Path) -> tuple[Path, dict[str, Any]]:
     io_root = tmp_path / "sandbox"
     project_root = io_root / "SampleProject"

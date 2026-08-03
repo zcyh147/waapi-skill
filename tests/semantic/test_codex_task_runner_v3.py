@@ -23,6 +23,7 @@ from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
     GatewayBrokerReconciliation,
 )
+from tests.semantic.support.codex_filesystem_security import write_utf8_text_bytes
 from tests.semantic.support.codex_harness import (
     CodexCommandRecord,
     CodexInfrastructureError,
@@ -815,7 +816,8 @@ def _run_infrastructure_task(
     elif plan_tamper == "rewrite":
         rewritten = dict(business_oracle_plan.payload)
         rewritten["assertion_ids"] = ["common.rewritten-after-seal"]
-        business_oracle_plan.path.write_text(
+        write_utf8_text_bytes(
+            business_oracle_plan.path,
             json.dumps(
                 rewritten,
                 ensure_ascii=False,
@@ -824,7 +826,6 @@ def _run_infrastructure_task(
                 separators=(",", ":"),
             )
             + "\n",
-            encoding="utf-8",
         )
     elif plan_tamper == "evidence_sha":
         business_oracle_plan = replace(

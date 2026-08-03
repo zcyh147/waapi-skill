@@ -11,6 +11,7 @@ import hashlib
 import json
 import math
 import shutil
+import stat
 import struct
 import wave
 from dataclasses import dataclass, replace
@@ -31,6 +32,11 @@ from tests.semantic.support.codex_gateway_broker import (
     MetadataTokenProjection,
     SemanticJsonArgument,
     project_required_metadata_tokens,
+)
+from tests.semantic.support.codex_filesystem_security import path_is_link_or_reparse
+from tests.semantic.support.codex_integration_paths_v2 import (
+    IntegrationOriginalPathError,
+    localize_copied_original_path,
 )
 from tests.semantic.support.codex_version_layout_v3 import (
     get_codex_version_layout_v3,
@@ -144,6 +150,7 @@ def prepare_weather_workflow(
     version: str,
     scenario_root: Path,
     owned_root: Path,
+    sandbox_project_root: Path,
     direct: DirectCall,
 ) -> PreparedWeatherWorkflow:
     """Materialize and seal the five-Sound weather workflow."""
@@ -169,6 +176,23 @@ def prepare_weather_workflow(
     if owned != (root / "owned").resolve(strict=True):
         raise IntegrationWeatherRuntimeError(
             "weather owned root differs from the scenario authority"
+        )
+    sandbox_input = Path(sandbox_project_root)
+    try:
+        sandbox_metadata = sandbox_input.lstat()
+        sandbox = sandbox_input.resolve(strict=True)
+    except OSError as exc:
+        raise IntegrationWeatherRuntimeError(
+            "weather sandbox project root is unavailable"
+        ) from exc
+    if (
+        path_is_link_or_reparse(sandbox_input, metadata=sandbox_metadata)
+        or not stat.S_ISDIR(sandbox_metadata.st_mode)
+        or sandbox == owned
+        or owned not in sandbox.parents
+    ):
+        raise IntegrationWeatherRuntimeError(
+            "weather sandbox project root is outside the scenario authority"
         )
 
     source_root = owned / "weather" / "sources"
@@ -414,6 +438,7 @@ def prepare_weather_workflow(
         targets=tuple(targets),
         created_ids=created_ids,
         source_root=source_root,
+        sandbox_root=sandbox,
         source_proofs=MappingProxyType(
             {
                 target.key: _file_proof(target.source_path)
@@ -585,6 +610,7 @@ class _WeatherState:
     targets: tuple[WeatherTarget, ...]
     created_ids: tuple[str, ...]
     source_root: Path
+    sandbox_root: Path
     source_proofs: Mapping[str, Mapping[str, Any]]
     cleaned: bool = False
 
@@ -789,35 +815,35 @@ class _WeatherState:
                     source.get("audioSource:language")
                 )
                 original_path = source.get("originalFilePath")
-                normalized_original = (
-                    original_path.replace("\\", "/")
-                    if isinstance(original_path, str)
-                    else ""
-                )
+                if source_language != "SFX":
+                    failures.append(
+                        f"{target.name} AudioFileSource file or language differs"
+                    )
+                    continue
+                try:
+                    copied_proof = _copied_original_proof(
+                        original_path,
+                        sandbox_root=self.sandbox_root,
+                    )
+                except IntegrationWeatherRuntimeError:
+                    failures.append(
+                        f"{target.name} copied Original is unavailable"
+                    )
+                    continue
                 if (
-                    source_language != "SFX"
-                    or not normalized_original
-                    or normalized_original.rpartition("/")[2]
+                    Path(str(copied_proof["path"])).name
                     != target.source_path.name
                 ):
                     failures.append(
                         f"{target.name} AudioFileSource file or language differs"
                     )
-                elif Path(original_path).is_absolute():
-                    try:
-                        copied_proof = _file_proof(Path(original_path))
-                    except (OSError, IntegrationWeatherRuntimeError):
-                        failures.append(
-                            f"{target.name} copied Original is unavailable"
-                        )
-                    else:
-                        if (
-                            copied_proof["sha256"]
-                            != self.source_proofs[target.key]["sha256"]
-                        ):
-                            failures.append(
-                                f"{target.name} copied Original content differs"
-                            )
+                elif (
+                    copied_proof["sha256"]
+                    != self.source_proofs[target.key]["sha256"]
+                ):
+                    failures.append(
+                        f"{target.name} copied Original content differs"
+                    )
         if _plain(snapshot["source_files"]) != _plain(self.source_proofs):
             failures.append("weather source fixture files changed")
         return WorkflowVerification(
@@ -2040,6 +2066,87 @@ def _file_proof(path: Path) -> Mapping[str, Any]:
             "sha256": hashlib.sha256(payload).hexdigest(),
         }
     )
+
+
+def _copied_original_proof(
+    value: Any,
+    *,
+    sandbox_root: Path,
+    account_home: Path | None = None,
+) -> Mapping[str, Any]:
+    """Prove one Wwise-reported Original inside this workflow's sandbox."""
+
+    try:
+        candidate = localize_copied_original_path(
+            value,
+            account_home=account_home,
+        )
+    except IntegrationOriginalPathError as exc:
+        raise IntegrationWeatherRuntimeError(str(exc)) from exc
+    try:
+        root_input = Path(sandbox_root)
+        root_metadata = root_input.lstat()
+        if (
+            path_is_link_or_reparse(root_input, metadata=root_metadata)
+            or not stat.S_ISDIR(root_metadata.st_mode)
+        ):
+            raise IntegrationWeatherRuntimeError(
+                "weather sandbox root is not a real directory"
+            )
+        root = root_input.resolve(strict=True)
+        originals = root / "Originals"
+        originals_metadata = originals.lstat()
+    except IntegrationWeatherRuntimeError:
+        raise
+    except OSError as exc:
+        raise IntegrationWeatherRuntimeError(
+            "weather copied Originals root is unavailable"
+        ) from exc
+    if (
+        path_is_link_or_reparse(originals, metadata=originals_metadata)
+        or not stat.S_ISDIR(originals_metadata.st_mode)
+    ):
+        raise IntegrationWeatherRuntimeError(
+            "weather copied Originals root is not a real directory"
+        )
+    try:
+        lexical_relative = candidate.relative_to(root)
+    except ValueError as exc:
+        raise IntegrationWeatherRuntimeError(
+            "weather copied Original escapes the sandbox"
+        ) from exc
+    if (
+        not lexical_relative.parts
+        or Path(lexical_relative.parts[0]) != Path("Originals")
+    ):
+        raise IntegrationWeatherRuntimeError(
+            "weather copied Original is outside sandbox Originals"
+        )
+    current = root
+    for part in lexical_relative.parts:
+        current /= part
+        try:
+            metadata = current.lstat()
+        except OSError as exc:
+            raise IntegrationWeatherRuntimeError(
+                f"weather copied Original path is unavailable: {current}"
+            ) from exc
+        if path_is_link_or_reparse(current, metadata=metadata):
+            raise IntegrationWeatherRuntimeError(
+                f"weather copied Original path contains a link: {current}"
+            )
+    try:
+        resolved = candidate.resolve(strict=True)
+        resolved_relative = resolved.relative_to(root)
+    except (OSError, ValueError) as exc:
+        raise IntegrationWeatherRuntimeError(
+            "weather copied Original resolves outside the sandbox"
+        ) from exc
+    if Path(*resolved_relative.parts) != Path(*lexical_relative.parts):
+        raise IntegrationWeatherRuntimeError(
+            "weather copied Original changed during containment proof"
+        )
+    return _file_proof(resolved)
 
 
 def _verification_from_snapshot(

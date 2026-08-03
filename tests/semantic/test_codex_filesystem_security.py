@@ -31,6 +31,23 @@ def test_binary_file_open_flags_reject_non_integer_flags() -> None:
         filesystem.binary_file_open_flags("read-only")  # type: ignore[arg-type]
 
 
+def test_utf8_archive_writer_keeps_explicit_lf_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "protocol.txt"
+    monkeypatch.setattr(
+        Path,
+        "write_text",
+        lambda *_args, **_kwargs: pytest.fail("text-mode writer was used"),
+    )
+
+    filesystem.write_utf8_text_bytes(path, "第一行\nsecond\n")
+
+    assert path.read_bytes() == "第一行\nsecond\n".encode("utf-8")
+    assert b"\r" not in path.read_bytes()
+
+
 @pytest.mark.parametrize(
     ("platform_name", "mode", "expected"),
     (
@@ -70,6 +87,69 @@ def test_reparse_attribute_is_rejected_independently_of_posix_mode(
     assert filesystem.path_is_link_or_reparse(path, metadata=metadata) is True
 
 
+def _stat_observation(**overrides: int) -> SimpleNamespace:
+    values = {
+        "st_dev": 7,
+        "st_ino": 11,
+        "st_mode": stat.S_IFREG | 0o600,
+        "st_nlink": 1,
+        "st_size": 13,
+        "st_mtime_ns": 17,
+        "st_ctime_ns": 19,
+        "st_file_attributes": 32,
+    }
+    values.update(overrides)
+    return SimpleNamespace(**values)
+
+
+def test_windows_path_handle_snapshot_ignores_unstable_cross_api_fields() -> None:
+    path_observation = _stat_observation()
+    handle_observation = _stat_observation(
+        st_mode=stat.S_IFREG | 0o666,
+        st_nlink=2,
+        st_ctime_ns=23,
+    )
+
+    assert filesystem.same_regular_file_path_handle_snapshot(
+        path_observation,
+        handle_observation,
+        platform_name="nt",
+    )
+    assert not filesystem.same_regular_file_path_handle_snapshot(
+        path_observation,
+        handle_observation,
+        platform_name="posix",
+    )
+
+
+@pytest.mark.parametrize(
+    "changed",
+    (
+        {"st_ino": 12},
+        {"st_mode": stat.S_IFDIR | 0o600},
+        {"st_size": 14},
+        {"st_mtime_ns": 18},
+        {"st_file_attributes": 33},
+    ),
+    ids=("identity", "file-kind", "size", "mtime", "file-attributes"),
+)
+def test_windows_path_handle_snapshot_keeps_portable_drift_checks(
+    changed: dict[str, int],
+) -> None:
+    assert not filesystem.same_regular_file_path_handle_snapshot(
+        _stat_observation(),
+        _stat_observation(**changed),
+        platform_name="nt",
+    )
+
+
+def test_handle_snapshot_keeps_full_metadata_checks_on_windows() -> None:
+    assert not filesystem.same_regular_file_handle_snapshot(
+        _stat_observation(),
+        _stat_observation(st_ctime_ns=23),
+    )
+
+
 def test_bounded_reader_preserves_exact_bytes_and_descriptor_identity(
     tmp_path: Path,
 ) -> None:
@@ -102,6 +182,49 @@ def test_bounded_reader_windows_policy_keeps_integrity_checks_without_mode_bits(
     )
 
     assert snapshot.raw == b'{"ok":true}\n'
+    assert snapshot.metadata.st_nlink == 1
+
+
+def test_bounded_reader_requires_explicit_opt_out_for_ordinary_posix_media(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "source.wav"
+    path.write_bytes(b"RIFF-media")
+    path.chmod(0o644)
+    monkeypatch.setattr(filesystem, "_platform_name", lambda: "posix")
+
+    with pytest.raises(filesystem.CodexFileSecurityError, match="exclusive"):
+        filesystem.read_bounded_exclusive_regular_file(path, max_bytes=64)
+
+    snapshot = filesystem.read_bounded_exclusive_regular_file(
+        path,
+        max_bytes=64,
+        require_private_posix_mode=False,
+    )
+
+    assert snapshot.raw == b"RIFF-media"
+    assert snapshot.metadata.st_nlink == 1
+
+
+def test_bounded_reader_requires_explicit_opt_in_for_an_empty_file(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "stderr.txt"
+    path.write_bytes(b"")
+    _restrict_owner_only_on_posix(path)
+
+    with pytest.raises(filesystem.CodexFileSecurityError, match="exclusive"):
+        filesystem.read_bounded_exclusive_regular_file(path, max_bytes=64)
+
+    snapshot = filesystem.read_bounded_exclusive_regular_file(
+        path,
+        max_bytes=64,
+        allow_empty=True,
+    )
+
+    assert snapshot.raw == b""
+    assert snapshot.metadata.st_size == 0
     assert snapshot.metadata.st_nlink == 1
 
 

@@ -21,6 +21,10 @@ from tests.semantic.support.codex_campaign import (
     canonical_json_bytes,
     stable_tree_sha256,
 )
+from tests.semantic.support.codex_archive_paths import (
+    ArchiveRelativePathError,
+    parse_archive_relative_path,
+)
 
 
 PROFILE_CONTRACT = "waapi-skill.codex-integration-workflows-profile/v2"
@@ -1254,11 +1258,12 @@ def _safe_repo_relative(value: Any, path: str) -> str:
 
 
 def _safe_relative(value: Any, path: str) -> str:
-    text = _string(value, path).replace("\\", "/")
-    relative = Path(text)
-    if relative.is_absolute() or not relative.parts or ".." in relative.parts:
+    text = _string(value, path)
+    try:
+        relative = parse_archive_relative_path(text)
+    except ArchiveRelativePathError as exc:
         raise IntegrationWorkflowV2Error(f"{path} must be a safe relative path")
-    return relative.as_posix()
+    return relative.canonical
 
 
 def _resolve_regular_file(value: str | Path, label: str) -> Path:

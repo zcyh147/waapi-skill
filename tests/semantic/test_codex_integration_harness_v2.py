@@ -21,7 +21,9 @@ from tests.semantic.support.codex_gateway_broker import ExpectedGatewayStep
 from tests.semantic.support.codex_integration_workflows_v2 import (
     EXPECTED_ASSERTION_IDS,
     BaselineManifest,
+    IntegrationWorkflowV2Error,
     WorkflowUnit,
+    _safe_relative,
     load_integration_workflows_v2_profile,
 )
 from tests.semantic.support.codex_prompt_provenance_v3 import (
@@ -43,6 +45,57 @@ GUID_2 = "{22222222-2222-2222-2222-222222222222}"
 GUID_3 = "{33333333-3333-3333-3333-333333333333}"
 GUID_4 = "{44444444-4444-4444-4444-444444444444}"
 GUID_5 = "{55555555-5555-5555-5555-555555555555}"
+
+
+def test_v2_profile_relative_paths_use_the_shared_archive_parser() -> None:
+    assert _safe_relative(r"incoming\素材", "fixture.path") == "incoming/素材"
+
+    for relative in (
+        r"incoming\mixed/path",
+        "incoming//file.wav",
+        "incoming/../file.wav",
+        "incoming/CON.wav",
+    ):
+        with pytest.raises(IntegrationWorkflowV2Error, match="safe relative path"):
+            _safe_relative(relative, "fixture.path")
+
+
+@pytest.mark.parametrize(
+    ("runtime_module", "error_type"),
+    (
+        (rifle, rifle.RifleIntegrationRuntimeError),
+        (footsteps, footsteps.FootstepsIntegrationRuntimeError),
+    ),
+)
+def test_v2_owned_input_directories_use_archive_parts(
+    tmp_path: Path,
+    runtime_module: Any,
+    error_type: type[Exception],
+) -> None:
+    root = tmp_path / runtime_module.__name__.rsplit(".", 1)[-1]
+    root.mkdir()
+    expected = root / "incoming" / "素材"
+
+    assert runtime_module._fresh_owned_directory(root, r"incoming\素材") == expected
+
+    for index, relative in enumerate(
+        (r"mixed\separator/path", "nested//empty", "nested/../escape", "CON")
+    ):
+        separate_root = tmp_path / f"rejected-{runtime_module.__name__}-{index}"
+        separate_root.mkdir()
+        with pytest.raises(error_type, match="relative path is unsafe"):
+            runtime_module._fresh_owned_directory(separate_root, relative)
+
+
+def test_footsteps_original_archive_path_rejects_ambiguous_spelling() -> None:
+    assert footsteps._safe_original_relative(r"Originals\SFX\Snow.wav")
+    for relative in (
+        r"Originals\SFX/Snow.wav",
+        "Originals//Snow.wav",
+        "Originals/../Snow.wav",
+        "Originals/CON.wav",
+    ):
+        assert not footsteps._safe_original_relative(relative)
 
 
 def _unit(workflow_id: str) -> WorkflowUnit:
@@ -497,9 +550,10 @@ def _with_snapshot_digest(value: dict[str, Any]) -> dict[str, Any]:
 
 
 def _file_proof(root: Path, name: str) -> dict[str, Any]:
+    relative = Path("Originals", "SFX", name)
     return {
-        "path": str((root / name).resolve()),
-        "relative_path": f"Originals/SFX/{name}",
+        "path": str((root / relative).resolve()),
+        "relative_path": relative.as_posix(),
         "size": 4,
         "sha256": SHA_A,
     }
@@ -561,9 +615,10 @@ def _snapshot(workflow_id: str, *, changed: bool, root: Path) -> dict[str, Any]:
 
 
 def _rifle_runtime_snapshot(*, changed: bool, root: Path) -> rifle.RifleSnapshot:
+    relative = Path("Originals", "SFX", "sound.wav")
     original = rifle.RifleFileProof(
-        str((root / "sound.wav").resolve()),
-        "Originals/SFX/sound.wav",
+        str((root / relative).resolve()),
+        relative.as_posix(),
         4,
         SHA_A,
     )

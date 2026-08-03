@@ -19,6 +19,11 @@ from copy import deepcopy
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Mapping, Sequence
 
+from tests.semantic.support.codex_filesystem_security import (
+    same_regular_file_handle_snapshot,
+    same_regular_file_path_handle_snapshot,
+)
+
 
 CAMPAIGN_CONFIG_CONTRACT = "waapi-skill.codex-semantic-campaign-config/v1"
 ATTEMPT_DESCRIPTOR_CONTRACT = "waapi-skill.codex-semantic-campaign-attempt/v1"
@@ -593,8 +598,11 @@ def _strict_artifact_manifest(root: Path) -> tuple[dict[str, Any], ...]:
         for name in list(names):
             path = directory_path / name
             info = path.lstat()
-            if stat.S_ISLNK(info.st_mode):
-                raise CampaignEvidenceError(f"attempt evidence may not contain symlinks: {path}")
+            if _is_windows_junction(path) or stat.S_ISLNK(info.st_mode):
+                raise CampaignEvidenceError(
+                    "attempt evidence may not contain links, junctions, or "
+                    f"reparse points: {path}"
+                )
             if not stat.S_ISDIR(info.st_mode):
                 raise CampaignEvidenceError(f"attempt evidence has non-directory entry: {path}")
         for name in files:
@@ -604,8 +612,11 @@ def _strict_artifact_manifest(root: Path) -> tuple[dict[str, Any], ...]:
                 continue
             _validate_relative_path(relative)
             info = path.lstat()
-            if stat.S_ISLNK(info.st_mode):
-                raise CampaignEvidenceError(f"attempt evidence may not contain symlinks: {path}")
+            if _is_windows_junction(path) or stat.S_ISLNK(info.st_mode):
+                raise CampaignEvidenceError(
+                    "attempt evidence may not contain links, junctions, or "
+                    f"reparse points: {path}"
+                )
             if not stat.S_ISREG(info.st_mode):
                 raise CampaignEvidenceError(
                     f"attempt artifact must be a real regular file: {path}"
@@ -711,6 +722,7 @@ def _verify_attempt_inventory(
                     ) from exc
                 if (
                     _ATTEMPT_RE.fullmatch(entry.name) is None
+                    or _is_windows_junction(path)
                     or stat.S_ISLNK(info.st_mode)
                     or not stat.S_ISDIR(info.st_mode)
                 ):
@@ -908,7 +920,10 @@ def _consume_real_regular_file(
     finally:
         os.close(fd)
 
-    if not _same_regular_file_snapshot(before, after) or bytes_read != before.st_size:
+    if (
+        not same_regular_file_handle_snapshot(before, after)
+        or bytes_read != before.st_size
+    ):
         raise CampaignEvidenceError(f"{label} changed while it was being read: {source}")
     try:
         final = source.lstat()
@@ -917,7 +932,7 @@ def _consume_real_regular_file(
             f"{label} path disappeared after it was read: {source}: {exc}"
         ) from exc
     _require_real_regular_stat(final, path=source, label=label)
-    if not _same_regular_file_snapshot(after, final):
+    if not same_regular_file_path_handle_snapshot(after, final):
         raise CampaignEvidenceError(f"{label} path changed while it was being read: {source}")
 
 
@@ -956,8 +971,8 @@ def _open_real_regular_file(path: Path, *, label: str) -> int:
             ) from exc
         _require_real_regular_stat(after_open, path=source, label=label)
         if (
-            not _same_regular_file_snapshot(before, opened)
-            or not _same_regular_file_snapshot(opened, after_open)
+            not same_regular_file_path_handle_snapshot(before, opened)
+            or not same_regular_file_path_handle_snapshot(opened, after_open)
         ):
             raise CampaignEvidenceError(
                 f"{label} path changed while it was being opened: {source}"
@@ -984,20 +999,6 @@ def _require_real_regular_stat(
             f"cannot open {label} {path} without following links: "
             "path must be a real regular file, not a symlink, junction, or reparse point"
         )
-
-
-def _same_regular_file_snapshot(
-    left: os.stat_result,
-    right: os.stat_result,
-) -> bool:
-    return (
-        os.path.samestat(left, right)
-        and stat.S_IFMT(left.st_mode) == stat.S_IFMT(right.st_mode)
-        and left.st_size == right.st_size
-        and left.st_mtime_ns == right.st_mtime_ns
-        and left.st_ctime_ns == right.st_ctime_ns
-        and left.st_nlink == right.st_nlink
-    )
 
 
 def _path_reports_windows_junction(path: Path) -> bool:

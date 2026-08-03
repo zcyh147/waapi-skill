@@ -530,7 +530,10 @@ def test_attempt_seal_rejects_symlinks_and_unsafe_manifest_paths(tmp_path: Path)
     _attempt_id, attempt = create_attempt(root)
     (attempt / "real.txt").write_text("real", encoding="utf-8")
     create_symlink_or_skip(attempt / "link.txt", "real.txt")
-    with pytest.raises(CampaignEvidenceError, match="may not contain symlinks"):
+    with pytest.raises(
+        CampaignEvidenceError,
+        match="may not contain links, junctions, or reparse points",
+    ):
         seal_attempt(attempt, [])
 
     (attempt / "link.txt").unlink()
@@ -541,6 +544,33 @@ def test_attempt_seal_rejects_symlinks_and_unsafe_manifest_paths(tmp_path: Path)
     atomic_write_json_with_digest(manifest_path, manifest)
     with pytest.raises(CampaignEvidenceError, match="unsafe relative path"):
         verify_attempt_seal(attempt)
+
+
+def test_attempt_seal_rejects_windows_junction_directory_without_descending(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = _campaign(tmp_path)
+    _attempt_id, attempt = create_attempt(root)
+    junction = attempt / "outside-junction"
+    junction.mkdir()
+    (junction / "must-not-be-archived.txt").write_text(
+        "outside\n",
+        encoding="utf-8",
+    )
+    real_is_junction = getattr(Path, "is_junction", lambda _self: False)
+    monkeypatch.setattr(
+        Path,
+        "is_junction",
+        lambda self: self == junction or real_is_junction(self),
+        raising=False,
+    )
+
+    with pytest.raises(
+        CampaignEvidenceError,
+        match="links, junctions, or reparse points",
+    ):
+        seal_attempt(attempt, [])
 
 
 def test_attempt_artifact_walk_errors_fail_closed(

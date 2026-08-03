@@ -4686,6 +4686,29 @@ def test_query_object_original_file_reference_match_returns_closed_candidate_rec
     assert audit["reference_detail_limit"] == 256
 
 
+def test_original_file_path_normalization_uses_the_paths_own_flavor() -> None:
+    assert waapi_gateway.normalize_original_file_system_path(
+        r"C:\Originals\Mix.wav"
+    ) == waapi_gateway.normalize_original_file_system_path(
+        "c:/originals/MIX.WAV"
+    )
+    assert waapi_gateway.normalize_original_file_system_path(
+        r"\\StudioNas\Originals\Mix.wav"
+    ) == waapi_gateway.normalize_original_file_system_path(
+        "//studionas/originals/MIX.WAV"
+    )
+    assert waapi_gateway.normalize_original_file_system_path(
+        "/Originals/Mix.wav"
+    ) != waapi_gateway.normalize_original_file_system_path(
+        "/Originals/mix.wav"
+    )
+    assert waapi_gateway.normalize_original_file_system_path(
+        r"/Originals/a\b.wav"
+    ) != waapi_gateway.normalize_original_file_system_path(
+        "/Originals/a/b.wav"
+    )
+
+
 def test_query_object_original_file_reference_match_sorts_and_truncates_details(
     tmp_path: Path,
 ) -> None:

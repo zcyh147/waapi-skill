@@ -60,6 +60,7 @@ from tests.semantic.support.codex_eval_execution_v3 import (
     HeavyScenarioUnit,
     build_heavy_units,
 )
+from tests.semantic.support.codex_filesystem_security import write_utf8_text_bytes
 from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
     GatewayBrokerEvidence,
@@ -1858,7 +1859,8 @@ def _write_common_business_oracle_plan(
 
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    write_utf8_text_bytes(
+        path,
         json.dumps(
             _json_value(payload),
             ensure_ascii=False,
@@ -1867,7 +1869,6 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
             indent=2,
         )
         + "\n",
-        encoding="utf-8",
     )
 
 

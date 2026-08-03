@@ -34,6 +34,9 @@ from tests.semantic.support.codex_campaign import (
     stable_tree_manifest,
     stable_tree_sha256,
 )
+from tests.semantic.support.codex_filesystem_security import (
+    path_is_link_or_reparse,
+)
 from wwise_waapi.headless import HeadlessLifecycle
 
 
@@ -789,7 +792,9 @@ def _collect_symlink_pairs(root: Path) -> tuple[tuple[str, str], ...]:
         raise ScenarioLifecycleError(
             f"cannot stat launch-environment root {tree}: {exc}"
         ) from exc
-    if stat.S_ISLNK(root_info.st_mode) or not stat.S_ISDIR(root_info.st_mode):
+    if path_is_link_or_reparse(tree, metadata=root_info) or not stat.S_ISDIR(
+        root_info.st_mode
+    ):
         raise ScenarioLifecycleError(
             f"launch-environment root must be a real directory: {tree}"
         )
@@ -820,6 +825,11 @@ def _collect_symlink_pairs(root: Path) -> tuple[tuple[str, str], ...]:
                         f"cannot read launch-environment symlink {path}: {exc}"
                     ) from exc
                 rows.append((path.relative_to(tree).as_posix(), target))
+            elif path_is_link_or_reparse(path, metadata=info):
+                raise ScenarioLifecycleError(
+                    "launch-environment tree may not contain a junction or "
+                    f"reparse point: {path}"
+                )
             elif stat.S_ISDIR(info.st_mode):
                 walk(path)
 
@@ -966,8 +976,8 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
         indent=2,
     ) + "\n"
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    with temporary.open("x", encoding="utf-8") as handle:
-        handle.write(serialized)
+    with temporary.open("xb") as handle:
+        handle.write(serialized.encode("utf-8"))
         handle.flush()
         os.fsync(handle.fileno())
     os.replace(temporary, path)

@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from tests.support.platform_filesystem import create_symlink_or_skip
+from tests.support.platform_process import run_model_argv
 from .support import codex_gateway_broker as broker_module  # pyright: ignore[reportMissingImports]
 from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImports]
     BASH_ENV_NAME,
@@ -46,6 +47,10 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     resolve_gateway_invocation,
 )
 from wwise_waapi.transactions import confirmation_token_for
+from wwise_waapi.platform_commands import (
+    WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    encode_windows_powershell_argv,
+)
 
 
 FAKE_ARTIFACT_HASH = "a" * 64
@@ -270,8 +275,8 @@ def expected_fake_confirmation_next_command(
         "requires_explicit_user_confirmation": True,
     }
     if os.name == "nt":
-        result["shell_family"] = "windows-cmd"
-        shell_command = subprocess.list2cmdline(full_argv)
+        result["shell_family"] = WINDOWS_POWERSHELL_ENCODED_FAMILY
+        shell_command = encode_windows_powershell_argv(full_argv)
     else:
         result["shell_family"] = "posix-sh"
         shell_command = shlex.join(full_argv)
@@ -291,6 +296,7 @@ def expected_fake_confirmation_next_command(
 
 
 FAKE_RUNNER = r'''from __future__ import annotations
+import base64
 import hashlib
 import json
 import os
@@ -299,6 +305,21 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+
+def windows_gateway_command(argv):
+    argv_json = json.dumps(tuple(argv), ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode("utf-8")
+    inner = base64.b64encode(argv_json).decode("ascii")
+    script = (
+        "$ErrorActionPreference='Stop';"
+        "$waapiJson=[System.Text.Encoding]::UTF8.GetString("
+        "[System.Convert]::FromBase64String('" + inner + "'));"
+        "$waapiArgv=@(ConvertFrom-Json -InputObject $waapiJson);"
+        "$waapiArgs=@($waapiArgv | Select-Object -Skip 1);"
+        "& $waapiArgv[0] @waapiArgs;"
+        "exit $LASTEXITCODE"
+    )
+    encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+    return "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand " + encoded
 
 state = Path(os.environ["WAAPI_SKILL_STATE_DIR"])
 state.mkdir(parents=True, exist_ok=True)
@@ -476,7 +497,7 @@ elif command == "transaction-show":
         "full_argv": full_argv,
         "copy_exactly": True,
         "requires_explicit_user_confirmation": True,
-        "shell_family": "windows-cmd" if os.name == "nt" else "posix-sh",
+        "shell_family": "windows-powershell-encoded" if os.name == "nt" else "posix-sh",
         "copy_instruction": {
             "contract": "waapi-skill.gateway-command-copy-instruction/v1",
             "source_field": "shell_command",
@@ -489,7 +510,7 @@ elif command == "transaction-show":
             ],
         },
         "shell_command": (
-            subprocess.list2cmdline(full_argv)
+            windows_gateway_command(full_argv)
             if os.name == "nt"
             else shlex.join(full_argv)
         ),
@@ -598,19 +619,15 @@ def run_model_command(
         "gateway.py",
         *arguments,
     ]
-    if os.name == "nt":
-        return subprocess.run(
-            subprocess.list2cmdline(command),
-            executable=os.environ.get("COMSPEC", "cmd.exe"),
-            shell=True,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    return subprocess.run(
+    return run_model_argv(
         command,
-        env=env,
+        environment=env,
+        windows_interpreter=(
+            Path(env[SHIM_TRUSTED_PYTHON_ENV])
+            if os.name == "nt"
+            else None
+        ),
+        windows_command_directory=broker.shim_directory,
         capture_output=True,
         text=True,
         check=False,
@@ -2433,9 +2450,15 @@ def test_runner_level_version_selector_is_canonicalized_and_sanitized(
         transport="tcp",
     ) as broker:
         raw = ["python", str(broker.runner_path), *selector, "gateway.py", "status"]
-        result = subprocess.run(
+        result = run_model_argv(
             raw,
-            env=broker.model_environment(os.environ),
+            environment=(model_environment := broker.model_environment(os.environ)),
+            windows_interpreter=(
+                Path(model_environment[SHIM_TRUSTED_PYTHON_ENV])
+                if os.name == "nt"
+                else None
+            ),
+            windows_command_directory=broker.shim_directory,
             capture_output=True,
             text=True,
             check=False,
@@ -2475,9 +2498,15 @@ def test_invalid_runner_level_selector_forms_fail_terminal_without_execution(
         expected_wwise_version="2022.1",
         transport="tcp",
     ) as broker:
-        result = subprocess.run(
+        result = run_model_argv(
             ["python", str(broker.runner_path), *runner_tail],
-            env=broker.model_environment(os.environ),
+            environment=(model_environment := broker.model_environment(os.environ)),
+            windows_interpreter=(
+                Path(model_environment[SHIM_TRUSTED_PYTHON_ENV])
+                if os.name == "nt"
+                else None
+            ),
+            windows_command_directory=broker.shim_directory,
             capture_output=True,
             text=True,
             check=False,
@@ -3384,10 +3413,17 @@ def test_subprocess_oserror_is_recorded_and_terminal(tmp_path: Path) -> None:
         expected_steps=(ExpectedGatewayStep("status", "status"),),
         transport="tcp",
     ) as broker:
-        # The shim already has a trusted shebang.  Changing only the broker's
-        # runner interpreter forces subprocess.run to raise FileNotFoundError.
+        # Freeze the already-materialized shim interpreter.  On POSIX it is in
+        # the shebang; on Windows it is the direct closed Python shim launch.
+        # Changing only the broker's runner interpreter then forces its
+        # subprocess.run boundary to raise FileNotFoundError.
+        model_environment = broker.model_environment(os.environ)
         broker.trusted_python = tmp_path / "missing-python"
-        failed = run_model_command(broker, ["status"])
+        failed = run_model_command(
+            broker,
+            ["status"],
+            environment=model_environment,
+        )
         assert failed.returncode == 125
         record = broker.evidence().records[0]
         assert record.accepted is True

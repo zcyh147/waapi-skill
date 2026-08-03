@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import signal
 import subprocess
 import sys
@@ -58,6 +59,7 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     CodexGatewayBroker,
     ExpectedGatewayStep,
     GATEWAY_REQUIRED_ENV,
+    SHIM_TRUSTED_PYTHON_ENV,
 )
 
 
@@ -224,6 +226,32 @@ def test_prompt_audit_rejects_memory_and_unexpected_personal_skills(tmp_path: Pa
     assert audit.has_memory is True
     assert audit.has_user_agent_skills is True
     assert audit.passed is False
+
+
+def test_skill_locator_classification_uses_local_path_parts(tmp_path: Path) -> None:
+    personal = tmp_path / ".agents" / "skills" / "demo" / "SKILL.md"
+    system = (
+        tmp_path
+        / ".codex"
+        / "skills"
+        / ".system"
+        / "skill-creator"
+        / "SKILL.md"
+    )
+    lookalike = tmp_path / ".agents" / "skills-archive" / "demo" / "SKILL.md"
+
+    assert codex_harness_module.local_locator_contains_parts(
+        str(personal),
+        (".agents", "skills"),
+    )
+    assert codex_harness_module.is_codex_system_skill(str(system))
+    assert not codex_harness_module.local_locator_contains_parts(
+        str(lookalike),
+        (".agents", "skills"),
+    )
+    assert not codex_harness_module.is_codex_system_skill(
+        str(tmp_path / ".codex" / "skills" / ".system-archive" / "SKILL.md")
+    )
 
 
 def test_prompt_audit_accepts_exact_target_and_codex_system_skills(tmp_path: Path) -> None:
@@ -710,19 +738,30 @@ def test_isolated_environment_preserves_only_complete_runner_owned_broker_overla
         with isolated_codex_environment(auth, extra_env=overlay) as environment:
             audit = inspect_isolated_environment(environment, auth_json=auth)
             assert audit.passed is True
+            platform_specific_keys = (
+                {SHIM_TRUSTED_PYTHON_ENV}
+                if os.name == "nt"
+                else {BASH_ENV_NAME}
+            )
             assert audit.broker_environment_keys == tuple(
                 sorted(
                     {
-                        BASH_ENV_NAME,
                         BROKER_ENDPOINT_ENV,
                         BROKER_TOKEN_ENV,
                         BROKER_TRANSPORT_ENV,
                         GATEWAY_REQUIRED_ENV,
                     }
+                    | platform_specific_keys
                 )
             )
             assert audit.unexpected_sensitive_environment_keys == ()
-            assert environment[BASH_ENV_NAME] == str(broker.bash_env_path)
+            if os.name == "nt":
+                assert BASH_ENV_NAME not in environment
+                assert environment[SHIM_TRUSTED_PYTHON_ENV] == str(
+                    broker.trusted_python
+                )
+            else:
+                assert environment[BASH_ENV_NAME] == str(broker.bash_env_path)
             assert environment[BROKER_TRANSPORT_ENV] == "tcp"
             assert environment[BROKER_ENDPOINT_ENV] == broker.endpoint
             assert environment[BROKER_TOKEN_ENV] == overlay[BROKER_TOKEN_ENV]
@@ -929,7 +968,15 @@ def test_run_process_keyboard_interrupt_terminates_kills_reaps_and_reraises(
     else:
         assert popen_arguments["start_new_session"] is True
         assert "creationflags" not in popen_arguments
-    assert fake.communicate_calls == [10.0, 5.0, None]
+    assert fake.communicate_calls == [
+        10.0,
+        5.0,
+        (
+            codex_harness_module.WINDOWS_HARD_REAP_SECONDS
+            if os.name == "nt"
+            else None
+        ),
+    ]
     if os.name != "nt":
         assert group_signals == [(fake.pid, signal.SIGTERM), (fake.pid, signal.SIGKILL)]
     else:
@@ -955,6 +1002,35 @@ def test_native_windows_hard_kill_uses_tree_taskkill_not_posix_signal(
     assert fake.windows_signals == []
 
 
+def test_native_windows_graceful_cleanup_failure_escalates_to_forced_tree(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = SimpleNamespace(poll=lambda: None)
+    forced: list[tuple[object, str | None]] = []
+
+    def fail_graceful_cleanup(*_args: object, **_kwargs: object) -> None:
+        raise CodexHarnessError("native graceful cleanup unavailable")
+
+    monkeypatch.setattr(
+        codex_harness_module,
+        "terminate_process_group",
+        fail_graceful_cleanup,
+    )
+    monkeypatch.setattr(
+        codex_harness_module,
+        "force_kill_and_reap_process",
+        lambda process, *, platform_name=None: (
+            forced.append((process, platform_name)) or ("stdout", "stderr")
+        ),
+    )
+
+    assert codex_harness_module.terminate_and_reap_process(
+        fake,  # type: ignore[arg-type]
+        platform_name="nt",
+    ) == ("stdout", "stderr")
+    assert forced == [(fake, "nt")]
+
+
 def test_native_windows_popen_boundary_uses_new_process_group(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -973,7 +1049,11 @@ def test_native_windows_taskkill_command_is_tree_scoped_and_fail_closed(
 ) -> None:
     fake = InterruptingFakeProcess()
     observed: list[tuple[str, ...]] = []
-    monkeypatch.setattr(codex_harness_module.shutil, "which", lambda _name: "taskkill.exe")
+    monkeypatch.setattr(
+        codex_harness_module,
+        "windows_system_executable",
+        lambda _name: r"C:\Windows\System32\taskkill.exe",
+    )
 
     def successful_run(command: Sequence[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
         observed.append(tuple(command))
@@ -981,7 +1061,9 @@ def test_native_windows_taskkill_command_is_tree_scoped_and_fail_closed(
 
     monkeypatch.setattr(subprocess, "run", successful_run)
     codex_harness_module.taskkill_process_tree(fake, force=True)
-    assert observed == [("taskkill.exe", "/PID", str(fake.pid), "/T", "/F")]
+    assert observed == [
+        (r"C:\Windows\System32\taskkill.exe", "/PID", str(fake.pid), "/T", "/F")
+    ]
 
     monkeypatch.setattr(
         subprocess,
@@ -995,6 +1077,27 @@ def test_native_windows_taskkill_command_is_tree_scoped_and_fail_closed(
     )
     with pytest.raises(CodexHarnessError, match="could not terminate"):
         codex_harness_module.taskkill_process_tree(fake, force=False)
+
+
+def test_windows_system_executable_uses_fixed_system32_path() -> None:
+    assert codex_harness_module.windows_system_executable(
+        "taskkill.exe",
+        environment={"SystemRoot": r"C:\Windows"},
+        platform_name="nt",
+    ) == r"C:\Windows\System32\taskkill.exe"
+
+    for environment in (
+        {},
+        {"SystemRoot": "Windows"},
+        {"SystemRoot": r"\\server\share\Windows"},
+        {"SystemRoot": r"C:\Windows", "SYSTEMROOT": r"D:\Windows"},
+    ):
+        with pytest.raises(CodexHarnessError):
+            codex_harness_module.windows_system_executable(
+                "taskkill.exe",
+                environment=environment,
+                platform_name="nt",
+            )
 
 
 @pytest.mark.skipif(os.name != "nt", reason="native Windows process-tree proof")
@@ -1225,6 +1328,19 @@ def test_session_audit_rejects_duplicate_threads_missing_completion_and_collab()
     assert audit.file_change_count == 1
     assert audit.unexpected_item_types == ("collab_tool_call", "file_change")
     assert audit.passed is False
+
+
+def test_windows_operator_scan_preserves_backslash_paths_and_rejects_composition() -> None:
+    command = r'python C:\ProgramData\waapi-skill\scripts\run.py gateway.py status'
+
+    assert not codex_harness_module.shell_script_has_operators(
+        command,
+        platform_name="nt",
+    )
+    assert codex_harness_module.shell_script_has_operators(
+        command + " & whoami",
+        platform_name="nt",
+    )
 
 
 def test_command_classifier_distinguishes_gateway_from_inline_code_and_discovery(tmp_path: Path) -> None:
@@ -1484,7 +1600,8 @@ def test_command_classifier_allows_only_exact_initial_skill_bootstrap_read(tmp_p
     skill_md = skill / "SKILL.md"
     content = "first\nsecond\n"
     skill_md.write_text(content, encoding="utf-8")
-    command = f'/bin/bash -lc "wc -l {skill_md} && sed -n \'1,240p\' {skill_md}"'
+    shell_path = shlex.quote(str(skill_md))
+    command = f'/bin/bash -lc "wc -l {shell_path} && sed -n \'1,240p\' {shell_path}"'
     output = f"       2 {skill_md}\n{content}"
     argv, has_operators, parse_error = parse_command_argv(command)
     record = CodexCommandRecord(
@@ -1532,7 +1649,9 @@ def test_command_classifier_accepts_codex_full_range_sed_only_for_exact_skill_re
     skill_md.write_text(content, encoding="utf-8")
     reference = references / "waapi-operate.md"
     reference.write_text(content, encoding="utf-8")
-    command = f'''/bin/bash -lc "sed -n '1,"'$p'"' {skill_md}"'''
+    shell_skill_md = shlex.quote(str(skill_md))
+    shell_reference = shlex.quote(str(reference))
+    command = f'''/bin/bash -lc "sed -n '1,"'$p'"' {shell_skill_md}"'''
     record = completed_record(command, content)
 
     facts = classify_commands((record,), skill_source=skill)
@@ -1545,7 +1664,7 @@ def test_command_classifier_accepts_codex_full_range_sed_only_for_exact_skill_re
     assert facts.unexpected_commands == ()
 
     partial = completed_record(command, "first\n")
-    reference_command = f"sed -n '1,$p' {reference}"
+    reference_command = f"sed -n '1,$p' {shell_reference}"
     reference_read = completed_record(reference_command, content)
     for rejected in (partial, reference_read):
         rejected_facts = classify_commands((rejected,), skill_source=skill)
@@ -1560,14 +1679,15 @@ def test_command_classifier_rejects_other_skill_reads_with_shell_operators(tmp_p
     skill_md = skill / "SKILL.md"
     content = "first\nsecond\n"
     skill_md.write_text(content, encoding="utf-8")
+    shell_path = shlex.quote(str(skill_md))
     commands_and_outputs = (
         (
-            f'/bin/bash -lc "wc -l {skill_md} && sed -n \'1,1p\' {skill_md}"',
+            f'/bin/bash -lc "wc -l {shell_path} && sed -n \'1,1p\' {shell_path}"',
             f"2 {skill_md}\nfirst\n",
         ),
-        (f'/bin/bash -lc "wc -l {skill_md} && cat {skill_md}"', f"2 {skill_md}\n{content}"),
-        (f'/bin/bash -lc "cat {skill_md} ; true"', content),
-        (f'/bin/bash -lc "cat {skill_md} | sed -n \'1,240p\'"', content),
+        (f'/bin/bash -lc "wc -l {shell_path} && cat {shell_path}"', f"2 {skill_md}\n{content}"),
+        (f'/bin/bash -lc "cat {shell_path} ; true"', content),
+        (f'/bin/bash -lc "cat {shell_path} | sed -n \'1,240p\'"', content),
     )
 
     for command, output in commands_and_outputs:
@@ -1809,7 +1929,7 @@ def test_output_snapshot_and_skill_tree_hash_detect_created_and_modified_source(
     assert snapshot_tree_hash(after_skill) != before_hash
 
 
-def test_workspace_snapshot_detects_write_then_restore_via_ctime(tmp_path: Path) -> None:
+def test_workspace_snapshot_detects_write_then_restore_via_file_times(tmp_path: Path) -> None:
     target = tmp_path / "existing.txt"
     target.write_text("original\n", encoding="utf-8")
     before = snapshot_workspace(tmp_path)

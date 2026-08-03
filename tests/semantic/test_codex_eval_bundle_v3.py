@@ -15,7 +15,10 @@ from tests.semantic.support.codex_eval_bundle_v3 import (
     EvalBundleV3Error,
     SEQUENTIAL_CONFIRMATION_PROMPT,
     WEAK_ASSERTION_ADAPTERS,
+    _archive_relative,
+    _canonical_archive_relative,
     _parse_online_case,
+    _safe_child,
     load_eval_bundle_v3,
 )
 from tests.semantic.render_v3_review import render_review
@@ -46,6 +49,70 @@ DEBUG_LUA_V3 = (
     / "online"
     / "debug_lua.json"
 )
+
+
+def test_eval_bundle_relative_fields_share_portable_archive_parsing() -> None:
+    parsed = _archive_relative(
+        r"nested\素材.wav",
+        "test.path",
+        error="must be portable",
+    )
+    assert parsed.canonical == "nested/素材.wav"
+
+    for relative in (
+        r"nested\mixed/file.wav",
+        "nested//file.wav",
+        "nested/../file.wav",
+        "nested/LPT1.wav",
+    ):
+        with pytest.raises(EvalBundleV3Error, match="must be portable"):
+            _archive_relative(relative, "test.path", error="must be portable")
+
+    assert _canonical_archive_relative(
+        "nested/素材.wav",
+        "test.path",
+        error="must be canonical",
+    ) == "nested/素材.wav"
+    with pytest.raises(EvalBundleV3Error, match="must be canonical"):
+        _canonical_archive_relative(
+            r"nested\素材.wav",
+            "test.path",
+            error="must be canonical",
+        )
+
+
+@pytest.mark.parametrize(
+    "relative",
+    (
+        "nested//case.json",
+        "nested/./case.json",
+        "nested/../case.json",
+        r"nested\case.json",
+        "nested/bad:name.json",
+        "nested/CON.json",
+    ),
+)
+def test_eval_bundle_child_path_reuses_portable_archive_boundary(
+    tmp_path: Path,
+    relative: str,
+) -> None:
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    (nested / "case.json").write_text("{}", encoding="utf-8")
+
+    with pytest.raises(EvalBundleV3Error, match="contained relative path"):
+        _safe_child(tmp_path, relative, "test.path")
+
+
+def test_eval_bundle_child_path_accepts_canonical_posix_spelling(
+    tmp_path: Path,
+) -> None:
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    expected = nested / "case.json"
+    expected.write_text("{}", encoding="utf-8")
+
+    assert _safe_child(tmp_path, "nested/case.json", "test.path") == expected
 
 
 def test_v3_bundle_covers_every_unique_five_version_api_with_reviewed_heavy_extensions() -> None:

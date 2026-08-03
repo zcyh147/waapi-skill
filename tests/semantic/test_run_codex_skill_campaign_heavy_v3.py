@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import asdict, dataclass, replace
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 from typing import Any, Mapping, Sequence
 
@@ -88,6 +88,10 @@ from tests.semantic.support.codex_object_heavy_v3 import (
     OperationRequestSpec,
     QueryObjectRequestSpec,
     build_object_heavy_v3_recipe,
+)
+from wwise_waapi.platform_commands import (
+    WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    encode_windows_powershell_argv,
 )
 from tests.semantic.support.codex_object_runtime_v3 import ObjectRuntimeSnapshot
 from tests.semantic.support.codex_soundbank_business_plan_v3 import (
@@ -634,9 +638,7 @@ def _mark_codex_infrastructure_block(
             "errors": [],
             "passed": True,
         }
-        (prior_turn_root / "prompt.txt").write_text(
-            prior_prompt + "\n", encoding="utf-8"
-        )
+        matrix.write_text(prior_turn_root / "prompt.txt", prior_prompt + "\n")
         prior_events = _synthetic_events(
             thread_id=str(prior_thread_id),
             records=broker_records[previous_prefix:prefix],
@@ -647,11 +649,9 @@ def _mark_codex_infrastructure_block(
                 else ()
             ),
         )
-        (prior_turn_root / "events.jsonl").write_text(
-            prior_events, encoding="utf-8"
-        )
-        (prior_turn_root / "stderr.txt").write_text("", encoding="utf-8")
-        (prior_turn_root / "final.txt").write_text("预览已准备。\n", encoding="utf-8")
+        matrix.write_text(prior_turn_root / "events.jsonl", prior_events)
+        matrix.write_text(prior_turn_root / "stderr.txt", "")
+        matrix.write_text(prior_turn_root / "final.txt", "预览已准备。\n")
         matrix.write_json(prior_turn_root / "turn-grade.json", prior_grade)
         matrix.write_json(
             prior_turn_root / "codex-facts.json",
@@ -698,14 +698,12 @@ def _mark_codex_infrastructure_block(
         version=unit.version,
         exit_status=1,
     )
-    (failed_turn_root / "prompt.txt").write_text(
-        failed_prompt + "\n", encoding="utf-8"
+    matrix.write_text(failed_turn_root / "prompt.txt", failed_prompt + "\n")
+    matrix.write_text(failed_turn_root / "events.jsonl", failed_events)
+    matrix.write_text(
+        failed_turn_root / "stderr.txt", infrastructure_message + "\n"
     )
-    (failed_turn_root / "events.jsonl").write_text(failed_events, encoding="utf-8")
-    (failed_turn_root / "stderr.txt").write_text(
-        infrastructure_message + "\n", encoding="utf-8"
-    )
-    (failed_turn_root / "final.txt").write_text("\n", encoding="utf-8")
+    matrix.write_text(failed_turn_root / "final.txt", "\n")
     matrix.write_json(failed_turn_root / "codex-facts.json", failed_facts)
     expected_step_names = [step.name for step in protocol.steps]
     prior_prefix = previous_prefix
@@ -1658,7 +1656,9 @@ def _synthetic_gateway_records(
                         "copy_exactly": True,
                         "requires_explicit_user_confirmation": True,
                         "shell_family": (
-                            "windows-cmd" if os.name == "nt" else "posix-sh"
+                            WINDOWS_POWERSHELL_ENCODED_FAMILY
+                            if os.name == "nt"
+                            else "posix-sh"
                         ),
                         "copy_instruction": {
                             "contract": (
@@ -1674,7 +1674,7 @@ def _synthetic_gateway_records(
                             ],
                         },
                         "shell_command": (
-                            subprocess.list2cmdline(full_argv)
+                            encode_windows_powershell_argv(full_argv)
                             if os.name == "nt"
                             else shlex.join(full_argv)
                         ),
@@ -2238,12 +2238,12 @@ def test_campaign_broker_seal_binds_confirmation_to_archived_transaction_store(
         for line in events_path.read_text(encoding="utf-8").splitlines()
     ]
     events[1]["event_hash"] = "f" * 64
-    events_path.write_text(
+    matrix.write_text(
+        events_path,
         "".join(
             json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n"
             for event in events
         ),
-        encoding="utf-8",
     )
 
     with pytest.raises(
@@ -3764,7 +3764,7 @@ def _synthetic_convert_verification_with_side_effects(
         row for row in asset_tree["files"]
         if row["relative_path"].casefold().endswith(".wav")
     )
-    akd_relative = str(Path(wav["relative_path"]).with_suffix(".akd"))
+    akd_relative = PurePosixPath(wav["relative_path"]).with_suffix(".akd").as_posix()
     _append_synthetic_cli_file(
         asset_tree,
         akd_relative,
@@ -3783,7 +3783,7 @@ def _synthetic_convert_verification_with_side_effects(
     )
     _append_synthetic_cli_file(
         project_tree,
-        f"{Path(project['relative_path']).stem}.crossover.wsettings",
+        f"{PurePosixPath(project['relative_path']).stem}.crossover.wsettings",
         b'<WwiseDocument Type="UserProjectSettings"/>',
     )
     return verification
@@ -4023,10 +4023,10 @@ def _write_passing_project_outcome(
                 else ()
             ),
         )
-        (turn_root / "prompt.txt").write_text(prompt + "\n", encoding="utf-8")
-        (turn_root / "events.jsonl").write_text(events_text, encoding="utf-8")
-        (turn_root / "stderr.txt").write_text("", encoding="utf-8")
-        (turn_root / "final.txt").write_text(turn_final + "\n", encoding="utf-8")
+        matrix.write_text(turn_root / "prompt.txt", prompt + "\n")
+        matrix.write_text(turn_root / "events.jsonl", events_text)
+        matrix.write_text(turn_root / "stderr.txt", "")
+        matrix.write_text(turn_root / "final.txt", turn_final + "\n")
         matrix.write_json(turn_root / "turn-grade.json", grade)
         matrix.write_json(
             turn_root / "codex-facts.json",
@@ -4582,7 +4582,7 @@ def test_heavy_validator_blocks_prompt_and_grade_digest_rewrite(
     rewritten = "synthetic rewritten request"
     rewritten_sha256 = hashlib.sha256(rewritten.encode("utf-8")).hexdigest()
     prompt_path = task_root / "turns" / "turn-01" / "prompt.txt"
-    prompt_path.write_text(rewritten + "\n", encoding="utf-8")
+    matrix.write_text(prompt_path, rewritten + "\n")
     grade_path = task_root / "turns" / "turn-01" / "turn-grade.json"
     grade = json.loads(grade_path.read_text(encoding="utf-8"))
     grade["prompt_sha256"] = rewritten_sha256
@@ -4992,7 +4992,7 @@ def test_heavy_validator_rejects_resealed_retryable_failed_prompt(
     )
     prompt_path = task_root / "turns" / "turn-02" / "prompt.txt"
     rewritten = "我确认执行另一份未审核请求。"
-    prompt_path.write_text(rewritten + "\n", encoding="utf-8")
+    matrix.write_text(prompt_path, rewritten + "\n")
     sidecar_path = task_root / "infrastructure-failure.json"
     sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
     sidecar["prompt_sha256"] = hashlib.sha256(
@@ -5174,14 +5174,14 @@ def test_heavy_validator_recomputes_infrastructure_category_from_raw_evidence(
     turn_root = task_root / "turns" / "turn-01"
     events_path = turn_root / "events.jsonl"
     stderr_path = turn_root / "stderr.txt"
-    events_path.write_text(
+    matrix.write_text(
+        events_path,
         events_path.read_text(encoding="utf-8").replace(
             "rate limit exceeded",
             "authentication failed",
         ),
-        encoding="utf-8",
     )
-    stderr_path.write_text("authentication failed\n", encoding="utf-8")
+    matrix.write_text(stderr_path, "authentication failed\n")
     failure_path = task_root / "infrastructure-failure.json"
     failure = json.loads(failure_path.read_text(encoding="utf-8"))
     for path in (events_path, stderr_path):
@@ -6333,6 +6333,136 @@ def test_campaign_import_snapshot_rejects_legacy_and_escaping_relative_evidence(
             legacy,
             scenario_id=scenario.id,
             label="legacy import snapshot",
+        )
+
+
+def test_campaign_archive_path_validators_are_host_flavor_aware() -> None:
+    windows_proof = {
+        "path": r"C:\Campaign\ORIGINALS\SFX\THUNDER.WAV",
+        "relative_path": "Originals/SFX/Thunder.wav",
+        "size": 16,
+        "sha256": "a" * 64,
+    }
+    campaign._validate_integration_v2_file_proof(
+        windows_proof,
+        label="Windows integration proof",
+        allow_null_relative=False,
+    )
+    campaign._validate_import_original_path_binding(
+        windows_proof,
+        original_relative_path="SFX/Thunder.wav",
+        originals_files=[windows_proof],
+        label="Windows import proof",
+    )
+
+    posix_case_drift = {
+        **windows_proof,
+        "path": "/campaign/Originals/SFX/THUNDER.WAV",
+    }
+    with pytest.raises(CampaignEvidenceError, match="inconsistent"):
+        campaign._validate_import_original_path_binding(
+            posix_case_drift,
+            original_relative_path="SFX/Thunder.wav",
+            originals_files=[posix_case_drift],
+            label="POSIX import proof",
+        )
+
+    with pytest.raises(CampaignEvidenceError, match="absolute host path"):
+        campaign._validate_integration_v2_file_proof(
+            {**windows_proof, "path": "relative/Thunder.wav"},
+            label="relative integration proof",
+            allow_null_relative=False,
+        )
+
+
+def test_campaign_real_directory_and_text_guards_reject_reparse_entries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "root"
+    child = root / "child"
+    child.mkdir(parents=True)
+    text_path = child / "evidence.txt"
+    text_path.write_bytes("证据\n".encode("utf-8"))
+    text_path.chmod(0o600)
+    empty_path = child / "empty.txt"
+    empty_path.write_bytes(b"")
+    empty_path.chmod(0o600)
+
+    assert campaign._require_real_directory(
+        root,
+        label="test root",
+    ) == root.resolve(strict=True)
+    assert campaign._strict_real_subdirectory_names(root) == {"child"}
+    assert campaign._load_strict_regular_text(text_path) == "证据\n"
+    assert campaign._load_strict_regular_text(empty_path) == ""
+
+    real_guard = campaign.path_is_link_or_reparse
+
+    def reports_child_reparse(
+        path: Path,
+        *,
+        metadata: Any | None = None,
+    ) -> bool:
+        return Path(path) == child or real_guard(Path(path), metadata=metadata)
+
+    monkeypatch.setattr(campaign, "path_is_link_or_reparse", reports_child_reparse)
+    with pytest.raises(CampaignEvidenceError, match="non-directory entry"):
+        campaign._strict_real_subdirectory_names(root)
+    with pytest.raises(CampaignEvidenceError, match="not a real directory"):
+        campaign._require_real_directory(child, label="reparse child")
+
+
+def test_campaign_scenario_directory_scan_rejects_reparse_entries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    matrix_root = tmp_path / "matrix"
+    scenario = matrix_root / "scenarios" / "001-case"
+    scenario.mkdir(parents=True)
+    real_guard = campaign.path_is_link_or_reparse
+
+    def reports_scenario_reparse(
+        path: Path,
+        *,
+        metadata: Any | None = None,
+    ) -> bool:
+        return Path(path) == scenario or real_guard(Path(path), metadata=metadata)
+
+    monkeypatch.setattr(
+        campaign,
+        "path_is_link_or_reparse",
+        reports_scenario_reparse,
+    )
+    with pytest.raises(CampaignEvidenceError, match="not a real directory"):
+        campaign._heavy_v3_scenario_directories(matrix_root)
+
+
+def test_prepare_campaign_root_checks_lexical_reparse_before_resolution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    campaign_root = workspace / "campaign-a"
+    campaign_root.mkdir(parents=True)
+    monkeypatch.setattr(campaign, "WORKSPACE_ROOT", workspace)
+    real_guard = campaign.path_is_link_or_reparse
+
+    def reports_campaign_reparse(
+        path: Path,
+        *,
+        metadata: Any | None = None,
+    ) -> bool:
+        return Path(path) == campaign_root or real_guard(Path(path), metadata=metadata)
+
+    monkeypatch.setattr(
+        campaign,
+        "path_is_link_or_reparse",
+        reports_campaign_reparse,
+    )
+    with pytest.raises(campaign.CampaignConfigError, match="real directory"):
+        campaign.prepare_campaign_root(
+            SimpleNamespace(campaign_root=campaign_root, resume=True)
         )
 
 

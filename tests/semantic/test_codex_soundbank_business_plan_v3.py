@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -17,6 +18,12 @@ from tests.semantic.support.codex_soundbank_business_plan_v3 import (
     TOPIC_ACK_CONTRACT,
     TOPIC_ACK_REQUIREMENT_CONTRACT,
     SoundBankBusinessPlanError,
+    _archive_output_policy,
+    _artifact_relative,
+    _relative_is_within,
+    _tree_by_relative,
+    _tree_maps_equal,
+    _verify_files,
     compile_soundbank_business_plan,
     parse_soundbank_business_plan_sections,
     soundbank_archive_identity,
@@ -115,6 +122,22 @@ def test_all_25_real_soundbank_ids_compile_and_recompute(scenario_id: str, tmp_p
     assert (sections.payload_bindings["primary_steps"] == []) == refusal
 
 
+def test_soundbank_file_verification_rejects_a_hard_linked_asset(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "definition.json"
+    source.write_bytes(b'{"soundbanks":[]}')
+    (tmp_path / "definition-alias.json").hardlink_to(source)
+    proof = SimpleNamespace(
+        path=str(source),
+        size=source.stat().st_size,
+        sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
+    )
+
+    with pytest.raises(SoundBankBusinessPlanError, match="input file drifted"):
+        _verify_files((proof,))
+
+
 def test_rejects_wrong_bank_platform_language_file_artifact_definition_and_inclusion(tmp_path: Path) -> None:
     materialized, before, protocol = _case(APIS[0], "O22-SB-GENERATE-01", tmp_path)
     sections = compile_soundbank_business_plan(materialized, before, protocol)
@@ -203,6 +226,207 @@ def test_topic_rejects_event_n_plus_one_and_publisher_as_primary(tmp_path: Path)
         validate_soundbank_archived_verification(sections, {"topic": {**topic_result, "extra": True}, "artifacts": _verification(sections, phase="topic_artifacts", after=after)})
 
 
+def test_archive_artifact_relative_path_uses_typed_windows_containment() -> None:
+    outputs = {
+        "bank.bnk": {"relative_path": "Bank.bnk"},
+        "nested/bank.bnk": {"relative_path": "nested/Bank.bnk"},
+    }
+
+    assert _artifact_relative(
+        r"C:\campaign\nested\Bank.bnk",
+        r"C:\campaign",
+        outputs,
+    ) == "nested/bank.bnk"
+    assert _artifact_relative(
+        r"C:\campaign\Bank.bnk",
+        r"C:\campaign",
+        outputs,
+    ) == "bank.bnk"
+    with pytest.raises(SoundBankBusinessPlanError, match="outside output authority"):
+        _artifact_relative(
+            r"C:\other\Bank.bnk",
+            r"C:\campaign",
+            outputs,
+        )
+
+
+@pytest.mark.parametrize(
+    ("io_root", "artifact", "managed"),
+    (
+        (
+            r"C:\Campaign",
+            r"C:\Campaign\outputs\Windows\Dialogue.wem",
+            r"C:\Campaign\outputs\Windows\Wwise.dat",
+        ),
+        (
+            r"\\StudioNas\Share\Campaign",
+            r"\\StudioNas\Share\Campaign\outputs\Dialogue.wem",
+            r"\\StudioNas\Share\Campaign\outputs\Wwise.dat",
+        ),
+    ),
+)
+def test_archive_output_policy_parses_windows_and_unc_off_host(
+    io_root: str,
+    artifact: str,
+    managed: str,
+) -> None:
+    static = {
+        "api": "ak.wwise.core.soundbank.convertExternalSources",
+        "io_root": io_root,
+        "dynamic_output_policy": {
+            "enum": "none",
+            "roots": [],
+            "allowed_suffixes": [],
+            "allowed_exact_names": [],
+            "require_nonempty": False,
+            "creation_only": False,
+        },
+        "expected_artifacts": [
+            {
+                "kind": "external",
+                "path": artifact,
+            }
+        ],
+        "managed_side_effects": [managed],
+    }
+
+    parsed_root, flavor, dynamic_roots, managed_paths = _archive_output_policy(static)
+
+    assert parsed_root == io_root
+    assert flavor == "windows"
+    assert dynamic_roots == ()
+    assert managed_paths == (managed,)
+
+
+def test_archive_relative_containment_follows_source_filesystem_case_rules() -> None:
+    assert _relative_is_within(
+        "IO/CACHE/SFX/generated.wem",
+        "io/cache",
+        flavor="windows",
+    )
+    assert not _relative_is_within(
+        "IO/CACHE/SFX/generated.wem",
+        "io/cache",
+        flavor="posix",
+    )
+
+
+def test_windows_output_policy_rejects_case_alias_overlap() -> None:
+    static = {
+        "api": "ak.wwise.core.soundbank.generate",
+        "io_root": r"C:\Campaign",
+        "dynamic_output_policy": {
+            "enum": "soundbank_generation_cache_v1",
+            "roots": ["io/cache"],
+            "allowed_suffixes": [".wem"],
+            "allowed_exact_names": ["Wwise.dat"],
+            "require_nonempty": True,
+            "creation_only": True,
+        },
+        "expected_artifacts": [
+            {
+                "kind": "bank",
+                "path": r"C:\Campaign\IO\CACHE\Bank.bnk",
+            }
+        ],
+        "managed_side_effects": [],
+    }
+
+    with pytest.raises(SoundBankBusinessPlanError, match="overlaps"):
+        _archive_output_policy(static)
+
+
+def test_archive_output_tree_canonicalizes_windows_relative_rows() -> None:
+    row = {
+        "relative_path": r"outputs\Windows\Bank.bnk",
+        "size": 4,
+        "sha256": "a" * 64,
+        "mtime_ns": 1,
+    }
+
+    indexed = _tree_by_relative([row], source_flavor="windows")
+
+    assert set(indexed) == {"outputs/windows/bank.bnk"}
+    assert indexed["outputs/windows/bank.bnk"]["relative_path"] == (
+        "outputs/Windows/Bank.bnk"
+    )
+    with pytest.raises(SoundBankBusinessPlanError, match="output tree is invalid"):
+        _tree_by_relative(
+            [
+                row,
+                {
+                    **row,
+                    "relative_path": "OUTPUTS/windows/bank.BNK",
+                },
+            ],
+            source_flavor="windows",
+        )
+
+
+def test_archive_tree_keeps_posix_case_distinct_and_windows_delta_stable() -> None:
+    upper = {
+        "relative_path": "outputs/Bank.bnk",
+        "size": 4,
+        "sha256": "a" * 64,
+        "mtime_ns": 1,
+    }
+    lower = {
+        **upper,
+        "relative_path": "outputs/bank.bnk",
+    }
+
+    posix = _tree_by_relative(
+        [upper, lower],
+        source_flavor="posix",
+    )
+    windows_before = _tree_by_relative(
+        [upper],
+        source_flavor="windows",
+    )
+    windows_after = _tree_by_relative(
+        [lower],
+        source_flavor="windows",
+    )
+
+    assert set(posix) == {"outputs/Bank.bnk", "outputs/bank.bnk"}
+    assert _tree_maps_equal(
+        windows_before,
+        windows_after,
+        source_flavor="windows",
+    )
+    assert not _tree_maps_equal(
+        _tree_by_relative([upper], source_flavor="posix"),
+        _tree_by_relative([lower], source_flavor="posix"),
+        source_flavor="posix",
+    )
+
+
+def test_archived_verification_validates_project_file_path_set(
+    tmp_path: Path,
+) -> None:
+    materialized, before, protocol = _case(
+        APIS[0],
+        "O22-SB-GENERATE-01",
+        tmp_path,
+    )
+    sections = compile_soundbank_business_plan(materialized, before, protocol)
+    after = _after(sections)
+    after["project_files"] = [
+        {
+            "relative_path": "../escaped.wwu",
+            "size": 4,
+            "sha256": "a" * 64,
+            "mtime_ns": 1,
+        }
+    ]
+
+    with pytest.raises(SoundBankBusinessPlanError, match="project tree is invalid"):
+        validate_soundbank_archived_verification(
+            sections,
+            _verification(sections, phase="after_execution", after=after),
+        )
+
+
 def test_refusal_requires_zero_dispatch_unchanged_snapshot_and_exact_error(tmp_path: Path) -> None:
     materialized, before, protocol = _case(APIS[1], "O22-SB-PROCESS-DEF-05", tmp_path, refusal=True)
     sections = compile_soundbank_business_plan(materialized, before, protocol)
@@ -211,6 +435,28 @@ def test_refusal_requires_zero_dispatch_unchanged_snapshot_and_exact_error(tmp_p
     validate_soundbank_archived_verification(sections, evidence)
     with pytest.raises(SoundBankBusinessPlanError):
         validate_soundbank_archived_verification(sections, {**evidence, "after": {**evidence["after"], "output_files": []}})
+
+
+def test_refusal_archive_validates_unchanged_path_sets(tmp_path: Path) -> None:
+    materialized, before, protocol = _case(
+        APIS[1],
+        "O22-SB-PROCESS-DEF-05",
+        tmp_path,
+        refusal=True,
+    )
+    sections = compile_soundbank_business_plan(materialized, before, protocol)
+    live = _copy(sections.live_binding)
+    live["before_snapshot"]["output_files"][0]["relative_path"] = "../Bank.bnk"
+    live["before_snapshot_sha256"] = _digest_value(live["before_snapshot"])
+    corrupted = replace(sections, live_binding=MappingProxyType(live))
+    evidence = _verification(
+        corrupted,
+        phase="zero_dispatch",
+        after=_copy(live["before_snapshot"]),
+    )
+
+    with pytest.raises(SoundBankBusinessPlanError, match="output tree is invalid"):
+        validate_soundbank_archived_verification(corrupted, evidence)
 
 
 def test_function_archive_accepts_control_artifact_absent_before_and_after(

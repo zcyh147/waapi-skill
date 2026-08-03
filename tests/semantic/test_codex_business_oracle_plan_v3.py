@@ -391,7 +391,41 @@ def test_reader_does_not_follow_plan_symlink(tmp_path: Path) -> None:
         read_business_oracle_plan(path, **kwargs)
 
 
-def test_reader_rejects_fixed_path_swap_after_descriptor_read(
+def test_reader_rejects_injected_path_identity_change_after_descriptor_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    kwargs = _kwargs(_root(tmp_path))
+    evidence = write_business_oracle_plan(**kwargs)
+    replacement = tmp_path / "replacement.json"
+    replacement.write_bytes(evidence.path.read_bytes())
+    original_lstat = plan_module.os.lstat
+    plan_lstat_count = 0
+    swapped = False
+
+    def report_swapped_path(path: os.PathLike[str] | str) -> os.stat_result:
+        nonlocal plan_lstat_count, swapped
+        if Path(path) == evidence.path:
+            plan_lstat_count += 1
+            if plan_lstat_count >= 3:
+                swapped = True
+                return original_lstat(replacement)
+        return original_lstat(path)
+
+    # Windows denies replacing an open file.  Inject the equivalent final path
+    # observation on every host so the native-Windows safety branch is covered
+    # without depending on an operation that Windows intentionally forbids.
+    monkeypatch.setattr(plan_module.os, "lstat", report_swapped_path)
+
+    with pytest.raises(BusinessOraclePlanError, match="path changed during read"):
+        read_business_oracle_plan(evidence.path, **kwargs)
+    assert swapped is True
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Windows does not permit replacing this open descriptor target",
+)
+def test_reader_rejects_real_posix_path_swap_after_descriptor_read(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     kwargs = _kwargs(_root(tmp_path))

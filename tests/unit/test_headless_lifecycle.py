@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import os
 import socket
 import subprocess
 import sys
@@ -841,6 +842,7 @@ def test_wineserver_cleanup_does_not_fall_back_from_invalid_explicit_binary(
     assert calls == []
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Wine prefix cleanup is POSIX-only")
 def test_wineserver_cleanup_polls_before_escalating(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -868,6 +870,7 @@ def test_wineserver_cleanup_polls_before_escalating(
     assert completed == [["wineserver", "-k"]]
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Wine prefix cleanup is POSIX-only")
 def test_wineserver_cleanup_escalates_after_bounded_poll(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

@@ -45,6 +45,7 @@ from tests.semantic.support.codex_filesystem_security import (
     CodexFileSecurityError,
     path_is_link_or_reparse,
     read_bounded_exclusive_regular_file,
+    write_utf8_text_bytes,
 )
 from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
@@ -3607,6 +3608,7 @@ def _prepare_integration_workflow_case(
             version=runtime.version,
             scenario_root=runtime.scenario_root,
             owned_root=runtime.owned_root,
+            sandbox_project_root=runtime.sandbox.sandbox_path,
             direct=direct,
         )
         typed_sections = prepared.typed_sections
@@ -5771,7 +5773,8 @@ def _append_reason(current: str, extra: str) -> str:
 
 def _write_json(path: Path, value: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    write_utf8_text_bytes(
+        path,
         json.dumps(
             _json_value(value),
             ensure_ascii=False,
@@ -5780,7 +5783,6 @@ def _write_json(path: Path, value: Mapping[str, Any]) -> None:
             indent=2,
         )
         + "\n",
-        encoding="utf-8",
     )
 
 

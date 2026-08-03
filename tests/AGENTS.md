@@ -71,6 +71,34 @@ Start from the committed template:
 
 Set `WWISE_TEST_CONFIG=/absolute/path/to/live-environment.json` to use a different file. Each version entry may define `wwise_console`, `sample_project`, and optional `sandbox_root`. Environment variables (`WWISE_CONSOLE`, `WWISE_SAMPLE_PROJECT_PATH`, `WWISE_SANDBOX_ROOT`) still override JSON values for one-off runs.
 
+## Cross-platform path and process boundaries
+
+Treat a path according to the namespace that owns it; never normalize an
+unknown string by replacing slashes:
+
+- Host filesystem paths must use `pathlib`. When a value may originate on a
+  different platform, select `PureWindowsPath` or `PurePosixPath` from its
+  validated lexical flavor before localizing it. Production WAAPI host paths
+  go through `skills/waapi-skill/wwise_waapi/host_paths.py`; semantic-only host
+  fixture paths use `tests/semantic/support/codex_host_paths.py`.
+- Paths stored inside evidence archives are portable logical identities, not
+  host paths. Parse and compare them through
+  `tests/semantic/support/codex_archive_paths.py`; persist only its canonical
+  POSIX spelling. Do not use host `Path` semantics or `replace("\\", "/")` to
+  derive an archive identity.
+- Wwise object hierarchy paths, JSON Pointers, WAQL expressions, URI strings,
+  and similar domain values are not filesystem paths. Preserve their domain
+  separators and validate them with the owning parser instead of `pathlib`.
+- Model-facing subprocess tests on Windows must use
+  `tests/support/platform_process.py`. Do not restore bare-PATH launch through
+  `cmd.exe`, `COMSPEC`, `shell=True`, or a hand-built command line; the helper
+  starts the attested Python and broker shim directly while keeping model argv
+  as data.
+
+Add focused POSIX, Windows-drive, and UNC cases whenever a shared path boundary
+changes. At minimum cover case semantics, traversal, mixed separators, spaces,
+Unicode, and shell metacharacters where the value can reach a subprocess.
+
 ## Strict real modes
 
 `live`, `destructive`, `smoke`, and `matrix` are strict real modes. They set `WWISE_STRICT_REAL=1`, require an executable `WWISE_CONSOLE`, and require an existing `.wproj` at `WWISE_SAMPLE_PROJECT_PATH`. Missing WwiseConsole or SampleProject prerequisites fail before pytest execution instead of becoming soft skips.

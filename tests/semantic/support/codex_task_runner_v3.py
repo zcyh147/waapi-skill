@@ -29,6 +29,7 @@ from tests.semantic.support.codex_gateway_broker import (
     TrustedStepPreObserver,
     gateway_step_sequence_matches,
 )
+from tests.semantic.support.codex_filesystem_security import write_utf8_text_bytes
 from tests.semantic.support.codex_harness import (
     CodexCliTask,
     CodexGatewayErrorExpectation,
@@ -835,10 +836,10 @@ def _archive_turn(
     grade: V3TurnGrade,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "prompt.txt").write_text(prompt + "\n", encoding="utf-8")
-    (output_dir / "events.jsonl").write_text(result.stdout, encoding="utf-8")
-    (output_dir / "stderr.txt").write_text(result.stderr, encoding="utf-8")
-    (output_dir / "final.txt").write_text(result.final_response + "\n", encoding="utf-8")
+    write_utf8_text_bytes(output_dir / "prompt.txt", prompt + "\n")
+    write_utf8_text_bytes(output_dir / "events.jsonl", result.stdout)
+    write_utf8_text_bytes(output_dir / "stderr.txt", result.stderr)
+    write_utf8_text_bytes(output_dir / "final.txt", result.final_response + "\n")
     _write_json(output_dir / "codex-facts.json", result.facts_dict())
     _write_json(
         output_dir / "turn-grade.json",
@@ -986,7 +987,7 @@ def _archive_infrastructure_failure(
         "final.txt": result.final_response + "\n",
     }
     for name, value in failed_turn_files.items():
-        (output_dir / name).write_text(value, encoding="utf-8")
+        write_utf8_text_bytes(output_dir / name, value)
     _write_json(output_dir / "codex-facts.json", result.facts_dict())
 
     broker_path = root / "broker-evidence.json"
@@ -1195,10 +1196,10 @@ def _is_sha256(value: Any) -> bool:
 
 def _write_json(path: Path, value: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    write_utf8_text_bytes(
+        path,
         json.dumps(value, ensure_ascii=False, allow_nan=False, sort_keys=True, indent=2, default=str)
         + "\n",
-        encoding="utf-8",
     )
 
 

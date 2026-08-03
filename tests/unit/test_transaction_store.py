@@ -830,6 +830,18 @@ def test_missing_artifact_files_report_transaction_not_found(tmp_path) -> None:
 def test_symlinked_store_components_fail_closed(tmp_path) -> None:
     external = tmp_path / "external"
     external.mkdir()
+    state_root_link = tmp_path / "state-root-link"
+    create_symlink_or_skip(
+        state_root_link,
+        external,
+        target_is_directory=True,
+    )
+    with pytest.raises(
+        StateCorruptionError,
+        match="State directory cannot be a link, junction, or reparse point",
+    ):
+        TransactionStore(state_root_link)
+
     state_with_link = tmp_path / "linked-store"
     state_with_link.mkdir()
     create_symlink_or_skip(
@@ -837,12 +849,18 @@ def test_symlinked_store_components_fail_closed(tmp_path) -> None:
         external,
         target_is_directory=True,
     )
-    with pytest.raises(StateCorruptionError, match="Store directory cannot be a symlink"):
+    with pytest.raises(
+        StateCorruptionError,
+        match="Store directory cannot be a link, junction, or reparse point",
+    ):
         TransactionStore(state_with_link)
 
     store = TransactionStore(tmp_path / "normal-store")
     create_symlink_or_skip(store.locks_dir / "tx-lock-link.lock", external / "lock")
-    with pytest.raises(StateCorruptionError, match="lock cannot be a symlink"):
+    with pytest.raises(
+        StateCorruptionError,
+        match="lock cannot be a link, junction, or reparse point",
+    ):
         store.create_preview("tx-lock-link", {"safe": True})
 
     create_symlink_or_skip(
@@ -850,8 +868,102 @@ def test_symlinked_store_components_fail_closed(tmp_path) -> None:
         external,
         target_is_directory=True,
     )
-    with pytest.raises(StateCorruptionError, match="directory cannot be a symlink"):
+    with pytest.raises(
+        StateCorruptionError,
+        match="directory cannot be a link, junction, or reparse point",
+    ):
         store.create_preview("tx-dir-link", {"safe": True})
+
+
+@pytest.mark.parametrize("durable_name", ("preview.json", "state.json", "events.jsonl"))
+def test_symlinked_durable_transaction_files_fail_closed(
+    tmp_path: Path,
+    durable_name: str,
+) -> None:
+    store = TransactionStore(tmp_path / "durable-link-store")
+    transaction_id = f"tx-linked-{durable_name.split('.', 1)[0]}"
+    store.create_preview(transaction_id, {"safe": True})
+    transaction_dir = store.transactions_dir / transaction_id
+    durable_path = transaction_dir / durable_name
+    external = tmp_path / f"external-{durable_name}"
+    external.write_bytes(durable_path.read_bytes())
+    durable_path.unlink()
+    create_symlink_or_skip(durable_path, external)
+
+    with pytest.raises(
+        StateCorruptionError,
+        match="link, junction, or reparse point",
+    ):
+        if durable_name == "preview.json":
+            store.load_preview(transaction_id)
+        elif durable_name == "state.json":
+            store.load(transaction_id)
+        else:
+            store.read_events(transaction_id)
+
+
+def test_event_append_rejects_link_without_modifying_its_target(tmp_path: Path) -> None:
+    target = tmp_path / "external-events.jsonl"
+    original = b'{"outside":true}\n'
+    target.write_bytes(original)
+    event_path = tmp_path / "events.jsonl"
+    create_symlink_or_skip(event_path, target)
+
+    with pytest.raises(
+        StateCorruptionError,
+        match="link, junction, or reparse point",
+    ):
+        TransactionStore._append_event(event_path, {"event": "blocked"})
+
+    assert target.read_bytes() == original
+
+
+def test_windows_junction_durable_file_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = TransactionStore(tmp_path / "junction-file-store")
+    transaction_id = "tx-junction-preview"
+    store.create_preview(transaction_id, {"safe": True})
+    preview = _preview_path(store.state_dir, transaction_id)
+    real_is_junction = getattr(Path, "is_junction", lambda _self: False)
+    monkeypatch.setattr(
+        Path,
+        "is_junction",
+        lambda self: self == preview or real_is_junction(self),
+        raising=False,
+    )
+
+    with pytest.raises(
+        StateCorruptionError,
+        match="link, junction, or reparse point",
+    ):
+        store.load_preview(transaction_id)
+
+
+@pytest.mark.parametrize("component", ("transactions", "locks"))
+def test_windows_junction_store_component_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    component: str,
+) -> None:
+    state_dir = tmp_path / "junction-store"
+    state_dir.mkdir()
+    junction = state_dir / component
+    junction.mkdir()
+    real_is_junction = getattr(Path, "is_junction", lambda _self: False)
+    monkeypatch.setattr(
+        Path,
+        "is_junction",
+        lambda self: self == junction or real_is_junction(self),
+        raising=False,
+    )
+
+    with pytest.raises(
+        StateCorruptionError,
+        match="Store directory cannot be a link, junction, or reparse point",
+    ):
+        TransactionStore(state_dir)
 
 
 def test_platform_lock_serializes_cross_process_state_race(tmp_path) -> None:

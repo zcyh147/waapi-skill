@@ -51,6 +51,15 @@ from .builders.schema import validate_semantic_payload, validate_semantic_result
 from .builders.soundbank import SoundBankBuilder
 from .builders.switchcontainer import SwitchContainerAssignmentBuilder
 from .execution_contracts import ExecutionContractError, ExecutionContractRegistry
+from .filesystem_security import path_is_link_or_reparse
+from .host_paths import (
+    HostPathError,
+    HostPathKey,
+    host_path_comparison_key,
+    localize_waapi_host_path,
+    parse_absolute_host_path,
+    parse_relative_host_path,
+)
 from .io_policy import IOPolicyError, validate_isolated_io
 from .operation_import import (
     AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS,
@@ -6249,7 +6258,7 @@ def _prepare_object_set_import(
         )
     dispatch_files: list[dict[str, Any]] = []
     source_specs: list[dict[str, Any]] = []
-    source_keys: set[str] = set()
+    source_keys: set[tuple[tuple[str, ...], str, str, str]] = set()
     for index, item in enumerate(descriptor.files):
         field = item.request_path
         dispatch_row: dict[str, Any] = {}
@@ -6269,7 +6278,10 @@ def _prepare_object_set_import(
                     str(exc),
                     details=exc.details,
                 ) from exc
-            source_identity = f"file:{str(proof['path']).casefold()}"
+            source_identity = (
+                "file",
+                *host_path_comparison_key(proof["path"]),
+            )
             dispatch_row["audioFile"] = proof["path"]
             source = {
                 "index": index,
@@ -6296,9 +6308,9 @@ def _prepare_object_set_import(
                     details=exc.details,
                 ) from exc
             source_identity = (
-                "inline:"
-                f"{str(inline_proof['relative_path']).casefold()}:"
-                f"{inline_proof['sha256']}"
+                "inline",
+                str(inline_proof["relative_path"]).casefold(),
+                str(inline_proof["sha256"]),
             )
             dispatch_row["audioFileBase64"] = encoded
             source = {
@@ -6341,13 +6353,11 @@ def _prepare_object_set_import(
             dispatch_row["objectType"] = type_info.name
             source["requested_object_type"] = type_info.name
             source["requested_object_type_class_id"] = type_info.class_id
-        source_key = ":".join(
-            (
-                source_identity,
-                str(dispatch_row.get("language", "")).casefold(),
-                str(dispatch_row.get("objectType", "")).casefold(),
-                str(dispatch_row.get("originalsSubFolder", "")).casefold(),
-            )
+        source_key = (
+            source_identity,
+            str(dispatch_row.get("language", "")).casefold(),
+            str(dispatch_row.get("objectType", "")).casefold(),
+            str(dispatch_row.get("originalsSubFolder", "")).casefold(),
         )
         if source_key in source_keys:
             raise OperationContractError(
@@ -8566,20 +8576,23 @@ def _import_project_directory_candidate(
             f"{field} must be a non-empty path string.",
             details={field: value},
         )
-    portable = value.replace("\\", "/")
-    if Path(portable).is_absolute() or re.fullmatch(r"[A-Za-z]:/.*", portable):
-        candidate = Path(_localize_waapi_file_path(value, field=field))
-    elif portable == ".":
-        candidate = base
-    else:
-        parts = portable.split("/")
-        if any(part in {"", ".", ".."} or ":" in part for part in parts):
+    try:
+        parse_absolute_host_path(value, allow_trailing_separator=True)
+    except HostPathError:
+        try:
+            relative = parse_relative_host_path(
+                value,
+                allow_current_directory=True,
+            )
+        except HostPathError as exc:
             raise OperationContractError(
                 "INVALID_PROJECT_CONTEXT",
-                f"{field} contains an unsafe relative path segment.",
-                details={field: value},
-            )
-        candidate = base.joinpath(*parts)
+                f"{field} contains an unsafe relative path.",
+                details={field: value, "path_error": str(exc)},
+            ) from exc
+        candidate = base.joinpath(*relative.components)
+    else:
+        candidate = Path(_localize_waapi_file_path(value, field=field))
     if not candidate.is_absolute():
         raise OperationContractError(
             "INVALID_PROJECT_CONTEXT",
@@ -8621,10 +8634,10 @@ def _secure_import_filesystem_path(
                 f"{field} contains an inaccessible path component.",
                 details={field: str(path), "component": str(current), "error": str(exc)},
             ) from exc
-        if stat.S_ISLNK(path_stat.st_mode):
+        if path_is_link_or_reparse(current, metadata=path_stat):
             raise OperationContractError(
                 "UNSAFE_ORIGINALS_PATH",
-                f"{field} must not contain symbolic links.",
+                f"{field} must not contain links, junctions, or reparse points.",
                 details={field: str(path), "component": str(current)},
             )
         is_final = index == len(components) - 1
@@ -10935,25 +10948,24 @@ def _localize_soundbank_project_directory(
             f"{field} must be a non-empty path string.",
             details={field: value},
         )
-    portable = value.replace("\\", "/")
-    if Path(portable).is_absolute() or re.fullmatch(r"[A-Za-z]:/.*", portable):
-        candidate = Path(_localize_waapi_file_path(value, field=field))
-    elif portable == ".":
-        candidate = project_root
-    else:
-        parts = portable.split("/")
-        if any(
-            part in {"", "."}
-            or ":" in part
-            or (part == ".." and not allow_parent_segments)
-            for part in parts
-        ):
+    try:
+        parse_absolute_host_path(value, allow_trailing_separator=True)
+    except HostPathError:
+        try:
+            relative = parse_relative_host_path(
+                value,
+                allow_current_directory=True,
+                allow_parent_segments=allow_parent_segments,
+            )
+        except HostPathError as exc:
             raise OperationContractError(
                 "INVALID_PROJECT_CONTEXT",
-                f"{field} contains an unsafe relative path segment.",
-                details={field: value},
-            )
-        candidate = project_root.joinpath(*parts)
+                f"{field} contains an unsafe relative path.",
+                details={field: value, "path_error": str(exc)},
+            ) from exc
+        candidate = project_root.joinpath(*relative.components)
+    else:
+        candidate = Path(_localize_waapi_file_path(value, field=field))
     try:
         resolved = candidate.resolve(strict=False)
         io_resolved = io_root.resolve(strict=False)
@@ -10990,57 +11002,16 @@ def _localize_waapi_file_path(
     *,
     field: str = "live Project filePath",
 ) -> str:
-    if not isinstance(value, str) or not value or value != value.strip() or "\x00" in value:
+    try:
+        return localize_waapi_host_path(value)
+    except HostPathError as exc:
+        details: dict[str, Any] = {field: value, "reason": str(exc)}
+        details.update(exc.details)
         raise OperationContractError(
             "INVALID_PROJECT_CONTEXT",
-            f"{field} must be a non-empty path string.",
-            details={field: value},
-        )
-    if os.name == "nt":
-        path = Path(value)
-        if not path.is_absolute():
-            raise OperationContractError(
-                "INVALID_PROJECT_CONTEXT",
-                f"{field} must be absolute.",
-                details={field: value},
-            )
-        return str(path)
-    normalized = value.replace("\\", "/")
-    virtual_drive = re.fullmatch(r"([A-Za-z]):/(.*)", normalized)
-    if virtual_drive is not None:
-        drive = virtual_drive.group(1).upper()
-        suffix = virtual_drive.group(2)
-        if drive == "Z":
-            path = Path("/") / suffix
-        elif drive == "Y":
-            # WAAPI's Y: is the login account home, while agent harnesses may
-            # deliberately replace HOME for the model process.
-            try:
-                import pwd
-
-                account_home = Path(pwd.getpwuid(os.getuid()).pw_dir)
-            except (ImportError, KeyError, OSError) as exc:
-                raise OperationContractError(
-                    "INVALID_PROJECT_CONTEXT",
-                    "The WAAPI Y: virtual drive could not be mapped to the host account home.",
-                    details={field: value, "error": str(exc)},
-                ) from exc
-            path = account_home / suffix
-        else:
-            raise OperationContractError(
-                "INVALID_PROJECT_CONTEXT",
-                f"{field} uses an unmappable WAAPI virtual drive.",
-                details={field: value, "drive": drive},
-            )
-    else:
-        path = Path(normalized)
-    if not path.is_absolute():
-        raise OperationContractError(
-            "INVALID_PROJECT_CONTEXT",
-            f"{field} must be absolute after WAAPI path localization.",
-            details={field: value, "localized": str(path)},
-        )
-    return str(path)
+            f"{field} is not a safe local filesystem path: {exc}",
+            details=details,
+        ) from exc
 
 
 def _normalize_generate_arguments(
@@ -18664,14 +18635,25 @@ def _import_language_name(value: Any) -> str | None:
 def _import_path_segments(value: Any) -> list[str]:
     if not isinstance(value, str):
         return []
-    return [segment.casefold() for segment in re.split(r"[\\/]+", value) if segment]
+    try:
+        relative = parse_relative_host_path(value)
+    except HostPathError:
+        return []
+    return [segment.casefold() for segment in relative.components]
 
 
 def _import_path_leaf_name(value: Any) -> str:
     if not isinstance(value, str):
         return ""
-    parts = [segment for segment in re.split(r"[\\/]+", value) if segment]
-    return parts[-1] if parts else ""
+    try:
+        absolute = parse_absolute_host_path(value)
+    except HostPathError:
+        try:
+            relative = parse_relative_host_path(value)
+        except HostPathError:
+            return ""
+        return relative.pure_path.name
+    return absolute.pure_path.name
 
 
 def _import_candidate_ancestor_chain(
@@ -18791,10 +18773,11 @@ def _import_relative_original_path(
     }
 
 
-def _import_file_path_key(value: Any) -> str | None:
-    if not isinstance(value, str) or not value:
+def _import_file_path_key(value: Any) -> HostPathKey | None:
+    try:
+        return host_path_comparison_key(value)
+    except HostPathError:
         return None
-    return os.path.normpath(value.replace("\\", "/")).casefold()
 
 
 def _require_reference_target_allowed(

@@ -179,6 +179,22 @@ def _case(
     return scenario, recipe, protocol, before, manifest
 
 
+def _reseal_object_fixture_spec(payload: dict) -> None:
+    fixture_value = {
+        "static": payload["static_expectation"],
+        "live": payload["live_binding"],
+    }
+    payload["fixture_spec"]["sha256"] = hashlib.sha256(
+        json.dumps(
+            fixture_value,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+
+
 @pytest.mark.parametrize("case_id", OBJECT_HEAVY_CASE_IDS)
 def test_all_fifteen_object_cases_compile_and_archive_validate(
     case_id: str,
@@ -621,6 +637,117 @@ def test_object_input_manifest_rejects_symlink(tmp_path: Path) -> None:
     create_symlink_or_skip(link, source)
     with pytest.raises(ObjectBusinessPlanError, match="regular file"):
         seal_object_input_file_manifest({"fixture": link})
+
+
+def test_object_input_manifest_rejects_hard_links_during_seal(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.wav"
+    source.write_bytes(b"RIFF-source")
+    (tmp_path / "source-alias.wav").hardlink_to(source)
+
+    with pytest.raises(ObjectBusinessPlanError, match="exclusive"):
+        seal_object_input_file_manifest({"fixture": source})
+
+
+def test_object_input_manifest_rejects_hard_links_during_verification(
+    tmp_path: Path,
+) -> None:
+    scenario, recipe, protocol, before, manifest = _case(
+        "OBJ22-F-GET-05",
+        tmp_path,
+    )
+    sections = compile_object_business_plan(
+        scenario,
+        recipe,
+        protocol,
+        before,
+        manifest,
+    )
+    source = Path(manifest[0]["path"])
+    (tmp_path / "source-alias.wav").hardlink_to(source)
+
+    with pytest.raises(ObjectBusinessPlanError, match="current fixture file"):
+        validate_archived_object_business_plan(
+            sections.writer_kwargs(),
+            scenario=scenario,
+            recipe=recipe,
+            protocol=protocol,
+            verify_files=True,
+        )
+
+
+def test_object_archive_accepts_windows_paths_without_host_os_reinterpretation(
+    tmp_path: Path,
+) -> None:
+    scenario, recipe, protocol, before, manifest = _case(
+        "OBJ22-F-GET-05",
+        tmp_path,
+    )
+    payload = compile_object_business_plan(
+        scenario,
+        recipe,
+        protocol,
+        before,
+        manifest,
+    ).writer_kwargs()
+    for index, row in enumerate(payload["live_binding"]["input_files"]):
+        row["path"] = rf"C:\Fixture Inputs\Sound {index}.wav"
+    _reseal_object_fixture_spec(payload)
+
+    validate_archived_object_business_plan(
+        payload,
+        scenario=scenario,
+        recipe=recipe,
+        protocol=protocol,
+        verify_files=False,
+    )
+
+
+def test_object_archive_path_uniqueness_uses_producer_case_semantics(
+    tmp_path: Path,
+) -> None:
+    scenario, recipe, protocol, before, manifest = _case(
+        "OBJ22-F-GET-05",
+        tmp_path,
+    )
+    sections = compile_object_business_plan(
+        scenario,
+        recipe,
+        protocol,
+        before,
+        manifest,
+    )
+
+    windows_attack = sections.writer_kwargs()
+    windows_rows = windows_attack["live_binding"]["input_files"]
+    windows_rows[0]["path"] = r"C:\Fixture Inputs\Thunder.wav"
+    windows_rows[1]["path"] = r"c:\fixture inputs\THUNDER.WAV"
+    for index, row in enumerate(windows_rows[2:], start=2):
+        row["path"] = rf"C:\Fixture Inputs\Sound {index}.wav"
+    _reseal_object_fixture_spec(windows_attack)
+    with pytest.raises(ObjectBusinessPlanError, match="manifest values"):
+        validate_archived_object_business_plan(
+            windows_attack,
+            scenario=scenario,
+            recipe=recipe,
+            protocol=protocol,
+        )
+
+    posix_payload = sections.writer_kwargs()
+    posix_rows = posix_payload["live_binding"]["input_files"]
+    posix_rows[0]["path"] = "/fixture-inputs/Thunder.wav"
+    posix_rows[1]["path"] = "/fixture-inputs/thunder.wav"
+    for index, row in enumerate(posix_rows[2:], start=2):
+        row["path"] = f"/fixture-inputs/sound-{index}.wav"
+    _reseal_object_fixture_spec(posix_payload)
+    validate_archived_object_business_plan(
+        posix_payload,
+        scenario=scenario,
+        recipe=recipe,
+        protocol=protocol,
+        verify_files=False,
+    )
 
 
 def test_object_archive_rejects_resealed_wrong_fixture_fields_and_prefix_rows(

@@ -10,7 +10,6 @@ import os
 import queue
 import shlex
 import stat
-import subprocess
 import sys
 import threading
 import time
@@ -85,6 +84,15 @@ from wwise_waapi.metadata_discovery import (  # noqa: E402  # pyright: ignore[re
     MAX_METADATA_DISCOVERY_QUERY_CHARS,
     MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS,
     discover_metadata,
+)
+from wwise_waapi.host_paths import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    HostPathError,
+    host_path_comparison_key,
+    localize_waapi_host_path,
+)
+from wwise_waapi.platform_commands import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    encode_windows_powershell_argv,
 )
 from wwise_waapi.builders.query import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     ADVANCED_QUERY_CONTRACT,
@@ -2586,41 +2594,7 @@ def normalize_original_file_system_path(value: Any) -> tuple[str, ...]:
     ):
         raise ValueError("path contains a control character")
 
-    normalized = value.replace("\\", "/")
-    if normalized.startswith("//"):
-        flavor = "unc"
-        prefix = ""
-        suffix = normalized[2:]
-    elif len(normalized) >= 2 and normalized[1] == ":":
-        if (
-            not normalized[0].isascii()
-            or not normalized[0].isalpha()
-            or len(normalized) < 4
-            or normalized[2] != "/"
-        ):
-            raise ValueError("expected a drive-absolute path such as Y:/folder/file.wav")
-        flavor = "drive"
-        prefix = normalized[0].casefold()
-        suffix = normalized[3:]
-    elif value.startswith("/"):
-        flavor = "posix"
-        prefix = ""
-        suffix = normalized[1:]
-    else:
-        raise ValueError("expected an absolute POSIX or drive-qualified path")
-
-    parts = suffix.split("/")
-    if any(part in {"", ".", ".."} for part in parts):
-        raise ValueError("path must use normalized non-traversing components")
-    if flavor == "unc":
-        if len(parts) < 3:
-            raise ValueError("UNC paths require nonempty server, share, and file components")
-        if parts[0] in {"?", "."}:
-            raise ValueError("extended or device UNC paths are outside this contract")
-        return (flavor, *(part.casefold() for part in parts))
-    if flavor == "drive":
-        return (flavor, prefix, *(part.casefold() for part in parts))
-    return (flavor, *parts)
+    return host_path_comparison_key(value)
 
 
 def preflight_metadata_input(args: argparse.Namespace) -> None:
@@ -9041,23 +9015,35 @@ def require_runtime_directory_outside_project(
     *,
     project: Mapping[str, Any],
 ) -> None:
-    """Reject preview state inside the live project when paths share a flavor."""
+    """Reject runtime state inside the live project across native/Wine paths."""
 
-    project_value = project.get("path")
-    if not isinstance(project_value, str) or not project_value:
-        return
-    project_file = Path(project_value)
-    if not project_file.is_absolute():
-        # Wwise under Wine can return a Windows path to a POSIX gateway.  Those
-        # paths cannot contain the already-absolute POSIX runtime directory.
-        return
-    project_root = project_file.resolve(strict=False).parent
+    project_value: str | None = None
+    for key in ("filePath", "projectPath", "path"):
+        value = project.get(key)
+        if isinstance(value, str) and value:
+            project_value = value
+            break
+    if project_value is None:
+        raise GatewayInputError(
+            "The live project does not expose an absolute filesystem path; "
+            "transaction state containment cannot be proven."
+        )
     try:
-        runtime_dir.relative_to(project_root)
+        localized_project = localize_waapi_host_path(project_value)
+    except HostPathError as exc:
+        raise GatewayInputError(
+            "The live project filesystem path cannot be localized safely: "
+            f"{project_value}: {exc}"
+        ) from exc
+    project_root = Path(localized_project).resolve(strict=False).parent
+    resolved_runtime = runtime_dir.resolve(strict=False)
+    try:
+        resolved_runtime.relative_to(project_root)
     except ValueError:
         return
     raise GatewayInputError(
-        f"Transaction state directory must be outside the live Wwise project: {runtime_dir}"
+        "Transaction state directory must be outside the live Wwise project: "
+        f"{resolved_runtime}"
     )
 
 
@@ -9089,8 +9075,8 @@ def transaction_next_command(
     if requires_later_user_message:
         payload["requires_later_user_message"] = True
     if os.name == "nt":
-        payload["shell_family"] = "windows-cmd"
-        shell_command = subprocess.list2cmdline(full_argv)
+        payload["shell_family"] = WINDOWS_POWERSHELL_ENCODED_FAMILY
+        shell_command = encode_windows_powershell_argv(full_argv)
     else:
         payload["shell_family"] = "posix-sh"
         shell_command = shlex.join(full_argv)
@@ -9894,7 +9880,7 @@ def current_project(
             connection=connection,
             version=version,
             args={"waql": "from type Project take 2"},
-            options={"return": ["id", "name", "type", "path"]},
+            options={"return": ["id", "name", "type", "path", "filePath"]},
         )
         if project_call.get("ok") is not True:
             raise GatewayInputError(
@@ -9924,7 +9910,7 @@ def current_project(
             connection=connection,
             version=version,
             args={"waql": "from type Project take 1"},
-            options={"return": ["id", "name", "type", "path"]},
+            options={"return": ["id", "name", "type", "path", "filePath"]},
         )
         rows = (
             strict_object_get_rows(

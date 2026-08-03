@@ -10,6 +10,13 @@ from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 
+from tests.semantic.support.codex_archive_paths import (
+    ArchiveAbsolutePath,
+    ArchiveRelativePathError,
+    archive_relative_from_absolute,
+    parse_archive_absolute_path,
+    parse_archive_relative_path,
+)
 from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
     V3GatewayProtocol,
@@ -17,8 +24,13 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_transaction_protocol,
     wait_topic_step,
 )
+from tests.semantic.support.codex_filesystem_security import (
+    CodexFileSecurityError,
+    read_bounded_exclusive_regular_file,
+)
 from tests.semantic.support.codex_prompt_provenance_v3 import serialize_protocol
 from tests.semantic.support.codex_soundbank_runtime_v3 import (
+    MAX_FILE_BYTES,
     OPERATION_REQUEST_CONTRACT,
     PROCESS_REFUSAL_ERROR_CODE,
     SOUNDBANK_APIS,
@@ -219,6 +231,12 @@ def validate_soundbank_archived_verification(sections: SoundBankBusinessPlanSect
         raise SoundBankBusinessPlanError("archived SoundBank verification is invalid")
     live = sections.live_binding
     static = sections.static_expectation
+    _io_root, source_flavor, _dynamic_roots, _managed = (
+        _archive_output_policy(static)
+    )
+    _validate_snapshot_path_sets(
+        live["before_snapshot"], source_flavor=source_flavor
+    )
     if static["api"] == SOUNDBANK_TOPIC:
         if set(value) != {"topic", "artifacts"}:
             raise SoundBankBusinessPlanError("archived topic verification schema is not closed")
@@ -232,6 +250,9 @@ def validate_soundbank_archived_verification(sections: SoundBankBusinessPlanSect
         raise SoundBankBusinessPlanError("archived SoundBank verification schema is not closed")
     _validate_runtime_result(value, static["scenario_id"], phase, live["before_snapshot"])
     if static["zero_dispatch_error_code"] is not None:
+        _validate_snapshot_path_sets(
+            value["after"], source_flavor=source_flavor
+        )
         if value["after"] != live["before_snapshot"]:
             raise SoundBankBusinessPlanError("archived refusal verification must prove before equals after")
         return
@@ -418,7 +439,12 @@ def _validate_archive_inputs(static: Mapping[str, Any], live: Mapping[str, Any])
     requests = static["operation_requests"]
     if type(count) is not int or count < 0 or not isinstance(requests, list):
         raise SoundBankBusinessPlanError("archived SoundBank dispatch/request shape is invalid")
-    io_root, _dynamic_roots, _managed_side_effects = _archive_output_policy(static)
+    (
+        io_root,
+        _io_root_flavor,
+        _dynamic_roots,
+        _managed_side_effects,
+    ) = _archive_output_policy(static)
     topic = live["topic"]
     if static["api"] == SOUNDBANK_TOPIC:
         expected_topic_keys = {
@@ -479,13 +505,35 @@ def _validate_archive_inputs(static: Mapping[str, Any], live: Mapping[str, Any])
     for field in ("short_ids", "media_ids"):
         if not isinstance(live[field], Mapping) or any(not isinstance(key, str) or type(value) is not int or value < 0 for key, value in live[field].items()):
             raise SoundBankBusinessPlanError("archived SoundBank numeric ID bindings are invalid")
-    if not isinstance(live["input_files"], list) or any(
-        not isinstance(item, Mapping) or set(item) != {"path", "relative_path", "size", "sha256", "mtime_ns"}
-        or not isinstance(item["path"], str) or not isinstance(item["relative_path"], str)
-        or type(item["size"]) is not int or item["size"] < 0 or not _sha_text(item["sha256"])
-        for item in live["input_files"]
-    ):
+    if not isinstance(live["input_files"], list):
         raise SoundBankBusinessPlanError("archived SoundBank input files lack path-size-sha proofs")
+    input_relative_paths: set[str] = set()
+    for item in live["input_files"]:
+        if (
+            not isinstance(item, Mapping)
+            or set(item)
+            != {"path", "relative_path", "size", "sha256", "mtime_ns"}
+            or not isinstance(item["path"], str)
+            or not isinstance(item["relative_path"], str)
+            or type(item["size"]) is not int
+            or not 0 < item["size"] <= MAX_FILE_BYTES
+            or not _sha_text(item["sha256"])
+        ):
+            raise SoundBankBusinessPlanError(
+                "archived SoundBank input files lack path-size-sha proofs"
+            )
+        try:
+            parse_archive_absolute_path(item["path"])
+            relative = parse_archive_relative_path(item["relative_path"]).canonical
+        except ArchiveRelativePathError as exc:
+            raise SoundBankBusinessPlanError(
+                "archived SoundBank input file path is invalid"
+            ) from exc
+        if relative in input_relative_paths:
+            raise SoundBankBusinessPlanError(
+                "archived SoundBank input file relative paths are duplicated"
+            )
+        input_relative_paths.add(relative)
     if live["input_files"] != live["before_snapshot"].get("input_files"):
         raise SoundBankBusinessPlanError("archived SoundBank live input manifest differs from the sealed before snapshot")
     reviewed_documents = {
@@ -586,9 +634,28 @@ def _validate_after_delta(static: Mapping[str, Any], live: Mapping[str, Any], af
     before = live["before_snapshot"]
     if after["input_files"] != before["input_files"]:
         raise SoundBankBusinessPlanError("archived SoundBank input file proof changed")
-    before_outputs = _tree_by_relative(before["output_files"])
-    after_outputs = _tree_by_relative(after["output_files"])
-    io_root, dynamic_roots, managed_side_effects = _archive_output_policy(static)
+    (
+        io_root,
+        io_root_flavor,
+        dynamic_roots,
+        managed_side_effects,
+    ) = _archive_output_policy(static)
+    before_project_files = _tree_by_relative(
+        before["project_files"],
+        label="project tree",
+        source_flavor=io_root_flavor,
+    )
+    after_project_files = _tree_by_relative(
+        after["project_files"],
+        label="project tree",
+        source_flavor=io_root_flavor,
+    )
+    before_outputs = _tree_by_relative(
+        before["output_files"], source_flavor=io_root_flavor
+    )
+    after_outputs = _tree_by_relative(
+        after["output_files"], source_flavor=io_root_flavor
+    )
     expected = static["expected_artifacts"]
     if not isinstance(expected, list):
         raise SoundBankBusinessPlanError("archived SoundBank expected artifacts are invalid")
@@ -598,6 +665,7 @@ def _validate_after_delta(static: Mapping[str, Any], live: Mapping[str, Any], af
             raise SoundBankBusinessPlanError("archived SoundBank artifact record is invalid")
         candidate = _artifact_relative(
             artifact["path"],
+            io_root,
             {**before_outputs, **after_outputs},
         )
         if candidate is None:
@@ -617,16 +685,26 @@ def _validate_after_delta(static: Mapping[str, Any], live: Mapping[str, Any], af
         if artifact.get("kind") == "control" or (
             artifact.get("kind") == "init" and static["api"] == SOUNDBANK_TOPIC
         ):
-            if current != previous:
+            if not _tree_rows_equal(
+                current, previous, source_flavor=io_root_flavor
+            ):
                 raise SoundBankBusinessPlanError("archived SoundBank control artifact changed")
         elif artifact.get("kind") == "init":
             if current is not None and current.get("size", 0) <= 0:
                 raise SoundBankBusinessPlanError("archived SoundBank automatic Init artifact is empty")
         else:
-            if current is None or current.get("size", 0) <= 0 or artifact.get("required_change") is True and current == previous:
+            if current is None or current.get("size", 0) <= 0 or artifact.get("required_change") is True and _tree_rows_equal(current, previous, source_flavor=io_root_flavor):
                 raise SoundBankBusinessPlanError("archived SoundBank expected artifact delta drifted")
     for path in managed_side_effects:
-        relative = path.relative_to(io_root).as_posix()
+        try:
+            relative = _relative_identity(
+                archive_relative_from_absolute(path, io_root).canonical,
+                source_flavor=io_root_flavor,
+            )
+        except ArchiveRelativePathError as exc:  # defensive; policy proved this
+            raise SoundBankBusinessPlanError(
+                "archived SoundBank managed side effect authority is invalid"
+            ) from exc
         allowed.add(relative)
         current = after_outputs.get(relative)
         if current is None:
@@ -642,9 +720,15 @@ def _validate_after_delta(static: Mapping[str, Any], live: Mapping[str, Any], af
                 "archived SoundBank managed side effect was not newly created"
             )
     for relative in set(before_outputs) | set(after_outputs):
-        if relative in allowed or after_outputs.get(relative) == before_outputs.get(relative):
+        if relative in allowed or _tree_rows_equal(
+            after_outputs.get(relative),
+            before_outputs.get(relative),
+            source_flavor=io_root_flavor,
+        ):
             continue
-        parsed_relative = PurePosixPath(relative)
+        display_row = after_outputs.get(relative) or before_outputs.get(relative)
+        assert display_row is not None
+        parsed_relative = PurePosixPath(str(display_row["relative_path"]))
         if (
             parsed_relative.suffix.casefold() not in {".bnk", ".wem"}
             and parsed_relative.name != "Wwise.dat"
@@ -652,11 +736,9 @@ def _validate_after_delta(static: Mapping[str, Any], live: Mapping[str, Any], af
             raise SoundBankBusinessPlanError(
                 "archived SoundBank output tree contains an unrecognized changed row"
             )
-        absolute = (io_root / Path(*parsed_relative.parts)).resolve(
-            strict=False
-        )
         dynamically_allowed = any(
-            absolute == root or root in absolute.parents for root in dynamic_roots
+            _relative_is_within(relative, root, flavor=io_root_flavor)
+            for root in dynamic_roots
         )
         current = after_outputs.get(relative)
         if dynamically_allowed:
@@ -699,7 +781,7 @@ def _validate_after_delta(static: Mapping[str, Any], live: Mapping[str, Any], af
             raise SoundBankBusinessPlanError("archived definition processing changed fixture objects")
         _validate_definition_inclusions(static, live, after)
     else:
-        if after["objects"] != before["objects"] or after["banks"] != before["banks"] or after["project_files"] != before["project_files"]:
+        if after["objects"] != before["objects"] or after["banks"] != before["banks"] or not _tree_maps_equal(after_project_files, before_project_files, source_flavor=io_root_flavor):
             raise SoundBankBusinessPlanError("archived artifact operation changed sealed project state")
 
 
@@ -759,9 +841,16 @@ def _definition_inclusion_filters(value: Any) -> list[str]:
     return sorted(normalized)
 
 
-def _tree_by_relative(rows: Any) -> dict[str, Mapping[str, Any]]:
-    if not isinstance(rows, list):
-        raise SoundBankBusinessPlanError("archived SoundBank output tree is invalid")
+def _tree_by_relative(
+    rows: Any,
+    *,
+    source_flavor: str,
+    label: str = "output tree",
+) -> dict[str, Mapping[str, Any]]:
+    if source_flavor not in {"posix", "windows"} or not isinstance(rows, list):
+        raise SoundBankBusinessPlanError(
+            f"archived SoundBank {label} is invalid"
+        )
     result: dict[str, Mapping[str, Any]] = {}
     for item in rows:
         if (
@@ -774,38 +863,132 @@ def _tree_by_relative(rows: Any) -> dict[str, Mapping[str, Any]]:
             or type(item.get("mtime_ns")) is not int
             or item["mtime_ns"] < 0
         ):
-            raise SoundBankBusinessPlanError("archived SoundBank output tree is invalid")
-        relative = item["relative_path"]
-        parsed = PurePosixPath(relative)
-        if (
-            not relative
-            or parsed.is_absolute()
-            or ".." in parsed.parts
-            or parsed.as_posix() != relative
-            or relative in result
-        ):
-            raise SoundBankBusinessPlanError("archived SoundBank output tree is invalid")
-        result[relative] = item
+            raise SoundBankBusinessPlanError(
+                f"archived SoundBank {label} is invalid"
+            )
+        raw_relative = item["relative_path"]
+        try:
+            parsed = parse_archive_relative_path(raw_relative)
+        except ArchiveRelativePathError as exc:
+            raise SoundBankBusinessPlanError(
+                f"archived SoundBank {label} is invalid"
+            ) from exc
+        relative = parsed.canonical
+        identity = _relative_identity(
+            relative,
+            source_flavor=source_flavor,
+        )
+        if identity in result:
+            raise SoundBankBusinessPlanError(
+                f"archived SoundBank {label} is invalid"
+            )
+        normalized = dict(item)
+        normalized["relative_path"] = relative
+        result[identity] = normalized
     if len(result) != len(rows):
-        raise SoundBankBusinessPlanError("archived SoundBank output tree is invalid")
+        raise SoundBankBusinessPlanError(
+            f"archived SoundBank {label} is invalid"
+        )
     return result
+
+
+def _validate_snapshot_path_sets(
+    value: Any,
+    *,
+    source_flavor: str,
+) -> None:
+    if not isinstance(value, Mapping):
+        raise SoundBankBusinessPlanError(
+            "archived SoundBank snapshot path sets are invalid"
+        )
+    _tree_by_relative(
+        value.get("project_files"),
+        label="project tree",
+        source_flavor=source_flavor,
+    )
+    _tree_by_relative(
+        value.get("output_files"),
+        source_flavor=source_flavor,
+    )
+
+
+def _relative_identity(value: str, *, source_flavor: str) -> str:
+    parts = PurePosixPath(value).parts
+    if source_flavor == "windows":
+        parts = tuple(part.casefold() for part in parts)
+    return PurePosixPath(*parts).as_posix()
+
+
+def _tree_rows_equal(
+    left: Mapping[str, Any] | None,
+    right: Mapping[str, Any] | None,
+    *,
+    source_flavor: str,
+) -> bool:
+    if left is None or right is None:
+        return left is right
+    left_value = dict(left)
+    right_value = dict(right)
+    left_value["relative_path"] = _relative_identity(
+        str(left_value["relative_path"]),
+        source_flavor=source_flavor,
+    )
+    right_value["relative_path"] = _relative_identity(
+        str(right_value["relative_path"]),
+        source_flavor=source_flavor,
+    )
+    return left_value == right_value
+
+
+def _tree_maps_equal(
+    left: Mapping[str, Mapping[str, Any]],
+    right: Mapping[str, Mapping[str, Any]],
+    *,
+    source_flavor: str,
+) -> bool:
+    return set(left) == set(right) and all(
+        _tree_rows_equal(
+            left[identity],
+            right[identity],
+            source_flavor=source_flavor,
+        )
+        for identity in left
+    )
+
+
+def _relative_is_within(
+    candidate: str,
+    root: str,
+    *,
+    flavor: str,
+) -> bool:
+    candidate_parts = PurePosixPath(candidate).parts
+    root_parts = PurePosixPath(root).parts
+    if flavor == "windows":
+        candidate_parts = tuple(part.casefold() for part in candidate_parts)
+        root_parts = tuple(part.casefold() for part in root_parts)
+    return (
+        len(candidate_parts) >= len(root_parts)
+        and candidate_parts[: len(root_parts)] == root_parts
+    )
 
 
 def _archive_output_policy(
     static: Mapping[str, Any],
-) -> tuple[Path, tuple[Path, ...], tuple[Path, ...]]:
+) -> tuple[str, str, tuple[str, ...], tuple[str, ...]]:
     io_root_value = static.get("io_root")
     policy = static.get("dynamic_output_policy")
-    if (
-        not isinstance(io_root_value, str)
-        or not Path(io_root_value).is_absolute()
-        or str(Path(io_root_value).resolve(strict=False)) != io_root_value
-        or not isinstance(policy, Mapping)
-    ):
+    if not isinstance(io_root_value, str) or not isinstance(policy, Mapping):
         raise SoundBankBusinessPlanError(
             "archived SoundBank output authority is invalid"
         )
-    io_root = Path(io_root_value)
+    try:
+        parsed_io_root = parse_archive_absolute_path(io_root_value)
+    except ArchiveRelativePathError as exc:
+        raise SoundBankBusinessPlanError(
+            "archived SoundBank output authority is invalid"
+        ) from exc
+    io_root = io_root_value
     enabled = static.get("api") in {
         "ak.wwise.core.soundbank.generate",
         SOUNDBANK_TOPIC,
@@ -827,29 +1010,19 @@ def _archive_output_policy(
         raise SoundBankBusinessPlanError(
             "archived SoundBank dynamic artifact roots are invalid"
         )
-    roots: list[Path] = []
+    roots: list[str] = []
     for value in roots_value:
         if not isinstance(value, str):
             raise SoundBankBusinessPlanError(
                 "archived SoundBank dynamic artifact root is invalid"
             )
-        relative = PurePosixPath(value)
-        if (
-            not value
-            or relative.is_absolute()
-            or ".." in relative.parts
-            or relative.as_posix() != value
-            or value == "."
-        ):
+        try:
+            relative = parse_archive_relative_path(value)
+        except ArchiveRelativePathError as exc:
             raise SoundBankBusinessPlanError(
                 "archived SoundBank dynamic artifact root exceeds case authority"
-            )
-        root = (io_root / Path(*relative.parts)).resolve(strict=False)
-        if root == io_root or io_root not in root.parents:
-            raise SoundBankBusinessPlanError(
-                "archived SoundBank dynamic artifact root exceeds case authority"
-            )
-        roots.append(root)
+            ) from exc
+        roots.append(relative.canonical)
     if len(set(roots)) != len(roots):
         raise SoundBankBusinessPlanError(
             "archived SoundBank dynamic artifact roots are duplicated"
@@ -868,55 +1041,96 @@ def _archive_output_policy(
         )
     for artifact in artifacts:
         path_value = artifact.get("path") if isinstance(artifact, Mapping) else None
-        if not isinstance(path_value, str) or not Path(path_value).is_absolute():
+        if not isinstance(path_value, str):
             raise SoundBankBusinessPlanError(
                 "archived SoundBank expected artifact authority is invalid"
             )
-        path = Path(path_value).resolve(strict=False)
-        if str(path) != path_value or io_root not in path.parents:
+        try:
+            artifact_relative = archive_relative_from_absolute(
+                path_value, io_root
+            ).canonical
+        except ArchiveRelativePathError as exc:
             raise SoundBankBusinessPlanError(
                 "archived SoundBank expected artifact exceeds case authority"
-            )
+            ) from exc
         if any(
-            root == path or root in path.parents or path in root.parents
+            _relative_is_within(
+                artifact_relative,
+                root,
+                flavor=parsed_io_root.source_flavor,
+            )
+            or _relative_is_within(
+                root,
+                artifact_relative,
+                flavor=parsed_io_root.source_flavor,
+            )
             for root in roots
         ):
             raise SoundBankBusinessPlanError(
                 "archived SoundBank dynamic root overlaps a sealed artifact"
             )
-    expected_managed = sorted(
-        {
-            str((Path(artifact["path"]).parent / "Wwise.dat").resolve(strict=False))
-            for artifact in artifacts
-            if static.get("api")
-            == "ak.wwise.core.soundbank.convertExternalSources"
-            and isinstance(artifact, Mapping)
-            and artifact.get("kind") == "external"
-        }
-    )
+    expected_managed: set[ArchiveAbsolutePath] = set()
+    if static.get("api") == "ak.wwise.core.soundbank.convertExternalSources":
+        for artifact in artifacts:
+            if not isinstance(artifact, Mapping) or artifact.get("kind") != "external":
+                continue
+            parsed_artifact = parse_archive_absolute_path(artifact["path"])
+            expected_managed.add(
+                ArchiveAbsolutePath(
+                    source_flavor=parsed_artifact.source_flavor,
+                    pure_path=parsed_artifact.pure_path.parent / "Wwise.dat",
+                )
+            )
     managed_value = static.get("managed_side_effects")
-    if managed_value != expected_managed:
+    if (
+        not isinstance(managed_value, list)
+        or any(not isinstance(value, str) for value in managed_value)
+        or managed_value != sorted(managed_value)
+    ):
         raise SoundBankBusinessPlanError(
             "archived SoundBank managed side effects drifted"
         )
-    managed: list[Path] = []
+    managed: list[str] = []
+    managed_identities: set[ArchiveAbsolutePath] = set()
     for value in managed_value:
         if not isinstance(value, str):
             raise SoundBankBusinessPlanError(
                 "archived SoundBank managed side effect authority is invalid"
             )
-        path = Path(value).resolve(strict=False)
+        try:
+            parsed_path = parse_archive_absolute_path(value)
+            relative = archive_relative_from_absolute(value, io_root).canonical
+        except ArchiveRelativePathError as exc:
+            raise SoundBankBusinessPlanError(
+                "archived SoundBank managed side effect authority is invalid"
+            ) from exc
         if (
-            str(path) != value
-            or path.name != "Wwise.dat"
-            or io_root not in path.parents
-            or any(root == path or root in path.parents for root in roots)
+            parsed_path.pure_path.name != "Wwise.dat"
+            or any(
+                _relative_is_within(
+                    relative,
+                    root,
+                    flavor=parsed_io_root.source_flavor,
+                )
+                for root in roots
+            )
+            or parsed_path in managed_identities
         ):
             raise SoundBankBusinessPlanError(
                 "archived SoundBank managed side effect authority is invalid"
             )
-        managed.append(path)
-    return io_root, tuple(roots), tuple(managed)
+        managed_identities.add(parsed_path)
+        managed.append(value)
+    if managed_identities != expected_managed:
+        raise SoundBankBusinessPlanError(
+            "archived SoundBank managed side effects drifted"
+        )
+    return (
+        io_root,
+        parsed_io_root.source_flavor,
+        tuple(roots),
+        tuple(managed),
+    )
 
 
 def _dynamic_output_policy(case: MaterializedSoundBankCase) -> dict[str, Any]:
@@ -977,11 +1191,22 @@ def _managed_side_effects(case: MaterializedSoundBankCase) -> list[str]:
     )
 
 
-def _artifact_relative(path: str, outputs: Mapping[str, Any]) -> str | None:
-    candidates = [relative for relative in outputs if path == relative or path.endswith("/" + relative)]
-    if len(candidates) > 1:
-        raise SoundBankBusinessPlanError("archived SoundBank artifact path is ambiguous")
-    return candidates[0] if candidates else None
+def _artifact_relative(
+    path: str,
+    io_root: str | Path,
+    outputs: Mapping[str, Any],
+) -> str | None:
+    try:
+        parsed_root = parse_archive_absolute_path(io_root)
+        relative = _relative_identity(
+            archive_relative_from_absolute(path, io_root).canonical,
+            source_flavor=parsed_root.source_flavor,
+        )
+    except ArchiveRelativePathError as exc:
+        raise SoundBankBusinessPlanError(
+            "archived SoundBank artifact path is outside output authority"
+        ) from exc
+    return relative if relative in outputs else None
 
 
 def _sha_text(value: Any) -> bool:
@@ -991,12 +1216,21 @@ def _sha_text(value: Any) -> bool:
 def _verify_files(values: Sequence[Any]) -> None:
     for item in values:
         path = Path(item.path)
-        if not path.is_file() or path.stat().st_size != item.size or _sha_file(path) != item.sha256:
+        try:
+            snapshot = read_bounded_exclusive_regular_file(
+                path,
+                max_bytes=item.size,
+                require_private_posix_mode=False,
+            )
+        except CodexFileSecurityError as exc:
+            raise SoundBankBusinessPlanError(
+                "sealed SoundBank input file drifted"
+            ) from exc
+        if (
+            snapshot.metadata.st_size != item.size
+            or hashlib.sha256(snapshot.raw).hexdigest() != item.sha256
+        ):
             raise SoundBankBusinessPlanError("sealed SoundBank input file drifted")
-
-
-def _sha_file(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _sha(value: Any) -> str:

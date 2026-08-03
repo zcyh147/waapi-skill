@@ -3,19 +3,28 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
-import stat
 from dataclasses import dataclass, fields, is_dataclass
 from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 
+from tests.semantic.support.codex_archive_paths import (
+    ArchiveAbsolutePath,
+    ArchiveRelativePathError,
+    archive_relative_from_absolute,
+    parse_archive_absolute_path,
+    parse_archive_relative_path,
+)
 from tests.semantic.support.codex_cli_runtime_v3 import (
-    CLI_APIS, SUPPORTED_VERSION, CliRuntimeSnapshot, CliRuntimeVerification,
-    PreparedCliRuntime, _types_equivalent,
+    CLI_APIS, MAX_FILE_BYTES, SUPPORTED_VERSION, CliRuntimeSnapshot,
+    CliRuntimeVerification, PreparedCliRuntime, _types_equivalent,
 )
 from tests.semantic.support.codex_eval_protocol_v3 import V3GatewayProtocol, build_transaction_protocol
+from tests.semantic.support.codex_filesystem_security import (
+    CodexFileSecurityError,
+    read_bounded_exclusive_regular_file,
+)
 from tests.semantic.support.codex_prompt_provenance_v3 import serialize_protocol
 
 
@@ -40,6 +49,18 @@ class CliBusinessPlanSections:
     delta_rules: tuple[Mapping[str, Any], ...]
     def writer_kwargs(self) -> dict[str, Any]:
         return {"fixture_spec": _plain(self.fixture_spec), "payload_bindings": _plain(self.payload_bindings), "assertion_ids": list(self.assertion_ids), "static_expectation": _plain(self.static_expectation), "live_binding": _plain(self.live_binding), "delta_rules": [_plain(x) for x in self.delta_rules]}
+
+
+@dataclass(frozen=True, slots=True)
+class _ArchivedTree:
+    root: ArchiveAbsolutePath
+    root_text: str
+    rows: Mapping[str, Mapping[str, Any]]
+    display_paths: Mapping[str, tuple[str, str]]
+
+    @property
+    def by_absolute_path(self) -> dict[ArchiveAbsolutePath, Mapping[str, Any]]:
+        return {row["path"]: row for row in self.rows.values()}
 
 
 def compile_cli_business_plan(runtime: PreparedCliRuntime, protocol: V3GatewayProtocol) -> CliBusinessPlanSections:
@@ -87,7 +108,24 @@ def validate_cli_business_plan_archive(payload: Mapping[str, Any] | CliBusinessP
     _validate_proofs(live["input_proofs"],verify_files=verify_files)
     _validate_tab_source_bindings(static, live)
     _validate_lifecycle_and_provenance(static)
-    root=Path(live["case_root"]); _owned(root,[Path(x) for x in live["root_bindings"].values()]); _owned(root,[Path(x) for x in live["visible_values"].values() if isinstance(x,str) and os.path.isabs(x)])
+    root = live["case_root"]
+    _archive_owned(root, live["root_bindings"].values())
+    _archive_owned(
+        root,
+        [str(proof["path"]) for proof in live["input_proofs"]],
+    )
+    visible_host_paths: list[str] = []
+    for value in live["visible_values"].values():
+        if not isinstance(value, str):
+            continue
+        try:
+            parse_archive_absolute_path(value)
+        except ArchiveRelativePathError:
+            # Visible values can also be Wwise hierarchy/domain paths.  They
+            # are not host filesystem identities and must not be normalized.
+            continue
+        visible_host_paths.append(value)
+    _archive_owned(root, visible_host_paths)
     if s.fixture_spec != {"kind":CLI_FIXTURE_KIND,"sha256":_hash({"static":static,"live":live})}: raise CliBusinessPlanError("CLI archive fixture digest drifted")
     if [_plain(x) for x in s.delta_rules] != _rules(static,live): raise CliBusinessPlanError("CLI archive delta rules drifted")
     return s
@@ -101,28 +139,68 @@ def validate_cli_archived_verification(sections: CliBusinessPlanSections, verifi
     if evidence["scenario_id"]!=static["scenario_id"] or evidence["phase"]!="after" or evidence["passed"] is not True or evidence["failures"]!=[] or evidence["before"]!=live["before_snapshot"]: raise CliBusinessPlanError("CLI verification is not exact passed after evidence")
     before,after=evidence["before"],evidence["after"]
     op=static["operation"]
-    if after.get("source_template_tree")!=before.get("source_template_tree"): raise CliBusinessPlanError("CLI immutable source/template changed")
+    tree_names = (
+        "project_tree",
+        "source_template_tree",
+        "asset_tree",
+        "output_tree",
+    )
+    before_trees = {
+        name: _archived_tree_rows(
+            before.get(name), label=f"CLI before {name.replace('_', ' ')}"
+        )
+        for name in tree_names
+    }
+    after_trees = {
+        name: _archived_tree_rows(
+            after.get(name), label=f"CLI after {name.replace('_', ' ')}"
+        )
+        for name in tree_names
+    }
+    if not _archived_trees_equal(
+        after_trees["source_template_tree"],
+        before_trees["source_template_tree"],
+    ):
+        raise CliBusinessPlanError("CLI immutable source/template changed")
     if op=="convertExternalSource":
         validate_cli_convert_archived_side_effects(
             before,
             after,
             project_path=static["operation_request"]["arguments"]["args"]["project"],
         )
-    elif after.get("asset_tree")!=before.get("asset_tree"):
+    elif not _archived_trees_equal(
+        after_trees["asset_tree"], before_trees["asset_tree"]
+    ):
         raise CliBusinessPlanError("CLI immutable input assets changed")
     if op in {"convertExternalSource","generateSoundbank"}:
-        files={x.get("path"):x for x in after["output_tree"]["files"]}
-        before_files={x.get("path"):x for x in before["output_tree"]["files"]}
-        if len(files)!=len(after["output_tree"]["files"]) or len(before_files)!=len(before["output_tree"]["files"]): raise CliBusinessPlanError("CLI output proof paths are duplicated or invalid")
-        expected_paths={x["path"] for x in static["expected_outputs"]}
+        before_output = before_trees["output_tree"]
+        after_output = after_trees["output_tree"]
+        if before_output.root != after_output.root:
+            raise CliBusinessPlanError("CLI output proof root changed")
+        files = after_output.by_absolute_path
+        before_files = before_output.by_absolute_path
+        try:
+            expected_paths = {
+                parse_archive_absolute_path(output["path"])
+                for output in static["expected_outputs"]
+            }
+            control_paths = {
+                parse_archive_absolute_path(path)
+                for path in static["control_output_paths"]
+            }
+        except (ArchiveRelativePathError, TypeError, KeyError) as exc:
+            raise CliBusinessPlanError(
+                "CLI expected/control output path is invalid"
+            ) from exc
         if not expected_paths.issubset(set(files)): raise CliBusinessPlanError("CLI exact expected output set is incomplete")
         for output in static["expected_outputs"]:
-            row=files.get(output["path"])
+            output_path = parse_archive_absolute_path(output["path"])
+            row=files.get(output_path)
             if not isinstance(row,Mapping) or row.get("size",0)<=0: raise CliBusinessPlanError("CLI expected output is absent or empty")
-            old=before_files.get(output["path"])
+            old=before_files.get(output_path)
             if output["required_change"] and old is not None and row.get("sha256")==old.get("sha256"): raise CliBusinessPlanError("CLI required output did not change")
-        before_controls={x.get("path"):x for x in before["output_tree"]["files"] if x.get("path") in static["control_output_paths"]}
-        after_controls={x.get("path"):x for x in after["output_tree"]["files"] if x.get("path") in static["control_output_paths"]}
+        before_controls={path:row for path,row in before_files.items() if path in control_paths}
+        after_controls={path:row for path,row in files.items() if path in control_paths}
         if before_controls!=after_controls: raise CliBusinessPlanError("CLI output control changed")
         if op=="generateSoundbank": _validate_generate_rebuild_archive(static,live,before_files,files)
     elif op=="tabDelimitedImport":
@@ -184,52 +262,51 @@ def validate_cli_convert_archived_side_effects(
     if not isinstance(before, Mapping) or not isinstance(after, Mapping):
         raise CliBusinessPlanError("convert archive snapshots are invalid")
 
-    asset_root, before_assets = _archived_tree_rows(
+    before_asset_tree = _archived_tree_rows(
         before.get("asset_tree"), label="convert before asset tree"
     )
-    after_asset_root, after_assets = _archived_tree_rows(
+    after_asset_tree = _archived_tree_rows(
         after.get("asset_tree"), label="convert after asset tree"
     )
     allowed_akd = frozenset(
         PurePosixPath(relative).with_suffix(".akd").as_posix()
-        for relative in before_assets
+        for relative in before_asset_tree.rows
         if PurePosixPath(relative).suffix.casefold() == ".wav"
     )
     asset_additions = _closed_archived_tree_delta(
-        asset_root,
-        before_assets,
-        after_asset_root,
-        after_assets,
+        before_asset_tree,
+        after_asset_tree,
         allowed_additions=allowed_akd,
         label="convert asset tree",
     )
     for relative in asset_additions:
-        if after_assets[relative]["size"] < 24:
+        if after_asset_tree.rows[relative]["size"] < 24:
             raise CliBusinessPlanError("convert AKD proof is too small")
 
-    project_root, before_project = _archived_tree_rows(
+    before_project_tree = _archived_tree_rows(
         before.get("project_tree"), label="convert before project tree"
     )
-    after_project_root, after_project = _archived_tree_rows(
+    after_project_tree = _archived_tree_rows(
         after.get("project_tree"), label="convert after project tree"
     )
     project_relative = _archived_project_relative_path(
-        project_root,
-        before_project,
+        before_project_tree,
         project_path=project_path,
     )
     settings_relative = f"{PurePosixPath(project_relative).stem}.crossover.wsettings"
     project_additions = _closed_archived_tree_delta(
-        project_root,
-        before_project,
-        after_project_root,
-        after_project,
+        before_project_tree,
+        after_project_tree,
         allowed_additions=frozenset({".cache/CacheVersion", settings_relative}),
         label="convert project tree",
     )
+    cache_relative = _archive_relative_identity(
+        ".cache/CacheVersion",
+        flavor=before_project_tree.root.source_flavor,
+    )
     cache = (
-        after_project[".cache/CacheVersion"]
-        if ".cache/CacheVersion" in project_additions
+        after_project_tree.rows[cache_relative]
+        if cache_relative in project_additions
         else None
     )
     if cache is not None and (
@@ -238,8 +315,16 @@ def validate_cli_convert_archived_side_effects(
     ):
         raise CliBusinessPlanError("convert CacheVersion proof is invalid")
     settings = (
-        after_project[settings_relative]
-        if settings_relative in project_additions
+        after_project_tree.rows[
+            _archive_relative_identity(
+                settings_relative,
+                flavor=before_project_tree.root.source_flavor,
+            )
+        ]
+        if _archive_relative_identity(
+            settings_relative,
+            flavor=before_project_tree.root.source_flavor,
+        ) in project_additions
         else None
     )
     if settings is not None and settings["size"] <= 0:
@@ -250,7 +335,7 @@ def _archived_tree_rows(
     value: Any,
     *,
     label: str,
-) -> tuple[str, dict[str, Mapping[str, Any]]]:
+) -> _ArchivedTree:
     if not isinstance(value, Mapping) or set(value) != {"root", "files", "sha256"}:
         raise CliBusinessPlanError(f"{label} schema is not closed")
     root = value.get("root")
@@ -258,15 +343,19 @@ def _archived_tree_rows(
     if (
         not isinstance(root, str)
         or not root
-        or not os.path.isabs(root)
         or not isinstance(files, list)
         or not isinstance(value.get("sha256"), str)
         or re.fullmatch(r"[0-9a-f]{64}", value["sha256"]) is None
     ):
         raise CliBusinessPlanError(f"{label} shape is invalid")
+    try:
+        parsed_root = parse_archive_absolute_path(root)
+    except ArchiveRelativePathError as exc:
+        raise CliBusinessPlanError(f"{label} root is invalid") from exc
 
     rows: dict[str, Mapping[str, Any]] = {}
-    absolute_paths: set[str] = set()
+    display_paths: dict[str, tuple[str, str]] = {}
+    absolute_paths: set[ArchiveAbsolutePath] = set()
     relatives: list[str] = []
     digest = hashlib.sha256()
     for row in files:
@@ -274,17 +363,30 @@ def _archived_tree_rows(
             "path", "relative_path", "size", "sha256", "mtime_ns"
         }:
             raise CliBusinessPlanError(f"{label} file proof schema is not closed")
-        relative = row.get("relative_path")
+        raw_relative = row.get("relative_path")
         path = row.get("path")
-        if not isinstance(relative, str) or not relative or "\\" in relative:
+        if not isinstance(raw_relative, str):
             raise CliBusinessPlanError(f"{label} relative path is invalid")
-        pure_relative = PurePosixPath(relative)
+        try:
+            parsed_relative = parse_archive_relative_path(raw_relative)
+        except ArchiveRelativePathError as exc:
+            raise CliBusinessPlanError(f"{label} relative path is invalid") from exc
+        relative = parsed_relative.canonical
+        relative_identity = _archive_relative_identity(
+            relative,
+            flavor=parsed_root.source_flavor,
+        )
+        try:
+            parsed_absolute = parse_archive_absolute_path(path)
+            absolute_relative = archive_relative_from_absolute(path, root)
+        except (ArchiveRelativePathError, TypeError) as exc:
+            raise CliBusinessPlanError(f"{label} file proof is invalid") from exc
         if (
-            pure_relative.is_absolute()
-            or pure_relative.as_posix() != relative
-            or any(part in {"", ".", ".."} for part in pure_relative.parts)
-            or not isinstance(path, str)
-            or path != str(Path(root).joinpath(*pure_relative.parts))
+            not isinstance(path, str)
+            or _archive_relative_identity(
+                absolute_relative.canonical,
+                flavor=parsed_root.source_flavor,
+            ) != relative_identity
             or type(row.get("size")) is not int
             or row["size"] < 0
             or type(row.get("mtime_ns")) is not int
@@ -293,12 +395,16 @@ def _archived_tree_rows(
             or re.fullmatch(r"[0-9a-f]{64}", row["sha256"]) is None
         ):
             raise CliBusinessPlanError(f"{label} file proof is invalid")
-        if relative in rows or path in absolute_paths:
+        if relative_identity in rows or parsed_absolute in absolute_paths:
             raise CliBusinessPlanError(f"{label} file proof identity is duplicated")
-        rows[relative] = row
-        absolute_paths.add(path)
-        relatives.append(relative)
-        digest.update(relative.encode("utf-8"))
+        normalized = dict(row)
+        normalized["path"] = parsed_absolute
+        normalized["relative_path"] = relative_identity
+        rows[relative_identity] = normalized
+        display_paths[relative_identity] = (path, relative)
+        absolute_paths.add(parsed_absolute)
+        relatives.append(raw_relative)
+        digest.update(raw_relative.encode("utf-8"))
         digest.update(b"\0")
         digest.update(str(row["size"]).encode("ascii"))
         digest.update(b"\0")
@@ -306,51 +412,71 @@ def _archived_tree_rows(
         digest.update(b"\0")
     if relatives != sorted(relatives) or value["sha256"] != digest.hexdigest():
         raise CliBusinessPlanError(f"{label} order or digest is invalid")
-    return root, rows
+    return _ArchivedTree(
+        root=parsed_root,
+        root_text=root,
+        rows=MappingProxyType(rows),
+        display_paths=MappingProxyType(display_paths),
+    )
+
+
+def _archive_relative_identity(value: str, *, flavor: str) -> str:
+    parts = PurePosixPath(value).parts
+    if flavor == "windows":
+        parts = tuple(part.casefold() for part in parts)
+    return PurePosixPath(*parts).as_posix()
+
+
+def _archived_trees_equal(left: _ArchivedTree, right: _ArchivedTree) -> bool:
+    return left.root == right.root and left.rows == right.rows
 
 
 def _closed_archived_tree_delta(
-    before_root: str,
-    before_rows: Mapping[str, Mapping[str, Any]],
-    after_root: str,
-    after_rows: Mapping[str, Mapping[str, Any]],
+    before: _ArchivedTree,
+    after: _ArchivedTree,
     *,
     allowed_additions: frozenset[str],
     label: str,
 ) -> frozenset[str]:
-    if before_root != after_root:
+    if before.root != after.root:
         raise CliBusinessPlanError(f"{label} root changed")
-    if any(after_rows.get(relative) != row for relative, row in before_rows.items()):
+    if any(after.rows.get(relative) != row for relative, row in before.rows.items()):
         raise CliBusinessPlanError(f"{label} changed a sealed pre-existing file")
-    additions = frozenset(after_rows) - frozenset(before_rows)
-    if not additions.issubset(allowed_additions):
+    additions = frozenset(after.rows) - frozenset(before.rows)
+    allowed_identities = frozenset(
+        _archive_relative_identity(value, flavor=before.root.source_flavor)
+        for value in allowed_additions
+    )
+    if not additions.issubset(allowed_identities):
         raise CliBusinessPlanError(f"{label} contains an unreviewed added file")
     return additions
 
 
 def _archived_project_relative_path(
-    project_root: str,
-    before_rows: Mapping[str, Mapping[str, Any]],
+    tree: _ArchivedTree,
     *,
     project_path: str | Path | None,
 ) -> str:
     if project_path is not None:
-        expected = str(project_path)
+        try:
+            expected = parse_archive_absolute_path(project_path)
+        except ArchiveRelativePathError as exc:
+            raise CliBusinessPlanError(
+                "convert project path binding is invalid"
+            ) from exc
         candidates = [
-            relative for relative, row in before_rows.items()
+            relative for relative, row in tree.rows.items()
             if row["path"] == expected
         ]
     else:
         candidates = [
-            relative for relative in before_rows
+            relative for relative in tree.rows
             if PurePosixPath(relative).suffix.casefold() == ".wproj"
             and len(PurePosixPath(relative).parts) == 1
         ]
     if (
         len(candidates) != 1
         or PurePosixPath(candidates[0]).suffix.casefold() != ".wproj"
-        or before_rows[candidates[0]]["path"]
-        != str(Path(project_root).joinpath(*PurePosixPath(candidates[0]).parts))
     ):
         raise CliBusinessPlanError("convert project proof is not bound to one project")
     return candidates[0]
@@ -365,7 +491,17 @@ def _compile_tab_source_bindings(runtime: PreparedCliRuntime) -> list[dict[str, 
     )
     for binding in bindings:
         path = Path(binding["path"])
-        if _file_hash(path) != binding["sha256"]:
+        try:
+            snapshot = read_bounded_exclusive_regular_file(
+                path,
+                max_bytes=MAX_FILE_BYTES,
+                require_private_posix_mode=False,
+            )
+        except CodexFileSecurityError as exc:
+            raise CliBusinessPlanError(
+                "tab source changed while compiling the plan"
+            ) from exc
+        if hashlib.sha256(snapshot.raw).hexdigest() != binding["sha256"]:
             raise CliBusinessPlanError("tab source changed while compiling the plan")
     _owned(runtime.plan.case_root, [Path(binding["path"]) for binding in bindings])
     return bindings
@@ -374,8 +510,8 @@ def _compile_tab_source_bindings(runtime: PreparedCliRuntime) -> list[dict[str, 
 def _validate_generate_rebuild_archive(
     static: Mapping[str, Any],
     live: Mapping[str, Any],
-    before_files: Mapping[str, Mapping[str, Any]],
-    after_files: Mapping[str, Mapping[str, Any]],
+    before_files: Mapping[ArchiveAbsolutePath, Mapping[str, Any]],
+    after_files: Mapping[ArchiveAbsolutePath, Mapping[str, Any]],
 ) -> None:
     spec = static["asset_spec"]
     seeds = spec["fixture_manifest"].get("rebuild_seeds")
@@ -384,17 +520,36 @@ def _validate_generate_rebuild_archive(
     bindings = spec["request"]["path_bindings"]
     roots = live["root_bindings"]
 
-    def seeded_path(binding: Mapping[str, Any], seed: Mapping[str, Any]) -> Path:
+    def seeded_path(
+        binding: Mapping[str, Any], seed: Mapping[str, Any]
+    ) -> ArchiveAbsolutePath:
         root_key = str(binding["root_key"])
         if root_key not in roots:
             raise CliBusinessPlanError("generate rebuild root binding is absent")
-        base = Path(roots[root_key]) / str(binding["relative_path"])
-        path = (base / str(seed["relative_path"])).resolve(strict=False)
-        _owned(Path(live["case_root"]), [path])
-        return path
+        try:
+            parsed_root = parse_archive_absolute_path(str(roots[root_key]))
+            binding_value = binding["relative_path"]
+            binding_parts = (
+                ()
+                if binding_value == "."
+                else parse_archive_relative_path(binding_value).parts
+            )
+            seed_relative = parse_archive_relative_path(seed["relative_path"])
+        except (ArchiveRelativePathError, TypeError) as exc:
+            raise CliBusinessPlanError(
+                "generate rebuild path binding is invalid"
+            ) from exc
+        path = str(
+            parsed_root.pure_path.joinpath(
+                *binding_parts,
+                *seed_relative.parts,
+            )
+        )
+        _archive_owned(live["case_root"], [path])
+        return parse_archive_absolute_path(path)
 
-    cache_path = str(seeded_path(bindings["cache"], seeds["cache"]))
-    header_path = str(seeded_path(bindings["root_output_path"], seeds["header"]))
+    cache_path = seeded_path(bindings["cache"], seeds["cache"])
+    header_path = seeded_path(bindings["root_output_path"], seeds["header"])
     before_cache = before_files.get(cache_path)
     before_header = before_files.get(header_path)
     after_header = after_files.get(header_path)
@@ -408,7 +563,9 @@ def _validate_generate_rebuild_archive(
     ):
         raise CliBusinessPlanError("generate rebuild did not replace exact stale header")
     header_paths = {
-        path for path in after_files if Path(str(path)).name.casefold() == "wwise_ids.h"
+        path
+        for path in after_files
+        if path.pure_path.name.casefold() == "wwise_ids.h"
     }
     if header_paths != {header_path}:
         raise CliBusinessPlanError("generate rebuild header inventory/location drifted")
@@ -426,7 +583,12 @@ def _derive_tab_source_bindings(
     for proof in input_proofs:
         if not isinstance(proof, Mapping):
             raise CliBusinessPlanError("CLI input proof shape is invalid")
-        relative = str(proof.get("relative_path") or "")
+        try:
+            relative = parse_archive_relative_path(
+                proof.get("relative_path")
+            ).canonical
+        except ArchiveRelativePathError as exc:
+            raise CliBusinessPlanError("CLI input proof path is invalid") from exc
         if relative in proofs_by_relative:
             raise CliBusinessPlanError("CLI input proof paths are duplicated")
         proofs_by_relative[relative] = proof
@@ -435,7 +597,7 @@ def _derive_tab_source_bindings(
         raise CliBusinessPlanError("tab WAV declaration is invalid")
     result: list[dict[str, str]] = []
     source_keys: set[str] = set()
-    absolute_paths: set[str] = set()
+    absolute_paths: set[ArchiveAbsolutePath] = set()
     for row in files:
         if not isinstance(row, Mapping):
             raise CliBusinessPlanError("tab WAV declaration is invalid")
@@ -446,15 +608,20 @@ def _derive_tab_source_bindings(
             not source_key
             or source_key in source_keys
             or not isinstance(proof, Mapping)
-            or not os.path.isabs(str(proof.get("path") or ""))
             or re.fullmatch(r"[0-9a-f]{64}", str(proof.get("sha256") or "")) is None
         ):
             raise CliBusinessPlanError("tab source binding is incomplete or ambiguous")
         path = str(proof["path"])
-        if path in absolute_paths:
+        try:
+            parsed_path = parse_archive_absolute_path(path)
+        except ArchiveRelativePathError as exc:
+            raise CliBusinessPlanError(
+                "tab source binding path is invalid"
+            ) from exc
+        if parsed_path in absolute_paths:
             raise CliBusinessPlanError("tab source binding reuses one WAV path")
         source_keys.add(source_key)
-        absolute_paths.add(path)
+        absolute_paths.add(parsed_path)
         result.append(
             {
                 "source_key": source_key,
@@ -490,7 +657,7 @@ def _validate_tab_source_bindings(
             "source_key", "path", "relative_path", "sha256"
         }:
             raise CliBusinessPlanError("tab source binding schema is not closed")
-    _owned(Path(live["case_root"]), [Path(row["path"]) for row in rows])
+    _archive_owned(live["case_root"], [str(row["path"]) for row in rows])
 
 
 def _tab_source_binding_map(
@@ -514,11 +681,35 @@ def _shape(s: CliBusinessPlanSections)->None:
 
 def _validate_proofs(rows:Any,*,verify_files:bool)->None:
     if not isinstance(rows,list): raise CliBusinessPlanError("CLI input proofs are invalid")
+    relative_paths: set[str] = set()
+    absolute_paths: set[ArchiveAbsolutePath] = set()
     for row in rows:
-        if not isinstance(row,Mapping) or set(row)!={"path","relative_path","size","sha256","mtime_ns"} or not os.path.isabs(str(row.get("path")or"")) or type(row.get("size")) is not int or type(row.get("mtime_ns")) is not int or not isinstance(row.get("sha256"),str) or re.fullmatch(r"[0-9a-f]{64}",row["sha256"]) is None: raise CliBusinessPlanError("CLI input proof shape is invalid")
+        if not isinstance(row,Mapping) or set(row)!={"path","relative_path","size","sha256","mtime_ns"} or type(row.get("size")) is not int or not 0 < row["size"] <= MAX_FILE_BYTES or type(row.get("mtime_ns")) is not int or not isinstance(row.get("sha256"),str) or re.fullmatch(r"[0-9a-f]{64}",row["sha256"]) is None: raise CliBusinessPlanError("CLI input proof shape is invalid")
+        try:
+            absolute_path = parse_archive_absolute_path(row.get("path"))
+            relative = parse_archive_relative_path(row.get("relative_path")).canonical
+        except (ArchiveRelativePathError, TypeError) as exc:
+            raise CliBusinessPlanError("CLI input proof path is invalid") from exc
+        if relative in relative_paths:
+            raise CliBusinessPlanError("CLI input proof relative paths are duplicated")
+        if absolute_path in absolute_paths:
+            raise CliBusinessPlanError("CLI input proof absolute paths are duplicated")
+        relative_paths.add(relative)
+        absolute_paths.add(absolute_path)
         if verify_files:
-            p=Path(row["path"]); meta=os.lstat(p)
-            if stat.S_ISLNK(meta.st_mode) or not stat.S_ISREG(meta.st_mode) or meta.st_size!=row["size"] or _file_hash(p)!=row["sha256"]: raise CliBusinessPlanError("CLI input proof changed")
+            try:
+                snapshot = read_bounded_exclusive_regular_file(
+                    Path(row["path"]),
+                    max_bytes=row["size"],
+                    require_private_posix_mode=False,
+                )
+            except CodexFileSecurityError as exc:
+                raise CliBusinessPlanError("CLI input proof changed") from exc
+            if (
+                snapshot.metadata.st_size != row["size"]
+                or hashlib.sha256(snapshot.raw).hexdigest() != row["sha256"]
+            ):
+                raise CliBusinessPlanError("CLI input proof changed")
 
 def _validate_lifecycle_and_provenance(static: Mapping[str,Any])->None:
     op=static["operation"]; lifecycle=static["lifecycle"]; provenance=static["request_provenance"]; args=static["operation_request"]["arguments"]["args"]
@@ -533,12 +724,24 @@ def _owned(root:Path,paths:Sequence[Path])->None:
         resolved=Path(path).resolve(strict=False)
         if resolved!=root and root not in resolved.parents: raise CliBusinessPlanError("CLI path escapes scenario-owned root")
 
+
+def _archive_owned(root: str, paths: Sequence[str]) -> None:
+    try:
+        parsed_root = parse_archive_absolute_path(root)
+    except ArchiveRelativePathError as exc:
+        raise CliBusinessPlanError("CLI archive case root is invalid") from exc
+    for path in paths:
+        try:
+            parsed_path = parse_archive_absolute_path(path)
+            if parsed_path == parsed_root:
+                continue
+            archive_relative_from_absolute(path, root)
+        except (ArchiveRelativePathError, TypeError) as exc:
+            raise CliBusinessPlanError(
+                "CLI archive path escapes scenario-owned root"
+            ) from exc
+
 def _hash(value:Any)->str:return hashlib.sha256(json.dumps(_plain(value),ensure_ascii=False,allow_nan=False,sort_keys=True,separators=(",",":")).encode()).hexdigest()
-def _file_hash(path:Path)->str:
-    h=hashlib.sha256()
-    with path.open("rb") as f:
-        for b in iter(lambda:f.read(1024*1024),b""):h.update(b)
-    return h.hexdigest()
 def _plain(v:Any)->Any:
     if v is None or type(v) in {str,int,float,bool}:return v
     if isinstance(v,Path):return str(v)

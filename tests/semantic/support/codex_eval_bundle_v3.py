@@ -22,9 +22,14 @@ import xml.etree.ElementTree as ET
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import lru_cache
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Mapping, Sequence
 
+from tests.semantic.support.codex_archive_paths import (
+    ArchiveRelativePath,
+    ArchiveRelativePathError,
+    parse_archive_relative_path,
+)
 from wwise_waapi.capabilities import CapabilityCatalog
 from wwise_waapi.execution_contracts import UNDO_GROUP_MEMBER_URIS
 from wwise_waapi.operation_import import (
@@ -1614,9 +1619,11 @@ def _parse_media_pool_asset_spec(value: Any, path: str) -> Mapping[str, Any]:
         row_keys.append(_adapter_id(fixture_row["key"], f"{row_path}.key"))
         if fixture_row["database"] not in database_keys:
             raise EvalBundleV3Error(f"{row_path}.database references an unknown database")
-        relative_path = _string(fixture_row["relative_path"], f"{row_path}.relative_path")
-        if relative_path.startswith(("/", "\\")) or ".." in relative_path.replace("\\", "/").split("/"):
-            raise EvalBundleV3Error(f"{row_path}.relative_path must stay below its database root")
+        _canonical_archive_relative(
+            fixture_row["relative_path"],
+            f"{row_path}.relative_path",
+            error="must stay below its database root",
+        )
         _positive_int(fixture_row["sample_rate"], f"{row_path}.sample_rate")
         channels = _positive_int(fixture_row["channels"], f"{row_path}.channels")
         if channels not in {1, 2}:
@@ -1964,18 +1971,19 @@ def _parse_cli_generate_spec(
             path=binding_path,
         )
         root_key = _adapter_id(binding["root_key"], f"{binding_path}.root_key")
-        relative_path = _string(
+        raw_relative_path = _string(
             binding["relative_path"],
             f"{binding_path}.relative_path",
-        ).replace("\\", "/")
-        if (
-            relative_path.startswith("/")
-            or ".." in relative_path.split("/")
-            or any(part == "" for part in relative_path.split("/"))
-        ):
-            raise EvalBundleV3Error(
-                f"{binding_path}.relative_path must stay below its declared root"
-            )
+        )
+        relative_path = (
+            "."
+            if raw_relative_path == "."
+            else _archive_relative(
+                raw_relative_path,
+                f"{binding_path}.relative_path",
+                error="must stay below its declared root",
+            ).canonical
+        )
         return root_key, relative_path
 
     soundbank_path_rows = _list(
@@ -2585,15 +2593,14 @@ def _parse_cli_external_source_spec(request_value: Any, assets_value: Any, expec
         wav_file = _object(value, wav_path)
         _closed_keys(wav_file, required={"key", "name", "duration_ms", "frequency_hz"}, path=wav_path)
         wav_keys.append(_adapter_id(wav_file["key"], f"{wav_path}.key"))
-        wav_name = _string(wav_file["name"], f"{wav_path}.name")
+        wav_name = _archive_relative(
+            wav_file["name"],
+            f"{wav_path}.name",
+            error="must be a contained relative WAV path",
+        ).canonical
         if not wav_name.casefold().endswith(".wav"):
             raise EvalBundleV3Error(f"{wav_path}.name must end in .wav")
-        wav_parts = re.split(r"[\\/]", wav_name)
-        if wav_name.startswith(("/", "\\")) or any(
-            part in {"", ".", ".."} for part in wav_parts
-        ):
-            raise EvalBundleV3Error(f"{wav_path}.name must be a contained relative WAV path")
-        wav_names.append("/".join(wav_parts))
+        wav_names.append(wav_name)
         _positive_int(wav_file["duration_ms"], f"{wav_path}.duration_ms")
         _positive_int(wav_file["frequency_hz"], f"{wav_path}.frequency_hz")
     _require_unique(tuple(wav_keys), f"{path}.assets.wav.files keys")
@@ -2662,10 +2669,11 @@ def _parse_cli_external_source_spec(request_value: Any, assets_value: Any, expec
         platform = _string(output["platform"], f"{output_path}.platform")
         document = _string(output["document"], f"{output_path}.document")
         source_path = _string(output["source_path"], f"{output_path}.source_path")
-        relative_path = _string(output["relative_path"], f"{output_path}.relative_path")
-        if relative_path.startswith(("/", "\\")) or ".." in relative_path.replace("\\", "/").split("/"):
-            raise EvalBundleV3Error(f"{output_path}.relative_path must stay below the output root")
-        normalized_relative_path = relative_path.replace("\\", "/")
+        normalized_relative_path = _archive_relative(
+            output["relative_path"],
+            f"{output_path}.relative_path",
+            error="must stay below the output root",
+        ).canonical
         parsed_keys.append(
             f"{platform.casefold()}|{document.casefold()}|"
             f"{source_path.casefold()}|{normalized_relative_path.casefold()}"
@@ -2701,8 +2709,13 @@ def _migration_fixture_inventory() -> tuple[Path, frozenset[str]]:
         row_path = f"migration_fixture.manifest.files[{index}]"
         row = _object(value, row_path)
         _closed_keys(row, required={"bytes", "path", "sha256"}, path=row_path)
-        relative = _string(row["path"], f"{row_path}.path")
-        file_path = (fixture_root / relative).resolve(strict=True)
+        relative = _canonical_archive_relative(
+            row["path"],
+            f"{row_path}.path",
+            error="must be a canonical contained fixture path",
+        )
+        relative_parts = PurePosixPath(relative).parts
+        file_path = fixture_root.joinpath(*relative_parts).resolve(strict=True)
         if fixture_root not in file_path.parents or not file_path.is_file():
             raise EvalBundleV3Error(f"{row_path}.path escapes the immutable fixture")
         data = file_path.read_bytes()
@@ -3098,16 +3111,19 @@ def _parse_import_asset_spec(value: Any, path: str, *, adapter: str) -> Mapping[
         source_key = _adapter_id(source["source_key"], f"{source_path}.source_key")
         if source_key in source_by_key:
             raise EvalBundleV3Error(f"{path}.sources source_key values must be unique")
-        relative_path = _string(source["relative_path"], f"{source_path}.relative_path")
+        relative_path = _archive_relative(
+            source["relative_path"],
+            f"{source_path}.relative_path",
+            error="must be one exact WAV basename",
+        )
         if (
-            "/" in relative_path
-            or "\\" in relative_path
-            or relative_path in {".", ".."}
-            or not relative_path.casefold().endswith(".wav")
+            len(relative_path.parts) != 1
+            or not relative_path.canonical.casefold().endswith(".wav")
         ):
             raise EvalBundleV3Error(
                 f"{source_path}.relative_path must be one exact WAV basename"
             )
+        relative_path = relative_path.canonical
         presence = source["presence"]
         if presence == "present":
             present_source_count += 1
@@ -3150,15 +3166,19 @@ def _parse_import_asset_spec(value: Any, path: str, *, adapter: str) -> Mapping[
             raise EvalBundleV3Error(
                 f"{path}.pre_state_sources media_sha256_key values must be unique"
             )
-        relative_path = _string(source["relative_path"], f"{source_path}.relative_path")
+        relative_path = _archive_relative(
+            source["relative_path"],
+            f"{source_path}.relative_path",
+            error="must be one exact WAV basename",
+        )
         if (
-            "/" in relative_path
-            or "\\" in relative_path
-            or not relative_path.casefold().endswith(".wav")
+            len(relative_path.parts) != 1
+            or not relative_path.canonical.casefold().endswith(".wav")
         ):
             raise EvalBundleV3Error(
                 f"{source_path}.relative_path must be one exact WAV basename"
             )
+        relative_path = relative_path.canonical
         duration = _positive_int(source["duration_ms"], f"{source_path}.duration_ms")
         frequency = _positive_int(source["frequency_hz"], f"{source_path}.frequency_hz")
         pre_state_source_by_key[media_sha256_key] = source
@@ -3284,17 +3304,11 @@ def _parse_import_asset_spec(value: Any, path: str, *, adapter: str) -> Mapping[
         language = _string(fixture_row["language"], f"{row_path}.language")
         originals_subfolder = fixture_row["originals_subfolder"]
         if originals_subfolder is not None:
-            originals_subfolder = _string(
-                originals_subfolder,
+            originals_subfolder = _canonical_archive_relative(
+                fixture_row["originals_subfolder"],
                 f"{row_path}.originals_subfolder",
+                error="must be a safe relative path",
             )
-            if (
-                originals_subfolder.startswith(("/", "\\"))
-                or ".." in originals_subfolder.replace("\\", "/").split("/")
-            ):
-                raise EvalBundleV3Error(
-                    f"{row_path}.originals_subfolder must be a safe relative path"
-                )
         if fixture_row["notes"] is not None:
             _string(fixture_row["notes"], f"{row_path}.notes")
         if fixture_row["audio_source_notes"] is not None:
@@ -4129,29 +4143,31 @@ def _parse_external_source_documents(
                 required={"path", "conversion", "destination", "analysis_types"},
                 path=entry_path,
             )
-            source = _string(entry["path"], f"{entry_path}.path")
-            if not source.casefold().endswith(".wav") or source.startswith(("/", "\\")):
+            source = _archive_relative(
+                entry["path"],
+                f"{entry_path}.path",
+                error="must be a relative WAV path",
+            )
+            if not source.canonical.casefold().endswith(".wav"):
                 raise EvalBundleV3Error(f"{entry_path}.path must be a relative WAV path")
-            if any(part in {"", ".", ".."} for part in re.split(r"[\\/]", source)):
-                raise EvalBundleV3Error(f"{entry_path}.path contains an unsafe segment")
-            normalized_source = "/".join(re.split(r"[\\/]", source))
+            normalized_source = source.canonical
             source_paths.append(normalized_source)
             conversion = entry["conversion"]
             if conversion is not None:
                 _string(conversion, f"{entry_path}.conversion")
             destination = entry["destination"]
-            expected_destination = source if destination is None else _string(
+            expected_destination = normalized_source if destination is None else _string(
                 destination,
                 f"{entry_path}.destination",
             )
-            if expected_destination.startswith(("/", "\\")):
-                raise EvalBundleV3Error(f"{entry_path}.destination must be relative")
-            destination_parts = re.split(r"[\\/]", expected_destination)
-            if any(part in {"", ".", ".."} for part in destination_parts):
-                raise EvalBundleV3Error(f"{entry_path}.destination contains an unsafe segment")
-            normalized_destination = str(Path(*destination_parts).with_suffix(".wem")).replace(
-                "\\", "/"
+            parsed_destination = _archive_relative(
+                expected_destination,
+                f"{entry_path}.destination",
+                error="must be relative and contain no unsafe segment",
             )
+            normalized_destination = PurePosixPath(
+                *parsed_destination.parts
+            ).with_suffix(".wem").as_posix()
             destinations.append(normalized_destination.casefold())
             parsed_entries.append((normalized_source, normalized_destination))
             analysis_types = entry["analysis_types"]
@@ -4820,12 +4836,50 @@ def _lint_natural_prompt(value: str, path: str, *, minimum_length: int = 24) -> 
             )
 
 
-def _safe_child(base: Path, value: Any, path: str) -> Path:
-    relative = Path(_string(value, path))
-    if relative.is_absolute() or ".." in relative.parts:
-        raise EvalBundleV3Error(f"{path} must be a contained relative path")
+def _archive_relative(
+    value: Any,
+    path: str,
+    *,
+    error: str,
+) -> ArchiveRelativePath:
+    raw_relative = _string(value, path)
     try:
-        resolved = (base / relative).resolve(strict=True)
+        return parse_archive_relative_path(raw_relative)
+    except ArchiveRelativePathError as exc:
+        raise EvalBundleV3Error(f"{path} {error}") from exc
+
+
+def _canonical_archive_relative(
+    value: Any,
+    path: str,
+    *,
+    error: str,
+) -> str:
+    raw_relative = _string(value, path)
+    parsed_relative = _archive_relative(raw_relative, path, error=error)
+    if (
+        parsed_relative.source_flavor != "posix"
+        or parsed_relative.canonical != raw_relative
+    ):
+        raise EvalBundleV3Error(f"{path} {error}")
+    return parsed_relative.canonical
+
+
+def _safe_child(base: Path, value: Any, path: str) -> Path:
+    raw_relative = _string(value, path)
+    parsed_relative = _archive_relative(
+        raw_relative,
+        path,
+        error="must be a contained relative path",
+    )
+    if (
+        parsed_relative.source_flavor != "posix"
+        or parsed_relative.canonical != raw_relative
+    ):
+        raise EvalBundleV3Error(f"{path} must be a contained relative path")
+    relative = PurePosixPath(*parsed_relative.parts)
+    try:
+        resolved = base.joinpath(*relative.parts).resolve(strict=True)
     except (OSError, RuntimeError) as exc:
         raise EvalBundleV3Error(f"{path} does not resolve to a bundled file: {relative}") from exc
     try:

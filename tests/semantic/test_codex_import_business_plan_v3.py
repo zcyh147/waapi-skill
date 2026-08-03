@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import replace
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from types import MappingProxyType
 from typing import Any
 
@@ -23,6 +24,7 @@ from tests.semantic.support.codex_import_assets_v3 import (
 )
 from tests.semantic.support.codex_import_business_plan_v3 import (
     ImportBusinessPlanError,
+    _validate_files,
     compile_import_business_plan,
     _hash,
     _rules,
@@ -152,6 +154,27 @@ def _plain(value: Any) -> Any:
 
 def test_plain_set_serialization_is_canonical() -> None:
     assert _plain(frozenset({"z", "a", "m"})) == ["a", "m", "z"]
+
+
+def test_import_file_verification_rejects_a_hard_linked_asset(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.wav"
+    source.write_bytes(b"RIFF-source")
+    (tmp_path / "source-alias.wav").hardlink_to(source)
+    files = [
+        {
+            "category": "wav",
+            "key": "source",
+            "path": str(source),
+            "present": True,
+            "size": source.stat().st_size,
+            "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+        }
+    ]
+
+    with pytest.raises(ImportBusinessPlanError, match="changed after sealing"):
+        _validate_files(files, verify_files=True)
 
 
 def test_all_ten_real_scenarios_compile_recompute_and_archive(tmp_path: Path) -> None:
@@ -749,6 +772,72 @@ def test_archived_verification_binds_derived_originals_path_and_subfolder(
         validate_import_archived_verification(
             sections,
             _verification(sections, after=legacy),
+        )
+
+
+def test_archived_original_binding_uses_the_absolute_path_flavor(
+    tmp_path: Path,
+) -> None:
+    scenario, materialized, plan, before, protocol = _case(
+        tmp_path,
+        "O22-AUDIO-IMPORT-01",
+    )
+    sections = compile_import_business_plan(
+        scenario,
+        materialized,
+        plan,
+        before,
+        protocol,
+    )
+    windows_after = _plain(_after_value(plan))
+    source = next(
+        row["object"]["audio_source"]
+        for row in windows_after["rows"]
+        if isinstance(row.get("object"), dict)
+    )
+    old_path = source["original_file"]["path"]
+    relative = source["original_file"]["relative_path"]
+    relative_parts = tuple(PurePosixPath(relative).parts)
+    windows_path = str(
+        PureWindowsPath(r"C:\Campaign").joinpath(
+            *(part.swapcase() for part in relative_parts)
+        )
+    )
+    source["original_file"]["path"] = windows_path
+    tree_proof = next(
+        item for item in windows_after["originals_files"] if item["path"] == old_path
+    )
+    tree_proof["path"] = windows_path
+
+    validate_import_archived_verification(
+        sections,
+        _verification(sections, after=windows_after),
+    )
+
+    posix_case_drift = _plain(_after_value(plan))
+    drift_source = next(
+        row["object"]["audio_source"]
+        for row in posix_case_drift["rows"]
+        if isinstance(row.get("object"), dict)
+    )
+    drift_relative = str(drift_source["original_file"]["relative_path"])
+    drift_source["original_file"]["relative_path"] = drift_relative.swapcase()
+    drift_source["original_relative_path"] = str(
+        drift_source["original_relative_path"]
+    ).swapcase()
+    drift_tree = next(
+        item
+        for item in posix_case_drift["originals_files"]
+        if item["path"] == drift_source["original_file"]["path"]
+    )
+    drift_tree["relative_path"] = drift_source["original_file"]["relative_path"]
+    with pytest.raises(
+        ImportBusinessPlanError,
+        match="absolute/relative paths are inconsistent",
+    ):
+        validate_import_archived_verification(
+            sections,
+            _verification(sections, after=posix_case_drift),
         )
 
 

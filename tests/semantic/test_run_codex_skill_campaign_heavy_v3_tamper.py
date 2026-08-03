@@ -174,7 +174,7 @@ def _campaign_prompt_asset_read_fixture(
             json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n"
             for row in event_rows
         )
-    (turn_root / "events.jsonl").write_text(events_text, encoding="utf-8")
+    matrix.write_text(turn_root / "events.jsonl", events_text)
     facts = fixture._synthetic_codex_facts(
         options=options,
         task_root=task_root,
@@ -387,6 +387,96 @@ def test_compact_media_reference_archive_joins_candidate_subset_to_full_baseline
         oracle=oracle,
         label="synthetic compact Media Pool reference archive",
     )
+
+
+def test_media_archive_uses_producer_path_flavor_for_basenames() -> None:
+    oracle, baseline, compact = _compact_media_reference_archive_fixture()
+    oracle["rows"][0]["host_path"] = (
+        r"\\StudioNas\Audio Share\Originals\SFX\A_REFERENCED.WAV"
+    )
+    baseline["return"][0]["originalFilePath"] = (
+        r"\\studionas\audio share\originals\sfx\a_referenced.wav"
+    )
+
+    campaign._validate_compact_media_reference_archive(
+        compact,
+        reference_baseline=baseline,
+        oracle=oracle,
+        label="cross-host compact Media Pool reference archive",
+    )
+
+    aliases = campaign._serialized_media_response_filenames(
+        {"request": {"binding": {"by_concept": {"name": "Filename"}}}},
+        {
+            "values": {"Filename": "A_referenced.wav"},
+            "host_path": r"C:\Fixture Inputs\A_REFERENCED.WAV",
+        },
+        label="cross-host Media Pool row",
+    )
+    assert aliases == ("a_referenced.wav",)
+
+
+@pytest.mark.parametrize(
+    "path",
+    (
+        r"Y:\owned\\Originals\SFX\A_referenced.wav",
+        r"Y:\owned\Originals\..\A_referenced.wav",
+        r"Y:\owned/Originals\SFX\A_referenced.wav",
+    ),
+)
+def test_compact_media_reference_archive_rejects_normalizing_windows_paths(
+    path: str,
+) -> None:
+    oracle, baseline, compact = _compact_media_reference_archive_fixture()
+    baseline["return"][0]["originalFilePath"] = path
+
+    with pytest.raises(CampaignEvidenceError, match="baseline path"):
+        campaign._validate_compact_media_reference_archive(
+            compact,
+            reference_baseline=baseline,
+            oracle=oracle,
+            label="malformed cross-host compact archive",
+        )
+
+
+def test_campaign_file_proofs_use_archive_path_semantics() -> None:
+    proof = {
+        "path": r"C:\Campaign\Originals\SFX\Thunder.WAV",
+        "relative_path": "Originals/SFX/thunder.wav",
+        "size": 12,
+        "sha256": "a" * 64,
+    }
+    campaign._validate_file_proof(
+        proof,
+        label="Windows file proof",
+        relative_optional=False,
+        has_mtime=False,
+    )
+
+    posix_case_attack = dict(proof)
+    posix_case_attack["path"] = "/campaign/Originals/SFX/Thunder.WAV"
+    with pytest.raises(CampaignEvidenceError, match="file proof"):
+        campaign._validate_file_proof(
+            posix_case_attack,
+            label="POSIX file proof",
+            relative_optional=False,
+            has_mtime=False,
+        )
+
+    for relative_path in (
+        "Originals//SFX/Thunder.WAV",
+        "Originals/../SFX/Thunder.WAV",
+        r"Originals\SFX/Thunder.WAV",
+    ):
+        malformed = dict(proof)
+        malformed["relative_path"] = relative_path
+        with pytest.raises(CampaignEvidenceError, match="file proof"):
+            campaign._validate_file_proof(
+                malformed,
+                label="malformed file proof",
+                relative_optional=False,
+                has_mtime=False,
+            )
 
 
 def test_compact_media_reference_archive_rejects_contract_and_equivalence_tampering() -> None:
@@ -974,7 +1064,7 @@ def test_success_rejects_gateway_commands_redistributed_across_turns(
                 else ()
             ),
         )
-        (turn_root / "events.jsonl").write_text(events, encoding="utf-8")
+        matrix.write_text(turn_root / "events.jsonl", events)
         facts = fixture._synthetic_codex_facts(
             options=options,
             task_root=task_root,
@@ -1006,9 +1096,9 @@ def test_success_rejects_events_and_facts_drift(tmp_path: Path) -> None:
         and row.get("item", {}).get("type") == "agent_message"
     )
     message["text"] += " tampered"
-    events_path.write_text(
+    matrix.write_text(
+        events_path,
         "".join(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in rows),
-        encoding="utf-8",
     )
 
     with pytest.raises(CampaignEvidenceError, match="reconstructed from events"):
@@ -1036,7 +1126,7 @@ def test_success_rejects_duplicate_or_mispaired_command_item_ids(
         json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n"
         for row in rows
     )
-    (turn_root / "events.jsonl").write_text(events, encoding="utf-8")
+    matrix.write_text(turn_root / "events.jsonl", events)
     protocol = fixture._synthetic_protocol(
         unit,
         scenario_root=scenario_root,
@@ -1346,7 +1436,8 @@ def test_success_rejects_business_oracle_plan_or_binding_tamper(
             plan["assertion_ids"] = ["common.tampered-after-codex"]
         else:
             plan["scenario_id"] = "CROSS-SCENARIO"
-        plan_path.write_text(
+        matrix.write_text(
+            plan_path,
             json.dumps(
                 plan,
                 ensure_ascii=False,
@@ -1355,7 +1446,6 @@ def test_success_rejects_business_oracle_plan_or_binding_tamper(
                 separators=(",", ":"),
             )
             + "\n",
-            encoding="utf-8",
         )
         if tamper == "plan_cross_scenario":
             receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
@@ -1495,7 +1585,8 @@ def _reseal_business_plan_chain(
     plan: dict,
 ) -> None:
     plan_path = scenario_root / "evidence" / "business-oracle-plan.json"
-    plan_path.write_text(
+    matrix.write_text(
+        plan_path,
         json.dumps(
             plan,
             ensure_ascii=False,
@@ -1504,7 +1595,6 @@ def _reseal_business_plan_chain(
             separators=(",", ":"),
         )
         + "\n",
-        encoding="utf-8",
     )
     plan_sha256 = hashlib.sha256(plan_path.read_bytes()).hexdigest()
     receipt_path = task_root / campaign.HEAVY_V3_PROMPT_MATERIALIZATION_FILE
@@ -1794,7 +1884,7 @@ def test_success_recomputes_common_gates_from_real_command_facts(tmp_path: Path)
         json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n"
         for row in event_rows
     )
-    (turn_root / "events.jsonl").write_text(events, encoding="utf-8")
+    matrix.write_text(turn_root / "events.jsonl", events)
     protocol = fixture._synthetic_protocol(
         unit,
         scenario_root=scenario_root,
@@ -1841,8 +1931,8 @@ def test_object_get_recomputes_identity_presence_from_final_text(tmp_path: Path)
         final_response=response,
         read_paths=fixture._synthetic_first_turn_reads(options, unit),
     )
-    (turn_root / "events.jsonl").write_text(events, encoding="utf-8")
-    (turn_root / "final.txt").write_text(response + "\n", encoding="utf-8")
+    matrix.write_text(turn_root / "events.jsonl", events)
+    matrix.write_text(turn_root / "final.txt", response + "\n")
     protocol = fixture._synthetic_protocol(
         unit,
         scenario_root=scenario_root,
@@ -1895,8 +1985,8 @@ def test_get02_campaign_rechecks_paired_path_boundaries_from_final_text(
         final_response=response,
         read_paths=fixture._synthetic_first_turn_reads(options, unit),
     )
-    (turn_root / "events.jsonl").write_text(events, encoding="utf-8")
-    (turn_root / "final.txt").write_text(response + "\n", encoding="utf-8")
+    matrix.write_text(turn_root / "events.jsonl", events)
+    matrix.write_text(turn_root / "final.txt", response + "\n")
     protocol = fixture._synthetic_protocol(
         unit,
         scenario_root=scenario_root,
@@ -1957,8 +2047,8 @@ def test_get02_campaign_recomputes_unexpected_language_from_final_text(
         final_response=response,
         read_paths=fixture._synthetic_first_turn_reads(options, unit),
     )
-    (turn_root / "events.jsonl").write_text(events, encoding="utf-8")
-    (turn_root / "final.txt").write_text(response + "\n", encoding="utf-8")
+    matrix.write_text(turn_root / "events.jsonl", events)
+    matrix.write_text(turn_root / "final.txt", response + "\n")
     protocol = fixture._synthetic_protocol(
         unit,
         scenario_root=scenario_root,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Callable
 
 import pytest
@@ -43,8 +43,8 @@ def _sandbox_original(tmp_path: Path) -> tuple[Path, Path, Path]:
 
 
 def _wine_y_path(path: Path, *, account_home: Path) -> str:
-    relative = path.relative_to(account_home).as_posix()
-    return "Y:\\" + relative.replace("/", "\\")
+    relative = path.relative_to(account_home)
+    return str(PureWindowsPath("Y:/").joinpath(*relative.parts))
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Wine aliases are POSIX-host paths")
@@ -191,3 +191,92 @@ def test_shared_localizer_rejects_malformed_drive_path(tmp_path: Path) -> None:
         match="malformed Wine drive path",
     ):
         localize_copied_original_path("Y:relative.wav", account_home=tmp_path)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Wine aliases are POSIX-host paths")
+@pytest.mark.parametrize(
+    ("value", "expected_parts"),
+    (
+        ("Y:/~archive/SFX/example.wav", ("~archive", "SFX", "example.wav")),
+        ("Z:/~archive/SFX/example.wav", ("~archive", "SFX", "example.wav")),
+        ("/~archive/SFX/example.wav", ("~archive", "SFX", "example.wav")),
+    ),
+    ids=("wine-y", "wine-z", "posix"),
+)
+def test_shared_localizer_keeps_tilde_prefixed_components_literal(
+    tmp_path: Path,
+    value: str,
+    expected_parts: tuple[str, ...],
+) -> None:
+    localized = localize_copied_original_path(value, account_home=tmp_path)
+
+    expected_root = tmp_path if value.startswith("Y:") else Path("/")
+    assert localized == expected_root.joinpath(*expected_parts)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Wine aliases are POSIX-host paths")
+@pytest.mark.parametrize(
+    ("runtime_name", "proof", "error_type"),
+    RUNTIME_PROOFS,
+    ids=[row[0] for row in RUNTIME_PROOFS],
+)
+def test_runtime_accepts_literal_tilde_component_inside_sandbox_originals(
+    tmp_path: Path,
+    runtime_name: str,
+    proof: ProofFunction,
+    error_type: type[Exception],
+) -> None:
+    del runtime_name, error_type
+    account_home = tmp_path / "account-home"
+    sandbox_root = account_home / "campaign" / "sandbox"
+    original = sandbox_root / "Originals" / "~archive" / "test.wav"
+    original.parent.mkdir(parents=True)
+    original.write_bytes(b"literal-tilde-component\n")
+
+    result = proof(
+        _wine_y_path(original, account_home=account_home),
+        sandbox_root=sandbox_root,
+        account_home=account_home,
+    )
+
+    assert result.relative_path == "Originals/~archive/test.wav"
+    assert result.sha256 == hashlib.sha256(original.read_bytes()).hexdigest()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows path semantics required")
+def test_shared_localizer_accepts_native_windows_tilde_component() -> None:
+    value = r"C:\projects\~archive\Originals\SFX\example.wav"
+
+    assert localize_copied_original_path(value) == Path(value)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows path semantics required")
+@pytest.mark.parametrize(
+    ("runtime_name", "proof", "error_type"),
+    RUNTIME_PROOFS,
+    ids=[row[0] for row in RUNTIME_PROOFS],
+)
+def test_runtime_accepts_native_windows_original_path(
+    tmp_path: Path,
+    runtime_name: str,
+    proof: ProofFunction,
+    error_type: type[Exception],
+) -> None:
+    del runtime_name, error_type
+    sandbox_root = tmp_path / "sandbox"
+    original = sandbox_root / "Originals" / "~archive" / "test.wav"
+    original.parent.mkdir(parents=True)
+    original.write_bytes(b"native-windows-original\n")
+
+    result = proof(str(original), sandbox_root=sandbox_root)
+
+    assert result.relative_path == "Originals/~archive/test.wav"
+    assert result.sha256 == hashlib.sha256(original.read_bytes()).hexdigest()
+
+    case_variant = sandbox_root / "oRIGINALS" / "~ARCHIVE" / "TEST.WAV"
+    case_result = proof(str(case_variant), sandbox_root=sandbox_root)
+
+    assert PureWindowsPath(case_result.relative_path) == PureWindowsPath(
+        "Originals/~archive/test.wav"
+    )
+    assert case_result.sha256 == hashlib.sha256(original.read_bytes()).hexdigest()

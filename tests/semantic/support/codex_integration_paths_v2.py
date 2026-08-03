@@ -14,17 +14,19 @@ that the resulting file is a real, non-symlinked descendant of its own copied
 from __future__ import annotations
 
 import os
-import re
 from pathlib import Path
 from typing import Any
+
+from tests.semantic.support.codex_host_paths import (
+    ReflectedHostPathError,
+    parse_posix_absolute_path,
+    parse_windows_drive_path,
+)
 
 try:  # ``pwd`` is unavailable on native Windows.
     import pwd
 except ImportError:  # pragma: no cover - native Windows uses native paths.
     pwd = None  # type: ignore[assignment]
-
-
-_WINDOWS_DRIVE_PATH_RE = re.compile(r"^([A-Za-z]):/(.*)$")
 
 
 class IntegrationOriginalPathError(ValueError):
@@ -55,52 +57,47 @@ def localize_copied_original_path(
         raise IntegrationOriginalPathError(
             "copied Original requires one absolute path string"
         )
-    normalized = value.replace("\\", "/")
-    if normalized.startswith("//"):
-        raise IntegrationOriginalPathError(
-            "copied Original uses an unsupported UNC path"
-        )
-
-    if os.name == "nt":  # pragma: no cover - native Windows path semantics
-        candidate = Path(value)
-        if not candidate.is_absolute():
-            raise IntegrationOriginalPathError(
-                "copied Original must be drive-absolute"
+    try:
+        windows = parse_windows_drive_path(value)
+    except ReflectedHostPathError as exc:
+        if value.startswith((r"\\", "//")):
+            message = "copied Original uses an unsupported UNC path"
+        elif len(value) >= 2 and value[0].isalpha() and value[1] == ":":
+            message = (
+                "copied Original contains an unsafe path component"
+                if "unsafe component" in str(exc)
+                else "copied Original uses a malformed Wine drive path"
             )
-        return candidate
+        else:
+            message = "copied Original contains an unsafe path component"
+        raise IntegrationOriginalPathError(message) from exc
 
-    drive_match = _WINDOWS_DRIVE_PATH_RE.fullmatch(normalized)
-    if re.match(r"^[A-Za-z]:", normalized):
-        if drive_match is None:
-            raise IntegrationOriginalPathError(
-                "copied Original uses a malformed Wine drive path"
-            )
-        drive = drive_match.group(1).upper()
-        suffix = drive_match.group(2)
-        if drive == "Z":
+    if windows is not None:
+        if os.name == "nt":  # pragma: no cover - exercised on native Windows.
+            return Path(windows.pure)
+        if windows.drive == "Z":
             root = Path("/")
-        elif drive == "Y":
+        elif windows.drive == "Y":
             root = _resolved_account_home(account_home)
         else:
             raise IntegrationOriginalPathError(
-                f"copied Original uses unsupported Wine drive {drive}:"
+                f"copied Original uses unsupported Wine drive {windows.drive}:"
             )
-    else:
-        if not normalized.startswith("/"):
-            raise IntegrationOriginalPathError(
-                "copied Original must be absolute"
-            )
-        root = Path("/")
-        suffix = normalized[1:]
+        return root.joinpath(*windows.relative_parts)
 
-    parts = suffix.split("/")
-    if not suffix or any(
-        part in {"", ".", ".."} or part.startswith("~") for part in parts
-    ):
+    if os.name == "nt":  # pragma: no cover - exercised on native Windows.
         raise IntegrationOriginalPathError(
-            "copied Original contains an unsafe path component"
+            "copied Original must be drive-absolute"
         )
-    return root.joinpath(*parts)
+    try:
+        return Path(parse_posix_absolute_path(value))
+    except ReflectedHostPathError as exc:
+        message = (
+            "copied Original must be absolute"
+            if "must be absolute" in str(exc)
+            else "copied Original contains an unsafe path component"
+        )
+        raise IntegrationOriginalPathError(message) from exc
 
 
 def _resolved_account_home(value: Path | None) -> Path:

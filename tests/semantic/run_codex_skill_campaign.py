@@ -69,6 +69,15 @@ from tests.semantic.support.codex_campaign import (  # noqa: E402
     stable_tree_sha256,
     verify_attempt_seal,
 )
+from tests.semantic.support.codex_archive_paths import (  # noqa: E402
+    ArchiveAbsolutePath,
+    ArchiveRelativePathError,
+    archive_absolute_has_relative_suffix,
+    archive_absolute_names_equal,
+    archive_relative_from_absolute,
+    parse_archive_absolute_path,
+    parse_archive_relative_path,
+)
 from tests.semantic.support.codex_campaign_runner import (  # noqa: E402
     AUTO_RETRY_CATEGORIES,
     BLOCKED_INFRASTRUCTURE_CATEGORIES,
@@ -187,8 +196,9 @@ from tests.semantic.support.codex_eval_protocol_v3 import (  # noqa: E402
 )
 from tests.semantic.support.codex_filesystem_security import (  # noqa: E402
     CodexFileSecurityError,
-    binary_file_open_flags,
+    path_is_link_or_reparse,
     read_bounded_exclusive_regular_file,
+    write_utf8_text_bytes,
 )
 from tests.semantic.support.codex_prompt_asset_reads_v3 import (  # noqa: E402
     PromptAssetReadError,
@@ -740,8 +750,8 @@ def run_campaign(options: CampaignOptions) -> int:
                         flush=True,
                     )
                     completed = run_child(argv_child, cwd=REPO_ROOT)
-                    (group_root / "stdout.txt").write_text(completed.stdout, encoding="utf-8")
-                    (group_root / "stderr.txt").write_text(completed.stderr, encoding="utf-8")
+                    write_utf8_text_bytes(group_root / "stdout.txt", completed.stdout)
+                    write_utf8_text_bytes(group_root / "stderr.txt", completed.stderr)
                     atomic_write_json_with_digest(
                         group_root / "child-result.json",
                         {
@@ -998,14 +1008,8 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
                     flush=True,
                 )
                 completed = run_child(argv_child, cwd=REPO_ROOT)
-                (group_root / "stdout.txt").write_text(
-                    completed.stdout,
-                    encoding="utf-8",
-                )
-                (group_root / "stderr.txt").write_text(
-                    completed.stderr,
-                    encoding="utf-8",
-                )
+                write_utf8_text_bytes(group_root / "stdout.txt", completed.stdout)
+                write_utf8_text_bytes(group_root / "stderr.txt", completed.stderr)
                 atomic_write_json_with_digest(
                     group_root / "child-result.json",
                     {
@@ -1288,8 +1292,41 @@ def heavy_v3_consolidated_exit(consolidated: Mapping[str, Any]) -> int | None:
     return None
 
 
+def _require_real_directory(
+    path: Path,
+    *,
+    label: str,
+    error_type: type[Exception] = CampaignEvidenceError,
+) -> Path:
+    """Validate a directory's lexical entry before resolving it.
+
+    ``Path.is_symlink`` alone does not cover Windows junctions or other
+    reparse points.  The shared filesystem-security primitive inspects the
+    no-follow metadata first; resolution is only allowed after that boundary
+    passes.
+    """
+
+    candidate = Path(path)
+    try:
+        metadata = candidate.lstat()
+        if (
+            path_is_link_or_reparse(candidate, metadata=metadata)
+            or not stat.S_ISDIR(metadata.st_mode)
+        ):
+            raise error_type(f"{label} is not a real directory: {candidate}")
+        return candidate.resolve(strict=True)
+    except error_type:
+        raise
+    except (OSError, RuntimeError) as exc:
+        raise error_type(
+            f"{label} is not a real directory: {candidate}: {exc}"
+        ) from exc
+
+
 def prepare_campaign_root(options: CampaignOptions) -> Path:
-    root = options.campaign_root.expanduser().resolve(strict=False)
+    root = Path(
+        os.path.abspath(os.fspath(options.campaign_root.expanduser()))
+    )
     allowed = WORKSPACE_ROOT.resolve(strict=False)
     if root == allowed:
         raise CampaignConfigError(f"campaign root must be a named child below {allowed}")
@@ -1300,12 +1337,26 @@ def prepare_campaign_root(options: CampaignOptions) -> Path:
     if not relative.parts:
         raise CampaignConfigError("campaign root must be a named child directory")
     if options.resume:
-        if not root.is_dir() or root.is_symlink():
-            raise CampaignConfigError(f"resume campaign root is missing or not a real directory: {root}")
+        root = _require_real_directory(
+            root,
+            label="resume campaign root",
+            error_type=CampaignConfigError,
+        )
     else:
-        if root.exists():
+        if os.path.lexists(root):
             raise CampaignConfigError(f"new campaign root already exists; use --resume: {root}")
         root.mkdir(parents=True, exist_ok=False)
+        root = _require_real_directory(
+            root,
+            label="new campaign root",
+            error_type=CampaignConfigError,
+        )
+    try:
+        root.relative_to(allowed)
+    except ValueError as exc:
+        raise CampaignConfigError(
+            f"campaign root resolves outside {allowed}: {root}"
+        ) from exc
     return root
 
 
@@ -2542,16 +2593,16 @@ def _validate_heavy_v3_pre_materialization_block(
         )
 
     evidence_root = scenario_root / "evidence"
-    if (
-        evidence_root.is_symlink()
-        or not evidence_root.is_dir()
-        or any(
-            os.path.lexists(path)
-            for path in (
-                evidence_root / "codex-task",
-                evidence_root / HEAVY_V3_PROMPT_PROVENANCE_FILE,
-                evidence_root / BUSINESS_ORACLE_PLAN_FILE,
-            )
+    _require_real_directory(
+        evidence_root,
+        label="pre-materialization heavy evidence root",
+    )
+    if any(
+        os.path.lexists(path)
+        for path in (
+            evidence_root / "codex-task",
+            evidence_root / HEAVY_V3_PROMPT_PROVENANCE_FILE,
+            evidence_root / BUSINESS_ORACLE_PLAN_FILE,
         )
     ):
         raise CampaignEvidenceError(
@@ -2576,19 +2627,20 @@ def _validate_heavy_v3_failure_prompt_plan(
     task_root = Path(task_root_value)
     evidence_root = scenario_root / "evidence"
     expected_task_root = evidence_root / "codex-task"
-    try:
-        resolved_task_root = task_root.resolve(strict=True)
-        resolved_expected_root = expected_task_root.resolve(strict=True)
-    except OSError as exc:
-        raise CampaignEvidenceError(
-            f"failed heavy prompt-plan task root is unavailable: {exc}"
-        ) from exc
+    resolved_task_root = _require_real_directory(
+        task_root,
+        label="failed heavy prompt-plan task root",
+    )
+    resolved_expected_root = _require_real_directory(
+        expected_task_root,
+        label="failed heavy fixed evidence task root",
+    )
+    _require_real_directory(
+        evidence_root,
+        label="failed heavy evidence root",
+    )
     if (
         not task_root.is_absolute()
-        or task_root.is_symlink()
-        or not task_root.is_dir()
-        or evidence_root.is_symlink()
-        or not evidence_root.is_dir()
         or resolved_task_root != resolved_expected_root
     ):
         raise CampaignEvidenceError(
@@ -2714,14 +2766,14 @@ def _validate_heavy_v3_retryable_task_failure(
     """Validate the failed turn, every prior turn, and the stopped broker prefix."""
 
     task_root = scenario_root / "evidence" / "codex-task"
-    if (
-        outcome.get("task_root") != str(task_root)
-        or task_root.is_symlink()
-        or not task_root.is_dir()
-    ):
+    if outcome.get("task_root") != str(task_root):
         raise CampaignEvidenceError(
             "retryable heavy Codex failure lacks its fixed task evidence root"
         )
+    _require_real_directory(
+        task_root,
+        label="retryable heavy fixed task evidence root",
+    )
     if os.path.lexists(task_root / "task-result.json"):
         raise CampaignEvidenceError(
             "retryable heavy task cannot coexist with a completed task result"
@@ -3265,14 +3317,14 @@ def _validate_heavy_v3_retryable_partial_broker(
     }
     for key, expected in expected_directories.items():
         raw = value.get(key)
-        if (
-            raw != str(expected)
-            or expected.is_symlink()
-            or not expected.is_dir()
-        ):
+        if raw != str(expected):
             raise CampaignEvidenceError(
                 f"retryable heavy partial broker {key} is misbound"
             )
+        _require_real_directory(
+            expected,
+            label=f"retryable heavy partial broker {key}",
+        )
 
 
 def _validate_heavy_v3_retryable_lifecycle(
@@ -3289,16 +3341,18 @@ def _validate_heavy_v3_retryable_lifecycle(
     evidence_root = scenario_root / "evidence"
     task_root = evidence_root / "codex-task"
     owned_root = scenario_root / "owned"
-    if (
-        outcome.get("task_root") != str(task_root)
-        or task_root.is_symlink()
-        or not task_root.is_dir()
-        or owned_root.is_symlink()
-        or not owned_root.is_dir()
-    ):
+    if outcome.get("task_root") != str(task_root):
         raise CampaignEvidenceError(
             "retryable heavy infrastructure evidence lacks retained task/owned roots"
         )
+    _require_real_directory(
+        task_root,
+        label="retryable heavy retained task root",
+    )
+    _require_real_directory(
+        owned_root,
+        label="retryable heavy retained owned root",
+    )
     archived_lifecycle = load_strict_regular_json(evidence_root / "lifecycle.json")
     if archived_lifecycle != lifecycle:
         raise CampaignEvidenceError(
@@ -3388,12 +3442,21 @@ def _validate_heavy_v3_retryable_lifecycle(
             "retryable heavy infrastructure lifecycle lacks quarantine evidence"
         )
     quarantine = Path(quarantine_value)
+    try:
+        quarantine_metadata = quarantine.lstat()
+    except OSError as exc:
+        raise CampaignEvidenceError(
+            "retryable heavy infrastructure quarantine is unavailable"
+        ) from exc
     if (
         quarantine != evidence_root / "quarantine.json"
         or not quarantine.is_absolute()
         or not _path_is_within(quarantine, scenario_root)
-        or quarantine.is_symlink()
-        or not quarantine.is_file()
+        or path_is_link_or_reparse(
+            quarantine,
+            metadata=quarantine_metadata,
+        )
+        or not stat.S_ISREG(quarantine_metadata.st_mode)
     ):
         raise CampaignEvidenceError(
             "retryable heavy infrastructure quarantine is not scenario-owned"
@@ -3556,14 +3619,20 @@ def _heavy_v3_retryable_cli_phases_are_clean(
             return False
         project = Path(open_project)
         working_directory = Path(cwd)
+        try:
+            project_metadata = project.lstat()
+            _require_real_directory(
+                working_directory,
+                label="retryable CLI working directory",
+            )
+        except (OSError, CampaignEvidenceError):
+            return False
         if (
             not project.is_absolute()
-            or project.is_symlink()
-            or not project.is_file()
+            or path_is_link_or_reparse(project, metadata=project_metadata)
+            or not stat.S_ISREG(project_metadata.st_mode)
             or not _path_is_within(project, owned_root)
             or not working_directory.is_absolute()
-            or working_directory.is_symlink()
-            or not working_directory.is_dir()
             or not _path_is_within(working_directory, owned_root)
             or working_directory != project.parent
             or open_project not in argv
@@ -3602,6 +3671,12 @@ def _validate_heavy_v3_retryable_project_start(
             "retryable heavy project start sandbox path is malformed"
         )
     sandbox_project = Path(sandbox_project_value)
+    try:
+        sandbox_project_metadata = sandbox_project.lstat()
+    except OSError as exc:
+        raise CampaignEvidenceError(
+            "retryable heavy project sandbox is unavailable"
+        ) from exc
     if (
         start.get("contract") != HEAVY_V3_PROJECT_LIFECYCLE_CONTRACT
         or start.get("scenario_id") != outcome.get("scenario_id")
@@ -3611,8 +3686,11 @@ def _validate_heavy_v3_retryable_project_start(
         or start.get("source_mtime_before_ns")
         != lifecycle.get("source_mtime_before_ns")
         or not sandbox_project.is_absolute()
-        or sandbox_project.is_symlink()
-        or not sandbox_project.is_file()
+        or path_is_link_or_reparse(
+            sandbox_project,
+            metadata=sandbox_project_metadata,
+        )
+        or not stat.S_ISREG(sandbox_project_metadata.st_mode)
         or not _path_is_within(sandbox_project, owned_root)
         or not isinstance(endpoint, Mapping)
         or set(endpoint) != {"host", "port"}
@@ -3648,11 +3726,17 @@ def _validate_heavy_v3_pass_outcome(
         raise CampaignEvidenceError("passing heavy outcome has no thread identity")
     task_root = Path(task_root_value)
     expected_task_root = scenario_root / "evidence" / "codex-task"
+    resolved_task_root = _require_real_directory(
+        task_root,
+        label="passing heavy task root",
+    )
+    resolved_expected_task_root = _require_real_directory(
+        expected_task_root,
+        label="passing heavy fixed task root",
+    )
     if (
         not task_root.is_absolute()
-        or task_root.resolve(strict=True) != expected_task_root.resolve(strict=True)
-        or task_root.is_symlink()
-        or not task_root.is_dir()
+        or resolved_task_root != resolved_expected_task_root
     ):
         raise CampaignEvidenceError(
             "passing heavy task root is not the exact real scenario evidence directory"
@@ -4278,10 +4362,14 @@ def _validate_heavy_v3_broker_result(
         expected = task_root / "broker" / (
             "state" if key == "state_directory" else "evidence"
         )
-        if raw != str(expected) or expected.is_symlink() or not expected.is_dir():
+        if raw != str(expected):
             raise CampaignEvidenceError(
                 f"passing heavy broker {key} is outside its task evidence"
             )
+        _require_real_directory(
+            expected,
+            label=f"passing heavy broker {key}",
+        )
 
 
 def _codex_command_exit_status_aligns(
@@ -6877,10 +6965,18 @@ def _validate_integration_v2_file_proof(
         label=label,
     )
     relative = proof.get("relative_path")
+    absolute = proof.get("path")
+    _validated_archive_absolute_path(absolute, label=f"{label}.path")
+    relative_identity = None
+    if relative is not None:
+        try:
+            relative_identity = parse_archive_relative_path(relative)
+        except ArchiveRelativePathError as exc:
+            raise CampaignEvidenceError(
+                f"{label} relative path is invalid"
+            ) from exc
     if (
-        not isinstance(proof.get("path"), str)
-        or not os.path.isabs(str(proof["path"]))
-        or not _plain_int(proof.get("size"), minimum=1)
+        not _plain_int(proof.get("size"), minimum=1)
         or not _sha256_text_value(proof.get("sha256"))
         or (
             relative is None
@@ -6888,6 +6984,17 @@ def _validate_integration_v2_file_proof(
             else relative is not None and not _nonempty_text(relative)
         )
         or (relative is not None and not _nonempty_text(relative))
+        or (
+            relative_identity is not None
+            and (
+                relative_identity.source_flavor != "posix"
+                or relative_identity.canonical != relative
+                or not archive_absolute_has_relative_suffix(
+                    absolute,
+                    relative_identity.canonical,
+                )
+            )
+        )
     ):
         raise CampaignEvidenceError(f"{label} file proof is invalid")
 
@@ -6985,12 +7092,16 @@ def _validate_integration_v2_cleanup(
             "removed_input_root" in cleanup
             and (
                 not isinstance(cleanup.get("removed_input_root"), str)
-                or not os.path.isabs(str(cleanup["removed_input_root"]))
             )
         )
     ):
         raise CampaignEvidenceError(
             f"{workflow_id} runtime cleanup proof is not an exact clean pass"
+        )
+    if "removed_input_root" in cleanup:
+        _validated_archive_absolute_path(
+            cleanup["removed_input_root"],
+            label=f"{workflow_id} runtime cleanup removed_input_root",
         )
 
 
@@ -7999,6 +8110,21 @@ def _campaign_object_field(value: Mapping[str, Any], name: str) -> Any:
     }.get(name)
 
 
+def _validated_archive_absolute_path(
+    value: Any,
+    *,
+    label: str,
+) -> ArchiveAbsolutePath:
+    if not isinstance(value, str):
+        raise CampaignEvidenceError(f"{label} is not an absolute host path")
+    try:
+        return parse_archive_absolute_path(value)
+    except ArchiveRelativePathError as exc:
+        raise CampaignEvidenceError(
+            f"{label} is not an absolute host path"
+        ) from exc
+
+
 def _validate_file_proof(
     value: Any,
     *,
@@ -8011,9 +8137,35 @@ def _validate_file_proof(
         keys.add("mtime_ns")
     row = _closed_oracle_mapping(value, keys, label=label)
     relative = row.get("relative_path")
+    absolute = row.get("path")
+    try:
+        _validated_archive_absolute_path(absolute, label=f"{label}.path")
+        relative_identity = (
+            None
+            if relative is None
+            else parse_archive_relative_path(relative)
+        )
+        suffix_matches = (
+            True
+            if relative_identity is None
+            else archive_absolute_has_relative_suffix(
+                absolute,
+                relative_identity.canonical,
+            )
+        )
+    except ArchiveRelativePathError as exc:
+        raise CampaignEvidenceError(f"{label} file proof is malformed") from exc
     if (
-        not _nonempty_text(row.get("path"))
+        not _nonempty_text(absolute)
         or not (relative is None if relative_optional and relative is None else _nonempty_text(relative))
+        or (
+            relative_identity is not None
+            and (
+                relative_identity.source_flavor != "posix"
+                or relative_identity.canonical != relative
+                or not suffix_matches
+            )
+        )
         or not _plain_int(row.get("size"))
         or not _sha256_text_value(row.get("sha256"))
         or (has_mtime and not _plain_int(row.get("mtime_ns"), minimum=1))
@@ -8313,37 +8465,43 @@ def _validate_import_original_path_binding(
     originals_files: Any,
     label: str,
 ) -> None:
-    if (
-        not isinstance(original_relative_path, str)
-        or not original_relative_path
-        or original_relative_path.startswith(("/", "\\"))
-        or "\\" in original_relative_path
-        or "\x00" in original_relative_path
-    ):
+    try:
+        requested_relative = parse_archive_relative_path(original_relative_path)
+    except ArchiveRelativePathError as exc:
         raise CampaignEvidenceError(
             f"{label} relative path is not canonical"
-        )
-    relative_parts = tuple(original_relative_path.split("/"))
-    if any(part in {"", ".", ".."} or ":" in part for part in relative_parts):
+        ) from exc
+    if (
+        requested_relative.source_flavor != "posix"
+        or requested_relative.canonical != original_relative_path
+    ):
         raise CampaignEvidenceError(
             f"{label} relative path is not canonical"
         )
     if not isinstance(proof, Mapping):
         raise CampaignEvidenceError(f"{label} proof is not an object")
     proof_relative = proof.get("relative_path")
-    expected_relative = "Originals/" + original_relative_path
-    if proof_relative != expected_relative:
+    expected_relative = parse_archive_relative_path(
+        f"Originals/{requested_relative.canonical}"
+    )
+    if (
+        not isinstance(proof_relative, str)
+        or proof_relative != expected_relative.canonical
+    ):
         raise CampaignEvidenceError(
             f"{label} project-relative path is inconsistent"
         )
     absolute_path = proof.get("path")
-    absolute_parts = tuple(
-        part for part in re.split(r"[\\/]+", str(absolute_path or "")) if part
-    )
-    expected_parts = ("Originals", *relative_parts)
-    if len(absolute_parts) < len(expected_parts) or tuple(
-        absolute_parts[-len(expected_parts) :]
-    ) != expected_parts:
+    try:
+        suffix_matches = archive_absolute_has_relative_suffix(
+            absolute_path,
+            expected_relative.canonical,
+        )
+    except (ArchiveRelativePathError, TypeError) as exc:
+        raise CampaignEvidenceError(
+            f"{label} absolute path is invalid"
+        ) from exc
+    if not suffix_matches:
         raise CampaignEvidenceError(
             f"{label} absolute/relative paths are inconsistent"
         )
@@ -9495,7 +9653,6 @@ def _validate_heavy_v3_audio_conversion_oracle(
         or not isinstance(paths, list)
         or not paths
         or len(paths) > slots
-        or len(paths) != len(set(paths))
         or any(not _nonempty_text(item) for item in paths)
         or not isinstance(byte_change_paths, list)
         or tuple(byte_change_paths) != expected_byte_change_paths
@@ -9512,6 +9669,17 @@ def _validate_heavy_v3_audio_conversion_oracle(
         != expected_verify_payload_sha256
     ):
         raise CampaignEvidenceError(f"{label} audio conversion evidence is invalid")
+    path_identities = tuple(
+        _validated_archive_absolute_path(
+            path,
+            label=f"{label} observed_target_paths[{index}]",
+        )
+        for index, path in enumerate(paths)
+    )
+    if len(path_identities) != len(set(path_identities)):
+        raise CampaignEvidenceError(
+            f"{label} audio conversion target paths are duplicated"
+        )
     before = evidence["before"]
     after = evidence["after"]
     arguments = operation_request.get("arguments")
@@ -9539,17 +9707,36 @@ def _validate_heavy_v3_audio_conversion_oracle(
         != after["baseline_artifact_paths"]
     ):
         raise CampaignEvidenceError(f"{label} audio conversion request/control proof is invalid")
+    _validated_archive_absolute_path(
+        io_root,
+        label=f"{label} io_root",
+    )
     baseline_paths = before["baseline_artifact_paths"]
+    try:
+        baseline_identities = {
+            _validated_archive_absolute_path(
+                path,
+                label=f"{label} baseline artifact",
+            )
+            for path in baseline_paths
+        }
+        for path in baseline_paths:
+            archive_relative_from_absolute(path, io_root)
+        output_tree_identities = {
+            _validated_archive_absolute_path(
+                item["path"],
+                label=f"{label} output tree path",
+            )
+            for item in before["output_tree"]
+        }
+    except ArchiveRelativePathError as exc:
+        raise CampaignEvidenceError(
+            f"{label} baseline artifact escaped io_root"
+        ) from exc
     if (
         len(baseline_paths) > len(before["artifacts"])
-        or any(
-            not Path(path).is_absolute()
-            or not _path_is_within(Path(path), Path(str(io_root)))
-            for path in baseline_paths
-        )
-        or not {
-            item["path"] for item in before["output_tree"]
-        } <= set(baseline_paths)
+        or len(baseline_identities) != len(baseline_paths)
+        or not output_tree_identities <= baseline_identities
     ):
         raise CampaignEvidenceError(
             f"{label} pre-preview stable output is not bound to baseline artifacts"
@@ -9611,6 +9798,20 @@ def _validate_heavy_v3_audio_conversion_oracle(
             if current != previous:
                 raise CampaignEvidenceError(f"{label} changed a non-target conversion slot")
             continue
+        current_path_identity = _validated_archive_absolute_path(
+            current["converted_path"],
+            label=f"{label} target converted_path",
+        )
+        current_file_identity = _validated_archive_absolute_path(
+            current["file"].get("path"),
+            label=f"{label} target file.path",
+        )
+        try:
+            archive_relative_from_absolute(current["converted_path"], io_root)
+        except ArchiveRelativePathError as exc:
+            raise CampaignEvidenceError(
+                f"{label} target conversion artifact escaped io_root"
+            ) from exc
         if (
             (current["object_id"], current["source_id"], current["source_key"])
             != (
@@ -9620,10 +9821,8 @@ def _validate_heavy_v3_audio_conversion_oracle(
             )
             or current["original_path"] != previous["original_path"]
             or current["original_file"] != previous["original_file"]
-            or current["converted_path"] not in paths
-            or current["file"].get("path") != current["converted_path"]
-            or not Path(str(current["converted_path"])).is_absolute()
-            or not _path_is_within(Path(str(current["converted_path"])), Path(str(io_root)))
+            or current_path_identity not in path_identities
+            or current_file_identity != current_path_identity
             or current["file"].get("present") is not True
             or not _plain_int(current["file"].get("size"), minimum=1)
             or not _sha256_text_value(current["file"].get("sha256"))
@@ -9647,24 +9846,37 @@ def _validate_heavy_v3_audio_conversion_oracle(
                     f"{label} target conversion bytes were not replaced"
                 )
     observed_after_target_paths = {
-        item["converted_path"]
+        _validated_archive_absolute_path(
+            item["converted_path"],
+            label=f"{label} after target path",
+        )
         for slot, item in after_slots.items()
         if slot in expected_slots
     }
-    if observed_after_target_paths != set(paths):
+    if observed_after_target_paths != set(path_identities):
         raise CampaignEvidenceError(
             f"{label} observed target path evidence is misbound"
         )
     before_target_paths = {
-        item["converted_path"]
+        _validated_archive_absolute_path(
+            item["converted_path"],
+            label=f"{label} before target path",
+        )
         for slot, item in before_slots.items()
         if slot in expected_slots
     }
     after_target_paths = observed_after_target_paths
     before_non_target_paths = {
-        item["path"]
+        _validated_archive_absolute_path(
+            item["path"],
+            label=f"{label} before non-target path",
+        )
         for item in before["output_tree"]
-        if item["path"] not in before_target_paths
+        if _validated_archive_absolute_path(
+            item["path"],
+            label=f"{label} before output path",
+        )
+        not in before_target_paths
     }
     if (after_target_paths - before_target_paths) & before_non_target_paths:
         raise CampaignEvidenceError(
@@ -9672,14 +9884,28 @@ def _validate_heavy_v3_audio_conversion_oracle(
         )
     target_paths = before_target_paths | after_target_paths
     before_controls = {
-        item["path"]: item
+        _validated_archive_absolute_path(
+            item["path"],
+            label=f"{label} before control path",
+        ): item
         for item in before["output_tree"]
-        if item["path"] not in target_paths
+        if _validated_archive_absolute_path(
+            item["path"],
+            label=f"{label} before output path",
+        )
+        not in target_paths
     }
     after_controls = {
-        item["path"]: item
+        _validated_archive_absolute_path(
+            item["path"],
+            label=f"{label} after control path",
+        ): item
         for item in after["output_tree"]
-        if item["path"] not in target_paths
+        if _validated_archive_absolute_path(
+            item["path"],
+            label=f"{label} after output path",
+        )
+        not in target_paths
     }
     if before_controls != after_controls:
         raise CampaignEvidenceError(f"{label} changed non-target conversion output")
@@ -10152,8 +10378,9 @@ def _validate_compact_media_reference_archive(
         if isinstance(row, Mapping) and _nonempty_text(row.get("key"))
     }
     expected_rows: list[Mapping[str, Any]] = []
-    host_name_to_key: dict[str, str] = {}
+    host_paths_by_key: dict[str, str] = {}
     path_to_key: dict[str, str] = {}
+    path_identities: set[ArchiveAbsolutePath] = set()
     for key in expected_keys:
         row = row_by_key.get(key)
         if not isinstance(key, str) or not isinstance(row, Mapping):
@@ -10162,13 +10389,27 @@ def _validate_compact_media_reference_archive(
         host_path = row.get("host_path")
         if not _nonempty_text(path) or not _nonempty_text(host_path):
             raise CampaignEvidenceError(f"{label} sealed candidate path is invalid")
-        host_name = Path(str(host_path)).name.casefold()
-        if not host_name or host_name in host_name_to_key or str(path) in path_to_key:
+        try:
+            path_identity = parse_archive_absolute_path(str(path))
+            host_identity = parse_archive_absolute_path(str(host_path))
+            host_identity.name
+        except ArchiveRelativePathError as exc:
+            raise CampaignEvidenceError(
+                f"{label} sealed candidate path is invalid"
+            ) from exc
+        if (
+            path_identity in path_identities
+            or any(
+                archive_absolute_names_equal(str(host_path), existing)
+                for existing in host_paths_by_key.values()
+            )
+        ):
             raise CampaignEvidenceError(
                 f"{label} sealed candidate paths are not uniquely matchable"
             )
-        host_name_to_key[host_name] = key
+        host_paths_by_key[key] = str(host_path)
         path_to_key[str(path)] = key
+        path_identities.add(path_identity)
         expected_rows.append(row)
 
     referenced = answer.get("referenced_keys")
@@ -10194,11 +10435,25 @@ def _validate_compact_media_reference_archive(
         original = raw_row.get("originalFilePath")
         if not isinstance(original, str) or not original:
             continue
-        key = host_name_to_key.get(
-            Path(original.replace("\\", "/")).name.casefold()
-        )
-        if key is None:
+        try:
+            original_identity = parse_archive_absolute_path(original)
+            original_identity.name
+            matching_keys = [
+                key
+                for key, host_path in host_paths_by_key.items()
+                if archive_absolute_names_equal(original, host_path)
+            ]
+        except ArchiveRelativePathError as exc:
+            raise CampaignEvidenceError(
+                f"{label} trusted baseline path is invalid"
+            ) from exc
+        if len(matching_keys) > 1:
+            raise CampaignEvidenceError(
+                f"{label} trusted baseline path is ambiguous"
+            )
+        if not matching_keys:
             continue
+        key = matching_keys[0]
         source_id = raw_row.get("id")
         object_path = raw_row.get("path")
         if (
@@ -10443,11 +10698,12 @@ def _serialized_media_response_filenames(
         raise CampaignEvidenceError(
             f"{label} Media Pool row lacks bound Filename/host_path identity"
         )
-    full_filename = Path(host_path).name
-    if not full_filename:
+    try:
+        full_filename = parse_archive_absolute_path(host_path).name
+    except ArchiveRelativePathError as exc:
         raise CampaignEvidenceError(
             f"{label} Media Pool row host_path has no basename"
-        )
+        ) from exc
     return tuple(
         dict.fromkeys((live_filename.casefold(), full_filename.casefold()))
     )
@@ -10690,8 +10946,15 @@ def _validate_soundbank_tree_entry(value: Any, *, label: str) -> None:
         {"relative_path", "size", "sha256", "mtime_ns"},
         label=label,
     )
+    relative = row.get("relative_path")
+    try:
+        relative_identity = parse_archive_relative_path(relative)
+    except ArchiveRelativePathError as exc:
+        raise CampaignEvidenceError(f"{label} tree entry is malformed") from exc
     if (
-        not _nonempty_text(row.get("relative_path"))
+        not _nonempty_text(relative)
+        or relative_identity.source_flavor != "posix"
+        or relative_identity.canonical != relative
         or not _plain_int(row.get("size"))
         or not _sha256_text_value(row.get("sha256"))
         or not _plain_int(row.get("mtime_ns"), minimum=1)
@@ -11315,8 +11578,13 @@ def _validate_cli_file_proof(value: Any, *, label: str) -> None:
 def _validate_cli_tree_proof(value: Any, *, label: str) -> None:
     row = _closed_oracle_mapping(value, {"root", "files", "sha256"}, label=label)
     files = row.get("files")
+    root = row.get("root")
+    try:
+        _validated_archive_absolute_path(root, label=f"{label} root")
+    except CampaignEvidenceError as exc:
+        raise CampaignEvidenceError(f"{label} tree proof is malformed") from exc
     if (
-        not _nonempty_text(row.get("root"))
+        not _nonempty_text(root)
         or not isinstance(files, list)
         or not _sha256_text_value(row.get("sha256"))
     ):
@@ -11326,6 +11594,21 @@ def _validate_cli_tree_proof(value: Any, *, label: str) -> None:
     for item in files:
         _validate_cli_file_proof(item, label=f"{label} file")
         relative = str(item["relative_path"])
+        try:
+            parsed_relative = parse_archive_relative_path(relative)
+            derived_relative = archive_relative_from_absolute(item["path"], root)
+        except ArchiveRelativePathError as exc:
+            raise CampaignEvidenceError(
+                f"{label} file escaped its tree root"
+            ) from exc
+        if (
+            parsed_relative.source_flavor != "posix"
+            or parsed_relative.canonical != relative
+            or derived_relative.canonical != relative
+        ):
+            raise CampaignEvidenceError(
+                f"{label} file path is not its canonical tree identity"
+            )
         relatives.append(relative)
         digest.update(relative.encode("utf-8"))
         digest.update(b"\0")
@@ -11653,13 +11936,18 @@ def _validate_heavy_v3_pass_lifecycle(
 
 
 def _strict_real_subdirectory_names(root: Path) -> set[str]:
-    directory = Path(root)
-    if directory.is_symlink() or not directory.is_dir():
-        raise CampaignEvidenceError(f"evidence directory is not real: {directory}")
+    directory = _require_real_directory(
+        Path(root),
+        label="evidence directory",
+    )
     names: set[str] = set()
     for entry in os.scandir(directory):
         info = entry.stat(follow_symlinks=False)
-        if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode):
+        entry_path = Path(entry.path)
+        if (
+            not stat.S_ISDIR(info.st_mode)
+            or path_is_link_or_reparse(entry_path, metadata=info)
+        ):
             raise CampaignEvidenceError(
                 f"evidence directory contains a non-directory entry: {entry.path}"
             )
@@ -11669,33 +11957,19 @@ def _strict_real_subdirectory_names(root: Path) -> set[str]:
 
 def _load_strict_regular_text(path: Path, *, limit_bytes: int = 8 * 1024 * 1024) -> str:
     source = Path(path)
-    flags = binary_file_open_flags(os.O_RDONLY)
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
     try:
-        descriptor = os.open(source, flags)
-    except OSError as exc:
-        raise CampaignEvidenceError(f"cannot open child text {source}: {exc}") from exc
+        snapshot = read_bounded_exclusive_regular_file(
+            source,
+            max_bytes=limit_bytes,
+            require_private_posix_mode=False,
+            allow_empty=True,
+        )
+    except (CodexFileSecurityError, ValueError) as exc:
+        raise CampaignEvidenceError(
+            f"child text is not a bounded exclusive regular file: {source}: {exc}"
+        ) from exc
     try:
-        info = os.fstat(descriptor)
-        if not stat.S_ISREG(info.st_mode) or info.st_size > limit_bytes:
-            raise CampaignEvidenceError(
-                f"child text is not a bounded regular file: {source}"
-            )
-        chunks: list[bytes] = []
-        total = 0
-        while True:
-            chunk = os.read(descriptor, min(1024 * 1024, limit_bytes + 1 - total))
-            if not chunk:
-                break
-            total += len(chunk)
-            if total > limit_bytes:
-                raise CampaignEvidenceError(f"child text exceeds limit: {source}")
-            chunks.append(chunk)
-    finally:
-        os.close(descriptor)
-    try:
-        return b"".join(chunks).decode("utf-8")
+        return snapshot.raw.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise CampaignEvidenceError(f"child text is not UTF-8: {source}") from exc
 
@@ -11710,8 +11984,12 @@ def _heavy_v3_outcome_contract(runner: str) -> str:
 
 def _heavy_v3_scenario_directories(root: Path) -> dict[str, Path]:
     scenarios_root = root / "scenarios"
-    if not scenarios_root.exists():
+    if not os.path.lexists(scenarios_root):
         return {}
+    scenarios_root = _require_real_directory(
+        scenarios_root,
+        label="heavy scenarios root",
+    )
     try:
         entries = tuple(os.scandir(scenarios_root))
     except OSError as exc:
@@ -11721,11 +11999,18 @@ def _heavy_v3_scenario_directories(root: Path) -> dict[str, Path]:
     result: dict[str, Path] = {}
     for entry in entries:
         info = entry.stat(follow_symlinks=False)
-        if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode):
+        entry_path = Path(entry.path)
+        if (
+            not stat.S_ISDIR(info.st_mode)
+            or path_is_link_or_reparse(entry_path, metadata=info)
+        ):
             raise CampaignEvidenceError(
                 f"heavy scenario evidence entry is not a real directory: {entry.path}"
             )
-        result[entry.name] = Path(entry.path).resolve(strict=True)
+        result[entry.name] = _require_real_directory(
+            entry_path,
+            label="heavy scenario evidence entry",
+        )
     return result
 
 
@@ -11977,8 +12262,19 @@ def _validate_modification_policy_identity_history(
     attempt.
     """
 
-    root = Path(campaign_root).resolve(strict=True)
+    root = _require_real_directory(
+        Path(campaign_root),
+        label="modification-policy campaign root",
+    )
     attempts_root = root / "attempts"
+    resolved_attempts_root = (
+        _require_real_directory(
+            attempts_root,
+            label="modification-policy attempts root",
+        )
+        if manifests or current_attempt_root is not None
+        else attempts_root
+    )
     attempt_roots: list[tuple[str, Path]] = []
     seen_attempt_ids: set[str] = set()
     for manifest in manifests:
@@ -11992,12 +12288,21 @@ def _validate_modification_policy_identity_history(
                 "modification-policy identity audit received invalid attempts"
             )
         seen_attempt_ids.add(attempt_id)
-        attempt_roots.append(
-            (attempt_id, (attempts_root / attempt_id).resolve(strict=True))
+        attempt_root = _require_real_directory(
+            attempts_root / attempt_id,
+            label=f"{attempt_id} modification-policy attempt root",
         )
+        if attempt_root.parent != resolved_attempts_root:
+            raise CampaignEvidenceError(
+                f"{attempt_id} modification-policy attempt escapes its campaign"
+            )
+        attempt_roots.append((attempt_id, attempt_root))
     if current_attempt_root is not None:
-        current = Path(current_attempt_root).resolve(strict=True)
-        if current.parent != attempts_root.resolve(strict=True):
+        current = _require_real_directory(
+            Path(current_attempt_root),
+            label="current modification-policy attempt root",
+        )
+        if current.parent != resolved_attempts_root:
             raise CampaignEvidenceError(
                 "current modification-policy attempt escapes the campaign"
             )
@@ -12010,12 +12315,12 @@ def _validate_modification_policy_identity_history(
     seen_threads: dict[str, str] = {}
     for attempt_id, attempt_root in attempt_roots:
         matrix_root = attempt_root / "runs" / HEAVY_V3_GROUP_ID / "matrix"
-        if not matrix_root.exists():
+        if not os.path.lexists(matrix_root):
             continue
-        if matrix_root.is_symlink() or not matrix_root.is_dir():
-            raise CampaignEvidenceError(
-                f"{attempt_id} modification-policy matrix root is not real"
-            )
+        _require_real_directory(
+            matrix_root,
+            label=f"{attempt_id} modification-policy matrix root",
+        )
         for scenario_name, scenario_root in sorted(
             _heavy_v3_scenario_directories(matrix_root).items()
         ):
@@ -12031,19 +12336,19 @@ def _validate_modification_policy_identity_history(
                 outcome = loaded_outcome
 
             task_root = scenario_root / "evidence" / "codex-task"
-            if not task_root.exists():
+            if not os.path.lexists(task_root):
                 if outcome is not None and (
                     outcome.get("thread_id") is not None
                     or outcome.get("task_root") is not None
                 ):
                     raise CampaignEvidenceError(
                         f"{label} outcome claims an absent policy task"
-                    )
-                continue
-            if task_root.is_symlink() or not task_root.is_dir():
-                raise CampaignEvidenceError(
-                    f"{label} policy task root is not real"
                 )
+                continue
+            _require_real_directory(
+                task_root,
+                label=f"{label} policy task root",
+            )
             if outcome is None or outcome.get("task_root") != str(task_root):
                 raise CampaignEvidenceError(
                     f"{label} outcome is not bound to its raw policy task"

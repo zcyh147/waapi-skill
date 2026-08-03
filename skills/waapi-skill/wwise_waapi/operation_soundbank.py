@@ -19,6 +19,16 @@ import xml.etree.ElementTree as ET
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping, Sequence
 
+from .filesystem_security import metadata_is_link_or_reparse
+from .host_paths import (
+    HostPathError,
+    HostPathKey,
+    host_path_comparison_key,
+    localize_waapi_host_path,
+    parse_absolute_host_path,
+    parse_relative_host_path,
+)
+
 from .canonical import canonical_sha256
 
 
@@ -119,19 +129,6 @@ class SoundBankContractError(ValueError):
             "message": self.message,
             "details": dict(self.details),
         }
-
-
-def _stat_is_link_or_reparse_point(metadata: os.stat_result) -> bool:
-    """Reject POSIX links and Windows reparse points with one portable check."""
-
-    if stat.S_ISLNK(metadata.st_mode):
-        return True
-    attributes = getattr(metadata, "st_file_attributes", 0)
-    # Python exposes this constant on supported Windows builds.  Keep the
-    # documented Win32 value as a compatibility fallback for older runtimes;
-    # POSIX stat results have no ``st_file_attributes`` so remain unaffected.
-    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x0400)
-    return bool(attributes & reparse_flag)
 
 
 def capture_file_proof(
@@ -236,7 +233,7 @@ def prove_artifact_path(
                 f"{field} could not be inspected.",
                 details={"path": str(supplied), "error": str(exc)},
             ) from exc
-        if _stat_is_link_or_reparse_point(leaf_stat):
+        if metadata_is_link_or_reparse(leaf_stat):
             raise SoundBankContractError(
                 "SYMLINK_NOT_ALLOWED",
                 f"{field} must not be a symbolic link or Windows reparse point.",
@@ -343,7 +340,7 @@ def capture_artifact_tree(
                         "An artifact entry could not be inspected.",
                         details={"path": entry.path, "error": str(exc)},
                     ) from exc
-                if _stat_is_link_or_reparse_point(entry_stat):
+                if metadata_is_link_or_reparse(entry_stat):
                     raise SoundBankContractError(
                         "SYMLINK_NOT_ALLOWED",
                         "Artifact trees must not contain symbolic links or Windows reparse points.",
@@ -1277,7 +1274,12 @@ def parse_external_sources_file(
     source_root = (
         project_path
         if root_value is None
-        else _resolve_xml_path(root_value, base=project_path, field="ExternalSourcesList.Root")
+        else _resolve_xml_path(
+            root_value,
+            base=project_path,
+            field="ExternalSourcesList.Root",
+            allow_trailing_separator=True,
+        )
     )
     if not source_root.is_dir():
         raise SoundBankContractError(
@@ -1437,9 +1439,9 @@ def build_external_sources_operation_plan(
     dispatch_rows: list[dict[str, str]] = []
     request_plans: list[dict[str, Any]] = []
     snapshot_roots: list[str] = []
-    seen_requests: set[tuple[str, str, str]] = set()
-    seen_platform_roots: dict[str, str] = {}
-    seen_outputs: set[tuple[str, str]] = set()
+    seen_requests: set[tuple[HostPathKey, str, HostPathKey]] = set()
+    seen_platform_roots: dict[HostPathKey, str] = {}
+    seen_outputs: set[HostPathKey] = set()
     requested_conversions: set[str] = set()
     uses_project_default_conversion = False
     project_root = project["directories"]["root"]
@@ -1454,7 +1456,7 @@ def build_external_sources_operation_plan(
             expect_directory=True,
         )
         output_root = output_proof["resolved_path"]
-        platform_root_key = output_root.casefold()
+        platform_root_key = host_path_comparison_key(output_root)
         previous_platform = seen_platform_roots.get(platform_root_key)
         if previous_platform is not None and previous_platform != platform["id"]:
             raise SoundBankContractError(
@@ -1464,7 +1466,11 @@ def build_external_sources_operation_plan(
             )
         seen_platform_roots[platform_root_key] = platform["id"]
         parsed = parse_external_sources_file(input_path, project_root=project_root)
-        request_key = (parsed["path"].casefold(), platform["id"].casefold(), output_root.casefold())
+        request_key = (
+            host_path_comparison_key(parsed["path"]),
+            platform["id"].casefold(),
+            platform_root_key,
+        )
         if request_key in seen_requests:
             raise SoundBankContractError(
                 "DUPLICATE_REQUEST",
@@ -1479,7 +1485,8 @@ def build_external_sources_operation_plan(
             else:
                 requested_conversions.add(entry["conversion"])
             relative = entry["expected_destination"]
-            output_key = (output_root.casefold(), relative.casefold())
+            absolute = Path(output_root, *PurePosixPath(relative).parts)
+            output_key = host_path_comparison_key(str(absolute))
             if output_key in seen_outputs:
                 raise SoundBankContractError(
                     "DUPLICATE_DESTINATION",
@@ -1487,7 +1494,6 @@ def build_external_sources_operation_plan(
                     details={"index": index, "output_root": output_root, "destination": relative},
                 )
             seen_outputs.add(output_key)
-            absolute = Path(output_root, *PurePosixPath(relative).parts)
             artifact_proof = prove_artifact_path(
                 absolute,
                 io_root=io_root,
@@ -1777,7 +1783,7 @@ def build_process_definition_operation_plan(
     documents: list[dict[str, Any]] = []
     dispatch_files: list[str] = []
     soundbanks: list[dict[str, Any]] = []
-    seen_files: set[str] = set()
+    seen_files: set[HostPathKey] = set()
     bank_sources: dict[str, str] = {}
     for index, value in enumerate(raw_files):
         if not isinstance(value, (str, os.PathLike)):
@@ -1787,7 +1793,7 @@ def build_process_definition_operation_plan(
                 details={"index": index},
             )
         document = parse_soundbank_definition_file(value)
-        file_key = document["path"].casefold()
+        file_key = host_path_comparison_key(document["path"])
         if file_key in seen_files:
             raise SoundBankContractError(
                 "DUPLICATE_REQUEST",
@@ -2343,7 +2349,7 @@ def _open_regular_file(
             f"{field} is not accessible.",
             details={"path": str(supplied), "error": str(exc)},
         ) from exc
-    if _stat_is_link_or_reparse_point(leaf_stat):
+    if metadata_is_link_or_reparse(leaf_stat):
         raise SoundBankContractError(
             "SYMLINK_NOT_ALLOWED",
             f"{field} must not be a symbolic link or Windows reparse point.",
@@ -2401,17 +2407,42 @@ def _require_unchanged_file_stat(
         )
 
 
-def _resolve_xml_path(value: str, *, base: Path, field: str) -> Path:
-    if _is_windows_absolute(value) and os.name != "nt":
-        raise SoundBankContractError(
-            "PATH_FLAVOR_MISMATCH",
-            f"{field} uses a Windows absolute path on a non-Windows host.",
-            details={"value": value},
+def _resolve_xml_path(
+    value: str,
+    *,
+    base: Path,
+    field: str,
+    allow_trailing_separator: bool = False,
+) -> Path:
+    try:
+        parse_absolute_host_path(
+            value,
+            allow_trailing_separator=allow_trailing_separator,
         )
-    normalized = value if os.name == "nt" else value.replace("\\", "/")
-    candidate = Path(normalized)
-    if not candidate.is_absolute():
-        candidate = base / candidate
+    except HostPathError:
+        try:
+            relative = parse_relative_host_path(
+                value,
+                allow_current_directory=True,
+                allow_parent_segments=True,
+                allow_trailing_separator=allow_trailing_separator,
+            )
+        except HostPathError as exc:
+            raise SoundBankContractError(
+                "INVALID_FILE",
+                f"{field} is not a safe host filesystem path.",
+                details={"value": value, "path_error": str(exc)},
+            ) from exc
+        candidate = base.joinpath(*relative.components)
+    else:
+        try:
+            candidate = Path(localize_waapi_host_path(value))
+        except HostPathError as exc:
+            raise SoundBankContractError(
+                "PATH_FLAVOR_MISMATCH",
+                f"{field} cannot be localized on this host.",
+                details={"value": value, "path_error": str(exc)},
+            ) from exc
     try:
         return candidate.resolve(strict=True)
     except OSError as exc:
@@ -2502,14 +2533,16 @@ def _relative_path_set(values: Sequence[str], *, field: str) -> set[str]:
 
 
 def _relative_path(value: Any, *, field: str) -> str:
-    text = _require_text(value, field=field).replace("\\", "/")
-    if _is_absolute_path_text(text):
-        raise SoundBankContractError("INVALID_ARGUMENT", f"{field} must be relative.")
-    raw_parts = text.split("/")
-    if any(part in {"", ".", ".."} for part in raw_parts):
-        raise SoundBankContractError("INVALID_ARGUMENT", f"{field} contains an unsafe path segment.")
-    path = PurePosixPath(text)
-    return path.as_posix()
+    text = _require_text(value, field=field)
+    try:
+        relative = parse_relative_host_path(text)
+    except HostPathError as exc:
+        raise SoundBankContractError(
+            "INVALID_ARGUMENT",
+            f"{field} must be a safe portable relative path.",
+            details={"value": text, "path_error": str(exc)},
+        ) from exc
+    return PurePosixPath(*relative.components).as_posix()
 
 
 def _require_io_root(value: str | os.PathLike[str]) -> Path:
@@ -2669,9 +2702,9 @@ def _dedupe_strings(values: Sequence[str]) -> list[str]:
 
 def _dedupe_path_proofs(values: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
-    seen: set[str] = set()
+    seen: set[HostPathKey] = set()
     for value in values:
-        key = str(value["resolved_path"]).casefold()
+        key = host_path_comparison_key(value["resolved_path"])
         if key not in seen:
             seen.add(key)
             result.append(dict(value))

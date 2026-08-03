@@ -15,6 +15,7 @@ from wwise_waapi.transaction_runtime import (  # pyright: ignore[reportMissingIm
     build_project_guard,
     build_runtime_guard,
     build_transaction_artifact,
+    canonical_project_path,
     validate_transaction_guards,
 )
 
@@ -71,6 +72,39 @@ def test_project_guard_fingerprint_binds_endpoint_version_and_project() -> None:
     assert first["fingerprint"] == same["fingerprint"]
     assert first["fingerprint"] != other_project["fingerprint"]
     assert first["fingerprint"] != other_port["fingerprint"]
+
+
+def test_canonical_project_path_uses_source_filesystem_semantics() -> None:
+    assert canonical_project_path(r"C:\Projects\SampleProject.wproj") == (
+        r"windows:c:\projects\sampleproject.wproj"
+    )
+    assert canonical_project_path("c:/PROJECTS/SAMPLEPROJECT.WPROJ") == (
+        r"windows:c:\projects\sampleproject.wproj"
+    )
+    assert canonical_project_path("/Projects/SampleProject.wproj") == (
+        "posix:/Projects/SampleProject.wproj"
+    )
+    assert canonical_project_path("/projects/SampleProject.wproj") != (
+        canonical_project_path("/Projects/SampleProject.wproj")
+    )
+
+
+@pytest.mark.parametrize(
+    "value",
+    (
+        r"C:\Projects\..\SampleProject.wproj",
+        r"C:\Projects\\SampleProject.wproj",
+        "/Projects/./SampleProject.wproj",
+        "/Projects//SampleProject.wproj",
+        " Projects/SampleProject.wproj ",
+        "Projects/SampleProject.wproj",
+    ),
+)
+def test_canonical_project_path_rejects_normalizing_or_relative_spelling(
+    value: str,
+) -> None:
+    with pytest.raises(TransactionGuardError, match="strict absolute host path"):
+        canonical_project_path(value)
 
 
 def test_transaction_artifact_binds_closed_preview_runtime_guard_and_expiry() -> None:

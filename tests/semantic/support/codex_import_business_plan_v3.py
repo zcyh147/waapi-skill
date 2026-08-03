@@ -10,19 +10,27 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
-import stat
 from dataclasses import dataclass, fields, is_dataclass
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 
+from tests.semantic.support.codex_archive_paths import (
+    ArchiveRelativePathError,
+    archive_absolute_has_relative_suffix,
+    parse_archive_absolute_path,
+    parse_archive_relative_path,
+)
 from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
     V3GatewayProtocol,
     build_metadata_transaction_protocol,
     build_transaction_protocol,
+)
+from tests.semantic.support.codex_filesystem_security import (
+    CodexFileSecurityError,
+    read_bounded_exclusive_regular_file,
 )
 from tests.semantic.support.codex_import_assets_v3 import (
     ImportAssetMaterializationError,
@@ -34,6 +42,7 @@ from tests.semantic.support.codex_import_assets_v3 import (
 from tests.semantic.support.codex_import_runtime_v3 import (
     COMPOUND_SUPPORTED_VERSIONS,
     IMPORT_APIS,
+    MAX_FILE_BYTES,
     SUPPORTED_VERSION,
     ImportCompoundRuntimeSnapshot,
     ImportRuntimePlan,
@@ -1790,12 +1799,22 @@ def _archive_json_scalar(value: Any) -> bool:
     return value is None or type(value) in {str, int, float, bool}
 
 
+def _archive_absolute_path_is_valid(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        parse_archive_absolute_path(value)
+    except ArchiveRelativePathError:
+        return False
+    return True
+
+
 def _validate_files(files: Any, *, verify_files: bool) -> None:
     if not isinstance(files, list) or not files:
         raise ImportBusinessPlanError("import file manifest is invalid")
     keys: set[tuple[str, str]] = set()
     for row in files:
-        if not isinstance(row, Mapping) or set(row) != {"category", "key", "path", "present", "size", "sha256"} or row.get("category") not in {"wav", "pre_state_wav", "tsv"} or not isinstance(row.get("key"), str) or not os.path.isabs(str(row.get("path") or "")):
+        if not isinstance(row, Mapping) or set(row) != {"category", "key", "path", "present", "size", "sha256"} or row.get("category") not in {"wav", "pre_state_wav", "tsv"} or not isinstance(row.get("key"), str) or not _archive_absolute_path_is_valid(row.get("path")):
             raise ImportBusinessPlanError("import file manifest row is invalid")
         marker = (str(row["category"]), str(row["key"]))
         if marker in keys:
@@ -1803,12 +1822,28 @@ def _validate_files(files: Any, *, verify_files: bool) -> None:
         keys.add(marker)
         present = row["present"]
         if present is True:
-            if type(row["size"]) is not int or row["size"] < 0 or not _sha(row["sha256"]):
+            if (
+                type(row["size"]) is not int
+                or not 0 < row["size"] <= MAX_FILE_BYTES
+                or not _sha(row["sha256"])
+            ):
                 raise ImportBusinessPlanError("present import file proof is invalid")
             if verify_files:
                 path = Path(row["path"])
-                meta = os.lstat(path)
-                if stat.S_ISLNK(meta.st_mode) or not stat.S_ISREG(meta.st_mode) or meta.st_size != row["size"] or _hash_file(path) != row["sha256"]:
+                try:
+                    snapshot = read_bounded_exclusive_regular_file(
+                        path,
+                        max_bytes=row["size"],
+                        require_private_posix_mode=False,
+                    )
+                except CodexFileSecurityError as exc:
+                    raise ImportBusinessPlanError(
+                        "import file changed after sealing"
+                    ) from exc
+                if (
+                    snapshot.metadata.st_size != row["size"]
+                    or hashlib.sha256(snapshot.raw).hexdigest() != row["sha256"]
+                ):
                     raise ImportBusinessPlanError("import file changed after sealing")
         elif present is False:
             if row["size"] is not None or row["sha256"] is not None:
@@ -1827,10 +1862,10 @@ def _validate_snapshot_evidence(snapshot: Mapping[str, Any]) -> None:
             raise ImportBusinessPlanError(f"import snapshot {name} is not an array")
     for name in ("project_xml_files", "originals_files"):
         for proof in snapshot[name]:
-            if not isinstance(proof, Mapping) or set(proof) != {"path", "relative_path", "size", "sha256"} or not os.path.isabs(str(proof.get("path") or "")) or type(proof.get("size")) is not int or proof["size"] < 0 or not _sha(proof.get("sha256")):
+            if not isinstance(proof, Mapping) or set(proof) != {"path", "relative_path", "size", "sha256"} or not _archive_absolute_path_is_valid(proof.get("path")) or type(proof.get("size")) is not int or proof["size"] < 0 or not _sha(proof.get("sha256")):
                 raise ImportBusinessPlanError(f"import snapshot {name} proof is invalid")
     for item in snapshot["input_files"]:
-        if not isinstance(item, list) or len(item) != 4 or not os.path.isabs(str(item[0] or "")) or type(item[1]) is not bool:
+        if not isinstance(item, list) or len(item) != 4 or not _archive_absolute_path_is_valid(item[0]) or type(item[1]) is not bool:
             raise ImportBusinessPlanError("import snapshot input fingerprint is invalid")
         if item[1] and (type(item[2]) is not int or not _sha(item[3])):
             raise ImportBusinessPlanError("present input snapshot fingerprint is invalid")
@@ -2073,7 +2108,7 @@ def _validate_archived_audio_source(
     }:
         raise ImportBusinessPlanError(f"{label} copied Original proof is malformed")
     if (
-        not os.path.isabs(str(original.get("path") or ""))
+        not _archive_absolute_path_is_valid(original.get("path"))
         or type(original.get("size")) is not int
         or original["size"] < 0
         or not _sha(original.get("sha256"))
@@ -2097,13 +2132,16 @@ def _validate_archived_audio_source(
             f"{label} copied Original relative evidence is inconsistent"
         )
 
-    absolute_parts = tuple(
-        part for part in re.split(r"[\\/]+", str(original["path"])) if part
-    )
-    expected_suffix = tuple(proof_parts)
-    if len(absolute_parts) < len(expected_suffix) or tuple(
-        absolute_parts[-len(expected_suffix) :]
-    ) != expected_suffix:
+    try:
+        suffix_matches = archive_absolute_has_relative_suffix(
+            original["path"],
+            original["relative_path"],
+        )
+    except ArchiveRelativePathError as exc:
+        raise ImportBusinessPlanError(
+            f"{label} copied Original path proof is invalid"
+        ) from exc
+    if not suffix_matches:
         raise ImportBusinessPlanError(
             f"{label} copied Original absolute/relative paths are inconsistent"
         )
@@ -2135,32 +2173,19 @@ def _validate_archived_audio_source(
 
 
 def _canonical_relative_parts(value: Any, *, label: str) -> tuple[str, ...]:
-    if (
-        not isinstance(value, str)
-        or not value
-        or value.startswith(("/", "\\"))
-        or "\\" in value
-        or "\x00" in value
-    ):
+    try:
+        parsed = parse_archive_relative_path(value)
+    except ArchiveRelativePathError as exc:
+        raise ImportBusinessPlanError(
+            f"{label} is not a canonical relative path"
+        ) from exc
+    if parsed.source_flavor != "posix" or parsed.canonical != value:
         raise ImportBusinessPlanError(f"{label} is not a canonical relative path")
-    parts = tuple(value.split("/"))
-    if any(part in {"", ".", ".."} or ":" in part for part in parts):
-        raise ImportBusinessPlanError(f"{label} is not a canonical relative path")
-    if "/".join(parts) != value:
-        raise ImportBusinessPlanError(f"{label} is not a canonical relative path")
-    return parts
+    return parsed.parts
 
 
 def _hash(value: Any) -> str:
     return hashlib.sha256(json.dumps(_plain(value), ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-
-
-def _hash_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _sha(value: Any) -> bool:

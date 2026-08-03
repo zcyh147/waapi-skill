@@ -4,7 +4,6 @@ import copy
 import json
 import os
 import shlex
-import subprocess
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from types import SimpleNamespace
@@ -31,6 +30,10 @@ from tests.semantic.support.codex_eval_fixtures import (
     normalize_typed_import_object_path,
 )
 from wwise_waapi.transactions import confirmation_token_for
+from wwise_waapi.platform_commands import (
+    WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    encode_windows_powershell_argv,
+)
 
 
 GATEWAY_CONTRACT = "waapi-skill.gateway-result/v1"
@@ -73,8 +76,8 @@ def _fake_trusted_next_command(
     if requires_explicit_user_confirmation:
         result["requires_explicit_user_confirmation"] = True
     if os.name == "nt":
-        result["shell_family"] = "windows-cmd"
-        shell_command = subprocess.list2cmdline(full_argv)
+        result["shell_family"] = WINDOWS_POWERSHELL_ENCODED_FAMILY
+        shell_command = encode_windows_powershell_argv(full_argv)
     else:
         result["shell_family"] = "posix-sh"
         shell_command = shlex.join(full_argv)

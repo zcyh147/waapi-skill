@@ -6,7 +6,6 @@ import os
 import re
 import shlex
 import shutil
-import subprocess
 import sys
 import threading
 from collections import deque
@@ -26,6 +25,11 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
     OPERATION_REQUEST_CONTRACT,
     UNDO_GROUP_INNER_URIS_BY_VERSION,
     parse_operation_request,
+)
+from wwise_waapi.platform_commands import (  # pyright: ignore[reportMissingImports]
+    WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    decode_windows_powershell_argv,
+    encode_windows_powershell_argv,
 )
 from wwise_waapi.transactions import TransactionState, TransactionStore
 
@@ -85,8 +89,8 @@ def expected_transaction_next_command(
     if requires_later_user_message:
         expected["requires_later_user_message"] = True
     if os.name == "nt":
-        expected["shell_family"] = "windows-cmd"
-        shell_command = subprocess.list2cmdline(full_argv)
+        expected["shell_family"] = WINDOWS_POWERSHELL_ENCODED_FAMILY
+        shell_command = encode_windows_powershell_argv(full_argv)
     else:
         expected["shell_family"] = "posix-sh"
         shell_command = shlex.join(full_argv)
@@ -225,6 +229,59 @@ def local_project(tmp_path: Path) -> dict[str, Any]:
 def z_wire_path(path: Path) -> str:
     resolved = path.resolve()
     return "Z:\\" + "\\".join(resolved.parts[1:])
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Wine Z: mapping is POSIX-only")
+def test_runtime_state_rejects_wine_project_containment(tmp_path: Path) -> None:
+    project_root = (tmp_path / "SampleProject").resolve()
+    project_root.mkdir()
+    project_file = project_root / "SampleProject.wproj"
+    project_file.write_text("<Project/>", encoding="utf-8")
+
+    with pytest.raises(
+        waapi_gateway.GatewayInputError,
+        match="outside the live Wwise project",
+    ):
+        waapi_gateway.require_runtime_directory_outside_project(
+            project_root / ".waapi-skill-state",
+            project={"path": "\\", "filePath": z_wire_path(project_file)},
+        )
+
+
+def test_2021_current_project_requests_filesystem_path(tmp_path: Path) -> None:
+    project_row = {
+        "id": PROJECT_GUID,
+        "name": "SampleProject",
+        "type": "Project",
+        "path": "\\",
+        "filePath": r"Y:\sandbox\SampleProject.wproj",
+    }
+    client = FakeClient(
+        {"ak.wwise.core.object.get": [{"return": [project_row]}]}
+    )
+    dispatcher = waapi_gateway.WwiseDispatcher(client=client)
+
+    observed, _call = waapi_gateway.current_project(
+        dispatcher,
+        connection=waapi_gateway.GatewayConnection(
+            host="127.0.0.1",
+            port=8080,
+            version_hint="2021.1",
+            evidence_dir=tmp_path / "evidence",
+            timeout=10.0,
+            deadline=waapi_gateway.GatewayDeadline.start(10.0),
+        ),
+        version="2021.1",
+    )
+
+    assert observed == project_row
+    assert client.calls == [
+        (
+            "ak.wwise.core.object.get",
+            {"waql": "from type Project take 1"},
+            {"return": ["id", "name", "type", "path", "filePath"]},
+        )
+    ]
 
 
 def parent_row() -> dict[str, Any]:
@@ -2033,8 +2090,10 @@ def test_transaction_next_command_keeps_one_copy_source_on_windows(
         ["execute", "tx1-windows"],
     )
 
-    assert payload["shell_family"] == "windows-cmd"
-    assert payload["shell_command"] == subprocess.list2cmdline(payload["full_argv"])
+    assert payload["shell_family"] == WINDOWS_POWERSHELL_ENCODED_FAMILY
+    assert decode_windows_powershell_argv(payload["shell_command"]) == tuple(
+        payload["full_argv"]
+    )
     assert payload["copy_instruction"] == {
         "contract": "waapi-skill.gateway-command-copy-instruction/v1",
         "source_field": "shell_command",
@@ -6405,7 +6464,7 @@ def test_tab_import_wire_path_selection_rejects_audit_or_dispatch_drift(
     os.name == "nt",
     reason="Wine host path translation is POSIX-only",
 )
-def test_local_wine_cli_mapping_failure_requires_repreview_before_execution_start(
+def test_local_wine_unmappable_project_path_blocks_preview_before_state_write(
     tmp_path: Path,
 ) -> None:
     state_dir = tmp_path / "wine-cli-failure-state"
@@ -6423,49 +6482,28 @@ def test_local_wine_cli_mapping_failure_requires_repreview_before_execution_star
     (io_root / "output").mkdir(parents=True)
     unsupported_project = project(path=r"C:\Projects\SampleProject.wproj")
     request = convert_external_source_call_request(io_root)
-    transaction = preview(
-        request,
-        tmp_path=tmp_path,
-        state_dir=state_dir,
-        client=FakeClient(
-            {
-                "ak.wwise.core.getInfo": [wine_live_info()],
-                "ak.wwise.core.getProjectInfo": [unsupported_project],
-            }
-        ),
-    )
-    confirm(
-        transaction["transaction_id"],
-        transaction["artifact_hash"],
-        tmp_path=tmp_path,
-        state_dir=state_dir,
-    )
-    execute_client = FakeClient(
+    client = FakeClient(
         {
             "ak.wwise.core.getInfo": [wine_live_info()],
             "ak.wwise.core.getProjectInfo": [unsupported_project],
         }
     )
 
-    execute_exit, execute_payload = execute(
-        ["execute", transaction["transaction_id"]],
+    exit_code, payload = execute(
+        ["preview", "--request-json", json.dumps(request)],
         tmp_path=tmp_path,
         state_dir=state_dir,
-        client=execute_client,
+        client=client,
     )
 
-    assert execute_exit == 2
-    assert execute_payload["status"] == "repreview_required"
-    assert execute_payload["state"] == TransactionState.REPREVIEW_REQUIRED.value
-    assert execute_payload["error_code"] == "WIRE_PATH_DRIVE_UNSUPPORTED"
-    assert execute_payload["executed"] is False
-    assert [call[0] for call in execute_client.calls] == [
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert "cannot be localized safely" in payload["message"]
+    assert [call[0] for call in client.calls] == [
         "ak.wwise.core.getInfo",
         "ak.wwise.core.getProjectInfo",
     ]
-    events = TransactionStore(state_dir).read_events(transaction["transaction_id"])
-    assert all(event["event_type"] != "execution_started" for event in events)
-    assert events[-1]["event_type"] == "repreview_required"
+    assert not state_dir.exists()
 
 
 def test_generate_soundbank_verify_uses_sealed_result_context_and_runtime_without_project_probe(

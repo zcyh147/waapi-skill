@@ -20,6 +20,7 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
     OPERATION_REQUEST_CONTRACT,
     PREPARED_OPERATION_CONTRACT,
     OperationContractError,
+    _import_file_path_key,
     parse_operation_request,
     prepare_operation,
     validate_prepared_roles,
@@ -49,6 +50,22 @@ LIVE_SOUND_TYPES = {
         }
     ]
 }
+
+
+def test_import_file_path_key_uses_the_path_own_filesystem_rules() -> None:
+    assert _import_file_path_key(r"C:\Originals\Mix.wav") == (
+        _import_file_path_key("c:/originals/MIX.WAV")
+    )
+    assert _import_file_path_key(r"\\StudioNas\Originals\Mix.wav") == (
+        _import_file_path_key("//studionas/originals/MIX.WAV")
+    )
+    assert _import_file_path_key("/Originals/Mix.wav") != (
+        _import_file_path_key("/Originals/mix.wav")
+    )
+    assert _import_file_path_key(r"/Originals/a\b.wav") != (
+        _import_file_path_key("/Originals/a/b.wav")
+    )
+    assert _import_file_path_key("relative/Mix.wav") is None
 
 
 class ScriptedReader:
@@ -1681,6 +1698,45 @@ def test_originals_subfolder_rejects_symlink_root_or_path_components(
     target = _target(source, path, requested_originals_subfolder="Dialog")
     live = _object_row(path, copied, relative_path="Dialog/symlink.wav")
     live["originalFilePath"] = str(reported_copied.absolute())
+
+    verified = verify_prepared_operation(
+        _prepared(
+            version="2022.1",
+            targets=[target],
+            originals_root=originals_root,
+        ),
+        execution_result=_result("2022.1", [live], [copied]),
+        read_call=ScriptedReader([{"return": [live]}]),
+    )
+
+    subfolder = next(
+        item
+        for item in verified.assertions
+        if item["name"] == "import target 0 Originals subfolder matches"
+    )
+    assert verified.status == "verification_failed"
+    assert subfolder["passed"] is False
+    assert subfolder["evidence"]["error"]["error_code"] == "UNSAFE_ORIGINALS_PATH"
+
+
+def test_originals_subfolder_rejects_windows_junction_component(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = _media(tmp_path, "junction-source.wav")
+    originals_root = tmp_path / "Originals"
+    junction = originals_root / "Dialog"
+    copied = _media(junction, "junction.wav")
+    real_is_junction = getattr(Path, "is_junction", lambda _self: False)
+    monkeypatch.setattr(
+        Path,
+        "is_junction",
+        lambda self: self == junction or real_is_junction(self),
+        raising=False,
+    )
+    path = OLD_ROOT + r"\Junction_component"
+    target = _target(source, path, requested_originals_subfolder="Dialog")
+    live = _object_row(path, copied, relative_path="Dialog/junction.wav")
 
     verified = verify_prepared_operation(
         _prepared(

@@ -21,6 +21,7 @@ import os
 import re
 import secrets
 import shutil
+import stat
 import time
 import uuid
 from contextlib import contextmanager
@@ -31,6 +32,7 @@ from pathlib import Path
 from typing import Any, Iterator, Mapping, Sequence
 
 from .canonical import canonical_json_bytes, canonical_sha256
+from .filesystem_security import path_is_link_or_reparse
 
 try:  # pragma: no branch - the absence is exercised by an explicit test hook.
     import fcntl as _fcntl
@@ -68,6 +70,7 @@ _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _LOCK_REGION_BYTES = 1
 _WINDOWS_LOCK_RETRY_SECONDS = 0.05
 _WINDOWS_LOCK_VIOLATION = 33
+_DURABLE_READ_CHUNK_BYTES = 1024 * 1024
 
 
 class TransactionError(RuntimeError):
@@ -357,7 +360,16 @@ def resolve_state_directory(state_dir: Path | None = None) -> Path:
                 f"Pass state_dir=Path(...) or set {STATE_DIRECTORY_ENV}."
             )
         candidate = Path(configured)
-    return candidate.expanduser().resolve()
+    # Keep the lexical path until the store has checked every existing parent.
+    # `resolve()` would follow a Windows junction or POSIX symlink before the
+    # write boundary had a chance to reject it.
+    expanded = candidate.expanduser()
+    absolute = expanded if expanded.is_absolute() else Path.cwd() / expanded
+    if any(component == ".." for component in absolute.parts):
+        raise StateCorruptionError(
+            f"State directory must not contain parent traversal: {absolute}"
+        )
+    return absolute
 
 
 def _encode_crockford(value: int, *, length: int) -> str:
@@ -861,23 +873,26 @@ class TransactionStore:
         )
 
     def _ensure_store_directories(self) -> None:
-        self.state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        _ensure_plain_directory_tree(self.state_dir, label="State directory")
         for directory in (self.transactions_dir, self.locks_dir):
-            if directory.is_symlink():
-                raise StateCorruptionError(f"Store directory cannot be a symlink: {directory}")
-            directory.mkdir(mode=0o700, parents=False, exist_ok=True)
+            _ensure_plain_directory_tree(directory, label="Store directory")
 
     @contextmanager
     def _transaction_lock(self, transaction_id: str) -> Iterator[None]:
         backend = _select_file_lock_backend(_lock_platform_name())
         lock_path = self.locks_dir / f"{transaction_id}.lock"
-        if lock_path.is_symlink():
-            raise StateCorruptionError(f"Transaction lock cannot be a symlink: {lock_path}")
+        if _lexists(lock_path):
+            _require_plain_regular_file(lock_path, label="Transaction lock")
         flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_BINARY", 0)
         if hasattr(os, "O_NOFOLLOW"):
             flags |= os.O_NOFOLLOW
         fd = os.open(lock_path, flags, 0o600)
         try:
+            _require_opened_plain_regular_file(
+                lock_path,
+                descriptor=fd,
+                label="Transaction lock",
+            )
             # Windows byte-range locks may extend beyond EOF.  Keep a newly
             # created lock file empty so concurrent first users do not write
             # byte zero before either one has acquired the lock protecting it.
@@ -916,8 +931,8 @@ class TransactionStore:
 
     def _transaction_dir(self, transaction_id: str) -> Path:
         path = self.transactions_dir / transaction_id
-        if path.is_symlink():
-            raise StateCorruptionError(f"Transaction directory cannot be a symlink: {path}")
+        if _lexists(path):
+            _require_plain_directory(path, label="Transaction directory")
         return path
 
     def _preview_path(self, transaction_id: str) -> Path:
@@ -1026,15 +1041,20 @@ class TransactionStore:
 
     def _read_events_unlocked(self, transaction_id: str, artifact_hash: str) -> list[dict[str, Any]]:
         path = self._events_path(transaction_id)
-        if not path.is_file():
+        if not _lexists(path):
             raise TransactionNotFound(f"Transaction {transaction_id!r} does not exist or has no events")
         events: list[dict[str, Any]] = []
         previous_event_hash = ""
         previous_state: str | None = None
         try:
-            lines = path.read_text(encoding="utf-8").splitlines()
-        except OSError as error:
-            raise TransactionError(f"Could not read transaction events from {path}: {error}") from error
+            lines = _read_plain_regular_bytes(
+                path,
+                label="Transaction event journal",
+            ).decode("utf-8").splitlines()
+        except UnicodeDecodeError as error:
+            raise StateCorruptionError(
+                f"Could not decode transaction events from {path}: {error}"
+            ) from error
         for line_number, line in enumerate(lines, start=1):
             if not line:
                 raise StateCorruptionError(f"Blank event at {path}:{line_number}")
@@ -1070,13 +1090,36 @@ class TransactionStore:
             | os.O_APPEND
             | getattr(os, "O_BINARY", 0)
         )
-        fd = os.open(path, flags, 0o600)
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        if _lexists(path):
+            _require_plain_regular_file(path, label="Transaction event journal")
         try:
+            fd = os.open(path, flags, 0o600)
+        except OSError as exc:
+            raise StateCorruptionError(
+                f"Transaction event journal could not be opened safely: {path}: {exc}"
+            ) from exc
+        try:
+            _require_opened_plain_regular_file(
+                path,
+                descriptor=fd,
+                label="Transaction event journal",
+            )
             view = memoryview(payload)
             while view:
                 written = os.write(fd, view)
+                if written <= 0:
+                    raise TransactionError(
+                        f"Transaction event journal write made no progress: {path}"
+                    )
                 view = view[written:]
             os.fsync(fd)
+            _require_opened_plain_regular_file(
+                path,
+                descriptor=fd,
+                label="Transaction event journal",
+            )
         finally:
             os.close(fd)
 
@@ -1214,15 +1257,75 @@ def _validate_non_empty_string(value: Any, *, field: str) -> str:
 
 
 def _read_json_object(path: Path, transaction_id: str) -> dict[str, Any]:
-    if not path.is_file():
+    if not _lexists(path):
         raise TransactionNotFound(f"Transaction {transaction_id!r} does not exist or is incomplete")
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as error:
+        payload = json.loads(
+            _read_plain_regular_bytes(path, label="Durable transaction JSON").decode(
+                "utf-8"
+            )
+        )
+    except (json.JSONDecodeError, UnicodeDecodeError) as error:
         raise StateCorruptionError(f"Could not read durable JSON from {path}: {error}") from error
     if not isinstance(payload, dict):
         raise StateCorruptionError(f"Durable JSON must be an object: {path}")
     return payload
+
+
+def _read_plain_regular_bytes(path: Path, *, label: str) -> bytes:
+    """Read one durable file without following or racing a path redirect."""
+
+    _require_plain_regular_file(path, label=label)
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise StateCorruptionError(
+            f"{label} could not be opened safely: {path}: {exc}"
+        ) from exc
+    try:
+        _require_opened_plain_regular_file(
+            path,
+            descriptor=descriptor,
+            label=label,
+        )
+        before = os.fstat(descriptor)
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(descriptor, _DURABLE_READ_CHUNK_BYTES)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(descriptor)
+        if not _same_regular_file_snapshot(before, after):
+            raise StateCorruptionError(f"{label} changed while it was read: {path}")
+        _require_opened_plain_regular_file(
+            path,
+            descriptor=descriptor,
+            label=label,
+        )
+        return b"".join(chunks)
+    except OSError as exc:
+        raise StateCorruptionError(f"{label} could not be read: {path}: {exc}") from exc
+    finally:
+        os.close(descriptor)
+
+
+def _same_regular_file_snapshot(
+    left: os.stat_result,
+    right: os.stat_result,
+) -> bool:
+    return (
+        stat.S_ISREG(left.st_mode)
+        and stat.S_ISREG(right.st_mode)
+        and os.path.samestat(left, right)
+        and left.st_size == right.st_size
+        and left.st_mtime_ns == right.st_mtime_ns
+        and left.st_ctime_ns == right.st_ctime_ns
+        and left.st_nlink == right.st_nlink == 1
+    )
 
 
 def _atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
@@ -1267,6 +1370,79 @@ def _fsync_directory(path: Path) -> None:
         pass
     finally:
         os.close(fd)
+
+
+def _ensure_plain_directory_tree(path: Path, *, label: str) -> None:
+    """Create one directory tree without traversing a link/reparse component."""
+
+    if not path.is_absolute():
+        raise StateCorruptionError(f"{label} must be absolute: {path}")
+    current = Path(path.anchor)
+    for component in path.parts[1:]:
+        current /= component
+        if not _lexists(current):
+            try:
+                current.mkdir(mode=0o700, parents=False)
+            except FileExistsError:
+                # A concurrent creator won the race; attest what now exists.
+                pass
+            except OSError as exc:
+                raise StateCorruptionError(
+                    f"Could not create {label.lower()} component {current}: {exc}"
+                ) from exc
+        _require_plain_directory(current, label=label)
+
+
+def _require_plain_directory(path: Path, *, label: str) -> None:
+    try:
+        metadata = path.lstat()
+    except OSError as exc:
+        raise StateCorruptionError(f"{label} is unavailable: {path}: {exc}") from exc
+    if path_is_link_or_reparse(path, metadata=metadata):
+        raise StateCorruptionError(
+            f"{label} cannot be a link, junction, or reparse point: {path}"
+        )
+    if not stat.S_ISDIR(metadata.st_mode):
+        raise StateCorruptionError(f"{label} must be a directory: {path}")
+
+
+def _require_plain_regular_file(path: Path, *, label: str) -> os.stat_result:
+    try:
+        metadata = path.lstat()
+    except OSError as exc:
+        raise StateCorruptionError(f"{label} is unavailable: {path}: {exc}") from exc
+    if path_is_link_or_reparse(path, metadata=metadata):
+        raise StateCorruptionError(
+            f"{label} cannot be a link, junction, or reparse point: {path}"
+        )
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+        raise StateCorruptionError(
+            f"{label} must be one non-hard-linked regular file: {path}"
+        )
+    return metadata
+
+
+def _require_opened_plain_regular_file(
+    path: Path,
+    *,
+    descriptor: int,
+    label: str,
+) -> None:
+    path_metadata = _require_plain_regular_file(path, label=label)
+    try:
+        opened_metadata = os.fstat(descriptor)
+    except OSError as exc:
+        raise StateCorruptionError(
+            f"Could not attest opened {label.lower()} {path}: {exc}"
+        ) from exc
+    if (
+        not stat.S_ISREG(opened_metadata.st_mode)
+        or opened_metadata.st_nlink != 1
+        or not os.path.samestat(path_metadata, opened_metadata)
+    ):
+        raise StateCorruptionError(
+            f"{label} path changed while it was being opened: {path}"
+        )
 
 
 def _lexists(path: Path) -> bool:

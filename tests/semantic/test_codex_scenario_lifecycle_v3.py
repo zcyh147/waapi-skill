@@ -209,6 +209,29 @@ def test_launch_environment_uses_only_fresh_case_owned_user_state(
     controller.finish("PASS")
 
 
+def test_launch_environment_baseline_rejects_windows_junction(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "private-home"
+    junction = root / "redirected"
+    junction.mkdir(parents=True)
+    (junction / "outside.txt").write_text("outside\n", encoding="utf-8")
+    real_is_junction = getattr(Path, "is_junction", lambda _self: False)
+    monkeypatch.setattr(
+        Path,
+        "is_junction",
+        lambda self: self == junction or real_is_junction(self),
+        raising=False,
+    )
+
+    with pytest.raises(
+        lifecycle_v3.ScenarioLifecycleError,
+        match="junction or reparse point",
+    ):
+        lifecycle_v3._collect_symlink_pairs(root)
+
+
 def test_lifecycle_binds_explicit_effective_wine_prefix_to_private_home(
     monkeypatch, tmp_path
 ) -> None:
