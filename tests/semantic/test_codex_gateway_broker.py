@@ -1718,6 +1718,48 @@ def test_ordinary_execute_exact_indeterminate_is_a_terminal_nonpassing_prefix(
         assert broker.evidence().terminal_state == "FAILED"
 
 
+def test_exact_indeterminate_execute_survives_trusted_observer_without_rewrite(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    observed: list[tuple[str, dict[str, object]]] = []
+
+    def observer(step, payload, _state_directory, _evidence_directory) -> None:
+        observed.append((step.name, dict(payload)))
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(
+            ExpectedGatewayStep(
+                "execute",
+                "execute",
+                ("tx",),
+                allowed_exit_codes=(0, 2),
+            ),
+            ExpectedGatewayStep("verify", "verify", ("tx",)),
+        ),
+        trusted_step_observer=observer,
+        runner_environment={
+            "PATH": os.environ.get("PATH", os.defpath),
+            "FAKE_GATEWAY_MODE": "terminal-indeterminate",
+        },
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, ["execute", "tx"])
+        evidence = broker.evidence()
+        record = evidence.records[0]
+
+        assert result.returncode == 2
+        assert evidence.terminal_state == "INDETERMINATE"
+        assert evidence.terminal_indeterminate is True
+        assert evidence.consumed_step_names == ("execute",)
+        assert record.succeeded is True
+        assert record.runner_exit_code == 2
+        assert record.exit_code == 2
+        assert record.payload_error == ""
+        assert observed == [("execute", dict(record.payload or {}))]
+
+
 def test_ordinary_execute_rejects_non_exact_exit_two_error(tmp_path: Path) -> None:
     skill = make_fake_skill(tmp_path)
     with CodexGatewayBroker(
@@ -3762,6 +3804,107 @@ def test_broker_accepts_only_declared_read_only_pair_linearizations(
         assert reconciliation.passed is True
 
 
+@pytest.mark.parametrize(
+    "runtime_order",
+    (
+        ("relationship.output_bus.01", "relationship.output_bus.02"),
+        ("relationship.output_bus.02", "relationship.output_bus.01"),
+    ),
+)
+def test_broker_accepts_declared_closed_exact_id_query_pair_linearizations(
+    tmp_path: Path,
+    runtime_order: tuple[str, str],
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    ids = {
+        "relationship.output_bus.01": "{11111111-1111-1111-1111-111111111111}",
+        "relationship.output_bus.02": "{22222222-2222-2222-2222-222222222222}",
+    }
+
+    def step(name: str) -> ExpectedGatewayStep:
+        return ExpectedGatewayStep(
+            name,
+            "query-object",
+            (
+                "--object-id",
+                ids[name],
+                "--return-field",
+                "id",
+                "--return-field",
+                "name",
+                "--return-field",
+                "type",
+                "--return-field",
+                "path",
+            ),
+        )
+
+    canonical = tuple(ids)
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=tuple(step(name) for name in canonical),
+        commutative_read_only_step_groups=(canonical,),
+        transport="tcp",
+    ) as broker:
+        completed = [
+            run_model_command(
+                broker,
+                [
+                    "query-object",
+                    "--object-id",
+                    ids[name],
+                    "--return-field",
+                    "id",
+                    "--return-field",
+                    "name",
+                    "--return-field",
+                    "type",
+                    "--return-field",
+                    "path",
+                ],
+            )
+            for name in runtime_order
+        ]
+
+        assert [result.returncode for result in completed] == [0, 0]
+        evidence = broker.evidence()
+        assert evidence.consumed_step_names == runtime_order
+        assert evidence.passed is True
+
+
+def test_broker_rejects_commutative_query_pair_outside_closed_identity_shape(
+    tmp_path: Path,
+) -> None:
+    broad = ExpectedGatewayStep(
+        "broad",
+        "query-object",
+        ("--path", r"\Actor-Mixer Hierarchy", "--all-results"),
+    )
+    exact = ExpectedGatewayStep(
+        "exact",
+        "query-object",
+        (
+            "--object-id",
+            "{11111111-1111-1111-1111-111111111111}",
+            "--return-field",
+            "id",
+            "--return-field",
+            "name",
+            "--return-field",
+            "type",
+            "--return-field",
+            "path",
+        ),
+    )
+
+    with pytest.raises(ValueError, match="closed exact-ID"):
+        CodexGatewayBroker(
+            skill_source=tmp_path / "waapi-skill",
+            expected_steps=(broad, exact),
+            commutative_read_only_step_groups=(("broad", "exact"),),
+        )
+
+
 def test_broker_commutative_pair_still_rejects_duplicates_and_preview_races(
     tmp_path: Path,
 ) -> None:
@@ -4906,6 +5049,32 @@ def _audio_import_equivalence_broker(
     return broker, preview_step
 
 
+def test_audio_import_absolute_paths_keep_added_import_location_wire_significant(
+    tmp_path: Path,
+) -> None:
+    expected, _ = _audio_import_equivalence_requests()
+    broker, preview_step = _audio_import_equivalence_broker(
+        tmp_path,
+        expected,
+    )
+    with_inferred_common_parent = json.loads(json.dumps(expected))
+    with_inferred_common_parent["arguments"]["defaults"]["import_location"] = {
+        "kind": "path",
+        "value": r"\Actor-Mixer Hierarchy",
+    }
+
+    with pytest.raises(GatewayInvocationError, match="semantically equal"):
+        broker._validate_step(  # noqa: SLF001
+            preview_step,
+            (
+                "preview",
+                "--apply",
+                "--request-json",
+                json.dumps(with_inferred_common_parent, separators=(",", ":")),
+            ),
+        )
+
+
 def _reference_activation_equivalence_broker(
     tmp_path: Path,
 ) -> tuple[
@@ -5440,6 +5609,117 @@ def test_audio_import_non_media_or_non_sound_syntax_aliases_remain_exact(
     )
 
     assert not broker_module._metadata_bound_json_equal(  # noqa: SLF001
+        actual,
+        argument,
+    )
+
+
+def test_audio_import_canonical_structure_and_sound_tokens_pass_exact_broker() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": (
+                        r"\Actor-Mixer Hierarchy\Default Work Unit\Snow"
+                    ),
+                    "object_type": "RandomSequenceContainer",
+                },
+                {
+                    "object_path": (
+                        r"\Actor-Mixer Hierarchy\Default Work Unit\Snow\Snow_Step_01"
+                    ),
+                    "object_type": "Sound SFX",
+                    "audio_file": "/owned/snow_step_01.wav",
+                    "import_language": "SFX",
+                },
+            ],
+            "import_operation": "createNew",
+        },
+    }
+    argument = SemanticJsonArgument(request)
+
+    assert broker_module._semantic_json_equal(  # noqa: SLF001
+        json.loads(json.dumps(request)),
+        argument,
+    )
+
+
+def _audio_import_default_operation_request() -> dict[str, object]:
+    return {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": (
+                        r"\Actor-Mixer Hierarchy\Default Work Unit\Snow\Snow_Step_01"
+                    ),
+                    "object_type": "Sound SFX",
+                    "audio_file": "/owned/snow_step_01.wav",
+                    "import_language": "SFX",
+                    "properties": [
+                        {"name": "IsLoopingEnabled", "value": True},
+                        {"name": "Volume", "value": -2.0},
+                    ],
+                }
+            ],
+            "import_operation": "createNew",
+        },
+    }
+
+
+def test_audio_import_default_operation_equivalence_allows_only_omission() -> None:
+    expected = _audio_import_default_operation_request()
+    argument = SemanticJsonArgument(
+        expected,
+        equivalence="audio_import_default_operation_v1",
+    )
+    omitted = json.loads(json.dumps(expected))
+    del omitted["arguments"]["import_operation"]
+
+    assert broker_module._semantic_json_equal(omitted, argument)  # noqa: SLF001
+    assert broker_module._semantic_json_equal(expected, argument)  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "promote_defaults",
+        "reverse_properties",
+        "object_type_alias",
+        "different_operation",
+        "unknown_argument",
+    ),
+)
+def test_audio_import_default_operation_equivalence_keeps_other_fields_exact(
+    mutation: str,
+) -> None:
+    expected = _audio_import_default_operation_request()
+    actual = json.loads(json.dumps(expected))
+    arguments = actual["arguments"]
+    row = arguments["imports"][0]
+    if mutation == "promote_defaults":
+        arguments["defaults"] = {
+            "properties": row.pop("properties"),
+        }
+    elif mutation == "reverse_properties":
+        row["properties"].reverse()
+    elif mutation == "object_type_alias":
+        row["object_type"] = "Sound"
+    elif mutation == "different_operation":
+        arguments["import_operation"] = "replaceExisting"
+    else:
+        arguments["unexpected"] = True
+    argument = SemanticJsonArgument(
+        expected,
+        equivalence="audio_import_default_operation_v1",
+    )
+
+    assert not broker_module._semantic_json_equal(  # noqa: SLF001
         actual,
         argument,
     )

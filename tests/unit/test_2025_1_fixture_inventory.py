@@ -94,7 +94,7 @@ def test_2025_1_fixture_manifest_hashes_match_committed_files() -> None:
     _assert_manifest_matches_committed_payload(manifest, actual_paths)
 
 
-def test_2025_1_fixture_contains_only_authored_project_source_files() -> None:
+def test_2025_1_fixture_contains_only_allowed_source_files() -> None:
     metadata = _read_json(METADATA_PATH)
     allowed_patterns = metadata["allowed_committed_file_patterns"]
     excluded_patterns = metadata["excluded_generated_file_patterns"]
@@ -109,6 +109,14 @@ def test_2025_1_fixture_contains_only_authored_project_source_files() -> None:
         assert not any(fnmatch.fnmatch(path.name, pattern) or fnmatch.fnmatch(rel, pattern) for pattern in excluded_patterns), rel
         assert not any(part in excluded_dirs for part in path.relative_to(ORG_FIXTURE_ROOT).parts), rel
         assert path.suffix.lower() not in DISALLOWED_RUNTIME_SUFFIXES, rel
+
+
+def test_2025_1_fixture_wav_assets_are_lfs_tracked_by_gitattributes() -> None:
+    attributes = (REPO_ROOT / ".gitattributes").read_text(encoding="utf-8")
+    wav_files = list(ORG_FIXTURE_ROOT.rglob("*.wav"))
+
+    assert wav_files
+    assert "*.wav filter=lfs diff=lfs merge=lfs -text" in attributes
 
 
 def test_2025_1_fixture_manifest_contains_no_generated_artifacts() -> None:

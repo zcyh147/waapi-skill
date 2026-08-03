@@ -170,7 +170,58 @@ passed in `current-r1`. All six current prompt units therefore have passing
 evidence across these roots, but there is no single repaired-candidate 6/6
 run. All eight lifecycle records retained identical source hashes and mtimes;
 the seven passing sandboxes were removed and the one failed sandbox is sealed
-and quarantined.
+and quarantined. Those V1 roots do not validate the newer V2 fixture, routing,
+or workflow contracts.
+
+The newer `integration_workflows_v2_cross_version_6` profile is defined by
+`tests/semantic/data/integration-workflows-v2/profile.json`. Its committed
+2022.1 and 2025.1 SampleProject sources contain the fixed `WAAPI Skill
+Integration V2` graph and required media. The profile runs these workflows on
+both versions:
+
+- safe batch reimport plus one new Rifle variation;
+- Footsteps Snow import, Switch Container assignment, and obsolete-assignment
+  removal;
+- scoped Weapons audit followed by one confirmed batch cleanup.
+
+That is three workflows times two versions: six fresh memory-off Codex tasks,
+16 user turns, and eight separately previewed transactions. The runner locks
+the profile to `gpt-5.6-terra`, medium reasoning, the default service tier, and
+sequential execution. Every unit copies the committed source to its own
+sandbox before Wwise starts. The lifecycle compares the committed source's
+full-tree hash and project-file mtime before and after the attempt, deletes the
+sandbox after `PASS`, and seals and quarantines failed, blocked, retryable, or
+indeterminate sandboxes.
+
+The committed baseline manifests record the fixed graph expected in each
+source fixture. Refresh one only from an already-running isolated sandbox copy:
+
+```bash
+skills/waapi-skill/.venv/bin/python \
+  tests/maintenance/collect_integration_workflows_v2_baseline.py \
+  --version 2022.1 \
+  --live-project /absolute/path/to/sandbox/SampleProject.wproj \
+  --write
+```
+
+The command is preview-only without `--write`. The collector neither launches
+Wwise nor mutates a project; all live reads go through the packaged public
+Gateway. It rejects the committed `tests/_org` source (and any overlapping
+path), so prepare the sandbox with the repository lifecycle and open that copy
+before collection. Collect 2022.1 and 2025.1 separately. A valid committed
+baseline is only a fixture prerequisite, not a semantic result. The v1
+campaigns above do not validate this V2 fixture, routing, or workflow contract.
+
+The completed 2026-08-03 V2 evidence is cumulative across frozen roots, not one
+final-candidate 6/6 run. `r8` passed both Rifle units, `r12-2022` passed the
+2022.1 Weapons unit, `r23-2022-footsteps` passed the 2022.1 Footsteps unit, and
+`r24-2025-repairs` passed the 2025.1 Footsteps and Weapons units. All six unique
+units therefore have passing evidence across those roots. Passing sandboxes
+were removed; failed or blocked diagnostic sandboxes were sealed and
+quarantined; every recorded source-project full hash and mtime remained
+unchanged. This evidence grants no per-API coverage credit and proves only the
+exact Rifle, Footsteps, and Weapons workflow paths, not advanced WAQL or
+unrelated routes.
 
 The focused `modification_policy_9` profile reuses the existing
 `OBJ22-F-CREATE-01` fixture, runner, broker, lifecycle, and business oracle. It
@@ -241,6 +292,7 @@ The separately approved V3 executable profiles are:
 | `heavy_cross_version_80` | 80 | 145 | Real sandboxed business-oracle coverage for the 16 implemented heavy APIs |
 | `compound_heavy_cross_version_24` | 24 | 48 | Complex batch composition and real business assertions on Wwise 2022.1 and 2025.1 |
 | `integration_workflows_cross_version_6` | 6 | 20 | Three prewritten cross-operation integration workflows on Wwise 2022.1 and 2025.1; no additional per-API coverage credit |
+| `integration_workflows_v2_cross_version_6` | 6 | 16 | Three fixed-baseline workflows on Wwise 2022.1 and 2025.1; eight previewed transactions and no additional per-API coverage credit |
 | `modification_policy_9` | 9 | 15 | Three isolated repetitions of each canonical project-modification policy on one reviewed object.create business case |
 
 From the repository root, run each profile into a distinct campaign directory.
@@ -261,6 +313,7 @@ skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py -
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile heavy_cross_version_80 --case-id OBJ22-F-GET-01 --version 2022.1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-heavy-v3-pilot-object-get
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile compound_heavy_cross_version_24 --suite tests/semantic/data/compound-heavy-v1/profile.json --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-compound-heavy-v1
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile integration_workflows_cross_version_6 --suite tests/semantic/data/integration-workflows-v1/profile.json --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-integration-workflows-v1-terra
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile integration_workflows_v2_cross_version_6 --suite tests/semantic/data/integration-workflows-v2/profile.json --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-integration-workflows-v2-terra
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile modification_policy_9 --campaign-root skills/waapi-skill-workspace/campaign-modification-policy-9
 ```
 
@@ -339,6 +392,13 @@ matching SampleProject configured by the local live-environment file. The
 trusted runner owns Wwise fixture creation, sandbox mutation, direct readback,
 transaction state, and dispatcher evidence; the evaluated model cannot write
 those paths.
+
+For `integration_workflows_v2_cross_version_6`, the live config points to the
+committed 2022.1 or 2025.1 fixed source, but the lifecycle always copies that
+source before launch. The baseline manifest must match the committed source;
+Wwise and the evaluated model operate only on the unit-owned copy. A source
+full-tree hash or project-mtime drift is a hard lifecycle failure, not a case
+failure that may be graded or repaired in place.
 
 For the five 2022.1 heavy `ak.wwise.cli.generateSoundbank` cases only, the
 trusted prelaunch step makes the private SampleProject copy independent of the
@@ -421,6 +481,7 @@ python -m pytest tests/semantic/test_codex_eval_suite.py tests/semantic/test_cod
 python -m pytest tests/semantic/test_codex_eval_grading.py tests/semantic/test_codex_skill_matrix.py tests/semantic/test_docs_semantic_inventory.py -q
 python -m pytest tests/semantic/test_codex_campaign.py tests/semantic/test_codex_campaign_runner.py tests/semantic/test_run_codex_skill_campaign.py -q
 python -m pytest tests/semantic/test_run_codex_skill_campaign_heavy_v3.py -q
+python -m pytest tests/semantic/test_codex_integration_workflows_v2.py tests/semantic/test_codex_integration_profile_wiring_v2.py tests/semantic/test_codex_integration_harness_v2.py tests/semantic/test_codex_integration_original_paths_v2.py tests/semantic/test_codex_integration_rifle_runtime_v2.py tests/semantic/test_codex_integration_footsteps_runtime_v2.py tests/semantic/test_codex_integration_weapons_runtime_v2.py tests/unit/test_collect_integration_workflows_v2_baseline.py -q
 ```
 
 Passing these mocked/offline tests does not prove live semantic capability.

@@ -119,6 +119,14 @@ DEFAULT_INTEGRATION_WORKFLOWS_V1_SUITE = (
     / "integration-workflows-v1"
     / "profile.json"
 )
+DEFAULT_INTEGRATION_WORKFLOWS_V2_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "integration-workflows-v2"
+    / "profile.json"
+)
 DEFAULT_ITERATION_ROOT = SKILL_ROOT.parent / "waapi-skill-workspace" / "iteration-9-v2-matrix"
 DEFAULT_HEAVY_V3_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "heavy-cross-version-80"
@@ -133,6 +141,11 @@ DEFAULT_INTEGRATION_WORKFLOWS_V1_ITERATION_ROOT = (
     SKILL_ROOT.parent
     / "waapi-skill-workspace"
     / "integration-workflows-cross-version-6"
+)
+DEFAULT_INTEGRATION_WORKFLOWS_V2_ITERATION_ROOT = (
+    SKILL_ROOT.parent
+    / "waapi-skill-workspace"
+    / "integration-workflows-v2-cross-version-6"
 )
 DEFAULT_CODEX_BINARY = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
 DEFAULT_AUTH_JSON = Path.home() / ".codex" / "auth.json"
@@ -167,12 +180,14 @@ HEAVY_V3_PROFILE_ID = "heavy_cross_version_80"
 MODIFICATION_POLICY_V3_PROFILE_ID = "modification_policy_9"
 COMPOUND_HEAVY_V1_PROFILE_ID = "compound_heavy_cross_version_24"
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = "integration_workflows_cross_version_6"
+INTEGRATION_WORKFLOWS_V2_PROFILE_ID = "integration_workflows_v2_cross_version_6"
 EXECUTABLE_V3_PROFILE_IDS = frozenset(
     {
         HEAVY_V3_PROFILE_ID,
         MODIFICATION_POLICY_V3_PROFILE_ID,
         COMPOUND_HEAVY_V1_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V1_PROFILE_ID,
+        INTEGRATION_WORKFLOWS_V2_PROFILE_ID,
     }
 )
 HEAVY_V3_RUN_CONFIG_CONTRACT = "waapi-skill.codex-heavy-matrix-config/v3"
@@ -313,6 +328,18 @@ HeavyV3DependencyPreflight = Callable[[], Mapping[str, Any]]
 def load_heavy_v3_units(options: RunnerOptions) -> tuple[Any, ...]:
     """Load and filter the reviewed V3 bundle without importing live runners."""
 
+    if options.profile == INTEGRATION_WORKFLOWS_V2_PROFILE_ID:
+        integration_module = importlib.import_module(
+            "tests.semantic.support.codex_integration_workflows_v2"
+        )
+        profile = integration_module.load_integration_workflows_v2_profile(
+            options.suite_path,
+            unit_ids=options.case_ids,
+            versions=options.versions,
+            require_committed_baselines=True,
+            repo_root=REPO_ROOT,
+        )
+        return tuple(profile.units)
     if options.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID:
         integration_module = importlib.import_module(
             "tests.semantic.support.codex_integration_workflows_v1"
@@ -2739,6 +2766,20 @@ def _q5_normalized_absence_matches_dispatch(
     gateway_payload: Mapping[str, Any],
     dispatcher_row: Mapping[str, Any],
 ) -> bool:
+    normalization_source = _q5_dispatch_normalization_source(dispatcher_row)
+    if normalization_source is None:
+        return False
+    if "call" not in gateway_payload:
+        return (
+            gateway_payload.get("ok") is True
+            and gateway_payload.get("status") == "ok"
+            and gateway_payload.get("command") == "query-object"
+            and gateway_payload.get("query_bound") == {"mode": "exact-object"}
+            and type(gateway_payload.get("count")) is int
+            and gateway_payload.get("count") == 0
+            and gateway_payload.get("objects") == []
+        )
+
     call = gateway_payload.get("call")
     if not isinstance(call, Mapping):
         return False
@@ -2758,13 +2799,6 @@ def _q5_normalized_absence_matches_dispatch(
         "evidence_path",
     }:
         return False
-    error_uri = dispatcher_row.get("waapi_error_uri")
-    expected_source = {
-        "ak.wwise.query.unknown_object": "ak.wwise.query.unknown_object",
-        "ak.wwise.query.invalid_query": "ak.wwise.query.invalid_query:object-not-found",
-    }.get(error_uri)
-    if expected_source is None:
-        return False
     provenance_fields = (
         "error_code",
         "waapi_error_uri",
@@ -2780,11 +2814,39 @@ def _q5_normalized_absence_matches_dispatch(
         and call.get("api") == OBJECT_GET_URI
         and call.get("result") == {"return": []}
         and normalization.get("kind") == "exact-object-absence"
-        and normalization.get("source") == expected_source
-        and dispatcher_row.get("ok") is False
-        and dispatcher_row.get("error_code") == "WaapiRequestFailed"
+        and normalization.get("source") == normalization_source
         and all(original.get(field) == dispatcher_row.get(field) for field in provenance_fields)
     )
+
+
+def _q5_dispatch_normalization_source(
+    dispatcher_row: Mapping[str, Any],
+) -> str | None:
+    """Return the exact gateway normalization source for trusted Q5 evidence."""
+
+    if (
+        dispatcher_row.get("ok") is not False
+        or dispatcher_row.get("error_code") != "WaapiRequestFailed"
+        or "result" not in dispatcher_row
+        or dispatcher_row.get("result") is not None
+        or not isinstance(dispatcher_row.get("evidence_path"), str)
+        or not dispatcher_row.get("evidence_path")
+        or not isinstance(dispatcher_row.get("message"), str)
+        or not dispatcher_row.get("message")
+    ):
+        return None
+    error_uri = dispatcher_row.get("waapi_error_uri")
+    if error_uri == "ak.wwise.query.unknown_object":
+        return error_uri
+    details = dispatcher_row.get("waapi_error_details")
+    if (
+        error_uri == "ak.wwise.query.invalid_query"
+        and isinstance(details, Mapping)
+        and isinstance(details.get("message"), str)
+        and "object not found" in details["message"].casefold()
+    ):
+        return "ak.wwise.query.invalid_query:object-not-found"
+    return None
 
 
 def final_query_response_matches(text: str, snapshot: OracleSnapshot) -> bool:
@@ -3222,7 +3284,13 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
     is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
     is_integration_v1 = args.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID
-    is_terra_v3 = is_policy_v3 or is_compound_v1 or is_integration_v1
+    is_integration_v2 = args.profile == INTEGRATION_WORKFLOWS_V2_PROFILE_ID
+    is_terra_v3 = (
+        is_policy_v3
+        or is_compound_v1
+        or is_integration_v1
+        or is_integration_v2
+    )
     if args.timeout <= 0:
         parser.error("--timeout must be greater than zero")
     if len(set(args.version)) != len(args.version):
@@ -3243,7 +3311,7 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         parser.error(
             f"{MODIFICATION_POLICY_V3_PROFILE_ID} supports only --version 2022.1"
         )
-    if (is_compound_v1 or is_integration_v1) and any(
+    if (is_compound_v1 or is_integration_v1 or is_integration_v2) and any(
         version not in {"2022.1", "2025.1"} for version in args.version
     ):
         parser.error(
@@ -3270,9 +3338,13 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
             DEFAULT_MODIFICATION_POLICY_V3_SUITE
             if is_policy_v3
             else (
-                DEFAULT_INTEGRATION_WORKFLOWS_V1_SUITE
-                if is_integration_v1
-                else DEFAULT_COMPOUND_HEAVY_V1_SUITE
+                DEFAULT_INTEGRATION_WORKFLOWS_V2_SUITE
+                if is_integration_v2
+                else (
+                    DEFAULT_INTEGRATION_WORKFLOWS_V1_SUITE
+                    if is_integration_v1
+                    else DEFAULT_COMPOUND_HEAVY_V1_SUITE
+                )
             )
         )
         if is_terra_v3
@@ -3283,9 +3355,13 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
             DEFAULT_MODIFICATION_POLICY_V3_ITERATION_ROOT
             if is_policy_v3
             else (
-                DEFAULT_INTEGRATION_WORKFLOWS_V1_ITERATION_ROOT
-                if is_integration_v1
-                else DEFAULT_COMPOUND_HEAVY_V1_ITERATION_ROOT
+                DEFAULT_INTEGRATION_WORKFLOWS_V2_ITERATION_ROOT
+                if is_integration_v2
+                else (
+                    DEFAULT_INTEGRATION_WORKFLOWS_V1_ITERATION_ROOT
+                    if is_integration_v1
+                    else DEFAULT_COMPOUND_HEAVY_V1_ITERATION_ROOT
+                )
             )
         )
         if is_terra_v3

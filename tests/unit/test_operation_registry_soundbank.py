@@ -831,6 +831,11 @@ class DefinitionReader:
                 return {"return": [self.event]}
             if isinstance(source, Mapping) and source.get("id") == [CONTROL_BANK_ID]:
                 return {"return": [self.control]}
+            if isinstance(source, Mapping) and source.get("id") == [
+                EVENT_ID,
+                CONTROL_BANK_ID,
+            ]:
+                return {"return": [self.event, self.control]}
             query = args.get("waql")
             if query == 'from type Event where name = "Play_Test" take 2':
                 return {"return": [self.event]}

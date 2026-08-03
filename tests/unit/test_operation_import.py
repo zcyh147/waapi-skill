@@ -235,6 +235,45 @@ def test_audio_import_plan_normalizes_structured_fields_and_provenance(tmp_path:
     assert plan["oracle"]["language_requires_live_project_validation"] is True
 
 
+@pytest.mark.parametrize(
+    ("version", "root"),
+    (
+        ("2022.1", OLD_ROOT),
+        ("2025.1", NEW_ROOT),
+    ),
+)
+def test_audio_import_preserves_exact_native_switch_assignment_directive(
+    version: str,
+    root: str,
+) -> None:
+    object_path = (
+        root
+        + r"\WAAPI Skill Integration V2\Footsteps\Player_Footsteps\Snow"
+    )
+
+    plan = build_audio_import_plan(
+        [
+            {
+                "object_path": object_path,
+                "object_type": "RandomSequenceContainer",
+                "switch_assignment": "Snow",
+            }
+        ],
+        version=version,
+        import_operation="createNew",
+    )
+
+    assert plan["dispatch_args"]["imports"] == [
+        {
+            "objectPath": object_path,
+            "objectType": "RandomSequenceContainer",
+            "switchAssignation": "Snow",
+        }
+    ]
+    assert plan["oracle"]["targets"][0]["requested_switch_assignment"] == "Snow"
+    assert plan["oracle"]["switch_assignment_side_effects_present"] is True
+
+
 def test_audio_import_accepts_matching_typed_leaf_and_explicit_object_type(
     tmp_path: Path,
 ) -> None:

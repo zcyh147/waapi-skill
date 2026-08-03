@@ -146,17 +146,26 @@ This is a Wwise `2025.1`-only follow-up to a successful Media Pool read.
 
 ## Object queries
 
-Public object discovery has three progressively disclosed forms: simple flags,
-the closed structured Builder, and a bounded native WAQL fallback. Do not load
-or use a later layer while an earlier one can express the requested read.
+Object reads: simple flags, closed structured Builder, then bounded native WAQL fallback.
+Use the earliest expressive layer.
 
-Use the existing flags for a simple lookup with one source and the flat
-conditions/transforms those flags expose: `--path`, `--object-id`, `--type`,
-`--search`, or `--query`; `--query` means an existing Wwise Query Editor object
-identified by canonical GUID or absolute `\Queries\...` path. Selects are
+Simple one-source/flat flags: `--path`, `--object-id`, `--type`, `--search`, and
+`--query`; `--query` means an existing Wwise Query Editor object
+identified by GUID or absolute `\Queries\...` path. Selects are
 `descendants`, `ancestors`, `referencesTo`, `children`, and `parent`; `this` and
 `owner` remain outside the packaged boundary. `=` is exact equality and `:` is
 a contains/match predicate.
+
+Copy user-supplied absolute Wwise paths character-for-character; never add or
+change their roots. In 2025, never rewrite `\Containers\...` or `\Busses\...`
+under legacy roots.
+
+Choose the query layer by live retrieval, not report-rule count. For every
+object in one explicit small subtree, fetch needed fields with one complete
+simple inventory, then apply the user's `OR`, `NOT`, comparison, or naming rules
+directly to those rows, without code. Do not call `query-schema` merely because
+a report has several rules. Use structured only when live row selection itself
+requires it.
 
 For a complex query, first run the offline, version-aware schema command:
 
@@ -171,22 +180,19 @@ structured fields it exposes, and then invoke:
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version <supported-version> query-object --request-json '<waapi-skill.object-query/v1-json>'
 ```
 
-The strict request contains `contract`, one structured `source`, ordered
-`transforms`, and an explicit `return` projection. Sources cover the schema's
-closed `all`, `project`, `type`, exact `object`, `search`, and Query Editor
-`query` shapes. Transforms cover only structured `select`, `where`, and `take`.
-A predicate is a closed `compare`, `truthy`, nested `all`/`any`, or `not`
-object. Do not add `waql`, `raw`, `expression`, or another escape field, and do
-not infer grammar that is absent from the returned schema.
+The strict request has `contract`, one structured `source`, ordered
+`transforms`, and explicit `return`. Its schema alone defines the closed
+sources; `select`, `where`, and `take`; and `compare`, `truthy`, nested
+`all`/`any`, or `not`. Do not add `waql`, `raw`, `expression`, or another escape
+field, or infer absent grammar.
 
-Every broad structured source and every structured select must end with exactly
-one `take` transform between `0` and `1000`. Only a single exact object source
-without an expanding select may omit it. The simple flag route keeps its
-existing `--take N` or explicit user-requested `--all-results` rule. A bounded
-response above its take, an exact lookup returning multiple rows, or a fixed
-`buses` response above 1000 is protocol drift. Successful rows must be objects
-in the documented array; only an explicit empty array is empty. An invalid
-response shape is a structured error, never an empty result.
+Every broad structured source/select must end with one `take` between `0` and `1000`;
+only one exact object without an expanding select may omit it. The simple
+route keeps its existing `--take N` or explicit user-requested `--all-results` rule.
+Rows above a bound, multiple exact-lookup rows, or a fixed
+`buses` response above 1000 is protocol drift. Successful rows are objects in the
+array; only an explicit empty array is empty. An invalid response shape is a structured error,
+never an empty result.
 
 Explicit `--return-field` on the simple route and `return` in the structured
 request replace defaults, so include every needed field. An exact path lookup
@@ -197,6 +203,33 @@ is rejected; keep those four fields explicit for an exact path/GUID identity loo
 python scripts/run.py gateway.py query-object --path '\Events\Default Work Unit' --return-field id --return-field name --return-field type --return-field path
 python scripts/run.py gateway.py query-object --search 'ExactName' --where-json '{"field":"name","operator":"=","value":"ExactName"}' --take 1 --return-field id --return-field name --return-field type --return-field path
 ```
+
+Ordinary `query-object` success defaults to compact business fields, sufficient for
+normal answers. Use `--detail` only for explicit user requests or compile/dispatch
+diagnosis; never rerun solely for detail. Failures skip
+compact projection but obey global limits. Keep terminal `agent_result` exact and final.
+
+### Relationship-guided next hops
+
+`Target`, `activeSource`, `OutputBus`, and `parent` are relationship objects.
+Only `Target.id`, `activeSource.id`, `OutputBus.id`, or `parent.id` is the next-hop
+identity. Require a canonical braced GUID; stop if missing or
+malformed. Query that GUID directly; do not reread the current row or search by name
+or path. Gateway target/role revalidation still runs during preview/execute/verify.
+Preserve first-returned order,
+de-duplicate the GUIDs, and query each distinct GUID exactly once.
+
+A relationship display `name`, including `OutputBus.name`, never proves an
+absolute path. If a rule gives an absolute Bus path,
+exact-ID query every distinct `OutputBus` GUID for `id`, `name`, `type`, and
+`path`; compare returned `path`, never `name` with its final segment.
+
+If a broad ordinary/structured query returns multiple
+candidates and the user selects some to change, before preview use
+`query-object --object-id` on each selected GUID with unaliased `id`, `name`,
+`type`, and `path`; all must match. Never reread unselected rows; relationship
+read hops are exempt. An advanced-WAQL candidate needs an exact choice and the
+simple exact-id readback.
 
 ### Advanced native WAQL fallback
 
@@ -216,36 +249,31 @@ invoke:
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version <supported-version> query-object --advanced-request-json '<advanced-object-query-v1-json>'
 ```
 
-That document owns exactly four fields: `contract`, one native `waql` string,
-the native `return` expressions, and `max_results` from 1 through 1000. It
-cannot choose a URI, args/options object, timeout, result byte limit, or
-all-results mode. The Gateway fixes the call to read-only
-`ak.wwise.core.object.get`, rejects ambiguous multi-query framing, and appends
-a final `take <max_results>` after the supplied query. It then independently
-rejects a response above that row cap. Native return expressions may use
-version-supported advanced syntax; their count and size are bounded, while the
-connected Wwise parser remains authoritative for their meaning.
+That document has four fields: `contract`, native `waql`, native `return`, and
+`max_results` (1–1000). It cannot choose URI, args/options, timeout, byte limit,
+or all-results mode. The Gateway fixes read-only
+`ak.wwise.core.object.get`, rejects multi-query framing, appends final
+`take <max_results>`, and rejects excess rows. Native return syntax remains
+version-checked by Wwise and bounded by the Gateway.
 
-Omit the Query Editor `$` marker. Keep the query on one line and do not add
-comments or statement separators. Do not keyword-filter ordinary object names:
-words such as “delete” remain harmless search text on this fixed read-only API.
-If Wwise rejects the query, report that structured error; never alter the WAQL,
-retry a guessed spelling, switch to generic `call`, or create a helper script in
-the same turn. A final `take` limits returned rows, not the internal work of an
-`orderby`, `distinct`, or other scan; the finite Gateway timeout and byte
-ceilings remain separate limits.
+The schema gives exact native-input limits. `waql` and every `return` expression
+use UTF-8 bytes (not character counts) and must be trimmed and single-line.
+Omit Query Editor `$`; add no comments or statement separators; reject an
+unclosed double-quoted string or slash-regex literal. Ordinary names such as
+“delete” remain harmless text. On Wwise rejection, report the structured error;
+never alter WAQL, guess-retry, use generic `call`, or create a helper script.
+Final `take` bounds returned rows, not internal `orderby`, `distinct`, or other
+scans; Gateway timeout and byte ceilings remain separate.
 
-For a purely read-only answer, choose the smallest honest `max_results` that
-matches the user's requested bound. Advanced WAQL may contain its own limiting,
-ordering, list, alias, or projection expressions, so even a one-row result does
-not prove that the underlying semantic target was unique. Never feed an
-advanced result directly into a mutation. If the user later wants a change,
-present the returned candidates, obtain their exact choice, then verify the
-chosen GUID through the simple `query-object --object-id` route before opening
-the normal closed mutation operation. Candidate displays must keep unaliased
-`id`, `name`, `type`, and `path`; never alias another advanced expression onto
-those reserved keys. The exact-ID readback must match the user's chosen name,
-type, and path or the workflow stops for a new choice. Raw WAQL itself is never
+For read-only work, choose the smallest honest `max_results` matching the user's
+bound. Advanced limiting, ordering, list, alias, or projection means even a
+one-row result does not prove target uniqueness. Never feed an advanced result
+directly into a mutation. For a later change, present candidates, obtain their
+exact choice, then verify its GUID through the simple
+`query-object --object-id` route before the closed mutation. Candidate displays
+keep `id`, `name`, `type`, and `path` unaliased; never alias another advanced
+expression onto those reserved keys. The exact-ID readback must match the chosen
+name/type/path or the workflow stops for a new choice. Raw WAQL itself is never
 a mutation identity.
 
 ### Bounded inventories
@@ -274,9 +302,11 @@ apply presentation logic only to that complete result.
   a pure AND. Put every supported conjunct into one `--where-json` array,
   preserving the user's condition order. Do not submit only the type predicate
   when Volume, notes, inclusion, child-count, or path is also a requested
-  condition. For `A and (B or C)` or another nested boolean, switch to the
-  structured route: use one `where` transform with `all`, `any`, and `not` only
-  in the shapes returned by `query-schema`.
+  server-side condition. When the live result selection itself requires
+  `A and (B or C)` or another nested boolean, switch to the structured route:
+  use one `where` transform with `all`, `any`, and `not` only in the shapes
+  returned by `query-schema`. Boolean rules applied after a complete small
+  inventory do not trigger that switch.
 - “Shared” applies to the complete final row set. For parent containers together
   with their direct child Sounds, omit a `type=Sound` or container-only
   predicate, fetch one bounded mixed-type descendant set, request `parent`, and
@@ -338,8 +368,9 @@ Eight-level non-Project ownership:
 python scripts/run.py gateway.py query-object --path '\Actor-Mixer Hierarchy\Default Work Unit\Player\Movement\Footstep_Run' --select ancestors --where-json '{"field":"type","operator":"!=","value":"Project"}' --take 8 --return-field id --return-field name --return-field type --return-field path --return-field childrenCount --return-field notes
 ```
 
-When the request instead contains nested OR/NOT logic, run the offline schema
-call and use the structured request:
+When the live result selection itself, rather than a report over a complete
+small inventory, contains nested OR/NOT logic, run the offline schema call and
+use the structured request:
 
 ```bash
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2022.1 query-object --request-json '{"contract":"waapi-skill.object-query/v1","source":{"kind":"object","objects":[{"kind":"path","value":"\\Actor-Mixer Hierarchy\\Default Work Unit\\CombatMix"}]},"transforms":[{"kind":"select","expressions":[["descendants"]]},{"kind":"where","predicate":{"kind":"all","operands":[{"kind":"compare","path":["type"],"operator":"=","value":"Sound"},{"kind":"compare","path":["@Volume"],"operator":"<=","value":-6.0},{"kind":"any","operands":[{"kind":"compare","path":["notes"],"operator":":","value":"mix-review"},{"kind":"not","operand":{"kind":"truthy","path":["isIncluded"]}}]}]}},{"kind":"take","value":12}],"return":["id","name","type","path","@Volume","notes","audioSource:language","OutputBus","isIncluded"]}'
@@ -364,23 +395,20 @@ running instance must be reflected again. For a machine-readable live summary,
 compact-serialize that object exactly and stop. Do not rebuild it from
 `normalized` or repeat the metadata command after success.
 
-Use `metadata discover` when the user describes a property/reference by meaning
-but no exact live name is already visible. Convert their intent to short natural
-search phrases in repeated `--query`; do not ask for internal names. Select
-exactly one scope: `--object-type` for a known new/imported type, `--class-id`
-for a proven class id, or `--object` for an existing GUID/path or concrete
-plug-in. Per-phrase `--limit` defaults to 5 and maxes at 8. For mutation
-planning use 8 candidates for 1–2 phrases, 3 for 3–4, and 2 for 5–8. Keep
-related phrases in one bounded invocation; if its dependency/byte ceiling is
-reached, split groups without repeating already-proven phrases.
+Use `metadata discover` only when meaning is known but no exact live name is
+visible. Translate intent to short English phrases in repeated
+`--query`; never ask for internal names. Choose one scope: `--object-type` for a
+known new/imported type, `--class-id` for a proven class id, or `--object` for an
+existing GUID/path or plug-in. Per-phrase `--limit` defaults to 5 and
+maxes at 8; for mutation use 8 candidates for 1–2 phrases, 3 for 3–4, and 2 for
+5–8. Keep related phrases together; at a dependency/byte ceiling, split without
+repeating proven phrases.
 
-The Gateway searches live names and details, reports cache use, and may scan at
-most 256 details when names lack lexical overlap. A complete `no_match` is a
-bounded miss; for `partial`, retry once with broader technical phrases, then ask
-one natural behavior question. Never guess. Only exact names from current live
-discovery may enter closed `properties`/`references`; memory, translations, UI
-labels, and presets are hints only. Honor returned dependencies in the same
-request when clearly authorized, otherwise clarify. Preview revalidates.
+The Gateway searches at most 256 live details. Complete
+`no_match` is a bounded miss; on `partial`, retry once with broader technical
+phrases, then ask one behavior question. Never guess. Only exact current
+live names may enter closed `properties`/`references`; labels are hints.
+Honor dependencies when authorized, otherwise clarify. Preview revalidates.
 
 Use fixed reads rather than reflected payloads:
 

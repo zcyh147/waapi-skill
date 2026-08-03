@@ -9,6 +9,8 @@ import pytest
 
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     OPERATION_REQUEST_CONTRACT,
+    OperationContractError,
+    _read_object_list_rows_with_evidence,
     parse_operation_request,
     prepare_operation,
     validate_prepared_roles,
@@ -130,7 +132,11 @@ def test_object_create_exposes_platform_list_and_source_control_without_raw_payl
         {
             "ak.wwise.core.object.get": [
                 {"return": [_owner_row()]},
-                {"return": []},
+                {
+                    "return": [
+                        {"id": OWNER_ID, "@CustomList": []}
+                    ]
+                },
             ],
             "ak.wwise.core.object.getTypes": [_types()],
         }
@@ -151,6 +157,340 @@ def test_object_create_exposes_platform_list_and_source_control_without_raw_payl
     assert prepared["pre_state"]["object_graph_guard"]["list_snapshots"][0][
         "platform"
     ] == "Windows"
+
+
+@pytest.mark.parametrize(
+    "version",
+    ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
+)
+def test_object_create_list_snapshot_uses_bounded_two_step_reads_in_every_version(
+    version: str,
+) -> None:
+    member_id = "{41000000-0000-0000-0000-000000000002}"
+    member_row = {
+        "id": member_id,
+        "name": "ExistingListMember",
+        "type": "Sound",
+        "path": OWNER_PATH + r"\ExistingListMember",
+        "parent": None,
+        "owner": {"id": OWNER_ID},
+        "notes": "existing",
+    }
+    reader = Reader(
+        {
+            "ak.wwise.core.object.get": [
+                {"return": [_owner_row()]},
+                {
+                    "return": [
+                        {
+                            "id": OWNER_ID,
+                            "@CustomList": [{"id": member_id}],
+                        }
+                    ]
+                },
+                {"return": [member_row]},
+            ],
+            "ak.wwise.core.object.getTypes": [_types()],
+        }
+    )
+
+    prepared = prepare_operation(
+        parse_operation_request(
+            {
+                "contract": OPERATION_REQUEST_CONTRACT,
+                "version": version,
+                "operation": "object.create",
+                "arguments": {
+                    "parent": {"kind": "id", "value": OWNER_ID},
+                    "type": "Sound",
+                    "name": "NewListMember",
+                    "platform": "Windows",
+                    "list": "CustomList",
+                },
+            }
+        ),
+        read_call=reader,
+    ).as_dict()
+
+    object_reads = [
+        call for call in reader.calls if call[0] == "ak.wwise.core.object.get"
+    ]
+    assert object_reads[1] == (
+        "ak.wwise.core.object.get",
+        {"from": {"id": [OWNER_ID]}},
+        {"return": ["id", "@CustomList"], "platform": "Windows"},
+    )
+    assert object_reads[2][1] == {"from": {"id": [member_id]}}
+    assert object_reads[2][2]["platform"] == "Windows"
+    assert all(
+        not any(
+            isinstance(selector, str) and selector.startswith("@")
+            for transform in call[1].get("transform", [])
+            if isinstance(transform, Mapping)
+            for selector in transform.get("select", [])
+        )
+        for call in object_reads
+    )
+    assert prepared["pre_state"]["object_graph_guard"]["list_snapshots"][0][
+        "rows"
+    ] == [member_row]
+
+
+@pytest.mark.parametrize(
+    ("case", "error_code"),
+    (
+        ("duplicate-member", "INVALID_READBACK"),
+        ("missing-detail", "INVALID_READBACK"),
+        ("extra-detail", "INVALID_READBACK"),
+        ("wrong-owner", "LIST_OWNER_MISMATCH"),
+        ("over-limit", "LIST_SNAPSHOT_LIMIT_EXCEEDED"),
+    ),
+)
+def test_object_create_list_snapshot_fails_closed_on_inexact_membership(
+    case: str,
+    error_code: str,
+) -> None:
+    member_id = "{41000000-0000-0000-0000-000000000002}"
+    extra_id = "{41000000-0000-0000-0000-000000000003}"
+    references = [{"id": member_id}]
+    details: list[Mapping[str, Any]] = [
+        {
+            "id": member_id,
+            "name": "ExistingListMember",
+            "type": "Sound",
+            "path": OWNER_PATH + r"\ExistingListMember",
+            "parent": None,
+            "owner": {"id": OWNER_ID},
+            "notes": "existing",
+        }
+    ]
+    if case == "duplicate-member":
+        references.append({"id": member_id})
+        details = []
+    elif case == "missing-detail":
+        details = []
+    elif case == "extra-detail":
+        details.append(
+            {
+                "id": extra_id,
+                "name": "Unexpected",
+                "type": "Sound",
+                "path": OWNER_PATH + r"\Unexpected",
+                "parent": None,
+                "owner": {"id": OWNER_ID},
+                "notes": "unexpected",
+            }
+        )
+    elif case == "wrong-owner":
+        details[0] = {**details[0], "owner": {"id": extra_id}}
+    else:
+        references = [
+            {
+                "id": (
+                    "{41000000-0000-0000-0000-"
+                    f"{index:012x}" + "}"
+                )
+            }
+            for index in range(129)
+        ]
+        details = []
+    object_get_responses: list[Mapping[str, Any]] = [
+        {"return": [_owner_row()]},
+        {"return": [{"id": OWNER_ID, "@CustomList": references}]},
+    ]
+    if details or case == "missing-detail":
+        object_get_responses.append({"return": details})
+
+    with pytest.raises(OperationContractError) as caught:
+        prepare_operation(
+            parse_operation_request(
+                {
+                    "contract": OPERATION_REQUEST_CONTRACT,
+                    "version": "2025.1",
+                    "operation": "object.create",
+                    "arguments": {
+                        "parent": {"kind": "id", "value": OWNER_ID},
+                        "type": "Sound",
+                        "name": "NewListMember",
+                        "list": "CustomList",
+                    },
+                }
+            ),
+            read_call=Reader(
+                {
+                    "ak.wwise.core.object.get": object_get_responses,
+                    "ak.wwise.core.object.getTypes": [_types()],
+                }
+            ),
+        )
+
+    assert caught.value.error_code == error_code
+
+
+@pytest.mark.parametrize(
+    ("owner_row", "allow_missing_empty", "expected_error"),
+    (
+        ({"id": OWNER_ID, "@CustomList": []}, False, None),
+        ({"id": OWNER_ID}, True, None),
+        ({"id": OWNER_ID}, False, "INVALID_READBACK"),
+        ({"id": OWNER_ID, "@CustomList": {}}, True, "INVALID_READBACK"),
+    ),
+)
+def test_object_list_owner_accessor_missing_empty_compatibility_is_explicit(
+    owner_row: Mapping[str, Any],
+    allow_missing_empty: bool,
+    expected_error: str | None,
+) -> None:
+    reader = Reader(
+        {"ak.wwise.core.object.get": [{"return": [owner_row]}]}
+    )
+
+    if expected_error is not None:
+        with pytest.raises(OperationContractError) as caught:
+            _read_object_list_rows_with_evidence(
+                OWNER_ID,
+                "CustomList",
+                fields=("id", "name", "type"),
+                read=reader,
+                context="test-object-list",
+                allow_missing_empty=allow_missing_empty,
+            )
+        assert caught.value.error_code == expected_error
+        return
+
+    rows, readbacks = _read_object_list_rows_with_evidence(
+        OWNER_ID,
+        "CustomList",
+        fields=("id", "name", "type"),
+        read=reader,
+        context="test-object-list",
+        allow_missing_empty=allow_missing_empty,
+    )
+    assert rows == []
+    assert len(readbacks) == 1
+    if "@CustomList" not in owner_row:
+        assert readbacks[0]["compatibility_normalization"]["field"] == (
+            "@CustomList"
+        )
+
+
+@pytest.mark.parametrize(
+    "reference",
+    ("not-an-object", {"id": "not-a-guid"}),
+)
+def test_object_list_owner_accessor_rejects_malformed_member_references(
+    reference: Any,
+) -> None:
+    with pytest.raises(OperationContractError) as caught:
+        _read_object_list_rows_with_evidence(
+            OWNER_ID,
+            "CustomList",
+            fields=("id", "name", "type"),
+            read=Reader(
+                {
+                    "ak.wwise.core.object.get": [
+                        {
+                            "return": [
+                                {
+                                    "id": OWNER_ID,
+                                    "@CustomList": [reference],
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ),
+            context="test-object-list",
+        )
+
+    assert caught.value.error_code == "INVALID_READBACK"
+
+
+@pytest.mark.parametrize(
+    "details",
+    (
+        [{"id": "not-a-guid", "name": "Malformed", "type": "Sound"}],
+        [
+            {
+                "id": "{41000000-0000-0000-0000-000000000002}",
+                "name": "Duplicate",
+                "type": "Sound",
+            },
+            {
+                "id": "{41000000-0000-0000-0000-000000000002}",
+                "name": "Duplicate",
+                "type": "Sound",
+            },
+        ],
+    ),
+)
+def test_object_list_detail_read_rejects_malformed_or_duplicate_rows(
+    details: list[Mapping[str, Any]],
+) -> None:
+    member_id = "{41000000-0000-0000-0000-000000000002}"
+    with pytest.raises(OperationContractError) as caught:
+        _read_object_list_rows_with_evidence(
+            OWNER_ID,
+            "CustomList",
+            fields=("id", "name", "type"),
+            read=Reader(
+                {
+                    "ak.wwise.core.object.get": [
+                        {
+                            "return": [
+                                {
+                                    "id": OWNER_ID,
+                                    "@CustomList": [{"id": member_id}],
+                                }
+                            ]
+                        },
+                        {"return": details},
+                    ]
+                }
+            ),
+            context="test-object-list",
+        )
+
+    assert caught.value.error_code == "INVALID_READBACK"
+
+
+def test_object_list_detail_read_restores_owner_membership_order() -> None:
+    first_id = "{41000000-0000-0000-0000-000000000002}"
+    second_id = "{41000000-0000-0000-0000-000000000003}"
+    first = {"id": first_id, "name": "First", "type": "Sound"}
+    second = {"id": second_id, "name": "Second", "type": "Sound"}
+    reader = Reader(
+        {
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": OWNER_ID,
+                            "@CustomList": [
+                                {"id": first_id},
+                                {"id": second_id},
+                            ],
+                        }
+                    ]
+                },
+                {"return": [second, first]},
+            ]
+        }
+    )
+
+    rows, readbacks = _read_object_list_rows_with_evidence(
+        OWNER_ID,
+        "CustomList",
+        fields=("id", "name", "type"),
+        read=reader,
+        platform="Windows",
+        context="test-object-list",
+    )
+
+    assert rows == [first, second]
+    assert len(readbacks) == 2
+    assert all(row["options"].get("platform") == "Windows" for row in readbacks)
+    assert all("transform" not in row["args"] for row in readbacks)
 
 
 def test_object_set_exposes_global_defaults_row_overrides_rename_and_closed_list() -> None:
@@ -194,7 +534,11 @@ def test_object_set_exposes_global_defaults_row_overrides_rename_and_closed_list
             "ak.wwise.core.object.get": [
                 {"return": [_owner_row()]},
                 {"return": []},
-                {"return": []},
+                {
+                    "return": [
+                        {"id": OWNER_ID, "@CustomList": []}
+                    ]
+                },
                 {"return": [_owner_row()]},
                 {"return": []},
             ],
@@ -264,6 +608,14 @@ def test_object_set_replace_all_seals_each_old_list_subtree_before_clear() -> No
             "ak.wwise.core.object.getTypes": [_types()],
             "ak.wwise.core.object.get": [
                 {"return": [_owner_row()]},
+                {
+                    "return": [
+                        {
+                            "id": OWNER_ID,
+                            "@CustomList": [{"id": old_id}],
+                        }
+                    ]
+                },
                 {"return": [old_row]},
                 {"return": [old_row]},
                 {"return": []},
@@ -578,8 +930,20 @@ def test_object_set_merge_seals_effective_node_views_for_preview_and_guard(
                 and isinstance(transforms[0], Mapping)
                 else []
             )
-            if object_id == OWNER_ID and selected == ["@CustomList"]:
-                return {"return": [list_row]}
+            return_fields = options.get("return", [])
+            if (
+                object_id == OWNER_ID
+                and isinstance(return_fields, list)
+                and "@CustomList" in return_fields
+            ):
+                return {
+                    "return": [
+                        {
+                            "id": OWNER_ID,
+                            "@CustomList": [{"id": list_id}],
+                        }
+                    ]
+                }
             if object_id == OWNER_ID and selected == ["children"]:
                 return {"return": [child_row]}
             if object_id == child_id and selected == ["children"]:
@@ -665,6 +1029,8 @@ def test_object_set_merge_seals_effective_node_views_for_preview_and_guard(
         for call in preview_reader.calls
         if call[0] == "ak.wwise.core.object.get"
         and call[1].get("from", {}).get("id") == [list_id]
+        and call[2].get("platform") == "Linux"
+        and call[2].get("language") == "Japanese"
     )
     assert preview_list_field_call[2]["platform"] == "Linux"
     assert preview_list_field_call[2]["language"] == "Japanese"
@@ -687,6 +1053,8 @@ def test_object_set_merge_seals_effective_node_views_for_preview_and_guard(
         for call in guard_reader.calls
         if call[1].get("from", {}).get("id") == [list_id]
         and "transform" not in call[1]
+        and call[2].get("platform") == "Linux"
+        and call[2].get("language") == "Japanese"
     )
     assert guard_list_field_call[2]["platform"] == "Linux"
     assert guard_list_field_call[2]["language"] == "Japanese"
@@ -1222,7 +1590,11 @@ def test_object_set_list_member_is_not_misclassified_as_direct_child() -> None:
                 "ak.wwise.core.object.getTypes": [_types()],
                 "ak.wwise.core.object.get": [
                     {"return": [_owner_row()]},
-                    {"return": []},
+                    {
+                        "return": [
+                            {"id": OWNER_ID, "@CustomList": []}
+                        ]
+                    },
                     {"return": [_owner_row()]},
                     {"return": []},
                 ],
@@ -1260,6 +1632,14 @@ def test_object_set_list_member_is_not_misclassified_as_direct_child() -> None:
                     {"return": [_owner_row()]},
                     {"return": [list_row]},
                     {"return": []},
+                    {
+                        "return": [
+                            {
+                                "id": OWNER_ID,
+                                "@CustomList": [{"id": new_id}],
+                            }
+                        ]
+                    },
                     {"return": [list_row]},
                 ]
             }

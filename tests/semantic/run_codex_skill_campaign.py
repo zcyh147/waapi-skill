@@ -154,6 +154,9 @@ from tests.semantic.support.codex_workflow_business_plan_v3 import (  # noqa: E4
     WorkflowBusinessPlanSections,
     parse_workflow_business_plan_sections,
 )
+from tests.semantic.support.codex_integration_workflows_v2 import (  # noqa: E402
+    EXPECTED_ASSERTION_IDS as INTEGRATION_V2_ASSERTION_IDS,
+)
 from tests.semantic.support.codex_object_heavy_v3 import (  # noqa: E402
     ObjectHeavyRecipeError,
     build_object_heavy_v3_recipe,
@@ -227,12 +230,36 @@ COMPOUND_HEAVY_V1_PROFILE_ID = matrix.COMPOUND_HEAVY_V1_PROFILE_ID
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = (
     matrix.INTEGRATION_WORKFLOWS_V1_PROFILE_ID
 )
+INTEGRATION_WORKFLOWS_V2_PROFILE_ID = (
+    matrix.INTEGRATION_WORKFLOWS_V2_PROFILE_ID
+)
+_INTEGRATION_V1_WORKFLOW_IDS = frozenset(
+    {
+        "interactive_weather_build",
+        "alarm_diagnose_and_repair",
+        "harbor_soundbank_release",
+    }
+)
+_INTEGRATION_V2_WORKFLOW_IDS = frozenset(
+    {
+        "rifle_safe_reimport",
+        "footsteps_snow_assignment_maintenance",
+        "weapons_query_guided_batch_cleanup",
+    }
+)
+_INTEGRATION_WORKFLOW_IDS = frozenset(
+    {*_INTEGRATION_V1_WORKFLOW_IDS, *_INTEGRATION_V2_WORKFLOW_IDS}
+)
+_INTEGRATION_QUERY_FIRST_WORKFLOW_IDS = frozenset(
+    {"alarm_diagnose_and_repair", "weapons_query_guided_batch_cleanup"}
+)
 EXECUTABLE_V3_PROFILE_IDS = matrix.EXECUTABLE_V3_PROFILE_IDS
 TERRA_LOCKED_V3_PROFILE_IDS = frozenset(
     {
         MODIFICATION_POLICY_V3_PROFILE_ID,
         COMPOUND_HEAVY_V1_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V1_PROFILE_ID,
+        INTEGRATION_WORKFLOWS_V2_PROFILE_ID,
     }
 )
 HEAVY_V3_EFFECTIVE_CONTRACT = "waapi-skill.codex-semantic-campaign-effective/v3"
@@ -3562,10 +3589,9 @@ def _heavy_v3_topic_publisher_request_count(
 
 
 def _heavy_v3_required_reference(expected_unit: Any) -> str:
-    if (
-        _heavy_v3_integration_workflow_id(expected_unit)
-        == "alarm_diagnose_and_repair"
-    ):
+    if _heavy_v3_integration_workflow_id(
+        expected_unit
+    ) in _INTEGRATION_QUERY_FIRST_WORKFLOW_IDS:
         return "references/waapi-query.md"
     scenario = getattr(expected_unit, "scenario", None)
     api = getattr(scenario, "api", None)
@@ -3591,13 +3617,11 @@ def _heavy_v3_expected_skill_reads(
             "heavy unit has no closed reference-read turn topology"
         )
     required_reference = _heavy_v3_required_reference(expected_unit)
-    if (
-        _heavy_v3_integration_workflow_id(expected_unit)
-        == "alarm_diagnose_and_repair"
-    ):
+    workflow_id = _heavy_v3_integration_workflow_id(expected_unit)
+    if workflow_id in _INTEGRATION_QUERY_FIRST_WORKFLOW_IDS:
         if turn_count != 3:
             raise CampaignEvidenceError(
-                "Alarm reference-read schedule requires exactly three turns"
+                "query-first integration reference schedule requires exactly three turns"
             )
         lane_schedule = (
             ("references/waapi-query.md",),
@@ -3619,6 +3643,11 @@ _ALARM_REVIEWED_TURN_KINDS = (
     "change_request",
     "confirmation",
 )
+_WEAPONS_V2_REVIEWED_TURN_KINDS = (
+    "audit_request",
+    "change_request",
+    "confirmation",
+)
 
 
 def _heavy_v3_receipt_kind_for_reviewed_turn(
@@ -3630,13 +3659,17 @@ def _heavy_v3_receipt_kind_for_reviewed_turn(
     """Map one closed reviewed turn kind to its generic receipt kind."""
 
     receipt_kind = "request" if index == 1 else "confirmation"
-    if (
-        _heavy_v3_integration_workflow_id(expected_unit)
-        == "alarm_diagnose_and_repair"
-    ):
+    workflow_id = _heavy_v3_integration_workflow_id(expected_unit)
+    if workflow_id == "alarm_diagnose_and_repair":
         reviewed_kind = (
             _ALARM_REVIEWED_TURN_KINDS[index - 1]
             if 1 <= index <= len(_ALARM_REVIEWED_TURN_KINDS)
+            else None
+        )
+    elif workflow_id == "weapons_query_guided_batch_cleanup":
+        reviewed_kind = (
+            _WEAPONS_V2_REVIEWED_TURN_KINDS[index - 1]
+            if 1 <= index <= len(_WEAPONS_V2_REVIEWED_TURN_KINDS)
             else None
         )
     else:
@@ -3646,6 +3679,44 @@ def _heavy_v3_receipt_kind_for_reviewed_turn(
             "heavy reviewed turn plan has an invalid request/confirmation order"
         )
     return receipt_kind
+
+
+def _heavy_v3_reviewed_prompts(
+    expected_unit: Any,
+    provenance: PromptProvenanceEvidence,
+) -> tuple[str, ...]:
+    """Rebuild the exact reviewed prompts from sealed visible inputs."""
+
+    planned_turns = tuple(getattr(expected_unit, "turns", ()))
+    workflow_id = _heavy_v3_integration_workflow_id(expected_unit)
+    if workflow_id not in _INTEGRATION_V2_WORKFLOW_IDS:
+        return (
+            provenance.prompts[0],
+            *(str(getattr(turn, "prompt", "")) for turn in planned_turns[1:]),
+        )
+
+    scenario = getattr(expected_unit, "scenario", None)
+    declarations = tuple(getattr(scenario, "visible_inputs", ()))
+    expected_names = tuple(getattr(item, "name", None) for item in declarations)
+    values = dict(provenance.visible_values)
+    if (
+        any(not isinstance(name, str) or not name for name in expected_names)
+        or len(expected_names) != len(set(expected_names))
+        or set(values) != set(expected_names)
+        or any(not isinstance(value, str) for value in values.values())
+    ):
+        raise CampaignEvidenceError(
+            "heavy reviewed turn inputs differ from sealed provenance"
+        )
+    try:
+        return tuple(
+            str(getattr(turn, "prompt", "")).format_map(values)
+            for turn in planned_turns
+        )
+    except (KeyError, ValueError) as exc:
+        raise CampaignEvidenceError(
+            "heavy reviewed turn prompt cannot be rendered from sealed provenance"
+        ) from exc
 
 
 def _validate_heavy_v3_prompt_materialization(
@@ -3775,6 +3846,11 @@ def _validate_heavy_v3_prompt_materialization(
         raise CampaignEvidenceError(
             "heavy prompt receipt is not bound to its business-oracle plan"
         )
+    reviewed_prompts = _heavy_v3_reviewed_prompts(expected_unit, provenance)
+    if len(reviewed_prompts) != len(planned_turns):
+        raise CampaignEvidenceError(
+            "heavy reviewed prompt count differs from the turn plan"
+        )
     expected_rows: list[dict[str, Any]] = []
     for index, turn in enumerate(planned_turns, start=1):
         if getattr(turn, "index", None) != index:
@@ -3787,11 +3863,7 @@ def _validate_heavy_v3_prompt_materialization(
             index=index,
         )
         prompt = provenance.prompts[index - 1]
-        reviewed_prompt = (
-            provenance.prompts[0]
-            if index == 1
-            else getattr(turn, "prompt", None)
-        )
+        reviewed_prompt = reviewed_prompts[index - 1]
         if prompt != reviewed_prompt:
             raise CampaignEvidenceError(
                 "heavy provenance prompt differs from the reviewed turn plan"
@@ -5230,19 +5302,11 @@ def _heavy_v3_plan_json_value(value: Any) -> Any:
 
 def _heavy_v3_integration_workflow_id(expected_unit: Any) -> str | None:
     value = getattr(expected_unit, "workflow_id", None)
-    if value in {
-        "interactive_weather_build",
-        "alarm_diagnose_and_repair",
-        "harbor_soundbank_release",
-    }:
+    if value in _INTEGRATION_WORKFLOW_IDS:
         return str(value)
     scenario = getattr(expected_unit, "scenario", None)
     value = getattr(scenario, "scenario_family", None)
-    if value in {
-        "interactive_weather_build",
-        "alarm_diagnose_and_repair",
-        "harbor_soundbank_release",
-    }:
+    if value in _INTEGRATION_WORKFLOW_IDS:
         return str(value)
     return None
 
@@ -5347,7 +5411,7 @@ def _validate_integration_workflow_business_plan(
             )
             continue
         is_diagnostic = (
-            workflow_id == "alarm_diagnose_and_repair"
+            workflow_id in _INTEGRATION_QUERY_FIRST_WORKFLOW_IDS
             and transaction_id is None
             and step.subcommand == "query-object"
         )
@@ -5447,8 +5511,24 @@ def _validate_integration_workflow_business_plan(
         )
     visible_values = dict(provenance.visible_values)
     if "visible_values" in bindings:
+        expected_binding_keys = {"version", "visible_values"}
+        if workflow_id in _INTEGRATION_V2_WORKFLOW_IDS:
+            expected_binding_keys.add("baseline_manifest_sha256")
+            manifest = getattr(expected_unit, "baseline_manifest", None)
+            manifest_digest = getattr(manifest, "digest", None)
+            if (
+                getattr(manifest, "version", None)
+                != getattr(expected_unit, "version", None)
+                or not isinstance(manifest_digest, str)
+                or _SHA256_RE.fullmatch(manifest_digest) is None
+                or bindings.get("baseline_manifest_sha256")
+                != manifest_digest
+            ):
+                raise CampaignEvidenceError(
+                    "integration v2 workflow plan is not bound to its sealed baseline manifest"
+                )
         if (
-            set(bindings) != {"version", "visible_values"}
+            set(bindings) != expected_binding_keys
             or bindings.get("visible_values") != visible_values
         ):
             raise CampaignEvidenceError(
@@ -5751,12 +5831,18 @@ def _validate_heavy_v3_pass_checks(
             raise CampaignEvidenceError(
                 "passing integration workflow lacks its exact mutation dispatch vector"
             )
-        required_turn_oracles = (
-            int(getattr(expected_unit, "user_turn_count", 0))
-            if workflow_id
-            in {"interactive_weather_build", "alarm_diagnose_and_repair"}
-            else 0
-        )
+        if workflow_id in _INTEGRATION_V2_WORKFLOW_IDS:
+            required_turn_oracles = max(
+                0,
+                int(getattr(expected_unit, "user_turn_count", 0)) - 1,
+            )
+        else:
+            required_turn_oracles = (
+                int(getattr(expected_unit, "user_turn_count", 0))
+                if workflow_id
+                in {"interactive_weather_build", "alarm_diagnose_and_repair"}
+                else 0
+            )
         for turn_index in range(1, required_turn_oracles + 1):
             _validate_heavy_v3_archived_verification(
                 checks.get(f"turn_{turn_index:02d}_workflow"),
@@ -5773,6 +5859,11 @@ def _validate_heavy_v3_pass_checks(
         if "runtime_cleanup" not in checks:
             raise CampaignEvidenceError(
                 "passing integration workflow lacks successful owned cleanup"
+            )
+        if workflow_id in _INTEGRATION_V2_WORKFLOW_IDS:
+            _validate_integration_v2_cleanup(
+                checks.get("runtime_cleanup"),
+                workflow_id=workflow_id,
             )
         _validate_heavy_v3_archived_verification(
             checks.get("business_verification"),
@@ -6157,6 +6248,17 @@ def _validate_integration_workflow_verification(
         raise CampaignEvidenceError(
             f"{label} integration verification is not an object"
         )
+    workflow_id = sections.static_expectation.get("workflow_id")
+    if workflow_id in _INTEGRATION_V2_WORKFLOW_IDS:
+        _validate_integration_v2_verification(
+            verification,
+            workflow_id=str(workflow_id),
+            version=str(
+                sections.live_binding.get("bindings", {}).get("version", "")
+            ),
+            label=label,
+        )
+        return
     keys = set(verification)
     weather_keys = {
         "workflow_id",
@@ -6181,7 +6283,6 @@ def _validate_integration_workflow_verification(
         "after",
         "evidence",
     }
-    workflow_id = sections.static_expectation.get("workflow_id")
     expected_keys = {
         "interactive_weather_build": weather_keys,
         "alarm_diagnose_and_repair": alarm_keys,
@@ -6275,6 +6376,463 @@ def _validate_integration_workflow_verification(
     ):
         raise CampaignEvidenceError(
             f"{label} Harbor verification phase or evidence is invalid"
+        )
+
+
+_INTEGRATION_V2_PHASE_ASSERTIONS = {
+    "rifle_safe_reimport": {
+        "preview_no_change": ("preview_unchanged",),
+        "after_import": INTEGRATION_V2_ASSERTION_IDS["rifle_safe_reimport"],
+    },
+    "footsteps_snow_assignment_maintenance": {
+        "preview_one_no_change": ("preview_unchanged",),
+        "after_snow_before_mud_removal": (
+            "snow_hierarchy_created_once",
+            "snow_media_hashes_match_inputs",
+            "snow_assignment_present",
+            "mud_objects_and_value_preserved",
+            "metal_wood_assignments_unchanged",
+            "footstep_event_chain_unchanged",
+            "existing_footstep_content_unchanged",
+            "footsteps_bus_unchanged",
+            "source_project_unchanged",
+        ),
+        "after_mud_assignment_removal": INTEGRATION_V2_ASSERTION_IDS[
+            "footsteps_snow_assignment_maintenance"
+        ],
+    },
+    "weapons_query_guided_batch_cleanup": {
+        "turn_1_no_change": (
+            "snapshot_unchanged",
+            "audit_query_valid",
+        ),
+        "turn_2_no_change": (
+            "snapshot_unchanged",
+            "audit_query_valid",
+            "selected_ids_revalidated",
+        ),
+        "after_batch": INTEGRATION_V2_ASSERTION_IDS[
+            "weapons_query_guided_batch_cleanup"
+        ],
+    },
+}
+_INTEGRATION_V2_NO_CHANGE_PHASES = frozenset(
+    {
+        "preview_no_change",
+        "preview_one_no_change",
+        "turn_1_no_change",
+        "turn_2_no_change",
+    }
+)
+_INTEGRATION_V2_FINAL_PHASES = {
+    "rifle_safe_reimport": "after_import",
+    "footsteps_snow_assignment_maintenance": "after_mud_assignment_removal",
+    "weapons_query_guided_batch_cleanup": "after_batch",
+}
+
+
+def _validate_integration_v2_verification(
+    value: Any,
+    *,
+    workflow_id: str,
+    version: str,
+    label: str,
+) -> None:
+    """Validate the exact JSON projection emitted by V2 runtime as_dict()."""
+
+    verification = _closed_oracle_mapping(
+        value,
+        {"phase", "passed", "failures", "assertions", "before", "after"},
+        label=label,
+    )
+    phase = verification.get("phase")
+    expected_by_phase = _INTEGRATION_V2_PHASE_ASSERTIONS.get(workflow_id)
+    expected_assertions = (
+        expected_by_phase.get(phase)
+        if isinstance(expected_by_phase, Mapping) and isinstance(phase, str)
+        else None
+    )
+    assertions = verification.get("assertions")
+    if (
+        version not in {"2022.1", "2025.1"}
+        or expected_assertions is None
+        or verification.get("passed") is not True
+        or verification.get("failures") != []
+        or not isinstance(assertions, Mapping)
+        or set(assertions) != set(expected_assertions)
+        or any(value is not True for value in assertions.values())
+    ):
+        raise CampaignEvidenceError(
+            f"{label} integration v2 verification is not an exact failure-free runtime result"
+        )
+    before = _validate_integration_v2_snapshot(
+        verification.get("before"),
+        workflow_id=workflow_id,
+        version=version,
+        label=f"{label}.before",
+    )
+    after = _validate_integration_v2_snapshot(
+        verification.get("after"),
+        workflow_id=workflow_id,
+        version=version,
+        label=f"{label}.after",
+    )
+    if before["source_project"] != after["source_project"]:
+        raise CampaignEvidenceError(
+            f"{label} integration v2 source-project proof changed"
+        )
+    if phase in _INTEGRATION_V2_NO_CHANGE_PHASES:
+        if before != after:
+            raise CampaignEvidenceError(
+                f"{label} integration v2 no-change phase contains a delta"
+            )
+    elif phase == _INTEGRATION_V2_FINAL_PHASES[workflow_id] and before == after:
+        raise CampaignEvidenceError(
+            f"{label} integration v2 final phase contains no business delta"
+        )
+
+
+def _validate_integration_v2_snapshot(
+    value: Any,
+    *,
+    workflow_id: str,
+    version: str,
+    label: str,
+) -> Mapping[str, Any]:
+    keys_by_workflow = {
+        "rifle_safe_reimport": {
+            "workflow_id",
+            "version",
+            "objects",
+            "absent_roles",
+            "media",
+            "container_children",
+            "input_files",
+            "source_project",
+            "digest",
+        },
+        "footsteps_snow_assignment_maintenance": {
+            "workflow_id",
+            "version",
+            "objects",
+            "absent_roles",
+            "media",
+            "children",
+            "assignments",
+            "input_files",
+            "source_project",
+            "digest",
+        },
+        "weapons_query_guided_batch_cleanup": {
+            "workflow_id",
+            "version",
+            "objects",
+            "media",
+            "source_project",
+            "digest",
+        },
+    }
+    snapshot = _closed_oracle_mapping(
+        value,
+        keys_by_workflow[workflow_id],
+        label=label,
+    )
+    if (
+        snapshot.get("workflow_id") != workflow_id
+        or snapshot.get("version") != version
+        or not _sha256_text_value(snapshot.get("digest"))
+        or _canonical_sha256(
+            {key: nested for key, nested in snapshot.items() if key != "digest"}
+        )
+        != snapshot.get("digest")
+    ):
+        raise CampaignEvidenceError(
+            f"{label} integration v2 snapshot identity or digest is invalid"
+        )
+    objects = snapshot.get("objects")
+    media = snapshot.get("media")
+    if (
+        not isinstance(objects, list)
+        or not objects
+        or not isinstance(media, list)
+        or not media
+    ):
+        raise CampaignEvidenceError(
+            f"{label} integration v2 object/media evidence is unavailable"
+        )
+    object_roles: list[str] = []
+    for index, raw in enumerate(objects):
+        row = _closed_oracle_mapping(
+            raw,
+            {"role", "id", "name", "type", "path", "state"},
+            label=f"{label}.objects[{index}]",
+        )
+        name = row.get("name")
+        object_type = row.get("type")
+        path = row.get("path")
+        if (
+            not _nonempty_text(row.get("role"))
+            or _OBJECT_ANSWER_GUID_RE.fullmatch(str(row.get("id", ""))) is None
+            or not _integration_v2_object_name_is_valid(
+                name,
+                object_type=object_type,
+                path=path,
+            )
+            or not _nonempty_text(object_type)
+            or not isinstance(path, str)
+            or not path.startswith("\\")
+            or not isinstance(row.get("state"), Mapping)
+        ):
+            raise CampaignEvidenceError(
+                f"{label} integration v2 object row is invalid"
+            )
+        object_roles.append(str(row["role"]))
+    if len(object_roles) != len(set(object_roles)):
+        raise CampaignEvidenceError(
+            f"{label} integration v2 object roles are duplicated"
+        )
+    media_roles: list[str] = []
+    for index, raw in enumerate(media):
+        row = _closed_oracle_mapping(
+            raw,
+            {
+                "role",
+                "sound_id",
+                "active_source_id",
+                "source_parent_id",
+                "language",
+                "original",
+            },
+            label=f"{label}.media[{index}]",
+        )
+        if (
+            not _nonempty_text(row.get("role"))
+            or any(
+                _OBJECT_ANSWER_GUID_RE.fullmatch(str(row.get(key, ""))) is None
+                for key in ("sound_id", "active_source_id", "source_parent_id")
+            )
+            or not _nonempty_text(row.get("language"))
+        ):
+            raise CampaignEvidenceError(
+                f"{label} integration v2 media row is invalid"
+            )
+        _validate_integration_v2_file_proof(
+            row.get("original"),
+            label=f"{label}.media[{index}].original",
+            allow_null_relative=False,
+        )
+        media_roles.append(str(row["role"]))
+    if len(media_roles) != len(set(media_roles)) or not set(media_roles) <= set(
+        object_roles
+    ):
+        raise CampaignEvidenceError(
+            f"{label} integration v2 media roles are duplicated or unbound"
+        )
+    source = _closed_oracle_mapping(
+        snapshot.get("source_project"),
+        {"project_sha256", "tree_sha256", "project_mtime_ns"},
+        label=f"{label}.source_project",
+    )
+    if (
+        not _sha256_text_value(source.get("project_sha256"))
+        or not _sha256_text_value(source.get("tree_sha256"))
+        or not _plain_int(source.get("project_mtime_ns"), minimum=1)
+    ):
+        raise CampaignEvidenceError(
+            f"{label} integration v2 source-project proof is invalid"
+        )
+    if "absent_roles" in snapshot:
+        absent = snapshot.get("absent_roles")
+        if (
+            not isinstance(absent, list)
+            or any(not _nonempty_text(role) for role in absent)
+            or len(absent) != len(set(absent))
+            or set(absent) & set(object_roles)
+        ):
+            raise CampaignEvidenceError(
+                f"{label} integration v2 absent-role evidence is invalid"
+            )
+    input_files = snapshot.get("input_files")
+    if input_files is not None:
+        if not isinstance(input_files, list) or not input_files:
+            raise CampaignEvidenceError(
+                f"{label} integration v2 input-file evidence is unavailable"
+            )
+        input_keys: list[str] = []
+        for index, raw in enumerate(input_files):
+            row = _closed_oracle_mapping(
+                raw,
+                {"key", "path", "relative_path", "size", "sha256"},
+                label=f"{label}.input_files[{index}]",
+            )
+            if not _nonempty_text(row.get("key")):
+                raise CampaignEvidenceError(
+                    f"{label} integration v2 input key is invalid"
+                )
+            _validate_integration_v2_file_proof(
+                {key: row[key] for key in ("path", "relative_path", "size", "sha256")},
+                label=f"{label}.input_files[{index}]",
+                allow_null_relative=False,
+            )
+            input_keys.append(str(row["key"]))
+        if len(input_keys) != len(set(input_keys)):
+            raise CampaignEvidenceError(
+                f"{label} integration v2 input keys are duplicated"
+            )
+    _validate_integration_v2_relationship_rows(
+        snapshot,
+        workflow_id=workflow_id,
+        label=label,
+    )
+    return snapshot
+
+
+def _integration_v2_object_name_is_valid(
+    value: Any,
+    *,
+    object_type: Any,
+    path: Any,
+) -> bool:
+    """Accept only Wwise's exact nameless Action display-path representation."""
+
+    if _nonempty_text(value):
+        return True
+    if value != "" or object_type != "Action" or not isinstance(path, str):
+        return False
+    display_segment = path.rsplit("\\", 1)[-1]
+    return (
+        len(display_segment) > 2
+        and display_segment.startswith("[")
+        and display_segment.endswith("]")
+    )
+
+
+def _validate_integration_v2_file_proof(
+    value: Any,
+    *,
+    label: str,
+    allow_null_relative: bool,
+) -> None:
+    proof = _closed_oracle_mapping(
+        value,
+        {"path", "relative_path", "size", "sha256"},
+        label=label,
+    )
+    relative = proof.get("relative_path")
+    if (
+        not isinstance(proof.get("path"), str)
+        or not os.path.isabs(str(proof["path"]))
+        or not _plain_int(proof.get("size"), minimum=1)
+        or not _sha256_text_value(proof.get("sha256"))
+        or (
+            relative is None
+            if not allow_null_relative
+            else relative is not None and not _nonempty_text(relative)
+        )
+        or (relative is not None and not _nonempty_text(relative))
+    ):
+        raise CampaignEvidenceError(f"{label} file proof is invalid")
+
+
+def _validate_integration_v2_relationship_rows(
+    snapshot: Mapping[str, Any],
+    *,
+    workflow_id: str,
+    label: str,
+) -> None:
+    specs: tuple[tuple[str, set[str]], ...]
+    if workflow_id == "rifle_safe_reimport":
+        specs = (
+            (
+                "container_children",
+                {"id", "name", "path", "type", "parent_id"},
+            ),
+        )
+    elif workflow_id == "footsteps_snow_assignment_maintenance":
+        specs = (
+            (
+                "children",
+                {"owner_role", "id", "name", "path", "type", "parent_id"},
+            ),
+            ("assignments", {"child", "stateOrSwitch"}),
+        )
+    else:
+        specs = ()
+    for field, keys in specs:
+        rows = snapshot.get(field)
+        if not isinstance(rows, list):
+            raise CampaignEvidenceError(
+                f"{label}.{field} relationship evidence is invalid"
+            )
+        for index, raw in enumerate(rows):
+            row = _closed_oracle_mapping(
+                raw,
+                keys,
+                label=f"{label}.{field}[{index}]",
+            )
+            guid_fields = (
+                ("child", "stateOrSwitch")
+                if field == "assignments"
+                else ("id", "parent_id")
+            )
+            if any(
+                _OBJECT_ANSWER_GUID_RE.fullmatch(str(row.get(key, ""))) is None
+                for key in guid_fields
+            ):
+                raise CampaignEvidenceError(
+                    f"{label}.{field} relationship identity is invalid"
+                )
+            if field != "assignments" and (
+                not isinstance(row.get("path"), str)
+                or not str(row["path"]).startswith("\\")
+                or not _integration_v2_object_name_is_valid(
+                    row.get("name"),
+                    object_type=row.get("type"),
+                    path=row.get("path"),
+                )
+                or not _nonempty_text(row.get("type"))
+                or ("owner_role" in row and not _nonempty_text(row.get("owner_role")))
+            ):
+                raise CampaignEvidenceError(
+                    f"{label}.{field} relationship row is invalid"
+                )
+
+
+def _validate_integration_v2_cleanup(
+    value: Any,
+    *,
+    workflow_id: str,
+) -> None:
+    keys = {
+        "passed",
+        "already_clean",
+        "sandbox_untouched",
+        "source_untouched",
+        "failures",
+    }
+    if workflow_id != "weapons_query_guided_batch_cleanup":
+        keys.add("removed_input_root")
+    cleanup = _closed_oracle_mapping(
+        value,
+        keys,
+        label=f"{workflow_id} runtime cleanup",
+    )
+    if (
+        cleanup.get("passed") is not True
+        or cleanup.get("already_clean") is not False
+        or cleanup.get("sandbox_untouched") is not True
+        or cleanup.get("source_untouched") is not True
+        or cleanup.get("failures") != []
+        or (
+            "removed_input_root" in cleanup
+            and (
+                not isinstance(cleanup.get("removed_input_root"), str)
+                or not os.path.isabs(str(cleanup["removed_input_root"]))
+            )
+        )
+    ):
+        raise CampaignEvidenceError(
+            f"{workflow_id} runtime cleanup proof is not an exact clean pass"
         )
 
 
@@ -6408,6 +6966,7 @@ def _heavy_v3_protocol_operation_request(
                 "semantic_json",
                 "semantic_json_object_operation_v1",
                 "semantic_json_soundbank_generate_v1",
+                "sealed_query_identity_object_operation_json",
             }
             and isinstance(arguments[2].get("value"), Mapping)
         ):
@@ -11546,6 +12105,7 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
     is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
     is_integration_v1 = args.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID
+    is_integration_v2 = args.profile == INTEGRATION_WORKFLOWS_V2_PROFILE_ID
     is_terra_v3 = args.profile in TERRA_LOCKED_V3_PROFILE_IDS
     if args.verify_only and not args.resume:
         parser.error("--verify-only requires --resume")
@@ -11570,7 +12130,7 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
             parser.error(
                 "unknown v2 --case-id values: " + ", ".join(unknown_case_ids)
             )
-    if (is_compound_v1 or is_integration_v1) and any(
+    if (is_compound_v1 or is_integration_v1 or is_integration_v2) and any(
         version not in {"2022.1", "2025.1"} for version in args.version
     ):
         parser.error(
@@ -11597,9 +12157,13 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
             matrix.DEFAULT_MODIFICATION_POLICY_V3_SUITE
             if is_policy_v3
             else (
-                matrix.DEFAULT_INTEGRATION_WORKFLOWS_V1_SUITE
-                if is_integration_v1
-                else matrix.DEFAULT_COMPOUND_HEAVY_V1_SUITE
+                matrix.DEFAULT_INTEGRATION_WORKFLOWS_V2_SUITE
+                if is_integration_v2
+                else (
+                    matrix.DEFAULT_INTEGRATION_WORKFLOWS_V1_SUITE
+                    if is_integration_v1
+                    else matrix.DEFAULT_COMPOUND_HEAVY_V1_SUITE
+                )
             )
         )
         if is_terra_v3

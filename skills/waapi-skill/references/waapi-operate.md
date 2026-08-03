@@ -28,9 +28,11 @@ This is a mandatory safety gate. Do not call `operations`, `operation-schema`, o
 
 ### New transaction
 
-Choose exactly one of these first-command branches:
+When this change uses a subset that the user selected from a previous multi-result ordinary, structured, or advanced object query, finish the query lane's selected-subset identity gate first: exact-ID read back every selected GUID and require its unaliased name, type, and path to match the candidate that the user chose. A failed, missing, changed, or ambiguous row stops the change. These bounded read-only checks precede the transaction contract; they do not replace its schema or metadata steps.
 
-| Request | First Gateway sequence |
+After any required selected-subset identity gate, choose exactly one of these first transaction-contract branches:
+
+| Request | First transaction-contract sequence |
 |---|---|
 | `object.create` or `object.set` | `operation-schema <name>` first. If the request describes dynamic properties/references by meaning, run one metadata discovery next; do not repeat the schema. |
 | Any other metadata-bound operation with unknown property/reference tokens, including both import operations | one metadata discovery first, then its named `operation-schema` |
@@ -39,7 +41,7 @@ Choose exactly one of these first-command branches:
 
 Use `operations` only for a broad inventory question, never as preparation for a named change. An implemented dedicated operation owns its URI; `waapi.call` is a hard-rejected bypass unless the catalog explicitly lists it as that URI's transaction operation. The three Undo Group member URIs use only `waapi.undoGroup`.
 
-After the required discovery/schema sequence, construct only the closed request returned by the schema and preview it. There is deliberately no unconditional schema-to-preview shortcut: missing metadata, version, identity, file, or user input must be resolved by the branch that owns it. Conversely, do not add metadata discovery when an exact property/reference token is already visible in a successful live query from this conversation. For example, an isolated `object.setReference` that follows a query returning the exact `OutputBus` accessor uses its operation schema and then previews with that returned token.
+After the required discovery/schema sequence, construct only the closed request returned by the schema and preview it. There is deliberately no unconditional schema-to-preview shortcut: missing metadata, version, identity, file, or user input must be resolved by the branch that owns it. Conversely, do not add metadata discovery when an exact property/reference accessor is already visible in a successful live query from this conversation. Apply only the operation schema's mapping: property accessor `@Foo` becomes mutation metadata token `Foo` by removing exactly one leading `@`; reference accessor `OutputBus` remains `OutputBus`. This mapping is evidence-bound to that returned accessor—never strip or invent a token from arbitrary user/model text. Then preview the canonical token.
 
 Public mutation identities are closed to `id`, `path`, `exact-type-name`,
 `direct-child`, and `scoped-name`. When the user's supplied identity and scope
@@ -66,7 +68,7 @@ otherwise incomplete query results do not identify a mutation target.
 
 Select the operation whose postcondition and verifier match the user's complete authorized outcome. A native API overlap or large batch does not override this rule. `operation.selection_guidance` and, for native URIs, `interface.selection_guidance` are authoritative.
 
-A named root that already exists and receives any notes, property, reference, or list change locks the whole batch to `object.set`, even when the same request also adds a wholly new subtree below it. Its first Gateway command is `operation-schema object.set`.
+A named root that already exists and receives any notes, property, reference, or list change locks the whole batch to `object.set`, even when the same request also adds a wholly new subtree below it. After any required selected-subset identity gate, its first transaction-contract command is `operation-schema object.set`.
 
 | User outcome | Select | Do not substitute |
 |---|---|---|
@@ -109,7 +111,7 @@ For example, `object.setRTPC` authors a curve while `ak.soundengine.setRTPCValue
 
 Users speak naturally; never ask them for internal property/reference names. When an exact token is not already visible from live metadata:
 
-For `object.create` and `object.set`, complete the named `operation-schema` call before the metadata discovery below, including when this is a later item in an ordered multi-transaction request. Other metadata-bound operations keep the first-command order in the New transaction table above.
+For `object.create` and `object.set`, complete any required selected-subset identity gate, then the named `operation-schema` call before the metadata discovery below, including when this is a later item in an ordered multi-transaction request. Other metadata-bound operations keep the transaction-contract order in the New transaction table above.
 
 1. Run `metadata discover` with one repeated `--query '<ordinary phrase>'` per requested setting. Use the smallest useful candidate budget so compound results stay compact: `--limit 8` for one or two phrases, `--limit 3` for three or four, and `--limit 2` for five through eight. Translate localized user wording into short English Wwise UI or technical behavior phrases for this search; do not copy CJK wording into the live lexical matcher. Keep independent enable switches and numeric values as separate queries. If one compound result still reaches a structured dependency/result-size boundary, split it into related phrase groups and do not repeat a phrase that already returned an exact token.
 2. Use exactly one scope: `--object-type` for a known new/imported type or several existing targets of one proven type, `--class-id` for a proven class id, or `--object` for one existing object.
@@ -126,8 +128,9 @@ For import tables, discover only dynamic property/reference behavior. `Notes` an
 - For an ordinary `audio.importTabDelimited` import, do not `cat` or otherwise read the caller's TSV. Pass its supplied absolute path unchanged to `preview`; that preview owns bounded TSV parsing and hashing, inline base64 and media validation, and exact-path conflict checks. A user request to view the file is a separate read-only task, never an import prerequisite.
 - `SFX` is the built-in nonlocalized import token. Preserve it literally and do not query the Project language inventory for it; validate only explicit non-SFX languages.
 - `arguments.import_operation` is the explicit batch-level mode: write `createNew`, `useExisting`, or `replaceExisting` when the user asks for that behavior; omission means `createNew`, and the field never belongs inside an `imports[]` row. Under `useExisting`, behavior is still resolved per row: an existing localized non-SFX target keeps only `audio_file`, `object_path`, `import_language`, and the live-preflighted `object_type`; omit notes, source notes, Originals subfolder, and Event. Existing SFX rows retain every user-supplied optional field, and missing targets retain creation fields.
+- `import_location` is a wire-significant path-base selector, not a harmless common-parent hint. For an absolute `object_path`, omit it from both the row and `defaults` unless the user explicitly asks for that native field; never infer `defaults.import_location` from a shared absolute parent. A relative `object_path` requires one effective row/default `import_location`.
 - When one direct import request explicitly includes a new container hierarchy, represent each requested container once as a typed structure-only row, then use full logical `object_path` values for the media rows below it. A structure-only row contains its path/type and only fields the user actually assigned to that container; never inherit Sound-only language, properties, references, media, or Event fields onto it through `defaults`. Keep those Sound fields on the media rows when the batch mixes structures and Sounds. Do not also encode the same containers as typed path segments.
-- `originals_subfolder` is relative to Wwise's normal destination for that language. For SFX, `Foley/Footsteps` means `Originals/SFX/Foley/Footsteps`; never silently add or remove an `SFX/` prefix.
+- Use `originals_subfolder` only when the user explicitly supplies its exact relative destination; otherwise omit it—never infer one from a source directory, media category, object path, or example. It is relative to Wwise's normal destination for that language; preserve an explicit value and never silently add or remove an `SFX/` prefix.
 - Every requested import Event belongs in the matching media row of that same `audio.import` preview, with the exact absolute path below `\Events` and the requested Action. It must be absent before preview and unique across rows. Do not omit it for a later transaction or append an Action to an existing Event.
 - Wwise `Pitch` values are cents. Convert requested semitones before preview (`1 semitone = 100 cents`); do not pass the semitone number as the property value.
 

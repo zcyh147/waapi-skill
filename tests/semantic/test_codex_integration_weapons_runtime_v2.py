@@ -1,0 +1,1185 @@
+from __future__ import annotations
+
+import copy
+import hashlib
+import json
+import uuid
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, Mapping
+
+import pytest
+
+from tests.semantic.support.codex_campaign import (
+    canonical_json_bytes,
+    stable_tree_sha256,
+)
+from tests.semantic.support.codex_integration_weapons_runtime_v2 import (
+    OBJECT_SET_API,
+    WEAPONS_CANONICAL_STATE_FIELDS,
+    WeaponsIntegrationRuntimeError,
+    prepare_weapons_integration_runtime,
+)
+from tests.semantic.support.codex_integration_workflows_v2 import (
+    BaselineManifest,
+    load_integration_workflows_v2_profile,
+)
+from tests.semantic.support.codex_gateway_broker import (
+    CodexGatewayBroker,
+    GatewayInvocationError,
+    SealedQueryIdentityBoundJsonArgument,
+    SemanticJsonArgument,
+    gateway_step_sequence_matches,
+)
+from tests.semantic.support.codex_prompt_provenance_v3 import (
+    deserialize_protocol,
+    serialize_protocol,
+)
+from wwise_waapi.builders.metadata import (
+    GET_PROPERTY_AND_REFERENCE_NAMES_URI,
+    GET_PROPERTY_INFO_URI,
+    GET_TYPES_URI,
+)
+
+
+DATA_ROOT = Path(__file__).resolve().parent / "data" / "integration-workflows-v2"
+PROFILE_PATH = DATA_ROOT / "profile.json"
+OBJECT_GET_API = "ak.wwise.core.object.get"
+RTPC_FIELDS = (
+    "id",
+    "name",
+    "type",
+    "path",
+    "notes",
+    "@PropertyName",
+    "@ControlInput",
+    "@Curve",
+)
+IN_SCOPE = (
+    "audit_close",
+    "audit_tail",
+    "audit_mechanical",
+    "audit_exception_legacy",
+    "audit_exception_hot",
+    "audit_compliant",
+)
+
+
+def _guid(label: str) -> str:
+    return "{" + str(uuid.uuid5(uuid.NAMESPACE_URL, f"weapons-v2:{label}")).upper() + "}"
+
+
+def _digest(value: Any) -> str:
+    return hashlib.sha256(canonical_json_bytes(value)).hexdigest()
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _plain(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _plain(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [_plain(item) for item in value]
+    return value
+
+
+class FakeWeaponsWaapi:
+    def __init__(self, workflow: Any, *, version: str, sandbox_root: Path) -> None:
+        self.workflow = workflow
+        self.version = version
+        self.sandbox_root = sandbox_root
+        self.rows: dict[str, dict[str, Any]] = {}
+        self.path_to_id: dict[str, str] = {}
+        self.roles: dict[str, str] = {}
+        self.media_roles: dict[str, str] = {}
+        self.calls: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
+        self._build_baseline()
+
+    def _insert(
+        self,
+        role: str,
+        *,
+        path: str,
+        object_type: str,
+        state: Mapping[str, Any],
+        object_id: str | None = None,
+    ) -> str:
+        identity = object_id or _guid(role)
+        row = {
+            "id": identity,
+            "name": path.rsplit("\\", 1)[-1],
+            "type": object_type,
+            "path": path,
+            **copy.deepcopy(dict(state)),
+        }
+        self.rows[identity.casefold()] = row
+        self.path_to_id[path.casefold()] = identity
+        self.roles[role] = identity
+        return identity
+
+    def _build_baseline(self) -> None:
+        specs = {row.role: row for row in self.workflow.fixture.object_graph}
+        path = lambda role: specs[role].path_for(self.version)
+        actor_parent = _guid("actor-parent")
+        event_parent = _guid("event-parent")
+        bus_parent = _guid(f"bus-parent-{self.version}")
+        parameter_parent = _guid("parameter-parent")
+        root_id = self._insert(
+            "audit_root",
+            path=path("audit_root"),
+            object_type=("PropertyContainer" if self.version == "2025.1" else "ActorMixer"),
+            state={"parent": {"id": actor_parent}, "children": []},
+        )
+        bus_id = self._insert(
+            "weapons_bus",
+            path=path("weapons_bus"),
+            object_type="Bus",
+            state={"parent": {"id": bus_parent}, "@Volume": 0.0},
+        )
+        wrong_bus_id = self._insert(
+            "footsteps_bus",
+            path=path("footsteps_bus"),
+            object_type="Bus",
+            state={"parent": {"id": bus_parent}, "@Volume": -1.0},
+        )
+        parameter_id = self._insert(
+            "rifle_distance_parameter",
+            path=path("rifle_distance_parameter"),
+            object_type="GameParameter",
+            state={"parent": {"id": parameter_parent}},
+        )
+        values = {
+            "audit_close": (2.0, "close-needs-review", wrong_bus_id),
+            "audit_tail": (1.0, "release-ready | tail", bus_id),
+            "audit_mechanical": (0.0, "mechanical-needs-review", wrong_bus_id),
+            "audit_exception_legacy": (0.0, "legacy-reference", wrong_bus_id),
+            "audit_exception_hot": (6.0, "release-ready | intentional-hot", bus_id),
+            "audit_compliant": (-3.0, "release-ready | clean", bus_id),
+            "audit_out_of_scope": (4.0, "outside", wrong_bus_id),
+        }
+        for role, (volume, notes, output_bus) in values.items():
+            parent = root_id if role in IN_SCOPE else _guid("pistol-parent")
+            source_id = _guid(f"{role}-source")
+            rtpc_refs: list[dict[str, str]] = []
+            if role == "audit_mechanical":
+                rtpc_id = _guid("mechanical-volume-rtpc")
+                self.rows[rtpc_id.casefold()] = {
+                    "id": rtpc_id,
+                    "name": "",
+                    "type": "RTPC",
+                    "path": path(role) + "\\Volume",
+                    "notes": "distance curve",
+                    "@PropertyName": "Volume",
+                    "@ControlInput": {"id": parameter_id},
+                    "@Curve": {
+                        "points": [
+                            {"x": 0.0, "y": -12.0, "shape": "Linear"},
+                            {"x": 100.0, "y": 0.0, "shape": "Linear"},
+                        ]
+                    },
+                }
+                rtpc_refs = [{"id": rtpc_id}]
+            sound_id = self._insert(
+                role,
+                path=path(role),
+                object_type="Sound",
+                state={
+                    "parent": {"id": parent},
+                    "notes": notes,
+                    "@Volume": volume,
+                    "@Pitch": 0.0,
+                    "@IsLoopingEnabled": False,
+                    "@UseMaxSoundPerInstance": False,
+                    "@MaxSoundPerInstance": 50,
+                    "OutputBus": {"id": output_bus},
+                    "activeSource": {"id": source_id},
+                    "@RTPC": rtpc_refs,
+                },
+            )
+            media = self.sandbox_root / "Originals" / "SFX" / f"{role}.wav"
+            media.parent.mkdir(parents=True, exist_ok=True)
+            media.write_bytes(f"baseline:{self.version}:{role}".encode())
+            source_path = path(role) + f"\\{role}_source"
+            self.rows[source_id.casefold()] = {
+                "id": source_id,
+                "name": f"{role}_source",
+                "type": "AudioFileSource",
+                "path": source_path,
+                "parent": {"id": sound_id},
+                "notes": f"{role} source notes",
+                "originalFilePath": str(media),
+                "audioSource:language": {"name": "SFX"},
+            }
+            self.path_to_id[source_path.casefold()] = source_id
+            self.media_roles[role] = source_id
+        self.rows[root_id.casefold()]["children"] = [
+            {"id": self.roles[role]} for role in IN_SCOPE
+        ]
+        event_id = self._insert(
+            "audit_close_event",
+            path=path("audit_close_event"),
+            object_type="Event",
+            state={"parent": {"id": event_parent}, "children": []},
+        )
+        action_id = self._insert(
+            "audit_close_action",
+            path=path("audit_close_action"),
+            object_type="Action",
+            state={
+                "parent": {"id": event_id},
+                "ActionType": 1,
+                "Target": {"id": self.roles["audit_close"]},
+            },
+        )
+        self.rows[event_id.casefold()]["children"] = [{"id": action_id}]
+
+    def manifest(self, *, source_project: Path, source_root: Path) -> BaselineManifest:
+        specs = {row.role: row for row in self.workflow.fixture.object_graph}
+        objects: list[Mapping[str, Any]] = []
+        media: list[Mapping[str, str]] = []
+        for role, spec in specs.items():
+            row = self.rows[self.roles[role].casefold()]
+            state: dict[str, Any] = {}
+            for field in WEAPONS_CANONICAL_STATE_FIELDS[role]:
+                if field == "rtpc_rows":
+                    state[field] = [
+                        {
+                            key: copy.deepcopy(self.rows[ref["id"].casefold()].get(key))
+                            for key in RTPC_FIELDS
+                        }
+                        for ref in row.get("@RTPC", [])
+                    ]
+                elif field == "children":
+                    state[field] = [{"id": value["id"]} for value in row[field]]
+                elif field in {"parent", "OutputBus", "activeSource", "Target"}:
+                    state[field] = {"id": row[field]["id"]}
+                else:
+                    state[field] = copy.deepcopy(row[field])
+            objects.append(
+                {
+                    "role": role,
+                    "id": row["id"],
+                    "path": row["path"],
+                    "type": spec.type,
+                    "state": state,
+                    "state_sha256": _digest(state),
+                }
+            )
+            if spec.type == "Sound":
+                source = self.rows[self.media_roles[role].casefold()]
+                original = Path(source["originalFilePath"])
+                media.append(
+                    {
+                        "role": role,
+                        "active_source_id": source["id"],
+                        "relative_path": original.relative_to(self.sandbox_root).as_posix(),
+                        "sha256": _sha256(original),
+                    }
+                )
+        return BaselineManifest(
+            source_root / "baseline.json",
+            self.version,
+            "0" * 64,
+            _sha256(source_project),
+            stable_tree_sha256(source_root),
+            tuple(objects),
+            tuple(media),
+        )
+
+    def __call__(
+        self, uri: str, args: Mapping[str, Any], options: Mapping[str, Any]
+    ) -> Any:
+        self.calls.append((uri, copy.deepcopy(dict(args)), copy.deepcopy(dict(options))))
+        if uri == OBJECT_GET_API:
+            source = args["from"]
+            values: list[dict[str, Any]] = []
+            if "path" in source:
+                object_id = self.path_to_id.get(str(source["path"][0]).casefold())
+                if object_id is not None:
+                    values = [self.rows[object_id.casefold()]]
+            else:
+                values = [
+                    self.rows[str(object_id).casefold()]
+                    for object_id in source["id"]
+                    if str(object_id).casefold() in self.rows
+                ]
+            if args.get("transform") == [{"select": ["children"]}]:
+                parent_ids = {str(row["id"]).casefold() for row in values}
+                values = [
+                    row
+                    for row in self.rows.values()
+                    if isinstance(row.get("parent"), Mapping)
+                    and str(row["parent"].get("id")).casefold()
+                    in parent_ids
+                ]
+            fields = options["return"]
+            # Wwise 2022.1 rejects children as a return accessor.  The
+            # cross-version shape uses the select transform instead.
+            assert "children" not in fields
+            return {
+                "return": [
+                    {
+                        field: copy.deepcopy(row.get(field, [] if field == "@RTPC" else None))
+                        for field in fields
+                    }
+                    for row in values
+                ]
+            }
+        if uri == GET_TYPES_URI:
+            return {"return": [{"classId": 65552, "name": "Sound", "type": "WObject"}]}
+        if uri == GET_PROPERTY_AND_REFERENCE_NAMES_URI:
+            return {"return": ["OutputBus", "OverrideOutput", "Volume"]}
+        if uri == GET_PROPERTY_INFO_URI:
+            name = str(args["property"])
+            if name == "OutputBus":
+                return {
+                    "name": name,
+                    "type": "Reference",
+                    "default": None,
+                    "display": {"name": "Output Bus"},
+                    "restriction": {"type": "reference"},
+                    "dependencies": [
+                        {
+                            "type": "override",
+                            "action": "Enable",
+                            "context": "Self",
+                            "property": "OverrideOutput",
+                        }
+                    ],
+                }
+            if name == "OverrideOutput":
+                return {
+                    "name": name,
+                    "type": "Boolean",
+                    "default": False,
+                    "display": {"name": name},
+                    "dependencies": [],
+                }
+            if name == "Volume":
+                return {
+                    "name": name,
+                    "type": "Real32",
+                    "default": 0.0,
+                    "display": {"name": name},
+                    "dependencies": [],
+                }
+        raise AssertionError(f"unexpected fake WAAPI call: {uri} {args} {options}")
+
+    def audit_payload(self) -> Mapping[str, Any]:
+        fields = (
+            "id", "name", "type", "path", "parent", "@Volume", "notes",
+            "OutputBus", "activeSource",
+        )
+        return {
+            "ok": True,
+            "command": "query-object",
+            "count": len(IN_SCOPE),
+            "objects": [
+                {
+                    field: copy.deepcopy(
+                        self.rows[self.roles[role].casefold()].get(field)
+                    )
+                    for field in fields
+                }
+                for role in IN_SCOPE
+            ],
+        }
+
+    def identity_payload(self, role: str) -> Mapping[str, Any]:
+        row = self.rows[self.roles[role].casefold()]
+        return self.object_id_payload(row["id"])
+
+    def object_id_payload(self, object_id: str) -> Mapping[str, Any]:
+        row = self.rows[object_id.casefold()]
+        return {
+            "ok": True,
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+                {
+                    field: copy.deepcopy(row[field])
+                    for field in ("id", "name", "type", "path")
+                }
+            ],
+        }
+
+    def apply_set(self, request: Mapping[str, Any]) -> None:
+        request = _plain(request)
+        assert request["operation"] == "object.set"
+        rows = request["arguments"]["objects"]
+        for index, item in enumerate(rows):
+            object_id = item["object"]["value"]
+            row = self.rows[object_id.casefold()]
+            if index == 0:
+                old_path = row["path"]
+                new_path = old_path.rsplit("\\", 1)[0] + "\\" + item["name"]
+                self.path_to_id.pop(old_path.casefold())
+                self.path_to_id[new_path.casefold()] = object_id
+                row["name"] = item["name"]
+                row["path"] = new_path
+                row["notes"] = item["notes"]
+                row["OutputBus"] = {"id": self.roles["weapons_bus"]}
+                action = self.rows[
+                    self.roles["audit_close_action"].casefold()
+                ]
+                old_action_path = action["path"]
+                action_parent, separator, action_name = (
+                    old_action_path.rpartition("\\")
+                )
+                assert separator and action_name.count("Rifle_Close") == 1
+                new_action_name = action_name.replace(
+                    "Rifle_Close", "RFL_Close"
+                )
+                new_action_path = (
+                    action_parent + separator + new_action_name
+                )
+                self.path_to_id.pop(old_action_path.casefold())
+                self.path_to_id[new_action_path.casefold()] = action["id"]
+                action["name"] = new_action_name
+                action["path"] = new_action_path
+            elif index == 1:
+                row["@Volume"] = item["properties"][0]["value"]
+            else:
+                row["notes"] = item["notes"]
+                row["OutputBus"] = {"id": self.roles["weapons_bus"]}
+
+    def mutate(self, mutation: str) -> None:
+        if mutation == "exception":
+            self.rows[self.roles["audit_exception_hot"].casefold()]["notes"] = "changed"
+        elif mutation == "rtpc":
+            ref = self.rows[self.roles["audit_mechanical"].casefold()]["@RTPC"][0]
+            self.rows[ref["id"].casefold()]["@Curve"]["points"][0]["y"] = 99.0
+        elif mutation == "event":
+            self.rows[self.roles["audit_close_action"].casefold()]["Target"] = {
+                "id": self.roles["audit_tail"]
+            }
+        elif mutation == "source":
+            self.rows[self.roles["audit_tail"].casefold()]["activeSource"] = {
+                "id": self.media_roles["audit_close"]
+            }
+        else:
+            raise AssertionError(mutation)
+
+
+def _unit(version: str = "2022.1") -> Any:
+    profile = load_integration_workflows_v2_profile(PROFILE_PATH)
+    return next(
+        unit
+        for unit in profile.units
+        if unit.workflow_id == "weapons_query_guided_batch_cleanup"
+        and unit.version == version
+    )
+
+
+def _paths(tmp_path: Path) -> tuple[Any, Path, Path]:
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    source_project = source_root / "SampleProject.wproj"
+    source_project.write_text("immutable source\n", encoding="utf-8")
+    scenario_root = tmp_path / "scenario"
+    asset_root = scenario_root / "owned" / "assets"
+    io_root = scenario_root / "owned" / "io"
+    sandbox_path = scenario_root / "owned" / "sandbox" / "SampleProject-copy"
+    for path in (asset_root, io_root, sandbox_path):
+        path.mkdir(parents=True, exist_ok=True)
+    sandbox_project = sandbox_path / "SampleProject.wproj"
+    sandbox_project.write_text("copy\n", encoding="utf-8")
+    runtime = SimpleNamespace(
+        scenario_root=scenario_root,
+        asset_root=asset_root,
+        io_root=io_root,
+        sandbox=SimpleNamespace(
+            source_root=source_root,
+            source_project=source_project,
+            sandbox_path=sandbox_path,
+            sandbox_project=sandbox_project,
+        ),
+    )
+    return runtime, source_root, source_project
+
+
+def _prepared(tmp_path: Path, *, version: str = "2022.1") -> tuple[Any, FakeWeaponsWaapi, Any]:
+    unit = _unit(version)
+    runtime, source_root, source_project = _paths(tmp_path)
+    fake = FakeWeaponsWaapi(
+        unit.workflow,
+        version=version,
+        sandbox_root=runtime.sandbox.sandbox_path,
+    )
+    manifest = fake.manifest(source_project=source_project, source_root=source_root)
+    prepared = prepare_weapons_integration_runtime(
+        unit.workflow,
+        unit.scenario,
+        version=version,
+        runtime=runtime,
+        baseline_manifest=manifest,
+        direct_call=fake,
+    )
+    return prepared, fake, runtime
+
+
+def _preview_broker(
+    prepared: Any,
+    fake: FakeWeaponsWaapi,
+) -> tuple[CodexGatewayBroker, Any]:
+    preview = next(
+        step for step in prepared.protocol.steps if step.name == "tx01.preview"
+    )
+    source = next(
+        step
+        for step in prepared.protocol.steps
+        if step.name == "relationship.output_bus.02"
+    )
+    assert source.arguments[1].casefold() == fake.roles["weapons_bus"].casefold()
+    broker = CodexGatewayBroker(
+        skill_source=(
+            Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+        ),
+        expected_steps=prepared.protocol.steps,
+        commutative_read_only_step_groups=(
+            prepared.protocol.commutative_read_only_step_groups
+        ),
+    )
+    broker._payloads_by_step[source.name] = fake.object_id_payload(  # noqa: SLF001
+        str(source.arguments[1])
+    )
+    return broker, preview
+
+
+def _observe(prepared: Any, fake: FakeWeaponsWaapi, *, apply: bool = True) -> None:
+    for step in prepared.protocol.steps:
+        if step.name == "tx01.execute" and apply:
+            fake.apply_set(prepared.operation_request)
+        payload = (
+            fake.audit_payload()
+            if step.name == "audit.scope"
+            else (
+                fake.object_id_payload(str(step.arguments[1]))
+                if step.name.startswith("relationship.output_bus.")
+                else {"ok": True, "command": step.subcommand}
+            )
+        )
+        if step.name.startswith("identity."):
+            payload = fake.identity_payload(step.name.removeprefix("identity."))
+        prepared.observe_payload(step, payload)
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+def test_prepares_scoped_complete_query_and_one_strict_batch(
+    tmp_path: Path, version: str
+) -> None:
+    prepared, _fake, _runtime = _prepared(tmp_path, version=version)
+
+    assert prepared.visible_values["weapons_bus_path"] == (
+        r"\Master-Mixer Hierarchy\Default Work Unit\WAAPI_V2_Weapons"
+        if version == "2022.1"
+        else r"\Busses\Default Work Unit\WAAPI_V2_Weapons"
+    )
+    assert tuple(step.name for step in prepared.protocol.steps) == (
+        "audit.scope",
+        "relationship.output_bus.01",
+        "relationship.output_bus.02",
+        "identity.audit_close",
+        "identity.audit_tail",
+        "identity.audit_mechanical",
+        "tx01.operation-schema",
+        "tx01.preview",
+        "tx01.transaction-show",
+        "tx01.confirm",
+        "tx01.execute",
+        "tx01.verify",
+    )
+    assert prepared.protocol.turn_prefix_counts == (3, 8, 12)
+    assert prepared.protocol.commutative_read_only_step_groups == (
+        (
+            "relationship.output_bus.01",
+            "relationship.output_bus.02",
+        ),
+    )
+    serialized = serialize_protocol(prepared.protocol)
+    assert deserialize_protocol(serialized) == prepared.protocol
+    preview_argument = serialized["steps"][7]["arguments"][2]
+    assert preview_argument["kind"] == (
+        "sealed_query_identity_object_operation_json"
+    )
+    assert preview_argument["source_step"] == "relationship.output_bus.02"
+    assert preview_argument["target_pointers"] == [
+        "/arguments/objects/0/references/0/target",
+        "/arguments/objects/2/references/0/target",
+    ]
+    audit = prepared.protocol.steps[0]
+    assert audit.subcommand == "query-object"
+    assert audit.arguments[:4] == (
+        "--path",
+        prepared.visible_values["weapons_audit_root_path"],
+        "--select",
+        "descendants",
+    )
+    assert audit.arguments[4:] == (
+        "--where-json",
+        SemanticJsonArgument(
+            {"field": "type", "operator": "=", "value": "Sound"}
+        ),
+        "--all-results",
+        "--return-field",
+        "id",
+        "--return-field",
+        "name",
+        "--return-field",
+        "type",
+        "--return-field",
+        "path",
+        "--return-field",
+        "OutputBus",
+        "--return-field",
+        "@Volume",
+        "--return-field",
+        "notes",
+    )
+    before = prepared.before_snapshot.objects_by_role()
+    expected_bus_ids = (
+        before["footsteps_bus"].object_id,
+        before["weapons_bus"].object_id,
+    )
+    for step, object_id in zip(
+        prepared.protocol.steps[1:3], expected_bus_ids, strict=True
+    ):
+        assert step.subcommand == "query-object"
+        assert step.arguments == (
+            "--object-id",
+            object_id,
+            "--return-field",
+            "id",
+            "--return-field",
+            "name",
+            "--return-field",
+            "type",
+            "--return-field",
+            "path",
+        )
+    for step, role in zip(
+        prepared.protocol.steps[3:6],
+        ("audit_close", "audit_tail", "audit_mechanical"),
+        strict=True,
+    ):
+        assert step.subcommand == "query-object"
+        assert step.arguments == (
+            "--object-id",
+            before[role].object_id,
+            "--return-field",
+            "id",
+            "--return-field",
+            "name",
+            "--return-field",
+            "type",
+            "--return-field",
+            "path",
+        )
+    request = _plain(prepared.operation_request)
+    assert request["contract"] == "waapi-skill.operation-request/v1"
+    assert request["version"] == version
+    assert request["operation"] == "object.set"
+    assert len(request["arguments"]["objects"]) == 3
+    assert request["arguments"]["objects"][0]["name"] == "RFL_Close"
+    assert request["arguments"]["objects"][1]["properties"] == [
+        {"name": "Volume", "value": -3.0}
+    ]
+    assert request["arguments"]["objects"][2]["notes"] == (
+        "release-ready | mechanical"
+    )
+    assert prepared.expected_dispatches[0].api == OBJECT_SET_API
+    assert prepared.expected_dispatches[0].count == 1
+    assert len(prepared.before_snapshot.objects) == 13
+    assert len(prepared.before_snapshot.media) == 7
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+def test_weapons_fast_path_keeps_canonical_volume_and_rejects_query_accessor(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path, version=version)
+    broker, preview = _preview_broker(prepared, fake)
+    argument = preview.arguments[2]
+
+    assert isinstance(argument, SealedQueryIdentityBoundJsonArgument)
+    assert argument.equivalence == "object_operation_v1"
+    expected = _plain(argument.expected)
+    tail_properties = expected["arguments"]["objects"][1]["properties"]
+    assert tail_properties == [{"name": "Volume", "value": -3.0}]
+
+    accessor_request = copy.deepcopy(expected)
+    accessor_request["arguments"]["objects"][1]["properties"][0]["name"] = (
+        "@Volume"
+    )
+    with pytest.raises(GatewayInvocationError, match="semantically equal"):
+        broker._validate_step(  # noqa: SLF001
+            preview,
+            (
+                "preview",
+                "--apply",
+                "--request-json",
+                json.dumps(accessor_request, separators=(",", ":")),
+            ),
+        )
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+@pytest.mark.parametrize("identity_form", ["path", "id", "mixed"])
+def test_preview_accepts_only_the_two_identities_from_the_sealed_weapons_bus_row(
+    tmp_path: Path,
+    version: str,
+    identity_form: str,
+) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path, version=version)
+    broker, preview = _preview_broker(prepared, fake)
+    argument = preview.arguments[2]
+    assert isinstance(argument, SealedQueryIdentityBoundJsonArgument)
+    request = _plain(argument.expected)
+    canonical_hash, _ = broker._validate_step(  # noqa: SLF001
+        preview,
+        (
+            "preview",
+            "--apply",
+            "--request-json",
+            json.dumps(request, separators=(",", ":")),
+        ),
+    )
+
+    if identity_form in {"id", "mixed"}:
+        request["arguments"]["objects"][0]["references"][0]["target"] = {
+            "kind": "id",
+            "value": fake.roles["weapons_bus"],
+        }
+    if identity_form == "id":
+        request["arguments"]["objects"][2]["references"][0]["target"] = {
+            "kind": "id",
+            "value": fake.roles["weapons_bus"],
+        }
+
+    semantic_hash, execution_argv = broker._validate_step(  # noqa: SLF001
+        preview,
+        (
+            "preview",
+            "--apply",
+            "--request-json",
+            json.dumps(request, separators=(",", ":")),
+        ),
+    )
+
+    assert semantic_hash == canonical_hash
+    assert json.loads(execution_argv[-1]) == request
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+@pytest.mark.parametrize("object_index", [0, 2])
+@pytest.mark.parametrize("wrong_identity", ["guid", "path"])
+def test_preview_rejects_wrong_output_bus_guid_or_path(
+    tmp_path: Path,
+    version: str,
+    object_index: int,
+    wrong_identity: str,
+) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path, version=version)
+    broker, preview = _preview_broker(prepared, fake)
+    argument = preview.arguments[2]
+    assert isinstance(argument, SealedQueryIdentityBoundJsonArgument)
+    request = _plain(argument.expected)
+    target = request["arguments"]["objects"][object_index]["references"][0][
+        "target"
+    ]
+    if wrong_identity == "guid":
+        target.update({"kind": "id", "value": _guid("wrong-output-bus")})
+    else:
+        target["value"] += "_Wrong"
+
+    with pytest.raises(GatewayInvocationError, match="sealed query-identity"):
+        broker._validate_step(  # noqa: SLF001
+            preview,
+            (
+                "preview",
+                "--apply",
+                "--request-json",
+                json.dumps(request, separators=(",", ":")),
+            ),
+        )
+
+
+@pytest.mark.parametrize("source_drift", ["id", "path"])
+def test_preview_rejects_a_drifted_sealed_output_bus_source_row(
+    tmp_path: Path,
+    source_drift: str,
+) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path)
+    broker, preview = _preview_broker(prepared, fake)
+    source_payload = copy.deepcopy(
+        broker._payloads_by_step["relationship.output_bus.02"]  # noqa: SLF001
+    )
+    if source_drift == "id":
+        source_payload["objects"][0]["id"] = _guid("wrong-output-bus")
+    else:
+        source_payload["objects"][0]["path"] += "_Wrong"
+    broker._payloads_by_step["relationship.output_bus.02"] = (  # noqa: SLF001
+        source_payload
+    )
+    argument = preview.arguments[2]
+    assert isinstance(argument, SealedQueryIdentityBoundJsonArgument)
+
+    with pytest.raises(GatewayInvocationError, match="sealed query.identity"):
+        broker._validate_step(  # noqa: SLF001
+            preview,
+            (
+                "preview",
+                "--apply",
+                "--request-json",
+                json.dumps(_plain(argument.expected), separators=(",", ":")),
+            ),
+        )
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+def test_children_use_select_transform_not_return_accessor(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path, version=version)
+
+    object_calls = [
+        (args, options)
+        for uri, args, options in fake.calls
+        if uri == OBJECT_GET_API
+    ]
+    assert object_calls
+    assert all("children" not in options["return"] for _, options in object_calls)
+    child_calls = [
+        (args, options)
+        for args, options in object_calls
+        if args.get("transform") == [{"select": ["children"]}]
+    ]
+    assert len(child_calls) == 2
+    assert {
+        str(args["from"]["id"][0]).casefold() for args, _ in child_calls
+    } == {
+        prepared.before_snapshot.objects_by_role()[role].object_id.casefold()
+        for role in ("audit_root", "audit_close_event")
+    }
+    assert all(
+        options["return"] == ["id", "name", "type", "path", "parent"]
+        for _, options in child_calls
+    )
+    action = prepared.before_snapshot.objects_by_role()["audit_close_action"]
+    assert any(
+        args.get("from") == {"id": [action.object_id]}
+        and "transform" not in args
+        for args, _ in object_calls
+    )
+    assert not any(
+        args.get("from") == {"path": [action.path]}
+        for args, _ in object_calls
+    )
+    prepared.cleanup().assert_passed()
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+def test_successful_batch_passes_all_ten_business_assertions(
+    tmp_path: Path, version: str
+) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path, version=version)
+
+    _observe(prepared, fake)
+    verification = prepared.verify_final()
+
+    verification.assert_passed()
+    assert verification.passed is True
+    assert tuple(verification.assertions) == (
+        "audit_candidates_exact",
+        "excluded_scope_absent",
+        "selected_ids_revalidated",
+        "selected_guids_and_parents_preserved",
+        "selected_corrections_exact",
+        "single_object_set_batch",
+        "event_action_links_unchanged",
+        "rtpc_and_audio_sources_unchanged",
+        "exceptions_and_controls_unchanged",
+        "source_project_unchanged",
+    )
+    assert all(verification.assertions.values())
+    assert fake.rows[fake.roles["audit_close"].casefold()]["name"] == "RFL_Close"
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+def test_derived_action_display_path_may_follow_renamed_target(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path, version=version)
+    old_action = prepared.before_snapshot.objects_by_role()[
+        "audit_close_action"
+    ]
+
+    _observe(prepared, fake)
+    verification = prepared.verify_final()
+
+    verification.assert_passed()
+    assert verification.assertions["event_action_links_unchanged"] is True
+    assert verification.after is not None
+    new_action = verification.after.objects_by_role()["audit_close_action"]
+    assert new_action.object_id == old_action.object_id
+    assert new_action.name == old_action.name.replace(
+        "Rifle_Close", "RFL_Close"
+    )
+    assert new_action.path == (
+        old_action.path.rsplit("\\", 1)[0] + "\\" + new_action.name
+    )
+    assert new_action.state == old_action.state
+
+
+def test_action_must_remain_the_event_exact_live_child(tmp_path: Path) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path)
+    _observe(prepared, fake)
+    fake.rows[fake.roles["audit_close_action"].casefold()]["parent"] = {
+        "id": _guid("unexpected-event")
+    }
+
+    verification = prepared.verify_final()
+
+    assert verification.passed is False
+    assert verification.after is None
+    assert any(
+        "exactly one direct Action" in failure
+        for failure in verification.failures
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "failed_assertion"),
+    [
+        ("exception", "exceptions_and_controls_unchanged"),
+        ("rtpc", "rtpc_and_audio_sources_unchanged"),
+        ("event", "event_action_links_unchanged"),
+        ("source", "rtpc_and_audio_sources_unchanged"),
+    ],
+)
+def test_oracle_detects_protected_state_drift(
+    tmp_path: Path, mutation: str, failed_assertion: str
+) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path)
+    _observe(prepared, fake)
+    fake.mutate(mutation)
+
+    verification = prepared.verify_final()
+
+    assert verification.passed is False
+    assert verification.assertions[failed_assertion] is False
+
+
+def test_audit_payload_fails_closed_on_scope_escape(tmp_path: Path) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path)
+    payload = copy.deepcopy(fake.audit_payload())
+    payload["objects"].append(
+        copy.deepcopy(fake.rows[fake.roles["audit_out_of_scope"].casefold()])
+    )
+
+    with pytest.raises(WeaponsIntegrationRuntimeError, match="escaped"):
+        prepared.observe_payload(prepared.protocol.steps[0], payload)
+
+
+def test_audit_payload_fails_closed_on_unreviewed_output_bus(tmp_path: Path) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path)
+    payload = copy.deepcopy(fake.audit_payload())
+    payload["objects"][0]["OutputBus"] = {"id": _guid("unreviewed-bus")}
+
+    with pytest.raises(WeaponsIntegrationRuntimeError, match="distinct OutputBus set"):
+        prepared.observe_payload(prepared.protocol.steps[0], payload)
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_output_bus_hops_accept_both_orders_and_finish_only_after_both(
+    tmp_path: Path,
+    version: str,
+    reverse: bool,
+) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path, version=version)
+    audit_payload = copy.deepcopy(fake.audit_payload())
+    bus_steps = list(prepared.protocol.steps[1:3])
+    if reverse:
+        audit_payload["objects"].reverse()
+        bus_steps.reverse()
+
+    prepared.observe_payload(prepared.protocol.steps[0], audit_payload)
+    prepared.observe_payload(
+        bus_steps[0],
+        fake.object_id_payload(str(bus_steps[0].arguments[1])),
+    )
+    assert prepared.verify_turn(1).passed is False
+
+    prepared.observe_payload(
+        bus_steps[1],
+        fake.object_id_payload(str(bus_steps[1].arguments[1])),
+    )
+
+    assert prepared.verify_turn(1).passed is True
+    canonical = tuple(step.name for step in prepared.protocol.steps[:3])
+    observed = (canonical[0], *(step.name for step in bus_steps))
+    assert gateway_step_sequence_matches(
+        canonical,
+        observed,
+        prepared.protocol.commutative_read_only_step_groups,
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    (
+        ("id", "different OutputBus GUID"),
+        ("type", "did not resolve to a Bus"),
+        ("path", "sealed OutputBus identity"),
+        ("missing_path", "identity shape is not closed"),
+    ),
+)
+def test_output_bus_hop_rejects_untrusted_identity_shapes(
+    tmp_path: Path,
+    mutation: str,
+    message: str,
+) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path)
+    prepared.observe_payload(prepared.protocol.steps[0], fake.audit_payload())
+    step = prepared.protocol.steps[1]
+    payload = copy.deepcopy(fake.object_id_payload(str(step.arguments[1])))
+    if mutation == "id":
+        payload["objects"][0]["id"] = fake.roles["weapons_bus"]
+    elif mutation == "type":
+        payload["objects"][0]["type"] = "Sound"
+    elif mutation == "path":
+        payload["objects"][0]["path"] += "_Drifted"
+    else:
+        payload["objects"][0].pop("path")
+
+    with pytest.raises(WeaponsIntegrationRuntimeError, match=message):
+        prepared.observe_payload(step, payload)
+
+
+def test_output_bus_target_classification_uses_path_not_same_name(
+    tmp_path: Path,
+) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path)
+    prepared.observe_payload(prepared.protocol.steps[0], fake.audit_payload())
+    wrong_bus_step, target_bus_step = prepared.protocol.steps[1:3]
+    wrong_bus_payload = copy.deepcopy(
+        fake.object_id_payload(str(wrong_bus_step.arguments[1]))
+    )
+    target_bus_payload = fake.object_id_payload(str(target_bus_step.arguments[1]))
+    wrong_bus_payload["objects"][0]["name"] = target_bus_payload["objects"][0][
+        "name"
+    ]
+
+    prepared.observe_payload(wrong_bus_step, wrong_bus_payload)
+    prepared.observe_payload(target_bus_step, target_bus_payload)
+
+    assert prepared.verify_turn(1).passed is True
+
+
+def test_output_bus_hops_reject_duplicate_before_second_distinct_read(
+    tmp_path: Path,
+) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path)
+    prepared.observe_payload(prepared.protocol.steps[0], fake.audit_payload())
+    first = prepared.protocol.steps[1]
+    payload = fake.object_id_payload(str(first.arguments[1]))
+    prepared.observe_payload(first, payload)
+
+    with pytest.raises(WeaponsIntegrationRuntimeError, match="duplicated or observed"):
+        prepared.observe_payload(first, payload)
+
+
+def test_preview_and_audit_turns_are_read_only(tmp_path: Path) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path)
+    audit_step = prepared.protocol.steps[0]
+    prepared.observe_payload(audit_step, fake.audit_payload())
+    for step in prepared.protocol.steps[1:prepared.protocol.turn_prefix_counts[1]]:
+        payload = (
+            fake.object_id_payload(str(step.arguments[1]))
+            if step.name.startswith("relationship.output_bus.")
+            else (
+                fake.identity_payload(step.name.removeprefix("identity."))
+                if step.name.startswith("identity.")
+                else {"ok": True, "command": step.subcommand}
+            )
+        )
+        prepared.observe_payload(step, payload)
+
+    assert prepared.verify_turn(1).passed is True
+    assert prepared.verify_turn(2).passed is True
+
+
+def test_exact_id_readback_fails_closed_before_preview_on_identity_drift(
+    tmp_path: Path,
+) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path)
+    prepared.observe_payload(prepared.protocol.steps[0], fake.audit_payload())
+    for step in prepared.protocol.steps[1:3]:
+        prepared.observe_payload(
+            step,
+            fake.object_id_payload(str(step.arguments[1])),
+        )
+    step = prepared.protocol.steps[3]
+    payload = copy.deepcopy(
+        fake.identity_payload(step.name.removeprefix("identity."))
+    )
+    payload["objects"][0]["path"] += "_Drifted"
+
+    with pytest.raises(
+        WeaponsIntegrationRuntimeError,
+        match="sealed selected object identity",
+    ):
+        prepared.observe_payload(step, payload)
+
+
+def test_manifest_rejects_noncanonical_state_shape(tmp_path: Path) -> None:
+    unit = _unit()
+    runtime, source_root, source_project = _paths(tmp_path)
+    fake = FakeWeaponsWaapi(
+        unit.workflow,
+        version="2022.1",
+        sandbox_root=runtime.sandbox.sandbox_path,
+    )
+    manifest = fake.manifest(source_project=source_project, source_root=source_root)
+    rows = [copy.deepcopy(dict(row)) for row in manifest.objects]
+    row = next(item for item in rows if item["role"] == "audit_close")
+    row["state"]["unexpected"] = True
+    row["state_sha256"] = _digest(row["state"])
+    drifted = BaselineManifest(
+        manifest.path,
+        manifest.version,
+        manifest.digest,
+        manifest.project_file_sha256,
+        manifest.full_tree_sha256,
+        tuple(rows),
+        manifest.media,
+    )
+
+    with pytest.raises(WeaponsIntegrationRuntimeError, match="state shape"):
+        prepare_weapons_integration_runtime(
+            unit.workflow,
+            unit.scenario,
+            version="2022.1",
+            runtime=runtime,
+            baseline_manifest=drifted,
+            direct_call=fake,
+        )
+
+
+def test_cleanup_owns_no_project_or_input_deletion(tmp_path: Path) -> None:
+    prepared, _fake, runtime = _prepared(tmp_path)
+
+    proof = prepared.cleanup()
+    repeated = prepared.cleanup()
+
+    proof.assert_passed()
+    assert proof.sandbox_untouched is True
+    assert proof.source_untouched is True
+    assert runtime.sandbox.sandbox_project.exists()
+    assert repeated.already_clean is True

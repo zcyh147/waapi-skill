@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <WwiseDocument Type="WorkUnit" ID="{6D1262CA-2375-4279-B5E2-FF5C0B0120EA}" SchemaVersion="110">
 	<GameParameters>
-		<WorkUnit Name="Default Work Unit" ID="{6D1262CA-2375-4279-B5E2-FF5C0B0120EA}" PersistMode="Standalone"/>
+		<WorkUnit Name="Default Work Unit" ID="{6D1262CA-2375-4279-B5E2-FF5C0B0120EA}" PersistMode="Standalone">
+			<ChildrenList>
+				<Folder Name="WAAPI Skill Integration V2" ID="{296F84DC-D8F9-4D4B-8BEE-9F2279EBA5AD}" ShortID="611042539">
+					<ChildrenList>
+						<GameParameter Name="Rifle_Distance" ID="{6F785D43-C143-4388-87DD-2706AEEBD32B}"/>
+					</ChildrenList>
+				</Folder>
+			</ChildrenList>
+		</WorkUnit>
 	</GameParameters>
 </WwiseDocument>

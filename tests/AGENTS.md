@@ -47,8 +47,9 @@ a version string:
 4. Review the default structured `query-schema` and the separately disclosed
    `query-schema --advanced` contract against the new reflection. Extend
    five-version Builder compiler goldens, advanced fixed-URI/final-cap tests,
-   schema parity, request ceilings, and mutation-isolation negatives whenever
-   either query layer changes. Native advanced syntax is accepted or rejected
+   schema parity, UTF-8 byte/framing disclosure, request ceilings, and
+   mutation-isolation negatives whenever either query layer changes. Native
+   advanced syntax is accepted or rejected
    by the matching live Wwise version; program tests must not claim otherwise.
 5. Run focused tests and extend `ci/test.sh --mode program` to prove the new
    supported-version matrix. Then run the matching smoke/live and destructive
@@ -148,9 +149,9 @@ sandboxes remain quarantined, and every lifecycle record reports unchanged
 source-project full hash and mtime. Those campaigns predate the structured
 `query-schema`/`query-object --request-json` migration, the separately
 disclosed bounded advanced-WAQL layer, and the removal of raw WAQL mutation
-selectors. No fresh Codex semantic campaign has validated those newer routing
-contracts; keep the historical integration result attached only to its
-migration-before candidate.
+selectors. Those V1 roots do not validate the newer routing contracts; keep
+the historical integration result attached only to its migration-before
+candidate. The V2 evidence below applies only to its exact workflow paths.
 
 The natural-language prompt revision received a fresh 2026-08-03 campaign.
 `campaign-integration-workflows-v1-terra-20260803-current-r1` passed five of
@@ -165,6 +166,49 @@ reference and passed for both versions in `r1`. This gives all six current
 prompt units passing evidence across roots, not a single repaired-candidate
 6/6 run. All eight lifecycle records preserve source hashes and mtimes;
 passing sandboxes were cleaned and the failed sandbox remains quarantined.
+Those V1 roots do not validate the newer V2 fixture, routing, or workflow
+contracts.
+
+The separate `integration_workflows_v2_cross_version_6` profile uses the fixed
+`WAAPI Skill Integration V2` graph committed in the 2022.1 and 2025.1
+`tests/_org` SampleProject sources. It schedules three workflows on both
+versions: six fresh memory-off Codex tasks, 16 user turns, and eight separately
+previewed transactions. Use only `gpt-5.6-terra`, medium reasoning, the default
+service tier, and sequential execution. Every unit starts by copying the
+committed source into a new owned sandbox; Wwise must never open the committed
+fixture itself. The lifecycle records the source full-tree hash and project
+mtime before and after each attempt, removes a passing sandbox, and seals and
+quarantines a failed, blocked, retryable, or indeterminate one.
+
+The completed 2026-08-03 V2 evidence is cumulative across frozen roots, not one
+final-candidate 6/6 run. `r8` passed both Rifle units, `r12-2022` passed the
+2022.1 Weapons unit, `r23-2022-footsteps` passed the 2022.1 Footsteps unit, and
+`r24-2025-repairs` passed the 2025.1 Footsteps and Weapons units. All six unique
+units therefore have passing evidence across those roots. Passing sandboxes
+were removed; failed or blocked diagnostic sandboxes were sealed and
+quarantined; every recorded source-project full hash and mtime remained
+unchanged.
+
+The committed v2 baseline manifests are maintenance evidence, not semantic
+passes. To refresh one, first prepare and open an isolated copy with the normal
+test lifecycle, then run the collector against that already-running copy:
+
+```bash
+skills/waapi-skill/.venv/bin/python \
+  tests/maintenance/collect_integration_workflows_v2_baseline.py \
+  --version 2022.1 \
+  --live-project /absolute/path/to/sandbox/SampleProject.wproj \
+  --write
+```
+
+The collector is preview-only without `--write`, accepts only an absolute
+sandbox `.wproj`, and performs live reads exclusively through
+`skills/waapi-skill/scripts/run.py gateway.py`. It does not launch Wwise,
+mutate a project, or authorize opening either fixed source. Repeat with the
+2025.1 sandbox separately. Historical `integration_workflows_cross_version_6`
+(V1) evidence does not validate this V2 profile. The completed V2 roots prove
+only the exact Rifle, Footsteps, and Weapons workflow paths; they grant no
+per-API coverage credit and do not prove advanced WAQL or unrelated routes.
 
 The review-oriented v3 bundle is rooted at
 `skills/waapi-skill/evals/suite-v3.json` and deliberately separates:

@@ -209,7 +209,7 @@ def test_advanced_query_five_version_contract_appends_gateway_cap(version: str) 
 def test_advanced_query_preserves_existing_transforms_and_adds_a_second_take() -> None:
     preview = build_advanced_object_get_query(
         advanced_request(
-            waql="from type Sound skip 10 take 40 orderby name reverse   ",
+            waql="from type Sound skip 10 take 40 orderby name reverse",
             max_results=7,
         )
     )
@@ -271,6 +271,8 @@ def test_advanced_query_rejects_contract_and_budget_drift(
     "waql",
     (
         "$ from type Sound",
+        " from type Sound",
+        "from type Sound ",
         "from type Sound\norderby name",
         "from type Sound; from type Event",
         "from type Sound // second query",
@@ -303,18 +305,25 @@ def test_advanced_query_schema_is_closed_and_versioned(version: str) -> None:
     assert schema["properties"]["return"]["uniqueItems"] is True
     assert schema["properties"]["waql"]["x-maxUtf8Bytes"] == MAX_ADVANCED_WAQL_BYTES
     assert schema["properties"]["waql"]["x-framing"] == {
+        "trimmed": True,
         "singleLine": True,
         "queryEditorDollarPrefix": False,
         "comments": False,
         "statementSeparators": False,
         "balancedDoubleQuotedStrings": True,
         "balancedSlashRegexLiterals": True,
-        "trailingWhitespace": "removed-before-final-take",
     }
     assert schema["properties"]["return"]["items"]["x-maxUtf8Bytes"] == (
         MAX_ADVANCED_RETURN_EXPRESSION_BYTES
     )
-    assert schema["properties"]["return"]["items"]["x-framing"]["trimmed"] is True
+    assert schema["properties"]["return"]["items"]["x-framing"] == {
+        "trimmed": True,
+        "singleLine": True,
+        "comments": False,
+        "statementSeparators": False,
+        "balancedDoubleQuotedStrings": True,
+        "balancedSlashRegexLiterals": True,
+    }
     assert schema["properties"]["max_results"] == {
         "type": "integer",
         "minimum": 1,

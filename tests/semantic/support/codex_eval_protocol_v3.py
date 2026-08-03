@@ -37,6 +37,8 @@ def operation_request_equivalence(operation: str) -> str:
         return "object_operation_v1"
     if operation == "soundbank.generate":
         return "soundbank_generate_v1"
+    if operation == "switchContainer.removeAssignment":
+        return "switch_container_remove_assignment_v1"
     return "wire_exact"
 
 
@@ -157,6 +159,7 @@ def build_transaction_protocol(
     *,
     refusal: StructuredRefusal | None = None,
     terminal_execute: bool = False,
+    request_equivalences: Sequence[str] | None = None,
 ) -> V3GatewayProtocol:
     """Build one or more separately confirmed immutable transactions.
 
@@ -183,10 +186,34 @@ def build_transaction_protocol(
         raise V3ProtocolError(
             "terminal execute and structured preview refusal are mutually exclusive"
         )
+    if request_equivalences is None:
+        equivalences = tuple(
+            operation_request_equivalence(str(request["operation"]))
+            for request in normalized
+        )
+    else:
+        equivalences = tuple(request_equivalences)
+        if len(equivalences) != len(normalized):
+            raise V3ProtocolError(
+                "request equivalences must match the transaction request count"
+            )
+        for request, equivalence in zip(normalized, equivalences, strict=True):
+            operation = str(request["operation"])
+            default = operation_request_equivalence(operation)
+            if equivalence != default and not (
+                operation == "audio.import"
+                and equivalence == "audio_import_default_operation_v1"
+            ):
+                raise V3ProtocolError(
+                    "request equivalence is not reviewed for the operation"
+                )
 
     steps: list[ExpectedGatewayStep] = []
     prefixes: list[int] = []
-    for index, request in enumerate(normalized, start=1):
+    for index, (request, request_equivalence) in enumerate(
+        zip(normalized, equivalences, strict=True),
+        start=1,
+    ):
         label = f"tx{index:02d}"
         operation = str(request["operation"])
         steps.append(
@@ -206,7 +233,7 @@ def build_transaction_protocol(
                     "--request-json",
                     SemanticJsonArgument(
                         request,
-                        equivalence=operation_request_equivalence(operation),
+                        equivalence=request_equivalence,
                     ),
                 ),
                 allowed_exit_codes=(2,) if refusal is not None else (0,),

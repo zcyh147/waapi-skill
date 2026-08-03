@@ -122,9 +122,9 @@ For capability discovery, start with `capabilities --all-versions --summary-only
 
 When the user explicitly asks for the five-version coverage numbers, exclusions, or what the program matrix proves, read `references/waapi-coverage.md` once and combine it with the current offline catalog. Do not claim that program-tested coverage is live-Wwise verification.
 
-Object discovery is progressive: simple flags, the structured Builder, then—only if its schema lacks required read-only syntax—the exact advanced contract. Do not reject the read or skip a sufficient earlier layer. Advanced WAQL stays inside fixed read-only `object.get` with Gateway row/time/byte limits; never rewrite a rejection or select a mutation from its result. For a later change, show candidates; after the user chooses, verify that GUID plus matching name/type/path via the simple exact-ID route. Generic `call` remains forbidden; obey `QUERY_OBJECT_REQUIRED`, `FIXED_COMMAND_REQUIRED`, and `WAIT_TOPIC_REQUIRED`.
+Object discovery progresses from simple flags to the structured Builder, using the exact advanced contract only when required. Do not skip a sufficient layer. Advanced WAQL is fixed read-only `object.get`, Gateway-bounded, and its schema states UTF-8/framing limits. Never rewrite a rejection or mutate from its result: a one-row response never certifies uniqueness. Before a later change, show candidates and exact-ID verify the chosen GUID/name/type/path. Do likewise for a mutation subset selected from multiple ordinary/structured results; relationship-GUID read hops are exempt. Generic `call` remains forbidden; obey `QUERY_OBJECT_REQUIRED`, `FIXED_COMMAND_REQUIRED`, and `WAIT_TOPIC_REQUIRED`.
 
-When the requested answer is machine-readable and any successful gateway payload contains `agent_result`, compact-serialize exactly that object as the result body and stop. This rule applies to fixed reads as well as transactions. Do not reconstruct its fields from the prompt, `normalized`, summaries, or verification evidence; do not alter JSON escaping or add/remove keys; and do not run another command after receiving it. If the required envelope is `WAAPI_RESULT_JSON=<json>`, append the compact serialization of `agent_result` directly after the prefix. Failed, deferred, indeterminate, or boundary payloads intentionally have no successful `agent_result`; report their actual state instead of inventing one. The one-time introduction belongs in a separate progress update when needed and never changes the exact machine-readable result body. For a normal natural-language answer, use the complete gateway evidence rather than only the compact projection.
+When a machine-readable answer is requested and any successful gateway payload contains `agent_result`, compact-serialize exactly that object as the result body and stop. This rule applies to fixed reads as well as transactions. Do not reconstruct its fields from the prompt, `normalized`, summaries, or verification evidence; do not alter JSON escaping or keys; and do not run another command after receiving it. For `WAAPI_RESULT_JSON=<json>`, append compact `agent_result` directly after the prefix. Failed, deferred, indeterminate, or boundary payloads have no successful `agent_result`; report their actual state. Put the one-time introduction in a separate progress update; it never changes the exact machine-readable body. Normal query answers use default business fields. Use `query-object --detail` only for explicit user requests or compile/dispatch diagnosis; never rerun solely for detail.
 
 ## Routing
 
@@ -142,7 +142,7 @@ Classify the requested action, not background wording. A request to listen for, 
 
 Default result shape: return the resolved structured result, not just “I called WAAPI”.
 
-For one exact path/GUID existence or standard identity lookup, run exactly one fixed `query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path`; substitute `--object-id '<exact-guid>'` for a GUID. Keep all four return fields explicit. This route is complete: do not read the query reference before or after it, and do not retry a rejected or failed gateway invocation.
+For exact path/GUID existence or identity lookup, run exactly one fixed `query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path`; substitute `--object-id '<exact-guid>'` for a GUID. Keep all four return fields explicit. Exact `not_found` stays Gateway-owned in compact output; use `--detail` only for explicit compile/dispatch diagnostics. This route is complete: do not read the query reference before or after it, and do not retry a rejected or failed gateway invocation.
 
 For current-selection questions, prefer the live selected-object query path first. If the connected endpoint is a headless or command-line Wwise instance where the UI selection API is unavailable, report that boundary clearly instead of drifting into repo/docs research or pretending a selection result exists.
 
@@ -154,8 +154,9 @@ Conditional read for a query not fully covered by the fixed commands, exact-iden
 
 Use operate for project-changing work: create, move, copy, delete, property/reference edits, imports, soundbanks, switch assignments, and design previews.
 
-For `object.create`/`object.set`, run schema before metadata; its adapter version
-selects scope. For other metadata-bound changes without a live-proven token,
+For `object.create`/`object.set`, finish any required selected-subset exact-ID
+readback first, then run schema before metadata; its adapter version selects
+scope. For other metadata-bound changes without a live-proven token,
 metadata discovery is the first Gateway command after the operate reference,
 followed by schema. Never infer name, scope, or order.
 

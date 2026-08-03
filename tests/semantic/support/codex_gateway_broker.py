@@ -107,6 +107,10 @@ _SUBSCRIPTION_ACK_WAIT_SECONDS = 30.0
 _SUBSCRIPTION_ACK_POLL_SECONDS = 0.01
 _SUBSCRIPTION_ACK_NONCE_RE = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_GUID_RE = re.compile(
+    r"^\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
+    r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}$"
+)
 _CROCKFORD_BASE32_ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz"
 _CONFIRMATION_TOKEN_RE = re.compile(
     rf"^ct1-[{_CROCKFORD_BASE32_ALPHABET}]{{24}}$"
@@ -233,6 +237,12 @@ _SOUNDBANK_GENERATE_DEFAULT_FALSE_ARGUMENT_FIELDS = (
     "clear_audio_file_cache",
     "rebuild_init_bank",
 )
+_SWITCH_CONTAINER_REMOVE_ASSIGNMENT_EQUIVALENCE = (
+    "switch_container_remove_assignment_v1"
+)
+_AUDIO_IMPORT_DEFAULT_OPERATION_EQUIVALENCE = (
+    "audio_import_default_operation_v1"
+)
 
 
 class GatewayBrokerError(RuntimeError):
@@ -253,13 +263,25 @@ class SemanticJsonArgument:
     def __post_init__(self) -> None:
         if self.equivalence not in {
             "wire_exact",
+            _AUDIO_IMPORT_DEFAULT_OPERATION_EQUIVALENCE,
             "object_operation_v1",
             "soundbank_generate_v1",
+            _SWITCH_CONTAINER_REMOVE_ASSIGNMENT_EQUIVALENCE,
         }:
             raise ValueError(
                 "SemanticJsonArgument.equivalence must be wire_exact, "
-                "object_operation_v1, or soundbank_generate_v1"
+                "audio_import_default_operation_v1, object_operation_v1, "
+                "soundbank_generate_v1, or "
+                "switch_container_remove_assignment_v1"
             )
+        if self.equivalence == _AUDIO_IMPORT_DEFAULT_OPERATION_EQUIVALENCE:
+            try:
+                _normalize_audio_import_default_operation_request(self.expected)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "audio_import_default_operation_v1 requires one valid "
+                    "audio.import request"
+                ) from exc
         if self.equivalence == "soundbank_generate_v1":
             try:
                 _normalize_soundbank_generate_request(self.expected)
@@ -268,6 +290,92 @@ class SemanticJsonArgument:
                     "soundbank_generate_v1 requires one valid "
                     "soundbank.generate request"
                 ) from exc
+        if self.equivalence == _SWITCH_CONTAINER_REMOVE_ASSIGNMENT_EQUIVALENCE:
+            try:
+                _switch_container_remove_assignment_arguments(self.expected)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "switch_container_remove_assignment_v1 requires one valid "
+                    "switchContainer.removeAssignment request"
+                ) from exc
+
+
+@dataclass(frozen=True, slots=True)
+class SealedQueryIdentityBoundJsonArgument(SemanticJsonArgument):
+    """One object operation with two identities bound to one prior query row.
+
+    This is deliberately narrower than the general object-operation matcher.
+    Only the declared request locations may alternate between the exact path in
+    ``expected`` and the GUID returned beside that path by ``source_step``.
+    """
+
+    source_step: str = ""
+    target_pointers: tuple[str, ...] = ()
+    equivalence: str = "object_operation_v1"
+
+    def __post_init__(self) -> None:
+        SemanticJsonArgument.__post_init__(self)
+        if self.equivalence != "object_operation_v1":
+            raise ValueError(
+                "SealedQueryIdentityBoundJsonArgument requires "
+                "object_operation_v1 equivalence"
+            )
+        if (
+            not isinstance(self.source_step, str)
+            or not self.source_step
+            or self.source_step != self.source_step.strip()
+            or len(self.source_step) > 160
+        ):
+            raise ValueError(
+                "SealedQueryIdentityBoundJsonArgument.source_step must be non-empty"
+            )
+        if (
+            not isinstance(self.target_pointers, tuple)
+            or len(self.target_pointers) != 2
+            or len(set(self.target_pointers)) != 2
+            or any(
+                not isinstance(pointer, str)
+                or not pointer.startswith("/")
+                or not pointer.endswith("/target")
+                or len(pointer) > 512
+                for pointer in self.target_pointers
+            )
+        ):
+            raise ValueError(
+                "SealedQueryIdentityBoundJsonArgument requires two unique "
+                "target JSON pointers"
+            )
+        if (
+            not isinstance(self.expected, Mapping)
+            or self.expected.get("operation") != "object.set"
+        ):
+            raise ValueError(
+                "SealedQueryIdentityBoundJsonArgument requires object.set"
+            )
+        for pointer in self.target_pointers:
+            try:
+                target = _json_pointer(self.expected, pointer)
+                reference = _json_pointer(
+                    self.expected,
+                    pointer.removesuffix("/target"),
+                )
+            except GatewayInvocationError as exc:
+                raise ValueError(
+                    "SealedQueryIdentityBoundJsonArgument target pointer is invalid"
+                ) from exc
+            if (
+                not isinstance(reference, Mapping)
+                or reference.get("name") != "OutputBus"
+                or not isinstance(target, Mapping)
+                or set(target) != {"kind", "value"}
+                or target.get("kind") != "path"
+                or not isinstance(target.get("value"), str)
+                or not str(target["value"]).startswith("\\")
+            ):
+                raise ValueError(
+                    "SealedQueryIdentityBoundJsonArgument expected targets must "
+                    "be exact Wwise paths"
+                )
 
 
 @dataclass(frozen=True, slots=True)
@@ -610,6 +718,7 @@ class ResponseBinding:
 ExpectedArgument = (
     str
     | SemanticJsonArgument
+    | SealedQueryIdentityBoundJsonArgument
     | MetadataQueryArgument
     | BoundedIntegerArgument
     | MetadataBoundJsonArgument
@@ -850,6 +959,30 @@ class GatewayBrokerRecord:
 CommutativeReadOnlyStepGroups = tuple[tuple[str, str], ...]
 
 
+def _is_closed_exact_id_query_step(step: ExpectedGatewayStep) -> bool:
+    """Return whether one step is the fixed identity-only object read shape."""
+
+    arguments = step.arguments
+    return (
+        step.subcommand == "query-object"
+        and len(arguments) == 10
+        and arguments[0] == "--object-id"
+        and isinstance(arguments[1], str)
+        and bool(arguments[1])
+        and arguments[2:]
+        == (
+            "--return-field",
+            "id",
+            "--return-field",
+            "name",
+            "--return-field",
+            "type",
+            "--return-field",
+            "path",
+        )
+    )
+
+
 def validate_commutative_read_only_step_groups(
     expected_steps: Sequence[ExpectedGatewayStep],
     groups: Sequence[Sequence[str]],
@@ -876,13 +1009,17 @@ def validate_commutative_read_only_step_groups(
                 "expected steps in canonical order"
             )
         grouped_steps = (steps[indexes[group[0]]], steps[indexes[group[1]]])
-        if {step.subcommand for step in grouped_steps} != {
-            "operation-schema",
-            "metadata",
-        }:
+        schema_metadata_pair = {
+            step.subcommand for step in grouped_steps
+        } == {"operation-schema", "metadata"}
+        exact_id_query_pair = all(
+            _is_closed_exact_id_query_step(step) for step in grouped_steps
+        )
+        if not schema_metadata_pair and not exact_id_query_pair:
             raise ValueError(
                 "commutative read-only groups are limited to one "
-                "operation-schema and one metadata step"
+                "operation-schema/metadata pair or two closed exact-ID "
+                "query-object steps"
             )
         claimed.update(group)
         normalized.append((group[0], group[1]))
@@ -1222,10 +1359,167 @@ def validate_transaction_show_confirmation_payload(
     )
 
 
+def _switch_container_remove_assignment_arguments(
+    value: Any,
+) -> Mapping[str, Any]:
+    if (
+        not isinstance(value, Mapping)
+        or not all(isinstance(key, str) for key in value)
+        or set(value) != {"contract", "version", "operation", "arguments"}
+        or value.get("contract") != "waapi-skill.operation-request/v1"
+        or value.get("version") not in _SUPPORTED_WWISE_VERSIONS
+        or value.get("operation") != "switchContainer.removeAssignment"
+    ):
+        raise ValueError(
+            "switch_container_remove_assignment_v1 requires one closed "
+            "switchContainer.removeAssignment request"
+        )
+    arguments = value.get("arguments")
+    if (
+        not isinstance(arguments, Mapping)
+        or not all(isinstance(key, str) for key in arguments)
+        or set(arguments)
+        != {"switch_container", "child", "state_or_switch"}
+        or any(
+            not isinstance(arguments.get(field), Mapping)
+            for field in ("switch_container", "child", "state_or_switch")
+        )
+    ):
+        raise ValueError(
+            "switch_container_remove_assignment_v1 arguments are not closed"
+        )
+    return arguments
+
+
+def _scoped_name_exact_child_path(value: Any) -> str | None:
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != {"kind", "name", "type", "parent"}
+        or value.get("kind") != "scoped-name"
+        or not isinstance(value.get("name"), str)
+        or not value.get("name")
+        or len(value["name"]) > _AUDIO_IMPORT_IDENTITY_MAX_NAME_LENGTH
+        or "\\" in value["name"]
+        or not isinstance(value.get("type"), str)
+        or not value.get("type")
+        or len(value["type"]) > _AUDIO_IMPORT_IDENTITY_MAX_TYPE_LENGTH
+        or _AUDIO_IMPORT_IDENTITY_TYPE_TOKEN_RE.fullmatch(value["type"])
+        is None
+    ):
+        return None
+    parent = value.get("parent")
+    if (
+        not isinstance(parent, Mapping)
+        or set(parent) != {"kind", "value"}
+        or parent.get("kind") != "path"
+        or not isinstance(parent.get("value"), str)
+        or not parent.get("value").startswith("\\")
+        or parent.get("value").endswith("\\")
+        or len(parent["value"]) > _AUDIO_IMPORT_IDENTITY_MAX_PARENT_LENGTH
+    ):
+        return None
+    return f'{parent["value"]}\\{value["name"]}'
+
+
+def _switch_remove_identity_equal(actual: Any, expected: Any) -> bool:
+    if _canonical_json_bytes(actual) == _canonical_json_bytes(expected):
+        return True
+    exact_child_path = _scoped_name_exact_child_path(expected)
+    return bool(
+        exact_child_path is not None
+        and isinstance(actual, Mapping)
+        and set(actual) == {"kind", "value"}
+        and actual.get("kind") == "path"
+        and actual.get("value") == exact_child_path
+    )
+
+
+def _switch_remove_container_identity_equal(actual: Any, expected: Any) -> bool:
+    if _canonical_json_bytes(actual) == _canonical_json_bytes(expected):
+        return True
+    if (
+        not isinstance(expected, Mapping)
+        or set(expected) != {"kind", "value"}
+        or expected.get("kind") != "path"
+        or not isinstance(expected.get("value"), str)
+        or not expected.get("value").startswith("\\")
+        or expected.get("value").endswith("\\")
+    ):
+        return False
+    expected_name = expected["value"].rsplit("\\", 1)[-1]
+    return bool(
+        expected_name
+        and isinstance(actual, Mapping)
+        and set(actual) == {"kind", "type", "name"}
+        and actual.get("kind") == "exact-type-name"
+        and actual.get("type") == "SwitchContainer"
+        and actual.get("name") == expected_name
+    )
+
+
+def _switch_container_remove_assignment_json_equal(
+    actual: Any,
+    expected: Any,
+) -> bool:
+    """Accept only exact scoped identities or their one sealed full path.
+
+    The equivalence belongs solely to ``switchContainer.removeAssignment``.
+    Its container identity may use the sealed exact path or the exact
+    ``SwitchContainer`` type/name derived from that path; live Gateway
+    resolution must still prove uniqueness.  Child/value path alternatives are
+    derived from the expected scoped-name's already sealed parent and exact
+    direct-child name, so basename, suffix, or deeper-descendant matches are
+    never accepted.
+    """
+
+    try:
+        actual_arguments = _switch_container_remove_assignment_arguments(actual)
+        expected_arguments = _switch_container_remove_assignment_arguments(
+            expected
+        )
+    except (TypeError, ValueError):
+        return False
+    if (
+        actual.get("contract") != expected.get("contract")
+        or actual.get("version") != expected.get("version")
+        or actual.get("operation") != expected.get("operation")
+        or not _switch_remove_container_identity_equal(
+            actual_arguments["switch_container"],
+            expected_arguments["switch_container"],
+        )
+    ):
+        return False
+    return all(
+        _switch_remove_identity_equal(
+            actual_arguments[field],
+            expected_arguments[field],
+        )
+        for field in ("child", "state_or_switch")
+    )
+
+
 def _semantic_json_equal(actual: Any, expected: SemanticJsonArgument) -> bool:
     if expected.equivalence == "wire_exact":
         return _canonical_json_bytes(actual) == _canonical_json_bytes(
             expected.expected
+        )
+    if expected.equivalence == _SWITCH_CONTAINER_REMOVE_ASSIGNMENT_EQUIVALENCE:
+        return _switch_container_remove_assignment_json_equal(
+            actual,
+            expected.expected,
+        )
+    if expected.equivalence == _AUDIO_IMPORT_DEFAULT_OPERATION_EQUIVALENCE:
+        try:
+            normalized_actual = _normalize_audio_import_default_operation_request(
+                actual
+            )
+            normalized_expected = _normalize_audio_import_default_operation_request(
+                expected.expected
+            )
+        except (TypeError, ValueError):
+            return False
+        return _canonical_json_bytes(normalized_actual) == _canonical_json_bytes(
+            normalized_expected
         )
     if expected.equivalence == "soundbank_generate_v1":
         try:
@@ -1239,6 +1533,63 @@ def _semantic_json_equal(actual: Any, expected: SemanticJsonArgument) -> bool:
             normalized_actual
         ) == _canonical_json_bytes(normalized_expected)
     return _object_operation_json_equal(actual, expected.expected)
+
+
+def _normalize_audio_import_default_operation_request(
+    value: Any,
+) -> dict[str, Any]:
+    """Normalize only audio.import's documented createNew batch default."""
+
+    if (
+        not isinstance(value, Mapping)
+        or not all(isinstance(key, str) for key in value)
+        or set(value) != {"contract", "version", "operation", "arguments"}
+        or value.get("contract") != "waapi-skill.operation-request/v1"
+        or value.get("version") not in _SUPPORTED_WWISE_VERSIONS
+        or value.get("operation") != "audio.import"
+    ):
+        raise ValueError(
+            "audio_import_default_operation_v1 requires one closed "
+            "audio.import request"
+        )
+    arguments_value = value.get("arguments")
+    if (
+        not isinstance(arguments_value, Mapping)
+        or not all(isinstance(key, str) for key in arguments_value)
+        or "imports" not in arguments_value
+        or set(arguments_value)
+        - {
+            "imports",
+            "import_operation",
+            "defaults",
+            "auto_add_to_source_control",
+        }
+    ):
+        raise ValueError(
+            "audio_import_default_operation_v1 arguments are not closed"
+        )
+    if (
+        "auto_add_to_source_control" in arguments_value
+        and not isinstance(arguments_value["auto_add_to_source_control"], bool)
+    ):
+        raise ValueError(
+            "audio_import_default_operation_v1 auto_add_to_source_control "
+            "must be a JSON boolean"
+        )
+    # Reuse the full validator only as a validity check.  Its broader semantic
+    # normalization is intentionally discarded: this equivalence permits one
+    # omission and keeps every other JSON value and array order wire-exact.
+    _normalize_audio_import_request(value)
+    normalized = dict(value)
+    arguments = dict(arguments_value)
+    operation = arguments.get("import_operation", "createNew")
+    if operation not in _AUDIO_IMPORT_TAB_OPERATIONS:
+        raise ValueError(
+            "audio_import_default_operation_v1 import_operation is invalid"
+        )
+    arguments["import_operation"] = operation
+    normalized["arguments"] = arguments
+    return normalized
 
 
 def _normalize_soundbank_generate_request(value: Any) -> dict[str, Any]:
@@ -3154,6 +3505,98 @@ def _json_pointer(payload: Any, pointer: str) -> Any:
     return current
 
 
+def _sealed_query_identity_object_operation_equal(
+    actual: Any,
+    expected: SealedQueryIdentityBoundJsonArgument,
+    *,
+    source_payload: Mapping[str, Any],
+    source_step: ExpectedGatewayStep,
+) -> tuple[bool, Mapping[str, str]]:
+    """Compare one request after sealing two aliases to one prior query row."""
+
+    if (
+        source_step.name != expected.source_step
+        or source_step.subcommand != "query-object"
+        or len(source_step.arguments) != 10
+        or source_step.arguments[0] != "--object-id"
+        or not isinstance(source_step.arguments[1], str)
+        or not source_step.arguments[1]
+        or tuple(source_step.arguments[2:])
+        != (
+            "--return-field",
+            "id",
+            "--return-field",
+            "name",
+            "--return-field",
+            "type",
+            "--return-field",
+            "path",
+        )
+    ):
+        raise GatewayInvocationError(
+            "sealed query identity source is not one exact-ID identity read"
+        )
+    objects = source_payload.get("objects")
+    if (
+        source_payload.get("ok") is not True
+        or source_payload.get("command") != "query-object"
+        or source_payload.get("count") != 1
+        or not isinstance(objects, list)
+        or len(objects) != 1
+        or not isinstance(objects[0], Mapping)
+    ):
+        raise GatewayInvocationError(
+            "sealed query identity source lacks one successful object row"
+        )
+    row = objects[0]
+    object_id = row.get("id")
+    object_path = row.get("path")
+    if (
+        not isinstance(object_id, str)
+        or _GUID_RE.fullmatch(object_id) is None
+        or object_id.casefold() != source_step.arguments[1].casefold()
+        or not isinstance(object_path, str)
+        or not object_path.startswith("\\")
+        or not isinstance(row.get("name"), str)
+        or not row.get("name")
+        or row.get("type") != "Bus"
+    ):
+        raise GatewayInvocationError(
+            "sealed query identity source row is not the exact requested Bus"
+        )
+
+    try:
+        normalized = json.loads(_canonical_json_bytes(actual))
+    except (json.JSONDecodeError, GatewayInvocationError):
+        return False, MappingProxyType({"id": object_id, "path": object_path})
+    path_identity = {"kind": "path", "value": object_path}
+    id_identity = {"kind": "id", "value": object_id}
+    allowed = {
+        _canonical_json_bytes(path_identity),
+        _canonical_json_bytes(id_identity),
+    }
+    for pointer in expected.target_pointers:
+        try:
+            expected_target = _json_pointer(expected.expected, pointer)
+            actual_target = _json_pointer(actual, pointer)
+            normalized_target = _json_pointer(normalized, pointer)
+        except GatewayInvocationError:
+            return False, MappingProxyType({"id": object_id, "path": object_path})
+        if (
+            _canonical_json_bytes(expected_target)
+            != _canonical_json_bytes(path_identity)
+            or _canonical_json_bytes(actual_target) not in allowed
+            or not isinstance(normalized_target, dict)
+        ):
+            return False, MappingProxyType({"id": object_id, "path": object_path})
+        normalized_target.clear()
+        normalized_target.update(path_identity)
+    return (
+        _object_operation_json_equal(normalized, expected.expected),
+        MappingProxyType({"id": object_id, "path": object_path}),
+    )
+
+
 def _decode_json_argument(
     value: str,
     *,
@@ -4572,6 +5015,49 @@ class CodexGatewayBroker:
                             f"step {step.name!r} argument {index} must be exactly {expected!r}"
                         )
                     semantic_values.append(expected)
+                elif isinstance(
+                    expected,
+                    SealedQueryIdentityBoundJsonArgument,
+                ):
+                    actual_json = _decode_json_argument(supplied)
+                    source = self._payloads_by_step.get(expected.source_step)
+                    if source is None:
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} sealed identity source "
+                            f"{expected.source_step!r} is unavailable"
+                        )
+                    source_steps = tuple(
+                        candidate
+                        for candidate in self.expected_steps
+                        if candidate.name == expected.source_step
+                    )
+                    if len(source_steps) != 1:
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} sealed identity source is not unique"
+                        )
+                    equal, identity = (
+                        _sealed_query_identity_object_operation_equal(
+                            actual_json,
+                            expected,
+                            source_payload=source,
+                            source_step=source_steps[0],
+                        )
+                    )
+                    if not equal:
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} argument {index} JSON is not "
+                            "semantically equal to the sealed query-identity "
+                            "allow-list"
+                        )
+                    semantic_values.extend(
+                        (
+                            _normalize_object_set_request(expected.expected),
+                            "sealed-query-identity/v1",
+                            expected.source_step,
+                            list(expected.target_pointers),
+                            dict(identity),
+                        )
+                    )
                 elif isinstance(expected, SemanticJsonArgument):
                     actual_json = _decode_json_argument(
                         supplied,
@@ -5034,6 +5520,7 @@ __all__ = [
     "MetadataTokenProjection",
     "ResolvedGatewayInvocation",
     "ResponseBinding",
+    "SealedQueryIdentityBoundJsonArgument",
     "SemanticJsonArgument",
     "SUBSCRIPTION_ACK_CONTRACT",
     "SUBSCRIPTION_ACK_NONCE_ENV",

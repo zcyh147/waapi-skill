@@ -170,9 +170,7 @@ def _prepare_replace() -> dict[str, Any]:
 def _role_guard_responses(*, descendants: list[dict[str, Any]] | None = None) -> dict[str, list[Mapping[str, Any]]]:
     return {
         "ak.wwise.core.object.get": [
-            {"return": [_parent_row()]},
-            {"return": [_owned_root_row()]},
-            {"return": [_old_root_row()]},
+            {"return": [_parent_row(), _owned_root_row(), _old_root_row()]},
             {"return": _parent_children()},
             {"return": [_old_root_row()]},
             {"return": [{"id": OLD_ROOT_ID, "path": COLLISION_PATH}]},

@@ -93,7 +93,7 @@ _WWISE_2025_AURO_BUS_WORK_UNIT = Path("Busses") / "Default Work Unit.wwu"
 _WWISE_2025_AURO_EFFECT_WORK_UNIT = Path("Effects") / "Ambisonics.wwu"
 _WWISE_2025_AURO_WORK_UNIT_SHA256 = {
     _WWISE_2025_AURO_BUS_WORK_UNIT: (
-        "abaefb80d17cb9f2f3f64b8d786eb02fface5e13066eaeaaac204cf2a3b4da06"
+        "0d06c10e0e632bdb723d00922d38e1796561c781b11c8d71f5b7eeedb10130b6"
     ),
     _WWISE_2025_AURO_EFFECT_WORK_UNIT: (
         "66ef565e7b4e28ed39b189284700d44f67cdb8c4f9035fa5a04842d2c050e29a"

@@ -335,6 +335,15 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
         "child",
         "state_or_switch",
     ]
+    assert specs["switchContainer.addAssignment"]["identity_contract"][
+        "exact_selector_goes_directly_to_preview"
+    ] is True
+    assert specs["switchContainer.addAssignment"]["identity_contract"][
+        "separate_query_object_required"
+    ] is False
+    assert "Do not query merely to translate" in specs[
+        "switchContainer.addAssignment"
+    ]["identity_contract"]["separate_query_object_rule"]
     assert "rejects a child that already has any assignment" in specs["switchContainer.addAssignment"]["constraints"][-1]
     assert specs["object.set"]["implemented"] is True
     assert specs["object.set"]["supported_versions"] == ["2022.1", "2023.1", "2024.1", "2025.1"]
@@ -723,6 +732,48 @@ def test_audio_import_operation_schema_discloses_compact_batch_composition_contr
     }
 
 
+def test_audio_import_operation_schema_discloses_exact_object_type_tokens() -> None:
+    operation = describe_operation("audio.import").as_dict(version="2022.1")
+    properties = operation["argument_contract"]["properties"]
+    row_type = properties["imports"]["items"]["properties"]["object_type"]
+    default_type = properties["defaults"]["properties"]["object_type"]
+
+    expected_description = (
+        "Exact Wwise audio.import objectType wire token. Natural mappings: "
+        "Sound SFX / SFX 声音 -> Sound SFX (do not shorten an explicitly requested "
+        "Sound SFX to Sound); Random Container / 随机容器 -> "
+        "RandomSequenceContainer (never RandomContainer). These spellings are "
+        "request-shape guidance; RandomContainer and SequenceContainer remain "
+        "distinct and are not semantic aliases."
+    )
+    assert row_type == default_type == {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "description": expected_description,
+    }
+
+
+def test_audio_import_operation_schema_discloses_native_switch_assignment_usage() -> None:
+    operation = describe_operation("audio.import").as_dict(version="2022.1")
+    properties = operation["argument_contract"]["properties"]
+    row_assignment = properties["imports"]["items"]["properties"][
+        "switch_assignment"
+    ]
+    default_assignment = properties["defaults"]["properties"][
+        "switch_assignment"
+    ]
+
+    assert row_assignment == default_assignment
+    assert row_assignment["type"] == "string"
+    description = row_assignment["description"]
+    assert "native Wwise Switch Assignation import directive" in description
+    assert "not an object identity or object-path field" in description
+    assert "exact Switch/State value name" in description
+    assert "for example, Snow" in description
+    assert "do not pass the value object's path" in description
+
+
 def test_audio_import_schema_discloses_generic_live_dependency_closure() -> None:
     operation = describe_operation("audio.import").as_dict(version="2022.1")
     dependency = operation["argument_contract"][
@@ -845,6 +896,21 @@ def test_audio_import_operation_schema_discloses_runtime_hierarchy_roots(
             "allowed_hierarchy_roots": expected_roots,
         },
         "absolute_form": True,
+        "import_location_selection": {
+            "wire_significant": True,
+            "absolute_object_path": {
+                "ordinary_action": "omit",
+                "infer_from_common_parent": False,
+                "include_only_when_user_explicitly_requests_native_field": True,
+            },
+            "relative_object_path": {
+                "requires_effective_import_location": True,
+                "effective_sources": [
+                    "$.arguments.imports[].import_location",
+                    "$.arguments.defaults.import_location",
+                ],
+            },
+        },
         "relative_form": {
             "allowed": True,
             "requires_effective_import_location": True,
@@ -1043,6 +1109,31 @@ def test_object_set_unversioned_schema_discloses_complete_target_matrix() -> Non
         "object_scope_is_for_one_existing_target_only": True,
         "actor_mixer_object_type_by_version": EXPECTED_ACTOR_MIXER_METADATA_TYPES,
     }
+
+
+def test_switch_remove_schema_prefers_scoped_names_from_parent_evidence() -> None:
+    remove = describe_operation("switchContainer.removeAssignment").as_dict()
+    properties = remove["argument_contract"]["properties"]
+
+    assert "canonical id already returned by the Gateway" in properties[
+        "switch_container"
+    ]["description"]
+    assert "Never shorten" in properties["switch_container"]["description"]
+    assert "use exact-type-name with type SwitchContainer" in properties[
+        "switch_container"
+    ]["description"]
+    assert "\\Player_Footsteps is not a complete Wwise path" in properties[
+        "switch_container"
+    ]["description"]
+    assert "use scoped-name" in properties["child"]["description"]
+    assert "do not synthesize a full path" in properties["child"]["description"]
+    assert "Group/Value" in properties["state_or_switch"]["description"]
+    assert "does not add a Group display-name path segment" in properties[
+        "state_or_switch"
+    ]["description"]
+    assert "description" not in describe_operation(
+        "switchContainer.addAssignment"
+    ).as_dict()["argument_contract"]["properties"]["child"]
 
 
 def test_operation_catalog_exposes_business_intent_selection_guidance() -> None:
@@ -1865,6 +1956,249 @@ def test_create_preflight_canonicalizes_parent_and_fixes_cross_version_source_co
     assert prepared["verification_plan"]["nodes"][0]["canonical_type"] == "ActorMixer"
     assert prepared["raw_dispatch_allowed"] is False
     assert reader.calls[0][1] == {"from": {"path": [parent_path]}}
+
+
+def test_object_create_reuses_prepare_local_selector_and_class_property_metadata() -> None:
+    parent_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Cache Tests"
+    parent = object_row(
+        object_id=PARENT_GUID,
+        name="Cache Tests",
+        object_type="WorkUnit",
+        path=parent_path,
+        parent="{hierarchy}",
+    )
+    output_bus = object_row(
+        object_id=TARGET_GUID,
+        name="Weapons",
+        object_type="Bus",
+        path=r"\Master-Mixer Hierarchy\Default Work Unit\Weapons",
+        parent="{master-workunit}",
+    )
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.get": [
+                {"return": [parent]},
+                {"return": [output_bus]},
+                {"return": [output_bus]},
+                {"return": []},
+                {"return": []},
+            ],
+            "ak.wwise.core.object.getTypes": [
+                {
+                    "return": [
+                        {"classId": 1, "name": "ActorMixer", "type": "ActorMixer"},
+                        {"classId": 2, "name": "Sound", "type": "Sound"},
+                    ]
+                }
+            ],
+            "ak.wwise.core.object.getPropertyInfo": [
+                {"name": "Volume", "type": "Real32"},
+                {"name": "OutputBus", "type": "Reference"},
+                {"name": "Volume", "type": "Real32"},
+                {"name": "OutputBus", "type": "Reference"},
+            ],
+        }
+    )
+    repeated_fields = {
+        "properties": [{"name": "Volume", "value": -3.0}],
+        "references": [
+            {
+                "name": "OutputBus",
+                "target": {"kind": "id", "value": TARGET_GUID},
+            }
+        ],
+    }
+
+    prepared = prepare_operation(
+        parse_operation_request(
+            request(
+                "object.create",
+                {
+                    "parent": {"kind": "id", "value": PARENT_GUID},
+                    "type": "ActorMixer",
+                    "name": "CacheRoot",
+                    **repeated_fields,
+                    "children": [
+                        {"type": "Sound", "name": "A", **repeated_fields},
+                        {
+                            "type": "Sound",
+                            "name": "B",
+                            "properties": repeated_fields["properties"],
+                            "references": [
+                                {
+                                    "name": "OutputBus",
+                                    "target": {
+                                        "kind": "path",
+                                        "value": output_bus["path"],
+                                    },
+                                }
+                            ],
+                        },
+                    ],
+                },
+            )
+        ),
+        read_call=reader,
+    ).as_dict()
+
+    target_reads = [
+        call
+        for call in reader.calls
+        if call[0] == "ak.wwise.core.object.get"
+        and call[1] == {"from": {"id": [TARGET_GUID]}}
+    ]
+    assert len(target_reads) == 1
+    target_path_reads = [
+        call
+        for call in reader.calls
+        if call[0] == "ak.wwise.core.object.get"
+        and call[1] == {"from": {"path": [output_bus["path"]]}}
+    ]
+    assert len(target_path_reads) == 1
+    assert [
+        call[1]
+        for call in reader.calls
+        if call[0] == "ak.wwise.core.object.getPropertyInfo"
+    ] == [
+        {"property": "Volume", "classId": 1},
+        {"property": "OutputBus", "classId": 1},
+        {"property": "Volume", "classId": 2},
+        {"property": "OutputBus", "classId": 2},
+    ]
+    reference_roles = [
+        row
+        for role, row in prepared["resolved_roles"].items()
+        if role != "parent"
+    ]
+    assert len(reference_roles) == 3
+    assert {row["object"] for row in reference_roles} == {TARGET_GUID}
+
+
+def test_object_set_reuses_prepare_local_selector_and_resets_cache_next_prepare() -> None:
+    target_path = r"\Actor-Mixer Hierarchy\Default Work Unit\CacheTarget"
+    target = object_row(
+        object_id=GUID,
+        name="CacheTarget",
+        object_type="ActorMixer",
+        path=target_path,
+    )
+    output_bus = object_row(
+        object_id=TARGET_GUID,
+        name="Weapons",
+        object_type="Bus",
+        path=r"\Master-Mixer Hierarchy\Default Work Unit\Weapons",
+        parent="{master-workunit}",
+    )
+    target_snapshot = {**target, "OutputBus": None}
+    payload = parse_operation_request(
+        request(
+            "object.set",
+            {
+                "objects": [
+                    {
+                        "object": {"kind": "id", "value": GUID},
+                        "references": [
+                            {
+                                "name": "OutputBus",
+                                "target": {"kind": "id", "value": TARGET_GUID},
+                            }
+                        ],
+                        "children": [
+                            {
+                                "type": "ActorMixer",
+                                "name": "Group",
+                                "children": [
+                                    {
+                                        "type": "Sound",
+                                        "name": "A",
+                                        "properties": [
+                                            {"name": "Volume", "value": -3.0}
+                                        ],
+                                        "references": [
+                                            {
+                                                "name": "OutputBus",
+                                                "target": {
+                                                    "kind": "id",
+                                                    "value": TARGET_GUID,
+                                                },
+                                            }
+                                        ],
+                                    },
+                                    {
+                                        "type": "Sound",
+                                        "name": "B",
+                                        "properties": [
+                                            {"name": "Volume", "value": -6.0}
+                                        ],
+                                        "references": [
+                                            {
+                                                "name": "OutputBus",
+                                                "target": {
+                                                    "kind": "id",
+                                                    "value": TARGET_GUID,
+                                                },
+                                            }
+                                        ],
+                                    },
+                                ],
+                            },
+                        ],
+                    }
+                ]
+            },
+        )
+    )
+
+    def make_reader() -> ScriptedReader:
+        return ScriptedReader(
+            {
+                "ak.wwise.core.object.get": [
+                    {"return": [target]},
+                    {"return": [output_bus]},
+                    {"return": []},
+                    {"return": [target_snapshot]},
+                    {"return": []},
+                ],
+                "ak.wwise.core.object.getTypes": [
+                    {
+                        "return": [
+                            {"classId": 1, "name": "ActorMixer", "type": "ActorMixer"},
+                            {"classId": 2, "name": "Sound", "type": "Sound"},
+                        ]
+                    }
+                ],
+                "ak.wwise.core.object.getPropertyInfo": [
+                    {"name": "OutputBus", "type": "Reference"},
+                    {"name": "Volume", "type": "Real32"},
+                    {"name": "OutputBus", "type": "Reference"},
+                ],
+            }
+        )
+
+    readers = [make_reader(), make_reader()]
+    prepared = [
+        prepare_operation(payload, read_call=reader).as_dict()
+        for reader in readers
+    ]
+
+    for reader in readers:
+        target_reads = [
+            call
+            for call in reader.calls
+            if call[0] == "ak.wwise.core.object.get"
+            and call[1] == {"from": {"id": [TARGET_GUID]}}
+        ]
+        assert len(target_reads) == 1
+        assert [
+            call[1]
+            for call in reader.calls
+            if call[0] == "ak.wwise.core.object.getPropertyInfo"
+        ] == [
+            {"property": "OutputBus", "object": GUID},
+            {"property": "Volume", "classId": 2},
+            {"property": "OutputBus", "classId": 2},
+        ]
+    assert prepared[0]["dispatch"] == prepared[1]["dispatch"]
 
 
 def test_create_rename_verification_requires_the_full_collision_snapshot_unchanged() -> None:
@@ -3072,6 +3406,186 @@ def test_confirmed_execution_role_guard_requires_the_live_preview_snapshot_to_be
     assert any(item["name"] == "object.path unchanged" and not item["passed"] for item in drifted["assertions"])
 
 
+def test_confirmed_role_guard_deduplicates_guids_into_one_bounded_read() -> None:
+    source = object_row()
+    target = object_row(
+        object_id=TARGET_GUID,
+        name="Target",
+        object_type="Bus",
+        path=r"\Master-Mixer Hierarchy\Default Work Unit\Target",
+        parent="{master-workunit}",
+    )
+    prepared = {
+        "contract": "waapi-skill.prepared-operation/v1",
+        "operation": "object.set",
+        "resolved_roles": {
+            "objects[0].object": {"object": GUID, "row": source},
+            "objects[0].references[0].target": {
+                "object": TARGET_GUID,
+                "row": target,
+            },
+            "objects[0].children[0].references[0].target": {
+                "object": TARGET_GUID,
+                "row": target,
+            },
+        },
+    }
+    reader = ScriptedReader(
+        {"ak.wwise.core.object.get": [{"return": [target, source]}]}
+    )
+
+    validation = validate_prepared_roles(prepared, read_call=reader)
+
+    assert validation["status"] == "valid"
+    assert reader.calls == [
+        (
+            "ak.wwise.core.object.get",
+            {"from": {"id": [GUID, TARGET_GUID]}},
+            {"return": ["id", "name", "type", "path", "parent", "notes"]},
+        )
+    ]
+    assert next(
+        item
+        for item in validation["assertions"]
+        if item["name"] == "resolved role GUID batch is exact"
+    )["passed"] is True
+    assert len(
+        [
+            item
+            for item in validation["assertions"]
+            if item["name"].endswith("resolves exactly once")
+        ]
+    ) == 3
+
+
+@pytest.mark.parametrize(
+    ("case", "rows", "evidence_field"),
+    (
+        ("missing", [object_row()], "missing_ids"),
+        (
+            "duplicate",
+            [
+                object_row(),
+                object_row(object_id=TARGET_GUID, name="Target"),
+                object_row(object_id=TARGET_GUID, name="Target"),
+            ],
+            "duplicate_ids",
+        ),
+        (
+            "extra",
+            [
+                object_row(),
+                object_row(object_id=TARGET_GUID, name="Target"),
+                object_row(object_id=PARENT_GUID, name="Unexpected"),
+            ],
+            "extra_rows",
+        ),
+        (
+            "malformed",
+            [
+                object_row(),
+                object_row(object_id=TARGET_GUID, name="Target"),
+                {"id": None, "name": "Malformed"},
+            ],
+            "malformed_rows",
+        ),
+    ),
+)
+def test_confirmed_role_guard_rejects_non_exact_batched_result_sets(
+    case: str,
+    rows: list[Mapping[str, Any]],
+    evidence_field: str,
+) -> None:
+    del case
+    target = object_row(object_id=TARGET_GUID, name="Target")
+    prepared = {
+        "contract": "waapi-skill.prepared-operation/v1",
+        "operation": "object.set",
+        "resolved_roles": {
+            "source": {"object": GUID, "row": object_row()},
+            "target": {"object": TARGET_GUID, "row": target},
+        },
+    }
+
+    validation = validate_prepared_roles(
+        prepared,
+        read_call=ScriptedReader(
+            {"ak.wwise.core.object.get": [{"return": rows}]}
+        ),
+    )
+
+    assert validation["status"] == "repreview_required"
+    assertion = next(
+        item
+        for item in validation["assertions"]
+        if item["name"] == "resolved role GUID batch is exact"
+    )
+    assert assertion["passed"] is False
+    assert assertion["evidence"][evidence_field]
+
+
+def test_confirmed_role_guard_rejects_more_than_4096_unique_guids_before_read() -> None:
+    roles = {}
+    for index in range(1, 4098):
+        object_id = f"{{00000000-0000-0000-0000-{index:012X}}}"
+        roles[f"objects[{index - 1}]"] = {
+            "object": object_id,
+            "row": {"id": object_id},
+        }
+    prepared = {
+        "contract": "waapi-skill.prepared-operation/v1",
+        "operation": "object.set",
+        "resolved_roles": roles,
+    }
+    reader = ScriptedReader({})
+
+    with pytest.raises(OperationContractError) as caught:
+        validate_prepared_roles(prepared, read_call=reader)
+
+    assert caught.value.error_code == "IDENTITY_READ_LIMIT_EXCEEDED"
+    assert caught.value.details == {"count": 4097, "limit": 4096}
+    assert reader.calls == []
+
+
+def test_confirmed_role_guard_rejects_field_drift_after_exact_batched_read() -> None:
+    target = object_row(object_id=TARGET_GUID, name="Target")
+    prepared = {
+        "contract": "waapi-skill.prepared-operation/v1",
+        "operation": "object.set",
+        "resolved_roles": {
+            "source": {"object": GUID, "row": object_row()},
+            "target": {"object": TARGET_GUID, "row": target},
+        },
+    }
+    drifted_target = {
+        **target,
+        "path": r"\Actor-Mixer Hierarchy\Default Work Unit\MovedTarget",
+    }
+
+    validation = validate_prepared_roles(
+        prepared,
+        read_call=ScriptedReader(
+            {
+                "ak.wwise.core.object.get": [
+                    {"return": [object_row(), drifted_target]}
+                ]
+            }
+        ),
+    )
+
+    assert validation["status"] == "repreview_required"
+    assert next(
+        item
+        for item in validation["assertions"]
+        if item["name"] == "resolved role GUID batch is exact"
+    )["passed"] is True
+    assert next(
+        item
+        for item in validation["assertions"]
+        if item["name"] == "target.path unchanged"
+    )["passed"] is False
+
+
 def test_create_delete_property_and_reference_verifiers_have_typed_outcomes() -> None:
     created_id = "{44444444-4444-4444-4444-444444444444}"
     prepared_create = {
@@ -4160,6 +4674,16 @@ def test_audio_import_accepts_language_and_originals_subfolder_for_closed_verifi
     assert parsed.arguments["imports"][0]["originals_subfolder"] == "Dialogue/Chapter06"
 
 
+def test_audio_import_schema_requires_originals_subfolder_to_be_user_supplied() -> None:
+    operation = describe_operation("audio.import").as_dict(version="2022.1")
+    rows = operation["argument_contract"]["properties"]["imports"]
+    description = rows["items"]["properties"]["originals_subfolder"]["description"]
+
+    assert "supplied explicitly by the user" in description
+    assert "otherwise omit this field" in description
+    assert "Never infer it" in description
+
+
 def test_audio_import_uses_versioned_authoring_roots_for_2025_containers(tmp_path: Any) -> None:
     audio_file = tmp_path / "source.wav"
     audio_file.write_bytes(b"RIFFWAVE")
@@ -4615,8 +5139,7 @@ def test_soundbank_inclusions_use_internal_prestate_exact_poststate_and_drift_gu
         read_call=ScriptedReader(
             {
                 "ak.wwise.core.object.get": [
-                    {"return": [soundbank_row]},
-                    {"return": [inclusion_row]},
+                    {"return": [soundbank_row, inclusion_row]},
                 ],
                 "ak.wwise.core.soundbank.getInclusions": [{"inclusions": []}],
             }
@@ -4628,8 +5151,7 @@ def test_soundbank_inclusions_use_internal_prestate_exact_poststate_and_drift_gu
         read_call=ScriptedReader(
             {
                 "ak.wwise.core.object.get": [
-                    {"return": [soundbank_row]},
-                    {"return": [inclusion_row]},
+                    {"return": [soundbank_row, inclusion_row]},
                 ],
                 "ak.wwise.core.soundbank.getInclusions": [normalized_after],
             }
@@ -4868,10 +5390,14 @@ def test_switch_assignment_validates_relationship_prestate_drift_and_exact_post_
         read_call=ScriptedReader(
             {
                 "ak.wwise.core.object.get": [
-                    {"return": [container_row]},
-                    {"return": [child_row]},
-                    {"return": [state_row]},
-                    {"return": [group_row]},
+                    {
+                        "return": [
+                            container_row,
+                            child_row,
+                            state_row,
+                            group_row,
+                        ]
+                    },
                     {"return": [reference_row]},
                 ],
                 "ak.wwise.core.switchContainer.getAssignments": [{"return": before}],

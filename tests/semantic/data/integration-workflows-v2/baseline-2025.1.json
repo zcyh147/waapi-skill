@@ -1,0 +1,914 @@
+{
+  "contract": "waapi-skill.codex-integration-workflow-committed-baseline/v1",
+  "version": "2025.1",
+  "source_project": {
+    "relative_path": "tests/_org/2025.1/SampleProject.wproj",
+    "project_file_sha256": "5bb298e71663a9d5834d82cb4539b9245678c1d5cc27e025fd190c322eadce5c",
+    "full_tree_sha256": "506eb13aac1937c544aa1a6b7ba9ac1b735481a3fbe2d5c33f6e3679ab8fb630"
+  },
+  "storage_files": [
+    {
+      "relative_path": "Containers/Default Work Unit.wwu",
+      "sha256": "23937bb856894f08578aecf93e3e44da31fbffd37a00efbd0144f2b11161b6ff"
+    },
+    {
+      "relative_path": "Events/Default Work Unit.wwu",
+      "sha256": "4228ada70ee414159caa1da41681d647956d2105c73ca7436fcd14bd57dab1be"
+    },
+    {
+      "relative_path": "Switches/Default Work Unit.wwu",
+      "sha256": "9b8635301fb4c8f666fef3461fa8b226b96abebefcaca8e5486410632236f5b4"
+    },
+    {
+      "relative_path": "Busses/Default Work Unit.wwu",
+      "sha256": "0d06c10e0e632bdb723d00922d38e1796561c781b11c8d71f5b7eeedb10130b6"
+    },
+    {
+      "relative_path": "Game Parameters/Default Work Unit.wwu",
+      "sha256": "a550d0c2afe62b273e8a0654a940c175f503af6220d2c200b97482f18657c16c"
+    }
+  ],
+  "objects": [
+    {
+      "role": "rifle_container",
+      "id": "{B273D3B2-05E3-47D8-B524-CD40D6D4CF37}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle",
+      "type": "RandomSequenceContainer",
+      "state": {
+        "parent": {
+          "id": "{98498B6A-C5B6-460E-B7C0-734D42A658DD}"
+        },
+        "children": [
+          {
+            "id": "{80876919-C42E-4807-9595-900CC8405222}"
+          },
+          {
+            "id": "{E560EB18-2DF1-410D-9A6B-DDAF2AEADB37}"
+          },
+          {
+            "id": "{EDC65EA5-F8B4-468A-BB65-629D2FAE9B2E}"
+          }
+        ]
+      },
+      "state_sha256": "fcd944afdac69a8a68fdfe07948d4fe836958c77e1d138b897d086bdca6de1e4"
+    },
+    {
+      "role": "rifle_close",
+      "id": "{EDC65EA5-F8B4-468A-BB65-629D2FAE9B2E}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle\\Rifle_Close",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{B273D3B2-05E3-47D8-B524-CD40D6D4CF37}"
+        },
+        "notes": "rifle-baseline | close",
+        "@Volume": -2.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}"
+        },
+        "activeSource": {
+          "id": "{20D04B6B-2EB3-4CE8-B70A-EB2A0144ED78}"
+        },
+        "rtpc_rows": [
+          {
+            "id": "{3991026E-3B23-402B-96E7-9BD5F0211AF5}",
+            "name": "",
+            "type": "RTPC",
+            "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle\\Rifle_Close\\[RTPC: Voice Volume, Rifle_Distance]",
+            "notes": "",
+            "@PropertyName": "Volume",
+            "@ControlInput": {
+              "id": "{5B499A43-5BA9-49E5-B3EF-7062627A5FC2}"
+            },
+            "@Curve": {
+              "@Flags": 3,
+              "id": "{D1D2EB33-C2C3-41D6-ACD4-0F8F7935F586}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": -12.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 50.0,
+                  "y": -6.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": 0.0
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "state_sha256": "ae2b057b259d94c02e56031d2100d53f2c9e622236efd0ad55bcf158a0132755"
+    },
+    {
+      "role": "rifle_tail",
+      "id": "{E560EB18-2DF1-410D-9A6B-DDAF2AEADB37}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle\\Rifle_Tail",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{B273D3B2-05E3-47D8-B524-CD40D6D4CF37}"
+        },
+        "notes": "rifle-baseline | tail",
+        "@Volume": -5.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}"
+        },
+        "activeSource": {
+          "id": "{D7E06088-034B-44B3-BF49-48B9E6E88FDD}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "3088d68939221ff4f6eba4a7e13b6247c9e6d14e8875aa6ffce36426dd18f226"
+    },
+    {
+      "role": "rifle_mechanical",
+      "id": "{80876919-C42E-4807-9595-900CC8405222}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle\\Rifle_Mechanical",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{B273D3B2-05E3-47D8-B524-CD40D6D4CF37}"
+        },
+        "notes": "rifle-baseline | mechanical",
+        "@Volume": -7.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}"
+        },
+        "activeSource": {
+          "id": "{66BDDC06-5699-4C17-A9DD-58119D7CE6BC}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "33dbd132b34e7ce2343c3121057613e548bd9f720579e40494661639dc01d26a"
+    },
+    {
+      "role": "rifle_close_backup",
+      "id": "{8C2E4276-0E42-40C8-9AFD-1D464ED311B2}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Distractors\\Rifle_Close_Backup",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{F543EE44-45E0-40AC-8EA3-C380A699A695}"
+        },
+        "notes": "do-not-touch | distractor",
+        "@Volume": 0.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}"
+        },
+        "activeSource": {
+          "id": "{7A158864-EA00-4C20-B51E-C5D0C8821168}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "06191a8ac1bdecaf91e2f92653209d38000aaf8c42a8288e6c323ef92dfb8807"
+    },
+    {
+      "role": "rifle_tails_distractor",
+      "id": "{8CDE17C5-D80D-45A3-A71D-CF35371C7B49}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Distractors\\Rifle_Tails",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{F543EE44-45E0-40AC-8EA3-C380A699A695}"
+        },
+        "notes": "do-not-touch | near-name",
+        "@Volume": 0.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}"
+        },
+        "activeSource": {
+          "id": "{16BEA67B-5848-4C67-B2B4-A7AF4B2E63E4}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "c9bd9676c7f9097a5a2be98c813263f7d40e94532657c6fc18bbe5bdfc4b402a"
+    },
+    {
+      "role": "play_rifle_event",
+      "id": "{7B02B5D3-BC0A-47B3-B670-23AFC863ED48}",
+      "path": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\Play_Rifle",
+      "type": "Event",
+      "state": {
+        "parent": {
+          "id": "{B53F7A4F-9336-48E6-8A54-08E4A5A9C0B3}"
+        },
+        "children": [
+          {
+            "id": "{28CD2FE7-E6BE-4271-980E-9761A0B37F6D}"
+          }
+        ]
+      },
+      "state_sha256": "869ec40d5a0e76c99db9a25715b6667050ee6a733b5f1191a317580f9e5f8853"
+    },
+    {
+      "role": "play_rifle_action",
+      "id": "{28CD2FE7-E6BE-4271-980E-9761A0B37F6D}",
+      "path": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\Play_Rifle\\[Play - Rifle]",
+      "type": "Action",
+      "state": {
+        "parent": {
+          "id": "{7B02B5D3-BC0A-47B3-B670-23AFC863ED48}"
+        },
+        "ActionType": 1,
+        "Target": {
+          "id": "{B273D3B2-05E3-47D8-B524-CD40D6D4CF37}"
+        }
+      },
+      "state_sha256": "2552bead7484fd3dc6cbeac67dd8d17e7805b20566238fc1878a37965575bfd1"
+    },
+    {
+      "role": "weapons_bus",
+      "id": "{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}",
+      "path": "\\Busses\\Default Work Unit\\WAAPI_V2_Weapons",
+      "type": "Bus",
+      "state": {
+        "parent": {
+          "id": "{A74EEB4A-0805-4AFA-969C-53DCB862B550}"
+        },
+        "@Volume": 0.0
+      },
+      "state_sha256": "0e28c67cb8e0442e5b17202c6ec64ee3163fb8a67f21b6a7bf17300184afc7c6"
+    },
+    {
+      "role": "rifle_distance_parameter",
+      "id": "{5B499A43-5BA9-49E5-B3EF-7062627A5FC2}",
+      "path": "\\Game Parameters\\Default Work Unit\\WAAPI Skill Integration V2\\Rifle_Distance",
+      "type": "GameParameter",
+      "state": {
+        "parent": {
+          "id": "{85915282-BAE3-4D1B-8E82-2BE79A1D9DBF}"
+        }
+      },
+      "state_sha256": "f7b9f27b906e20dc2a5b0cc45f30906ca3c671c5bbf6319603814a340e0c0ea6"
+    },
+    {
+      "role": "player_footsteps",
+      "id": "{72A207A3-DA06-4467-8E18-3FDAB77DC66B}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps",
+      "type": "SwitchContainer",
+      "state": {
+        "parent": {
+          "id": "{8570736F-FDCF-4C43-AF64-C99A25B16722}"
+        },
+        "children": [
+          {
+            "id": "{99805432-CFD1-41B9-BA45-1B089820A287}"
+          },
+          {
+            "id": "{BDBC026F-4C5C-4548-9437-FFA135C7973F}"
+          },
+          {
+            "id": "{DE5F6FCD-C11F-42AD-A8F4-C3D24F1BDF13}"
+          }
+        ],
+        "SwitchGroupOrStateGroup": {
+          "id": "{4F5CED25-BA00-4C46-88AB-CE2CFBEFDD2D}"
+        },
+        "OutputBus": {
+          "id": "{EF9E9851-4728-4F6C-9939-2C84CF0367A3}"
+        },
+        "assignment_pairs": [
+          {
+            "child": "{99805432-CFD1-41B9-BA45-1B089820A287}",
+            "stateOrSwitch": "{629C36DB-CC1F-4983-B0C9-4850BC3EF461}"
+          },
+          {
+            "child": "{BDBC026F-4C5C-4548-9437-FFA135C7973F}",
+            "stateOrSwitch": "{CB4C53E6-9695-4C0A-A00D-4323FE28E0E9}"
+          },
+          {
+            "child": "{DE5F6FCD-C11F-42AD-A8F4-C3D24F1BDF13}",
+            "stateOrSwitch": "{D457E7BF-4C4D-41A9-93F9-C127198EC739}"
+          }
+        ]
+      },
+      "state_sha256": "6bc1a2c9217fbdf3466aed772d151e52f82f1e562c9365b5f073546a4fdbdebd"
+    },
+    {
+      "role": "metal_container",
+      "id": "{DE5F6FCD-C11F-42AD-A8F4-C3D24F1BDF13}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Metal",
+      "type": "RandomSequenceContainer",
+      "state": {
+        "parent": {
+          "id": "{72A207A3-DA06-4467-8E18-3FDAB77DC66B}"
+        },
+        "children": [
+          {
+            "id": "{DEE5CBB2-AFCB-472C-A483-54CCD583E551}"
+          }
+        ],
+        "OutputBus": {
+          "id": "{EF9E9851-4728-4F6C-9939-2C84CF0367A3}"
+        }
+      },
+      "state_sha256": "f140d462b5a9ce18e37c8314661c61579004a2e24144a69d569a32efbe1db71e"
+    },
+    {
+      "role": "metal_sound",
+      "id": "{DEE5CBB2-AFCB-472C-A483-54CCD583E551}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Metal\\Metal_Step_01",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{DE5F6FCD-C11F-42AD-A8F4-C3D24F1BDF13}"
+        },
+        "activeSource": {
+          "id": "{5B106EE2-1536-4573-BC6E-6D84BF6FDD4A}"
+        },
+        "OutputBus": {
+          "id": "{EF9E9851-4728-4F6C-9939-2C84CF0367A3}"
+        }
+      },
+      "state_sha256": "0750e933ba97cc8da4f7417d26ec9492b8e62799b87637828886c65eacbc5666"
+    },
+    {
+      "role": "wood_container",
+      "id": "{99805432-CFD1-41B9-BA45-1B089820A287}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Wood",
+      "type": "RandomSequenceContainer",
+      "state": {
+        "parent": {
+          "id": "{72A207A3-DA06-4467-8E18-3FDAB77DC66B}"
+        },
+        "children": [
+          {
+            "id": "{A81D29AF-0AB6-4BC9-902C-8A904D3CFA94}"
+          }
+        ],
+        "OutputBus": {
+          "id": "{EF9E9851-4728-4F6C-9939-2C84CF0367A3}"
+        }
+      },
+      "state_sha256": "54b38512423f863d53b126df87530bec2f1e963b07d6a46e792ed5791e2d3bbf"
+    },
+    {
+      "role": "wood_sound",
+      "id": "{A81D29AF-0AB6-4BC9-902C-8A904D3CFA94}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Wood\\Wood_Step_01",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{99805432-CFD1-41B9-BA45-1B089820A287}"
+        },
+        "activeSource": {
+          "id": "{9D00E863-DFD1-4051-9EAB-41EE4C723DE4}"
+        },
+        "OutputBus": {
+          "id": "{EF9E9851-4728-4F6C-9939-2C84CF0367A3}"
+        }
+      },
+      "state_sha256": "3473a008bfab9e84e7e524a4199913cfe556892de8a2f7f825bb9e1dcf9b0d9e"
+    },
+    {
+      "role": "mud_container",
+      "id": "{BDBC026F-4C5C-4548-9437-FFA135C7973F}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Mud",
+      "type": "RandomSequenceContainer",
+      "state": {
+        "parent": {
+          "id": "{72A207A3-DA06-4467-8E18-3FDAB77DC66B}"
+        },
+        "children": [
+          {
+            "id": "{8F68E177-F11D-4AD0-899F-E1A326DF419F}"
+          }
+        ],
+        "OutputBus": {
+          "id": "{EF9E9851-4728-4F6C-9939-2C84CF0367A3}"
+        }
+      },
+      "state_sha256": "0285f6f94b1467d9603bc20b830b15bcb1ced4e20988493744e9bff92b006e91"
+    },
+    {
+      "role": "mud_sound",
+      "id": "{8F68E177-F11D-4AD0-899F-E1A326DF419F}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Mud\\Mud_Step_01",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{BDBC026F-4C5C-4548-9437-FFA135C7973F}"
+        },
+        "activeSource": {
+          "id": "{E705667B-12C2-4225-AEAC-92ADBA053AB0}"
+        },
+        "OutputBus": {
+          "id": "{EF9E9851-4728-4F6C-9939-2C84CF0367A3}"
+        }
+      },
+      "state_sha256": "3cc7125cf619ccfa10dbed6f534af77b4ce37a13fc204ff05c82cc42df1934c2"
+    },
+    {
+      "role": "surface_group",
+      "id": "{4F5CED25-BA00-4C46-88AB-CE2CFBEFDD2D}",
+      "path": "\\Switches\\Default Work Unit\\WAAPI_V2_Surface",
+      "type": "SwitchGroup",
+      "state": {
+        "parent": {
+          "id": "{943EAFED-3A2C-4325-9F3C-E4CD8AEE33DC}"
+        },
+        "children": [
+          {
+            "id": "{629C36DB-CC1F-4983-B0C9-4850BC3EF461}"
+          },
+          {
+            "id": "{8E435F66-9998-4396-8BBC-1BEAF62FD304}"
+          },
+          {
+            "id": "{CB4C53E6-9695-4C0A-A00D-4323FE28E0E9}"
+          },
+          {
+            "id": "{D457E7BF-4C4D-41A9-93F9-C127198EC739}"
+          }
+        ]
+      },
+      "state_sha256": "d618fae5af10adb57f4c40e686cec5332f4b737e81bfe09beb2ad4dbb8a34e15"
+    },
+    {
+      "role": "surface_metal",
+      "id": "{D457E7BF-4C4D-41A9-93F9-C127198EC739}",
+      "path": "\\Switches\\Default Work Unit\\WAAPI_V2_Surface\\Metal",
+      "type": "Switch",
+      "state": {
+        "parent": {
+          "id": "{4F5CED25-BA00-4C46-88AB-CE2CFBEFDD2D}"
+        }
+      },
+      "state_sha256": "15e9bf0dd631e501b373a318e119d04ac9f0c483999aa787e082b5d08cc315ae"
+    },
+    {
+      "role": "surface_wood",
+      "id": "{629C36DB-CC1F-4983-B0C9-4850BC3EF461}",
+      "path": "\\Switches\\Default Work Unit\\WAAPI_V2_Surface\\Wood",
+      "type": "Switch",
+      "state": {
+        "parent": {
+          "id": "{4F5CED25-BA00-4C46-88AB-CE2CFBEFDD2D}"
+        }
+      },
+      "state_sha256": "15e9bf0dd631e501b373a318e119d04ac9f0c483999aa787e082b5d08cc315ae"
+    },
+    {
+      "role": "surface_mud",
+      "id": "{CB4C53E6-9695-4C0A-A00D-4323FE28E0E9}",
+      "path": "\\Switches\\Default Work Unit\\WAAPI_V2_Surface\\Mud",
+      "type": "Switch",
+      "state": {
+        "parent": {
+          "id": "{4F5CED25-BA00-4C46-88AB-CE2CFBEFDD2D}"
+        }
+      },
+      "state_sha256": "15e9bf0dd631e501b373a318e119d04ac9f0c483999aa787e082b5d08cc315ae"
+    },
+    {
+      "role": "surface_snow",
+      "id": "{8E435F66-9998-4396-8BBC-1BEAF62FD304}",
+      "path": "\\Switches\\Default Work Unit\\WAAPI_V2_Surface\\Snow",
+      "type": "Switch",
+      "state": {
+        "parent": {
+          "id": "{4F5CED25-BA00-4C46-88AB-CE2CFBEFDD2D}"
+        }
+      },
+      "state_sha256": "15e9bf0dd631e501b373a318e119d04ac9f0c483999aa787e082b5d08cc315ae"
+    },
+    {
+      "role": "play_footsteps_event",
+      "id": "{38996905-87BB-4FCF-87DB-F5EB0C10B45D}",
+      "path": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\Play_Player_Footsteps",
+      "type": "Event",
+      "state": {
+        "parent": {
+          "id": "{B53F7A4F-9336-48E6-8A54-08E4A5A9C0B3}"
+        },
+        "children": [
+          {
+            "id": "{C7D0F93C-27CE-4FB5-8286-77525CE7B92E}"
+          }
+        ]
+      },
+      "state_sha256": "70f06e9b9a37a6b25aa726818a02e767cfe3c10453f57b8117fd21d15200a329"
+    },
+    {
+      "role": "play_footsteps_action",
+      "id": "{C7D0F93C-27CE-4FB5-8286-77525CE7B92E}",
+      "path": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\Play_Player_Footsteps\\[Play - Player_Footsteps]",
+      "type": "Action",
+      "state": {
+        "parent": {
+          "id": "{38996905-87BB-4FCF-87DB-F5EB0C10B45D}"
+        },
+        "ActionType": 1,
+        "Target": {
+          "id": "{72A207A3-DA06-4467-8E18-3FDAB77DC66B}"
+        }
+      },
+      "state_sha256": "1cdba9ede1d9f4075a6e7cd7952b7e3c945779021b9b86ec96f8859eacf2e9e5"
+    },
+    {
+      "role": "footsteps_bus",
+      "id": "{EF9E9851-4728-4F6C-9939-2C84CF0367A3}",
+      "path": "\\Busses\\Default Work Unit\\WAAPI_V2_Footsteps",
+      "type": "Bus",
+      "state": {
+        "parent": {
+          "id": "{A74EEB4A-0805-4AFA-969C-53DCB862B550}"
+        },
+        "@Volume": 0.0
+      },
+      "state_sha256": "0e28c67cb8e0442e5b17202c6ec64ee3163fb8a67f21b6a7bf17300184afc7c6"
+    },
+    {
+      "role": "audit_root",
+      "id": "{14528B61-F578-4C4F-BE52-4BAF29AC1E3E}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle",
+      "type": "ActorMixer",
+      "state": {
+        "parent": {
+          "id": "{290A1055-DE97-435A-B2A3-419C6815AEE8}"
+        },
+        "children": [
+          {
+            "id": "{67C60B1B-CA2D-4DC5-B149-F773AE2C95A3}"
+          },
+          {
+            "id": "{FBF74BF9-8B83-44A8-AC8A-BA85372ECDC4}"
+          },
+          {
+            "id": "{55FE8F64-365F-4528-BD72-BA7F775779A1}"
+          },
+          {
+            "id": "{FBA9A1A2-3248-49B7-9983-830338229706}"
+          },
+          {
+            "id": "{D414B8C4-3D29-465D-A788-EEC7D0C86DD7}"
+          },
+          {
+            "id": "{243E851B-259E-4FCC-861E-65CFE25B4967}"
+          }
+        ]
+      },
+      "state_sha256": "ee5613daa448e04e171adde5b9baccd418f0a3b9da6f3df62d8d2d384c4238d1"
+    },
+    {
+      "role": "audit_close",
+      "id": "{67C60B1B-CA2D-4DC5-B149-F773AE2C95A3}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\Rifle_Close",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{14528B61-F578-4C4F-BE52-4BAF29AC1E3E}"
+        },
+        "notes": "close-needs-review",
+        "@Volume": 2.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{EF9E9851-4728-4F6C-9939-2C84CF0367A3}"
+        },
+        "activeSource": {
+          "id": "{98D57DD7-9AB1-41D1-8178-817BE1CA061E}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "58a1b12c193d93f7c36543eef6e9c68efde6bbc932d33059b4c1481232aea02b"
+    },
+    {
+      "role": "audit_tail",
+      "id": "{FBF74BF9-8B83-44A8-AC8A-BA85372ECDC4}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\RFL_Tail",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{14528B61-F578-4C4F-BE52-4BAF29AC1E3E}"
+        },
+        "notes": "release-ready | tail",
+        "@Volume": 1.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}"
+        },
+        "activeSource": {
+          "id": "{6F767F75-9ED2-4860-A745-A5D905C6DF9C}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "2f69e246494c02916bfb758580ac2c3e35b1f1054467ebcb38539f947dcebad7"
+    },
+    {
+      "role": "audit_mechanical",
+      "id": "{55FE8F64-365F-4528-BD72-BA7F775779A1}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\RFL_Mechanical",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{14528B61-F578-4C4F-BE52-4BAF29AC1E3E}"
+        },
+        "notes": "mechanical-needs-review",
+        "@Volume": 0.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{EF9E9851-4728-4F6C-9939-2C84CF0367A3}"
+        },
+        "activeSource": {
+          "id": "{F40B05D7-A754-41C0-95EA-2993623E5B5D}"
+        },
+        "rtpc_rows": [
+          {
+            "id": "{B379BE63-6FA7-4A4E-AFD5-6A20A4C7AC7C}",
+            "name": "",
+            "type": "RTPC",
+            "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\RFL_Mechanical\\[RTPC: Voice Volume, Rifle_Distance]",
+            "notes": "",
+            "@PropertyName": "Volume",
+            "@ControlInput": {
+              "id": "{5B499A43-5BA9-49E5-B3EF-7062627A5FC2}"
+            },
+            "@Curve": {
+              "@Flags": 3,
+              "id": "{EA5DF588-264B-40EA-84FB-CF5BF3C79E91}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": -12.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 50.0,
+                  "y": -6.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": 0.0
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "state_sha256": "f338fb58a8089431732772132bbfb38225ebc9e22cc57cfc9e6b4390ccbbff76"
+    },
+    {
+      "role": "audit_exception_legacy",
+      "id": "{FBA9A1A2-3248-49B7-9983-830338229706}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\Legacy_Rifle_Reference",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{14528B61-F578-4C4F-BE52-4BAF29AC1E3E}"
+        },
+        "notes": "legacy-reference",
+        "@Volume": 0.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{EF9E9851-4728-4F6C-9939-2C84CF0367A3}"
+        },
+        "activeSource": {
+          "id": "{6B238C6D-93A5-4914-9C77-1024CE8340E0}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "d10c1bec4e0e945fcd357c8f808a1ffdbca97761f6860c59375b65a7224db879"
+    },
+    {
+      "role": "audit_exception_hot",
+      "id": "{D414B8C4-3D29-465D-A788-EEC7D0C86DD7}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\RFL_Intentional_Hot",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{14528B61-F578-4C4F-BE52-4BAF29AC1E3E}"
+        },
+        "notes": "release-ready | intentional-hot",
+        "@Volume": 6.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}"
+        },
+        "activeSource": {
+          "id": "{A3519A32-1F5A-471E-8F7D-F0DCBBE6FC62}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "0009dbb9bf2de8582358b4efdd54b7f715fe15858a08af888bee439e20f370d5"
+    },
+    {
+      "role": "audit_compliant",
+      "id": "{243E851B-259E-4FCC-861E-65CFE25B4967}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\RFL_Clean",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{14528B61-F578-4C4F-BE52-4BAF29AC1E3E}"
+        },
+        "notes": "release-ready | clean",
+        "@Volume": -3.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}"
+        },
+        "activeSource": {
+          "id": "{81DC830A-E4F4-43CD-9EB7-D6979C142492}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "06ea22f06e7560e7eef9d0d569bdbdee2e75ee1e19846e1091a28ca08d63d28a"
+    },
+    {
+      "role": "audit_out_of_scope",
+      "id": "{89F0AF56-29EB-475A-A719-44B2C785A702}",
+      "path": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Pistol\\Rifle_Close",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{E14D2644-0171-4942-9761-83D38C0FD21B}"
+        },
+        "notes": "outside-scope",
+        "@Volume": 4.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{EF9E9851-4728-4F6C-9939-2C84CF0367A3}"
+        },
+        "activeSource": {
+          "id": "{868418A1-6753-44A7-A8F0-4FBC0E79A2B4}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "15c01f5fd94e5350e3c2ad2749c45946943fd7c79af96baaac4752109d0e5892"
+    },
+    {
+      "role": "audit_close_event",
+      "id": "{0112B248-632B-4DF4-BC80-4CD8270250BA}",
+      "path": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\Play_Rifle_Close",
+      "type": "Event",
+      "state": {
+        "parent": {
+          "id": "{B53F7A4F-9336-48E6-8A54-08E4A5A9C0B3}"
+        },
+        "children": [
+          {
+            "id": "{8257E0BC-513A-4DFA-B85C-22C6997A5B19}"
+          }
+        ]
+      },
+      "state_sha256": "429bb8311b17cebc1620fb0f26e194b2e230cea06cf1bfad97f44c9c6c055b86"
+    },
+    {
+      "role": "audit_close_action",
+      "id": "{8257E0BC-513A-4DFA-B85C-22C6997A5B19}",
+      "path": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\Play_Rifle_Close\\[Play - Rifle_Close]",
+      "type": "Action",
+      "state": {
+        "parent": {
+          "id": "{0112B248-632B-4DF4-BC80-4CD8270250BA}"
+        },
+        "ActionType": 1,
+        "Target": {
+          "id": "{67C60B1B-CA2D-4DC5-B149-F773AE2C95A3}"
+        }
+      },
+      "state_sha256": "37b8b7206e548585409fdb8341eaf124fd3ec596d1a92480f3d0adc4399625d8"
+    }
+  ],
+  "media": [
+    {
+      "role": "rifle_close",
+      "active_source_id": "{20D04B6B-2EB3-4CE8-B70A-EB2A0144ED78}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/rifle_close_old.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "rifle_tail",
+      "active_source_id": "{D7E06088-034B-44B3-BF49-48B9E6E88FDD}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/rifle_tail_old.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "rifle_mechanical",
+      "active_source_id": "{66BDDC06-5699-4C17-A9DD-58119D7CE6BC}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/rifle_mechanical_old.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "rifle_close_backup",
+      "active_source_id": "{7A158864-EA00-4C20-B51E-C5D0C8821168}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/rifle_close_backup.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "rifle_tails_distractor",
+      "active_source_id": "{16BEA67B-5848-4C67-B2B4-A7AF4B2E63E4}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/rifle_tails_distractor.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "metal_sound",
+      "active_source_id": "{5B106EE2-1536-4573-BC6E-6D84BF6FDD4A}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/metal_step_01.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "wood_sound",
+      "active_source_id": "{9D00E863-DFD1-4051-9EAB-41EE4C723DE4}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/wood_step_01.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "mud_sound",
+      "active_source_id": "{E705667B-12C2-4225-AEAC-92ADBA053AB0}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/mud_step_01.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "audit_close",
+      "active_source_id": "{98D57DD7-9AB1-41D1-8178-817BE1CA061E}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/audit_close.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "audit_tail",
+      "active_source_id": "{6F767F75-9ED2-4860-A745-A5D905C6DF9C}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/audit_tail.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "audit_mechanical",
+      "active_source_id": "{F40B05D7-A754-41C0-95EA-2993623E5B5D}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/audit_mechanical.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "audit_exception_legacy",
+      "active_source_id": "{6B238C6D-93A5-4914-9C77-1024CE8340E0}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/audit_legacy.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "audit_exception_hot",
+      "active_source_id": "{A3519A32-1F5A-471E-8F7D-F0DCBBE6FC62}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/audit_hot.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "audit_compliant",
+      "active_source_id": "{81DC830A-E4F4-43CD-9EB7-D6979C142492}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/audit_clean.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "audit_out_of_scope",
+      "active_source_id": "{868418A1-6753-44A7-A8F0-4FBC0E79A2B4}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/audit_outside.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    }
+  ]
+}

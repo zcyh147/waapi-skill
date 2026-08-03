@@ -333,9 +333,9 @@ def test_rtpc_add_materializes_only_the_closed_append_shape_and_verifies_full_li
         read_call=ScriptedReader(
             {
                 "ak.wwise.core.object.get": [
-                    {"return": [_object_row()]},
                     {
                         "return": [
+                            _object_row(),
                             _object_row(
                                 CONTROL_ID,
                                 name="Distance",
@@ -457,9 +457,9 @@ def test_version_proven_missing_empty_rtpc_field_is_normalized_through_prepare_g
         read_call=ScriptedReader(
             {
                 "ak.wwise.core.object.get": [
-                    {"return": [_object_row()]},
                     {
                         "return": [
+                            _object_row(),
                             _object_row(
                                 CONTROL_ID,
                                 name="Distance",

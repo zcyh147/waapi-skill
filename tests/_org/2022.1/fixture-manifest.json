@@ -1,7 +1,7 @@
 {
   "algorithm": "sha256",
-  "digest": "0cc2c22606264b869e788532641159b2a1812d5e2cfa88353956154c978583b6",
-  "file_count": 67,
+  "digest": "6ac627c62a638e73bce91ecdbe89830b2600a8a17739bfed9d4b0a135d05825f",
+  "file_count": 82,
   "files": [
     {
       "bytes": 96264,
@@ -14,9 +14,9 @@
       "sha256": "23555c7214846fb38135b2161a3ba1a6e25238ac7773d75f615c8e14c1853012"
     },
     {
-      "bytes": 1874,
+      "bytes": 46148,
       "path": "Actor-Mixer Hierarchy/Default Work Unit.wwu",
-      "sha256": "89bc25cb9806925a6ee682865e4059a738df1ed73a59cdb313ef47c4f3128e13"
+      "sha256": "912275490a209901d62cbcf92836a1de207ba082b66e827ae779a509199e3d9d"
     },
     {
       "bytes": 126907,
@@ -139,9 +139,9 @@
       "sha256": "d85b69e1ba1f9ca6133b155fe8493382576397bba00e165b2de2c1eaf3618845"
     },
     {
-      "bytes": 287,
+      "bytes": 2896,
       "path": "Events/Default Work Unit.wwu",
-      "sha256": "175103a4f35a349b867927ec9ad20d5f5427183fb0013c61f3be8d1e31b76ecf"
+      "sha256": "95f31c3e4ede604cceccc6701155ae9d214f4086005419b9baf27b8b0c76e5be"
     },
     {
       "bytes": 1474,
@@ -174,9 +174,9 @@
       "sha256": "8f69b80bc805d76372f3517bc17be3ba5cb79498cc022e488e58685c1d1b48c8"
     },
     {
-      "bytes": 303,
+      "bytes": 602,
       "path": "Game Parameters/Default Work Unit.wwu",
-      "sha256": "e87ed8f267f39725c172d1d7af5f9509b7c28b2c2c1681cd8f4bdfe5c08683ed"
+      "sha256": "6b8e72a405b515d68c25d5581ab98f05c7e8c05ba1b65e384c14d86df56437a9"
     },
     {
       "bytes": 432,
@@ -204,9 +204,9 @@
       "sha256": "88d38034004bd745fb2248784cc93bc9ed8d1cd1dc9dc3468c1312e167a9b0f9"
     },
     {
-      "bytes": 18648,
+      "bytes": 19902,
       "path": "Master-Mixer Hierarchy/Default Work Unit.wwu",
-      "sha256": "e0c1eab23094496d1572978b57714ec129a32f106f5e2ac03f2bb995eec9bb22"
+      "sha256": "21d965bedfaee2151144d6d0801bcf972e423e52a927e440857f61787e343d26"
     },
     {
       "bytes": 293,
@@ -239,6 +239,81 @@
       "sha256": "474422f208c274b61253678676352a3d94627c63b208a725aee206a89542a8c4"
     },
     {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/audit_clean.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/audit_close.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/audit_hot.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/audit_legacy.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/audit_mechanical.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/audit_outside.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/audit_tail.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/metal_step_01.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/mud_step_01.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/rifle_close_backup.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/rifle_close_old.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/rifle_mechanical_old.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/rifle_tail_old.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/rifle_tails_distractor.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/wood_step_01.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
       "bytes": 289,
       "path": "Presets/Default Work Unit.wwu",
       "sha256": "8220ff47ad643313508efc53abcddb557a6005d098f1f6d938f753d7969cb63b"
@@ -254,9 +329,9 @@
       "sha256": "0fd76d815a098c087de55bd2cf25273de01ca0516d03a89683b62581efee1e1e"
     },
     {
-      "bytes": 625,
+      "bytes": 794,
       "path": "README.md",
-      "sha256": "055fc57e7f27976f2278476ec0666b2264d38bfe299d1faedbeca0fc527f5029"
+      "sha256": "aa898c2f9dbccdd167b3a287b6cf34ecadce39de66112cc7d597b801ad818e56"
     },
     {
       "bytes": 464873,
@@ -309,9 +384,9 @@
       "sha256": "9ee51af35ea4abe84dc86599f226492f2913733ddb93f4f5e486df370d60c286"
     },
     {
-      "bytes": 291,
+      "bytes": 769,
       "path": "Switches/Default Work Unit.wwu",
-      "sha256": "7e291760a7c991851199af3d3d6b289fc02fd44014946e5f26c092499bd1fa20"
+      "sha256": "c82a2d0b8889c0d1c07a5309201b5f2648f7c6b0e7ea0592c896212c589c5839"
     },
     {
       "bytes": 1233,

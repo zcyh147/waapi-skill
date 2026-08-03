@@ -36,11 +36,16 @@ from tests.semantic.support.codex_gateway_broker import (
     MetadataQueryArgument,
     MetadataTokenProjection,
     ResponseBinding,
+    SealedQueryIdentityBoundJsonArgument,
     SemanticJsonArgument,
 )
 from tests.semantic.support.codex_integration_workflows_v1 import (
-    EXPECTED_PRIMARY_API as INTEGRATION_PRIMARY_API,
-    WORKFLOW_IDS as INTEGRATION_WORKFLOW_IDS,
+    EXPECTED_PRIMARY_API as INTEGRATION_V1_PRIMARY_API,
+    WORKFLOW_IDS as INTEGRATION_V1_WORKFLOW_IDS,
+)
+from tests.semantic.support.codex_integration_workflows_v2 import (
+    EXPECTED_PRIMARY_API as INTEGRATION_V2_PRIMARY_API,
+    WORKFLOW_IDS as INTEGRATION_V2_WORKFLOW_IDS,
 )
 from tests.semantic.support.codex_soundbank_runtime_v3 import (
     render_soundbank_generation_build_locations,
@@ -58,13 +63,20 @@ MAX_PROOF_FILES = 8192
 MAX_PROOF_BYTES = 512 * 1024 * 1024
 _SEMANTIC_JSON_KIND_BY_EQUIVALENCE = {
     "wire_exact": "semantic_json",
+    "audio_import_default_operation_v1": (
+        "semantic_json_audio_import_default_operation_v1"
+    ),
     "object_operation_v1": "semantic_json_object_operation_v1",
     "soundbank_generate_v1": "semantic_json_soundbank_generate_v1",
+    "switch_container_remove_assignment_v1": (
+        "semantic_json_switch_container_remove_assignment_v1"
+    ),
 }
 _SEMANTIC_JSON_EQUIVALENCE_BY_KIND = {
     kind: equivalence
     for equivalence, kind in _SEMANTIC_JSON_KIND_BY_EQUIVALENCE.items()
 }
+_SEALED_QUERY_IDENTITY_JSON_KIND = "sealed_query_identity_object_operation_json"
 
 HEAVY_APIS = frozenset(
     {
@@ -109,6 +121,14 @@ MAX_INTEGRATION_SCALAR_BYTES = 16 * 1024
 MAX_INTEGRATION_STRUCTURED_BYTES = 256 * 1024
 MAX_INTEGRATION_ARRAY_ITEMS = 64
 MAX_INTEGRATION_LEAVES = 4096
+INTEGRATION_PRIMARY_API = {
+    **INTEGRATION_V1_PRIMARY_API,
+    **INTEGRATION_V2_PRIMARY_API,
+}
+INTEGRATION_WORKFLOW_IDS = (
+    *INTEGRATION_V1_WORKFLOW_IDS,
+    *INTEGRATION_V2_WORKFLOW_IDS,
+)
 
 
 class PromptProvenanceError(RuntimeError):
@@ -522,6 +542,17 @@ def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
     for item in step.arguments:
         if isinstance(item, str):
             arguments.append({"kind": "literal", "value": item})
+        elif isinstance(item, SealedQueryIdentityBoundJsonArgument):
+            cloned = _json_clone(item.expected)
+            arguments.append(
+                {
+                    "kind": _SEALED_QUERY_IDENTITY_JSON_KIND,
+                    "value": cloned,
+                    "sha256": _sha256_json(cloned),
+                    "source_step": item.source_step,
+                    "target_pointers": list(item.target_pointers),
+                }
+            )
         elif isinstance(item, SemanticJsonArgument):
             cloned = _json_clone(item.expected)
             arguments.append(
@@ -638,6 +669,39 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
             if not isinstance(row.get("value"), str):
                 raise PromptProvenanceError("literal protocol argument is invalid")
             arguments.append(row["value"])
+        elif (
+            kind == _SEALED_QUERY_IDENTITY_JSON_KIND
+            and set(row)
+            == {
+                "kind",
+                "value",
+                "sha256",
+                "source_step",
+                "target_pointers",
+            }
+        ):
+            raw_pointers = row.get("target_pointers")
+            if (
+                row.get("sha256") != _sha256_json(row.get("value"))
+                or not isinstance(row.get("source_step"), str)
+                or not isinstance(raw_pointers, list)
+                or any(not isinstance(item, str) for item in raw_pointers)
+            ):
+                raise PromptProvenanceError(
+                    "sealed-query-identity protocol argument is invalid"
+                )
+            try:
+                arguments.append(
+                    SealedQueryIdentityBoundJsonArgument(
+                        expected=_json_clone(row.get("value")),
+                        source_step=str(row["source_step"]),
+                        target_pointers=tuple(raw_pointers),
+                    )
+                )
+            except (TypeError, ValueError) as exc:
+                raise PromptProvenanceError(
+                    "sealed-query-identity protocol argument is invalid"
+                ) from exc
         elif (
             kind in _SEMANTIC_JSON_EQUIVALENCE_BY_KIND
             and set(row) == {"kind", "value", "sha256"}
@@ -1454,6 +1518,28 @@ def _protocol_requests(
                 raise PromptProvenanceError(
                     "metadata-bound preview request manifest is invalid"
                 )
+        elif semantic_kind == _SEALED_QUERY_IDENTITY_JSON_KIND:
+            if (
+                set(semantic)
+                != {
+                    "kind",
+                    "value",
+                    "sha256",
+                    "source_step",
+                    "target_pointers",
+                }
+                or not isinstance(semantic.get("source_step"), str)
+                or not semantic.get("source_step")
+                or not isinstance(semantic.get("target_pointers"), list)
+                or len(semantic["target_pointers"]) != 2
+                or any(
+                    not isinstance(pointer, str)
+                    for pointer in semantic["target_pointers"]
+                )
+            ):
+                raise PromptProvenanceError(
+                    "sealed-query-identity preview request manifest is invalid"
+                )
         elif (
             semantic_kind not in _SEMANTIC_JSON_EQUIVALENCE_BY_KIND
             or set(semantic) != {"kind", "value", "sha256"}
@@ -1499,6 +1585,11 @@ def _protocol_requests(
                 raise PromptProvenanceError(
                     "metadata-bound request JSON equivalence contract is invalid"
                 )
+        elif semantic_kind == _SEALED_QUERY_IDENTITY_JSON_KIND:
+            if request.get("operation") != "object.set":
+                raise PromptProvenanceError(
+                    "sealed-query-identity request must be object.set"
+                )
         else:
             equivalence = _SEMANTIC_JSON_EQUIVALENCE_BY_KIND[
                 str(semantic_kind)
@@ -1507,6 +1598,11 @@ def _protocol_requests(
                 equivalence != "wire_exact"
                 and equivalence
                 != operation_request_equivalence(str(request_operation))
+                and not (
+                    request_operation == "audio.import"
+                    and equivalence
+                    == "audio_import_default_operation_v1"
+                )
             ):
                 raise PromptProvenanceError(
                     "operation request JSON equivalence contract is invalid"
@@ -2504,6 +2600,10 @@ def _expected_prompts(
             raise PromptProvenanceError(
                 "explicit follow-up prompt count differs from the closed "
                 "protocol turn boundaries"
+            )
+        if scenario.scenario_family in INTEGRATION_V2_WORKFLOW_IDS:
+            explicit_follow_ups = tuple(
+                prompt.format_map(values) for prompt in explicit_follow_ups
             )
         expected = (request, *explicit_follow_ups)
     else:

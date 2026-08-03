@@ -1,0 +1,1270 @@
+{
+  "contract": "waapi-skill.codex-integration-workflow-cases/v2",
+  "workflows": [
+    {
+      "id": "rifle_safe_reimport",
+      "versions": [
+        "2022.1",
+        "2025.1"
+      ],
+      "visible_inputs": [
+        {
+          "name": "rifle_source_directory",
+          "kind": "absolute_directory_path",
+          "description": "包含四条新版 Rifle WAV 的案例独占绝对目录"
+        },
+        {
+          "name": "rifle_container_path",
+          "kind": "object_path",
+          "description": "包含三个既有 Rifle Sound 的固定 Random Container 绝对路径"
+        },
+        {
+          "name": "rifle_event_path",
+          "kind": "object_path",
+          "description": "必须保持原有播放链路的固定 Play_Rifle Event 绝对路径"
+        },
+        {
+          "name": "rifle_bus_path",
+          "kind": "object_path",
+          "description": "既有三个 Sound 和新增 Distant 应使用的 Weapons Bus 绝对路径"
+        }
+      ],
+      "turns": [
+        {
+          "index": 1,
+          "kind": "request",
+          "prompt": "{rifle_source_directory} 里有 rifle_close_v2.wav、rifle_tail_v2.wav、rifle_mechanical_v2.wav 和 rifle_distant.wav。请在现有 {rifle_container_path} 中，用前三条新版素材更新 Rifle_Close、Rifle_Tail 和 Rifle_Mechanical；沿用这三个 Sound，不要替换或重建对象，并保持它们的 GUID、父级、音量、Notes、输出总线以及已有 RTPC 不变。{rifle_event_path} 及其 Action 也不要修改。在同一个 Random Container 中新增 Rifle_Distant，音量设为 -12 dB，输出总线设为 {rifle_bus_path}。请把三条更新和一条新增合成一次变更，先给我看预览再执行；不要影响名称相近的其他对象。",
+          "confirms_transaction": null,
+          "expects_preview_transaction": 1
+        },
+        {
+          "index": 2,
+          "kind": "confirmation",
+          "prompt": "这个预览符合要求：三个既有 Sound 只更新素材并保留原有声音设计，另外只新增一个 Rifle_Distant。请执行并核对对象身份、媒体、播放链路、属性、路由和 RTPC。",
+          "confirms_transaction": 1,
+          "expects_preview_transaction": null
+        }
+      ],
+      "transactions": [
+        {
+          "index": 1,
+          "operation": "audio.import",
+          "api": "ak.wwise.core.audio.import",
+          "preview_turn": 1,
+          "confirmation_turn": 2
+        }
+      ],
+      "fixture": {
+        "adapter": "rifle_committed_baseline_fixture_v2",
+        "baseline_source": "committed_sample_project",
+        "visible_bindings": {
+          "rifle_source_directory": {
+            "source": "owned_path",
+            "relative_path": "integration-v2/rifle/incoming"
+          },
+          "rifle_container_path": {
+            "source": "version_literal",
+            "values": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle"
+            }
+          },
+          "rifle_event_path": {
+            "source": "version_literal",
+            "values": {
+              "2022.1": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\RifleRevision\\Play_Rifle",
+              "2025.1": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\Play_Rifle"
+            }
+          },
+          "rifle_bus_path": {
+            "source": "version_literal",
+            "values": {
+              "2022.1": "\\Master-Mixer Hierarchy\\Default Work Unit\\WAAPI_V2_Weapons",
+              "2025.1": "\\Busses\\Default Work Unit\\WAAPI_V2_Weapons"
+            }
+          }
+        },
+        "object_graph": [
+          {
+            "role": "rifle_container",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle"
+            },
+            "type": "RandomSequenceContainer",
+            "baseline_state": "present"
+          },
+          {
+            "role": "rifle_close",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle\\Rifle_Close",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle\\Rifle_Close"
+            },
+            "type": "Sound",
+            "baseline_state": "present"
+          },
+          {
+            "role": "rifle_tail",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle\\Rifle_Tail",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle\\Rifle_Tail"
+            },
+            "type": "Sound",
+            "baseline_state": "present"
+          },
+          {
+            "role": "rifle_mechanical",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle\\Rifle_Mechanical",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle\\Rifle_Mechanical"
+            },
+            "type": "Sound",
+            "baseline_state": "present"
+          },
+          {
+            "role": "rifle_distant",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle\\Rifle_Distant",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle\\Rifle_Distant"
+            },
+            "type": "Sound",
+            "baseline_state": "absent"
+          },
+          {
+            "role": "rifle_close_backup",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Distractors\\Rifle_Close_Backup",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Distractors\\Rifle_Close_Backup"
+            },
+            "type": "Sound",
+            "baseline_state": "present"
+          },
+          {
+            "role": "rifle_tails_distractor",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Distractors\\Rifle_Tails",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Distractors\\Rifle_Tails"
+            },
+            "type": "Sound",
+            "baseline_state": "present"
+          },
+          {
+            "role": "play_rifle_event",
+            "paths": {
+              "2022.1": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\RifleRevision\\Play_Rifle",
+              "2025.1": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\Play_Rifle"
+            },
+            "type": "Event",
+            "baseline_state": "present"
+          },
+          {
+            "role": "play_rifle_action",
+            "paths": {
+              "2022.1": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\RifleRevision\\Play_Rifle\\[Play - Rifle]",
+              "2025.1": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\Play_Rifle\\[Play - Rifle]"
+            },
+            "type": "Action",
+            "baseline_state": "present"
+          },
+          {
+            "role": "weapons_bus",
+            "paths": {
+              "2022.1": "\\Master-Mixer Hierarchy\\Default Work Unit\\WAAPI_V2_Weapons",
+              "2025.1": "\\Busses\\Default Work Unit\\WAAPI_V2_Weapons"
+            },
+            "type": "Bus",
+            "baseline_state": "present"
+          },
+          {
+            "role": "rifle_distance_parameter",
+            "path": "\\Game Parameters\\Default Work Unit\\WAAPI Skill Integration V2\\Rifle_Distance",
+            "type": "GameParameter",
+            "baseline_state": "present"
+          }
+        ],
+        "source_files": [
+          {
+            "key": "rifle_close_v2",
+            "file_name": "rifle_close_v2.wav",
+            "duration_ms": 431,
+            "frequency_hz": 271
+          },
+          {
+            "key": "rifle_tail_v2",
+            "file_name": "rifle_tail_v2.wav",
+            "duration_ms": 557,
+            "frequency_hz": 349
+          },
+          {
+            "key": "rifle_mechanical_v2",
+            "file_name": "rifle_mechanical_v2.wav",
+            "duration_ms": 373,
+            "frequency_hz": 463
+          },
+          {
+            "key": "rifle_distant",
+            "file_name": "rifle_distant.wav",
+            "duration_ms": 689,
+            "frequency_hz": 587
+          }
+        ],
+        "parameters": {
+          "import_operation": "useExisting",
+          "existing_rows": [
+            {
+              "role": "rifle_close",
+              "source_key": "rifle_close_v2"
+            },
+            {
+              "role": "rifle_tail",
+              "source_key": "rifle_tail_v2"
+            },
+            {
+              "role": "rifle_mechanical",
+              "source_key": "rifle_mechanical_v2"
+            }
+          ],
+          "new_row": {
+            "role": "rifle_distant",
+            "source_key": "rifle_distant",
+            "properties": {
+              "Volume": -12.0
+            },
+            "references": {
+              "OutputBus": "{rifle_bus_path}"
+            }
+          },
+          "preserve_fields": [
+            "id",
+            "parent",
+            "notes",
+            "@Volume",
+            "OutputBus",
+            "@IsLoopingEnabled",
+            "@UseMaxSoundPerInstance",
+            "@MaxSoundPerInstance",
+            "rtpc"
+          ],
+          "protected_roles": [
+            "play_rifle_event",
+            "play_rifle_action",
+            "rifle_close_backup",
+            "rifle_tails_distractor"
+          ]
+        },
+        "business_assertions": [
+          {
+            "id": "existing_sound_guids_preserved",
+            "kind": "guid_preserved",
+            "roles": [
+              "rifle_close",
+              "rifle_tail",
+              "rifle_mechanical"
+            ],
+            "fields": []
+          },
+          {
+            "id": "existing_active_sources_bound_to_sounds",
+            "kind": "active_source_binding_exact",
+            "roles": [
+              "rifle_close",
+              "rifle_tail",
+              "rifle_mechanical"
+            ],
+            "fields": [
+              "activeSource",
+              "parent"
+            ]
+          },
+          {
+            "id": "updated_media_hashes_match_inputs",
+            "kind": "media_sha256_matches_input",
+            "roles": [
+              "rifle_close",
+              "rifle_tail",
+              "rifle_mechanical"
+            ],
+            "fields": [
+              "originalFilePath"
+            ]
+          },
+          {
+            "id": "distant_created_once_with_new_guid",
+            "kind": "absent_then_present_once",
+            "roles": [
+              "rifle_distant"
+            ],
+            "fields": [
+              "id",
+              "parent"
+            ]
+          },
+          {
+            "id": "distant_media_hash_matches_input",
+            "kind": "media_sha256_matches_input",
+            "roles": [
+              "rifle_distant"
+            ],
+            "fields": [
+              "originalFilePath"
+            ]
+          },
+          {
+            "id": "rifle_container_child_set_exact",
+            "kind": "direct_child_set_exact",
+            "roles": [
+              "rifle_container",
+              "rifle_close",
+              "rifle_tail",
+              "rifle_mechanical",
+              "rifle_distant"
+            ],
+            "fields": []
+          },
+          {
+            "id": "play_event_chain_unchanged",
+            "kind": "object_state_unchanged",
+            "roles": [
+              "play_rifle_event",
+              "play_rifle_action"
+            ],
+            "fields": [
+              "id",
+              "parent",
+              "ActionType",
+              "Target"
+            ]
+          },
+          {
+            "id": "sound_design_state_unchanged",
+            "kind": "selected_fields_unchanged",
+            "roles": [
+              "rifle_close",
+              "rifle_tail",
+              "rifle_mechanical"
+            ],
+            "fields": [
+              "parent",
+              "notes",
+              "@Volume",
+              "@Pitch",
+              "OutputBus",
+              "@IsLoopingEnabled",
+              "@UseMaxSoundPerInstance",
+              "@MaxSoundPerInstance",
+              "rtpc"
+            ]
+          },
+          {
+            "id": "distractors_unchanged",
+            "kind": "object_state_unchanged",
+            "roles": [
+              "rifle_close_backup",
+              "rifle_tails_distractor"
+            ],
+            "fields": [
+              "*"
+            ]
+          },
+          {
+            "id": "single_import_transaction",
+            "kind": "transaction_sequence_exact",
+            "roles": [],
+            "fields": [
+              "audio.import"
+            ]
+          },
+          {
+            "id": "source_project_unchanged",
+            "kind": "source_tree_hash_unchanged",
+            "roles": [],
+            "fields": [
+              "full_tree_sha256",
+              "mtime_ns"
+            ]
+          }
+        ],
+        "cleanup": {
+          "success": "remove_scenario_owned_sandbox_and_inputs",
+          "failure": "seal_owned_state_never_reuse",
+          "source_project": "must_remain_unchanged"
+        }
+      }
+    },
+    {
+      "id": "footsteps_snow_assignment_maintenance",
+      "versions": [
+        "2022.1",
+        "2025.1"
+      ],
+      "visible_inputs": [
+        {
+          "name": "snow_source_directory",
+          "kind": "absolute_directory_path",
+          "description": "包含四条 Snow 脚步 WAV 的案例独占绝对目录"
+        },
+        {
+          "name": "footsteps_container_path",
+          "kind": "object_path",
+          "description": "固定 Player_Footsteps Switch Container 绝对路径"
+        },
+        {
+          "name": "surface_group_path",
+          "kind": "object_path",
+          "description": "已含 Metal、Wood、Mud 和 Snow 的固定 Surface Switch Group 绝对路径"
+        },
+        {
+          "name": "footsteps_event_path",
+          "kind": "object_path",
+          "description": "必须保持不变的固定 Play_Footsteps Event 绝对路径"
+        }
+      ],
+      "turns": [
+        {
+          "index": 1,
+          "kind": "request",
+          "prompt": "{snow_source_directory} 中有 snow_step_01.wav、snow_step_02.wav、snow_step_03.wav 和 snow_step_04.wav。请在现有 {footsteps_container_path} 下新建一个名为 Snow 的 Random Container，并把四条素材依次作为名为 Snow_Step_01、Snow_Step_02、Snow_Step_03、Snow_Step_04 的 Sound SFX 导入其中；文件编号和 Sound 名称编号一一对应。把这个 Snow 容器分配给 {surface_group_path} 下已有的 Snow Switch。随后解除 Mud 容器当前的 Surface/Mud 分配，但保留 Mud 容器、里面的声音、素材和 Mud Switch 值。Metal、Wood 的现有分配以及 {footsteps_event_path} 的播放链路都不要修改。请先给我看 Snow 层级、四条导入和 Snow 分配这一步的预览；完成后再单独预览解除 Mud 分配。",
+          "confirms_transaction": null,
+          "expects_preview_transaction": 1
+        },
+        {
+          "index": 2,
+          "kind": "confirmation",
+        "prompt": "名为 Snow 的 Random Container、四条 Snow_Step 声音和 Surface/Snow 分配的预览都正确，请执行。Player_Footsteps Switch Container 位于 {footsteps_container_path}，它下面名为 Mud 的 Random Container 就是要解除分配的对象；对应的 Mud Switch 位于 {surface_group_path}\\Mud。完成后只给我看解除这对现有分配的预览，不要删除 Mud 相关对象。",
+          "confirms_transaction": 1,
+          "expects_preview_transaction": 2
+        },
+        {
+          "index": 3,
+          "kind": "confirmation",
+          "prompt": "解除 Surface/Mud 分配的预览正确，请执行。不要再改动 Snow、Mud、Metal、Wood 的对象、其他分配或 Play_Footsteps 播放链路。",
+          "confirms_transaction": 2,
+          "expects_preview_transaction": null
+        }
+      ],
+      "transactions": [
+        {
+          "index": 1,
+          "operation": "audio.import",
+          "api": "ak.wwise.core.audio.import",
+          "preview_turn": 1,
+          "confirmation_turn": 2
+        },
+        {
+          "index": 2,
+          "operation": "switchContainer.removeAssignment",
+          "api": "ak.wwise.core.switchContainer.removeAssignment",
+          "preview_turn": 2,
+          "confirmation_turn": 3
+        }
+      ],
+      "fixture": {
+        "adapter": "footsteps_committed_baseline_fixture_v2",
+        "baseline_source": "committed_sample_project",
+        "visible_bindings": {
+          "snow_source_directory": {
+            "source": "owned_path",
+            "relative_path": "integration-v2/footsteps/incoming"
+          },
+          "footsteps_container_path": {
+            "source": "version_literal",
+            "values": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps"
+            }
+          },
+          "surface_group_path": {
+            "source": "literal",
+            "value": "\\Switches\\Default Work Unit\\WAAPI_V2_Surface"
+          },
+          "footsteps_event_path": {
+            "source": "version_literal",
+            "values": {
+              "2022.1": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\PlayerFootstepsMaintenance\\Play_Footsteps",
+              "2025.1": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\Play_Player_Footsteps"
+            }
+          }
+        },
+        "object_graph": [
+          {
+            "role": "player_footsteps",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps"
+            },
+            "type": "SwitchContainer",
+            "baseline_state": "present"
+          },
+          {
+            "role": "metal_container",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Metal",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Metal"
+            },
+            "type": "RandomSequenceContainer",
+            "baseline_state": "present"
+          },
+          {
+            "role": "metal_sound",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Metal\\Metal_Step_01",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Metal\\Metal_Step_01"
+            },
+            "type": "Sound",
+            "baseline_state": "present"
+          },
+          {
+            "role": "wood_container",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Wood",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Wood"
+            },
+            "type": "RandomSequenceContainer",
+            "baseline_state": "present"
+          },
+          {
+            "role": "wood_sound",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Wood\\Wood_Step_01",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Wood\\Wood_Step_01"
+            },
+            "type": "Sound",
+            "baseline_state": "present"
+          },
+          {
+            "role": "mud_container",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Mud",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Mud"
+            },
+            "type": "RandomSequenceContainer",
+            "baseline_state": "present"
+          },
+          {
+            "role": "mud_sound",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Mud\\Mud_Step_01",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Mud\\Mud_Step_01"
+            },
+            "type": "Sound",
+            "baseline_state": "present"
+          },
+          {
+            "role": "snow_container",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Snow",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Snow"
+            },
+            "type": "RandomSequenceContainer",
+            "baseline_state": "absent"
+          },
+          {
+            "role": "snow_step_01",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Snow\\Snow_Step_01",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Snow\\Snow_Step_01"
+            },
+            "type": "Sound",
+            "baseline_state": "absent"
+          },
+          {
+            "role": "snow_step_02",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Snow\\Snow_Step_02",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Snow\\Snow_Step_02"
+            },
+            "type": "Sound",
+            "baseline_state": "absent"
+          },
+          {
+            "role": "snow_step_03",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Snow\\Snow_Step_03",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Snow\\Snow_Step_03"
+            },
+            "type": "Sound",
+            "baseline_state": "absent"
+          },
+          {
+            "role": "snow_step_04",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Snow\\Snow_Step_04",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Snow\\Snow_Step_04"
+            },
+            "type": "Sound",
+            "baseline_state": "absent"
+          },
+          {
+            "role": "surface_group",
+            "path": "\\Switches\\Default Work Unit\\WAAPI_V2_Surface",
+            "type": "SwitchGroup",
+            "baseline_state": "present"
+          },
+          {
+            "role": "surface_metal",
+            "path": "\\Switches\\Default Work Unit\\WAAPI_V2_Surface\\Metal",
+            "type": "Switch",
+            "baseline_state": "present"
+          },
+          {
+            "role": "surface_wood",
+            "path": "\\Switches\\Default Work Unit\\WAAPI_V2_Surface\\Wood",
+            "type": "Switch",
+            "baseline_state": "present"
+          },
+          {
+            "role": "surface_mud",
+            "path": "\\Switches\\Default Work Unit\\WAAPI_V2_Surface\\Mud",
+            "type": "Switch",
+            "baseline_state": "present"
+          },
+          {
+            "role": "surface_snow",
+            "path": "\\Switches\\Default Work Unit\\WAAPI_V2_Surface\\Snow",
+            "type": "Switch",
+            "baseline_state": "present"
+          },
+          {
+            "role": "play_footsteps_event",
+            "paths": {
+              "2022.1": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\PlayerFootstepsMaintenance\\Play_Footsteps",
+              "2025.1": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\Play_Player_Footsteps"
+            },
+            "type": "Event",
+            "baseline_state": "present"
+          },
+          {
+            "role": "play_footsteps_action",
+            "paths": {
+              "2022.1": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\PlayerFootstepsMaintenance\\Play_Footsteps\\[Play - Player_Footsteps]",
+              "2025.1": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\Play_Player_Footsteps\\[Play - Player_Footsteps]"
+            },
+            "type": "Action",
+            "baseline_state": "present"
+          },
+          {
+            "role": "footsteps_bus",
+            "paths": {
+              "2022.1": "\\Master-Mixer Hierarchy\\Default Work Unit\\WAAPI_V2_Footsteps",
+              "2025.1": "\\Busses\\Default Work Unit\\WAAPI_V2_Footsteps"
+            },
+            "type": "Bus",
+            "baseline_state": "present"
+          }
+        ],
+        "source_files": [
+          {
+            "key": "snow_step_01",
+            "file_name": "snow_step_01.wav",
+            "duration_ms": 317,
+            "frequency_hz": 293
+          },
+          {
+            "key": "snow_step_02",
+            "file_name": "snow_step_02.wav",
+            "duration_ms": 359,
+            "frequency_hz": 367
+          },
+          {
+            "key": "snow_step_03",
+            "file_name": "snow_step_03.wav",
+            "duration_ms": 401,
+            "frequency_hz": 439
+          },
+          {
+            "key": "snow_step_04",
+            "file_name": "snow_step_04.wav",
+            "duration_ms": 443,
+            "frequency_hz": 521
+          }
+        ],
+        "parameters": {
+          "import_operation": "createNew",
+          "structure_row": {
+            "role": "snow_container",
+            "object_type": "RandomSequenceContainer",
+            "switch_assignment": "Snow"
+          },
+          "sound_rows": [
+            {
+              "role": "snow_step_01",
+              "source_key": "snow_step_01"
+            },
+            {
+              "role": "snow_step_02",
+              "source_key": "snow_step_02"
+            },
+            {
+              "role": "snow_step_03",
+              "source_key": "snow_step_03"
+            },
+            {
+              "role": "snow_step_04",
+              "source_key": "snow_step_04"
+            }
+          ],
+          "assignment_pairs": {
+            "add": {
+              "child_role": "snow_container",
+              "value_role": "surface_snow"
+            },
+            "remove": {
+              "child_role": "mud_container",
+              "value_role": "surface_mud"
+            },
+            "preserve": [
+              {
+                "child_role": "metal_container",
+                "value_role": "surface_metal"
+              },
+              {
+                "child_role": "wood_container",
+                "value_role": "surface_wood"
+              }
+            ]
+          },
+          "protected_roles": [
+            "mud_container",
+            "surface_mud",
+            "metal_container",
+            "wood_container",
+            "footsteps_bus",
+            "play_footsteps_event",
+            "play_footsteps_action"
+          ]
+        },
+        "business_assertions": [
+          {
+            "id": "snow_hierarchy_created_once",
+            "kind": "absent_then_present_once",
+            "roles": [
+              "snow_container",
+              "snow_step_01",
+              "snow_step_02",
+              "snow_step_03",
+              "snow_step_04"
+            ],
+            "fields": [
+              "id",
+              "parent"
+            ]
+          },
+          {
+            "id": "snow_media_hashes_match_inputs",
+            "kind": "media_sha256_matches_input",
+            "roles": [
+              "snow_step_01",
+              "snow_step_02",
+              "snow_step_03",
+              "snow_step_04"
+            ],
+            "fields": [
+              "originalFilePath"
+            ]
+          },
+          {
+            "id": "snow_assignment_present",
+            "kind": "assignment_pair_present",
+            "roles": [
+              "player_footsteps",
+              "snow_container",
+              "surface_snow"
+            ],
+            "fields": []
+          },
+          {
+            "id": "mud_assignment_absent",
+            "kind": "assignment_pair_absent",
+            "roles": [
+              "player_footsteps",
+              "mud_container",
+              "mud_sound",
+              "surface_mud"
+            ],
+            "fields": []
+          },
+          {
+            "id": "mud_objects_and_value_preserved",
+            "kind": "object_state_unchanged",
+            "roles": [
+              "mud_container",
+              "surface_mud"
+            ],
+            "fields": [
+              "*"
+            ]
+          },
+          {
+            "id": "metal_wood_assignments_unchanged",
+            "kind": "assignment_pairs_unchanged",
+            "roles": [
+              "player_footsteps",
+              "metal_container",
+              "surface_metal",
+              "wood_container",
+              "surface_wood"
+            ],
+            "fields": []
+          },
+          {
+            "id": "footstep_event_chain_unchanged",
+            "kind": "object_state_unchanged",
+            "roles": [
+              "play_footsteps_event",
+              "play_footsteps_action"
+            ],
+            "fields": [
+              "id",
+              "parent",
+              "ActionType",
+              "Target"
+            ]
+          },
+          {
+            "id": "existing_footstep_content_unchanged",
+            "kind": "selected_fields_unchanged",
+            "roles": [
+              "metal_container",
+              "metal_sound",
+              "wood_container",
+              "wood_sound",
+              "mud_container",
+              "mud_sound"
+            ],
+            "fields": [
+              "id",
+              "parent",
+              "children",
+              "activeSource",
+              "OutputBus"
+            ]
+          },
+          {
+            "id": "footsteps_bus_unchanged",
+            "kind": "object_state_unchanged",
+            "roles": [
+              "footsteps_bus"
+            ],
+            "fields": [
+              "*"
+            ]
+          },
+          {
+            "id": "two_transaction_sequence_exact",
+            "kind": "transaction_sequence_exact",
+            "roles": [],
+            "fields": [
+              "audio.import",
+              "switchContainer.removeAssignment"
+            ]
+          },
+          {
+            "id": "source_project_unchanged",
+            "kind": "source_tree_hash_unchanged",
+            "roles": [],
+            "fields": [
+              "full_tree_sha256",
+              "mtime_ns"
+            ]
+          }
+        ],
+        "cleanup": {
+          "success": "remove_scenario_owned_sandbox_and_inputs",
+          "failure": "seal_owned_state_never_reuse",
+          "source_project": "must_remain_unchanged"
+        }
+      }
+    },
+    {
+      "id": "weapons_query_guided_batch_cleanup",
+      "versions": [
+        "2022.1",
+        "2025.1"
+      ],
+      "visible_inputs": [
+        {
+          "name": "weapons_audit_root_path",
+          "kind": "object_path",
+          "description": "固定 Weapons/Rifle 审计范围的绝对路径"
+        },
+        {
+          "name": "weapons_bus_path",
+          "kind": "object_path",
+          "description": "合规 Sound 应使用的固定 Weapons Bus 绝对路径"
+        }
+      ],
+      "turns": [
+        {
+          "index": 1,
+          "kind": "audit_request",
+          "prompt": "请只读检查 {weapons_audit_root_path} 下面的 Sound：名称没有使用 RFL_ 前缀、输出没有指向 {weapons_bus_path}、音量高于 0 dB，或者 Notes 中没有 release-ready 的对象都列出来。请逐项说明对象路径和违反了哪些规则；范围外的同名对象不要算进去，这一轮不要修改工程。",
+          "confirms_transaction": null,
+          "expects_preview_transaction": null
+        },
+        {
+          "index": 2,
+          "kind": "change_request",
+          "prompt": "请修正刚才报告中的 Rifle_Close、RFL_Tail 和 RFL_Mechanical：把 Rifle_Close 重命名为 RFL_Close、路由到 Weapons Bus，并把 Notes 设为 release-ready | close；把 RFL_Tail 的音量设为 -3 dB；把 RFL_Mechanical 路由到 Weapons Bus，并把 Notes 设为 release-ready | mechanical。Legacy_Rifle_Reference 和 RFL_Intentional_Hot 是有意保留的例外，不要修改；合规对象和范围外对象也不要动。请把三个对象的修正合成一次预览，等我确认后再执行。",
+          "confirms_transaction": null,
+          "expects_preview_transaction": 1
+        },
+        {
+          "index": 3,
+          "kind": "confirmation",
+          "prompt": "这三个对象的批量修正预览正确，请执行，并核对它们的 GUID、父级、AudioSource、Event/Action 引用和已有 RTPC 都保持不变，同时确认两个例外、合规对象和范围外对象没有变化。",
+          "confirms_transaction": 1,
+          "expects_preview_transaction": null
+        }
+      ],
+      "transactions": [
+        {
+          "index": 1,
+          "operation": "object.set",
+          "api": "ak.wwise.core.object.set",
+          "preview_turn": 2,
+          "confirmation_turn": 3
+        }
+      ],
+      "fixture": {
+        "adapter": "weapons_audit_committed_baseline_fixture_v2",
+        "baseline_source": "committed_sample_project",
+        "visible_bindings": {
+          "weapons_audit_root_path": {
+            "source": "version_literal",
+            "values": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle"
+            }
+          },
+          "weapons_bus_path": {
+            "source": "version_literal",
+            "values": {
+              "2022.1": "\\Master-Mixer Hierarchy\\Default Work Unit\\WAAPI_V2_Weapons",
+              "2025.1": "\\Busses\\Default Work Unit\\WAAPI_V2_Weapons"
+            }
+          }
+        },
+        "object_graph": [
+          {
+            "role": "audit_root",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle"
+            },
+            "type": "ActorMixer",
+            "baseline_state": "present"
+          },
+          {
+            "role": "audit_close",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\Rifle_Close",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\Rifle_Close"
+            },
+            "type": "Sound",
+            "baseline_state": "present"
+          },
+          {
+            "role": "audit_tail",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\RFL_Tail",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\RFL_Tail"
+            },
+            "type": "Sound",
+            "baseline_state": "present"
+          },
+          {
+            "role": "audit_mechanical",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\RFL_Mechanical",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\RFL_Mechanical"
+            },
+            "type": "Sound",
+            "baseline_state": "present"
+          },
+          {
+            "role": "audit_exception_legacy",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\Legacy_Rifle_Reference",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\Legacy_Rifle_Reference"
+            },
+            "type": "Sound",
+            "baseline_state": "present"
+          },
+          {
+            "role": "audit_exception_hot",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\RFL_Intentional_Hot",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\RFL_Intentional_Hot"
+            },
+            "type": "Sound",
+            "baseline_state": "present"
+          },
+          {
+            "role": "audit_compliant",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\RFL_Clean",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\RFL_Clean"
+            },
+            "type": "Sound",
+            "baseline_state": "present"
+          },
+          {
+            "role": "audit_out_of_scope",
+            "paths": {
+              "2022.1": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Pistol\\Rifle_Close",
+              "2025.1": "\\Containers\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Pistol\\Rifle_Close"
+            },
+            "type": "Sound",
+            "baseline_state": "present"
+          },
+          {
+            "role": "audit_close_event",
+            "paths": {
+              "2022.1": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\WeaponsAudit\\Play_Rifle_Close",
+              "2025.1": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\Play_Rifle_Close"
+            },
+            "type": "Event",
+            "baseline_state": "present"
+          },
+          {
+            "role": "audit_close_action",
+            "paths": {
+              "2022.1": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\WeaponsAudit\\Play_Rifle_Close\\[Play - Rifle_Close]",
+              "2025.1": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\Play_Rifle_Close\\[Play - Rifle_Close]"
+            },
+            "type": "Action",
+            "baseline_state": "present"
+          },
+          {
+            "role": "weapons_bus",
+            "paths": {
+              "2022.1": "\\Master-Mixer Hierarchy\\Default Work Unit\\WAAPI_V2_Weapons",
+              "2025.1": "\\Busses\\Default Work Unit\\WAAPI_V2_Weapons"
+            },
+            "type": "Bus",
+            "baseline_state": "present"
+          },
+          {
+            "role": "footsteps_bus",
+            "paths": {
+              "2022.1": "\\Master-Mixer Hierarchy\\Default Work Unit\\WAAPI_V2_Footsteps",
+              "2025.1": "\\Busses\\Default Work Unit\\WAAPI_V2_Footsteps"
+            },
+            "type": "Bus",
+            "baseline_state": "present"
+          },
+          {
+            "role": "rifle_distance_parameter",
+            "path": "\\Game Parameters\\Default Work Unit\\WAAPI Skill Integration V2\\Rifle_Distance",
+            "type": "GameParameter",
+            "baseline_state": "present"
+          }
+        ],
+        "source_files": [],
+        "parameters": {
+          "audit_rules": [
+            {
+              "field": "name",
+              "operator": "not_starts_with",
+              "value": "RFL_"
+            },
+            {
+              "field": "OutputBus",
+              "operator": "not_equal_path",
+              "value": "{weapons_bus_path}"
+            },
+            {
+              "field": "@Volume",
+              "operator": "greater_than",
+              "value": 0.0
+            },
+            {
+              "field": "notes",
+              "operator": "not_contains",
+              "value": "release-ready"
+            }
+          ],
+          "reported_candidate_roles": [
+            "audit_close",
+            "audit_tail",
+            "audit_mechanical",
+            "audit_exception_legacy",
+            "audit_exception_hot"
+          ],
+          "selected_corrections": [
+            {
+              "role": "audit_close",
+              "name": "RFL_Close",
+              "notes": "release-ready | close",
+              "properties": {},
+              "references": {
+                "OutputBus": "{weapons_bus_path}"
+              }
+            },
+            {
+              "role": "audit_tail",
+              "properties": {
+                "Volume": -3.0
+              },
+              "references": {}
+            },
+            {
+              "role": "audit_mechanical",
+              "notes": "release-ready | mechanical",
+              "properties": {},
+              "references": {
+                "OutputBus": "{weapons_bus_path}"
+              }
+            }
+          ],
+          "exception_roles": [
+            "audit_exception_legacy",
+            "audit_exception_hot"
+          ],
+          "control_roles": [
+            "audit_compliant",
+            "audit_out_of_scope"
+          ],
+          "identity_readback": "exact_id_before_preview",
+          "batch_operation": "object.set"
+        },
+        "business_assertions": [
+          {
+            "id": "audit_candidates_exact",
+            "kind": "query_candidate_set_exact",
+            "roles": [
+              "audit_close",
+              "audit_tail",
+              "audit_mechanical",
+              "audit_exception_legacy",
+              "audit_exception_hot"
+            ],
+            "fields": [
+              "id",
+              "name",
+              "path",
+              "type",
+              "@Volume",
+              "notes",
+              "OutputBus"
+            ]
+          },
+          {
+            "id": "excluded_scope_absent",
+            "kind": "query_result_excludes_roles",
+            "roles": [
+              "audit_compliant",
+              "audit_out_of_scope"
+            ],
+            "fields": []
+          },
+          {
+            "id": "selected_ids_revalidated",
+            "kind": "exact_id_readback_before_preview",
+            "roles": [
+              "audit_close",
+              "audit_tail",
+              "audit_mechanical"
+            ],
+            "fields": [
+              "id",
+              "name",
+              "path",
+              "type"
+            ]
+          },
+          {
+            "id": "selected_guids_and_parents_preserved",
+            "kind": "selected_fields_unchanged",
+            "roles": [
+              "audit_close",
+              "audit_tail",
+              "audit_mechanical"
+            ],
+            "fields": [
+              "id",
+              "parent"
+            ]
+          },
+          {
+            "id": "selected_corrections_exact",
+            "kind": "requested_fields_exact",
+            "roles": [
+              "audit_close",
+              "audit_tail",
+              "audit_mechanical"
+            ],
+            "fields": [
+              "name",
+              "@Volume",
+              "notes",
+              "OutputBus"
+            ]
+          },
+          {
+            "id": "single_object_set_batch",
+            "kind": "transaction_sequence_exact",
+            "roles": [],
+            "fields": [
+              "object.set"
+            ]
+          },
+          {
+            "id": "event_action_links_unchanged",
+            "kind": "object_state_unchanged",
+            "roles": [
+              "audit_close_event",
+              "audit_close_action"
+            ],
+            "fields": [
+              "id",
+              "parent",
+              "ActionType",
+              "Target"
+            ]
+          },
+          {
+            "id": "rtpc_and_audio_sources_unchanged",
+            "kind": "selected_fields_unchanged",
+            "roles": [
+              "audit_close",
+              "audit_tail",
+              "audit_mechanical"
+            ],
+            "fields": [
+              "activeSource",
+              "rtpc"
+            ]
+          },
+          {
+            "id": "exceptions_and_controls_unchanged",
+            "kind": "object_state_unchanged",
+            "roles": [
+              "audit_exception_legacy",
+              "audit_exception_hot",
+              "audit_compliant",
+              "audit_out_of_scope"
+            ],
+            "fields": [
+              "*"
+            ]
+          },
+          {
+            "id": "source_project_unchanged",
+            "kind": "source_tree_hash_unchanged",
+            "roles": [],
+            "fields": [
+              "full_tree_sha256",
+              "mtime_ns"
+            ]
+          }
+        ],
+        "cleanup": {
+          "success": "remove_scenario_owned_sandbox_and_inputs",
+          "failure": "seal_owned_state_never_reuse",
+          "source_project": "must_remain_unchanged"
+        }
+      }
+    }
+  ]
+}

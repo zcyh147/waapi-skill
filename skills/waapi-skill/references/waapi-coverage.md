@@ -54,8 +54,10 @@ inherited from the canonical Console manifest.
 - `fixed_command`: a dedicated packaged gateway command.
 - `bounded_call`: a reviewed, read-only `call` route with recursive reflected
   request/result validation, a timeout, and a result-size ceiling.
-- `bounded_topic_wait`: one bounded subscription followed by guaranteed
-  unsubscribe.
+- `bounded_topic_wait`: a configurable finite or explicitly no-timeout wait
+  that remains event-count/result bounded and always unsubscribes. Explicit
+  continuous requests use `stream-topic`, whose persistent subscription emits
+  bounded records and also unsubscribes on termination.
 - `transaction`, `managed_transaction`, or `isolated_transaction`: the
   manifest-registered `waapi.call` operation through immutable
   preview -> accepted authorization -> execute once -> result verification.
@@ -164,22 +166,28 @@ closed until the packaged contract is reviewed and updated.
 
 ## Verification scope
 
-The focused program gate currently contains 2362 passing tests and exercises
+The focused program gate currently contains 2411 passing tests and exercises
 all 808 packaged route-contract version/API rows with
 in-process fake clients. It validates exact URI dispatch, reflected request and
 result/event schemas, timeout/result ceilings, all three modification-policy
 branches, transaction preparation and verification, same-connection Undo execution, lifecycle cleanup binding,
-isolated path confinement, and topic
-subscribe/event/unsubscribe behavior. Separate negative tests cover exclusions,
+isolated path confinement, and topic subscribe/event/unsubscribe behavior for
+configurable finite or explicitly no-timeout event-count-bounded waits plus
+continuous `stream-topic`. Separate negative tests cover exclusions,
 route bypass attempts, model-authored external command hooks, malformed nested
 payloads, and manifest drift. Direct and isolated generic transactions also run
 through complete preview/confirm/execute/verify program chains. Dedicated tests
 separately validate the 824-row Authoring overlay and its UI-command routes;
 this is not a second 824-row per-API fake-dispatch matrix. The query tests cover
 all five versions of the closed Builder plus the advanced WAQL route's fixed
-read-only URI, framing, Gateway-appended final `take`, response cap, and
-explicit lack of a mutation-identity bridge. They do not prove native syntax
-acceptance by a real Wwise process.
+read-only URI, UTF-8 byte limits, trimmed single-line framing (no comments,
+semicolons, or unclosed string/regex literals), Gateway-appended final `take`,
+response cap, and explicit lack of a mutation-identity bridge. Dedicated
+program tests also cover five context/read optimizations: compact default query
+replies, opt-in `--detail` diagnostics, direct canonical relationship-GUID
+hops, request/preview-local identity/property-metadata cache reuse, and
+deduplicated bounded multi-ID prepared-role revalidation. They do not prove
+native syntax acceptance by a real Wwise process.
 
 The completed, memory-off `h80-release-c38` Codex Terra campaign ran 80
 real-Wwise business scenarios for the 16 approved heavy APIs: 70 on 2022.1,

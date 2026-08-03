@@ -14,6 +14,10 @@ from typing import Any, Mapping
 import pytest  # pyright: ignore[reportMissingImports]
 
 import wwise_waapi.dispatcher as dispatcher_module
+from wwise_waapi.builders.query import (  # pyright: ignore[reportMissingImports]
+    MAX_ADVANCED_RETURN_EXPRESSION_BYTES,
+    MAX_ADVANCED_WAQL_BYTES,
+)
 from wwise_waapi.safety import EXPLICIT_UNSUPPORTED_TOPIC_URIS, IMMEDIATE_UNSUPPORTED_CALL_URIS
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS, version_key_from_get_info
 
@@ -3657,12 +3661,99 @@ def test_query_object_uses_semantic_builder_and_returns_normalized_rows(tmp_path
     assert exit_code == 0
     assert payload["count"] == 1
     assert payload["objects"][0]["name"] == "UI_Click"
-    assert payload["semantic_preview"]["source_note_family"] == "query"
+    assert payload["query_bound"] == {"mode": "take", "value": 10}
+    assert "semantic_preview" not in payload
+    assert "call" not in payload
+    assert list(payload)[-1] == "session_context"
     assert client.calls[-1] == (
         "ak.wwise.core.object.get",
         {"waql": 'from type Sound where name : "UI" take 10'},
         {"return": ["id", "name", "type", "path"]},
     )
+
+
+def test_query_object_detail_restores_compiler_and_dispatch_evidence(tmp_path: Path) -> None:
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {"return": []},
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-object", "--type", "Sound", "--take", "1", "--detail"],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["semantic_preview"]["source_note_family"] == "query"
+    assert payload["semantic_preview"]["envelope"]["args"] == {
+        "waql": "from type Sound take 1"
+    }
+    assert payload["call"]["api"] == "ak.wwise.core.object.get"
+    assert payload["call"]["ok"] is True
+
+
+def test_query_object_success_projection_preserves_terminal_agent_result_exactly() -> None:
+    agent_result = {"contract": "example/v1", "objects": [{"id": "{one}"}]}
+    full = {
+        "contract": waapi_gateway.GATEWAY_RESULT_CONTRACT,
+        "ok": True,
+        "status": "ok",
+        "command": "query-object",
+        "detected_version": "2022.1",
+        "query_bound": {"mode": "take", "value": 1},
+        "semantic_preview": {"compiled": "private-detail"},
+        "call": {"evidence_path": "/private/evidence.json"},
+        "count": 1,
+        "objects": [{"id": "{one}"}],
+        "agent_result": agent_result,
+    }
+
+    compact = waapi_gateway.project_successful_query_object_payload(
+        full,
+        detail=False,
+    )
+
+    assert "semantic_preview" not in compact
+    assert "call" not in compact
+    assert compact["agent_result"] is agent_result
+    assert list(compact)[-1] == "agent_result"
+    assert waapi_gateway.project_successful_query_object_payload(
+        full,
+        detail=True,
+    ) == full
+
+
+def test_query_object_cleanup_failure_keeps_complete_success_evidence(
+    tmp_path: Path,
+) -> None:
+    class DisconnectFailureClient(FakeClient):
+        def disconnect(self) -> None:
+            raise RuntimeError("disconnect failed after query")
+
+    client = DisconnectFailureClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {"return": []},
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-object", "--type", "Sound", "--take", "1"],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["ok"] is True
+    assert payload["semantic_preview"]["source_note_family"] == "query"
+    assert payload["call"]["ok"] is True
+    assert payload["details"]["cleanup_failure"] == {
+        "error_code": "RuntimeError",
+        "message": "disconnect failed after query",
+    }
 
 
 def test_query_schema_returns_five_version_closed_contract_without_connecting(
@@ -3730,6 +3821,28 @@ def test_query_schema_advanced_discloses_bounded_native_contract_offline(
         "version_specific_syntax_validated_by": "connected Wwise",
         "fallback_or_retry_on_invalid_query": False,
     }
+    for schema in payload["schemas"].values():
+        waql = schema["properties"]["waql"]
+        expression = schema["properties"]["return"]["items"]
+        assert waql["x-maxUtf8Bytes"] == MAX_ADVANCED_WAQL_BYTES
+        assert waql["x-framing"] == {
+            "trimmed": True,
+            "singleLine": True,
+            "queryEditorDollarPrefix": False,
+            "comments": False,
+            "statementSeparators": False,
+            "balancedDoubleQuotedStrings": True,
+            "balancedSlashRegexLiterals": True,
+        }
+        assert expression["x-maxUtf8Bytes"] == MAX_ADVANCED_RETURN_EXPRESSION_BYTES
+        assert expression["x-framing"] == {
+            "trimmed": True,
+            "singleLine": True,
+            "comments": False,
+            "statementSeparators": False,
+            "balancedDoubleQuotedStrings": True,
+            "balancedSlashRegexLiterals": True,
+        }
 
 
 def test_query_object_advanced_dispatches_fixed_bounded_waql_once(
@@ -4412,7 +4525,7 @@ def test_query_object_structured_exact_missing_object_is_normalized(
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--request-json", json.dumps(request)],
+        ["query-object", "--request-json", json.dumps(request), "--detail"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -5374,7 +5487,16 @@ def test_query_object_accepts_only_query_editor_path_or_guid(
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--query", query, "--take", "1", "--return-field", "id"],
+        [
+            "query-object",
+            "--query",
+            query,
+            "--take",
+            "1",
+            "--return-field",
+            "id",
+            "--detail",
+        ],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -5404,6 +5526,10 @@ def test_query_object_help_names_closed_query_editor_specifier_and_selects() -> 
     assert "Query Editor object specifier" in help_text
     assert "raw WAQL is not accepted" in help_text
     assert "--all-results" in help_text
+    assert "--detail" in help_text
+    assert "failures skip compact projection but still obey the global result ceiling" in " ".join(
+        help_text.split()
+    )
     select_action = next(action for action in query_parser._actions if action.dest == "select")
     assert tuple(select_action.choices) == (
         "descendants",
@@ -5468,7 +5594,8 @@ def test_documented_single_quoted_path_reaches_preview_with_single_separators(
 
     assert exit_code == 0, payload
     assert argv[argv.index("--path") + 1] == documented_path
-    assert payload["semantic_preview"]["envelope"]["args"] == {
+    assert "semantic_preview" not in payload
+    assert client.calls[-1][1] == {
         "waql": r'from object "\Events\Default Work Unit"'
     }
 
@@ -5664,7 +5791,14 @@ def test_exact_missing_object_is_normalized_to_empty_rows(
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--object-id", missing_id, "--return-field", "id"],
+        [
+            "query-object",
+            "--object-id",
+            missing_id,
+            "--return-field",
+            "id",
+            "--detail",
+        ],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -6785,9 +6919,16 @@ def test_wait_topic_timeout_unsubscribes_on_transport_owner_thread(tmp_path: Pat
 
     assert exit_code == 2
     assert payload["call"]["error_code"] == "TIMEOUT"
-    assert payload["call"]["details"]["cleanup_pending"] is False
-    assert payload["call"]["details"]["deadline_exhausted"] is False
-    assert 0 < payload["call"]["details"]["operation_timeout_seconds"] < 0.1
+    details = payload["call"]["details"]
+    assert details["cleanup_pending"] is False
+    # The dispatch reserves time for unsubscribe, but an overloaded scheduler
+    # may resume the waiter after the outer 100 ms deadline.  Preserve the
+    # truthful wall-clock flag instead of treating that scheduling variance as
+    # a cleanup failure.
+    assert details["deadline_exhausted"] is (
+        details["elapsed_seconds"] >= details["configured_timeout_seconds"]
+    )
+    assert 0 < details["operation_timeout_seconds"] < 0.1
     assert payload["cleanup"] == "unsubscribed"
     assert client.handlers[0].unsubscribe_calls == 1
     assert client.handlers[0].unsubscribe_thread_ident == client.handlers[0].subscribe_thread_ident

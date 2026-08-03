@@ -14,7 +14,7 @@ COVERAGE = (SKILL_ROOT / "references" / "waapi-coverage.md").read_text(encoding=
 
 def _structured_query_example_request() -> dict[str, object]:
     section = QUERY.split(
-        "When the request instead contains nested OR/NOT logic", 1
+        "contains nested OR/NOT logic, run the offline schema call", 1
     )[1].split("```bash", 1)[1].split("```", 1)[0]
     request_json = section.split("--request-json '", 1)[1].rsplit("'", 1)[0]
     payload = json.loads(request_json)
@@ -127,6 +127,8 @@ def test_exact_identity_query_is_complete_in_entry_file() -> None:
     )
     assert command in SKILL
     assert "Keep all four return fields explicit" in SKILL
+    assert "Exact `not_found` stays Gateway-owned in compact output" in SKILL
+    assert "use `--detail` only for explicit compile/dispatch diagnostics" in SKILL
     assert "do not read the query reference before or after it" in SKILL
     assert "Conditional read for a query not fully covered" in SKILL
     assert "keep those four fields explicit for an exact path/GUID identity lookup" in QUERY
@@ -144,6 +146,123 @@ def test_exact_hop_playback_diagnosis_does_not_repeat_the_action_lookup() -> Non
     assert "for the next exact-id Sound lookup" in section_flat
 
 
+def test_query_relationship_hops_reuse_returned_guids_without_weakening_guards() -> None:
+    section = QUERY.split("### Relationship-guided next hops", 1)[1].split(
+        "### Advanced native WAQL fallback", 1
+    )[0]
+    section_flat = " ".join(section.split())
+
+    for relationship in ("`Target`", "`activeSource`", "`OutputBus`", "`parent`"):
+        assert relationship in section_flat
+    for relationship_id in (
+        "`Target.id`",
+        "`activeSource.id`",
+        "`OutputBus.id`",
+        "`parent.id`",
+    ):
+        assert relationship_id in section_flat
+    assert "are relationship objects" in section_flat
+    assert "canonical braced GUID" in section_flat
+    assert "stop if missing or malformed" in section_flat
+    assert "Query that GUID directly" in section_flat
+    assert "do not reread the current row or search by name or path" in section_flat
+    assert "Gateway target/role revalidation still runs during preview/execute/verify" in section_flat
+    assert "Preserve first-returned order" in section_flat
+    assert "de-duplicate the GUIDs" in section_flat
+    assert "query each distinct GUID exactly once" in section_flat
+    assert "advanced-WAQL candidate" in section_flat
+    assert "simple exact-id readback" in section_flat
+
+
+def test_relationship_display_name_never_substitutes_for_absolute_bus_path() -> None:
+    section = QUERY.split("### Relationship-guided next hops", 1)[1].split(
+        "### Advanced native WAQL fallback", 1
+    )[0]
+    section_flat = " ".join(section.split())
+
+    assert "A relationship display `name`, including `OutputBus.name`, never proves an absolute path" in section_flat
+    assert "rule gives an absolute Bus path" in section_flat
+    assert "exact-ID query every distinct `OutputBus` GUID" in section_flat
+    assert "for `id`, `name`, `type`, and `path`" in section_flat
+    assert "compare returned `path`, never `name` with its final segment" in section_flat
+
+
+def test_broad_query_subset_mutations_require_exact_id_readback() -> None:
+    section = QUERY.split("### Relationship-guided next hops", 1)[1].split(
+        "### Advanced native WAQL fallback", 1
+    )[0]
+    section_flat = " ".join(section.split())
+
+    assert "broad ordinary/structured query returns multiple candidates" in section_flat
+    assert "selects some to change" in section_flat
+    assert "`query-object --object-id` on each selected GUID" in section_flat
+    assert "`id`, `name`, `type`, and `path`" in section_flat
+    assert "Never reread unselected rows" in section_flat
+    assert "relationship read hops are exempt" in section_flat
+    assert "mutation subset selected from multiple ordinary/structured results" in SKILL
+    assert "relationship-GUID read hops are exempt" in SKILL
+
+
+def test_query_reference_discloses_compact_success_and_explicit_detail() -> None:
+    section = QUERY.split("Ordinary `query-object` success", 1)[1].split(
+        "### Relationship-guided next hops", 1
+    )[0]
+    section_flat = " ".join(section.split())
+
+    assert "defaults to compact business fields" in section_flat
+    assert "sufficient for normal answers" in section_flat
+    assert "Use `--detail` only for explicit user requests" in section_flat
+    assert "compile/dispatch diagnosis" in section_flat
+    assert "never rerun solely for detail" in section_flat
+    assert "Failures skip compact projection but obey global limits" in section_flat
+    assert "Keep terminal `agent_result` exact and final" in section_flat
+
+    skill_flat = " ".join(SKILL.split())
+    assert "Normal query answers use default business fields" in skill_flat
+    assert "only for explicit user requests or compile/dispatch diagnosis" in skill_flat
+    assert "never rerun solely for detail" in skill_flat
+
+
+def test_small_complete_audit_uses_simple_inventory_before_report_rules() -> None:
+    query_flat = " ".join(QUERY.split())
+
+    assert "Choose the query layer by live retrieval, not report-rule count" in query_flat
+    assert "every object in one explicit small subtree" in query_flat
+    assert "apply the user's `OR`, `NOT`, comparison, or naming rules directly to those rows, without code" in query_flat
+    assert "Do not call `query-schema` merely because a report has several rules" in query_flat
+    assert "Boolean rules applied after a complete small inventory do not trigger that switch" in query_flat
+
+
+def test_user_supplied_absolute_wwise_paths_keep_their_exact_versioned_root() -> None:
+    query_flat = " ".join(QUERY.split())
+
+    assert "Copy user-supplied absolute Wwise paths character-for-character" in query_flat
+    assert "never add or change their roots" in query_flat
+    assert "In 2025, never rewrite `\\Containers\\...` or `\\Busses\\...` under legacy roots" in query_flat
+
+
+def test_advanced_query_docs_forbid_identity_handoff_and_disclose_framing() -> None:
+    section = QUERY.split("### Advanced native WAQL fallback", 1)[1].split(
+        "### Bounded inventories", 1
+    )[0]
+    section_flat = " ".join(section.split())
+
+    for phrase in (
+        "UTF-8 bytes (not character counts)",
+        "trimmed and single-line",
+        "comments or statement separators",
+        "unclosed double-quoted string or slash-regex literal",
+        "even a one-row result does not prove",
+        "Never feed an advanced result directly into a mutation",
+        "obtain their exact choice",
+        "simple `query-object --object-id` route",
+        "workflow stops for a new choice",
+    ):
+        assert phrase in section_flat
+    assert "identity handoff" not in section.casefold()
+    assert "one-row response never certifies uniqueness" in SKILL
+
+
 def test_complex_query_guidance_preserves_tokens_pushdown_and_user_bounds() -> None:
     query_flat = " ".join(QUERY.split())
     for phrase in (
@@ -155,7 +274,7 @@ def test_complex_query_guidance_preserves_tokens_pushdown_and_user_bounds() -> N
         "Do not report the language as missing when this exact child-source evidence exists",
         "do not associate by row position, similar names, or path prefixes",
         "A predicate array means AND only",
-        "For `A and (B or C)` or another nested boolean, switch to the structured route",
+        "When the live result selection itself requires `A and (B or C)` or another nested boolean, switch to the structured route",
         "copy that exact number to `--take`",
         "ask for a limit instead of inventing one",
     ):
@@ -471,6 +590,10 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "Do not call `operations`, `operation-schema`, or `preview` first" in OPERATE
     assert "`object.create` or `object.set`" in OPERATE
     assert "`operation-schema <name>` first" in OPERATE
+    assert "selected-subset identity gate" in OPERATE
+    assert "exact-ID read back every selected" in OPERATE
+    assert "These bounded read-only checks precede the transaction contract" in OPERATE
+    assert "first transaction-contract branches" in OPERATE
     assert "Any other metadata-bound operation" in OPERATE
     assert "one metadata discovery first, then its named `operation-schema`" in OPERATE
     assert "A named operation with no metadata lookup" in OPERATE
@@ -519,7 +642,10 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
     assert "named request root itself does not count" in compact
     assert "locks the whole batch to `object.set`" in compact
     assert "even when the same request also adds a wholly new subtree" in compact
-    assert "Its first Gateway command is `operation-schema object.set`" in compact
+    assert (
+        "After any required selected-subset identity gate, its first "
+        "transaction-contract command is `operation-schema object.set`"
+    ) in compact
     assert "whose requested root does not already exist" in compact
     assert "existing descendant container below the named request root" in compact
     assert "explicitly identifies as the direct insertion target" in compact
@@ -577,7 +703,13 @@ def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
         "never belongs inside an `imports[]` row",
         "Under `useExisting`, behavior is still resolved per row",
         "Existing SFX rows retain every user-supplied optional field",
-        "`originals_subfolder` is relative",
+        "`import_location` is a wire-significant path-base selector",
+        "absolute `object_path`, omit it from both the row and `defaults`",
+        "never infer `defaults.import_location` from a shared absolute parent",
+        "relative `object_path` requires one effective row/default `import_location`",
+        "Use `originals_subfolder` only when the user explicitly supplies",
+        "never infer one from a source directory, media category, object path, or example",
+        "It is relative to Wwise's normal destination",
         "absolute path below `\\Events`",
         "absent before preview",
         "unique across rows",
@@ -585,6 +717,18 @@ def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
     ):
         assert phrase in compact
     assert "never silently add or remove an `SFX/` prefix" in compact
+
+
+def test_operate_maps_only_live_query_accessors_to_mutation_tokens() -> None:
+    compact = " ".join(OPERATE.split())
+
+    assert "exact property/reference accessor is already visible in a successful live query" in compact
+    assert "property accessor `@Foo` becomes mutation metadata token `Foo`" in compact
+    assert "removing exactly one leading `@`" in compact
+    assert "reference accessor `OutputBus` remains `OutputBus`" in compact
+    assert "evidence-bound to that returned accessor" in compact
+    assert "never strip or invent a token from arbitrary user/model text" in compact
+    assert "preview the canonical token" in compact
 
 
 def test_operate_cli_and_authoring_fast_routes_keep_unstructured_materialization_rules() -> None:

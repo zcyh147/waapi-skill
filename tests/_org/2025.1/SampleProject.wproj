@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<WwiseDocument Type="Project" SchemaVersion="133" WwiseVersion="v2025.1.3" WwiseBuild="6590">
+<WwiseDocument Type="Project" SchemaVersion="133" WwiseVersion="v2025.1.7" WwiseBuild="9143">
 	<ProjectInfo>
 		<Project Name="SampleProject" ID="{16164796-C6E6-491A-8799-C42A33110A84}">
 			<Platforms>
@@ -15452,6 +15452,16 @@
 								<Value>False</Value>
 							</ValueList>
 						</Property>
+						<Property Name="EnableHPF" Type="bool">
+							<ValueList>
+								<Value>False</Value>
+							</ValueList>
+						</Property>
+						<Property Name="EnableLPF" Type="bool">
+							<ValueList>
+								<Value>False</Value>
+							</ValueList>
+						</Property>
 						<Property Name="HPF" Type="int16">
 							<ValueList>
 								<Value>0</Value>
@@ -15472,7 +15482,7 @@
 								<Value>False</Value>
 							</ValueList>
 						</Property>
-						<Property Name="SidechainScope" Type="int32">
+						<Property Name="SidechainScope" Type="int16">
 							<ValueList>
 								<Value>0</Value>
 							</ValueList>
@@ -15491,6 +15501,16 @@
 								<Value>0</Value>
 							</ValueList>
 						</Property>
+						<Property Name="EnableHPF" Type="bool">
+							<ValueList>
+								<Value>False</Value>
+							</ValueList>
+						</Property>
+						<Property Name="EnableLPF" Type="bool">
+							<ValueList>
+								<Value>False</Value>
+							</ValueList>
+						</Property>
 						<Property Name="HPF" Type="int16">
 							<ValueList>
 								<Value>0</Value>
@@ -15511,7 +15531,51 @@
 								<Value>False</Value>
 							</ValueList>
 						</Property>
-						<Property Name="SidechainScope" Type="int32">
+						<Property Name="SidechainScope" Type="int16">
+							<ValueList>
+								<Value>0</Value>
+							</ValueList>
+						</Property>
+						<Property Name="Volume" Type="Real32">
+							<ValueList>
+								<Value>0</Value>
+							</ValueList>
+						</Property>
+					</PropertyList>
+				</SharedPropertyList>
+				<SharedPropertyList ClassName="Ak Sidechain Source" PluginType="2" CompanyID="0" PluginID="195">
+					<PropertyList>
+						<Property Name="Color" Type="int16">
+							<ValueList>
+								<Value>0</Value>
+							</ValueList>
+						</Property>
+						<Property Name="EnableHPF" Type="bool">
+							<ValueList>
+								<Value>False</Value>
+							</ValueList>
+						</Property>
+						<Property Name="EnableLPF" Type="bool">
+							<ValueList>
+								<Value>False</Value>
+							</ValueList>
+						</Property>
+						<Property Name="HPF" Type="int16">
+							<ValueList>
+								<Value>0</Value>
+							</ValueList>
+						</Property>
+						<Property Name="LPF" Type="int16">
+							<ValueList>
+								<Value>0</Value>
+							</ValueList>
+						</Property>
+						<Property Name="OverrideColor" Type="bool">
+							<ValueList>
+								<Value>False</Value>
+							</ValueList>
+						</Property>
+						<Property Name="SidechainScope" Type="int16">
 							<ValueList>
 								<Value>0</Value>
 							</ValueList>

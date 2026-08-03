@@ -214,10 +214,10 @@ def test_isolates_only_pinned_auro_nodes_for_2025_soundbank_copy(
     assert {
         relative: row.input_sha256
         for relative, row in proofs.items()
-    } == {
-        "Busses/Default Work Unit.wwu": (
-            "abaefb80d17cb9f2f3f64b8d786eb02fface5e13066eaeaaac204cf2a3b4da06"
-        ),
+        } == {
+            "Busses/Default Work Unit.wwu": (
+                "0d06c10e0e632bdb723d00922d38e1796561c781b11c8d71f5b7eeedb10130b6"
+            ),
         "Effects/Ambisonics.wwu": (
             "66ef565e7b4e28ed39b189284700d44f67cdb8c4f9035fa5a04842d2c050e29a"
         ),

@@ -1496,6 +1496,56 @@ def test_soundbank_generate_equivalence_round_trips_and_rejects_wrong_route() ->
         _protocol_requests(wrong_route)
 
 
+def test_switch_remove_equivalence_round_trips_and_rejects_wrong_route() -> None:
+    container_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps"
+    group_path = r"\Switches\Default Work Unit\Surface"
+    request = _operation_request(
+        "switchContainer.removeAssignment",
+        {
+            "switch_container": {"kind": "path", "value": container_path},
+            "child": {
+                "kind": "scoped-name",
+                "name": "Mud",
+                "type": "RandomSequenceContainer",
+                "parent": {"kind": "path", "value": container_path},
+            },
+            "state_or_switch": {
+                "kind": "scoped-name",
+                "name": "Mud",
+                "type": "Switch",
+                "parent": {"kind": "path", "value": group_path},
+            },
+        },
+    )
+    protocol = build_transaction_protocol((request,))
+    serialized = serialize_protocol(protocol)
+    argument = serialized["steps"][1]["arguments"][2]
+
+    assert argument["kind"] == (
+        "semantic_json_switch_container_remove_assignment_v1"
+    )
+    assert deserialize_protocol(serialized) == protocol
+    assert serialize_protocol(deserialize_protocol(serialized)) == serialized
+    assert _protocol_requests(serialized) == (
+        ("/steps/1/arguments/2/value", request),
+    )
+
+    wrong_route = json.loads(json.dumps(serialized))
+    wrong_argument = wrong_route["steps"][1]["arguments"][2]
+    wrong_argument["value"]["operation"] = "switchContainer.addAssignment"
+    wrong_argument["sha256"] = hashlib.sha256(
+        json.dumps(
+            wrong_argument["value"],
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    with pytest.raises(PromptProvenanceError, match="equivalence contract"):
+        _protocol_requests(wrong_route)
+
+
 def test_protocol_round_trip_preserves_omitted_default_event_count_flag() -> None:
     protocol = build_direct_protocol(
         [

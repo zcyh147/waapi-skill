@@ -1,6 +1,67 @@
 <?xml version="1.0" encoding="utf-8"?>
 <WwiseDocument Type="WorkUnit" ID="{4113E002-9F9B-43CE-B15A-B1CBE8F9C520}" SchemaVersion="110">
 	<Events>
-		<WorkUnit Name="Default Work Unit" ID="{4113E002-9F9B-43CE-B15A-B1CBE8F9C520}" PersistMode="Standalone"/>
+		<WorkUnit Name="Default Work Unit" ID="{4113E002-9F9B-43CE-B15A-B1CBE8F9C520}" PersistMode="Standalone">
+			<ChildrenList>
+				<Folder Name="WAAPI_Skill_Integration_V2" ID="{C62A5FBD-2FA6-4A48-8D5B-4DB275011546}" ShortID="399084735">
+					<ChildrenList>
+						<Folder Name="PlayerFootstepsMaintenance" ID="{96C0C4EB-23CD-4E30-AFB0-E06A2065C749}" ShortID="508597475">
+							<ChildrenList>
+								<Event Name="Play_Footsteps" ID="{48679C6A-DE26-4952-BBE6-017DBEFEB67E}">
+									<ChildrenList>
+										<Action Name="" ID="{ECE89728-E299-4FAE-BE1E-267ADA6FB1FA}" ShortID="632267151">
+											<PropertyList>
+												<Property Name="ActionType" Type="int16" Value="1"/>
+											</PropertyList>
+											<ReferenceList>
+												<Reference Name="Target">
+													<ObjectRef Name="Player_Footsteps" ID="{CDEDE404-C540-4B7B-B7F9-EE5A036DE54C}" WorkUnitID="{B7237E6E-5972-4B02-A4C9-267862F2241B}"/>
+												</Reference>
+											</ReferenceList>
+										</Action>
+									</ChildrenList>
+								</Event>
+							</ChildrenList>
+						</Folder>
+						<Folder Name="RifleRevision" ID="{0E538DE2-C369-40C4-AB85-11FAD055A5D8}" ShortID="919681502">
+							<ChildrenList>
+								<Event Name="Play_Rifle" ID="{573B6D20-7F91-45B1-B668-A01894970363}">
+									<ChildrenList>
+										<Action Name="" ID="{024AE7FE-3B8F-465A-89AA-695BAA25B3F0}" ShortID="98832350">
+											<PropertyList>
+												<Property Name="ActionType" Type="int16" Value="1"/>
+											</PropertyList>
+											<ReferenceList>
+												<Reference Name="Target">
+													<ObjectRef Name="Rifle" ID="{236F92A6-AA2D-4DEF-A775-76A00D8BCF81}" WorkUnitID="{B7237E6E-5972-4B02-A4C9-267862F2241B}"/>
+												</Reference>
+											</ReferenceList>
+										</Action>
+									</ChildrenList>
+								</Event>
+							</ChildrenList>
+						</Folder>
+						<Folder Name="WeaponsAudit" ID="{6EC9CD04-2A55-4356-814C-A83348057C09}" ShortID="720599162">
+							<ChildrenList>
+								<Event Name="Play_Rifle_Close" ID="{C3488086-4073-4746-AD74-130C02020EAD}">
+									<ChildrenList>
+										<Action Name="" ID="{B8C7867E-8D4E-432A-827A-0DEA5EC09997}" ShortID="392118863">
+											<PropertyList>
+												<Property Name="ActionType" Type="int16" Value="1"/>
+											</PropertyList>
+											<ReferenceList>
+												<Reference Name="Target">
+													<ObjectRef Name="Rifle_Close" ID="{3E9BFB6E-0220-44F6-BFD5-6E050D721D7F}" WorkUnitID="{B7237E6E-5972-4B02-A4C9-267862F2241B}"/>
+												</Reference>
+											</ReferenceList>
+										</Action>
+									</ChildrenList>
+								</Event>
+							</ChildrenList>
+						</Folder>
+					</ChildrenList>
+				</Folder>
+			</ChildrenList>
+		</WorkUnit>
 	</Events>
 </WwiseDocument>

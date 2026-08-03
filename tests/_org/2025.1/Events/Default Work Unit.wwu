@@ -1,6 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
 <WwiseDocument Type="WorkUnit" ID="{4113E002-9F9B-43CE-B15A-B1CBE8F9C520}" SchemaVersion="133">
 	<Events>
-		<WorkUnit Name="Default Work Unit" ID="{4113E002-9F9B-43CE-B15A-B1CBE8F9C520}" PersistMode="Standalone"/>
+		<WorkUnit Name="Default Work Unit" ID="{4113E002-9F9B-43CE-B15A-B1CBE8F9C520}" PersistMode="Standalone">
+			<ChildrenList>
+				<Folder Name="WAAPI_Skill_Integration_V2" ID="{B53F7A4F-9336-48E6-8A54-08E4A5A9C0B3}" ShortID="835749332">
+					<ChildrenList>
+						<Event Name="Play_Rifle" ID="{7B02B5D3-BC0A-47B3-B670-23AFC863ED48}">
+							<ChildrenList>
+								<Action Name="" ID="{28CD2FE7-E6BE-4271-980E-9761A0B37F6D}" ShortID="793829635">
+									<PropertyList>
+										<Property Name="ActionType" Type="int16" Value="1"/>
+									</PropertyList>
+									<ReferenceList>
+										<Reference Name="Target">
+											<ObjectRef Name="Rifle" ID="{B273D3B2-05E3-47D8-B524-CD40D6D4CF37}" WorkUnitID="{B7237E6E-5972-4B02-A4C9-267862F2241B}"/>
+										</Reference>
+									</ReferenceList>
+								</Action>
+							</ChildrenList>
+						</Event>
+						<Event Name="Play_Player_Footsteps" ID="{38996905-87BB-4FCF-87DB-F5EB0C10B45D}">
+							<ChildrenList>
+								<Action Name="" ID="{C7D0F93C-27CE-4FB5-8286-77525CE7B92E}" ShortID="31893177">
+									<PropertyList>
+										<Property Name="ActionType" Type="int16" Value="1"/>
+									</PropertyList>
+									<ReferenceList>
+										<Reference Name="Target">
+											<ObjectRef Name="Player_Footsteps" ID="{72A207A3-DA06-4467-8E18-3FDAB77DC66B}" WorkUnitID="{B7237E6E-5972-4B02-A4C9-267862F2241B}"/>
+										</Reference>
+									</ReferenceList>
+								</Action>
+							</ChildrenList>
+						</Event>
+						<Event Name="Play_Rifle_Close" ID="{0112B248-632B-4DF4-BC80-4CD8270250BA}">
+							<ChildrenList>
+								<Action Name="" ID="{8257E0BC-513A-4DFA-B85C-22C6997A5B19}" ShortID="332231459">
+									<PropertyList>
+										<Property Name="ActionType" Type="int16" Value="1"/>
+									</PropertyList>
+									<ReferenceList>
+										<Reference Name="Target">
+											<ObjectRef Name="Rifle_Close" ID="{67C60B1B-CA2D-4DC5-B149-F773AE2C95A3}" WorkUnitID="{B7237E6E-5972-4B02-A4C9-267862F2241B}"/>
+										</Reference>
+									</ReferenceList>
+								</Action>
+							</ChildrenList>
+						</Event>
+					</ChildrenList>
+				</Folder>
+			</ChildrenList>
+		</WorkUnit>
 	</Events>
 </WwiseDocument>

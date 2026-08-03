@@ -1,0 +1,914 @@
+{
+  "contract": "waapi-skill.codex-integration-workflow-committed-baseline/v1",
+  "version": "2022.1",
+  "source_project": {
+    "relative_path": "tests/_org/2022.1/SampleProject.wproj",
+    "project_file_sha256": "6ef42c1b859c3ab578169079b0d01c2650da38cad44cda8a357f052fdc0b1aa7",
+    "full_tree_sha256": "467e0c3dfabab4e7187addd77909eab12183f98af846b418d2ff8cb579c2b3e4"
+  },
+  "storage_files": [
+    {
+      "relative_path": "Actor-Mixer Hierarchy/Default Work Unit.wwu",
+      "sha256": "912275490a209901d62cbcf92836a1de207ba082b66e827ae779a509199e3d9d"
+    },
+    {
+      "relative_path": "Events/Default Work Unit.wwu",
+      "sha256": "95f31c3e4ede604cceccc6701155ae9d214f4086005419b9baf27b8b0c76e5be"
+    },
+    {
+      "relative_path": "Switches/Default Work Unit.wwu",
+      "sha256": "c82a2d0b8889c0d1c07a5309201b5f2648f7c6b0e7ea0592c896212c589c5839"
+    },
+    {
+      "relative_path": "Master-Mixer Hierarchy/Default Work Unit.wwu",
+      "sha256": "21d965bedfaee2151144d6d0801bcf972e423e52a927e440857f61787e343d26"
+    },
+    {
+      "relative_path": "Game Parameters/Default Work Unit.wwu",
+      "sha256": "6b8e72a405b515d68c25d5581ab98f05c7e8c05ba1b65e384c14d86df56437a9"
+    }
+  ],
+  "objects": [
+    {
+      "role": "rifle_container",
+      "id": "{236F92A6-AA2D-4DEF-A775-76A00D8BCF81}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle",
+      "type": "RandomSequenceContainer",
+      "state": {
+        "parent": {
+          "id": "{EF4A704F-7FA2-45C5-9081-CDC58024C777}"
+        },
+        "children": [
+          {
+            "id": "{080EB9AF-294E-4630-B88D-CCC315DB0615}"
+          },
+          {
+            "id": "{324FA8E7-3AB1-4500-B326-09FBBB96A173}"
+          },
+          {
+            "id": "{803D158F-1A0C-4DAE-803A-0DF6ED5BC4CF}"
+          }
+        ]
+      },
+      "state_sha256": "1155c3fe11c0fe4bd5593441204b53638634ca3b8a13f27b2063bbcb5a82b0e9"
+    },
+    {
+      "role": "rifle_close",
+      "id": "{803D158F-1A0C-4DAE-803A-0DF6ED5BC4CF}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle\\Rifle_Close",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{236F92A6-AA2D-4DEF-A775-76A00D8BCF81}"
+        },
+        "notes": "rifle-baseline | close",
+        "@Volume": -2.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{4B802164-7463-4826-8DA1-F980848ACC26}"
+        },
+        "activeSource": {
+          "id": "{8C75DA3B-93BC-46E6-A81F-2F970F11F817}"
+        },
+        "rtpc_rows": [
+          {
+            "id": "{8AE0C7AB-C694-4FCA-9D9E-C2BC315E1D39}",
+            "name": "",
+            "type": "RTPC",
+            "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle\\Rifle_Close\\[RTPC: Voice Volume, Rifle_Distance]",
+            "notes": "WAAPI integration baseline RTPC",
+            "@PropertyName": "Volume",
+            "@ControlInput": {
+              "id": "{6F785D43-C143-4388-87DD-2706AEEBD32B}"
+            },
+            "@Curve": {
+              "@Flags": 3,
+              "id": "{FABC7979-D930-49F6-B5C9-E9E76E6912D0}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": -12.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 50.0,
+                  "y": -6.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": 0.0
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "state_sha256": "2eb4aff9429750466aa0b225e3684b05a36d597c05f562659fdbb5b007541471"
+    },
+    {
+      "role": "rifle_tail",
+      "id": "{080EB9AF-294E-4630-B88D-CCC315DB0615}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle\\Rifle_Tail",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{236F92A6-AA2D-4DEF-A775-76A00D8BCF81}"
+        },
+        "notes": "rifle-baseline | tail",
+        "@Volume": -5.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{4B802164-7463-4826-8DA1-F980848ACC26}"
+        },
+        "activeSource": {
+          "id": "{2DD164A5-2FD5-4158-998D-933FA2F39096}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "1a8a9a9f06f33e4b822fa8e44806a0c5ae7036cddf0a9bd5cc58d398f98c99b1"
+    },
+    {
+      "role": "rifle_mechanical",
+      "id": "{324FA8E7-3AB1-4500-B326-09FBBB96A173}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Rifle\\Rifle_Mechanical",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{236F92A6-AA2D-4DEF-A775-76A00D8BCF81}"
+        },
+        "notes": "rifle-baseline | mechanical",
+        "@Volume": -7.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{4B802164-7463-4826-8DA1-F980848ACC26}"
+        },
+        "activeSource": {
+          "id": "{9C7FEE5C-EC50-4339-BA6E-AB8007FDFB15}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "be3e9adafb2b00c8e0615ea0b3e4b879e31c555f5a22b7088eeebcb428055e82"
+    },
+    {
+      "role": "rifle_close_backup",
+      "id": "{81C069B3-D5EC-4BC2-A4A6-F826FEB1328E}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Distractors\\Rifle_Close_Backup",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{B6372385-384D-4503-9908-492E492F27D7}"
+        },
+        "notes": "do-not-touch | distractor",
+        "@Volume": 0.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{4B802164-7463-4826-8DA1-F980848ACC26}"
+        },
+        "activeSource": {
+          "id": "{E91F3384-1226-41FC-BA7B-04F4C8EEB164}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "78cd3dcd8c50603f68a776608cbe55aad38a4b5f600e4af3c0d46e0137e2c138"
+    },
+    {
+      "role": "rifle_tails_distractor",
+      "id": "{21315181-29BD-473D-9FE0-C4CAD4D7F1D0}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\RifleRevision\\Distractors\\Rifle_Tails",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{B6372385-384D-4503-9908-492E492F27D7}"
+        },
+        "notes": "do-not-touch | near-name",
+        "@Volume": 0.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{4B802164-7463-4826-8DA1-F980848ACC26}"
+        },
+        "activeSource": {
+          "id": "{9440CCED-DF55-410E-9C3F-53A01F331CB8}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "5fb8248bf63f293e90a1b8ba843366a4d4beec101c38b65818c650d0153bcb63"
+    },
+    {
+      "role": "play_rifle_event",
+      "id": "{573B6D20-7F91-45B1-B668-A01894970363}",
+      "path": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\RifleRevision\\Play_Rifle",
+      "type": "Event",
+      "state": {
+        "parent": {
+          "id": "{0E538DE2-C369-40C4-AB85-11FAD055A5D8}"
+        },
+        "children": [
+          {
+            "id": "{024AE7FE-3B8F-465A-89AA-695BAA25B3F0}"
+          }
+        ]
+      },
+      "state_sha256": "4c51247c0fade6935a7669eeb48348329303ea4b53f7684686a42c2f946f8991"
+    },
+    {
+      "role": "play_rifle_action",
+      "id": "{024AE7FE-3B8F-465A-89AA-695BAA25B3F0}",
+      "path": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\RifleRevision\\Play_Rifle\\[Play - Rifle]",
+      "type": "Action",
+      "state": {
+        "parent": {
+          "id": "{573B6D20-7F91-45B1-B668-A01894970363}"
+        },
+        "ActionType": 1,
+        "Target": {
+          "id": "{236F92A6-AA2D-4DEF-A775-76A00D8BCF81}"
+        }
+      },
+      "state_sha256": "20a1f1a510274aac528093c6ed2cb1a144647184ed6dc73ec345bfba51be0d06"
+    },
+    {
+      "role": "weapons_bus",
+      "id": "{4B802164-7463-4826-8DA1-F980848ACC26}",
+      "path": "\\Master-Mixer Hierarchy\\Default Work Unit\\WAAPI_V2_Weapons",
+      "type": "Bus",
+      "state": {
+        "parent": {
+          "id": "{A74EEB4A-0805-4AFA-969C-53DCB862B550}"
+        },
+        "@Volume": 0.0
+      },
+      "state_sha256": "0e28c67cb8e0442e5b17202c6ec64ee3163fb8a67f21b6a7bf17300184afc7c6"
+    },
+    {
+      "role": "rifle_distance_parameter",
+      "id": "{6F785D43-C143-4388-87DD-2706AEEBD32B}",
+      "path": "\\Game Parameters\\Default Work Unit\\WAAPI Skill Integration V2\\Rifle_Distance",
+      "type": "GameParameter",
+      "state": {
+        "parent": {
+          "id": "{296F84DC-D8F9-4D4B-8BEE-9F2279EBA5AD}"
+        }
+      },
+      "state_sha256": "46b4318bb2f4e03a2429d254c35a694ca88b914904efe0c8fdce97144adb190e"
+    },
+    {
+      "role": "player_footsteps",
+      "id": "{CDEDE404-C540-4B7B-B7F9-EE5A036DE54C}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps",
+      "type": "SwitchContainer",
+      "state": {
+        "parent": {
+          "id": "{A6E2FFE3-9F89-46B6-84F4-9F96504E5045}"
+        },
+        "children": [
+          {
+            "id": "{3C8B89E5-36CB-418B-BA71-4DFC06F1E06F}"
+          },
+          {
+            "id": "{3F4D7A79-AA8A-41AD-A56E-9EADFB62710A}"
+          },
+          {
+            "id": "{E5335572-7671-498B-9922-B237CE443550}"
+          }
+        ],
+        "SwitchGroupOrStateGroup": {
+          "id": "{FFB983A2-A062-46BE-9284-31E137053D9E}"
+        },
+        "OutputBus": {
+          "id": "{BEACB0B3-DE08-4F41-820F-758635D57E56}"
+        },
+        "assignment_pairs": [
+          {
+            "child": "{3C8B89E5-36CB-418B-BA71-4DFC06F1E06F}",
+            "stateOrSwitch": "{11F9DB4B-CF74-4C83-96EA-7F331E2D2B81}"
+          },
+          {
+            "child": "{3F4D7A79-AA8A-41AD-A56E-9EADFB62710A}",
+            "stateOrSwitch": "{F5DF5281-CB25-4D77-90B3-9D2F9FE2E40D}"
+          },
+          {
+            "child": "{E5335572-7671-498B-9922-B237CE443550}",
+            "stateOrSwitch": "{5B4C06B9-DB68-424E-B68A-C9298AA2D526}"
+          }
+        ]
+      },
+      "state_sha256": "f0d1d6f92673d94c8829ade43c8f27d6915f7d350dee147e1eb897bd2f57782c"
+    },
+    {
+      "role": "metal_container",
+      "id": "{3F4D7A79-AA8A-41AD-A56E-9EADFB62710A}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Metal",
+      "type": "RandomSequenceContainer",
+      "state": {
+        "parent": {
+          "id": "{CDEDE404-C540-4B7B-B7F9-EE5A036DE54C}"
+        },
+        "children": [
+          {
+            "id": "{2B239A17-60D0-4880-830C-2AAF83AFCEF2}"
+          }
+        ],
+        "OutputBus": {
+          "id": "{BEACB0B3-DE08-4F41-820F-758635D57E56}"
+        }
+      },
+      "state_sha256": "e4d6173947e760b88a7a5509fd6a704e3a72205f5e1fa105495e2b9f3d023be8"
+    },
+    {
+      "role": "metal_sound",
+      "id": "{2B239A17-60D0-4880-830C-2AAF83AFCEF2}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Metal\\Metal_Step_01",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{3F4D7A79-AA8A-41AD-A56E-9EADFB62710A}"
+        },
+        "activeSource": {
+          "id": "{163A85CE-C98B-43B4-B36B-CFDB6D5F0D91}"
+        },
+        "OutputBus": {
+          "id": "{BEACB0B3-DE08-4F41-820F-758635D57E56}"
+        }
+      },
+      "state_sha256": "6d22f241111ece7c0637699cab25d3fcc00b823cbc73fe7fef69612650a34c6a"
+    },
+    {
+      "role": "wood_container",
+      "id": "{3C8B89E5-36CB-418B-BA71-4DFC06F1E06F}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Wood",
+      "type": "RandomSequenceContainer",
+      "state": {
+        "parent": {
+          "id": "{CDEDE404-C540-4B7B-B7F9-EE5A036DE54C}"
+        },
+        "children": [
+          {
+            "id": "{AE4142E1-844E-4E40-93EF-F468626465E1}"
+          }
+        ],
+        "OutputBus": {
+          "id": "{BEACB0B3-DE08-4F41-820F-758635D57E56}"
+        }
+      },
+      "state_sha256": "0e745116d18a4de433421a38d538b4aca1ff1fff9dc558bfd9fa66eeb5d8dfe1"
+    },
+    {
+      "role": "wood_sound",
+      "id": "{AE4142E1-844E-4E40-93EF-F468626465E1}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Wood\\Wood_Step_01",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{3C8B89E5-36CB-418B-BA71-4DFC06F1E06F}"
+        },
+        "activeSource": {
+          "id": "{FAEA33FB-8285-4320-9845-99FE15CA4299}"
+        },
+        "OutputBus": {
+          "id": "{BEACB0B3-DE08-4F41-820F-758635D57E56}"
+        }
+      },
+      "state_sha256": "039f886a276db8cdfdf47d60da71b4eb4967326ca87db27cb7aff5a160e5f747"
+    },
+    {
+      "role": "mud_container",
+      "id": "{E5335572-7671-498B-9922-B237CE443550}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Mud",
+      "type": "RandomSequenceContainer",
+      "state": {
+        "parent": {
+          "id": "{CDEDE404-C540-4B7B-B7F9-EE5A036DE54C}"
+        },
+        "children": [
+          {
+            "id": "{F31B59AB-8343-4783-A730-5C6C459EF96B}"
+          }
+        ],
+        "OutputBus": {
+          "id": "{BEACB0B3-DE08-4F41-820F-758635D57E56}"
+        }
+      },
+      "state_sha256": "2471c018c71785097dabe3038b352e9c36cd3eb7b81b1d0017d0bbf47e1b6e4d"
+    },
+    {
+      "role": "mud_sound",
+      "id": "{F31B59AB-8343-4783-A730-5C6C459EF96B}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\PlayerFootstepsMaintenance\\Player_Footsteps\\Mud\\Mud_Step_01",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{E5335572-7671-498B-9922-B237CE443550}"
+        },
+        "activeSource": {
+          "id": "{D294E13F-2EA3-428C-AE22-08540327C802}"
+        },
+        "OutputBus": {
+          "id": "{BEACB0B3-DE08-4F41-820F-758635D57E56}"
+        }
+      },
+      "state_sha256": "57e9d641d69ff4474f4227c3bbe744252cff694a043bea08e2c2653af3ea9819"
+    },
+    {
+      "role": "surface_group",
+      "id": "{FFB983A2-A062-46BE-9284-31E137053D9E}",
+      "path": "\\Switches\\Default Work Unit\\WAAPI_V2_Surface",
+      "type": "SwitchGroup",
+      "state": {
+        "parent": {
+          "id": "{943EAFED-3A2C-4325-9F3C-E4CD8AEE33DC}"
+        },
+        "children": [
+          {
+            "id": "{11F9DB4B-CF74-4C83-96EA-7F331E2D2B81}"
+          },
+          {
+            "id": "{5B4C06B9-DB68-424E-B68A-C9298AA2D526}"
+          },
+          {
+            "id": "{F5DF5281-CB25-4D77-90B3-9D2F9FE2E40D}"
+          },
+          {
+            "id": "{FE4BB417-54FC-44A0-B1EF-FEBD1A0EE25E}"
+          }
+        ]
+      },
+      "state_sha256": "a20ac0516bff592f7a77a03c2cfff35e74e7d0961484d1a257d9188bb46a99b3"
+    },
+    {
+      "role": "surface_metal",
+      "id": "{F5DF5281-CB25-4D77-90B3-9D2F9FE2E40D}",
+      "path": "\\Switches\\Default Work Unit\\WAAPI_V2_Surface\\Metal",
+      "type": "Switch",
+      "state": {
+        "parent": {
+          "id": "{FFB983A2-A062-46BE-9284-31E137053D9E}"
+        }
+      },
+      "state_sha256": "1e01904903f8ab40fc569d94e2600c7c059aca680e1cf4c856a72d8bafa5143f"
+    },
+    {
+      "role": "surface_wood",
+      "id": "{11F9DB4B-CF74-4C83-96EA-7F331E2D2B81}",
+      "path": "\\Switches\\Default Work Unit\\WAAPI_V2_Surface\\Wood",
+      "type": "Switch",
+      "state": {
+        "parent": {
+          "id": "{FFB983A2-A062-46BE-9284-31E137053D9E}"
+        }
+      },
+      "state_sha256": "1e01904903f8ab40fc569d94e2600c7c059aca680e1cf4c856a72d8bafa5143f"
+    },
+    {
+      "role": "surface_mud",
+      "id": "{5B4C06B9-DB68-424E-B68A-C9298AA2D526}",
+      "path": "\\Switches\\Default Work Unit\\WAAPI_V2_Surface\\Mud",
+      "type": "Switch",
+      "state": {
+        "parent": {
+          "id": "{FFB983A2-A062-46BE-9284-31E137053D9E}"
+        }
+      },
+      "state_sha256": "1e01904903f8ab40fc569d94e2600c7c059aca680e1cf4c856a72d8bafa5143f"
+    },
+    {
+      "role": "surface_snow",
+      "id": "{FE4BB417-54FC-44A0-B1EF-FEBD1A0EE25E}",
+      "path": "\\Switches\\Default Work Unit\\WAAPI_V2_Surface\\Snow",
+      "type": "Switch",
+      "state": {
+        "parent": {
+          "id": "{FFB983A2-A062-46BE-9284-31E137053D9E}"
+        }
+      },
+      "state_sha256": "1e01904903f8ab40fc569d94e2600c7c059aca680e1cf4c856a72d8bafa5143f"
+    },
+    {
+      "role": "play_footsteps_event",
+      "id": "{48679C6A-DE26-4952-BBE6-017DBEFEB67E}",
+      "path": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\PlayerFootstepsMaintenance\\Play_Footsteps",
+      "type": "Event",
+      "state": {
+        "parent": {
+          "id": "{96C0C4EB-23CD-4E30-AFB0-E06A2065C749}"
+        },
+        "children": [
+          {
+            "id": "{ECE89728-E299-4FAE-BE1E-267ADA6FB1FA}"
+          }
+        ]
+      },
+      "state_sha256": "ca8cbef1dfefc3b2d796fb48e5d30b91419950ba527b955f1d744e9725c55eae"
+    },
+    {
+      "role": "play_footsteps_action",
+      "id": "{ECE89728-E299-4FAE-BE1E-267ADA6FB1FA}",
+      "path": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\PlayerFootstepsMaintenance\\Play_Footsteps\\[Play - Player_Footsteps]",
+      "type": "Action",
+      "state": {
+        "parent": {
+          "id": "{48679C6A-DE26-4952-BBE6-017DBEFEB67E}"
+        },
+        "ActionType": 1,
+        "Target": {
+          "id": "{CDEDE404-C540-4B7B-B7F9-EE5A036DE54C}"
+        }
+      },
+      "state_sha256": "aceb6bc1794acb91bb647d4b7e22dca37d06d426671b75adbe2f51820ccb9c05"
+    },
+    {
+      "role": "footsteps_bus",
+      "id": "{BEACB0B3-DE08-4F41-820F-758635D57E56}",
+      "path": "\\Master-Mixer Hierarchy\\Default Work Unit\\WAAPI_V2_Footsteps",
+      "type": "Bus",
+      "state": {
+        "parent": {
+          "id": "{A74EEB4A-0805-4AFA-969C-53DCB862B550}"
+        },
+        "@Volume": 0.0
+      },
+      "state_sha256": "0e28c67cb8e0442e5b17202c6ec64ee3163fb8a67f21b6a7bf17300184afc7c6"
+    },
+    {
+      "role": "audit_root",
+      "id": "{11DCE239-CEDF-4A55-8A24-1E33F2FCCC93}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle",
+      "type": "ActorMixer",
+      "state": {
+        "parent": {
+          "id": "{F5FA250B-0254-4419-BD82-85879AF127F1}"
+        },
+        "children": [
+          {
+            "id": "{9DE679A0-F8EB-457C-BEB3-2AA01C627507}"
+          },
+          {
+            "id": "{02F26E4F-0143-4554-B2D3-434FF3E8D8F9}"
+          },
+          {
+            "id": "{4B4DA189-3DEF-4413-B1E5-C58370A82521}"
+          },
+          {
+            "id": "{6CE1E4AD-74BB-4D72-BE68-0226C7336590}"
+          },
+          {
+            "id": "{5D8F74B3-15C9-455F-8D95-8A877E59A7E1}"
+          },
+          {
+            "id": "{3E9BFB6E-0220-44F6-BFD5-6E050D721D7F}"
+          }
+        ]
+      },
+      "state_sha256": "fa0aafbf179c9c1e73f8e9861bcbb7568710d7e2c3e87cc90a8e5bc6be8c78a7"
+    },
+    {
+      "role": "audit_close",
+      "id": "{3E9BFB6E-0220-44F6-BFD5-6E050D721D7F}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\Rifle_Close",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{11DCE239-CEDF-4A55-8A24-1E33F2FCCC93}"
+        },
+        "notes": "close-needs-review",
+        "@Volume": 2.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{BEACB0B3-DE08-4F41-820F-758635D57E56}"
+        },
+        "activeSource": {
+          "id": "{F7D745C6-70D0-48E2-AE8A-89473C24E84E}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "ee600938778c042a88203756e98ad12d5113f7b9811544638d42f1513670049a"
+    },
+    {
+      "role": "audit_tail",
+      "id": "{5D8F74B3-15C9-455F-8D95-8A877E59A7E1}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\RFL_Tail",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{11DCE239-CEDF-4A55-8A24-1E33F2FCCC93}"
+        },
+        "notes": "release-ready | tail",
+        "@Volume": 1.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{4B802164-7463-4826-8DA1-F980848ACC26}"
+        },
+        "activeSource": {
+          "id": "{928E4D01-61C6-48E8-B633-06B9CA74916F}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "bae6877a4e9c24fb9dbc23461e83f4680ccb009e6fc04631b0278a917548536a"
+    },
+    {
+      "role": "audit_mechanical",
+      "id": "{6CE1E4AD-74BB-4D72-BE68-0226C7336590}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\RFL_Mechanical",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{11DCE239-CEDF-4A55-8A24-1E33F2FCCC93}"
+        },
+        "notes": "mechanical-needs-review",
+        "@Volume": 0.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{BEACB0B3-DE08-4F41-820F-758635D57E56}"
+        },
+        "activeSource": {
+          "id": "{8E59D692-C9B8-43D4-8C2A-8F55E2685259}"
+        },
+        "rtpc_rows": [
+          {
+            "id": "{6B0F431F-59B2-4B9F-B08F-1FC9A7DB1C6D}",
+            "name": "",
+            "type": "RTPC",
+            "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\RFL_Mechanical\\[RTPC: Voice Volume, Rifle_Distance]",
+            "notes": "WAAPI integration baseline RTPC",
+            "@PropertyName": "Volume",
+            "@ControlInput": {
+              "id": "{6F785D43-C143-4388-87DD-2706AEEBD32B}"
+            },
+            "@Curve": {
+              "@Flags": 3,
+              "id": "{255783B2-8438-42AF-85EF-BDB1F5253A6A}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": -12.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 50.0,
+                  "y": -6.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": 0.0
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "state_sha256": "5426b448acb6cd82621beffc354b206429475c53b8df0a16fb939b548c751944"
+    },
+    {
+      "role": "audit_exception_legacy",
+      "id": "{9DE679A0-F8EB-457C-BEB3-2AA01C627507}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\Legacy_Rifle_Reference",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{11DCE239-CEDF-4A55-8A24-1E33F2FCCC93}"
+        },
+        "notes": "legacy-reference",
+        "@Volume": 0.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{BEACB0B3-DE08-4F41-820F-758635D57E56}"
+        },
+        "activeSource": {
+          "id": "{B7C93128-0413-41BB-BAE5-E587CBF9E0C7}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "7815006b9e16bcb87171d926c5ba73dda3f30a325c11a1a1d7975966a68c5708"
+    },
+    {
+      "role": "audit_exception_hot",
+      "id": "{4B4DA189-3DEF-4413-B1E5-C58370A82521}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\RFL_Intentional_Hot",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{11DCE239-CEDF-4A55-8A24-1E33F2FCCC93}"
+        },
+        "notes": "release-ready | intentional-hot",
+        "@Volume": 6.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{4B802164-7463-4826-8DA1-F980848ACC26}"
+        },
+        "activeSource": {
+          "id": "{F084B3B4-9D0C-4237-84CB-5F5303DA884A}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "d2f9b0e6da80b0586b2039168b4b3731461e82e5cb20f44dc42701ce63a94ee9"
+    },
+    {
+      "role": "audit_compliant",
+      "id": "{02F26E4F-0143-4554-B2D3-434FF3E8D8F9}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Rifle\\RFL_Clean",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{11DCE239-CEDF-4A55-8A24-1E33F2FCCC93}"
+        },
+        "notes": "release-ready | clean",
+        "@Volume": -3.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{4B802164-7463-4826-8DA1-F980848ACC26}"
+        },
+        "activeSource": {
+          "id": "{9F8097D1-283C-4AE7-A8AE-E25444A764B6}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "a19fc8390c22f00668244ade55c0ef9676319a614250f7810bb33db7f5fc46a0"
+    },
+    {
+      "role": "audit_out_of_scope",
+      "id": "{AE15E1C6-2416-4B19-AD00-20D8A6E0ADDD}",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI Skill Integration V2\\WeaponsAudit\\Pistol\\Rifle_Close",
+      "type": "Sound",
+      "state": {
+        "parent": {
+          "id": "{11B2B580-24EA-4A66-887F-45250F5D06F4}"
+        },
+        "notes": "outside-scope",
+        "@Volume": 4.0,
+        "@Pitch": 0,
+        "@IsLoopingEnabled": false,
+        "@UseMaxSoundPerInstance": false,
+        "@MaxSoundPerInstance": 50,
+        "OutputBus": {
+          "id": "{BEACB0B3-DE08-4F41-820F-758635D57E56}"
+        },
+        "activeSource": {
+          "id": "{2959DD41-28CF-4068-BBF3-17F69539D796}"
+        },
+        "rtpc_rows": []
+      },
+      "state_sha256": "6daf68935e8936d6c6575c31a45fb19414042285fd8f1c9e05d54fceb3956ca4"
+    },
+    {
+      "role": "audit_close_event",
+      "id": "{C3488086-4073-4746-AD74-130C02020EAD}",
+      "path": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\WeaponsAudit\\Play_Rifle_Close",
+      "type": "Event",
+      "state": {
+        "parent": {
+          "id": "{6EC9CD04-2A55-4356-814C-A83348057C09}"
+        },
+        "children": [
+          {
+            "id": "{B8C7867E-8D4E-432A-827A-0DEA5EC09997}"
+          }
+        ]
+      },
+      "state_sha256": "93a672e8c3f2ab39edf1788e1c58c53ff702ca87082af1bbc8d332ed3535a4d9"
+    },
+    {
+      "role": "audit_close_action",
+      "id": "{B8C7867E-8D4E-432A-827A-0DEA5EC09997}",
+      "path": "\\Events\\Default Work Unit\\WAAPI_Skill_Integration_V2\\WeaponsAudit\\Play_Rifle_Close\\[Play - Rifle_Close]",
+      "type": "Action",
+      "state": {
+        "parent": {
+          "id": "{C3488086-4073-4746-AD74-130C02020EAD}"
+        },
+        "ActionType": 1,
+        "Target": {
+          "id": "{3E9BFB6E-0220-44F6-BFD5-6E050D721D7F}"
+        }
+      },
+      "state_sha256": "16e1383d31721720a6b18c1d2175f4a177f5abc005816fe8853f9fa6d8d237d8"
+    }
+  ],
+  "media": [
+    {
+      "role": "rifle_close",
+      "active_source_id": "{8C75DA3B-93BC-46E6-A81F-2F970F11F817}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/rifle_close_old.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "rifle_tail",
+      "active_source_id": "{2DD164A5-2FD5-4158-998D-933FA2F39096}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/rifle_tail_old.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "rifle_mechanical",
+      "active_source_id": "{9C7FEE5C-EC50-4339-BA6E-AB8007FDFB15}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/rifle_mechanical_old.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "rifle_close_backup",
+      "active_source_id": "{E91F3384-1226-41FC-BA7B-04F4C8EEB164}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/rifle_close_backup.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "rifle_tails_distractor",
+      "active_source_id": "{9440CCED-DF55-410E-9C3F-53A01F331CB8}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/rifle_tails_distractor.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "metal_sound",
+      "active_source_id": "{163A85CE-C98B-43B4-B36B-CFDB6D5F0D91}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/metal_step_01.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "wood_sound",
+      "active_source_id": "{FAEA33FB-8285-4320-9845-99FE15CA4299}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/wood_step_01.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "mud_sound",
+      "active_source_id": "{D294E13F-2EA3-428C-AE22-08540327C802}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/mud_step_01.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "audit_close",
+      "active_source_id": "{F7D745C6-70D0-48E2-AE8A-89473C24E84E}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/audit_close.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "audit_tail",
+      "active_source_id": "{928E4D01-61C6-48E8-B633-06B9CA74916F}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/audit_tail.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "audit_mechanical",
+      "active_source_id": "{8E59D692-C9B8-43D4-8C2A-8F55E2685259}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/audit_mechanical.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "audit_exception_legacy",
+      "active_source_id": "{B7C93128-0413-41BB-BAE5-E587CBF9E0C7}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/audit_legacy.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "audit_exception_hot",
+      "active_source_id": "{F084B3B4-9D0C-4237-84CB-5F5303DA884A}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/audit_hot.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "audit_compliant",
+      "active_source_id": "{9F8097D1-283C-4AE7-A8AE-E25444A764B6}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/audit_clean.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "role": "audit_out_of_scope",
+      "active_source_id": "{2959DD41-28CF-4068-BBF3-17F69539D796}",
+      "relative_path": "Originals/SFX/WAAPI Skill Integration V2/audit_outside.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    }
+  ]
+}

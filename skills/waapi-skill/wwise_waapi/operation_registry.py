@@ -285,6 +285,7 @@ UNDO_GROUP_INNER_URIS_BY_VERSION: Mapping[str, frozenset[str]] = {
 }
 SWITCH_GROUP_REFERENCE = "SwitchGroupOrStateGroup"
 IDENTITY_RETURN_FIELDS = ("id", "name", "type", "path", "parent", "notes")
+MULTI_IDENTITY_READ_MAX_IDS = 4096
 # ``ak.wwise.core.object.get`` does not accept a bare numeric Short ID.  Its
 # ``from.id`` Short ID selector is a closed object whose numeric ``type`` is
 # the WAAPI object-type code.  Only Definition directives with an official
@@ -571,6 +572,42 @@ IDENTITY_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     ]
 }
 
+_SWITCH_REMOVE_CHILD_IDENTITY_SCHEMA: Mapping[str, Any] = {
+    **IDENTITY_ARGUMENT_SCHEMA,
+    "description": (
+        "Identity of the existing direct child whose assignment will be removed. "
+        "Use an exact id or full path only when that identity was supplied or "
+        "proved directly. When the available evidence is the closed Switch "
+        "Container parent plus the child's exact name and type, use scoped-name "
+        "with that parent; do not synthesize a full path."
+    ),
+}
+_SWITCH_REMOVE_CONTAINER_IDENTITY_SCHEMA: Mapping[str, Any] = {
+    **IDENTITY_ARGUMENT_SCHEMA,
+    "description": (
+        "Identity of the existing Switch Container. Prefer a canonical id "
+        "already returned by the Gateway (for example an import result's "
+        "parent.id); otherwise copy the complete Wwise path supplied or proved "
+        "earlier verbatim. If neither is practical, use exact-type-name with "
+        "type SwitchContainer and the exact display name so the Gateway can "
+        "prove uniqueness live. Never shorten, infer, or reconstruct a path: "
+        "a single display-name segment such as \\Player_Footsteps is not a "
+        "complete Wwise path and must not be sent as kind path."
+    ),
+}
+_SWITCH_REMOVE_VALUE_IDENTITY_SCHEMA: Mapping[str, Any] = {
+    **IDENTITY_ARGUMENT_SCHEMA,
+    "description": (
+        "Identity of the existing direct Switch/State value whose assignment "
+        "will be removed. Use an exact id or full path only when that identity "
+        "was supplied or proved directly. When the available evidence is the "
+        "closed Switch/State Group parent plus the value's exact name and type, "
+        "use scoped-name with that parent. Business wording such as Group/Value "
+        "describes the relationship; it does not add a Group display-name path "
+        "segment between the known parent and value."
+    ),
+}
+
 PLATFORM_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     "type": "string",
     "minLength": 1,
@@ -582,7 +619,24 @@ _OBJECT_PROPERTY_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     "required": ["name", "value"],
     "additionalProperties": False,
     "properties": {
-        "name": {"type": "string", "minLength": 1},
+        "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": r"^[:_a-zA-Z0-9]+$",
+            "description": (
+                "Mutation token without @. If this conversation's successful "
+                "live query returned exact accessor @Foo, submit Foo by removing "
+                "exactly one leading @. Never infer it from other text."
+            ),
+            "live_query_accessor_mapping": {
+                "source": "successful_live_query_in_this_conversation",
+                "query": "@Foo",
+                "mutation": "Foo",
+                "transform": "remove_exactly_one_leading_at",
+                "guessing": False,
+            },
+        },
         "value": {"description": "Finite JSON scalar validated against live getPropertyInfo metadata."},
     },
 }
@@ -675,7 +729,24 @@ _OBJECT_REFERENCE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     "required": ["name", "target"],
     "additionalProperties": False,
     "properties": {
-        "name": {"type": "string", "minLength": 1},
+        "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": r"^[:_a-zA-Z0-9]+$",
+            "description": (
+                "Mutation token. Copy an exact reference accessor from this "
+                "conversation's successful live query unchanged: OutputBus "
+                "remains OutputBus. Never infer it from other text."
+            ),
+            "live_query_accessor_mapping": {
+                "source": "successful_live_query_in_this_conversation",
+                "query": "OutputBus",
+                "mutation": "OutputBus",
+                "transform": "copy_exactly",
+                "guessing": False,
+            },
+        },
         "target": IDENTITY_ARGUMENT_SCHEMA,
     },
 }
@@ -889,9 +960,36 @@ _IMPORT_EVENT_ARGUMENT_SCHEMA: Mapping[str, Any] = {
         },
     },
 }
+_AUDIO_IMPORT_OBJECT_TYPE_TOKEN_DESCRIPTION = (
+    "Exact Wwise audio.import objectType wire token. Natural mappings: "
+    "Sound SFX / SFX 声音 -> Sound SFX (do not shorten an explicitly requested "
+    "Sound SFX to Sound); Random Container / 随机容器 -> "
+    "RandomSequenceContainer (never RandomContainer). These spellings are "
+    "request-shape guidance; RandomContainer and SequenceContainer remain "
+    "distinct and are not semantic aliases."
+)
+_AUDIO_IMPORT_OBJECT_TYPE_TOKEN_SCHEMA: Mapping[str, Any] = {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 128,
+    "description": _AUDIO_IMPORT_OBJECT_TYPE_TOKEN_DESCRIPTION,
+}
+_AUDIO_IMPORT_SWITCH_ASSIGNMENT_DESCRIPTION = (
+    "One native Wwise Switch Assignation import directive, not an object "
+    "identity or object-path field. When importing a direct child into an "
+    "existing Switch Container whose Switch/State Group is already bound, "
+    "use the exact Switch/State value name (for example, Snow); do not pass "
+    "the value object's path in that common case."
+)
+_AUDIO_IMPORT_SWITCH_ASSIGNMENT_SCHEMA: Mapping[str, Any] = {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 16 * 1024,
+    "description": _AUDIO_IMPORT_SWITCH_ASSIGNMENT_DESCRIPTION,
+}
 _IMPORT_COMMON_ARGUMENT_PROPERTIES: Mapping[str, Any] = {
     "object_path": {"type": "string", "minLength": 1},
-    "object_type": {"type": "string", "minLength": 1, "maxLength": 128},
+    "object_type": _AUDIO_IMPORT_OBJECT_TYPE_TOKEN_SCHEMA,
     "audio_file": {"type": "string", "absoluteRegularFile": True},
     "audio_file_base64": {
         "type": "string",
@@ -907,7 +1005,15 @@ _IMPORT_COMMON_ARGUMENT_PROPERTIES: Mapping[str, Any] = {
     },
     "import_language": {"type": "string", "minLength": 1},
     "import_location": IDENTITY_ARGUMENT_SCHEMA,
-    "originals_subfolder": {"type": "string"},
+    "originals_subfolder": {
+        "type": "string",
+        "description": (
+            "Optional relative Originals destination supplied explicitly by "
+            "the user. Copy an exact requested value; otherwise omit this "
+            "field. Never infer it from the source directory, media category, "
+            "object path, or examples."
+        ),
+    },
     "notes": {"type": "string"},
     "audio_source_notes": {"type": "string"},
     "event": _IMPORT_EVENT_ARGUMENT_SCHEMA,
@@ -917,12 +1023,7 @@ _IMPORT_COMMON_ARGUMENT_PROPERTIES: Mapping[str, Any] = {
         "maxLength": 16 * 1024,
         "description": "One native Wwise Dialogue Event import directive.",
     },
-    "switch_assignment": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 16 * 1024,
-        "description": "One native Wwise Switch Assignation import directive.",
-    },
+    "switch_assignment": _AUDIO_IMPORT_SWITCH_ASSIGNMENT_SCHEMA,
     "properties": {
         "type": "array",
         "maxItems": 64,
@@ -1540,6 +1641,16 @@ class OperationSpec:
                 ],
                 "argument_fields": list(self.identity_arguments),
                 "runtime_live_resolution_required": True,
+                "exact_selector_goes_directly_to_preview": True,
+                "separate_query_object_required": False,
+                "separate_query_object_rule": (
+                    "Do not query merely to translate an already exact id, "
+                    "complete path, exact-type-name, direct-child, or "
+                    "scoped-name selector; preview performs live resolution, "
+                    "uniqueness, type, and parent checks. Query first only "
+                    "when the user's target cannot yet be expressed by one "
+                    "closed selector."
+                ),
                 "caller_rows_allowed": False,
             }
         return result
@@ -3236,9 +3347,9 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         argument_contract=_object_contract(
             ("switch_container", "child", "state_or_switch"),
             {
-                "switch_container": IDENTITY_ARGUMENT_SCHEMA,
-                "child": IDENTITY_ARGUMENT_SCHEMA,
-                "state_or_switch": IDENTITY_ARGUMENT_SCHEMA,
+                "switch_container": _SWITCH_REMOVE_CONTAINER_IDENTITY_SCHEMA,
+                "child": _SWITCH_REMOVE_CHILD_IDENTITY_SCHEMA,
+                "state_or_switch": _SWITCH_REMOVE_VALUE_IDENTITY_SCHEMA,
             },
         ),
         identity_arguments=("switch_container", "child", "state_or_switch"),
@@ -3805,7 +3916,17 @@ def _prepare_object_create(
             "replace_owned_root is accepted only when object.create uses on_name_conflict=replace.",
             details={"on_name_conflict": requested_conflict},
         )
-    parent = _resolve_identity(arguments.get("parent"), role="parent", read=read)
+    identity_cache: dict[bytes, ResolvedObject] = {}
+    property_info_cache: dict[
+        tuple[str, str, str],
+        PropertyInfoMetadataRecord,
+    ] = {}
+    parent = _resolve_identity(
+        arguments.get("parent"),
+        role="parent",
+        read=read,
+        identity_cache=identity_cache,
+    )
     if list_name is None:
         _require_object_create_writable_parent(parent, version=request.version)
     else:
@@ -3822,6 +3943,7 @@ def _prepare_object_create(
             arguments.get("replace_owned_root"),
             role="replace_owned_root",
             read=read,
+            identity_cache=identity_cache,
         )
         _reject_protected_replace_boundary(replace_owned_root)
         roles["replace_owned_root"] = replace_owned_root
@@ -3851,6 +3973,8 @@ def _prepare_object_create(
         canonical_types=canonical_types,
         resolved_references=resolved_references,
         derived_properties=derived_properties,
+        identity_cache=identity_cache,
+        property_info_cache=property_info_cache,
     )
     for index, spec in enumerate(node_specs):
         spec["platform"] = platform
@@ -4422,13 +4546,18 @@ def _read_plugin_prestate(
         }
 
     fields = PLUGIN_EFFECT_SLOT_READBACK_FIELDS
-    args = {
-        "from": {"id": [target_id]},
-        "transform": [{"select": ["@Effects"]}],
-    }
-    options = {"return": list(fields)}
-    result = read(OBJECT_GET_URI, args, options)
-    rows = _rows(result)
+    rows, effect_readbacks = _read_object_list_rows_with_evidence(
+        target_id,
+        "Effects",
+        fields=fields,
+        read=read,
+        platform=descriptor.platform,
+        context="plugin-effect-slots",
+        # Wwise can omit an empty, requested object-list accessor.  This is a
+        # fixed, operation-owned list token rather than caller-authored input.
+        allow_missing_empty=True,
+    )
+    owner_readback = effect_readbacks[0]
     normalized_slots: list[dict[str, Any]] = []
     plugin_ids: list[str] = []
     for index, row_value in enumerate(rows):
@@ -4494,8 +4623,8 @@ def _read_plugin_prestate(
     return {
         "kind": "effect_slots",
         "uri": OBJECT_GET_URI,
-        "args": args,
-        "options": options,
+        "args": owner_readback["args"],
+        "options": owner_readback["options"],
         "effect_slots": normalized_slots,
         "preexisting_plugin_ids": sorted(plugin_ids, key=str.casefold),
     }
@@ -4677,6 +4806,11 @@ def _prepare_object_set(
     requested_languages: set[str] = set()
     materialized_imports: dict[str, dict[str, Any]] = {}
     project_info_cache: dict[str, Mapping[str, Any]] = {}
+    identity_cache: dict[bytes, ResolvedObject] = {}
+    property_info_cache: dict[
+        tuple[str, str, str],
+        PropertyInfoMetadataRecord,
+    ] = {}
 
     def import_context_read(
         uri: str,
@@ -4695,7 +4829,12 @@ def _prepare_object_set(
     resolved_target_ids: dict[str, int] = {}
     for index, item in enumerate(raw_objects):
         merge_child_snapshots: list[dict[str, Any]] = []
-        target = _resolve_identity(item.get("object"), role=f"objects[{index}].object", read=read)
+        target = _resolve_identity(
+            item.get("object"),
+            role=f"objects[{index}].object",
+            read=read,
+            identity_cache=identity_cache,
+        )
         platform = (
             _non_empty_string(item.get("platform"), field=f"objects[{index}].platform")
             if "platform" in item
@@ -4826,7 +4965,12 @@ def _prepare_object_set(
                 )
             trusted["name"] = requested_name
         for descriptor in properties:
-            info = _read_property_info(read, object_id=target.object, name=descriptor.name)
+            info = _read_property_info_cached(
+                read,
+                cache=property_info_cache,
+                object_id=target.object,
+                name=descriptor.name,
+            )
             _require_object_property_value(info, descriptor.value)
             if platform is not None:
                 _require_platform_field_enabled(
@@ -4841,7 +4985,12 @@ def _prepare_object_set(
                 {"name": descriptor.name, "value": descriptor.value, "metadata_type": info.type}
             )
         for descriptor in references:
-            info = _read_property_info(read, object_id=target.object, name=descriptor.name)
+            info = _read_property_info_cached(
+                read,
+                cache=property_info_cache,
+                object_id=target.object,
+                name=descriptor.name,
+            )
             _require_object_reference_metadata(info)
             if platform is not None:
                 _require_platform_field_enabled(
@@ -4858,11 +5007,13 @@ def _prepare_object_set(
                 property_info_by_name=property_info_by_name,
                 derived_properties=derived_target_properties,
                 request_path=descriptor.request_path,
+                property_info_cache=property_info_cache,
             )
             resolved = _resolve_identity(
                 descriptor.target.as_dict(),
                 role=descriptor.request_path,
                 read=read,
+                identity_cache=identity_cache,
             )
             _require_reference_target_allowed(info, resolved)
             roles[descriptor.request_path] = resolved
@@ -4886,6 +5037,8 @@ def _prepare_object_set(
             canonical_types=canonical_types,
             resolved_references=resolved_references,
             derived_properties=derived_child_properties,
+            identity_cache=identity_cache,
+            property_info_cache=property_info_cache,
         )
         child_spec_by_path = {
             str(spec["request_path"]): spec for spec in child_specs
@@ -5117,6 +5270,8 @@ def _prepare_object_set(
                 canonical_types=canonical_types,
                 resolved_references=resolved_references,
                 derived_properties=derived_child_properties,
+                identity_cache=identity_cache,
+                property_info_cache=property_info_cache,
             )
             prepared_spec_by_path = {
                 str(spec["request_path"]): spec for spec in prepared_specs
@@ -5954,6 +6109,11 @@ def _prepare_object_node_specs(
     canonical_types: dict[str, str],
     resolved_references: dict[str, Any],
     derived_properties: dict[str, dict[str, Any]],
+    identity_cache: dict[bytes, ResolvedObject],
+    property_info_cache: dict[
+        tuple[str, str, str],
+        PropertyInfoMetadataRecord,
+    ],
 ) -> list[dict[str, Any]]:
     specs: list[dict[str, Any]] = []
     for node in nodes:
@@ -6020,14 +6180,24 @@ def _prepare_object_node_specs(
         property_info_by_name: dict[str, PropertyInfoMetadataRecord] = {}
         node_derived_properties: dict[str, Any] = {}
         for descriptor in node.properties:
-            info = _read_property_info(read, class_id=type_info.class_id, name=descriptor.name)
+            info = _read_property_info_cached(
+                read,
+                cache=property_info_cache,
+                class_id=type_info.class_id,
+                name=descriptor.name,
+            )
             _require_object_property_value(info, descriptor.value)
             property_info_by_name[descriptor.name.casefold()] = info
             spec["properties"].append(
                 {"name": descriptor.name, "value": descriptor.value, "metadata_type": info.type}
             )
         for descriptor in node.references:
-            info = _read_property_info(read, class_id=type_info.class_id, name=descriptor.name)
+            info = _read_property_info_cached(
+                read,
+                cache=property_info_cache,
+                class_id=type_info.class_id,
+                name=descriptor.name,
+            )
             _require_object_reference_metadata(info)
             activation_properties = _apply_reference_activation_dependencies(
                 info,
@@ -6037,11 +6207,13 @@ def _prepare_object_node_specs(
                 property_info_by_name=property_info_by_name,
                 derived_properties=node_derived_properties,
                 request_path=descriptor.request_path,
+                property_info_cache=property_info_cache,
             )
             resolved = _resolve_identity(
                 descriptor.target.as_dict(),
                 role=descriptor.request_path,
                 read=read,
+                identity_cache=identity_cache,
             )
             _require_reference_target_allowed(info, resolved)
             roles[descriptor.request_path] = resolved
@@ -6234,6 +6406,50 @@ def _read_property_info(
     return info
 
 
+def _read_property_info_cached(
+    read: ReadCall,
+    *,
+    cache: dict[tuple[str, str, str], PropertyInfoMetadataRecord],
+    name: str,
+    object_id: Any | None = None,
+    class_id: int | None = None,
+) -> PropertyInfoMetadataRecord:
+    """Read property metadata once per exact prepare-local object/class scope."""
+
+    if (object_id is None) == (class_id is None):  # pragma: no cover - internal invariant.
+        raise AssertionError("object_id or class_id must be supplied exclusively")
+    if object_id is not None:
+        scope_kind = "object"
+        scope_value = _identity_key(object_id)
+    else:
+        if isinstance(class_id, bool) or not isinstance(class_id, int):
+            raise OperationContractError(
+                "INVALID_METADATA",
+                "A class-scoped property metadata cache key requires one integer classId.",
+                details={"class_id": class_id, "property": name},
+            )
+        scope_kind = "class"
+        scope_value = str(class_id)
+    cache_key = (scope_kind, scope_value, name.casefold())
+    cached = cache.get(cache_key)
+    if cached is not None:
+        if cached.name != name:
+            raise OperationContractError(
+                "INVALID_METADATA",
+                "Cached property metadata does not match the exact requested field token.",
+                details={"requested": name, "actual": cached.name},
+            )
+        return cached
+    info = _read_property_info(
+        read,
+        name=name,
+        object_id=object_id,
+        class_id=class_id,
+    )
+    cache[cache_key] = info
+    return info
+
+
 def _require_platform_field_enabled(
     read: ReadCall,
     *,
@@ -6344,6 +6560,10 @@ def _apply_reference_activation_dependencies(
     request_path: str,
     object_id: Any | None = None,
     class_id: int | None = None,
+    property_info_cache: dict[
+        tuple[str, str, str],
+        PropertyInfoMetadataRecord,
+    ] | None = None,
 ) -> tuple[str, ...]:
     """Materialize the one closed live-metadata dependency shape we support.
 
@@ -6442,11 +6662,21 @@ def _apply_reference_activation_dependencies(
 
         property_info = property_info_by_name.get(property_key)
         if property_info is None:
-            property_info = _read_property_info(
-                read,
-                name=property_name,
-                object_id=object_id,
-                class_id=class_id,
+            property_info = (
+                _read_property_info_cached(
+                    read,
+                    cache=property_info_cache,
+                    name=property_name,
+                    object_id=object_id,
+                    class_id=class_id,
+                )
+                if property_info_cache is not None
+                else _read_property_info(
+                    read,
+                    name=property_name,
+                    object_id=object_id,
+                    class_id=class_id,
+                )
             )
             property_info_by_name[property_key] = property_info
         if (
@@ -6682,6 +6912,283 @@ def _read_object_id_rows(object_id: Any, *, fields: Sequence[str], read: ReadCal
     return _rows(read(OBJECT_GET_URI, {"from": {"id": [object_id]}}, {"return": list(fields)}))
 
 
+def _bounded_multi_identity_read(
+    object_ids: Sequence[Any],
+    *,
+    fields: Sequence[str],
+    read: ReadCall,
+    context: str,
+    platform: str | None = None,
+) -> dict[str, Any]:
+    """Read one unique bounded GUID set and classify every returned row."""
+
+    unique_ids: list[Any] = []
+    expected_by_key: dict[str, Any] = {}
+    for object_id in object_ids:
+        key = _identity_key(object_id)
+        if key not in expected_by_key:
+            expected_by_key[key] = object_id
+            unique_ids.append(object_id)
+    if not unique_ids:
+        return {
+            "args": {"from": {"id": []}},
+            "options": _import_object_get_options(
+                _dedupe_fields(["id", *fields]),
+                platform=platform,
+            ),
+            "result": {"return": []},
+            "rows_by_key": {},
+            "missing_ids": [],
+            "duplicate_ids": [],
+            "extra_rows": [],
+            "malformed_rows": [],
+            "exact": True,
+        }
+    if len(unique_ids) > MULTI_IDENTITY_READ_MAX_IDS:
+        raise OperationContractError(
+            "IDENTITY_READ_LIMIT_EXCEEDED",
+            f"{context} exceeds the bounded multi-identity read limit.",
+            details={
+                "count": len(unique_ids),
+                "limit": MULTI_IDENTITY_READ_MAX_IDS,
+            },
+        )
+
+    args = {"from": {"id": unique_ids}}
+    options = _import_object_get_options(
+        _dedupe_fields(["id", *fields]),
+        platform=platform,
+    )
+    result = read(OBJECT_GET_URI, args, options)
+    if not isinstance(result, Mapping):
+        raise OperationContractError(
+            "INVALID_READBACK",
+            f"{context} readback must be a JSON object.",
+            details={"actual_type": type(result).__name__},
+        )
+    rows = _rows(result)
+    if len(rows) > MULTI_IDENTITY_READ_MAX_IDS:
+        raise OperationContractError(
+            "INVALID_READBACK",
+            f"{context} returned more rows than the bounded identity-read limit.",
+            details={
+                "count": len(rows),
+                "limit": MULTI_IDENTITY_READ_MAX_IDS,
+            },
+        )
+
+    rows_by_key: dict[str, list[dict[str, Any]]] = {}
+    malformed_rows: list[dict[str, Any]] = []
+    extra_rows: list[dict[str, Any]] = []
+    for index, row in enumerate(rows):
+        object_id = row.get("id")
+        if not _valid_object_id(object_id):
+            malformed_rows.append({"index": index, "row": row})
+            continue
+        key = _identity_key(object_id)
+        rows_by_key.setdefault(key, []).append(row)
+        if key not in expected_by_key:
+            extra_rows.append({"index": index, "row": row})
+
+    missing_ids = [
+        object_id
+        for key, object_id in expected_by_key.items()
+        if key not in rows_by_key
+    ]
+    duplicate_ids = [
+        expected_by_key.get(key, values[0].get("id"))
+        for key, values in rows_by_key.items()
+        if len(values) != 1
+    ]
+    exact = not (missing_ids or duplicate_ids or extra_rows or malformed_rows)
+    return {
+        "args": args,
+        "options": options,
+        "result": dict(result),
+        "rows_by_key": rows_by_key,
+        "missing_ids": missing_ids,
+        "duplicate_ids": duplicate_ids,
+        "extra_rows": extra_rows,
+        "malformed_rows": malformed_rows,
+        "exact": exact,
+    }
+
+
+def _read_object_list_rows_with_evidence(
+    object_id: Any,
+    list_name: str,
+    *,
+    fields: Sequence[str],
+    read: ReadCall,
+    platform: str | None = None,
+    context: str,
+    allow_missing_empty: bool = False,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Resolve one object list without using an invalid transform selector.
+
+    Legacy ``object.get.transform.select`` supports hierarchy relationships,
+    not dynamic object-list accessors.  Read the owner's ``@List`` accessor,
+    validate its complete bounded GUID set, then resolve those GUIDs in one
+    ordinary multi-ID read.
+    """
+
+    try:
+        canonical_name = normalize_object_list_name(
+            list_name,
+            request_path="object_list.name",
+        )
+    except ObjectOperationContractError as exc:
+        raise OperationContractError(
+            exc.error_code,
+            str(exc),
+            details=exc.details,
+        ) from exc
+
+    list_field = f"@{canonical_name}"
+    owner_args = {"from": {"id": [object_id]}}
+    owner_options = _import_object_get_options(
+        ("id", list_field),
+        platform=platform,
+    )
+    owner_result = read(OBJECT_GET_URI, owner_args, owner_options)
+    if not isinstance(owner_result, Mapping):
+        raise OperationContractError(
+            "INVALID_READBACK",
+            f"{context} owner readback must be a JSON object.",
+        )
+    owner_rows = _rows(owner_result)
+    if (
+        len(owner_rows) != 1
+        or not _same_identity(owner_rows[0].get("id"), object_id)
+    ):
+        raise OperationContractError(
+            "INVALID_READBACK",
+            f"{context} owner must resolve exactly once by canonical ID.",
+            details={"object_id": object_id, "rows": owner_rows},
+        )
+    owner_row = owner_rows[0]
+    compatibility_normalization: dict[str, Any] | None = None
+    if list_field not in owner_row:
+        if allow_missing_empty and set(owner_row) == {"id"}:
+            raw_references: Any = []
+            compatibility_normalization = {
+                "kind": "missing-empty-object-list",
+                "field": list_field,
+                "observed_row_keys": ["id"],
+                "normalized_value": [],
+            }
+        else:
+            raise OperationContractError(
+                "INVALID_READBACK",
+                f"{context} owner readback must contain a {list_field} array.",
+                details={"object_id": object_id, "row": owner_row},
+            )
+    else:
+        raw_references = owner_row[list_field]
+    if not isinstance(raw_references, list):
+        raise OperationContractError(
+            "INVALID_READBACK",
+            f"{context} owner readback must contain a {list_field} array.",
+            details={"object_id": object_id, "row": owner_row},
+        )
+    if len(raw_references) > OBJECT_LIST_MAX_SUBTREE_NODES:
+        raise OperationContractError(
+            "LIST_SNAPSHOT_LIMIT_EXCEEDED",
+            f"{context} exceeds the complete object-list snapshot limit.",
+            details={
+                "list": canonical_name,
+                "count": len(raw_references),
+                "limit": OBJECT_LIST_MAX_SUBTREE_NODES,
+            },
+        )
+
+    reference_ids: list[str] = []
+    reference_keys: set[str] = set()
+    for index, reference in enumerate(raw_references):
+        reference_id = (
+            reference.get("id") if isinstance(reference, Mapping) else None
+        )
+        if (
+            not isinstance(reference_id, str)
+            or not _PLUGIN_GUID.fullmatch(reference_id)
+        ):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                f"Every {list_field} member must expose a canonical Wwise GUID.",
+                details={"index": index, "entry": reference},
+            )
+        key = _identity_key(reference_id)
+        if key in reference_keys:
+            raise OperationContractError(
+                "INVALID_READBACK",
+                f"{context} contains a duplicate member GUID.",
+                details={"list": canonical_name, "index": index, "id": reference_id},
+            )
+        reference_keys.add(key)
+        reference_ids.append(reference_id)
+
+    owner_readback: dict[str, Any] = {
+        "role": f"{context}-owner",
+        "uri": OBJECT_GET_URI,
+        "args": owner_args,
+        "options": owner_options,
+        "result": dict(owner_result),
+    }
+    if compatibility_normalization is not None:
+        owner_readback["compatibility_normalization"] = (
+            compatibility_normalization
+        )
+    readbacks = [owner_readback]
+    if not reference_ids:
+        return [], readbacks
+
+    detail_read = _bounded_multi_identity_read(
+        reference_ids,
+        fields=fields,
+        read=read,
+        context=f"{context} detail",
+        platform=platform,
+    )
+    readbacks.append(
+        {
+            "role": f"{context}-members",
+            "uri": OBJECT_GET_URI,
+            "args": detail_read["args"],
+            "options": detail_read["options"],
+            "result": detail_read["result"],
+        }
+    )
+    if not detail_read["exact"]:
+        raise OperationContractError(
+            "INVALID_READBACK",
+            f"{context} detail readback does not exactly match the owner's complete GUID list.",
+            details={
+                "list": canonical_name,
+                "owner_ids": reference_ids,
+                "missing_ids": detail_read["missing_ids"],
+                "duplicate_ids": detail_read["duplicate_ids"],
+                "extra_rows": detail_read["extra_rows"],
+                "malformed_rows": detail_read["malformed_rows"],
+            },
+        )
+    rows_by_key = detail_read["rows_by_key"]
+    rows = [
+        rows_by_key[_identity_key(reference_id)][0]
+        for reference_id in reference_ids
+    ]
+    if not all(
+        isinstance(row.get("id"), str)
+        and _PLUGIN_GUID.fullmatch(row["id"])
+        for row in rows
+    ):
+        raise OperationContractError(
+            "INVALID_READBACK",
+            f"Every {list_field} detail row must expose a canonical Wwise GUID.",
+            details={"rows": rows},
+        )
+    return rows, readbacks
+
+
 def _read_direct_children(object_id: Any, *, fields: Sequence[str], read: ReadCall) -> list[dict[str, Any]]:
     return _rows(
         read(
@@ -6700,30 +7207,15 @@ def _read_object_list(
     read: ReadCall,
     platform: str | None = None,
 ) -> list[dict[str, Any]]:
-    try:
-        canonical_name = normalize_object_list_name(
-            list_name,
-            request_path="object_list.name",
-        )
-    except ObjectOperationContractError as exc:
-        raise OperationContractError(
-            exc.error_code,
-            str(exc),
-            details=exc.details,
-        ) from exc
-    options: dict[str, Any] = {"return": list(fields)}
-    if platform is not None:
-        options["platform"] = platform
-    return _rows(
-        read(
-            OBJECT_GET_URI,
-            {
-                "from": {"id": [object_id]},
-                "transform": [{"select": [f"@{canonical_name}"]}],
-            },
-            options,
-        )
+    rows, _readbacks = _read_object_list_rows_with_evidence(
+        object_id,
+        list_name,
+        fields=fields,
+        read=read,
+        platform=platform,
+        context="object-list snapshot",
     )
+    return rows
 
 
 def _normalize_object_list_snapshot(
@@ -8469,7 +8961,10 @@ def _prepare_import_dynamic_fields(
     # previews avoid another WAAPI round trip without accepting stale
     # cross-build or plug-in-specific type metadata.
     type_catalog = _read_object_type_catalog(read)
-    property_info_cache: dict[tuple[int, str], PropertyInfoMetadataRecord] = {}
+    property_info_cache: dict[
+        tuple[str, str, str],
+        PropertyInfoMetadataRecord,
+    ] = {}
     identity_cache: dict[bytes, ResolvedObject] = {}
     roles: dict[str, ResolvedObject] = {}
 
@@ -8489,13 +8984,12 @@ def _prepare_import_dynamic_fields(
         dispatch_rows = []
 
     def property_info(class_id: int, name: str) -> PropertyInfoMetadataRecord:
-        cache_key = (class_id, name.casefold())
-        cached = property_info_cache.get(cache_key)
-        if cached is not None:
-            return cached
-        info = _read_property_info(read, class_id=class_id, name=name)
-        property_info_cache[cache_key] = info
-        return info
+        return _read_property_info_cached(
+            read,
+            cache=property_info_cache,
+            class_id=class_id,
+            name=name,
+        )
 
     def resolve_reference(identity: Mapping[str, Any], *, role: str) -> ResolvedObject:
         try:
@@ -8507,7 +9001,12 @@ def _prepare_import_dynamic_fields(
             ) from exc
         cached = identity_cache.get(cache_key)
         if cached is None:
-            cached = _resolve_identity(identity, role=role, read=read)
+            cached = _resolve_identity(
+                identity,
+                role=role,
+                read=read,
+                identity_cache=identity_cache,
+            )
             identity_cache[cache_key] = cached
         roles[role] = cached
         return cached
@@ -8689,6 +9188,7 @@ def _prepare_import_dynamic_fields(
                 property_info_by_name=property_info_by_name,
                 derived_properties=derived_properties,
                 request_path=f"targets[{index}].references[{reference_index}]",
+                property_info_cache=property_info_cache,
             )
             resolved = resolve_reference(
                 identity,
@@ -11444,6 +11944,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 },
             ]
         )
+    role_snapshots: list[tuple[str, Any, Mapping[str, Any]]] = []
     for role, snapshot_value in roles.items():
         if not isinstance(snapshot_value, Mapping):
             raise OperationContractError("INVALID_PREVIEW", f"Resolved role {role!r} is malformed.")
@@ -11451,14 +11952,51 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         expected_row = snapshot_value.get("row")
         if object_id is None or not isinstance(expected_row, Mapping):
             raise OperationContractError("INVALID_PREVIEW", f"Resolved role {role!r} lacks object/row evidence.")
-        args = {"from": {"id": [object_id]}}
-        options = {"return": list(IDENTITY_RETURN_FIELDS)}
-        result = read_call(OBJECT_GET_URI, args, options)
-        if not isinstance(result, Mapping):
-            raise OperationContractError("INVALID_READBACK", f"Role {role!r} readback must be an object.")
-        rows = _rows(result)
-        readbacks.append({"role": role, "uri": OBJECT_GET_URI, "args": args, "options": options, "result": dict(result)})
-        assertions.append({"name": f"{role} resolves exactly once", "passed": len(rows) == 1, "evidence": rows})
+        _identity_key(object_id)
+        role_snapshots.append((str(role), object_id, expected_row))
+
+    role_batch: dict[str, Any] | None = None
+    if role_snapshots:
+        role_batch = _bounded_multi_identity_read(
+            [object_id for _, object_id, _ in role_snapshots],
+            fields=IDENTITY_RETURN_FIELDS,
+            read=read_call,
+            context="Prepared role validation",
+        )
+        readbacks.append(
+            {
+                "role": "resolved-roles",
+                "roles": [role for role, _, _ in role_snapshots],
+                "uri": OBJECT_GET_URI,
+                "args": role_batch["args"],
+                "options": role_batch["options"],
+                "result": role_batch["result"],
+            }
+        )
+        assertions.append(
+            {
+                "name": "resolved role GUID batch is exact",
+                "passed": role_batch["exact"],
+                "evidence": {
+                    "requested_unique_ids": role_batch["args"]["from"]["id"],
+                    "missing_ids": role_batch["missing_ids"],
+                    "duplicate_ids": role_batch["duplicate_ids"],
+                    "extra_rows": role_batch["extra_rows"],
+                    "malformed_rows": role_batch["malformed_rows"],
+                },
+            }
+        )
+
+    for role, object_id, expected_row in role_snapshots:
+        assert role_batch is not None  # role_snapshots is non-empty in this loop.
+        rows = role_batch["rows_by_key"].get(_identity_key(object_id), [])
+        assertions.append(
+            {
+                "name": f"{role} resolves exactly once",
+                "passed": len(rows) == 1,
+                "evidence": rows,
+            }
+        )
         if len(rows) != 1:
             continue
         actual = rows[0]
@@ -11819,11 +12357,6 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                     "INVALID_PREVIEW",
                     "Object graph list snapshot lacks its owner, list, fields, or rows.",
                 )
-            args = {
-                "from": {"id": [object_id]},
-                "transform": [{"select": [f"@{list_name}"]}],
-            }
-            options = {"return": list(OBJECT_LIST_SNAPSHOT_FIELDS)}
             platform = snapshot.get("platform")
             if platform is not None:
                 if not isinstance(platform, str) or not platform:
@@ -11831,27 +12364,20 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                         "INVALID_PREVIEW",
                         "Object graph list snapshot platform is malformed.",
                     )
-                options["platform"] = platform
-            result = read_call(OBJECT_GET_URI, args, options)
-            if not isinstance(result, Mapping):
-                raise OperationContractError(
-                    "INVALID_READBACK",
-                    "Object graph list guard must return an object.",
-                )
+            list_rows, list_readbacks = _read_object_list_rows_with_evidence(
+                object_id,
+                list_name,
+                fields=OBJECT_LIST_SNAPSHOT_FIELDS,
+                read=read_call,
+                platform=platform,
+                context=f"object-graph-list[{index}]",
+            )
             actual = _normalize_object_list_snapshot(
-                _rows(result),
+                list_rows,
                 owner_id=object_id,
                 list_name=list_name,
             )
-            readbacks.append(
-                {
-                    "role": f"object-graph-list[{index}]",
-                    "uri": OBJECT_GET_URI,
-                    "args": args,
-                    "options": options,
-                    "result": dict(result),
-                }
-            )
+            readbacks.extend(list_readbacks)
             assertions.append(
                 {
                     "name": f"object graph list snapshot {index} unchanged",
@@ -14794,37 +15320,30 @@ def verify_prepared_operation(
                     complete_expected = False
                     continue
                 expected_ids.add(_identity_key(object_id))
-            args = {
-                "from": {"id": [owner_id]},
-                "transform": [{"select": [f"@{list_name}"]}],
-            }
-            options = {"return": list(OBJECT_LIST_SNAPSHOT_FIELDS)}
             list_platform = (
                 list_root_specs[0].get("platform")
                 if list_root_specs
                 else owner_spec.get("platform")
             )
-            if isinstance(list_platform, str) and list_platform:
-                options["platform"] = list_platform
-            result = read_call(OBJECT_GET_URI, args, options)
-            if not isinstance(result, Mapping):
-                raise OperationContractError(
-                    "INVALID_READBACK",
-                    "Object-list verification must return an object.",
-                )
+            effective_platform = (
+                list_platform
+                if isinstance(list_platform, str) and list_platform
+                else None
+            )
+            list_rows, list_readbacks = _read_object_list_rows_with_evidence(
+                owner_id,
+                list_name,
+                fields=OBJECT_LIST_SNAPSHOT_FIELDS,
+                read=read_call,
+                platform=effective_platform,
+                context=f"object-list-verification[{owner_path}].{list_name}",
+            )
             actual_rows = _normalize_object_list_snapshot(
-                _rows(result),
+                list_rows,
                 owner_id=owner_id,
                 list_name=list_name,
             )
-            readbacks.append(
-                {
-                    "uri": OBJECT_GET_URI,
-                    "args": args,
-                    "options": options,
-                    "result": dict(result),
-                }
-            )
+            readbacks.extend(list_readbacks)
             actual_ids = {_identity_key(row["id"]) for row in actual_rows}
             check(
                 f"{owner_path}.@{list_name} GUID set matches the reviewed {list_mode} operation",
@@ -15233,6 +15752,7 @@ def verify_prepared_operation(
                 },
                 )
         if native_directive_boundaries:
+            success_status = "result_schema_checked"
             verification_strength = "operation_specific_readback_with_explicit_native_directive_boundary"
             business_state_verified = False
 
@@ -16654,9 +17174,27 @@ def _verification(
     )
 
 
-def _resolve_identity(payload: Any, *, role: str, read: ReadCall) -> ResolvedObject:
+def _resolve_identity(
+    payload: Any,
+    *,
+    role: str,
+    read: ReadCall,
+    identity_cache: dict[bytes, ResolvedObject] | None = None,
+) -> ResolvedObject:
     if not isinstance(payload, Mapping):
         raise OperationContractError("INVALID_IDENTITY", f"{role} identity must be a JSON object.")
+    cache_key: bytes | None = None
+    if identity_cache is not None:
+        try:
+            cache_key = canonical_json_bytes(dict(payload))
+        except (TypeError, ValueError) as exc:
+            raise OperationContractError(
+                "INVALID_IDENTITY",
+                f"{role} identity is not canonical JSON.",
+            ) from exc
+        cached = identity_cache.get(cache_key)
+        if cached is not None:
+            return cached
     kind = payload.get("kind")
     direct_child_parent: ResolvedObject | None = None
     direct_child_type: str | None = None
@@ -16693,6 +17231,7 @@ def _resolve_identity(payload: Any, *, role: str, read: ReadCall) -> ResolvedObj
             parent_payload,
             role=f"{role}.parent",
             read=read,
+            identity_cache=identity_cache,
         )
         direct_child_type = str(payload["type"])
         parent_literal = str(parent_payload["value"])
@@ -16721,6 +17260,7 @@ def _resolve_identity(payload: Any, *, role: str, read: ReadCall) -> ResolvedObj
             parent_payload,
             role=f"{role}.parent",
             read=read,
+            identity_cache=identity_cache,
         )
         name = str(payload["name"])
         object_type = str(payload["type"])
@@ -16832,7 +17372,15 @@ def _resolve_identity(payload: Any, *, role: str, read: ReadCall) -> ResolvedObj
                     "row": row,
                 },
             )
-    return ResolvedObject(identity=identity, object=object_id, resolution=f"live-{kind}", row=row)
+    resolved = ResolvedObject(
+        identity=identity,
+        object=object_id,
+        resolution=f"live-{kind}",
+        row=row,
+    )
+    if identity_cache is not None and cache_key is not None:
+        identity_cache[cache_key] = resolved
+    return resolved
 
 
 def _mapping_sequence(value: Any, *, field: str) -> list[Mapping[str, Any]]:
@@ -18880,6 +19428,21 @@ def _audio_import_object_path_contract(
         "contract": "waapi-skill.audio-import-object-path/v1",
         "resolved_target": resolved_target,
         "absolute_form": True,
+        "import_location_selection": {
+            "wire_significant": True,
+            "absolute_object_path": {
+                "ordinary_action": "omit",
+                "infer_from_common_parent": False,
+                "include_only_when_user_explicitly_requests_native_field": True,
+            },
+            "relative_object_path": {
+                "requires_effective_import_location": True,
+                "effective_sources": [
+                    "$.arguments.imports[].import_location",
+                    "$.arguments.defaults.import_location",
+                ],
+            },
+        },
         "relative_form": {
             "allowed": True,
             "requires_effective_import_location": True,

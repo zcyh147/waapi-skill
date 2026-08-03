@@ -2,6 +2,7 @@
   "allowed_committed_file_patterns": [
     "*.wproj",
     "**/*.wwu",
+    "Originals/**/*.wav",
     "fixture-metadata.json",
     "fixture-manifest.json",
     "README.md"
@@ -33,22 +34,28 @@
   "fixture_root": "tests/_org/2025.1",
   "fixture_update_procedure": [
     "Refresh from installed Wwise 2025.1.7.9143 SampleProject at /Applications/Audiokinetic/SampleProject2025.1.7.9143/SampleProject/SampleProject.wproj.",
-    "Copy only source-control-safe authored project files (.wproj/.wwu) unless media is explicitly reviewed.",
+    "Copy only source-control-safe authored project files and intentionally selected original media.",
     "Regenerate fixture-manifest.json and fixture-metadata.json hashes.",
-    "Run python -m pytest tests/unit/test_2025_1_fixture_inventory.py -q."
+    "Run python -m pytest tests/unit/test_2025_1_fixture_inventory.py -q.",
+    "Confirm git lfs track or .gitattributes covers *.wav before committing media changes."
   ],
   "hash_strategy": {
     "algorithm": "sha256",
-    "file_count": 66,
-    "manifest_digest": "b37bb23fb0b982f6c1206c0edfbd99b0728ae8e9c09a4e72ed932c06840fc5a3",
+    "file_count": 81,
+    "manifest_digest": "8d632195b2a8da8aabfa38c45a78d0421fee48acff61a94cc07ee48a6bb1b55e",
     "mode": "path-plus-content over committed fixture payload files; excludes fixture-metadata.json and fixture-manifest.json bookkeeping files to avoid circular hashes"
   },
   "immutability": {
     "mutation_policy": "Never pass this directory or any descendant as WWISE_SANDBOX_ROOT or WWISE_FIXTURE_PROJECT for destructive tests; copy it to a per-test sandbox before mutation.",
     "role": "committed immutable source fixture"
   },
+  "lfs_managed_asset_patterns": [
+    "*.wav"
+  ],
   "provenance": {
-    "copied_policy": "Authored .wproj/.wwu project source files only. Generated outputs, caches, local settings, validation caches, logs, profiler captures, runtime sandboxes, and bulk media are intentionally excluded.",
+    "copied_policy": "Authored .wproj/.wwu project source files plus the reviewed original-media subset required by the fixed integration baseline. The WAAPI Skill Integration V2 graph was authored in a disposable copy through public waapi-skill transactions before source-safe .wwu and WAV files were promoted. Generated outputs, caches, local settings, validation caches, logs, profiler captures, runtime sandboxes, and bulk media are intentionally excluded.",
+    "derived_baseline": "WAAPI Skill Integration V2",
+    "derived_baseline_authoring": "public waapi-skill transactions against a disposable project copy",
     "source_build": "2025.1.7.9143",
     "source_path": "/Applications/Audiokinetic/SampleProject2025.1.7.9143/SampleProject/SampleProject.wproj",
     "source_root": "/Applications/Audiokinetic/SampleProject2025.1.7.9143/SampleProject",

@@ -458,6 +458,36 @@
 						</Reference>
 					</ReferenceList>
 				</Bus>
+				<Bus Name="WAAPI_V2_Weapons" ID="{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}">
+					<PropertyList>
+						<Property Name="CenterPercentage" Type="int32">
+							<ValueList>
+								<Value>100</Value>
+							</ValueList>
+						</Property>
+						<Property Name="MaxDuckVolume" Type="Real64" Value="-96"/>
+					</PropertyList>
+					<ReferenceList>
+						<Reference Name="AudioDevice" PluginName="System" CompanyID="0" PluginID="174" PluginType="7">
+							<ObjectRef Name="System" ID="{ADC920EF-0BEE-483D-B40B-0C2CDF19E1F4}" WorkUnitID="{B231292D-F96D-4EDC-AE14-D62DE1E07EDD}"/>
+						</Reference>
+					</ReferenceList>
+				</Bus>
+				<Bus Name="WAAPI_V2_Footsteps" ID="{EF9E9851-4728-4F6C-9939-2C84CF0367A3}">
+					<PropertyList>
+						<Property Name="CenterPercentage" Type="int32">
+							<ValueList>
+								<Value>100</Value>
+							</ValueList>
+						</Property>
+						<Property Name="MaxDuckVolume" Type="Real64" Value="-96"/>
+					</PropertyList>
+					<ReferenceList>
+						<Reference Name="AudioDevice" PluginName="System" CompanyID="0" PluginID="174" PluginType="7">
+							<ObjectRef Name="System" ID="{ADC920EF-0BEE-483D-B40B-0C2CDF19E1F4}" WorkUnitID="{B231292D-F96D-4EDC-AE14-D62DE1E07EDD}"/>
+						</Reference>
+					</ReferenceList>
+				</Bus>
 			</ChildrenList>
 		</WorkUnit>
 	</Busses>

@@ -1,7 +1,7 @@
 {
   "algorithm": "sha256",
-  "digest": "b37bb23fb0b982f6c1206c0edfbd99b0728ae8e9c09a4e72ed932c06840fc5a3",
-  "file_count": 66,
+  "digest": "8d632195b2a8da8aabfa38c45a78d0421fee48acff61a94cc07ee48a6bb1b55e",
+  "file_count": 81,
   "files": [
     {
       "bytes": 12865,
@@ -24,9 +24,9 @@
       "sha256": "b78a755630abe3cda1314127b5b6e16f32f2792d4ccb626414b80d7f35150f12"
     },
     {
-      "bytes": 18262,
+      "bytes": 19546,
       "path": "Busses/Default Work Unit.wwu",
-      "sha256": "abaefb80d17cb9f2f3f64b8d786eb02fface5e13066eaeaaac204cf2a3b4da06"
+      "sha256": "0d06c10e0e632bdb723d00922d38e1796561c781b11c8d71f5b7eeedb10130b6"
     },
     {
       "bytes": 98527,
@@ -39,9 +39,9 @@
       "sha256": "f9ee5098445ebe1e66b649e4af90699362796186c81fa04dc2d0e18f39209f52"
     },
     {
-      "bytes": 295,
+      "bytes": 45094,
       "path": "Containers/Default Work Unit.wwu",
-      "sha256": "2d9905b70b8872464d7044a6de1d9c75c1ede4b22f41546cd7204aab8e2c9f87"
+      "sha256": "23937bb856894f08578aecf93e3e44da31fbffd37a00efbd0144f2b11161b6ff"
     },
     {
       "bytes": 130011,
@@ -159,9 +159,9 @@
       "sha256": "97cc8d4e4664c631600ea3a133ad5866685f9e402d314a8b7724f2dd03b5d8d5"
     },
     {
-      "bytes": 287,
+      "bytes": 2379,
       "path": "Events/Default Work Unit.wwu",
-      "sha256": "e5ea126374f9cad6e933da17d9cd77d8b3ab5a754f1a709c5c3c31247e10fee3"
+      "sha256": "4228ada70ee414159caa1da41681d647956d2105c73ca7436fcd14bd57dab1be"
     },
     {
       "bytes": 978,
@@ -194,9 +194,9 @@
       "sha256": "093ff86fb01ddbc247fd824caf4d00556bb1fbe52bd2481889d8c3a4d3e65ff1"
     },
     {
-      "bytes": 303,
+      "bytes": 751,
       "path": "Game Parameters/Default Work Unit.wwu",
-      "sha256": "d80f92ac81c98f6cc06c8f5f5d6d21a0b3b91888a272eceef1eff323c631c1e0"
+      "sha256": "a550d0c2afe62b273e8a0654a940c175f503af6220d2c200b97482f18657c16c"
     },
     {
       "bytes": 432,
@@ -229,6 +229,81 @@
       "sha256": "35120f8be4a3d21e3a72fbb11424b8956695bb164336cc673de0d98fcfd11051"
     },
     {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/audit_clean.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/audit_close.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/audit_hot.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/audit_legacy.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/audit_mechanical.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/audit_outside.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/audit_tail.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/metal_step_01.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/mud_step_01.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/rifle_close_backup.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/rifle_close_old.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/rifle_mechanical_old.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/rifle_tail_old.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/rifle_tails_distractor.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
+      "bytes": 12404,
+      "path": "Originals/SFX/WAAPI Skill Integration V2/wood_step_01.wav",
+      "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+    },
+    {
       "bytes": 289,
       "path": "Presets/Default Work Unit.wwu",
       "sha256": "2c93d4488121e0478ec864a6b47bf537795bdbfba7a596268849f8102e4f6b11"
@@ -244,14 +319,14 @@
       "sha256": "1afebc403b9f8256465821d0350ff44e3265678390d60ccc33f26cf70fa10573"
     },
     {
-      "bytes": 610,
+      "bytes": 857,
       "path": "README.md",
-      "sha256": "0e9e47e1e021e4df06d7cfbf7ba068b83a705ebe20b265f7a99c103331e0e55e"
+      "sha256": "1bb66779bfa4c7794c20277344772adeebe02ab8c088cf7f79a7c349d7f5003d"
     },
     {
-      "bytes": 501447,
+      "bytes": 503239,
       "path": "SampleProject.wproj",
-      "sha256": "f3b3b20056e34a285c3b812abbb696a7d5f5a6f0a9f22cfe63dd9caec3fa4794"
+      "sha256": "5bb298e71663a9d5834d82cb4539b9245678c1d5cc27e025fd190c322eadce5c"
     },
     {
       "bytes": 303,
@@ -304,9 +379,9 @@
       "sha256": "65698912e221154656d706020e359a2dbf8c2148dc022e1d139510bdd5e3857f"
     },
     {
-      "bytes": 291,
+      "bytes": 786,
       "path": "Switches/Default Work Unit.wwu",
-      "sha256": "a32b12e48ec69679496ea74317d7b643f5cbdb46c5ac2b867a15671906f0135f"
+      "sha256": "9b8635301fb4c8f666fef3461fa8b226b96abebefcaca8e5486410632236f5b4"
     },
     {
       "bytes": 1233,

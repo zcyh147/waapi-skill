@@ -343,12 +343,52 @@ def test_closed_audio_import_enforces_each_reflected_version_shape(
     )
 
     assert verified.status == "verified"
+    assert verified.ok is True
+    assert verified.business_state_verified is True
+    assert verified.verification_strength == "operation_specific_readback"
     reflected = next(
         assertion
         for assertion in verified.assertions
         if assertion["name"] == "WAAPI result matches the packaged reflected schema"
     )
     assert reflected["passed"] is True
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+def test_closed_audio_import_native_directive_boundary_is_weak_success(
+    version: str,
+    tmp_path: Path,
+) -> None:
+    source = _media(tmp_path, f"switch-source-{version}.wav")
+    copied = _media(tmp_path, f"Originals/switch-copied-{version}.wav")
+    root = NEW_ROOT if version == "2025.1" else OLD_ROOT
+    path = root + rf"\SwitchImported_{version}"
+    target = _target(
+        source,
+        path,
+        requested_object_type="Sound SFX",
+        requested_switch_assignment="Snow",
+    )
+    live = _object_row(path, copied)
+    prepared = _prepared(version=version, targets=[target])
+    prepared["verification_plan"]["native_directive_boundaries"] = [
+        "switch_assignment_result_and_target_verified_side_effect_not_fully_reconstructed"
+    ]
+
+    verified = verify_prepared_operation(
+        prepared,
+        execution_result=_result(version, [live], [copied]),
+        read_call=ScriptedReader([{"return": [live]}]),
+    )
+
+    assert verified.status == "result_schema_checked"
+    assert verified.ok is True
+    assert verified.business_state_verified is False
+    assert verified.verification_strength == (
+        "operation_specific_readback_with_explicit_native_directive_boundary"
+    )
+    assert verified.assertions
+    assert all(assertion["passed"] is True for assertion in verified.assertions)
 
 
 def test_create_new_accepts_bound_sound_and_audio_file_source_rows(
@@ -1071,8 +1111,7 @@ def test_use_existing_live_localized_row_has_exact_three_field_wire_shape(
 
     confirmation_reader = ScriptedReader(
         [
-            {"return": [anchor]},
-            {"return": [existing]},
+            {"return": [anchor, existing]},
             {"return": [existing]},
         ],
         project_languages=[

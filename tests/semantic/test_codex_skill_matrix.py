@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import importlib.util
 import json
+import sys
 import threading
 import time
 from dataclasses import replace
@@ -20,6 +22,16 @@ from .support.codex_eval_fixtures import (
 )
 from .support.codex_eval_suite import EvalSession, load_eval_suite
 from .support.codex_harness import CodexInfrastructureError, CodexInfrastructureFailure
+
+
+GATEWAY_SPEC = importlib.util.spec_from_file_location(
+    "waapi_gateway_semantic_matrix_test",
+    matrix.SKILL_ROOT / "scripts" / "gateway.py",
+)
+assert GATEWAY_SPEC is not None and GATEWAY_SPEC.loader is not None
+waapi_gateway = importlib.util.module_from_spec(GATEWAY_SPEC)
+sys.modules[GATEWAY_SPEC.name] = waapi_gateway
+GATEWAY_SPEC.loader.exec_module(waapi_gateway)
 
 
 def _suite():
@@ -170,6 +182,7 @@ def _q5_absence_evidence() -> tuple[dict[str, object], dict[str, object]]:
         "ok": False,
         "api": matrix.OBJECT_GET_URI,
         "error_code": "WaapiRequestFailed",
+        "result": None,
         "waapi_error_uri": "ak.wwise.query.invalid_query",
         "waapi_error_details": {"message": "Object not found"},
         "message": "WAAPI request failed",
@@ -187,6 +200,9 @@ def _q5_absence_evidence() -> tuple[dict[str, object], dict[str, object]]:
     }
     gateway = {
         "ok": True,
+        "status": "ok",
+        "command": "query-object",
+        "query_bound": {"mode": "exact-object"},
         "count": 0,
         "objects": [],
         "call": {
@@ -1182,6 +1198,128 @@ def test_query_dispatch_evidence_accepts_only_bound_q5_absence_normalization() -
         gateway_payload=gateway,
         dispatch_rows=[wrong_dispatch],
     ) is False
+
+
+def test_q5_compact_and_detail_projections_preserve_absence_proof_for_matcher() -> None:
+    gateway, dispatch = _q5_absence_evidence()
+    missing_path = r"\Actor-Mixer Hierarchy\Default Work Unit\ProvenMissing"
+    step = matrix.build_expected_gateway_steps(
+        _session("Q5", "single"),
+        {"wwise_version": "2022.1", "missing_path": missing_path},
+    )[0]
+
+    assert "--detail" not in step.arguments
+    compact = waapi_gateway.project_successful_query_object_payload(
+        gateway,
+        detail="--detail" in step.arguments,
+    )
+
+    assert "call" not in compact
+    assert matrix.query_dispatch_evidence_matches(
+        case_id="Q5",
+        gateway_payload=compact,
+        dispatch_rows=[dispatch],
+    ) is True
+    detail = waapi_gateway.project_successful_query_object_payload(
+        gateway,
+        detail=True,
+    )
+    assert detail["call"]["normalization"]["kind"] == "exact-object-absence"
+    assert matrix.query_dispatch_evidence_matches(
+        case_id="Q5",
+        gateway_payload=detail,
+        dispatch_rows=[dispatch],
+    ) is True
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda payload: payload.update(call={}),
+        lambda payload: payload.update(call=None),
+        lambda payload: payload.update(status="error"),
+        lambda payload: payload.update(command="selected"),
+        lambda payload: payload.update(query_bound={"mode": "take", "value": 1}),
+        lambda payload: payload.update(count=False),
+        lambda payload: payload.update(objects=[{"id": "fabricated"}]),
+    ],
+    ids=(
+        "partial-call",
+        "null-call",
+        "wrong-status",
+        "wrong-command",
+        "wrong-bound",
+        "boolean-count",
+        "nonempty-objects",
+    ),
+)
+def test_q5_compact_absence_rejects_incomplete_call_or_invalid_business_shape(
+    change: object,
+) -> None:
+    gateway, dispatch = _q5_absence_evidence()
+    compact = waapi_gateway.project_successful_query_object_payload(gateway, detail=False)
+    assert callable(change)
+    change(compact)
+
+    assert matrix.query_dispatch_evidence_matches(
+        case_id="Q5",
+        gateway_payload=compact,
+        dispatch_rows=[dispatch],
+    ) is False
+
+
+@pytest.mark.parametrize(
+    "dispatch_change",
+    [
+        {"result": {}},
+        {"error_code": "OtherError"},
+        {
+            "waapi_error_uri": "ak.wwise.query.invalid_query",
+            "waapi_error_details": {},
+        },
+        {
+            "waapi_error_uri": "ak.wwise.query.invalid_query",
+            "waapi_error_details": {"message": "syntax error"},
+        },
+        {"evidence_path": ""},
+        {"message": ""},
+    ],
+    ids=(
+        "non-null-result",
+        "wrong-error-code",
+        "missing-error-message",
+        "wrong-error-message",
+        "missing-evidence-path",
+        "missing-dispatch-message",
+    ),
+)
+def test_q5_compact_absence_requires_exact_trusted_dispatch_error(
+    dispatch_change: dict[str, object],
+) -> None:
+    gateway, dispatch = _q5_absence_evidence()
+    compact = waapi_gateway.project_successful_query_object_payload(gateway, detail=False)
+    dispatch.update(dispatch_change)
+
+    assert matrix.query_dispatch_evidence_matches(
+        case_id="Q5",
+        gateway_payload=compact,
+        dispatch_rows=[dispatch],
+    ) is False
+
+
+def test_q5_compact_absence_accepts_unknown_object_dispatch_variant() -> None:
+    gateway, dispatch = _q5_absence_evidence()
+    compact = waapi_gateway.project_successful_query_object_payload(gateway, detail=False)
+    dispatch.update(
+        waapi_error_uri="ak.wwise.query.unknown_object",
+        waapi_error_details={"message": "Unknown object"},
+    )
+
+    assert matrix.query_dispatch_evidence_matches(
+        case_id="Q5",
+        gateway_payload=compact,
+        dispatch_rows=[dispatch],
+    ) is True
 
 
 def test_transaction_final_response_contract_is_exact_strict_json_with_request_echo() -> None:

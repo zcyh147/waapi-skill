@@ -141,6 +141,31 @@ def test_schema_validator_loads_supported_uri_from_manifest_resources() -> None:
     "version",
     ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
 )
+def test_versioned_object_get_schema_accepts_multi_id_read(
+    version: str,
+) -> None:
+    result = validate_semantic_payload(
+        "ak.wwise.core.object.get",
+        {
+            "from": {
+                "id": [
+                    "{11111111-1111-1111-1111-111111111111}",
+                    "{22222222-2222-2222-2222-222222222222}",
+                ]
+            }
+        },
+        {"return": ["id", "name", "type", "path", "parent", "notes"]},
+        version=version,
+    )
+
+    assert result.version == version
+    assert result.uri == "ak.wwise.core.object.get"
+
+
+@pytest.mark.parametrize(
+    "version",
+    ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
+)
 def test_versioned_object_create_schema_accepts_reflected_dynamic_property(
     version: str,
 ) -> None:

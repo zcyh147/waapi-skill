@@ -431,7 +431,7 @@ class AdvancedWaqlQueryBuilder:
                 details={"max_results": max_results, "maximum": MAX_QUERY_TAKE},
             )
 
-        bounded_waql = f"{waql.rstrip()} take {max_results}"
+        bounded_waql = f"{waql} take {max_results}"
         source_note = (
             self.source_note_checker or SemanticSourceNoteChecker()
         ).check(BuilderFamily.QUERY.value, self.version)
@@ -555,18 +555,19 @@ def advanced_query_schema(
                 "maxLength": MAX_ADVANCED_WAQL_BYTES,
                 "x-maxUtf8Bytes": MAX_ADVANCED_WAQL_BYTES,
                 "x-framing": {
+                    "trimmed": True,
                     "singleLine": True,
                     "queryEditorDollarPrefix": False,
                     "comments": False,
                     "statementSeparators": False,
                     "balancedDoubleQuotedStrings": True,
                     "balancedSlashRegexLiterals": True,
-                    "trailingWhitespace": "removed-before-final-take",
                 },
                 "description": (
-                    "One native WAQL query without the Query Editor $ prefix, "
-                    "comments, statement separators, or line breaks. Limits "
-                    "are UTF-8 bytes, not Unicode character counts."
+                    "One trimmed native WAQL query without the Query Editor $ "
+                    "prefix, comments, statement separators, line breaks, or "
+                    "unclosed string/regex literals. Limits are UTF-8 bytes, "
+                    "not Unicode character counts."
                 ),
             },
             "return": {
@@ -589,9 +590,10 @@ def advanced_query_schema(
                     },
                     "description": (
                         "A native object.get return accessor or advanced return "
-                        "expression. It must be trimmed and use one balanced, "
-                        "comment-free frame. Limits are UTF-8 bytes. Wwise "
-                        "validates version-specific semantics."
+                        "expression. It must be trimmed, single-line, comment- "
+                        "and semicolon-free, and have no unclosed string/regex "
+                        "literal. Limits are UTF-8 bytes. Wwise validates "
+                        "version-specific semantics."
                     ),
                 },
             },
@@ -1525,8 +1527,10 @@ def _advanced_waql(value: Any) -> str:
             "Advanced object query waql must be a string.",
             details={"actual_type": type(value).__name__},
         )
-    if not value.strip():
-        raise _advanced_query_error("Advanced object query waql must not be empty.")
+    if not value or value != value.strip():
+        raise _advanced_query_error(
+            "Advanced object query waql must be non-empty and trimmed."
+        )
     try:
         encoded_length = len(value.encode("utf-8"))
     except UnicodeEncodeError as exc:

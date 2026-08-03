@@ -1148,6 +1148,7 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
                 "subcommand": "preview",
                 "required_flag": "--apply",
                 "effect": (
+                    "required even when the user asks to see only a preview; "
                     "creates a durable confirmation-bound preview and does not "
                     "execute the change"
                 ),
@@ -1341,6 +1342,16 @@ def test_audio_import_operation_schema_discloses_versioned_hierarchy_roots(
     default_path_contract = properties["defaults"]["properties"]["object_path"][
         "path_contract"
     ]
+    row_object_type = properties["imports"]["items"]["properties"][
+        "object_type"
+    ]
+    default_object_type = properties["defaults"]["properties"]["object_type"]
+    row_switch_assignment = properties["imports"]["items"]["properties"][
+        "switch_assignment"
+    ]
+    default_switch_assignment = properties["defaults"]["properties"][
+        "switch_assignment"
+    ]
     assert row_path_contract["contract"] == (
         "waapi-skill.audio-import-object-path/v1"
     )
@@ -1350,7 +1361,37 @@ def test_audio_import_operation_schema_discloses_versioned_hierarchy_roots(
         "wwise_version": version,
         "allowed_hierarchy_roots": expected_roots,
     }
+    assert row_path_contract["import_location_selection"] == {
+        "wire_significant": True,
+        "absolute_object_path": {
+            "ordinary_action": "omit",
+            "infer_from_common_parent": False,
+            "include_only_when_user_explicitly_requests_native_field": True,
+        },
+        "relative_object_path": {
+            "requires_effective_import_location": True,
+            "effective_sources": [
+                "$.arguments.imports[].import_location",
+                "$.arguments.defaults.import_location",
+            ],
+        },
+    }
     assert default_path_contract == row_path_contract
+    assert row_object_type == default_object_type
+    assert "Random Container / 随机容器 -> RandomSequenceContainer" in (
+        row_object_type["description"]
+    )
+    assert "never RandomContainer" in row_object_type["description"]
+    assert "Sound SFX / SFX 声音 -> Sound SFX" in row_object_type["description"]
+    assert row_switch_assignment == default_switch_assignment
+    assert "native Wwise Switch Assignation import directive" in (
+        row_switch_assignment["description"]
+    )
+    assert "exact Switch/State value name" in row_switch_assignment["description"]
+    assert "for example, Snow" in row_switch_assignment["description"]
+    assert "do not pass the value object's path" in (
+        row_switch_assignment["description"]
+    )
     inline_audio = properties["imports"]["items"]["properties"][
         "audio_file_base64"
     ]
@@ -1516,6 +1557,43 @@ def test_object_set_operation_schema_discloses_versioned_target_and_metadata_sco
     assert "Omission defaults to fail" in on_name_conflict["description"]
 
 
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+def test_object_set_schema_maps_live_query_accessors_to_canonical_mutation_tokens(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    exit_code, payload = execute(
+        ["operation-schema", "object.set"],
+        tmp_path=tmp_path,
+        version=version,
+    )
+
+    assert exit_code == 0
+    fields = payload["operation"]["argument_contract"]["properties"][
+        "objects"
+    ]["items"]["properties"]
+    property_name = fields["properties"]["items"]["properties"]["name"]
+    reference_name = fields["references"]["items"]["properties"]["name"]
+
+    assert property_name["pattern"] == r"^[:_a-zA-Z0-9]+$"
+    assert property_name["live_query_accessor_mapping"] == {
+        "source": "successful_live_query_in_this_conversation",
+        "query": "@Foo",
+        "mutation": "Foo",
+        "transform": "remove_exactly_one_leading_at",
+        "guessing": False,
+    }
+    assert "submit Foo by removing exactly one leading @" in property_name["description"]
+    assert reference_name["live_query_accessor_mapping"] == {
+        "source": "successful_live_query_in_this_conversation",
+        "query": "OutputBus",
+        "mutation": "OutputBus",
+        "transform": "copy_exactly",
+        "guessing": False,
+    }
+    assert "OutputBus remains OutputBus" in reference_name["description"]
+
+
 @pytest.mark.parametrize(
     "version",
     ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
@@ -1570,6 +1648,7 @@ def test_soundbank_generate_operation_schema_closes_batch_language_scope(
             "subcommand": "preview",
             "required_flag": "--apply",
             "effect": (
+                "required even when the user asks to see only a preview; "
                 "creates a durable confirmation-bound preview and does not "
                 "execute the change"
             ),
@@ -4012,11 +4091,16 @@ def test_large_successful_verify_is_digest_bounded_and_journal_stays_exact(
 @pytest.mark.parametrize(
     "tamper",
     (
+        "top-level-status",
         "top-level-state",
+        "top-level-verified",
+        "top-level-result-schema-checked",
         "verification-status",
+        "verification-business-state",
         "failed-assertion",
         "verification-strength",
         "agent-result-state",
+        "agent-result-verified",
         "agent-result-operation",
         "agent-result-cleanup",
     ),
@@ -4063,20 +4147,262 @@ def test_successful_verify_projection_rejects_tampered_success(
             "cleanup": cleanup,
         },
     }
-    if tamper == "top-level-state":
+    if tamper == "top-level-status":
+        payload["status"] = TransactionState.RESULT_SCHEMA_CHECKED.value
+    elif tamper == "top-level-state":
         payload["state"] = TransactionState.EXECUTED_UNVERIFIED.value
+    elif tamper == "top-level-verified":
+        payload["verified"] = False
+    elif tamper == "top-level-result-schema-checked":
+        payload["result_schema_checked"] = True
     elif tamper == "verification-status":
         payload["verification"]["status"] = "verification_failed"
+    elif tamper == "verification-business-state":
+        payload["verification"]["business_state_verified"] = False
     elif tamper == "failed-assertion":
         payload["verification"]["assertions"][0]["passed"] = False
     elif tamper == "verification-strength":
         payload["verification_strength"] = "result_schema"
     elif tamper == "agent-result-state":
         payload["agent_result"]["state"] = TransactionState.EXECUTED_UNVERIFIED.value
+    elif tamper == "agent-result-verified":
+        payload["agent_result"]["verified"] = False
     elif tamper == "agent-result-operation":
         payload["agent_result"]["operation"] = "object.create"
     elif tamper == "agent-result-cleanup":
         payload["agent_result"]["cleanup"] = {"status": "pending"}
+
+    with pytest.raises(waapi_gateway.GatewayResultShapeError) as caught:
+        waapi_gateway.project_successful_transaction_verify_payload(payload)
+
+    assert caught.value.error_code == "INVALID_VERIFY_SUCCESS_PROJECTION"
+    assert caught.value.details["reasons"]
+
+
+def test_native_directive_boundary_records_bounded_weak_success_projection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state_dir = tmp_path / "native-directive-boundary-state"
+    transaction = execute_set_notes_successfully(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+    assertions = tuple(
+        {
+            "name": f"bounded native directive assertion {index}",
+            "passed": True,
+            "evidence": {
+                "index": index,
+                "bounded_readback": "x" * 512,
+            },
+        }
+        for index in range(180)
+    )
+    readbacks = tuple(
+        {
+            "kind": "native-directive-target-readback",
+            "index": index,
+            "row": {
+                "id": OBJECT_GUID,
+                "path": OBJECT_PATH,
+                "payload": "y" * 512,
+            },
+        }
+        for index in range(120)
+    )
+    weak_verification = waapi_gateway.VerificationResult(
+        operation="object.setNotes",
+        status=TransactionState.RESULT_SCHEMA_CHECKED.value,
+        assertions=assertions,
+        readbacks=readbacks,
+        message=(
+            "Target readbacks passed; the native directive remains an explicit "
+            "business-state boundary."
+        ),
+        verification_strength=(
+            "operation_specific_readback_with_explicit_native_directive_boundary"
+        ),
+        business_state_verified=False,
+    )
+    full_verification = weak_verification.as_dict()
+    monkeypatch.setattr(
+        waapi_gateway,
+        "verify_prepared_operation",
+        lambda *args, **kwargs: weak_verification,
+    )
+
+    exit_code, payload = execute(
+        ["verify", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info()],
+                "ak.wwise.core.getProjectInfo": [project()],
+            }
+        ),
+    )
+
+    assert exit_code == 0, payload
+    assert payload["ok"] is True
+    assert payload["status"] == TransactionState.RESULT_SCHEMA_CHECKED.value
+    assert payload["state"] == TransactionState.RESULT_SCHEMA_CHECKED.value
+    assert payload["verified"] is False
+    assert payload["result_schema_checked"] is True
+    assert payload["verification"] == {
+        "summary_contract": (
+            "waapi-skill.transaction-verification-result-summary/v1"
+        ),
+        "contract": full_verification["contract"],
+        "operation": "object.setNotes",
+        "status": TransactionState.RESULT_SCHEMA_CHECKED.value,
+        "ok": True,
+        "verification_strength": (
+            "operation_specific_readback_with_explicit_native_directive_boundary"
+        ),
+        "business_state_verified": False,
+        "assertion_count": len(assertions),
+        "passed_assertion_count": len(assertions),
+        "failed_assertion_count": 0,
+        "assertions_canonical_sha256": waapi_gateway.canonical_sha256(
+            list(assertions)
+        ),
+        "readback_count": len(readbacks),
+        "readbacks_canonical_sha256": waapi_gateway.canonical_sha256(
+            list(readbacks)
+        ),
+        "canonical_sha256": waapi_gateway.canonical_sha256(full_verification),
+        "full_evidence_in_stdout": False,
+    }
+    assert payload["verification_strength"] == (
+        "operation_specific_readback_with_explicit_native_directive_boundary"
+    )
+    projection = payload["stdout_projection"]
+    assert projection["detail_level"] == "digest-verification-evidence"
+    assert projection["verification_canonical_sha256"] == (
+        waapi_gateway.canonical_sha256(full_verification)
+    )
+    assert projection["assertion_count"] == len(assertions)
+    assert projection["passed_assertion_count"] == len(assertions)
+    assert projection["readback_count"] == len(readbacks)
+    assert projection["full_verification_evidence_in_stdout"] is False
+    assert projection["full_verification_evidence_persisted"] is True
+    assert projection["journal_event"] == "verification_recorded"
+    assert projection["agent_result_exact"] is True
+    assert projection["cleanup_exact"] is True
+    assert projection["truncated"] is False
+    assert waapi_gateway.gateway_json_document_size(payload) <= (
+        waapi_gateway.TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES
+    )
+    assert payload["agent_result"] == {
+        "operation": "object.setNotes",
+        "transaction_id": transaction["transaction_id"],
+        "artifact_hash": transaction["artifact_hash"],
+        "state": TransactionState.RESULT_SCHEMA_CHECKED.value,
+        "executed": True,
+        "request": set_notes_request(),
+        "verified": False,
+        "cleanup": payload["cleanup"],
+    }
+    assert list(payload)[-1] == "agent_result"
+
+    verification_event = next(
+        event
+        for event in TransactionStore(state_dir).read_events(
+            transaction["transaction_id"]
+        )
+        if event["event_type"] == "verification_recorded"
+    )
+    journal_verification = verification_event["details"]["verification"]
+    assert journal_verification == full_verification
+    assert len(journal_verification["assertions"]) == len(assertions)
+    assert len(journal_verification["readbacks"]) == len(readbacks)
+    assert waapi_gateway.canonical_sha256(journal_verification) == (
+        projection["verification_canonical_sha256"]
+    )
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    (
+        "top-level-status",
+        "top-level-state",
+        "top-level-verified",
+        "top-level-result-schema-checked",
+        "verification-status",
+        "verification-business-state",
+        "failed-assertion",
+        "verification-strength",
+        "agent-result-state",
+        "agent-result-verified",
+    ),
+)
+def test_weak_verify_projection_rejects_tampered_success(tamper: str) -> None:
+    cleanup = {
+        "status": "not_required",
+        "projection": {"status": "not_required"},
+    }
+    verification = waapi_gateway.VerificationResult(
+        operation="object.setNotes",
+        status=TransactionState.RESULT_SCHEMA_CHECKED.value,
+        assertions=({"name": "bounded readback passed", "passed": True},),
+        readbacks=({"kind": "object-readback", "id": OBJECT_GUID},),
+        verification_strength=(
+            "operation_specific_readback_with_explicit_native_directive_boundary"
+        ),
+        business_state_verified=False,
+    ).as_dict()
+    payload: dict[str, Any] = {
+        "contract": waapi_gateway.GATEWAY_RESULT_CONTRACT,
+        "command": "verify",
+        "ok": True,
+        "status": TransactionState.RESULT_SCHEMA_CHECKED.value,
+        "transaction_id": "tx-result-schema-checked",
+        "artifact_hash": "e" * 64,
+        "state": TransactionState.RESULT_SCHEMA_CHECKED.value,
+        "verification": verification,
+        "guard_validation": {"ok": True},
+        "project_call": {"ok": True},
+        "executed": True,
+        "verified": False,
+        "result_schema_checked": True,
+        "verification_strength": (
+            "operation_specific_readback_with_explicit_native_directive_boundary"
+        ),
+        "cleanup": cleanup,
+        "automatic_retry": False,
+        "agent_result": {
+            "operation": "object.setNotes",
+            "transaction_id": "tx-result-schema-checked",
+            "artifact_hash": "e" * 64,
+            "state": TransactionState.RESULT_SCHEMA_CHECKED.value,
+            "executed": True,
+            "request": set_notes_request(),
+            "verified": False,
+            "cleanup": cleanup,
+        },
+    }
+    if tamper == "top-level-status":
+        payload["status"] = TransactionState.VERIFIED.value
+    elif tamper == "top-level-state":
+        payload["state"] = TransactionState.VERIFIED.value
+    elif tamper == "top-level-verified":
+        payload["verified"] = True
+    elif tamper == "top-level-result-schema-checked":
+        payload["result_schema_checked"] = False
+    elif tamper == "verification-status":
+        payload["verification"]["status"] = TransactionState.VERIFIED.value
+    elif tamper == "verification-business-state":
+        payload["verification"]["business_state_verified"] = True
+    elif tamper == "failed-assertion":
+        payload["verification"]["assertions"][0]["passed"] = False
+    elif tamper == "verification-strength":
+        payload["verification_strength"] = "operation_specific_readback"
+    elif tamper == "agent-result-state":
+        payload["agent_result"]["state"] = TransactionState.VERIFIED.value
+    elif tamper == "agent-result-verified":
+        payload["agent_result"]["verified"] = True
 
     with pytest.raises(waapi_gateway.GatewayResultShapeError) as caught:
         waapi_gateway.project_successful_transaction_verify_payload(payload)
@@ -4167,7 +4493,15 @@ def test_verify_transport_cleanup_failure_keeps_full_unprojected_success_boundar
 
 
 @pytest.mark.parametrize(
-    ("status", "state", "ok", "verified", "result_schema_checked", "cleanup_status"),
+    (
+        "status",
+        "state",
+        "ok",
+        "verified",
+        "result_schema_checked",
+        "cleanup_status",
+        "expected_projection",
+    ),
     (
         (
             "verification_failed",
@@ -4176,6 +4510,7 @@ def test_verify_transport_cleanup_failure_keeps_full_unprojected_success_boundar
             False,
             False,
             "not_required",
+            False,
         ),
         (
             "indeterminate",
@@ -4184,6 +4519,7 @@ def test_verify_transport_cleanup_failure_keeps_full_unprojected_success_boundar
             False,
             False,
             "unknown",
+            False,
         ),
         (
             "result_schema_checked",
@@ -4192,6 +4528,7 @@ def test_verify_transport_cleanup_failure_keeps_full_unprojected_success_boundar
             False,
             True,
             "not_required",
+            True,
         ),
         (
             "verified",
@@ -4200,10 +4537,11 @@ def test_verify_transport_cleanup_failure_keeps_full_unprojected_success_boundar
             True,
             False,
             "unknown",
+            False,
         ),
     ),
 )
-def test_verify_failure_weak_and_cleanup_boundaries_are_not_projected(
+def test_verify_projects_only_safe_terminal_success_boundaries(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     status: str,
@@ -4212,6 +4550,7 @@ def test_verify_failure_weak_and_cleanup_boundaries_are_not_projected(
     verified: bool,
     result_schema_checked: bool,
     cleanup_status: str,
+    expected_projection: bool,
 ) -> None:
     verification = {
         "operation": "object.setNotes",
@@ -4220,7 +4559,7 @@ def test_verify_failure_weak_and_cleanup_boundaries_are_not_projected(
         "assertions": [
             {
                 "name": "boundary evidence remains complete",
-                "passed": verified,
+                "passed": ok,
                 "evidence": "x" * 8_000,
             }
         ],
@@ -4282,7 +4621,7 @@ def test_verify_failure_weak_and_cleanup_boundaries_are_not_projected(
     assert payload["status"] == status
     assert payload["state"] == state
     assert payload["verification"] == verification
-    assert "stdout_projection" not in payload
+    assert ("stdout_projection" in payload) is expected_projection
 
 
 @pytest.mark.parametrize(
@@ -4520,10 +4859,15 @@ def test_generic_manifest_call_runs_full_preview_confirm_execute_verify_chain(tm
     assert verify_payload["verified"] is False
     assert verify_payload["result_schema_checked"] is True
     assert verify_payload["verification_strength"] == "complete_reflected_schema"
-    assert "stdout_projection" not in verify_payload
+    assert verify_payload["stdout_projection"]["contract"] == (
+        "waapi-skill.transaction-verify-success-summary/v1"
+    )
+    assert verify_payload["stdout_projection"]["agent_result_exact"] is True
+    assert verify_payload["stdout_projection"]["cleanup_exact"] is True
     assert verify_payload["agent_result"]["result"] == {}
     assert verify_payload["agent_result"]["verified"] is False
     assert verify_payload["agent_result"]["request"] == generic_manifest_call_request()
+    assert list(verify_payload)[-1] == "agent_result"
 
 
 def test_object_create_plugin_runs_full_preview_confirm_execute_verify_chain(

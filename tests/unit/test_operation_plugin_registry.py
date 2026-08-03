@@ -562,13 +562,26 @@ def test_2022_effect_prepare_uses_complete_fixed_slot_snapshot_and_verifies_plug
     }
 
 
-def test_2023_effect_verifier_resolves_effect_slot_to_effect_guid_before_plugin_read() -> None:
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_effect_verifier_resolves_effect_slot_to_effect_guid_before_plugin_read(
+    version: str,
+) -> None:
+    payload = request(version=version, kind="effect")
+    payload["arguments"]["plugin"]["platform"] = "Windows"
     prepared = prepare_operation(
-        parse_operation_request(request(version="2023.1", kind="effect")),
+        parse_operation_request(payload),
         read_call=ScriptedReader(
             {
                 "ak.wwise.core.object.get": [
                     {"return": [target_row(object_type="ActorMixer")]},
+                    {
+                        "return": [
+                            {
+                                "id": TARGET_ID,
+                                "@Effects": [{"id": OLD_SLOT_ID}],
+                            }
+                        ]
+                    },
                     {
                         "return": [
                             effect_slot_row(
@@ -587,6 +600,25 @@ def test_2023_effect_verifier_resolves_effect_slot_to_effect_guid_before_plugin_
     assert dispatch_object["@Effects"][0]["@Effect"]["type"] == "Effect"
     assert prepared["verification_plan"]["preexisting_effect_slot_ids"] == [
         OLD_SLOT_ID
+    ]
+    preview_snapshot = prepared["pre_state"]["plugin_creation_guard"][
+        "snapshot"
+    ]
+    assert preview_snapshot["args"] == {"from": {"id": [TARGET_ID]}}
+    assert preview_snapshot["options"] == {
+        "return": ["id", "@Effects"],
+        "platform": "Windows",
+    }
+    preview_readbacks = prepared["preflight_reads"]
+    effect_reads = [
+        row
+        for row in preview_readbacks
+        if row["uri"] == "ak.wwise.core.object.get"
+        and row["options"].get("platform") == "Windows"
+    ]
+    assert [row["options"]["return"] for row in effect_reads] == [
+        ["id", "@Effects"],
+        ["id", "name", "type", "parent", "owner", "@Effect"],
     ]
 
     verifier_reader = ScriptedReader(
@@ -647,12 +679,12 @@ def test_2023_effect_verifier_resolves_effect_slot_to_effect_guid_before_plugin_
                 "owner",
             ],
             "language": None,
-            "platform": None,
+            "platform": "Windows",
         },
         "requested_state": {
             "language": {"requested": False, "value": None},
             "notes": {"requested": False, "value": None},
-            "platform": None,
+            "platform": "Windows",
             "properties": [],
         },
         "placement": {
@@ -671,7 +703,7 @@ def test_2023_effect_verifier_fails_closed_when_slot_has_no_effect_reference() -
             {
                 "ak.wwise.core.object.get": [
                     {"return": [target_row(object_type="ActorMixer")]},
-                    {"return": []},
+                    {"return": [{"id": TARGET_ID, "@Effects": []}]},
                 ]
             }
         ),
@@ -714,6 +746,14 @@ def test_2023_effect_verifier_rejects_a_reused_preexisting_slot_id() -> None:
             {
                 "ak.wwise.core.object.get": [
                     {"return": [target_row(object_type="ActorMixer")]},
+                    {
+                        "return": [
+                            {
+                                "id": TARGET_ID,
+                                "@Effects": [{"id": OLD_SLOT_ID}],
+                            }
+                        ]
+                    },
                     {
                         "return": [
                             effect_slot_row(

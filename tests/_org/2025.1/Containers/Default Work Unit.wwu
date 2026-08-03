@@ -1,6 +1,869 @@
 <?xml version="1.0" encoding="utf-8"?>
 <WwiseDocument Type="WorkUnit" ID="{B7237E6E-5972-4B02-A4C9-267862F2241B}" SchemaVersion="133">
 	<Containers>
-		<WorkUnit Name="Default Work Unit" ID="{B7237E6E-5972-4B02-A4C9-267862F2241B}" PersistMode="Standalone"/>
+		<WorkUnit Name="Default Work Unit" ID="{B7237E6E-5972-4B02-A4C9-267862F2241B}" PersistMode="Standalone">
+			<ChildrenList>
+				<PropertyContainer Name="WAAPI Skill Integration V2" ID="{69D14C5F-00CF-445E-B163-A53DBC2AFB80}" ShortID="1031269849">
+					<PropertyList>
+						<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+						<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+					</PropertyList>
+					<ReferenceList>
+						<Reference Name="Conversion">
+							<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+						</Reference>
+						<Reference Name="OutputBus">
+							<ObjectRef Name="Main Audio Bus" ID="{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+						</Reference>
+					</ReferenceList>
+					<ChildrenList>
+						<PropertyContainer Name="RifleRevision" ID="{98498B6A-C5B6-460E-B7C0-734D42A658DD}" ShortID="384865402">
+							<PropertyList>
+								<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+								<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+							</PropertyList>
+							<ReferenceList>
+								<Reference Name="Conversion">
+									<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+								</Reference>
+								<Reference Name="OutputBus">
+									<ObjectRef Name="Main Audio Bus" ID="{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+								</Reference>
+							</ReferenceList>
+							<ChildrenList>
+								<RandomSequenceContainer Name="Rifle" ID="{B273D3B2-05E3-47D8-B524-CD40D6D4CF37}" ShortID="757987980">
+									<PropertyList>
+										<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+										<Property Name="OverrideOutput" Type="bool" Value="True"/>
+										<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+									</PropertyList>
+									<ReferenceList>
+										<Reference Name="Conversion">
+											<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+										</Reference>
+										<Reference Name="OutputBus">
+											<ObjectRef Name="WAAPI_V2_Weapons" ID="{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+										</Reference>
+									</ReferenceList>
+									<ChildrenList>
+										<Sound Name="Rifle_Close" ID="{EDC65EA5-F8B4-468A-BB65-629D2FAE9B2E}" ShortID="40172883">
+											<Comment>rifle-baseline | close</Comment>
+											<PropertyList>
+												<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+												<Property Name="OverrideOutput" Type="bool" Value="True"/>
+												<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+												<Property Name="Volume" Type="Real64">
+													<ValueList>
+														<Value>-2</Value>
+													</ValueList>
+												</Property>
+											</PropertyList>
+											<ReferenceList>
+												<Reference Name="Conversion">
+													<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+												</Reference>
+												<Reference Name="OutputBus">
+													<ObjectRef Name="WAAPI_V2_Weapons" ID="{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+												</Reference>
+											</ReferenceList>
+											<ChildrenList>
+												<AudioFileSource Name="rifle_close_old" ID="{20D04B6B-2EB3-4CE8-B70A-EB2A0144ED78}">
+													<PropertyList>
+														<Property Name="LoopBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="LoopEnd" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimEnd" Type="Real64" Value="-0.001"/>
+													</PropertyList>
+													<Language>SFX</Language>
+													<AudioFile>WAAPI Skill Integration V2\rifle_close_old.wav</AudioFile>
+													<MediaIDList>
+														<MediaID ID="59379384"/>
+													</MediaIDList>
+												</AudioFileSource>
+											</ChildrenList>
+											<ObjectLists>
+												<ObjectList Name="RTPC">
+													<RTPC Name="" ID="{3991026E-3B23-402B-96E7-9BD5F0211AF5}" ShortID="344320289">
+														<PropertyList>
+															<Property Name="PropertyName" Type="string" Value="Volume"/>
+														</PropertyList>
+														<ReferenceList>
+															<Reference Name="ControlInput">
+																<ObjectRef Name="Rifle_Distance" ID="{5B499A43-5BA9-49E5-B3EF-7062627A5FC2}" WorkUnitID="{6D1262CA-2375-4279-B5E2-FF5C0B0120EA}"/>
+															</Reference>
+															<Reference Name="Curve">
+																<Custom>
+																	<Curve Name="" ID="{D1D2EB33-C2C3-41D6-ACD4-0F8F7935F586}">
+																		<PropertyList>
+																			<Property Name="Flags" Type="int32" Value="3"/>
+																		</PropertyList>
+																		<PointList>
+																			<Point>
+																				<XPos>0</XPos>
+																				<YPos>-12</YPos>
+																				<Flags>5</Flags>
+																			</Point>
+																			<Point>
+																				<XPos>50</XPos>
+																				<YPos>-6</YPos>
+																				<Flags>0</Flags>
+																			</Point>
+																			<Point>
+																				<XPos>100</XPos>
+																				<YPos>0</YPos>
+																				<Flags>37</Flags>
+																			</Point>
+																		</PointList>
+																	</Curve>
+																</Custom>
+															</Reference>
+														</ReferenceList>
+													</RTPC>
+												</ObjectList>
+											</ObjectLists>
+											<ActiveSourceList>
+												<ActiveSource Name="rifle_close_old" ID="{20D04B6B-2EB3-4CE8-B70A-EB2A0144ED78}" Platform="Linked"/>
+											</ActiveSourceList>
+										</Sound>
+										<Sound Name="Rifle_Tail" ID="{E560EB18-2DF1-410D-9A6B-DDAF2AEADB37}" ShortID="737909806">
+											<Comment>rifle-baseline | tail</Comment>
+											<PropertyList>
+												<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+												<Property Name="OverrideOutput" Type="bool" Value="True"/>
+												<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+												<Property Name="Volume" Type="Real64">
+													<ValueList>
+														<Value>-5</Value>
+													</ValueList>
+												</Property>
+											</PropertyList>
+											<ReferenceList>
+												<Reference Name="Conversion">
+													<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+												</Reference>
+												<Reference Name="OutputBus">
+													<ObjectRef Name="WAAPI_V2_Weapons" ID="{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+												</Reference>
+											</ReferenceList>
+											<ChildrenList>
+												<AudioFileSource Name="rifle_tail_old" ID="{D7E06088-034B-44B3-BF49-48B9E6E88FDD}">
+													<PropertyList>
+														<Property Name="LoopBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="LoopEnd" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimEnd" Type="Real64" Value="-0.001"/>
+													</PropertyList>
+													<Language>SFX</Language>
+													<AudioFile>WAAPI Skill Integration V2\rifle_tail_old.wav</AudioFile>
+													<MediaIDList>
+														<MediaID ID="268182761"/>
+													</MediaIDList>
+												</AudioFileSource>
+											</ChildrenList>
+											<ActiveSourceList>
+												<ActiveSource Name="rifle_tail_old" ID="{D7E06088-034B-44B3-BF49-48B9E6E88FDD}" Platform="Linked"/>
+											</ActiveSourceList>
+										</Sound>
+										<Sound Name="Rifle_Mechanical" ID="{80876919-C42E-4807-9595-900CC8405222}" ShortID="123698531">
+											<Comment>rifle-baseline | mechanical</Comment>
+											<PropertyList>
+												<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+												<Property Name="OverrideOutput" Type="bool" Value="True"/>
+												<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+												<Property Name="Volume" Type="Real64">
+													<ValueList>
+														<Value>-7</Value>
+													</ValueList>
+												</Property>
+											</PropertyList>
+											<ReferenceList>
+												<Reference Name="Conversion">
+													<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+												</Reference>
+												<Reference Name="OutputBus">
+													<ObjectRef Name="WAAPI_V2_Weapons" ID="{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+												</Reference>
+											</ReferenceList>
+											<ChildrenList>
+												<AudioFileSource Name="rifle_mechanical_old" ID="{66BDDC06-5699-4C17-A9DD-58119D7CE6BC}">
+													<PropertyList>
+														<Property Name="LoopBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="LoopEnd" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimEnd" Type="Real64" Value="-0.001"/>
+													</PropertyList>
+													<Language>SFX</Language>
+													<AudioFile>WAAPI Skill Integration V2\rifle_mechanical_old.wav</AudioFile>
+													<MediaIDList>
+														<MediaID ID="663847802"/>
+													</MediaIDList>
+												</AudioFileSource>
+											</ChildrenList>
+											<ActiveSourceList>
+												<ActiveSource Name="rifle_mechanical_old" ID="{66BDDC06-5699-4C17-A9DD-58119D7CE6BC}" Platform="Linked"/>
+											</ActiveSourceList>
+										</Sound>
+									</ChildrenList>
+								</RandomSequenceContainer>
+								<PropertyContainer Name="Distractors" ID="{F543EE44-45E0-40AC-8EA3-C380A699A695}" ShortID="270314187">
+									<PropertyList>
+										<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+										<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+									</PropertyList>
+									<ReferenceList>
+										<Reference Name="Conversion">
+											<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+										</Reference>
+										<Reference Name="OutputBus">
+											<ObjectRef Name="Main Audio Bus" ID="{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+										</Reference>
+									</ReferenceList>
+									<ChildrenList>
+										<Sound Name="Rifle_Close_Backup" ID="{8C2E4276-0E42-40C8-9AFD-1D464ED311B2}" ShortID="481600142">
+											<Comment>do-not-touch | distractor</Comment>
+											<PropertyList>
+												<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+												<Property Name="OverrideOutput" Type="bool" Value="True"/>
+												<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+											</PropertyList>
+											<ReferenceList>
+												<Reference Name="Conversion">
+													<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+												</Reference>
+												<Reference Name="OutputBus">
+													<ObjectRef Name="WAAPI_V2_Weapons" ID="{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+												</Reference>
+											</ReferenceList>
+											<ChildrenList>
+												<AudioFileSource Name="rifle_close_backup" ID="{7A158864-EA00-4C20-B51E-C5D0C8821168}">
+													<PropertyList>
+														<Property Name="LoopBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="LoopEnd" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimEnd" Type="Real64" Value="-0.001"/>
+													</PropertyList>
+													<Language>SFX</Language>
+													<AudioFile>WAAPI Skill Integration V2\rifle_close_backup.wav</AudioFile>
+													<MediaIDList>
+														<MediaID ID="21551602"/>
+													</MediaIDList>
+												</AudioFileSource>
+											</ChildrenList>
+											<ActiveSourceList>
+												<ActiveSource Name="rifle_close_backup" ID="{7A158864-EA00-4C20-B51E-C5D0C8821168}" Platform="Linked"/>
+											</ActiveSourceList>
+										</Sound>
+										<Sound Name="Rifle_Tails" ID="{8CDE17C5-D80D-45A3-A71D-CF35371C7B49}" ShortID="33483875">
+											<Comment>do-not-touch | near-name</Comment>
+											<PropertyList>
+												<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+												<Property Name="OverrideOutput" Type="bool" Value="True"/>
+												<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+											</PropertyList>
+											<ReferenceList>
+												<Reference Name="Conversion">
+													<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+												</Reference>
+												<Reference Name="OutputBus">
+													<ObjectRef Name="WAAPI_V2_Weapons" ID="{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+												</Reference>
+											</ReferenceList>
+											<ChildrenList>
+												<AudioFileSource Name="rifle_tails_distractor" ID="{16BEA67B-5848-4C67-B2B4-A7AF4B2E63E4}">
+													<PropertyList>
+														<Property Name="LoopBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="LoopEnd" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimEnd" Type="Real64" Value="-0.001"/>
+													</PropertyList>
+													<Language>SFX</Language>
+													<AudioFile>WAAPI Skill Integration V2\rifle_tails_distractor.wav</AudioFile>
+													<MediaIDList>
+														<MediaID ID="567469785"/>
+													</MediaIDList>
+												</AudioFileSource>
+											</ChildrenList>
+											<ActiveSourceList>
+												<ActiveSource Name="rifle_tails_distractor" ID="{16BEA67B-5848-4C67-B2B4-A7AF4B2E63E4}" Platform="Linked"/>
+											</ActiveSourceList>
+										</Sound>
+									</ChildrenList>
+								</PropertyContainer>
+							</ChildrenList>
+						</PropertyContainer>
+						<PropertyContainer Name="PlayerFootstepsMaintenance" ID="{8570736F-FDCF-4C43-AF64-C99A25B16722}" ShortID="286705552">
+							<PropertyList>
+								<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+								<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+							</PropertyList>
+							<ReferenceList>
+								<Reference Name="Conversion">
+									<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+								</Reference>
+								<Reference Name="OutputBus">
+									<ObjectRef Name="Main Audio Bus" ID="{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+								</Reference>
+							</ReferenceList>
+							<ChildrenList>
+								<SwitchContainer Name="Player_Footsteps" ID="{72A207A3-DA06-4467-8E18-3FDAB77DC66B}" ShortID="991893116">
+									<PropertyList>
+										<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+										<Property Name="OverrideOutput" Type="bool" Value="True"/>
+										<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+									</PropertyList>
+									<ReferenceList>
+										<Reference Name="Conversion">
+											<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+										</Reference>
+										<Reference Name="OutputBus">
+											<ObjectRef Name="WAAPI_V2_Footsteps" ID="{EF9E9851-4728-4F6C-9939-2C84CF0367A3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+										</Reference>
+										<Reference Name="SwitchGroupOrStateGroup">
+											<ObjectRef Name="WAAPI_V2_Surface" ID="{4F5CED25-BA00-4C46-88AB-CE2CFBEFDD2D}" WorkUnitID="{943EAFED-3A2C-4325-9F3C-E4CD8AEE33DC}"/>
+										</Reference>
+									</ReferenceList>
+									<ChildrenList>
+										<RandomSequenceContainer Name="Metal" ID="{DE5F6FCD-C11F-42AD-A8F4-C3D24F1BDF13}" ShortID="575494909">
+											<PropertyList>
+												<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+												<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+											</PropertyList>
+											<ReferenceList>
+												<Reference Name="Conversion">
+													<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+												</Reference>
+												<Reference Name="OutputBus">
+													<ObjectRef Name="Main Audio Bus" ID="{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+												</Reference>
+											</ReferenceList>
+											<ChildrenList>
+												<Sound Name="Metal_Step_01" ID="{DEE5CBB2-AFCB-472C-A483-54CCD583E551}" ShortID="390018327">
+													<Comment>footstep-baseline | metal</Comment>
+													<PropertyList>
+														<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+														<Property Name="OverrideOutput" Type="bool" Value="True"/>
+														<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+													</PropertyList>
+													<ReferenceList>
+														<Reference Name="Conversion">
+															<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+														</Reference>
+														<Reference Name="OutputBus">
+															<ObjectRef Name="WAAPI_V2_Footsteps" ID="{EF9E9851-4728-4F6C-9939-2C84CF0367A3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+														</Reference>
+													</ReferenceList>
+													<ChildrenList>
+														<AudioFileSource Name="metal_step_01" ID="{5B106EE2-1536-4573-BC6E-6D84BF6FDD4A}">
+															<PropertyList>
+																<Property Name="LoopBegin" Type="Real64" Value="-0.001"/>
+																<Property Name="LoopEnd" Type="Real64" Value="-0.001"/>
+																<Property Name="TrimBegin" Type="Real64" Value="-0.001"/>
+																<Property Name="TrimEnd" Type="Real64" Value="-0.001"/>
+															</PropertyList>
+															<Language>SFX</Language>
+															<AudioFile>WAAPI Skill Integration V2\metal_step_01.wav</AudioFile>
+															<MediaIDList>
+																<MediaID ID="1022952185"/>
+															</MediaIDList>
+														</AudioFileSource>
+													</ChildrenList>
+													<ActiveSourceList>
+														<ActiveSource Name="metal_step_01" ID="{5B106EE2-1536-4573-BC6E-6D84BF6FDD4A}" Platform="Linked"/>
+													</ActiveSourceList>
+												</Sound>
+											</ChildrenList>
+										</RandomSequenceContainer>
+										<RandomSequenceContainer Name="Wood" ID="{99805432-CFD1-41B9-BA45-1B089820A287}" ShortID="973727042">
+											<PropertyList>
+												<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+												<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+											</PropertyList>
+											<ReferenceList>
+												<Reference Name="Conversion">
+													<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+												</Reference>
+												<Reference Name="OutputBus">
+													<ObjectRef Name="Main Audio Bus" ID="{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+												</Reference>
+											</ReferenceList>
+											<ChildrenList>
+												<Sound Name="Wood_Step_01" ID="{A81D29AF-0AB6-4BC9-902C-8A904D3CFA94}" ShortID="130392505">
+													<Comment>footstep-baseline | wood</Comment>
+													<PropertyList>
+														<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+														<Property Name="OverrideOutput" Type="bool" Value="True"/>
+														<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+													</PropertyList>
+													<ReferenceList>
+														<Reference Name="Conversion">
+															<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+														</Reference>
+														<Reference Name="OutputBus">
+															<ObjectRef Name="WAAPI_V2_Footsteps" ID="{EF9E9851-4728-4F6C-9939-2C84CF0367A3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+														</Reference>
+													</ReferenceList>
+													<ChildrenList>
+														<AudioFileSource Name="wood_step_01" ID="{9D00E863-DFD1-4051-9EAB-41EE4C723DE4}">
+															<PropertyList>
+																<Property Name="LoopBegin" Type="Real64" Value="-0.001"/>
+																<Property Name="LoopEnd" Type="Real64" Value="-0.001"/>
+																<Property Name="TrimBegin" Type="Real64" Value="-0.001"/>
+																<Property Name="TrimEnd" Type="Real64" Value="-0.001"/>
+															</PropertyList>
+															<Language>SFX</Language>
+															<AudioFile>WAAPI Skill Integration V2\wood_step_01.wav</AudioFile>
+															<MediaIDList>
+																<MediaID ID="456135324"/>
+															</MediaIDList>
+														</AudioFileSource>
+													</ChildrenList>
+													<ActiveSourceList>
+														<ActiveSource Name="wood_step_01" ID="{9D00E863-DFD1-4051-9EAB-41EE4C723DE4}" Platform="Linked"/>
+													</ActiveSourceList>
+												</Sound>
+											</ChildrenList>
+										</RandomSequenceContainer>
+										<RandomSequenceContainer Name="Mud" ID="{BDBC026F-4C5C-4548-9437-FFA135C7973F}" ShortID="490305542">
+											<PropertyList>
+												<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+												<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+											</PropertyList>
+											<ReferenceList>
+												<Reference Name="Conversion">
+													<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+												</Reference>
+												<Reference Name="OutputBus">
+													<ObjectRef Name="Main Audio Bus" ID="{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+												</Reference>
+											</ReferenceList>
+											<ChildrenList>
+												<Sound Name="Mud_Step_01" ID="{8F68E177-F11D-4AD0-899F-E1A326DF419F}" ShortID="160936490">
+													<Comment>footstep-baseline | mud</Comment>
+													<PropertyList>
+														<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+														<Property Name="OverrideOutput" Type="bool" Value="True"/>
+														<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+													</PropertyList>
+													<ReferenceList>
+														<Reference Name="Conversion">
+															<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+														</Reference>
+														<Reference Name="OutputBus">
+															<ObjectRef Name="WAAPI_V2_Footsteps" ID="{EF9E9851-4728-4F6C-9939-2C84CF0367A3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+														</Reference>
+													</ReferenceList>
+													<ChildrenList>
+														<AudioFileSource Name="mud_step_01" ID="{E705667B-12C2-4225-AEAC-92ADBA053AB0}">
+															<PropertyList>
+																<Property Name="LoopBegin" Type="Real64" Value="-0.001"/>
+																<Property Name="LoopEnd" Type="Real64" Value="-0.001"/>
+																<Property Name="TrimBegin" Type="Real64" Value="-0.001"/>
+																<Property Name="TrimEnd" Type="Real64" Value="-0.001"/>
+															</PropertyList>
+															<Language>SFX</Language>
+															<AudioFile>WAAPI Skill Integration V2\mud_step_01.wav</AudioFile>
+															<MediaIDList>
+																<MediaID ID="403070687"/>
+															</MediaIDList>
+														</AudioFileSource>
+													</ChildrenList>
+													<ActiveSourceList>
+														<ActiveSource Name="mud_step_01" ID="{E705667B-12C2-4225-AEAC-92ADBA053AB0}" Platform="Linked"/>
+													</ActiveSourceList>
+												</Sound>
+											</ChildrenList>
+										</RandomSequenceContainer>
+									</ChildrenList>
+									<GroupingInfo>
+										<GroupingBehaviorList>
+											<GroupingBehavior>
+												<ItemRef Name="Wood" ID="{99805432-CFD1-41B9-BA45-1B089820A287}"/>
+											</GroupingBehavior>
+											<GroupingBehavior>
+												<ItemRef Name="Mud" ID="{BDBC026F-4C5C-4548-9437-FFA135C7973F}"/>
+											</GroupingBehavior>
+											<GroupingBehavior>
+												<ItemRef Name="Metal" ID="{DE5F6FCD-C11F-42AD-A8F4-C3D24F1BDF13}"/>
+											</GroupingBehavior>
+										</GroupingBehaviorList>
+										<GroupingList>
+											<Grouping>
+												<SwitchRef Name="Metal" ID="{D457E7BF-4C4D-41A9-93F9-C127198EC739}"/>
+												<ItemList>
+													<ItemRef Name="Metal" ID="{DE5F6FCD-C11F-42AD-A8F4-C3D24F1BDF13}"/>
+												</ItemList>
+											</Grouping>
+											<Grouping>
+												<SwitchRef Name="Wood" ID="{629C36DB-CC1F-4983-B0C9-4850BC3EF461}"/>
+												<ItemList>
+													<ItemRef Name="Wood" ID="{99805432-CFD1-41B9-BA45-1B089820A287}"/>
+												</ItemList>
+											</Grouping>
+											<Grouping>
+												<SwitchRef Name="Mud" ID="{CB4C53E6-9695-4C0A-A00D-4323FE28E0E9}"/>
+												<ItemList>
+													<ItemRef Name="Mud" ID="{BDBC026F-4C5C-4548-9437-FFA135C7973F}"/>
+												</ItemList>
+											</Grouping>
+										</GroupingList>
+									</GroupingInfo>
+								</SwitchContainer>
+							</ChildrenList>
+						</PropertyContainer>
+						<PropertyContainer Name="WeaponsAudit" ID="{290A1055-DE97-435A-B2A3-419C6815AEE8}" ShortID="403787467">
+							<PropertyList>
+								<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+								<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+							</PropertyList>
+							<ReferenceList>
+								<Reference Name="Conversion">
+									<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+								</Reference>
+								<Reference Name="OutputBus">
+									<ObjectRef Name="Main Audio Bus" ID="{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+								</Reference>
+							</ReferenceList>
+							<ChildrenList>
+								<PropertyContainer Name="Rifle" ID="{14528B61-F578-4C4F-BE52-4BAF29AC1E3E}" ShortID="778382878">
+									<PropertyList>
+										<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+										<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+									</PropertyList>
+									<ReferenceList>
+										<Reference Name="Conversion">
+											<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+										</Reference>
+										<Reference Name="OutputBus">
+											<ObjectRef Name="Main Audio Bus" ID="{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+										</Reference>
+									</ReferenceList>
+									<ChildrenList>
+										<Sound Name="Rifle_Close" ID="{67C60B1B-CA2D-4DC5-B149-F773AE2C95A3}" ShortID="823080852">
+											<Comment>close-needs-review</Comment>
+											<PropertyList>
+												<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+												<Property Name="OverrideOutput" Type="bool" Value="True"/>
+												<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+												<Property Name="Volume" Type="Real64">
+													<ValueList>
+														<Value>2</Value>
+													</ValueList>
+												</Property>
+											</PropertyList>
+											<ReferenceList>
+												<Reference Name="Conversion">
+													<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+												</Reference>
+												<Reference Name="OutputBus">
+													<ObjectRef Name="WAAPI_V2_Footsteps" ID="{EF9E9851-4728-4F6C-9939-2C84CF0367A3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+												</Reference>
+											</ReferenceList>
+											<ChildrenList>
+												<AudioFileSource Name="audit_close" ID="{98D57DD7-9AB1-41D1-8178-817BE1CA061E}">
+													<PropertyList>
+														<Property Name="LoopBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="LoopEnd" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimEnd" Type="Real64" Value="-0.001"/>
+													</PropertyList>
+													<Language>SFX</Language>
+													<AudioFile>WAAPI Skill Integration V2\audit_close.wav</AudioFile>
+													<MediaIDList>
+														<MediaID ID="414831870"/>
+													</MediaIDList>
+												</AudioFileSource>
+											</ChildrenList>
+											<ActiveSourceList>
+												<ActiveSource Name="audit_close" ID="{98D57DD7-9AB1-41D1-8178-817BE1CA061E}" Platform="Linked"/>
+											</ActiveSourceList>
+										</Sound>
+										<Sound Name="RFL_Tail" ID="{FBF74BF9-8B83-44A8-AC8A-BA85372ECDC4}" ShortID="738551277">
+											<Comment>release-ready | tail</Comment>
+											<PropertyList>
+												<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+												<Property Name="OverrideOutput" Type="bool" Value="True"/>
+												<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+												<Property Name="Volume" Type="Real64">
+													<ValueList>
+														<Value>1</Value>
+													</ValueList>
+												</Property>
+											</PropertyList>
+											<ReferenceList>
+												<Reference Name="Conversion">
+													<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+												</Reference>
+												<Reference Name="OutputBus">
+													<ObjectRef Name="WAAPI_V2_Weapons" ID="{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+												</Reference>
+											</ReferenceList>
+											<ChildrenList>
+												<AudioFileSource Name="audit_tail" ID="{6F767F75-9ED2-4860-A745-A5D905C6DF9C}">
+													<PropertyList>
+														<Property Name="LoopBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="LoopEnd" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimEnd" Type="Real64" Value="-0.001"/>
+													</PropertyList>
+													<Language>SFX</Language>
+													<AudioFile>WAAPI Skill Integration V2\audit_tail.wav</AudioFile>
+													<MediaIDList>
+														<MediaID ID="262226637"/>
+													</MediaIDList>
+												</AudioFileSource>
+											</ChildrenList>
+											<ActiveSourceList>
+												<ActiveSource Name="audit_tail" ID="{6F767F75-9ED2-4860-A745-A5D905C6DF9C}" Platform="Linked"/>
+											</ActiveSourceList>
+										</Sound>
+										<Sound Name="RFL_Mechanical" ID="{55FE8F64-365F-4528-BD72-BA7F775779A1}" ShortID="820886907">
+											<Comment>mechanical-needs-review</Comment>
+											<PropertyList>
+												<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+												<Property Name="OverrideOutput" Type="bool" Value="True"/>
+												<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+											</PropertyList>
+											<ReferenceList>
+												<Reference Name="Conversion">
+													<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+												</Reference>
+												<Reference Name="OutputBus">
+													<ObjectRef Name="WAAPI_V2_Footsteps" ID="{EF9E9851-4728-4F6C-9939-2C84CF0367A3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+												</Reference>
+											</ReferenceList>
+											<ChildrenList>
+												<AudioFileSource Name="audit_mechanical" ID="{F40B05D7-A754-41C0-95EA-2993623E5B5D}">
+													<PropertyList>
+														<Property Name="LoopBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="LoopEnd" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimEnd" Type="Real64" Value="-0.001"/>
+													</PropertyList>
+													<Language>SFX</Language>
+													<AudioFile>WAAPI Skill Integration V2\audit_mechanical.wav</AudioFile>
+													<MediaIDList>
+														<MediaID ID="298074430"/>
+													</MediaIDList>
+												</AudioFileSource>
+											</ChildrenList>
+											<ObjectLists>
+												<ObjectList Name="RTPC">
+													<RTPC Name="" ID="{B379BE63-6FA7-4A4E-AFD5-6A20A4C7AC7C}" ShortID="408445557">
+														<PropertyList>
+															<Property Name="PropertyName" Type="string" Value="Volume"/>
+														</PropertyList>
+														<ReferenceList>
+															<Reference Name="ControlInput">
+																<ObjectRef Name="Rifle_Distance" ID="{5B499A43-5BA9-49E5-B3EF-7062627A5FC2}" WorkUnitID="{6D1262CA-2375-4279-B5E2-FF5C0B0120EA}"/>
+															</Reference>
+															<Reference Name="Curve">
+																<Custom>
+																	<Curve Name="" ID="{EA5DF588-264B-40EA-84FB-CF5BF3C79E91}">
+																		<PropertyList>
+																			<Property Name="Flags" Type="int32" Value="3"/>
+																		</PropertyList>
+																		<PointList>
+																			<Point>
+																				<XPos>0</XPos>
+																				<YPos>-12</YPos>
+																				<Flags>5</Flags>
+																			</Point>
+																			<Point>
+																				<XPos>50</XPos>
+																				<YPos>-6</YPos>
+																				<Flags>0</Flags>
+																			</Point>
+																			<Point>
+																				<XPos>100</XPos>
+																				<YPos>0</YPos>
+																				<Flags>37</Flags>
+																			</Point>
+																		</PointList>
+																	</Curve>
+																</Custom>
+															</Reference>
+														</ReferenceList>
+													</RTPC>
+												</ObjectList>
+											</ObjectLists>
+											<ActiveSourceList>
+												<ActiveSource Name="audit_mechanical" ID="{F40B05D7-A754-41C0-95EA-2993623E5B5D}" Platform="Linked"/>
+											</ActiveSourceList>
+										</Sound>
+										<Sound Name="Legacy_Rifle_Reference" ID="{FBA9A1A2-3248-49B7-9983-830338229706}" ShortID="863552215">
+											<Comment>legacy-reference</Comment>
+											<PropertyList>
+												<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+												<Property Name="OverrideOutput" Type="bool" Value="True"/>
+												<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+											</PropertyList>
+											<ReferenceList>
+												<Reference Name="Conversion">
+													<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+												</Reference>
+												<Reference Name="OutputBus">
+													<ObjectRef Name="WAAPI_V2_Footsteps" ID="{EF9E9851-4728-4F6C-9939-2C84CF0367A3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+												</Reference>
+											</ReferenceList>
+											<ChildrenList>
+												<AudioFileSource Name="audit_legacy" ID="{6B238C6D-93A5-4914-9C77-1024CE8340E0}">
+													<PropertyList>
+														<Property Name="LoopBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="LoopEnd" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimEnd" Type="Real64" Value="-0.001"/>
+													</PropertyList>
+													<Language>SFX</Language>
+													<AudioFile>WAAPI Skill Integration V2\audit_legacy.wav</AudioFile>
+													<MediaIDList>
+														<MediaID ID="825069579"/>
+													</MediaIDList>
+												</AudioFileSource>
+											</ChildrenList>
+											<ActiveSourceList>
+												<ActiveSource Name="audit_legacy" ID="{6B238C6D-93A5-4914-9C77-1024CE8340E0}" Platform="Linked"/>
+											</ActiveSourceList>
+										</Sound>
+										<Sound Name="RFL_Intentional_Hot" ID="{D414B8C4-3D29-465D-A788-EEC7D0C86DD7}" ShortID="504472965">
+											<Comment>release-ready | intentional-hot</Comment>
+											<PropertyList>
+												<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+												<Property Name="OverrideOutput" Type="bool" Value="True"/>
+												<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+												<Property Name="Volume" Type="Real64">
+													<ValueList>
+														<Value>6</Value>
+													</ValueList>
+												</Property>
+											</PropertyList>
+											<ReferenceList>
+												<Reference Name="Conversion">
+													<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+												</Reference>
+												<Reference Name="OutputBus">
+													<ObjectRef Name="WAAPI_V2_Weapons" ID="{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+												</Reference>
+											</ReferenceList>
+											<ChildrenList>
+												<AudioFileSource Name="audit_hot" ID="{A3519A32-1F5A-471E-8F7D-F0DCBBE6FC62}">
+													<PropertyList>
+														<Property Name="LoopBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="LoopEnd" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimEnd" Type="Real64" Value="-0.001"/>
+													</PropertyList>
+													<Language>SFX</Language>
+													<AudioFile>WAAPI Skill Integration V2\audit_hot.wav</AudioFile>
+													<MediaIDList>
+														<MediaID ID="995073228"/>
+													</MediaIDList>
+												</AudioFileSource>
+											</ChildrenList>
+											<ActiveSourceList>
+												<ActiveSource Name="audit_hot" ID="{A3519A32-1F5A-471E-8F7D-F0DCBBE6FC62}" Platform="Linked"/>
+											</ActiveSourceList>
+										</Sound>
+										<Sound Name="RFL_Clean" ID="{243E851B-259E-4FCC-861E-65CFE25B4967}" ShortID="706733866">
+											<Comment>release-ready | clean</Comment>
+											<PropertyList>
+												<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+												<Property Name="OverrideOutput" Type="bool" Value="True"/>
+												<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+												<Property Name="Volume" Type="Real64">
+													<ValueList>
+														<Value>-3</Value>
+													</ValueList>
+												</Property>
+											</PropertyList>
+											<ReferenceList>
+												<Reference Name="Conversion">
+													<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+												</Reference>
+												<Reference Name="OutputBus">
+													<ObjectRef Name="WAAPI_V2_Weapons" ID="{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+												</Reference>
+											</ReferenceList>
+											<ChildrenList>
+												<AudioFileSource Name="audit_clean" ID="{81DC830A-E4F4-43CD-9EB7-D6979C142492}">
+													<PropertyList>
+														<Property Name="LoopBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="LoopEnd" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimEnd" Type="Real64" Value="-0.001"/>
+													</PropertyList>
+													<Language>SFX</Language>
+													<AudioFile>WAAPI Skill Integration V2\audit_clean.wav</AudioFile>
+													<MediaIDList>
+														<MediaID ID="766671832"/>
+													</MediaIDList>
+												</AudioFileSource>
+											</ChildrenList>
+											<ActiveSourceList>
+												<ActiveSource Name="audit_clean" ID="{81DC830A-E4F4-43CD-9EB7-D6979C142492}" Platform="Linked"/>
+											</ActiveSourceList>
+										</Sound>
+									</ChildrenList>
+								</PropertyContainer>
+								<PropertyContainer Name="Pistol" ID="{E14D2644-0171-4942-9761-83D38C0FD21B}" ShortID="823639585">
+									<PropertyList>
+										<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+										<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+									</PropertyList>
+									<ReferenceList>
+										<Reference Name="Conversion">
+											<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+										</Reference>
+										<Reference Name="OutputBus">
+											<ObjectRef Name="Main Audio Bus" ID="{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+										</Reference>
+									</ReferenceList>
+									<ChildrenList>
+										<Sound Name="Rifle_Close" ID="{89F0AF56-29EB-475A-A719-44B2C785A702}" ShortID="1009017164">
+											<Comment>outside-scope</Comment>
+											<PropertyList>
+												<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+												<Property Name="OverrideOutput" Type="bool" Value="True"/>
+												<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+												<Property Name="Volume" Type="Real64">
+													<ValueList>
+														<Value>4</Value>
+													</ValueList>
+												</Property>
+											</PropertyList>
+											<ReferenceList>
+												<Reference Name="Conversion">
+													<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+												</Reference>
+												<Reference Name="OutputBus">
+													<ObjectRef Name="WAAPI_V2_Footsteps" ID="{EF9E9851-4728-4F6C-9939-2C84CF0367A3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+												</Reference>
+											</ReferenceList>
+											<ChildrenList>
+												<AudioFileSource Name="audit_outside" ID="{868418A1-6753-44A7-A8F0-4FBC0E79A2B4}">
+													<PropertyList>
+														<Property Name="LoopBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="LoopEnd" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimBegin" Type="Real64" Value="-0.001"/>
+														<Property Name="TrimEnd" Type="Real64" Value="-0.001"/>
+													</PropertyList>
+													<Language>SFX</Language>
+													<AudioFile>WAAPI Skill Integration V2\audit_outside.wav</AudioFile>
+													<MediaIDList>
+														<MediaID ID="874663443"/>
+													</MediaIDList>
+												</AudioFileSource>
+											</ChildrenList>
+											<ActiveSourceList>
+												<ActiveSource Name="audit_outside" ID="{868418A1-6753-44A7-A8F0-4FBC0E79A2B4}" Platform="Linked"/>
+											</ActiveSourceList>
+										</Sound>
+									</ChildrenList>
+								</PropertyContainer>
+							</ChildrenList>
+						</PropertyContainer>
+					</ChildrenList>
+				</PropertyContainer>
+			</ChildrenList>
+		</WorkUnit>
 	</Containers>
 </WwiseDocument>

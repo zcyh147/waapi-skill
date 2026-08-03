@@ -174,7 +174,27 @@ user's approval.
   verify that chosen GUID through the simple exact-ID query route before using
   the normal closed mutation contract. Candidate projections keep unaliased
   `id`, `name`, `type`, and `path`; the exact-ID readback must match the chosen
-  name/type/path or the workflow stops.
+  name/type/path or the workflow stops. The advanced schema is explicit about
+  UTF-8 byte limits and one trimmed, single-line frame: comments, semicolons,
+  and unclosed string or slash-regex literals are rejected before dispatch.
+  The same per-object exact-ID readback applies when a broad ordinary or
+  structured query returns multiple candidates and the user later selects only
+  a subset for mutation. It does not apply to a canonical relationship GUID
+  used directly as the next read-only hop.
+- Keep successful ordinary `query-object` replies compact by default. The
+  compiled semantic preview and dispatch evidence are an explicit `--detail`
+  diagnostic view; do not rerun a successful live query merely to obtain that
+  detail. Failures retain their complete bounded evidence, and both projections
+  must preserve the exact final `agent_result` object.
+- Prepared-role revalidation deduplicates canonical GUIDs into one
+  `MULTI_IDENTITY_READ_MAX_IDS`-bounded object read. Reject an oversized set
+  before dispatch, and fail closed on missing, duplicate, extra, or malformed
+  rows before applying the stored per-role field comparisons.
+- Identity and property-metadata reuse inside operation preparation is
+  preview-local. Key identity results by the exact canonical selector and
+  property metadata by its exact object/class scope and field token, reset both
+  caches for every new preview, and never let either replace execution-time or
+  verification-time live state checks.
 - Generalize “shortcut flags → structured contract → controlled native
   expression” only to fixed read-only APIs with a declarative DSL whose time,
   row, and byte boundaries remain Gateway-owned. Do not copy the native
@@ -371,8 +391,33 @@ loaded only the unchanged operate reference in `r1`; all four passed there.
 Thus all six current prompt units have passing evidence across these roots,
 but there is still no single repaired-candidate 6/6 campaign. All eight
 recorded lifecycles preserved source hashes and mtimes; passing sandboxes were
-removed and the one failed sandbox remains quarantined. Do not extrapolate
-this workflow evidence to unexercised advanced WAQL or unrelated APIs.
+removed and the one failed sandbox remains quarantined. Those V1 roots do not
+validate the newer V2 fixture, routing, or workflow contracts.
+
+The newer `integration_workflows_v2_cross_version_6` profile is a distinct,
+fixed-baseline acceptance contract. Its three workflows run once on Wwise
+2022.1 and once on 2025.1: six fresh memory-off Codex tasks, 16 user turns, and
+eight separately previewed transactions. It is fixed to `gpt-5.6-terra`,
+medium reasoning, the default service tier, and sequential execution. The
+required business graph and media are fixed in the committed
+`tests/_org/2022.1` and `tests/_org/2025.1` SampleProject sources and sealed by
+the versioned manifests below `tests/semantic/data/integration-workflows-v2/`.
+Never open or mutate either committed source directly. Each campaign unit must
+copy it to an isolated sandbox, attest the source full-tree hash and project
+mtime before and after the attempt, remove the sandbox only after `PASS`, and
+seal/quarantine every failed or indeterminate sandbox. The baseline collector
+may inspect only an already-running sandbox copy and must do so through the
+public Gateway; it is not permission to use a direct WAAPI client.
+
+The completed 2026-08-03 V2 evidence is cumulative across frozen roots, not one
+final-candidate 6/6 run. `r8` passed both Rifle units, `r12-2022` passed the
+2022.1 Weapons unit, `r23-2022-footsteps` passed the 2022.1 Footsteps unit, and
+`r24-2025-repairs` passed the 2025.1 Footsteps and Weapons units. Thus all six
+unique units have passing evidence across those roots. Passing sandboxes were
+removed; failed or blocked diagnostic sandboxes were sealed and quarantined;
+every recorded source-project full hash and mtime remained unchanged. This
+grants no per-API coverage credit and proves only the exact Rifle, Footsteps,
+and Weapons workflow paths, not advanced WAQL or unrelated routes.
 
 For harness-only CI checks that start neither Codex nor Wwise, use the focused
 pytest commands in `tests/semantic/README.md`.

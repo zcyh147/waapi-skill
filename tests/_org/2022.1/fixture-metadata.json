@@ -41,8 +41,8 @@
   ],
   "hash_strategy": {
     "algorithm": "sha256",
-    "file_count": 67,
-    "manifest_digest": "0cc2c22606264b869e788532641159b2a1812d5e2cfa88353956154c978583b6",
+    "file_count": 82,
+    "manifest_digest": "6ac627c62a638e73bce91ecdbe89830b2600a8a17739bfed9d4b0a135d05825f",
     "mode": "path-plus-content over committed fixture payload files; excludes fixture-metadata.json and fixture-manifest.json bookkeeping files to avoid circular hashes"
   },
   "immutability": {
@@ -53,7 +53,9 @@
     "*.wav"
   ],
   "provenance": {
-    "copied_policy": "All authored .wproj/.wwu project source files plus a tiny original-media subset required for deterministic unit fixture and LFS coverage. Generated outputs, caches, local settings, validation caches, logs, profiler captures, and bulk media are intentionally excluded.",
+    "copied_policy": "All authored .wproj/.wwu project source files plus the reviewed original-media subset required by the fixed integration baseline. The WAAPI Skill Integration V2 graph was authored in a disposable copy through public waapi-skill transactions before source-safe .wwu and WAV files were promoted. Generated outputs, caches, local settings, validation caches, logs, profiler captures, runtime sandboxes, and bulk media are intentionally excluded.",
+    "derived_baseline": "WAAPI Skill Integration V2",
+    "derived_baseline_authoring": "public waapi-skill transactions against a disposable project copy",
     "source_path": "/Applications/Audiokinetic/Wwise2022.1.19.8584/SampleProject",
     "type": "curated copy from local Audiokinetic SampleProject"
   },

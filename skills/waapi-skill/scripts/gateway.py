@@ -314,10 +314,11 @@ TRANSACTION_EXECUTE_SUCCESS_SUMMARY_CONTRACT = (
 TRANSACTION_ROLE_VALIDATION_SUMMARY_CONTRACT = (
     "waapi-skill.transaction-role-validation-summary/v1"
 )
-# A terminal, strongly verified transaction has already sealed its complete
-# operation-specific readbacks in ``verification_recorded``.  Keep stdout
-# small enough for the agent broker while retaining the exact ``agent_result``
-# and a canonical digest that binds the projection to the journal evidence.
+# A terminal successful verification, whether strongly ``verified`` or the
+# explicit weaker ``result_schema_checked`` boundary, has already sealed its
+# complete evidence in ``verification_recorded``.  Keep stdout small enough
+# for the agent broker while retaining the exact ``agent_result`` and a
+# canonical digest that binds the projection to the journal evidence.
 # Projection is intentionally delayed until transport cleanup succeeds.
 TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES = 24 * 1024
 TRANSACTION_VERIFY_SUCCESS_ENVELOPE_RESERVE_BYTES = 2 * 1024
@@ -1105,6 +1106,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Explicitly allow an unbounded broad query; otherwise broad sources/selects require --take",
     )
     query_object.add_argument("--return-field", action="append", dest="return_fields")
+    query_object.add_argument(
+        "--detail",
+        action="store_true",
+        help=(
+            "Include the compiled semantic preview and dispatcher evidence on "
+            "success; failures skip compact projection but still obey the "
+            "global result ceiling"
+        ),
+    )
 
     metadata = subparsers.add_parser(
         "metadata",
@@ -1657,10 +1667,22 @@ def _execute_gateway_unconstrained(
             args.command == "verify"
             and not post_result_cleanup_failed
             and payload.get("ok") is True
-            and payload.get("status") == TransactionState.VERIFIED.value
+            and payload.get("status") in (
+                TransactionState.VERIFIED.value,
+                TransactionState.RESULT_SCHEMA_CHECKED.value,
+            )
             and transaction_verify_cleanup_projection_safe(payload.get("cleanup"))
         ):
             payload = project_successful_transaction_verify_payload(payload)
+        if (
+            args.command == "query-object"
+            and not original_file_reference_match_requested(args)
+            and not post_result_cleanup_failed
+        ):
+            payload = project_successful_query_object_payload(
+                payload,
+                detail=args.detail,
+            )
     except Exception as exc:  # noqa: BLE001 - the CLI always returns structured failure JSON
         normalized = normalize_gateway_exception(exc)
         details = normalized.get("details")
@@ -3172,8 +3194,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                         "subcommand": "preview",
                         "required_flag": "--apply",
                         "effect": (
-                            "creates a durable confirmation-bound preview and "
-                            "does not execute the change"
+                            "required even when the user asks to see only a "
+                            "preview; creates a durable confirmation-bound "
+                            "preview and does not execute the change"
                         ),
                         "includes_later_ordered_transactions": True,
                     },
@@ -7893,6 +7916,43 @@ def _query_bound_summary(args: argparse.Namespace) -> dict[str, Any]:
     return {"mode": "exact-object"}
 
 
+def project_successful_query_object_payload(
+    payload: Mapping[str, Any],
+    *,
+    detail: bool,
+) -> dict[str, Any]:
+    """Keep ordinary successful query output focused on business rows.
+
+    The complete compiled preview and dispatch/evidence summary remain available
+    through ``query-object --detail``.  Failed and boundary results are never
+    projected because their complete evidence is required for a truthful stop.
+    """
+
+    if detail or payload.get("ok") is not True:
+        return dict(payload)
+    compact_keys = (
+        "contract",
+        "ok",
+        "status",
+        "command",
+        "endpoint",
+        "detected_version",
+        "is_command_line",
+        "query_layer",
+        "query_contract",
+        "query_bound",
+        "count",
+        "limit_reached",
+        "objects",
+    )
+    projected = {key: payload[key] for key in compact_keys if key in payload}
+    if "agent_result" in payload:
+        # Preserve the exact object and keep it insertion-order last.  The outer
+        # session-context attachment repeats the same terminal-order guarantee.
+        projected["agent_result"] = payload["agent_result"]
+    return projected
+
+
 def _canonical_wwise_path(value: Any) -> bool:
     if not isinstance(value, str) or not value.startswith("\\"):
         return False
@@ -8291,19 +8351,32 @@ def validate_successful_transaction_verify_projection(
     agent_result = payload.get("agent_result")
     cleanup = payload.get("cleanup")
     invalid_reasons: list[str] = []
+    status = payload.get("status")
+    projectable_statuses = (
+        TransactionState.VERIFIED.value,
+        TransactionState.RESULT_SCHEMA_CHECKED.value,
+    )
+    strong_success = status == TransactionState.VERIFIED.value
+    expected_state = status if status in projectable_statuses else None
+    expected_verified = strong_success
+    expected_result_schema_checked = (
+        status == TransactionState.RESULT_SCHEMA_CHECKED.value
+    )
 
     if payload.get("ok") is not True:
         invalid_reasons.append("top-level ok is not true")
-    if payload.get("status") != TransactionState.VERIFIED.value:
-        invalid_reasons.append("top-level status is not verified")
-    if payload.get("state") != TransactionState.VERIFIED.value:
-        invalid_reasons.append("transaction state is not verified")
+    if status not in projectable_statuses:
+        invalid_reasons.append("top-level status is not a projectable success")
+    if payload.get("state") != expected_state:
+        invalid_reasons.append("transaction state does not match success status")
     if payload.get("executed") is not True:
         invalid_reasons.append("top-level executed is not true")
-    if payload.get("verified") is not True:
-        invalid_reasons.append("top-level verified is not true")
-    if payload.get("result_schema_checked") is not False:
-        invalid_reasons.append("result_schema_checked is not false")
+    if payload.get("verified") is not expected_verified:
+        invalid_reasons.append("top-level verified does not match success status")
+    if payload.get("result_schema_checked") is not expected_result_schema_checked:
+        invalid_reasons.append(
+            "result_schema_checked does not match success status"
+        )
     if payload.get("automatic_retry") is not False:
         invalid_reasons.append("automatic_retry is not false")
 
@@ -8313,10 +8386,14 @@ def validate_successful_transaction_verify_projection(
     else:
         if verification.get("ok") is not True:
             invalid_reasons.append("verification ok is not true")
-        if verification.get("status") != TransactionState.VERIFIED.value:
-            invalid_reasons.append("verification status is not verified")
-        if verification.get("business_state_verified") is not True:
-            invalid_reasons.append("business state was not strongly verified")
+        if verification.get("status") != expected_state:
+            invalid_reasons.append(
+                "verification status does not match top-level success status"
+            )
+        if verification.get("business_state_verified") is not expected_verified:
+            invalid_reasons.append(
+                "business verification strength does not match success status"
+            )
         if payload.get("verification_strength") != verification.get(
             "verification_strength"
         ):
@@ -8386,12 +8463,13 @@ def validate_successful_transaction_verify_projection(
 def project_successful_transaction_verify_payload(
     payload: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Bound one strong terminal verify reply without altering agent_result.
+    """Bound one terminal verify success without altering agent_result.
 
     Complete assertions and readbacks were durably written to the
     ``verification_recorded`` journal event before this function can run.
-    Failure, indeterminate, weak result-schema validation, and cleanup-error
-    boundaries never enter this projection.
+    Both strong ``verified`` and explicit weak ``result_schema_checked``
+    outcomes enter this projection.  Failure, indeterminate, and cleanup-error
+    boundaries never do.
     """
 
     verification, agent_result, _cleanup = (
@@ -8515,7 +8593,10 @@ def project_successful_transaction_verify_payload(
                     128,
                 ),
                 "executed": True,
-                "verified": True,
+                "verified": payload.get("verified") is True,
+                "result_schema_checked": (
+                    payload.get("result_schema_checked") is True
+                ),
                 "automatic_retry": False,
                 "agent_result_exact": True,
                 "truncated": False,

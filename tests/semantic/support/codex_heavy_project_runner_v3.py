@@ -842,7 +842,20 @@ def run_heavy_project_unit(
             project_modification_policy=policy_mode,
             unit=unit,
         )
-        prompts = (prepared.prompt, *(turn.prompt for turn in unit.turns[1:]))
+        if getattr(unit, "workflow_id", None) in _INTEGRATION_V2_WORKFLOW_IDS:
+            rendered_values = {
+                key: str(value) for key, value in prepared.visible_values.items()
+            }
+            prompts = tuple(
+                turn.prompt.format_map(rendered_values)
+                for turn in unit.turns
+            )
+            if not prompts or prompts[0] != prepared.prompt:
+                raise _HeavyProjectInfrastructureError(
+                    "integration v2 prepared prompt differs from rendered turn one"
+                )
+        else:
+            prompts = (prepared.prompt, *(turn.prompt for turn in unit.turns[1:]))
         task_root = runtime.evidence_root / "codex-task"
         provenance = write_prompt_provenance(
             scenario=unit.scenario,
@@ -1445,17 +1458,18 @@ class _CaseObservers:
             ] = True
         if self.prepared.verify_turn is not None:
             verification = self.prepared.verify_turn(turn_index, result)
-            _assert_verification(
-                verification,
-                context=f"turn {turn_index} workflow oracle",
-            )
-            self.checks[f"turn_{turn_index:02d}_workflow"] = _oracle_evidence(
-                scenario=self.scenario,
-                version=self.version,
-                runner="project",
-                business_oracle_plan_sha256=self.business_oracle_plan_sha256,
-                verification=verification,
-            )
+            if verification is not None:
+                _assert_verification(
+                    verification,
+                    context=f"turn {turn_index} workflow oracle",
+                )
+                self.checks[f"turn_{turn_index:02d}_workflow"] = _oracle_evidence(
+                    scenario=self.scenario,
+                    version=self.version,
+                    runner="project",
+                    business_oracle_plan_sha256=self.business_oracle_plan_sha256,
+                    verification=verification,
+                )
         if turn_index == len(self.prepared.protocol.turn_prefix_counts):
             if self.scenario.protocol == "single" and self.prepared.topic_payload_step is None:
                 payload = self.payloads[self.prepared.protocol.steps[-1].name]
@@ -3510,12 +3524,25 @@ def _build_compound_object_metadata_protocol(
     )
 
 
-_INTEGRATION_WORKFLOW_IDS = frozenset(
+_INTEGRATION_V1_WORKFLOW_IDS = frozenset(
     {
         "interactive_weather_build",
         "alarm_diagnose_and_repair",
         "harbor_soundbank_release",
     }
+)
+_INTEGRATION_V2_WORKFLOW_IDS = frozenset(
+    {
+        "rifle_safe_reimport",
+        "footsteps_snow_assignment_maintenance",
+        "weapons_query_guided_batch_cleanup",
+    }
+)
+_INTEGRATION_WORKFLOW_IDS = frozenset(
+    {*_INTEGRATION_V1_WORKFLOW_IDS, *_INTEGRATION_V2_WORKFLOW_IDS}
+)
+_INTEGRATION_QUERY_FIRST_WORKFLOW_IDS = frozenset(
+    {"alarm_diagnose_and_repair", "weapons_query_guided_batch_cleanup"}
 )
 _ALARM_TURN_REFERENCE_SCHEDULE = (
     ("references/waapi-query.md",),
@@ -3624,6 +3651,91 @@ def _prepare_integration_workflow_case(
             visible_values=prepared.visible_values,
             oracle_requirements=prepared.oracle_requirements,
         )
+    elif workflow_id in _INTEGRATION_V2_WORKFLOW_IDS:
+        baseline_manifest = _integration_v2_baseline_manifest(
+            unit,
+            version=runtime.version,
+        )
+        if workflow_id == "rifle_safe_reimport":
+            from tests.semantic.support.codex_integration_rifle_runtime_v2 import (
+                prepare_rifle_integration_runtime,
+            )
+
+            prepared = prepare_rifle_integration_runtime(
+                workflow,
+                scenario,
+                version=runtime.version,
+                runtime=runtime,
+                baseline_manifest=baseline_manifest,
+                direct_call=direct,
+            )
+        elif workflow_id == "footsteps_snow_assignment_maintenance":
+            from tests.semantic.support.codex_integration_footsteps_runtime_v2 import (
+                prepare_footsteps_integration_runtime,
+            )
+
+            prepared = prepare_footsteps_integration_runtime(
+                workflow,
+                scenario,
+                version=runtime.version,
+                runtime=runtime,
+                baseline_manifest=baseline_manifest,
+                direct_call=direct,
+            )
+        else:
+            from tests.semantic.support.codex_integration_weapons_runtime_v2 import (
+                prepare_weapons_integration_runtime,
+            )
+
+            prepared = prepare_weapons_integration_runtime(
+                workflow,
+                scenario,
+                version=runtime.version,
+                runtime=runtime,
+                baseline_manifest=baseline_manifest,
+                direct_call=direct,
+            )
+        if (
+            prepared.workflow_id != workflow_id
+            or prepared.version != runtime.version
+        ):
+            raise HeavyProjectRunnerError(
+                "integration v2 runtime returned another workflow or version"
+            )
+        prompt = scenario.render_prompt(prepared.visible_values)
+
+        def cleanup_v2() -> Mapping[str, Any]:
+            proof = prepared.cleanup()
+            as_dict = getattr(proof, "as_dict", None)
+            if not callable(as_dict):
+                raise HeavyProjectRunnerError(
+                    "integration v2 cleanup omitted its closed as_dict projection"
+                )
+            value = as_dict()
+            if not isinstance(value, Mapping):
+                raise HeavyProjectRunnerError(
+                    "integration v2 cleanup as_dict projection is not an object"
+                )
+            return value
+
+        cleanup = cleanup_v2
+
+        def verify_v2_intermediate_turn(
+            turn_index: int,
+            result: CodexRunResult,
+        ) -> Any | None:
+            if 1 <= turn_index < int(unit.user_turn_count):
+                return prepared.verify_turn(turn_index, result)
+            return None
+
+        verify_turn = verify_v2_intermediate_turn
+        typed_sections = _compile_integration_workflow_plan(
+            unit=unit,
+            protocol=prepared.protocol,
+            visible_values=prepared.visible_values,
+            oracle_requirements=prepared.oracle_requirements,
+            baseline_manifest_digest=baseline_manifest.digest,
+        )
     else:  # pragma: no cover - workflow identity is closed above
         raise HeavyProjectRunnerError(
             f"integration workflow has no runtime: {workflow_id}"
@@ -3643,7 +3755,7 @@ def _prepare_integration_workflow_case(
         protocol=prepared.protocol,
         required_reference=(
             "references/waapi-query.md"
-            if workflow_id == "alarm_diagnose_and_repair"
+            if workflow_id in _INTEGRATION_QUERY_FIRST_WORKFLOW_IDS
             else getattr(
                 prepared,
                 "required_reference",
@@ -3652,7 +3764,7 @@ def _prepare_integration_workflow_case(
         ),
         turn_reference_schedule=(
             _ALARM_TURN_REFERENCE_SCHEDULE
-            if workflow_id == "alarm_diagnose_and_repair"
+            if workflow_id in _INTEGRATION_QUERY_FIRST_WORKFLOW_IDS
             else None
         ),
         snapshot=prepared.snapshot,
@@ -3666,6 +3778,37 @@ def _prepare_integration_workflow_case(
         verify_turn=verify_turn,
         expected_dispatches=expected_dispatches,
     )
+
+
+def _integration_v2_baseline_manifest(
+    unit: Any,
+    *,
+    version: str,
+) -> Any:
+    """Require the loader-sealed manifest on every executable V2 unit."""
+
+    manifest = getattr(unit, "baseline_manifest", None)
+    path = getattr(manifest, "path", None)
+    digest = getattr(manifest, "digest", None)
+    objects = getattr(manifest, "objects", None)
+    media = getattr(manifest, "media", None)
+    if (
+        manifest is None
+        or getattr(manifest, "version", None) != version
+        or not isinstance(path, Path)
+        or not path.is_absolute()
+        or not path.is_file()
+        or not isinstance(digest, str)
+        or not _valid_sha256_text(digest)
+        or not isinstance(objects, tuple)
+        or not objects
+        or not isinstance(media, tuple)
+        or not media
+    ):
+        raise HeavyProjectRunnerError(
+            "integration v2 unit lacks its exact sealed baseline manifest"
+        )
+    return manifest
 
 
 def _integration_expected_dispatches(
@@ -3704,6 +3847,7 @@ def _compile_integration_workflow_plan(
     protocol: V3GatewayProtocol,
     visible_values: Mapping[str, Any],
     oracle_requirements: Sequence[Any],
+    baseline_manifest_digest: str | None = None,
 ) -> WorkflowBusinessPlanSections:
     transactions = tuple(getattr(unit, "transactions", ()))
     if not transactions:
@@ -3889,15 +4033,29 @@ def _compile_integration_workflow_plan(
             }
             for row in transaction_rows
         ]
+    live_bindings: dict[str, Any] = {
+        "version": unit.version,
+        "visible_values": dict(visible_values),
+    }
+    if baseline_manifest_digest is not None:
+        if (
+            unit.workflow_id not in _INTEGRATION_V2_WORKFLOW_IDS
+            or not _valid_sha256_text(baseline_manifest_digest)
+        ):
+            raise HeavyProjectRunnerError(
+                "integration workflow baseline-manifest binding is invalid"
+            )
+        live_bindings["baseline_manifest_sha256"] = baseline_manifest_digest
+    elif unit.workflow_id in _INTEGRATION_V2_WORKFLOW_IDS:
+        raise HeavyProjectRunnerError(
+            "integration v2 workflow plan lacks its baseline-manifest digest"
+        )
     return compile_workflow_business_plan_sections(
         workflow_id=unit.workflow_id,
         transactions=transaction_rows,
         workflow_steps=tuple(workflow_steps),
         diagnostic_evidence=tuple(diagnostic_evidence),
-        live_bindings={
-            "version": unit.version,
-            "visible_values": dict(visible_values),
-        },
+        live_bindings=live_bindings,
         transaction_expectations=tuple(requirements),
     )
 
@@ -5523,6 +5681,20 @@ def _oracle_evidence(
 ) -> dict[str, Any]:
     """Bind one bounded business oracle to the exact scenario/version lane."""
 
+    workflow_id = _integration_workflow_id(scenario)
+    if workflow_id in _INTEGRATION_V2_WORKFLOW_IDS:
+        as_dict = getattr(verification, "as_dict", None)
+        if not callable(as_dict):
+            raise HeavyProjectRunnerError(
+                "integration v2 verification omitted its closed as_dict projection"
+            )
+        verification_value = as_dict()
+        if not isinstance(verification_value, Mapping):
+            raise HeavyProjectRunnerError(
+                "integration v2 verification as_dict projection is not an object"
+            )
+    else:
+        verification_value = verification
     return {
         "contract": "waapi-skill.heavy-oracle/v2",
         "scenario_id": scenario.id,
@@ -5530,7 +5702,7 @@ def _oracle_evidence(
         "api": scenario.api,
         "runner": runner,
         "business_oracle_plan_sha256": business_oracle_plan_sha256,
-        "verification": _json_value(verification),
+        "verification": _json_value(verification_value),
     }
 
 
