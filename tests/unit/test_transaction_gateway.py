@@ -231,6 +231,25 @@ def z_wire_path(path: Path) -> str:
     return "Z:\\" + "\\".join(resolved.parts[1:])
 
 
+def test_runtime_state_uses_native_project_containment(tmp_path: Path) -> None:
+    project_row = local_project(tmp_path)
+    project_root = Path(project_row["path"]).parent
+
+    waapi_gateway.require_runtime_directory_outside_project(
+        tmp_path / "transaction-state",
+        project=project_row,
+    )
+
+    with pytest.raises(
+        waapi_gateway.GatewayInputError,
+        match="outside the live Wwise project",
+    ):
+        waapi_gateway.require_runtime_directory_outside_project(
+            project_root / ".waapi-skill-state",
+            project=project_row,
+        )
+
+
 @pytest.mark.skipif(os.name == "nt", reason="Wine Z: mapping is POSIX-only")
 def test_runtime_state_rejects_wine_project_containment(tmp_path: Path) -> None:
     project_root = (tmp_path / "SampleProject").resolve()

@@ -129,11 +129,12 @@ def live_info(
     }
 
 
-def project() -> dict[str, Any]:
+def project(tmp_path: Path) -> dict[str, Any]:
+    project_path = tmp_path / "wwise-project" / "SampleProject.wproj"
     return {
         "id": PROJECT_GUID,
         "name": "SampleProject",
-        "path": "/tmp/waapi-authoring-ui/SampleProject.wproj",
+        "path": str(project_path),
     }
 
 
@@ -562,7 +563,7 @@ def test_confirmed_ui_file_transaction_cannot_switch_to_remote_execute(
     preview_client = FakeClient(
         {
             GET_INFO_URI: [live_info(year=2025)],
-            GET_PROJECT_INFO_URI: [project()],
+            GET_PROJECT_INFO_URI: [project(tmp_path)],
         }
     )
     code, transaction = execute(
@@ -689,7 +690,7 @@ def test_confirmed_ui_program_transaction_cannot_switch_to_remote_execute(
     preview_client = FakeClient(
         {
             GET_INFO_URI: [info, info],
-            GET_PROJECT_INFO_URI: [project()],
+            GET_PROJECT_INFO_URI: [project(tmp_path)],
         }
     )
     code, transaction = execute(
@@ -808,7 +809,7 @@ def test_ui_command_transactions_run_full_fake_gateway_chain(
             if needs_host_platform
             else [preview_info]
         ),
-        GET_PROJECT_INFO_URI: [project()],
+        GET_PROJECT_INFO_URI: [project(tmp_path)],
     }
     preview_client = FakeClient(preview_responses)
     code, preview = execute(
@@ -851,7 +852,7 @@ def test_ui_command_transactions_run_full_fake_gateway_chain(
             if needs_host_platform
             else [execute_info]
         ),
-        GET_PROJECT_INFO_URI: [project()],
+        GET_PROJECT_INFO_URI: [project(tmp_path)],
         GET_COMMANDS_URI: [{"commands": list(pre_commands)}],
         mutation_uri: [{}],
     }
@@ -870,7 +871,7 @@ def test_ui_command_transactions_run_full_fake_gateway_chain(
 
     verify_responses: dict[str, Sequence[Any]] = {
         GET_INFO_URI: [live_info()],
-        GET_PROJECT_INFO_URI: [project()],
+        GET_PROJECT_INFO_URI: [project(tmp_path)],
     }
     if post_commands is not None:
         verify_responses[GET_COMMANDS_URI] = [
