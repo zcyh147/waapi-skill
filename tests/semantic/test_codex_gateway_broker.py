@@ -307,13 +307,18 @@ import time
 from pathlib import Path
 
 def windows_gateway_command(argv):
-    argv_json = json.dumps(tuple(argv), ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode("utf-8")
-    inner = base64.b64encode(argv_json).decode("ascii")
+    encoded_argv = [
+        base64.b64encode(argument.encode("utf-8")).decode("ascii")
+        for argument in argv
+    ]
+    argument_prefix = (
+        "[System.Text.Encoding]::UTF8.GetString("
+        "[System.Convert]::FromBase64String('"
+    )
+    inner = ",".join(argument_prefix + encoded + "'))" for encoded in encoded_argv)
     script = (
         "$ErrorActionPreference='Stop';"
-        "$waapiJson=[System.Text.Encoding]::UTF8.GetString("
-        "[System.Convert]::FromBase64String('" + inner + "'));"
-        "$waapiArgv=@(ConvertFrom-Json -InputObject $waapiJson);"
+        "$waapiArgv=@(" + inner + ");"
         "$waapiExecutable=$waapiArgv[0];"
         "$waapiArgs=@($waapiArgv | Select-Object -Skip 1);"
         "& $waapiExecutable @waapiArgs;"

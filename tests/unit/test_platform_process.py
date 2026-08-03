@@ -88,9 +88,12 @@ def test_windows_model_command_preserves_shell_metacharacters_as_exact_argv(
     )
 
     assert result.returncode == 0
+    assert result.args == model_argv
+    assert result.stdout == "ok"
     assert observed["argv"] == (str(interpreter), str(shim), *model_argv)
     assert observed["env"] == environment
     assert observed["shell"] is False
+    assert observed["encoding"] == "utf-8"
 
 
 @pytest.mark.parametrize(

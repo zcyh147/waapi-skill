@@ -4214,17 +4214,29 @@ def test_parse_args_selects_heavy_defaults_and_preserves_v2_defaults(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    codex = tmp_path / ("codex.exe" if os.name == "nt" else "codex")
+    auth = tmp_path / "auth.json"
+    live = tmp_path / "live-environment.json"
+    auth.write_text("{}\n", encoding="utf-8")
+    live.write_text('{"versions": {}}\n', encoding="utf-8")
     monkeypatch.setattr(
         matrix,
         "resolve_codex_binary",
-        lambda _value: Path("/synthetic-host/codex"),
+        lambda _value: codex,
     )
     root = tmp_path / "campaign"
-    v2 = campaign.parse_args(["--campaign-root", str(root)])
+    common = [
+        "--campaign-root",
+        str(root),
+        "--auth-json",
+        str(auth),
+        "--live-config",
+        str(live),
+    ]
+    v2 = campaign.parse_args(common)
     heavy = campaign.parse_args(
         [
-            "--campaign-root",
-            str(root),
+            *common,
             "--profile",
             campaign.HEAVY_V3_PROFILE_ID,
             "--case-id",
@@ -4271,7 +4283,9 @@ def test_heavy_child_argv_reuses_matrix_and_requests_exact_pending_cases(tmp_pat
         matrix_root=tmp_path / "matrix",
     )
 
-    assert argv[1].endswith("tests/semantic/run_codex_skill_matrix.py")
+    assert Path(argv[1]).resolve(strict=True) == (
+        campaign.REPO_ROOT / "tests" / "semantic" / "run_codex_skill_matrix.py"
+    ).resolve(strict=True)
     assert argv[argv.index("--profile") + 1] == campaign.HEAVY_V3_PROFILE_ID
     assert [argv[index + 1] for index, value in enumerate(argv) if value == "--case-id"] == [
         "OBJ22-F-GET-01",
@@ -5660,7 +5674,9 @@ def test_heavy_fingerprint_includes_migration_source_tree(
     )
 
     migration = effective["live_inputs"]["migration_source"]
-    assert migration["project_path"].endswith("tests/_org/2021.1/SampleProject.wproj")
+    assert Path(migration["project_path"]).resolve(strict=True) == (
+        campaign.HEAVY_V3_MIGRATION_SOURCE.resolve(strict=True)
+    )
     assert migration["full_project_hash"]["strategy"] == "full"
 
 

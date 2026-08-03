@@ -36,6 +36,18 @@ def test_windows_continuation_round_trips_metacharacters_as_argv_data() -> None:
     assert all(character not in outer_payload for character in "&|<>%^!")
 
 
+def test_windows_continuation_decodes_each_argv_item_without_json_array_coercion() -> None:
+    argv = ("python", "run.py", "", "中文")
+
+    command = encode_windows_powershell_argv(argv)
+    encoded_script = command.rsplit(" ", 1)[1]
+    script = base64.b64decode(encoded_script).decode("utf-16-le")
+
+    assert "ConvertFrom-Json" not in script
+    assert script.count("[System.Convert]::FromBase64String('") == len(argv)
+    assert decode_windows_powershell_argv(command) == argv
+
+
 @pytest.mark.parametrize(
     "mutation",
     (

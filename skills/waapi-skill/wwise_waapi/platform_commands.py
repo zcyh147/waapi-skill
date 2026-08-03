@@ -3,7 +3,7 @@
 Windows has no standard-library equivalent of POSIX ``shlex.join`` for
 ``cmd.exe``, and ``subprocess.list2cmdline`` only implements native
 CreateProcess/MSVCRT argument quoting.  It does not escape CMD metacharacters.
-The gateway therefore places the exact argv JSON inside a fixed encoded
+The gateway therefore places every UTF-8 argv item inside a fixed encoded
 PowerShell envelope.  The outer command contains only fixed tokens and Base64;
 no path or transaction token is interpolated into shell syntax.
 """
@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import base64
 import binascii
-import json
 from collections.abc import Sequence
 
 
@@ -20,14 +19,15 @@ WINDOWS_POWERSHELL_ENCODED_FAMILY = "windows-powershell-encoded"
 _WINDOWS_COMMAND_PREFIX = (
     "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand "
 )
-_SCRIPT_PREFIX = (
-    "$ErrorActionPreference='Stop';"
-    "$waapiJson=[System.Text.Encoding]::UTF8.GetString("
+_SCRIPT_PREFIX = "$ErrorActionPreference='Stop';$waapiArgv=@("
+_ARGUMENT_PREFIX = (
+    "[System.Text.Encoding]::UTF8.GetString("
     "[System.Convert]::FromBase64String('"
 )
+_ARGUMENT_SUFFIX = "'))"
+_ARGUMENT_SEPARATOR = ","
 _SCRIPT_SUFFIX = (
-    "'));"
-    "$waapiArgv=@(ConvertFrom-Json -InputObject $waapiJson);"
+    ");"
     "$waapiExecutable=$waapiArgv[0];"
     "$waapiArgs=@($waapiArgv | Select-Object -Skip 1);"
     "& $waapiExecutable @waapiArgs;"
@@ -43,8 +43,14 @@ def encode_windows_powershell_argv(argv: Sequence[str]) -> str:
     """Return one shell-safe Windows continuation for an exact argv array."""
 
     normalized = _validated_argv(argv)
-    argv_json = _canonical_argv_json(normalized)
-    inner = base64.b64encode(argv_json).decode("ascii")
+    encoded_arguments = (
+        base64.b64encode(argument.encode("utf-8")).decode("ascii")
+        for argument in normalized
+    )
+    inner = _ARGUMENT_SEPARATOR.join(
+        f"{_ARGUMENT_PREFIX}{encoded}{_ARGUMENT_SUFFIX}"
+        for encoded in encoded_arguments
+    )
     script = f"{_SCRIPT_PREFIX}{inner}{_SCRIPT_SUFFIX}"
     encoded_script = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
     return _WINDOWS_COMMAND_PREFIX + encoded_script
@@ -68,14 +74,28 @@ def decode_windows_powershell_argv(command: str) -> tuple[str, ...]:
     if not script.startswith(_SCRIPT_PREFIX) or not script.endswith(_SCRIPT_SUFFIX):
         raise PlatformCommandError("PowerShell payload uses an unsupported script shape")
     inner = script[len(_SCRIPT_PREFIX) : -len(_SCRIPT_SUFFIX)]
-    argv_json = _decode_base64(inner, label="argv payload")
-    try:
-        value = json.loads(argv_json.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise PlatformCommandError("argv payload is not strict UTF-8 JSON") from exc
-    argv = _validated_argv(value)
-    if _canonical_argv_json(argv) != argv_json:
-        raise PlatformCommandError("argv payload is not canonical JSON")
+    encoded_arguments = inner.split(_ARGUMENT_SEPARATOR)
+    arguments: list[str] = []
+    for encoded_argument in encoded_arguments:
+        if not (
+            encoded_argument.startswith(_ARGUMENT_PREFIX)
+            and encoded_argument.endswith(_ARGUMENT_SUFFIX)
+        ):
+            raise PlatformCommandError(
+                "PowerShell payload uses an unsupported argv item shape"
+            )
+        encoded = encoded_argument[
+            len(_ARGUMENT_PREFIX) : -len(_ARGUMENT_SUFFIX)
+        ]
+        argument_bytes = _decode_base64(encoded, label="argv item")
+        try:
+            argument = argument_bytes.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise PlatformCommandError("argv item is not strict UTF-8") from exc
+        if base64.b64encode(argument.encode("utf-8")).decode("ascii") != encoded:
+            raise PlatformCommandError("argv item is not canonical Base64")
+        arguments.append(argument)
+    argv = _validated_argv(arguments)
     if encode_windows_powershell_argv(argv) != command:
         raise PlatformCommandError("Windows continuation envelope is not canonical")
     return argv
@@ -93,15 +113,6 @@ def _validated_argv(value: Sequence[str]) -> tuple[str, ...]:
         if any(ord(character) < 32 or ord(character) == 127 for character in argument):
             raise PlatformCommandError("argv contains a control character")
     return argv
-
-
-def _canonical_argv_json(argv: tuple[str, ...]) -> bytes:
-    return json.dumps(
-        argv,
-        ensure_ascii=False,
-        allow_nan=False,
-        separators=(",", ":"),
-    ).encode("utf-8")
 
 
 def _decode_base64(value: str, *, label: str) -> bytes:

@@ -61,23 +61,41 @@ def run_model_argv(
     windows_command_directory: Path | None = None,
     **run_options: Any,
 ) -> subprocess.CompletedProcess[Any]:
-    """Run one model command without changing what the broker observes."""
+    """Run one model command and report the original model-visible argv."""
 
     forbidden = {"args", "env", "executable", "shell"}.intersection(run_options)
     if forbidden:
         joined = ", ".join(sorted(forbidden))
         raise TypeError(f"launcher owns subprocess option(s): {joined}")
+    command = _model_argv(model_argv)
     launcher_argv = model_command_launcher_argv(
-        model_argv,
+        command,
         platform_name=platform_name,
         windows_interpreter=windows_interpreter,
         windows_command_directory=windows_command_directory,
     )
-    return subprocess.run(
+    process_options = dict(run_options)
+    text_mode = bool(
+        process_options.get("text")
+        or process_options.get("universal_newlines")
+        or process_options.get("encoding") is not None
+        or process_options.get("errors") is not None
+    )
+    if text_mode and process_options.get("encoding") is None:
+        # The broker shim writes protocol output as explicit UTF-8 bytes.  Do
+        # not let the Windows ANSI code page reinterpret that byte stream.
+        process_options["encoding"] = "utf-8"
+    completed = subprocess.run(
         launcher_argv,
         env=dict(environment),
         shell=False,
-        **run_options,
+        **process_options,
+    )
+    return subprocess.CompletedProcess(
+        args=command,
+        returncode=completed.returncode,
+        stdout=completed.stdout,
+        stderr=completed.stderr,
     )
 
 

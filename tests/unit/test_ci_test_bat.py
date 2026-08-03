@@ -104,15 +104,18 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
 
     python_bat = bin_dir / "python.bat"
     python_bat.write_text(
-        f'@echo off\r\n"{sys.executable}" "%~dp0fake_python.py" %*\r\nexit /b %ERRORLEVEL%\r\n',
+        f'@echo off\r\n"{sys.executable}" "%~dp0fake_python.py" %*\r\n'
+        'exit /b %ERRORLEVEL%\r\n',
         encoding="utf-8",
+        newline="",
     )
 
     poetry_bat = bin_dir / "poetry.bat"
     poetry_bat.write_text(
-        '@echo off\r\n'
-        f'"{sys.executable}" "{runner}" %*\r\nexit /b %ERRORLEVEL%\r\n',
+        f'@echo off\r\n"{sys.executable}" "{runner}" %*\r\n'
+        'exit /b %ERRORLEVEL%\r\n',
         encoding="utf-8",
+        newline="",
     )
 
 
@@ -386,6 +389,21 @@ def test_ci_test_bat_and_shell_share_pathlib_config_resolver() -> None:
     assert shell_source.count("ci/resolve_live_test_config.py") == 1
     assert "ci\\run_live_test_command.py" in batch_source
     assert "resolve_live_test_config" in live_runner_source
+
+
+def test_ci_test_bat_includes_shared_gateway_nodes_for_every_matrix_version() -> None:
+    batch_source = CI_TEST_BAT.read_text(encoding="utf-8")
+
+    assert batch_source.count(
+        "tests/live/test_gateway_live_matrix.py::"
+        "test_gateway_read_only_matrix_runs_once_against_copied_sandbox"
+    ) == 5
+    assert batch_source.count(
+        "tests/destructive/test_gateway_transaction_matrix.py"
+    ) == 5
+    assert batch_source.count(
+        "tests/destructive/test_gateway_workflow_transaction_matrix.py"
+    ) == 5
 
 
 def test_ci_test_bat_all_mode_defaults_to_all_and_runs_full_matrix(tmp_path: Path) -> None:

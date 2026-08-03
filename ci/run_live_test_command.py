@@ -199,10 +199,14 @@ def main(
             default_project=args.default_project,
             default_sandbox=args.default_sandbox,
         )
-        validate_live_test_environment(environment, mode=args.mode)
     except (LiveTestConfigError, OSError) as exc:
         print(f"live-test config error: {exc}", file=sys.stderr)
         return 2
+    try:
+        validate_live_test_environment(environment, mode=args.mode)
+    except (LiveTestConfigError, OSError) as exc:
+        print(f"live-test prerequisite error: {exc}", file=sys.stderr)
+        return 1
 
     _print_context(environment, version=args.version, mode=args.mode)
     runner = subprocess.run if command_runner is None else command_runner

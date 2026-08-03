@@ -247,6 +247,63 @@ def test_live_command_main_runs_exact_argv_without_a_shell(
     assert environment["WWISE_STRICT_REAL"] == "1"
 
 
+def test_live_command_main_reports_missing_real_prerequisite_as_test_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    console = tmp_path / "WwiseConsole"
+    console.write_text("console\n", encoding="utf-8")
+    console.chmod(0o755)
+    missing_project = tmp_path / "missing.wproj"
+    child_started = False
+
+    for name in (
+        "WWISE_TEST_CONFIG",
+        "WWISE_CONSOLE",
+        "WWISE_SAMPLE_PROJECT_PATH",
+        "WWISE_SANDBOX_ROOT",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    def reject_child(
+        *_args: object,
+        **_kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        nonlocal child_started
+        child_started = True
+        return subprocess.CompletedProcess((), 0)
+
+    code = run_live_test_command(
+        (
+            "--version",
+            "2025.1",
+            "--mode",
+            "live",
+            "--repo-root",
+            str(tmp_path),
+            "--default-config",
+            str(tmp_path / "missing-config.json"),
+            "--default-console",
+            str(console),
+            "--default-project",
+            str(missing_project),
+            "--default-sandbox",
+            str(tmp_path / "sandbox"),
+            "--",
+            "poetry",
+            "run",
+            "python",
+            "-m",
+            "pytest",
+        ),
+        command_runner=reject_child,
+        python_executable=sys.executable,
+    )
+
+    assert code == 1
+    assert child_started is False
+
+
 def _write_fake_python(bin_dir: Path, fail_on_nonlive: bool = False) -> Path:
     script = bin_dir / "fake_python.py"
     script.write_text(
@@ -276,14 +333,17 @@ def _write_fake_python(bin_dir: Path, fail_on_nonlive: bool = False) -> Path:
     if os.name == "nt":
         launcher = bin_dir / "python.bat"
         launcher.write_text(
-            f'@echo off\r\n"{sys.executable}" "%~dp0fake_python.py" %*\r\nexit /b %ERRORLEVEL%\r\n',
+            f'@echo off\r\n"{sys.executable}" "%~dp0fake_python.py" %*\r\n'
+            'exit /b %ERRORLEVEL%\r\n',
             encoding="utf-8",
+            newline="",
         )
         poetry = bin_dir / "poetry.bat"
         poetry.write_text(
-            '@echo off\r\n'
-            f'"{sys.executable}" "{script}" %*\r\nexit /b %ERRORLEVEL%\r\n',
+            f'@echo off\r\n"{sys.executable}" "{script}" %*\r\n'
+            'exit /b %ERRORLEVEL%\r\n',
             encoding="utf-8",
+            newline="",
         )
     else:
         launcher = bin_dir / "python"
