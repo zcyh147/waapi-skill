@@ -1643,7 +1643,11 @@ def _lua_module_search_pattern(
 
     host = _require_host_platform(host_platform)
     path_type = PureWindowsPath if host == "windows" else PurePosixPath
-    return str(path_type(directory) / "?.lua")
+    # Preserve the source host's native pathlib flavour until the target pure
+    # path performs the conversion.  Passing the string directly would make a
+    # Windows backslash an ordinary character to ``PurePosixPath`` and produce
+    # a mixed ``C:\\.../?.lua`` pattern in cross-platform validation.
+    return str(path_type(Path(directory)) / "?.lua")
 
 
 def _materialize_handler_common(
