@@ -28,8 +28,9 @@ _SCRIPT_PREFIX = (
 _SCRIPT_SUFFIX = (
     "'));"
     "$waapiArgv=@(ConvertFrom-Json -InputObject $waapiJson);"
+    "$waapiExecutable=$waapiArgv[0];"
     "$waapiArgs=@($waapiArgv | Select-Object -Skip 1);"
-    "& $waapiArgv[0] @waapiArgs;"
+    "& $waapiExecutable @waapiArgs;"
     "exit $LASTEXITCODE"
 )
 

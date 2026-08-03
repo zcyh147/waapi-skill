@@ -9,7 +9,11 @@ from pathlib import Path
 import pytest
 
 from ci.resolve_live_test_config import LiveTestConfigError, resolve_version_config
-from ci.run_live_test_command import build_live_test_environment
+from ci.run_live_test_command import (
+    build_live_test_environment,
+    main as run_live_test_command,
+    resolve_live_python_command,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -121,20 +125,148 @@ def test_live_command_environment_rejects_missing_explicit_config(
         )
 
 
+def test_live_python_command_reuses_active_interpreter_and_preserves_exact_argv(
+    tmp_path: Path,
+) -> None:
+    interpreter = str(tmp_path / "venv with spaces" / "python")
+    child = (
+        "poetry",
+        "run",
+        "python",
+        "-m",
+        "pytest",
+        "-k",
+        "transaction and (gateway or lock)",
+        "",
+        "中文 & | < > ^ ! %",
+    )
+
+    assert resolve_live_python_command(
+        child,
+        python_executable=interpreter,
+    ) == (interpreter, *child[3:])
+
+
+@pytest.mark.parametrize(
+    "command,python_executable",
+    (
+        ("poetry run python -m pytest", None),
+        (("python", "-m", "pytest"), None),
+        (("poetry", "run", "python"), None),
+        (("poetry", "run", "python", "-m", 7), None),
+        (("poetry", "run", "python", "-m", "pytest"), "python"),
+        (("poetry", "run", "python", "-m", "py\x00test"), None),
+    ),
+)
+def test_live_python_command_rejects_noncanonical_or_unsafe_argv(
+    command: object,
+    python_executable: str | None,
+) -> None:
+    with pytest.raises(LiveTestConfigError):
+        resolve_live_python_command(  # type: ignore[arg-type]
+            command,
+            python_executable=python_executable,
+        )
+
+
+def test_live_command_main_runs_exact_argv_without_a_shell(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    console = tmp_path / "WwiseConsole"
+    console.write_text("console\n", encoding="utf-8")
+    console.chmod(0o755)
+    project = tmp_path / "SampleProject.wproj"
+    project.write_text("<Project />\n", encoding="utf-8")
+    sandbox = tmp_path / "sandbox"
+    interpreter = str(tmp_path / "venv" / "python")
+    calls: list[tuple[tuple[str, ...], dict[str, object]]] = []
+
+    for name in (
+        "WWISE_TEST_CONFIG",
+        "WWISE_CONSOLE",
+        "WWISE_SAMPLE_PROJECT_PATH",
+        "WWISE_SANDBOX_ROOT",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    def record_child(
+        command: tuple[str, ...],
+        **options: object,
+    ) -> subprocess.CompletedProcess[str]:
+        calls.append((tuple(command), dict(options)))
+        return subprocess.CompletedProcess(command, 7)
+
+    code = run_live_test_command(
+        (
+            "--version",
+            "2025.1",
+            "--mode",
+            "live",
+            "--repo-root",
+            str(tmp_path),
+            "--default-config",
+            str(tmp_path / "missing.json"),
+            "--default-console",
+            str(console),
+            "--default-project",
+            str(project),
+            "--default-sandbox",
+            str(sandbox),
+            "--",
+            "poetry",
+            "run",
+            "python",
+            "-m",
+            "pytest",
+            "-k",
+            "transaction and (gateway or lock)",
+        ),
+        command_runner=record_child,
+        python_executable=interpreter,
+    )
+
+    assert code == 7
+    assert len(calls) == 1
+    command, options = calls[0]
+    assert command == (
+        interpreter,
+        "-m",
+        "pytest",
+        "-k",
+        "transaction and (gateway or lock)",
+    )
+    assert options["cwd"] == tmp_path.resolve()
+    assert options["shell"] is False
+    assert options["check"] is False
+    environment = options["env"]
+    assert isinstance(environment, dict)
+    assert environment["WWISE_VERSION"] == "2025.1"
+    assert environment["WWISE_LIVE"] == "1"
+    assert environment["WWISE_DESTRUCTIVE"] == "0"
+    assert environment["WWISE_STRICT_REAL"] == "1"
+
+
 def _write_fake_python(bin_dir: Path, fail_on_nonlive: bool = False) -> Path:
     script = bin_dir / "fake_python.py"
     script.write_text(
         "from __future__ import annotations\n"
-        "import json, os, sys\n"
+        "import json, os, subprocess, sys\n"
         "from pathlib import Path\n"
         f"log_path = Path(os.environ['CI_TEST_LOG'])\n"
+        "def record_live_child(command, **options):\n"
+        "    child_argv = list(command)\n"
+        "    if not child_argv or os.path.normcase(child_argv[0]) != os.path.normcase(sys.executable):\n"
+        "        raise AssertionError('live child did not reuse the active Python interpreter')\n"
+        "    with log_path.open('a', encoding='utf-8') as handle:\n"
+        "        handle.write(json.dumps(child_argv) + '\\n')\n"
+        "    return subprocess.CompletedProcess(command, 0)\n"
         "argv = sys.argv[1:]\n"
         "effective_argv = argv[2:] if argv[:2] == ['run', 'python'] else argv\n"
         "if effective_argv and Path(effective_argv[0]).name == 'run_live_test_command.py':\n"
-        "    import runpy\n"
         "    sys.path.insert(0, str(Path(effective_argv[0]).resolve().parent))\n"
-        "    sys.argv = effective_argv\n"
-        "    runpy.run_path(effective_argv[0], run_name='__main__')\n"
+        "    from run_live_test_command import main\n"
+        "    sys.exit(main(effective_argv[1:], command_runner=record_live_child, python_executable=sys.executable))\n"
         "with log_path.open('a', encoding='utf-8') as handle:\n"
         "    handle.write(json.dumps(argv) + '\\n')\n"
         f"if {str(fail_on_nonlive)} and effective_argv[:3] == ['-m', 'pytest', '-m'] and 'not live and not destructive' in effective_argv:\n"
@@ -171,6 +303,8 @@ def _run_ci_test(env: dict[str, str], *args: str) -> subprocess.CompletedProcess
 def _pytest_argv(argv: list[str]) -> list[str]:
     if argv[:2] == ["run", "python"]:
         return argv[2:]
+    if argv and os.path.normcase(argv[0]) == os.path.normcase(sys.executable):
+        return argv[1:]
     return argv
 
 

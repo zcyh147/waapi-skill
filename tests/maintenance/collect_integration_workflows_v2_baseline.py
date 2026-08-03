@@ -25,11 +25,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
-try:  # ``pwd`` is unavailable on native Windows.
-    import pwd
-except ImportError:  # pragma: no cover - native Windows uses native paths.
-    pwd = None  # type: ignore[assignment]
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
@@ -60,6 +55,11 @@ from tests.semantic.support.codex_integration_workflows_v2 import (  # noqa: E40
     WorkflowProfile,
     load_integration_workflows_v2_profile,
 )
+from wwise_waapi.host_paths import (  # noqa: E402
+    HostPathError,
+    localize_waapi_host_path,
+    parse_absolute_host_path,
+)
 
 
 SUPPORTED_VERSIONS = ("2022.1", "2025.1")
@@ -80,7 +80,6 @@ _GUID_RE = re.compile(
     r"^\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
     r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}$"
 )
-_WINDOWS_DRIVE_PATH_RE = re.compile(r"^([A-Za-z]):/(.*)$")
 _MAX_OBJECT_ROWS = 64
 _MAX_ASSIGNMENT_ROWS = 32
 _MAX_RTPC_ROWS = 32
@@ -1203,6 +1202,7 @@ def _localize_live_project_path(
     value: str,
     *,
     account_home: Path | None = None,
+    host_os_name: str | None = None,
 ) -> Path:
     """Resolve one native or local Wine ``Y:`` project path exactly.
 
@@ -1211,32 +1211,27 @@ def _localize_live_project_path(
     native, and an unknown Windows drive fails closed.
     """
 
-    if not value or value != value.strip() or "\x00" in value:
-        raise IntegrationBaselineCollectionError(
-            "live project path must be one non-empty exact path string"
+    effective_os_name = os.name if host_os_name is None else host_os_name
+    try:
+        parsed = parse_absolute_host_path(value)
+        if (
+            effective_os_name == "posix"
+            and parsed.flavor == "drive"
+            and parsed.drive != "Y"
+        ):
+            raise IntegrationBaselineCollectionError(
+                f"live project path uses unsupported Wine drive {parsed.drive}:"
+            )
+        localized = localize_waapi_host_path(
+            value,
+            host_os_name=effective_os_name,
+            account_home=account_home,
         )
-    normalized = value.replace("\\", "/")
-    drive_match = _WINDOWS_DRIVE_PATH_RE.fullmatch(normalized)
-    if os.name != "nt" and drive_match is not None:
-        drive = drive_match.group(1).upper()
-        suffix = drive_match.group(2)
-        parts = suffix.split("/")
-        if drive != "Y":
-            raise IntegrationBaselineCollectionError(
-                f"live project path uses unsupported Wine drive {drive}:"
-            )
-        if not suffix or any(part in {"", ".", ".."} for part in parts):
-            raise IntegrationBaselineCollectionError(
-                "live project path has an unsafe Wine Y: suffix"
-            )
-        home = _resolved_account_home(account_home, label="live Wine Y: project path")
-        candidate = home.joinpath(*parts)
-    else:
-        candidate = Path(value).expanduser()
-        if not candidate.is_absolute():
-            raise IntegrationBaselineCollectionError(
-                "live project path is not an absolute native or Wine Y: path"
-            )
+    except HostPathError as exc:
+        raise IntegrationBaselineCollectionError(
+            f"live project path is not an absolute native or Wine Y: path: {exc}"
+        ) from exc
+    candidate = Path(localized)
     try:
         project = candidate.resolve(strict=True)
     except OSError as exc:
@@ -1248,27 +1243,6 @@ def _localize_live_project_path(
             "live project path does not resolve to one .wproj file"
         )
     return project
-
-
-def _resolved_account_home(value: Path | None, *, label: str) -> Path:
-    home = value
-    if home is None:
-        if pwd is None:  # pragma: no cover - native Windows skips Wine mapping.
-            raise IntegrationBaselineCollectionError(
-                f"{label} cannot resolve the host account home"
-            )
-        try:
-            home = Path(pwd.getpwuid(os.getuid()).pw_dir)
-        except (KeyError, OSError) as exc:
-            raise IntegrationBaselineCollectionError(
-                f"{label} cannot resolve the host account home"
-            ) from exc
-    try:
-        return Path(home).expanduser().resolve(strict=True)
-    except OSError as exc:
-        raise IntegrationBaselineCollectionError(
-            f"{label} account home is unavailable"
-        ) from exc
 
 
 def _isolated_live_project(
@@ -1535,45 +1509,30 @@ def _original_file(
     project_root: Path,
     label: str,
     account_home: Path | None = None,
+    host_os_name: str | None = None,
 ) -> Path:
-    if (
-        not isinstance(value, str)
-        or not value
-        or value != value.strip()
-        or "\x00" in value
-    ):
-        raise IntegrationBaselineCollectionError(
-            f"{label} requires one absolute local path"
-        )
-    normalized = value.replace("\\", "/")
-    if normalized.startswith("//"):
-        raise IntegrationBaselineCollectionError(
-            f"{label} uses an unsupported UNC path"
-        )
-    drive_match = _WINDOWS_DRIVE_PATH_RE.fullmatch(normalized)
-    if os.name != "nt" and drive_match is not None:
-        drive = drive_match.group(1).upper()
-        suffix = drive_match.group(2)
-        parts = suffix.split("/")
-        if not suffix or any(part in {"", ".", ".."} for part in parts):
+    effective_os_name = os.name if host_os_name is None else host_os_name
+    try:
+        parsed = parse_absolute_host_path(value)
+        if parsed.flavor == "unc":
             raise IntegrationBaselineCollectionError(
-                f"{label} has an unsafe Wine path suffix"
+                f"{label} uses an unsupported UNC path"
             )
-        if drive == "Z":
-            root = Path("/")
-        elif drive == "Y":
-            root = _resolved_account_home(account_home, label=label)
-        else:
+        localized = localize_waapi_host_path(
+            value,
+            host_os_name=effective_os_name,
+            account_home=account_home,
+        )
+    except HostPathError as exc:
+        if exc.error_code == "HOST_PATH_DRIVE_UNAVAILABLE":
+            drive = exc.details.get("drive", "unknown")
             raise IntegrationBaselineCollectionError(
                 f"{label} uses unsupported Wine drive {drive}:"
-            )
-        candidate = root.joinpath(*parts)
-    else:
-        candidate = Path(normalized)
-    if not candidate.is_absolute():
+            ) from exc
         raise IntegrationBaselineCollectionError(
-            f"{label} is not an absolute local path"
-        )
+            f"{label} requires one absolute local path: {exc}"
+        ) from exc
+    candidate = Path(localized)
     try:
         relative = candidate.relative_to(project_root)
     except ValueError as exc:

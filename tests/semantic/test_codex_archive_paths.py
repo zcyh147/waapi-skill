@@ -124,6 +124,13 @@ def test_absolute_archive_identity_and_basename_follow_source_case_semantics() -
         r"\\?\C:\Campaign\output",
         r"\\.\C:\Campaign\output",
         r"\\server\\share\Campaign",
+        r"\\server\share\\Campaign",
+        r"\\\\server\share\Campaign",
+        "\\\\server\\share\\Campaign\\",
+        "//server//share/Campaign",
+        "////server/share/Campaign",
+        "//server/share//Campaign",
+        "//server/share/Campaign/",
     ),
 )
 def test_archive_absolute_path_rejects_relative_or_normalizing_spelling(

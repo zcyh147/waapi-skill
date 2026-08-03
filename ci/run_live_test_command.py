@@ -6,6 +6,7 @@ import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any, Callable
 
 if __package__:
     from .resolve_live_test_config import LiveTestConfigError, load_version_config
@@ -14,6 +15,48 @@ else:  # Executed directly by ci/test.bat.
 
 
 LIVE_MODES = frozenset({"smoke", "live", "destructive"})
+_POETRY_PYTHON_PREFIX = ("poetry", "run", "python")
+
+
+def resolve_live_python_command(
+    command: Sequence[str],
+    *,
+    python_executable: str | None = None,
+) -> tuple[str, ...]:
+    """Replace the already-active Poetry prefix with this interpreter.
+
+    ``run_live_test_command.py`` itself is launched by ``poetry run python``.
+    Starting another bare ``poetry`` child is unnecessary and is unreliable on
+    Windows where the Poetry shim may be a batch file that CreateProcess cannot
+    execute directly.  The remaining argv is kept as data without any shell or
+    quoting round-trip.
+    """
+
+    if isinstance(command, (str, bytes)):
+        raise LiveTestConfigError("child command must be an argv sequence")
+    normalized = tuple(command)
+    if any(type(argument) is not str for argument in normalized):
+        raise LiveTestConfigError("child command argv must contain only strings")
+    if any("\x00" in argument for argument in normalized):
+        raise LiveTestConfigError("child command argv contains a NUL character")
+    if normalized[:3] != _POETRY_PYTHON_PREFIX:
+        raise LiveTestConfigError(
+            "child command must begin with the fixed 'poetry run python' prefix"
+        )
+    if len(normalized) == len(_POETRY_PYTHON_PREFIX):
+        raise LiveTestConfigError("child Python command is missing")
+
+    executable = sys.executable if python_executable is None else python_executable
+    if (
+        not isinstance(executable, str)
+        or not executable
+        or "\x00" in executable
+        or not Path(executable).is_absolute()
+    ):
+        raise LiveTestConfigError(
+            "the active Python interpreter must be one absolute native path"
+        )
+    return (executable, *normalized[len(_POETRY_PYTHON_PREFIX) :])
 
 
 def build_live_test_environment(
@@ -128,7 +171,12 @@ def _print_context(environment: Mapping[str, str], *, version: str, mode: str) -
     print(flush=True)
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(
+    argv: Sequence[str] | None = None,
+    *,
+    command_runner: Callable[..., subprocess.CompletedProcess[Any]] | None = None,
+    python_executable: str | None = None,
+) -> int:
     args = _build_parser().parse_args(argv)
     command = list(args.command)
     if command and command[0] == "--":
@@ -137,6 +185,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("live-test config error: child command is required", file=sys.stderr)
         return 2
     try:
+        resolved_command = resolve_live_python_command(
+            command,
+            python_executable=python_executable,
+        )
         environment = build_live_test_environment(
             os.environ,
             version=args.version,
@@ -153,11 +205,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     _print_context(environment, version=args.version, mode=args.mode)
+    runner = subprocess.run if command_runner is None else command_runner
     try:
-        completed = subprocess.run(
-            command,
+        completed = runner(
+            resolved_command,
             cwd=args.repo_root.expanduser().resolve(strict=False),
             env=environment,
+            shell=False,
             check=False,
         )
     except OSError as exc:

@@ -204,6 +204,14 @@ def gateway_command(skill: Path, arguments: str) -> str:
     return f"python {skill / 'scripts' / 'run.py'} gateway.py {arguments}"
 
 
+def recorded_argv_command(*argv: str) -> str:
+    """Render synthetic Codex argv with the parser grammar of this host."""
+
+    if os.name == "nt":
+        return subprocess.list2cmdline(argv)
+    return shlex.join(argv)
+
+
 def test_prompt_audit_rejects_memory_and_unexpected_personal_skills(tmp_path: Path) -> None:
     skill = tmp_path / "waapi-skill"
     skill.mkdir()
@@ -1348,9 +1356,17 @@ def test_command_classifier_distinguishes_gateway_from_inline_code_and_discovery
     skill.mkdir()
     (skill / "SKILL.md").write_text("skill\n", encoding="utf-8")
     commands = (
-        completed_record(f"sed -n '1,200p' {skill}/SKILL.md", "skill\n"),
         completed_record(
-            gateway_command(skill, "buses"),
+            recorded_argv_command("sed", "-n", "1,200p", str(skill / "SKILL.md")),
+            "skill\n",
+        ),
+        completed_record(
+            recorded_argv_command(
+                "python",
+                str(skill / "scripts" / "run.py"),
+                "gateway.py",
+                "buses",
+            ),
             {
                 "contract": "waapi-skill.gateway-result/v1",
                 "command": "buses",
@@ -1358,8 +1374,15 @@ def test_command_classifier_distinguishes_gateway_from_inline_code_and_discovery
                 "call": {"api": "ak.wwise.core.object.get", "ok": True, "result": {"return": []}},
             },
         ),
-        completed_record("rg --files ."),
-        completed_record("python -u -c 'from waapi import WaapiClient; print(WaapiClient())'"),
+        completed_record(recorded_argv_command("rg", "--files", ".")),
+        completed_record(
+            recorded_argv_command(
+                "python",
+                "-u",
+                "-c",
+                "from waapi import WaapiClient; print(WaapiClient())",
+            )
+        ),
     )
 
     facts = classify_commands(commands, skill_source=skill, expected_gateway_subcommands=("buses",))

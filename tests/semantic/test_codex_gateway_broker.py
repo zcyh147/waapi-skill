@@ -314,8 +314,9 @@ def windows_gateway_command(argv):
         "$waapiJson=[System.Text.Encoding]::UTF8.GetString("
         "[System.Convert]::FromBase64String('" + inner + "'));"
         "$waapiArgv=@(ConvertFrom-Json -InputObject $waapiJson);"
+        "$waapiExecutable=$waapiArgv[0];"
         "$waapiArgs=@($waapiArgv | Select-Object -Skip 1);"
-        "& $waapiArgv[0] @waapiArgs;"
+        "& $waapiExecutable @waapiArgs;"
         "exit $LASTEXITCODE"
     )
     encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")

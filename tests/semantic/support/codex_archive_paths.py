@@ -182,6 +182,8 @@ def archive_absolute_names_equal(
 def _parse_absolute(
     text: str,
 ) -> tuple[ArchivePathFlavor, PurePosixPath | PureWindowsPath]:
+    if text.startswith(("\\\\", "//")):
+        _validate_raw_unc_absolute_text(text)
     windows = PureWindowsPath(text)
     if windows.is_absolute():
         _validate_windows_absolute_text(text, windows)
@@ -192,6 +194,40 @@ def _parse_absolute(
         _validate_posix_absolute_text(text)
         return "posix", posix
     raise ArchiveRelativePathError("archive host path must be absolute")
+
+
+def _validate_raw_unc_absolute_text(text: str) -> None:
+    """Reject UNC normalization before ``pathlib`` can absorb it into an anchor.
+
+    Python 3.13 accepts some malformed UNC spellings that older releases leave
+    relative, including an empty share component after a repeated separator.
+    Archive identity must not depend on that interpreter-version distinction.
+    """
+
+    if text.startswith(("\\\\?\\", "\\\\.\\", "//?/", "//./")):
+        raise ArchiveRelativePathError(
+            "extended or device paths are outside the archive contract"
+        )
+    separator = "\\" if text.startswith("\\\\") else "/"
+    other_separator = "/" if separator == "\\" else "\\"
+    if other_separator in text:
+        raise ArchiveRelativePathError(
+            "archive host path cannot mix Windows separators"
+        )
+    parts = text[2:].split(separator)
+    if parts and parts[-1] == "":
+        # A canonical UNC share root may retain its anchor separator.  A named
+        # entry may not use a trailing separator.
+        if len(parts) != 3:
+            raise ArchiveRelativePathError(
+                "UNC archive path has a non-canonical trailing separator"
+            )
+        parts.pop()
+    if len(parts) < 2:
+        raise ArchiveRelativePathError(
+            "UNC archive path requires nonempty server and share components"
+        )
+    _validate_relative_parts(tuple(parts), flavor="windows", portable=False)
 
 
 def _validate_windows_absolute_text(

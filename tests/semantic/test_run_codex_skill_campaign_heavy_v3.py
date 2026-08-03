@@ -91,6 +91,7 @@ from tests.semantic.support.codex_object_heavy_v3 import (
 )
 from wwise_waapi.platform_commands import (
     WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    decode_windows_powershell_argv,
     encode_windows_powershell_argv,
 )
 from tests.semantic.support.codex_object_runtime_v3 import ObjectRuntimeSnapshot
@@ -2050,6 +2051,7 @@ def _synthetic_events(
     records: Sequence[Mapping[str, Any]],
     final_response: str,
     read_paths: Sequence[Path] = (),
+    platform_name: str | None = None,
 ) -> str:
     events: list[dict[str, Any]] = [
         {"type": "thread.started", "thread_id": thread_id},
@@ -2057,7 +2059,9 @@ def _synthetic_events(
     ]
     for index, path in enumerate(read_paths, start=1):
         item_id = f"read-{index}"
-        command = shlex.join(("cat", str(path.resolve())))
+        command = _synthetic_command(
+            ("cat", str(path.resolve())), platform_name=platform_name
+        )
         events.extend(
             (
                 {
@@ -2079,7 +2083,10 @@ def _synthetic_events(
         )
     for index, record in enumerate(records, start=1):
         item_id = f"gateway-{index}"
-        command = shlex.join([str(value) for value in record["model_argv"]])
+        command = _synthetic_command(
+            tuple(str(value) for value in record["model_argv"]),
+            platform_name=platform_name,
+        )
         events.extend(
             (
                 {
@@ -2120,6 +2127,35 @@ def _synthetic_events(
         json.dumps(item, ensure_ascii=False, sort_keys=True) + "\n"
         for item in events
     )
+
+
+def _synthetic_command(
+    argv: Sequence[str],
+    *,
+    platform_name: str | None = None,
+) -> str:
+    """Encode synthetic Codex evidence with the grammar used by that host."""
+
+    effective_platform = os.name if platform_name is None else platform_name
+    if effective_platform == "nt":
+        return encode_windows_powershell_argv(argv)
+    if effective_platform == "posix":
+        return shlex.join(argv)
+    raise AssertionError(f"unsupported synthetic command platform: {effective_platform}")
+
+
+def test_synthetic_command_uses_exact_host_command_grammar() -> None:
+    argv = (
+        r"C:\Program Files\Python\python.exe",
+        r"C:\Skill Path\run.py",
+        "--request-json",
+        '{"name":"雷雨 & wind"}',
+    )
+
+    assert decode_windows_powershell_argv(
+        _synthetic_command(argv, platform_name="nt")
+    ) == argv
+    assert tuple(shlex.split(_synthetic_command(argv, platform_name="posix"))) == argv
 
 
 def _soundbank_refusal_broker_fixture(

@@ -28,14 +28,56 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
     runner = bin_dir / "fake_python.py"
     runner.write_text(
         "from __future__ import annotations\n"
-        "import json, os, sys\n"
+        "import json, os, subprocess, sys\n"
         "from pathlib import Path\n"
         "log_path = Path(os.environ['CI_TEST_LOG'])\n"
+        f"fail_on = {fail_on!r}\n"
+        "def append_entry(payload_argv, environment, program_manifest_nodes=None, options=None):\n"
+        "    entry = {\n"
+        "        'argv': list(payload_argv),\n"
+        "        'program_manifest_nodes': program_manifest_nodes,\n"
+        "        'WWISE_VERSION': environment.get('WWISE_VERSION'),\n"
+        "        'WWISE_LIVE': environment.get('WWISE_LIVE'),\n"
+        "        'WWISE_DESTRUCTIVE': environment.get('WWISE_DESTRUCTIVE'),\n"
+        "        'WWISE_STRICT_REAL': environment.get('WWISE_STRICT_REAL'),\n"
+        "        'WWISE_CONSOLE': environment.get('WWISE_CONSOLE'),\n"
+        "        'WWISE_SAMPLE_PROJECT_PATH': environment.get('WWISE_SAMPLE_PROJECT_PATH'),\n"
+        "        'WWISE_SANDBOX_ROOT': environment.get('WWISE_SANDBOX_ROOT'),\n"
+        "        'WWISE_TEST_CONFIG': environment.get('WWISE_TEST_CONFIG'),\n"
+        "        'PYTEST_ADDOPTS': environment.get('PYTEST_ADDOPTS'),\n"
+        "    }\n"
+        "    if options is not None:\n"
+        "        entry.update({\n"
+        "            'cwd': str(options.get('cwd')),\n"
+        "            'shell': options.get('shell'),\n"
+        "            'check': options.get('check'),\n"
+        "        })\n"
+        "    with log_path.open('a', encoding='utf-8') as handle:\n"
+        "        handle.write(json.dumps(entry) + '\\n')\n"
+        "def selected_returncode(effective):\n"
+        "    if fail_on == 'nonlive' and effective[:4] == ['-m', 'pytest', '-m', 'not live and not destructive']:\n"
+        "        return 7\n"
+        "    if fail_on == 'smoke' and effective and effective[0].endswith('wwise_smoke.py'):\n"
+        "        return 8\n"
+        "    if fail_on == 'live' and 'tests/live/' in ' '.join(effective):\n"
+        "        return 9\n"
+        "    if fail_on == 'destructive' and 'tests/destructive/' in ' '.join(effective):\n"
+        "        return 10\n"
+        "    return 0\n"
+        "def record_live_child(command, **options):\n"
+        "    child_argv = list(command)\n"
+        "    if not child_argv or os.path.normcase(child_argv[0]) != os.path.normcase(sys.executable):\n"
+        "        raise AssertionError('live child did not reuse the active Python interpreter')\n"
+        "    child_environment = options['env']\n"
+        "    append_entry(child_argv, child_environment, options=options)\n"
+        "    return subprocess.CompletedProcess(command, selected_returncode(child_argv[1:]))\n"
         "argv = sys.argv[1:]\n"
         "effective_argv = argv[2:] if argv[:2] == ['run', 'python'] else argv\n"
-        "if effective_argv and Path(effective_argv[0]).name in {\n"
-        "    'resolve_live_test_config.py', 'run_live_test_command.py'\n"
-        "}:\n"
+        "if effective_argv and Path(effective_argv[0]).name == 'run_live_test_command.py':\n"
+        "    sys.path.insert(0, str(Path(effective_argv[0]).resolve().parent))\n"
+        "    from run_live_test_command import main\n"
+        "    sys.exit(main(effective_argv[1:], command_runner=record_live_child, python_executable=sys.executable))\n"
+        "if effective_argv and Path(effective_argv[0]).name == 'resolve_live_test_config.py':\n"
         "    import runpy\n"
         "    sys.path.insert(0, str(Path(effective_argv[0]).resolve().parent))\n"
         "    sys.argv = effective_argv\n"
@@ -55,32 +97,8 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
         "    except ProgramPytestArgsError as exc:\n"
         "        print(str(exc), file=sys.stderr)\n"
         "        sys.exit(1)\n"
-        "entry = {\n"
-        "    'argv': argv,\n"
-        "    'program_manifest_nodes': program_manifest_nodes,\n"
-        "    'WWISE_VERSION': os.environ.get('WWISE_VERSION'),\n"
-        "    'WWISE_LIVE': os.environ.get('WWISE_LIVE'),\n"
-        "    'WWISE_DESTRUCTIVE': os.environ.get('WWISE_DESTRUCTIVE'),\n"
-        "    'WWISE_STRICT_REAL': os.environ.get('WWISE_STRICT_REAL'),\n"
-        "    'WWISE_CONSOLE': os.environ.get('WWISE_CONSOLE'),\n"
-        "    'WWISE_SAMPLE_PROJECT_PATH': os.environ.get('WWISE_SAMPLE_PROJECT_PATH'),\n"
-        "    'WWISE_SANDBOX_ROOT': os.environ.get('WWISE_SANDBOX_ROOT'),\n"
-        "    'WWISE_TEST_CONFIG': os.environ.get('WWISE_TEST_CONFIG'),\n"
-        "    'PYTEST_ADDOPTS': os.environ.get('PYTEST_ADDOPTS'),\n"
-        "}\n"
-        "with log_path.open('a', encoding='utf-8') as handle:\n"
-        "    handle.write(json.dumps(entry) + '\\n')\n"
-        f"fail_on = {fail_on!r}\n"
-        "joined = ' '.join(argv)\n"
-        "if fail_on == 'nonlive' and effective_argv[:4] == ['-m', 'pytest', '-m', 'not live and not destructive']:\n"
-        "    sys.exit(7)\n"
-        "if fail_on == 'smoke' and effective_argv and effective_argv[0].endswith('wwise_smoke.py'):\n"
-        "    sys.exit(8)\n"
-        "if fail_on == 'live' and 'tests/live/' in ' '.join(effective_argv):\n"
-        "    sys.exit(9)\n"
-        "if fail_on == 'destructive' and 'tests/destructive/' in ' '.join(effective_argv):\n"
-        "    sys.exit(10)\n"
-        "sys.exit(0)\n",
+        "append_entry(argv, os.environ, program_manifest_nodes)\n"
+        "sys.exit(selected_returncode(effective_argv))\n",
         encoding="utf-8",
     )
 
@@ -156,6 +174,8 @@ def _pytest_argv(call: dict[str, object]) -> list[str]:
     argv = _payload_argv(call)
     if argv[:2] == ["run", "python"]:
         return argv[2:]
+    if argv and os.path.normcase(argv[0]) == os.path.normcase(sys.executable):
+        return argv[1:]
     return argv
 
 
@@ -163,6 +183,8 @@ def _smoke_argv(call: dict[str, object]) -> list[str]:
     argv = _payload_argv(call)
     if argv[:2] == ["run", "python"]:
         return argv[2:]
+    if argv and os.path.normcase(argv[0]) == os.path.normcase(sys.executable):
+        return argv[1:]
     return argv
 
 

@@ -161,7 +161,7 @@ def _campaign_prompt_asset_read_fixture(
     )
     if asset_output is not None:
         event_rows = [json.loads(line) for line in events_text.splitlines()]
-        asset_command = f"cat {asset}"
+        asset_command = fixture._synthetic_command(("cat", str(asset.resolve())))
         for row in event_rows:
             item = row.get("item")
             if (

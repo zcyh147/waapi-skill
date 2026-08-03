@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import uuid
 from pathlib import Path
@@ -506,6 +507,7 @@ def test_collector_rejects_committed_source_as_live_project() -> None:
     assert gateway.queries == []
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Wine Y: mapping is POSIX-only")
 def test_live_project_path_localizes_exact_wine_y_drive(tmp_path: Path) -> None:
     project = tmp_path / "Documents" / "Fixture" / "SampleProject.wproj"
     project.parent.mkdir(parents=True)
@@ -541,6 +543,7 @@ def test_live_project_path_rejects_unproven_wine_paths(
         collector._localize_live_project_path(value, account_home=tmp_path)
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Wine Z: mapping is POSIX-only")
 def test_original_file_localizes_wine_z_path_inside_project(tmp_path: Path) -> None:
     original = tmp_path / "Originals" / "SFX" / "line.wav"
     original.parent.mkdir(parents=True)
@@ -554,6 +557,7 @@ def test_original_file_localizes_wine_z_path_inside_project(tmp_path: Path) -> N
     ) == original.resolve(strict=True)
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Wine drive rejection is POSIX-only")
 def test_original_file_rejects_unknown_wine_drive(tmp_path: Path) -> None:
     with pytest.raises(
         collector.IntegrationBaselineCollectionError,
@@ -564,6 +568,20 @@ def test_original_file_rejects_unknown_wine_drive(tmp_path: Path) -> None:
             project_root=tmp_path,
             label="test original",
         )
+
+
+def test_original_file_accepts_native_absolute_path_inside_project(
+    tmp_path: Path,
+) -> None:
+    original = tmp_path / "Originals" / "SFX" / "line.wav"
+    original.parent.mkdir(parents=True)
+    original.write_bytes(b"RIFF")
+
+    assert collector._original_file(
+        str(original),
+        project_root=tmp_path,
+        label="test original",
+    ) == original.resolve(strict=True)
 
 
 def test_atomic_manifest_write_rejects_symlink(tmp_path: Path) -> None:
